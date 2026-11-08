@@ -149,7 +149,8 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
   person, group or app, or a concept one part references by id in the other); **xor** gives
   two lists, what only one side holds and what only the other holds; **not** keeps a context
   closed and out of the answer. Two items are the same when they share an \`@id\`, one names
-  the other with \`skos:exactMatch\`, or both point at the same registry entity. Without an
+  the other with \`skos:exactMatch\`, or both are ABOUT the same registry entity. Who decided
+  or said them does not count: the person decides most things in every context. Without an
   ontology there are no ids: say that the comparison was made by reading.
   Typical uses: an app's umbrella context is its spec OR its research OR its marketing; "what
   do we promise that is not built" is marketing XOR spec; "what do these two matters share" is
