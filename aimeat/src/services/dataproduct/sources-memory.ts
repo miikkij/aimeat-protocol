@@ -22,13 +22,17 @@
  * @structure recordsAudienceCap · readRecordsSource · readAppSource · readMemorySource · familyMatches · descriptionsOfJson
  * @usage const src = await readMemorySource(call);
  * @version-history
+ *   v1.3.0 — 2026-11-08 — A records source names the label address of every record it copied
+ *     (labelSources), so the version keeps the strictest of their labels and a reader the label keeps
+ *     out reads no row of it (secaudit2026nov08 round 14,
+ *     dataproduct/sources-memory:records-source-drops-source-record-labels).
  *   v1.2.0 — 2026-11-02 — A records source's audience is the organism only when the caller decides the
  *     workspace's readers or the workspace admits every member; private otherwise (secaudit2026nov02d
  *     round 13, dataproduct:records-source:audience-capped-at-organism-not-workspace).
  *   v1.1.0 — 2026-11-01 — A records space's locked schema describes its columns (descriptionsOfJson; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.1).
  */
-import type { MemoryRecord } from '../../storage/interface.js';
+import type { MemoryRecord, ContentLabelTarget } from '../../storage/interface.js';
 import type { FieldType } from '../datapackage/contract.js';
 import { readWorkspaceOp } from '../workspace-tool-ops.js';
 import { workspaceCallerOf, type WorkspaceOpsCaller } from '../workspace-ops-caller.js';
@@ -108,11 +112,14 @@ export async function readRecordsSource(call: SourceCall): Promise<ResolvedSourc
     if (ot.backing === 'rows') throw sourceError(spec, 'INVALID_INPUT', `"${spec.space}" keeps its rows in the workspace row store, which a records source does not read; publish those rows with a memory or an extension source instead.`);
     const ids = (data.index?.[ot.name] ?? []).filter(e => e.published).map(e => e.id).sort();
     const rows: Array<Record<string, unknown>> = [];
+    // Each copied record's label address: the version keeps the strictest of their labels.
+    const labelSources: ContentLabelTarget[] = [];
     for (let i = 0; i < ids.length; i += 200) {
         const got = await readWorkspaceOp(deps, wsCaller, { organismId, ws, ids: ids.slice(i, i + 200), space: ot.name, reader: readerFor(deps, caller.auth) });
         if (!got.ok) throw sourceError(spec, got.code, got.message, got.status);
         for (const item of ((got.data as { items?: Array<{ id: string; value: unknown }> }).items ?? [])) {
             rows.push(item.value && typeof item.value === 'object' ? { id: item.id, ...(item.value as Record<string, unknown>) } : { id: item.id, value: item.value });
+            labelSources.push(memoryTarget(caller.ownerGhii, `organism.${organismId}.w.${ws}.${ot.namespace ?? ''}.${item.id}`));
         }
     }
     // The lock on the space: `<namespace>` or `<namespace>.*`, whichever the workspace wrote.
@@ -123,7 +130,7 @@ export async function readRecordsSource(call: SourceCall): Promise<ResolvedSourc
     for (const [name, p] of Object.entries(schema?.properties ?? {})) { types[name] = fieldTypeOfJson(p); order.push(name); }
     const table = tableOf(spec.id, shapeRows(rows, spec.columns), types, new Set(), spec.columns ? [] : order);
     return {
-        ...table, descriptions: descriptionsOfJson(schema?.properties), audience: await recordsAudienceCap(call, wsCaller, organismId, ws), fetchedAt: now(),
+        ...table, descriptions: descriptionsOfJson(schema?.properties), audience: await recordsAudienceCap(call, wsCaller, organismId, ws), fetchedAt: now(), labelSources,
         provenance: { kind: 'records', address: `organism:${organismId}/${ws}/${ot.name}`, title: `${ot.name} records` },
     };
 }

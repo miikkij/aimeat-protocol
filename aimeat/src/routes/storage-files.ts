@@ -11,6 +11,9 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-08 -- GET /v1/pub asks the classification reader about a data package version's label source
+ *     beside the file, so a version built from labelled records keeps their strictest label
+ *     (secaudit2026nov08 round 14, dataproduct/sources-memory:records-source-drops-source-record-labels).
  *   2026-11-06 -- GET /v1/pub serves an attachment of a message in the caller's owner's mailbox to a
  *     caller that may read that mailbox in the owner's name (services/mailbox/attachment-read.ts); an
  *     agent holding messages:read-as-owner was refused CONSENT_DENIED no_matching_consent.
@@ -199,6 +202,7 @@ import { generateDownloadToken } from '../services/download-token.js';
 import { storageDownloadRouter } from './storage-files-download.js';
 import { odpsRedirectFor } from '../services/datapackage/odps-read.js';
 import { packageFileVerdict } from '../services/datapackage/file-read.js';
+import { packageFileHiddenBySourceLabel } from '../services/datapackage/source-labels.js';
 import { withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
@@ -488,8 +492,13 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // The classification reader (TARGET-082) runs once the access decision below has admitted the
         // caller, so an outsider writes no refusal row into the owner's classification audit log
         // (TARGET-082 review). A file the admitted caller may not see answers as absent.
-        const hiddenFromCaller = async (): Promise<boolean> =>
-            !(await contentReaderFor({ storage, config }, req.auth).show([file], () => fileTarget(gaii, key, file.workspaceRef)))[0];
+        // A data package version built from labelled records keeps the strictest source label
+        // (services/datapackage/source-labels.ts), asked beside the file's own.
+        const hiddenFromCaller = async (): Promise<boolean> => {
+            const content = contentReaderFor({ storage, config }, req.auth);
+            return !(await content.show([file], () => fileTarget(gaii, key, file.workspaceRef)))[0]
+                || await packageFileHiddenBySourceLabel(storage, content, gaii, key);
+        };
 
         // ?mode=handle — answer an ALLOWED read with a presigned URL + metadata instead of the bytes.
         // Same access decision as the byte path (this runs only after it passes); the caller just gets

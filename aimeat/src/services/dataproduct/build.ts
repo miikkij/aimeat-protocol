@@ -20,6 +20,9 @@
  * @structure BuildContext · prepareBuild · previewProduct · runProduct
  * @usage const out = await runProduct({ deps, caller }, definition);
  * @version-history
+ *   v1.4.0 — 2026-11-08 — runProduct records the strictest label of the source items with the version
+ *     (datapackage/source-labels.ts), so a labelled record copied into the package keeps its readers
+ *     (secaudit2026nov08 round 14).
  *   v1.3.1 — 2026-11-03 — AUDIENCE_WIDER_THAN_SOURCE over a restricted workspace says who can widen it
  *     (secaudit2026nov02d round 13b).
  *   v1.3.0 — 2026-11-01 — A definition's `attribution` and `i18n` go into the version (WP10e A2, A3).
@@ -30,6 +33,7 @@
 import type { CallerContext } from '../caller-context.js';
 import type { PublishInput, TableSchema } from '../datapackage/contract.js';
 import { publishPackage } from '../datapackage/store.js';
+import { strictestSourceTarget } from '../datapackage/source-labels.js';
 import { inferSchema, validateRows, type ValidationIssue } from '../datapackage/table.js';
 import { datapackagePublishGate, fileDatapackageAsk } from '../datapackage/publish-ask.js';
 import { closedNodeWarnings } from '../closed-node-level.js';
@@ -185,10 +189,12 @@ export async function runProduct(ctx: BuildContext, def: DataProductDefinition):
     // the package had, and the request is filed after.
     const gate = await datapackagePublishGate(store, ctx.caller, ctx.app, ownerGhii, def.name, def.visibility);
     if (gate.kind === 'refused') throw new DataProductError(gate.code, gate.message, gate.status);
+    // The version keeps the strictest label of the items its rows were copied from (datapackage/source-labels.ts).
+    const labelSource = await strictestSourceTarget(store, prepared.sources.flatMap(s => s.labelSources ?? []));
     const out = await publishPackage(store, ownerGhii, { ...prepared.input, ...(gate.visibility !== undefined ? { visibility: gate.visibility } : {}) }, {
         gaii: ctx.caller.principal, kind: 'dataproduct', ref: `dataproducts.${def.name}`,
         ...(ctx.schedule ? { schedule: ctx.schedule } : scheduleLabelOf(def) ? { schedule: scheduleLabelOf(def) } : {}),
-    });
+    }, { labelSource });
     if (!out.ok) {
         const first = out.issues?.[0];
         const detail = first ? ` First: row ${first.row ?? '?'}, field "${first.field ?? '?'}": ${first.message}.` : '';
