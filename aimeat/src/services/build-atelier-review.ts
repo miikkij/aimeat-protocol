@@ -9,6 +9,9 @@
  * @structure ATELIER_REVIEW_SECTION
  * @usage import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
  * @version-history
+ *   v1.1.0 — 2026-11-09 — One top bar: the shell's on a shell app, the genre's masthead on a fork, with
+ *     the node's pill as it comes, restyled only when the owner asks (Jouni). It said "the shell's
+ *     bar is the ONLY top bar", which a genre fork has none of.
  *   v1.0.0 — 2026-10-17 — Moved verbatim from build-atelier-prompt.ts.
  */
 
@@ -27,8 +30,9 @@ export const ATELIER_REVIEW_SECTION = '## What the review always catches\n\n'
     + '- Master-detail is ALWAYS listDetail, never a hand-rolled pick panel: the component carries '
     + 'the selection mark, the row-to-detail morph and the narrow-screen fold, and a hand-rolled '
     + 'panel loses all three.\n'
-    + '- The shell\'s bar is the ONLY top bar. Building a second header of your own puts two bars '
-    + 'and the account pill in a fight for the same edge.\n'
+    + '- ONE top bar: the shell\'s bar on a shell app, the genre\'s masthead on a genre fork, with the '
+    + 'node\'s pill in it as it comes (its look and functions, restyled only when the owner asks). A '
+    + 'second header of your own puts two bars and the account pill in a fight for the same edge.\n'
     + '- A filter applies WHEN IT CHANGES. A separate Show/Apply button beside a dropdown is a '
     + 'second step nobody expects of a filter.\n'
     + '- Give the shell a `tagline` (one line on what the app IS): the sign-in screen presents the '

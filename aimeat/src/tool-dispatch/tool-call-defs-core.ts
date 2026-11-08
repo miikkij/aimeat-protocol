@@ -10,6 +10,7 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-08 -- aimeat_consent_grant sends `role` (read | write) in the POST /v1/consent body.
  *   2026-11-01 -- aimeat_consent_grant sends pinned_version, allow_url_key and terms_required as the
  *     consent's metadata, for a party recipient (plan doc-mvwxcas3dom3, D3.4).
  *   2026-11-01 -- aimeat_datapackage_withdraw: a proxy over DELETE /v1/datapackages/{owner}/{name}
@@ -606,6 +607,9 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const terms = Object.fromEntries(['pinned_version', 'allow_url_key', 'terms_required']
                 .filter(k => input[k] !== undefined).map(k => [k, input[k]])) as JsonObject;
             if (Object.keys(terms).length) body.metadata = terms;
+            // What the recipient may do (read | write); the route decides whether write is possible.
+            const role = optionalString(input, 'role');
+            if (role !== undefined) body.role = role;
             return client.post('/v1/consent', body);
         },
     },

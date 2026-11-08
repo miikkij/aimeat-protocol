@@ -11,6 +11,7 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-08 — aimeat_consent_grant passes `role` (read | write) to grantConsent, as POST /v1/consent does.
  *   2026-11-01 — aimeat_consent_grant takes a party recipient (a named share of a data package) with
  *     pinned_version, allow_url_key and terms_required, sent to grantConsent as the share's metadata,
  *     and answers the share (plan doc-mvwxcas3dom3, D3.4).
@@ -152,7 +153,7 @@ export function registerConsentTools(
             inputSchema: zodShapeFor('aimeat_consent_grant'),
             annotations: annotationsFor('aimeat_consent_grant'),
         },
-        async ({ target_gaii, scope, data_pattern, purpose, ttl_hours, pinned_version, allow_url_key, terms_required }) => {
+        async ({ target_gaii, scope, data_pattern, purpose, ttl_hours, pinned_version, allow_url_key, terms_required, role }) => {
             // A party recipient's share terms (services/parties/shares.ts reads them from the metadata).
             const shareTerms = {
                 ...(pinned_version !== undefined ? { pinned_version } : {}),
@@ -170,6 +171,8 @@ export function registerConsentTools(
                 scope,
                 expires: ttl_hours != null ? new Date(Date.now() + ttl_hours * 3_600_000).toISOString() : null,
                 ...(Object.keys(shareTerms).length ? { metadata: shareTerms } : {}),
+                // What the recipient may do; the service decides whether write is possible here.
+                ...(role !== undefined ? { role } : {}),
             });
             if (!granted.ok) {
                 // Nothing was granted, and the owner was asked: the answer carries the request so the

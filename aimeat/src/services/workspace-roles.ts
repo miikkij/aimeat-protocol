@@ -36,6 +36,8 @@
  *   import { grantWorkspaceRole } from './workspace-roles.js';
  *   await grantWorkspaceRole(storage, config, { creatorGhii, orgId, ws, grantee, role, source, grantedBy });
  * @version-history
+ *   v1.1.1 -- 2026-11-08 -- The creator-only write refusal names aimeat_workspace_member_grant, the way an
+ *     agent gives a member write (aimeat_consent_grant now takes role too).
  *   v1.1.0 -- 2026-11-08 -- The role is metadata.wsRole, never the purpose text: wsRoleOf for the
  *     write gate and the listings, consentWsRole for POST /v1/consent's explicit `role` (write on one
  *     workspace, to one person on this node, filed under the workspace's creator; anything else is
@@ -121,7 +123,7 @@ export async function consentWsRole(
   if (role === 'write' && !byCreator) {
     return {
       ok: false, status: 403, code: 'WRITE_NOT_SUPPORTED',
-      message: `Only the workspace's creator gives write access with a permission, signed in as themselves, because the write check reads the creator's permissions. An organism admin gives a member write with POST /v1/organisms/${ws[1]}/workspace-access/grant.`,
+      message: `Only the workspace's creator gives write access with a permission, signed in as themselves, because the write check reads the creator's permissions. An organism admin gives a member write with POST /v1/organisms/${ws[1]}/workspace-access/grant, and an agent with the MCP tool aimeat_workspace_member_grant.`,
     };
   }
   if (!byCreator) return { ok: true, wsRole: null };

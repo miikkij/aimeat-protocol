@@ -3,6 +3,9 @@
  * @description E2E tests for MCP consent module — 3 tools + 1 resource.
  *   Tests consent grant, list, revoke, and the consent resource template.
  * @version-history
+ *   v1.2.0 — 2026-11-08 — 10-12: aimeat_consent_grant takes role read; role write from an agent is
+ *     refused with WRITE_NOT_SUPPORTED naming aimeat_workspace_member_grant and stores nothing; a role
+ *     that is neither is refused.
  *   v1.1.0 — 2026-10-20 — 6b probes the AGENT's own record, and 6c/6d assert the reach of an agent's
  *     consent on both doors: a wildcard grant does not open the owner's private record, and an agent
  *     cannot revoke what the owner granted in person (secaudit 2026-10, consent-identity).
@@ -485,6 +488,43 @@ await test('9. A consent an agent grants over REST is the owner\'s: listed, read
     assert(read.status === 200, `the owner reads the agent's consent: ${read.status}`);
     const del = await json(`/v1/consent/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(del.status === 200, `the owner revokes the agent's consent: ${del.status} ${JSON.stringify(del.body?.error)}`);
+});
+
+// The role (read | write) reaches the AI: the tool takes it and the service decides, as on POST
+// /v1/consent. Write is given with a consent only by a workspace's creator in person, so an agent
+// asking for it is refused with the reason and the tool that does it.
+await test('10. aimeat_consent_grant takes role read', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_consent_grant',
+        arguments: { target_gaii: `ghii:someone@${NODE_ID}`, data_pattern: 'notes.role.*', purpose: 'Role read probe', role: 'read' },
+    }, 107);
+    assert(!body.result?.isError, `role read refused: ${JSON.stringify(body.result ?? body.error)}`);
+    const result = JSON.parse(body.result.content[0].text);
+    assert(typeof result.consent_id === 'string', 'has consent_id');
+});
+
+await test('11. aimeat_consent_grant role write from an agent is refused with WRITE_NOT_SUPPORTED, naming aimeat_workspace_member_grant; nothing granted', async () => {
+    const pattern = 'organism.rolecheck.w.rolews.**';
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_consent_grant',
+        arguments: { target_gaii: `ghii:someone@${NODE_ID}`, data_pattern: pattern, purpose: 'Role write probe', role: 'write' },
+    }, 108);
+    const text = String(body.result?.content?.[0]?.text ?? JSON.stringify(body.error ?? body));
+    assert(body.result?.isError === true && text.startsWith('WRITE_NOT_SUPPORTED') && text.includes('aimeat_workspace_member_grant'),
+        `expected WRITE_NOT_SUPPORTED naming aimeat_workspace_member_grant, got: ${text.slice(0, 300)}`);
+    const list = await mcpRpc('tools/call', { name: 'aimeat_consent_list', arguments: {} }, 109);
+    const consents = JSON.parse(list.body.result.content[0].text);
+    const rows = Array.isArray(consents) ? consents : (consents.consents ?? []);
+    assert(!rows.some((c: any) => c.data_pattern === pattern || c.dataPattern === pattern), 'a refused write grant stored a consent');
+});
+
+await test('12. aimeat_consent_grant refuses a role that is neither read nor write', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_consent_grant',
+        arguments: { target_gaii: `ghii:someone@${NODE_ID}`, data_pattern: 'notes.role2.*', purpose: 'Bad role probe', role: 'admin' },
+    }, 110);
+    const refused = body.error !== undefined || body.result?.isError === true;
+    assert(refused, `role admin was accepted: ${JSON.stringify(body.result ?? body)}`);
 });
 
 // ─── Summary ───
