@@ -22,6 +22,9 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.6.0 — 2026-11-08 — Reading by level: `libraries` and `patterns` before any code on every level,
+ *     `genre` and `book` on `fine` (a prototype read 36 000 characters of genres and Design Book it is
+ *     told not to use, in a real build on aimeat.io).
  *   v1.5.1 — 2026-11-08 — The `genre` index line and the parts index in `start` say the genre fork and
  *     the register refusal hold on the level `fine` (and on a page that states no level), and that a
  *     `proto` or `plain` app starts from `shell-atelier`, as app-artifact-lint.ts enforces it
@@ -51,7 +54,7 @@ export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
   { id: 'start', what: 'The interview with its data map and introduction questions, the proposal, what the Atelier track is, the component kit, how to finish and publish, and what is never done.' },
   { id: 'genre', what: 'REQUIRED before any code: on the level `fine` (and on a page that states no level) an app starts from a genre, a complete page in a committed register, and the publish refuses it without a register; a `proto` or `plain` app starts from the shell `shell-atelier`. Also the pattern shelf, the Design Book and the signature.' },
   { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, AI inside the app, data (personal, team and public) and what the review always catches. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist. It also says how to start the app\'s structure page, the link you give the person first, and how an introduction is built when the owner asked for one.' },
-  { id: 'book', what: 'REQUIRED before any code: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, how a kit component that is nearly right is customised instead of copied, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
+  { id: 'book', what: 'REQUIRED before any code on `fine`: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, how a kit component that is nearly right is customised instead of copied, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
   { id: 'look', what: 'The look presets, the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
   { id: 'motion', what: 'What already moves, the attention gesture, and the controls that answer the hand. Read it before you make anything move.' },
@@ -137,7 +140,7 @@ export function splitAtelierSpec(full: string): AtelierSection[] {
 function partsIndex(nodeUrl: string): string {
   let out = '### This specification comes in parts\n';
   out += 'You are reading part `start`. The others belong to the same specification and carry the same authority. '
-    + 'Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code: on `fine` an Atelier app is forked from a genre and the publish refuses one that names no register (a `proto` or `plain` app starts from `shell-atelier`), a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
+    + 'Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too: on `fine` an Atelier app is forked from a genre and the publish refuses one that names no register (a `proto` or `plain` app starts from `shell-atelier`), a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP the whole text in one piece: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier?format=txt`.\n';
   for (const p of ATELIER_PARTS.filter(x => x.id !== 'start')) out += '- `' + p.id + '` — ' + p.what + '\n';
   return out;

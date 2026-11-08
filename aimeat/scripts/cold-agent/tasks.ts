@@ -283,7 +283,7 @@ export const TASKS: Task[] = [
             // Published ON THE ATELIER TRACK is the pass, since 2026-09-19. Until then published was
             // enough, and three Classic apps in a row counted as good while the developer was being
             // handed exactly that and rejecting it. What else the app is like goes in the note.
-            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
             const ok = onAtelier(quality);
             return { ok, detail: ok ? 'the app is published on the Atelier track' : 'the app is published, and it is not an Atelier app with a register', note: describeQuality(quality) };
         },
@@ -383,7 +383,7 @@ export const TASKS: Task[] = [
             const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
             const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
             if (!hit?.filename) return { ok: false, detail: 'no published app carries the name', note: buildCost(ctx) };
-            const q = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            const q = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
             const atelier = q.declaredTrack === 'atelier' && q.loadsAtelier;
             const failed = [
                 ...(atelier ? [] : ['not on the Atelier track']),
@@ -411,7 +411,7 @@ export const TASKS: Task[] = [
             const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
             const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
             if (!hit?.filename) return { ok: false, detail: 'no published app carries the name', note: buildCost(ctx) };
-            const q = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            const q = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
             const called = (name: string, has?: string) => ctx.metrics.toolCalls.some(c => c.name.endsWith(name) && !c.isError && (!has || JSON.stringify(c.input ?? {}).includes(has)));
             const owed: Array<[string, boolean]> = [
                 ['agent face', called('aimeat_memory_write', '.agentface') || called('aimeat_invoke', 'agentface')],
@@ -447,7 +447,7 @@ export const TASKS: Task[] = [
             const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
             const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
             if (!hit?.filename) return { ok: false, detail: 'no published app carries the name' };
-            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
             const html = await fetch(`${ctx.baseUrl}/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(hit.filename)}?mode=inline`).then(res => res.text());
             // "Remember everything, on my phone too" is the node's store, not the browser's.
             // Through any name the page gave the global: two of three runs wrote `var A = window.AIMEAT`

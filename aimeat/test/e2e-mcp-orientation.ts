@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-08 — 17b: the first part says which parts come before code by level.
  *   2026-11-05 — 17c, 17d: the Atelier specification has seven parts; `motion` was split from `look` in effc2bcaa.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-14 — 17n, 17o: tier "places" and "places/admin", where things are on the node's own
@@ -515,7 +516,8 @@ async function main() {
             assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
             const full = await json('/v1/prompts/build-app-atelier');
             assert(start.includes(full.body.data.spec_token), 'it names the Atelier spec token');
-            assert(/Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code/.test(start), 'it says which parts come before code');
+            // By level since 2026-11-08 (B): `libraries` and `patterns` always, `genre` and `book` on `fine`.
+            assert(/Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too/.test(start), 'it says which parts come before code');
         });
 
         await test('17c. the Atelier parts each arrive whole, and between them carry the whole specification', async () => {

@@ -15,6 +15,7 @@
  * @structure appQuality(baseUrl, ownerName, filename, toolCalls) → AppQuality
  * @usage const q = await appQuality(ctx.baseUrl, ctx.ownerName, app.filename, ctx.metrics.toolCalls);
  * @version-history
+ *   v1.2.3 — 2026-11-08 — appQuality takes the owner's token, so an app opened only to members is read.
  *   v1.2.2 — 2026-11-08 — The page is read through a redirect to `<label>.apps.localhost` by asking the
  *     node's address with that Host; Node could not resolve the name and the run stopped.
  *   v1.2.1 — 2026-09-20 — A kit alias goes into its pattern through utils/regex-literal. The escape
@@ -106,22 +107,33 @@ function kitAliases(html: string): string[] {
  * ("fetch failed", which stopped a whole run on 2026-11-08). Such a redirect is followed by asking
  * the node's own address with the subdomain as the Host, which is what a browser's lookup reaches.
  */
-async function publishedHtml(url: string): Promise<string> {
-    const res = await fetch(url, { redirect: 'manual' });
+async function publishedHtml(url: string, token?: string): Promise<string> {
+    // The owner's token reads an app opened only to members: anonymously it answers 401, and the
+    // family list of 2026-11-08 measured as an empty, Classic, level-less page three times out of three.
+    const res = await fetch(url, { redirect: 'manual', headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
-        const to = new URL(res.headers.get('location')!, url);
+        let to = new URL(res.headers.get('location')!, url);
         if (to.hostname.endsWith('.localhost')) {
+            // A members-only app answers its access link with a cookie and a second redirect, so the
+            // hops carry the cookies they are given, up to four.
             const { request } = await import('node:http');
-            return new Promise<string>((resolve) => {
-                const req = request({ host: '127.0.0.1', port: to.port || 80, path: to.pathname + to.search, headers: { Host: to.host } }, (r) => {
-                    let body = '';
-                    r.setEncoding('utf8');
-                    r.on('data', (c: string) => { body += c; });
-                    r.on('end', () => resolve((r.statusCode ?? 500) < 300 ? body : ''));
+            let cookie = '';
+            for (let hop = 0; hop < 4; hop++) {
+                const r = await new Promise<{ status: number; body: string; location?: string; setCookie: string[] }>((resolve) => {
+                    const req = request({ host: '127.0.0.1', port: to.port || 80, path: to.pathname + to.search, headers: { Host: to.host, ...(cookie ? { Cookie: cookie } : {}) } }, (m) => {
+                        let body = '';
+                        m.setEncoding('utf8');
+                        m.on('data', (c: string) => { body += c; });
+                        m.on('end', () => resolve({ status: m.statusCode ?? 500, body, location: m.headers.location, setCookie: m.headers['set-cookie'] ?? [] }));
+                    });
+                    req.on('error', () => resolve({ status: 599, body: '', setCookie: [] }));
+                    req.end();
                 });
-                req.on('error', () => resolve(''));
-                req.end();
-            });
+                if (r.setCookie.length) cookie = [cookie, ...r.setCookie.map(c => c.split(';')[0])].filter(Boolean).join('; ');
+                if (r.status >= 300 && r.status < 400 && r.location) { to = new URL(r.location, to); continue; }
+                return r.status < 300 ? r.body : '';
+            }
+            return '';
         }
         const next = await fetch(to);
         return next.ok ? next.text() : '';
@@ -129,8 +141,8 @@ async function publishedHtml(url: string): Promise<string> {
     return res.ok ? res.text() : '';
 }
 
-export async function appQuality(baseUrl: string, ownerName: string, filename: string, toolCalls: Call[]): Promise<AppQuality> {
-    const html = await publishedHtml(`${baseUrl}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}?mode=inline`).catch(() => '');
+export async function appQuality(baseUrl: string, ownerName: string, filename: string, toolCalls: Call[], ownerToken?: string): Promise<AppQuality> {
+    const html = await publishedHtml(`${baseUrl}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}?mode=inline`, ownerToken).catch(() => '');
     const lint = html
         ? await lintAppArtifact(html, { baseUrl, nodeId: 'cold-agent' } as AimeatConfig)
         : { blocking: [], warnings: [] };

@@ -7,6 +7,7 @@
  *   that lands in `start` by default can push it over the limit without anybody deciding so.
  * @usage cd aimeat && pnpm vitest run test/unit/build-atelier-layers.test.ts
  * @version-history
+ *   v1.6.0 — 2026-11-08 — The level is the interview's question 0 and decides the rest; reading by level.
  *   v1.5.0 — 2026-11-08 — The genre index line and the parts index in `start` say the fork and the
  *     register refusal hold on `fine`.
  *   v1.4.0 — 2026-11-05 — The first part also names `motion`, the seventh part.
@@ -47,9 +48,21 @@ describe('the Atelier specification in parts', () => {
   it('the first part names the others, says which come before code, and carries the token', () => {
     const start = atelierPiece(full, 'start', config.baseUrl)!.text;
     for (const id of ['genre', 'libraries', 'book', 'patterns', 'look', 'motion']) expect(start).toContain('`' + id + '`');
-    expect(start).toMatch(/Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code/);
+    // Since 2026-11-08 (B): `libraries` and `patterns` on every level, `genre` and `book` on `fine`.
+    expect(start).toMatch(/Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too/);
     expect(start).toMatch(/aimeat_handbook_get \{ tier: "build-app-atelier\/<id>" \}/);
     expect(start).toMatch(/spec_token: atelier-[0-9a-f]{12}/);
+  });
+
+  // B, 2026-11-08: two real builds met four rounds of questions before the level was asked. The
+  // level is question 0, and it decides what a prototype and an ordinary page skip.
+  it('the interview asks the level first and lets it decide the rest', () => {
+    const start = atelierPiece(full, 'start', config.baseUrl)!.text;
+    const interview = start.slice(start.indexOf('## First, a short interview'), start.indexOf('BEFORE YOU SEND THESE QUESTIONS'));
+    expect(interview.indexOf('0. Which level')).toBeGreaterThan(-1);
+    expect(interview.indexOf('0. Which level')).toBeLessThan(interview.indexOf('1. What should the app do'));
+    expect(interview).toMatch(/`proto`: ask 1, 2 and 4 only, draw no layouts, no introduction/);
+    expect(interview).toMatch(/`fine` or no answer: all of it/);
   });
 
   it('the interview first tells the person which models build the better app', () => {
