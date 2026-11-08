@@ -21,7 +21,8 @@
  *   gets a new password at POST /v1/ghii/key-credentials, which signs in. A key whose account was
  *   erased does not touch the next account of the name; a cancelled key does not replace the
  *   password of a later account of the name. Kept: a key's first password sign-in still answers the
- *   new password and the code stops working; cancelling an un-used key still removes its account.
+ *   new password and the code stops working; cancelling an un-used key still removes its account; the
+ *   owner of another organism is refused the cancel (403).
  *
  *   Runs on the runner's node (no mail needed): the address is marked verified and the link issued
  *   behind the server's back (helpers/seed-password.ts seedSignInLink).
@@ -152,6 +153,15 @@ await test('a cancelled key does not replace the password of a later account of 
         `the old key replaced a later account's password at its first sign-in: ${first.status} ${JSON.stringify(first.body.data?.key_credentials)}`);
     const second = await login(name, chosen);
     assert(second.status === 200, `the chosen password no longer signs in: ${second.status}`);
+});
+
+await test('the owner of another organism cannot cancel this organism\'s key, and its account stays', async () => {
+    const name = `ckother${STAMP}`;
+    const key = await mintKey(alice.token, aliceOrg, name, 'OtherKeyCode-123');
+    const r = await json(`/v1/organisms/${aliceOrg}/invitations/code/${key}/cancel`, { method: 'POST', headers: auth(bob.token), body: '{}' });
+    assert(r.status === 403, `another organism's owner cancelled the key: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const first = await login(name, 'OtherKeyCode-123');
+    assert(first.status === 200, `the key's account is gone after a refused cancel: ${first.status}`);
 });
 
 await test('POST /v1/ghii/key-credentials refuses a caller with no sign-in', async () => {

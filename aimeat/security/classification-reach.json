@@ -2197,9 +2197,9 @@
     },
     "src/services/key-credentials.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-11-05 (codebase analysis 2026-11-03, decision 14a), the node's own read: the held first sign-in credentials in the pseudo-owner namespace key-credentials-held, which the node itself wrote at the first sign-in; the sealed password is mailed once to the account's own verified address and goes to no model or other principal."
+      "why": "Reviewed 2026-11-05 (codebase analysis 2026-11-03, decision 14a), the node's own read: the held first sign-in credentials in the pseudo-owner namespace key-credentials-held, which the node itself wrote at the first sign-in; the sealed password is mailed once to the account's own verified address and goes to no model or other principal. 2026-11-08 (secaudit2026nov08 round 14): the second read is the marker in the same namespace (key-credentials-owed.<ghii>) that a link or provider first sign-in left, holding the invitation id, the session id, a password hash and the place to continue to; read by takeOwedKeyCredentials for the session that signed in, and no content goes to a model or another principal."
     },
     "src/services/key-reencrypt/job.ts": {
       "reads": {

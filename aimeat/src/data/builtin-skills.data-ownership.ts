@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-08 — Section 6: erasure closes the still-open access key that made the account
+ *     (owner-erasure.ts step code_invitation; secaudit2026nov08 round 14).
  *   2026-11-05 — Section 2: an imported entry at `group` keeps its record's group, or is stored private (routes/memory/bulk.ts).
  *   2026-11-02 — Section 6: erasure removes the person's own MCP servers and their own sign-ins on
  *     shared ones (owner-erasure.ts step mcp_user_credentials).
@@ -314,7 +316,7 @@ let knowledge age, and you should offer them, not wait to be asked:
   they want to keep. Then erasure: \`DELETE /v1/owners/{name}\` from their own signed-in session,
   which no MCP tool and no page offers today. **It is immediate and has no window.** It removes the
   account, every agent, all their memory and files, consents, memberships, schedules, connections,
-  their own MCP servers and their own sign-ins on servers the node or a group shares, and apps. It also takes their name out of every group's list of owners, admins and members, and takes
+  their own MCP servers and their own sign-ins on servers the node or a group shares, and apps. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a
   pseudonym: finished work and disputes (the other party has a right to them), other people's ledger

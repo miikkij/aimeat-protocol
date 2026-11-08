@@ -337,7 +337,7 @@
       "digest": "sha256:88416f9f5363f6029bcd8b64"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -346,7 +346,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:4a3970223ce7eabfed9df2fd"
+      "digest": "sha256:9c8cbd4071853008bf01325c"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-05",
@@ -384,7 +384,7 @@
       "digest": "sha256:4fc6b7208d5efd69a09a02d3"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -395,7 +395,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:6f80adf4626cf0705da76341",
+      "digest": "sha256:c0fe0ebe063bb1b979ebddee",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -763,7 +763,7 @@
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
       "aimeat/src/routes/organisms/workspace-ops.ts": "496df585b6cca05d",
-      "aimeat/src/routes/organisms/workspace-access.ts": "317d7de34d1bd172",
+      "aimeat/src/routes/organisms/workspace-access.ts": "0957cf2ea86e0dfa",
       "aimeat/src/services/agent-profile-write.ts": "d01d8242acdae568",
       "aimeat/src/services/agent-task-rules.ts": "207afa09788c8a11"
     },
@@ -782,7 +782,7 @@
       "aimeat/src/services/memory-bin.ts": "d1da26595d5c18d2",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
-      "aimeat/src/services/owner-erasure.ts": "2dda308d52c09f9a",
+      "aimeat/src/services/owner-erasure.ts": "0df1133cdedfedd9",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "e54c2a62cff8c189"
     },
