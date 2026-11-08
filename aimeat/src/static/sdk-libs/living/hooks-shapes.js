@@ -18,11 +18,15 @@
  *   is opened. Not a sample, not a schema: the object that would leave if the machine moved now,
  *   built by the same payload.js the delivery uses. If those two ever disagree, the dialog is
  *   lying, which is why they are one function called twice rather than two functions.
- * @structure inwardShape(ctx) · outwardShape(ctx) · memoryKeyFor(doc, id)
+ * @structure inwardShape(ctx) · outwardShape(ctx) · memoryKeyFor(doc, id) · ownerForAddress(owner, nodeId)
  * @usage
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.3 -- 2026-11-08 -- The program road's address is the node's own (ctx.apex), not the app's
+ *     origin, and it carries the signed-in account's name (ctx.owner) where it said <owner>; the
+ *     placeholder stays only when the page does not know the name. The POSIX line single-quotes the
+ *     address, so a placeholder in it is text for the shell (secaudit2026nov08b round 15b).
  *   v0.7.2 -- 2026-11-08 -- Each road carries `windows`: the same call for Command Prompt and PowerShell,
  *     with the JSON body as its own block (value.json) and a curl.exe line that reads it, so the line
  *     holds no live data. The POSIX lines are unchanged (secaudit2026nov08b round 15).
@@ -103,27 +107,60 @@ function windowsCall(address, bearer, body) {
   };
 }
 
-/** The program road of the inward dialog: where the owner makes the receiver, and the call a program sends. */
-function receiverRoad(base, key, doc, id, sample) {
+/** What the address carries where the account name goes when the page does not know it. */
+export const OWNER_PLACEHOLDER = '<owner>';
+
+/** What the call carries where the key goes: the key is shown once when it is made, never again. */
+export const KEY_PLACEHOLDER = '<the receiver key>';
+
+/**
+ * The account name for the address path, or '' when there is none this line can carry as it is. A
+ * GHII of this node (`alice@<node id>`) gives its account part. Any other text gives '': the address
+ * then keeps OWNER_PLACEHOLDER, inside the quotes.
+ * @param {any} owner @param {string} [nodeId]
+ * @returns {string}
+ */
+export function ownerForAddress(owner, nodeId) {
+  let name = typeof owner === 'string' ? owner.trim() : '';
+  const at = name.indexOf('@');
+  if (at >= 0) name = nodeId && name.slice(at + 1) === String(nodeId) ? name.slice(0, at) : '';
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) ? name : '';
+}
+
+/**
+ * The program road of the inward dialog: where the owner makes the receiver, and the call a program
+ * sends. `apex` is the node's own address: /v1/receive and the profile page answer there, and an app
+ * host of a node that shows its content to signed-in accounts only answers neither. `owner` is the
+ * signed-in account's name, '' when the page does not know it. The POSIX line single-quotes the
+ * address, so the placeholder in it stays text for the shell.
+ */
+function receiverRoad(apex, owner, key, doc, id, sample) {
   const name = receiverNameFor(doc, id);
-  const address = base + '/v1/receive/<owner>/' + name;
+  const address = apex + '/v1/receive/' + (owner || OWNER_PLACEHOLDER) + '/' + name;
   return {
     name: name,
     key: key,
-    settings: base + '/v1/profile?tab=receivers&new=key&key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name),
+    owner: owner,
+    ownerKnown: !!owner,
+    keyPlaceholder: KEY_PLACEHOLDER,
+    ownerPlaceholder: OWNER_PLACEHOLDER,
+    settings: apex + '/v1/profile?tab=receivers&new=key&key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name),
     address: address,
-    curl: 'curl -X POST ' + address
+    curl: 'curl -X POST ' + shellQuoted(address)
       + ' -H "Content-Type: application/json"'
-      + ' -H "Authorization: Bearer <the receiver key>"'
+      + ' -H "Authorization: Bearer ' + KEY_PLACEHOLDER + '"'
       + ' -d ' + shellQuoted(JSON.stringify({ value: sample })),
     /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
-    windows: windowsCall(address, '<the receiver key>', { value: sample }),
+    windows: windowsCall(address, KEY_PLACEHOLDER, { value: sample }),
   };
 }
 
 /**
- * The inward dialog's whole content, for a control, a value or a source.
- * @param {{ id: string, node: any, doc: any, graph: any, langs?: () => string[], base?: string }} ctx
+ * The inward dialog's whole content, for a control, a value or a source. `apex` is the node's own
+ * address for the program road (default: base); `owner` the signed-in account's name or GHII and
+ * `nodeId` this node's id, both optional.
+ * @param {{ id: string, node: any, doc: any, graph: any, langs?: () => string[], base?: string,
+ *   apex?: string, owner?: string, nodeId?: string }} ctx
  * @returns {any}
  */
 export function inwardShape(ctx) {
@@ -188,7 +225,7 @@ export function inwardShape(ctx) {
      * hold: a personal access token writes into its own test identity, and an agent token reaches
      * all of the owner's memory. `settings` opens the owner's Receivers page with this key filled in.
      */
-    receiver: receiverRoad(base, key, doc, subjectId, sample),
+    receiver: receiverRoad(String(ctx.apex || base), ownerForAddress(ctx.owner, ctx.nodeId), key, doc, subjectId, sample),
     /** The agent road: the same thing said out loud, in the language the page is reading. */
     sentence: fill(say('sentence.write', wanted), {
       key: key,

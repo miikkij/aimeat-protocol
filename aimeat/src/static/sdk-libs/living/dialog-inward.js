@@ -31,6 +31,9 @@
  *   import { openInward } from './dialog-inward.js';
  *   openInward({ id, node, doc, graph, hooks, langs, base, onSave });
  * @version-history
+ *   v0.8.2 -- 2026-11-08 -- The program road's call goes to the node's own address with the signed-in
+ *     owner's name in it, and a line under it says where the key comes from (and, when the page does
+ *     not know the name, what goes in its place) (secaudit2026nov08b round 15b).
  *   v0.8.1 -- 2026-11-08 -- Each curl line's label says it is for macOS and Linux, and a closed fold
  *     under it holds the same call for PowerShell and Command Prompt: the body to save as value.json
  *     and a curl.exe line that reads it (secaudit2026nov08b round 15).
@@ -45,7 +48,8 @@ import { kit } from './dom.js';
 import { say, fill } from './hooks-words.js';
 import { inwardShape } from './hooks-shapes.js';
 import { asRaw } from './sources-url.js';
-import { group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, headerEditor } from './dialog-parts.js';
+import { group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, headerEditor, apexPage, signedInOwner } from './dialog-parts.js';
+import { NODE_ID } from '../_core/config.js';
 
 /** The value a reading came back as, in one line a status can show. */
 function reading(value) {
@@ -81,7 +85,11 @@ function windowsBlock(host, call, words, langs) {
  */
 export function openInward(spec) {
   const langs = typeof spec.langs === 'function' ? spec.langs : function () { return []; };
-  const shape = inwardShape(spec);
+  // The program road's call goes to the node's own address in the signed-in owner's name: a program
+  // copies it as it is, so it must not carry this document's origin or a word the person fills in.
+  const shape = inwardShape(Object.assign({
+    apex: apexPage(''), owner: signedInOwner(), nodeId: NODE_ID,
+  }, spec));
   const words = function (key) { return say(key, langs()); };
   // The headers come off the node itself: the shape says what the ANSWER must look like, and a
   // header is part of the asking.
@@ -199,6 +207,14 @@ export function openInward(spec) {
         label: words('inward.receiverCall') + ' (' + words('shell.posix') + ')', text: shape.receiver.curl, langs: langs,
       });
       windowsBlock(keyRoad.body, shape.receiver.windows, words, langs);
+      // The key is shown once, when it is made, so the call carries a placeholder and this line says
+      // where the key comes from. The account name is filled in; when the page does not know it, the
+      // line says what goes in its place too.
+      const keyWhere = document.createElement('p');
+      keyWhere.className = 'ak-living__dialog-range';
+      keyWhere.textContent = fill(words('inward.keyWhere'), { placeholder: shape.receiver.keyPlaceholder })
+        + (shape.receiver.ownerKnown ? '' : ' ' + fill(words('inward.ownerWhere'), { placeholder: shape.receiver.ownerPlaceholder }));
+      keyRoad.body.appendChild(keyWhere);
       copyBlock(keyRoad.body, {
         label: words('inward.write') + ' (' + words('shell.posix') + ')', text: shape.write.curl, langs: langs,
       });

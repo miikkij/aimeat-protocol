@@ -12,6 +12,8 @@
  *   more words than curl's, with a `;` operator among them.
  * @usage cd aimeat && pnpm vitest run test/unit/living-curl-quoting.test.ts
  * @version-history
+ *   v1.0.1 -- 2026-11-08 -- The receiver line's expected address is single-quoted, as the developer's
+ *     ruling on the copyable call asks (secaudit2026nov08b round 15b). The memory line is unchanged.
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14, living-inward-curl-single-quote-unescaped).
  */
 import { describe, it, expect } from 'vitest';
@@ -106,8 +108,10 @@ describe('the inward dialog\'s curl lines quote their body for the shell', () =>
 
   it('a value without a single quote gives the same lines as before, byte for byte', () => {
     const shape = shapeFor(4.2);
+    // The address is single-quoted since round 15b (living-curl-receiver-address.test.ts): unquoted,
+    // bash read `<owner>` as a redirection. Everything else on the line is as before.
     expect(shape.receiver.curl).toBe(
-      'curl -X POST https://node.example/v1/receive/<owner>/' + shape.receiver.name
+      "curl -X POST 'https://node.example/v1/receive/<owner>/" + shape.receiver.name + "'"
       + ' -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>"'
       + " -d '{\"value\":4.2}'",
     );

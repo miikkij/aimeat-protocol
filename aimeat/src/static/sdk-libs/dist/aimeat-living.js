@@ -3404,6 +3404,8 @@
       "shell.windows": "Windowsissa: PowerShell tai komentokehote",
       "shell.windowsFile": "Tallenna tämä tiedostoon {file}",
       "shell.windowsRun": "Aja sitten tämä komento samassa kansiossa",
+      "inward.keyWhere": "Liitä avain kutsuun kohtaan {placeholder}. Yllä oleva linkki avaa sivun, joka näyttää avaimen vain kerran, kun teet sen. Kopioi avain silloin.",
+      "inward.ownerWhere": "Kirjoita käyttäjätunnuksesi kohtaan {placeholder}.",
       "inward.agent": "Sano tämä omalle tekoälyllesi",
       "inward.range": "Sallittu väli",
       "outward.title": "Kun tämä muuttuu, kerro jollekin",
@@ -3474,6 +3476,8 @@
       "shell.windows": "On Windows: PowerShell or Command Prompt",
       "shell.windowsFile": "Save this as {file}",
       "shell.windowsRun": "Then run this command in the same folder",
+      "inward.keyWhere": "Put the key in place of {placeholder} in the call. The link above opens the page that shows the key once, when you make it, so copy it then.",
+      "inward.ownerWhere": "Write your username in place of {placeholder}.",
       "inward.agent": "Say this to your own AI",
       "inward.range": "The range it accepts",
       "outward.title": "When this changes, tell someone",
@@ -5378,17 +5382,29 @@
       curl: 'curl.exe -X POST "' + address + '" -H "Content-Type: application/json" -H "Authorization: Bearer ' + bearer + '" --data-binary "@' + WINDOWS_BODY_FILE + '"'
     };
   }
-  function receiverRoad(base, key, doc, id, sample) {
+  var OWNER_PLACEHOLDER = "<owner>";
+  var KEY_PLACEHOLDER = "<the receiver key>";
+  function ownerForAddress(owner, nodeId) {
+    let name = typeof owner === "string" ? owner.trim() : "";
+    const at = name.indexOf("@");
+    if (at >= 0) name = nodeId && name.slice(at + 1) === String(nodeId) ? name.slice(0, at) : "";
+    return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) ? name : "";
+  }
+  function receiverRoad(apex, owner, key, doc, id, sample) {
     const name = receiverNameFor(doc, id);
-    const address = base + "/v1/receive/<owner>/" + name;
+    const address = apex + "/v1/receive/" + (owner || OWNER_PLACEHOLDER) + "/" + name;
     return {
       name,
       key,
-      settings: base + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
+      owner,
+      ownerKnown: !!owner,
+      keyPlaceholder: KEY_PLACEHOLDER,
+      ownerPlaceholder: OWNER_PLACEHOLDER,
+      settings: apex + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
       address,
-      curl: "curl -X POST " + address + ' -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>" -d ' + shellQuoted(JSON.stringify({ value: sample })),
+      curl: "curl -X POST " + shellQuoted(address) + ' -H "Content-Type: application/json" -H "Authorization: Bearer ' + KEY_PLACEHOLDER + '" -d ' + shellQuoted(JSON.stringify({ value: sample })),
       /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
-      windows: windowsCall(address, "<the receiver key>", { value: sample })
+      windows: windowsCall(address, KEY_PLACEHOLDER, { value: sample })
     };
   }
   function inwardShape(ctx) {
@@ -5442,7 +5458,7 @@
        * hold: a personal access token writes into its own test identity, and an agent token reaches
        * all of the owner's memory. `settings` opens the owner's Receivers page with this key filled in.
        */
-      receiver: receiverRoad(base, key, doc, subjectId, sample),
+      receiver: receiverRoad(String(ctx.apex || base), ownerForAddress(ctx.owner, ctx.nodeId), key, doc, subjectId, sample),
       /** The agent road: the same thing said out loud, in the language the page is reading. */
       sentence: fill(say("sentence.write", wanted), {
         key,
@@ -5613,6 +5629,20 @@
         line.setAttribute("data-ok", ok ? "yes" : "no");
       }
     };
+  }
+  function signedInOwner() {
+    try {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      const session = ns && ns.auth && typeof ns.auth.getSession === "function" ? ns.auth.getSession() : null;
+      return session && typeof session.owner === "string" ? session.owner : "";
+    } catch (e) {
+      console.warn("[aimeat-living] The signed-in account could not be read:", e && /** @type {Error} */
+      e.message);
+      return "";
+    }
   }
   async function ownerRead(path) {
     try {
@@ -5816,7 +5846,11 @@
     const langs = typeof spec.langs === "function" ? spec.langs : function() {
       return [];
     };
-    const shape = inwardShape(spec);
+    const shape = inwardShape(Object.assign({
+      apex: apexPage(""),
+      owner: signedInOwner(),
+      nodeId: NODE_ID
+    }, spec));
     const words2 = function(key) {
       return say(key, langs());
     };
@@ -5940,6 +5974,10 @@
           langs
         });
         windowsBlock(keyRoad.body, shape.receiver.windows, words2, langs);
+        const keyWhere = document.createElement("p");
+        keyWhere.className = "ak-living__dialog-range";
+        keyWhere.textContent = fill(words2("inward.keyWhere"), { placeholder: shape.receiver.keyPlaceholder }) + (shape.receiver.ownerKnown ? "" : " " + fill(words2("inward.ownerWhere"), { placeholder: shape.receiver.ownerPlaceholder }));
+        keyRoad.body.appendChild(keyWhere);
         copyBlock(keyRoad.body, {
           label: words2("inward.write") + " (" + words2("shell.posix") + ")",
           text: shape.write.curl,
