@@ -22,6 +22,12 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.20.0 -- 2026-11-08 -- Before a job runs, the runner asks its account and its starter as they are
+ *     now (run-gate.ts runGate): a deactivated account's job waits queued and runs after reactivation,
+ *     a starter that is gone ends the job before anything is paid, and a narrowed starter's job runs
+ *     with the narrower permissions. With several processes, the paid and side-effecting steps and the
+ *     fold run only while this process still holds the job (run-gate.ts stillHeld), and a cancel taken
+ *     by another process reaches the runner on the bus (secaudit2026nov08 round 14).
  *   v1.19.1 -- 2026-11-04 -- The running service is held by services/node-context.ts; getActiveAiJobService is gone and
  *     setActiveAiJobService writes the context (codebase analysis 2026-11-03, item D-i).
  *   v1.19.0 -- 2026-11-04 -- A job's index entry names the process that runs it; the restart pass moved to reclaim.ts and
@@ -126,8 +132,10 @@ import { emitAiJobFinished } from './finished-listeners.js';
 import { findExtension, namespacedName } from '../component-address.js';
 import { markStopped } from './restart.js';
 import { reclaimJobs, ADOPT_MS, type ReclaimDeps } from './reclaim.js';
+import { runGate, stillHeld } from './run-gate.js';
 import { processLeaseReady, thisProcess } from '../process-lease.js';
 import { provideNodeService } from '../node-context.js';
+import { emitAiJobCancel, onAiJobCancelEvent, isRemoteEvent, type AiJobCancelEvent } from '../event-bus.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
     addToActiveIndex, removeFromActiveIndex,
@@ -142,6 +150,9 @@ import {
 /** How long a caller is asked to wait after a queue-full refusal. A guess would be worse than a
  *  round number: what it really says is "shortly", and Retry-After has no way to say that. */
 const RETRY_AFTER_SECONDS = 30;
+
+/** How often a job of a deactivated account asks again whether the account was reactivated (run-gate.ts). */
+export const ACCOUNT_RECHECK_MS = 15_000;
 
 /** What a live job carries in this process, beside the record in storage. */
 interface LiveEntry {
@@ -165,6 +176,10 @@ export class AiJobService implements AiJobStarter {
     private stopping = false;
     /** The adoption pass (reclaim.ts), started by reconcileAfterRestart. */
     private adoptTimer?: ReturnType<typeof setInterval>;
+    /** Hears a cancel another process of the node took for a job this process runs; added by reconcileAfterRestart. */
+    private cancelListener?: (evt: AiJobCancelEvent) => void;
+    /** How often a job of a deactivated account asks again (a field, so a unit test can shorten it). */
+    private accountRecheckMs = ACCOUNT_RECHECK_MS;
 
     constructor(config: AimeatConfig, storage: Storage, emailService?: EmailService) {
         this.config = config;
@@ -398,12 +413,16 @@ export class AiJobService implements AiJobStarter {
         const entry = this.live.get(jobId);
         if (!entry) {
             // Live in storage but not in this process: what a restart leaves behind between the boot
-            // and the reconciliation pass. Terminate it here rather than leaving it running for ever.
+            // and the reconciliation pass, or, with several processes, a job another process runs.
+            // Terminate it here rather than leaving it running for ever, and tell the other processes:
+            // the one that runs it aborts its provider call, and its next check (run-gate.ts
+            // stillHeld) finds the job no longer live, so it writes no answer and runs no on_done.
             const stored = await readJob(this.storage, ownerGhii, jobId);
             if (stored) {
                 const cancelled: AiJobRecord = { ...stored, state: 'cancelled', finished_at: new Date().toISOString() };
                 await foldIntoLog(this.storage, cancelled);
                 await removeFromActiveIndex(this.storage, this.config.nodeId, jobId);
+                emitAiJobCancel({ nodeId: this.config.nodeId, jobId });
                 return cancelled;
             }
             throw new AiJobError('NOT_FOUND', 404, 'No such job.');
@@ -426,21 +445,44 @@ export class AiJobService implements AiJobStarter {
         if (!entry) return;
         // The lane is the account, so its agents and access tokens share one turn (secaudit2026oct26).
         const owner = ownerGhiiOf(entry.job.owner);
+        const deps = { storage: this.storage, config: this.config };
+        // Set by the gate below before the loop is left: whether the starter's permissions were narrowed.
+        let narrowed!: boolean;
 
-        try {
-            await this.pool.acquire(owner, { signal: entry.controller.signal });
-            // A stopping node starts nothing: the job stays queued in storage and the next start runs it.
-            if (this.stopping) { this.pool.release(owner); return; }
-        } catch (err) {
-            if (err instanceof SlotAbortedError) {
-                await this.finish(jobId, { state: 'cancelled' });
+        for (;;) {
+            try {
+                await this.pool.acquire(owner, { signal: entry.controller.signal });
+                // A stopping node starts nothing: the job stays queued in storage and the next start runs it.
+                if (this.stopping) { this.pool.release(owner); return; }
+            } catch (err) {
+                if (err instanceof SlotAbortedError) {
+                    await this.finish(jobId, { state: 'cancelled' });
+                    return;
+                }
+                await this.finish(jobId, {
+                    state: 'failed',
+                    error: { code: 'AI_JOB_QUEUE_ERROR', message: (err as Error).message },
+                });
                 return;
             }
-            await this.finish(jobId, {
-                state: 'failed',
-                error: { code: 'AI_JOB_QUEUE_ERROR', message: (err as Error).message },
-            });
-            return;
+
+            // The account and the starter as they are NOW, however the job came here: a start, a
+            // restart or a takeover (run-gate.ts; secaudit2026nov08 round 14).
+            const gate = await runGate(deps, entry.job);
+            if (gate.action === 'run') { entry.job = gate.job; narrowed = gate.narrowed; break; }
+            this.pool.release(owner);
+            if (gate.action === 'end') { await this.finish(jobId, { state: 'failed', error: gate.error }); return; }
+            // A deactivated account: the job stays queued and says why, and asks again until the
+            // account is reactivated, the job is cancelled or the node stops.
+            if (entry.job.waiting !== gate.reason) {
+                entry.job = { ...entry.job, waiting: gate.reason };
+                if (await stillHeld(deps, entry.job)) {
+                    await writeJob(this.storage, entry.job).catch(err => logger.warn(`[ai-jobs] could not mark ${jobId} as waiting`, { error: String(err) }));
+                }
+                logger.info(`[ai-jobs] ${jobId} waits: ${gate.reason}`);
+            }
+            if (!await this.waitForAccount(entry)) { await this.finish(jobId, { state: 'cancelled' }); return; }
+            if (this.stopping) return;
         }
 
         // A picture stored private while making it public waits for the owner (picture-request.ts):
@@ -452,7 +494,13 @@ export class AiJobService implements AiJobStarter {
             await fileJobPictureRequest({ storage: this.storage, config: this.config }, pending, recordRequestId);
         };
         try {
-            entry.job = { ...entry.job, state: 'running', started_at: new Date().toISOString() };
+            // A starter the owner narrowed reads the inputs again with what it may read now.
+            if (narrowed) entry.prompt = (await this.prepareInput(entry.job.owner, entry.job)).prompt;
+            // Several processes: a job another process cancelled or took over is not paid for here.
+            if (!await stillHeld(deps, entry.job)) { this.dropHere(jobId); return; }
+            const running: AiJobRecord = { ...entry.job, state: 'running', started_at: new Date().toISOString() };
+            delete running.waiting;
+            entry.job = running;
             await writeJob(this.storage, entry.job);
 
             // The job and its result stay in the CALLER's namespace; the money is the human's. An
@@ -484,6 +532,8 @@ export class AiJobService implements AiJobStarter {
                 await this.finish(jobId, { state: 'cancelled', ...spend });
                 return;
             }
+            // The answer is written and on_done runs only where the job is still held (run-gate.ts).
+            if (!await stillHeld(deps, entry.job)) { await filePicture(); this.dropHere(jobId); return; }
 
             const written = await writeJobResult({ storage: this.storage, config: this.config }, entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
             await filePicture(written.requestId);
@@ -496,6 +546,7 @@ export class AiJobService implements AiJobStarter {
 
             // The callback, and the reason a green job can still be a failure. See on-done.ts.
             if (entry.job.on_done) {
+                if (!await stillHeld(deps, entry.job)) { this.dropHere(jobId); return; }
                 const outcome = await fireOnDone(
                     { storage: this.storage, config: this.config, service: this, emailService: this.emailService },
                     { ...entry.job, ...spend, state: 'done' },
@@ -545,6 +596,8 @@ export class AiJobService implements AiJobStarter {
     private async finish(jobId: string, patch: Partial<AiJobRecord> & { state: AiJobState }): Promise<void> {
         const entry = this.live.get(jobId);
         if (!entry) return;
+        // Several processes: a job another process cancelled or took over is folded there, once.
+        if (!await stillHeld({ storage: this.storage, config: this.config }, entry.job)) { this.dropHere(jobId); return; }
 
         const finishedJob: AiJobRecord = { ...entry.job, ...patch, finished_at: new Date().toISOString() };
         this.live.delete(jobId);
@@ -562,6 +615,33 @@ export class AiJobService implements AiJobStarter {
         // A feature that started the job hears it finish (finished-listeners.ts): agent goals settle
         // the work the node's model did. After the log, so a listener reads the job as stored.
         await emitAiJobFinished(finishedJob);
+    }
+
+    /**
+     * Let go of a job this process no longer runs (run-gate.ts stillHeld): another process of the node
+     * cancelled it or took it over, and that process writes its terminal state. Nothing is stored here.
+     */
+    private dropHere(jobId: string): void {
+        const entry = this.live.get(jobId);
+        if (!entry) return;
+        this.live.delete(jobId);
+        entry.resolveFinished();
+    }
+
+    /**
+     * A job of a deactivated account waits here: true after ACCOUNT_RECHECK_MS, when the runner asks
+     * the account again, false when the job was cancelled meanwhile.
+     */
+    private waitForAccount(entry: LiveEntry): Promise<boolean> {
+        const signal = entry.controller.signal;
+        if (signal.aborted) return Promise.resolve(false);
+        return new Promise(resolve => {
+            const onAbort = () => { clearTimeout(timer); resolve(false); };
+            // process-local: one timer per waiting job of this process; it ends with the wait.
+            const timer = setTimeout(() => { signal.removeEventListener('abort', onAbort); resolve(true); }, this.accountRecheckMs);
+            timer.unref?.();
+            signal.addEventListener('abort', onAbort, { once: true });
+        });
     }
 
     // ── gates ─────────────────────────────────────────────────────────────────
@@ -694,6 +774,15 @@ export class AiJobService implements AiJobStarter {
         // Only the jobs no live process holds; a job another live process runs is left to it
         // (reclaim.ts). Then, while this process runs, the jobs of a process that ends are taken over.
         const result = await reclaimJobs(this.reclaimDeps(), 'boot');
+        if (!this.cancelListener) {
+            // A cancel another process of this node took for a job this process runs aborts its
+            // provider call here (cancelJob). This process's own cancels reach the live map directly.
+            this.cancelListener = (evt) => {
+                if (!isRemoteEvent(evt) || evt.nodeId !== this.config.nodeId) return;
+                this.live.get(evt.jobId)?.controller.abort();
+            };
+            onAiJobCancelEvent(this.cancelListener);
+        }
         if (!this.adoptTimer && !this.stopping) {
             // process-local: this process looks for the jobs of a process that ended; the claim is on the stored index.
             this.adoptTimer = setInterval(() => {

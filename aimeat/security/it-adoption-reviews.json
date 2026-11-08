@@ -124,7 +124,7 @@
       "digest": "sha256:a3eec7b960928ad6b1577e84"
     },
     "11-backup-recovery.md": {
-      "reviewedOn": "2026-11-07",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "docs/operations/backup-and-restore.md",
         "aimeat/src/auth/node-keys.ts",
@@ -133,7 +133,7 @@
         "aimeat/src/storage/providers/postgres-kysely/read-retry.ts",
         "aimeat/src/server-bootstrap/bus-relay-start.ts"
       ],
-      "digest": "sha256:ee98d11b515071ff990b5ff7"
+      "digest": "sha256:1ddf0000e2a1f962f719ebc6"
     },
     "12-updates-releases.md": {
       "reviewedOn": "2026-11-04",
@@ -219,7 +219,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:d7bde25b48cc55662028b930"
+      "digest": "sha256:66c6245ad35d88144c018d66"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -357,7 +357,7 @@
       "aimeat/src/services/encryption.ts": "b0a16df9e1d5c2cb",
       "docs/operations/database-high-availability.md": "fb3b82782584e700",
       "aimeat/src/storage/providers/postgres-kysely/read-retry.ts": "9c1d34ab26d00182",
-      "aimeat/src/server-bootstrap/bus-relay-start.ts": "4ea49009017ba3bc"
+      "aimeat/src/server-bootstrap/bus-relay-start.ts": "a77a01c5de30a627"
     },
     "12-updates-releases.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
@@ -416,24 +416,24 @@
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
       "aimeat/src/services/once-only-step.ts": "12c59204aa41d7f2",
-      "aimeat/src/services/event-bus.ts": "ecbc1a1ff2fe2b02",
+      "aimeat/src/services/event-bus.ts": "af3e5e48485c304d",
       "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
       "aimeat/src/mcp/legacy-sessions.ts": "e1e17ec26e540150",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "c6b46235bc263958",
+      "aimeat/src/services/ai-jobs/service.ts": "5fe511c5ffa5cf5a",
       "aimeat/src/services/config-apply.ts": "9a4e295d031eff60",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "766efa3f33c1b08d",
+      "aimeat/security/process-local-baseline.json": "33ee1714478e1c63",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
       "aimeat/src/services/notification-sweeps.ts": "79e7a75daebd3d89",
-      "aimeat/src/services/bus-relay.ts": "11799af91121af30",
-      "aimeat/src/server-bootstrap/bus-relay-start.ts": "4ea49009017ba3bc",
+      "aimeat/src/services/bus-relay.ts": "ebd93b1ae4ace1cc",
+      "aimeat/src/server-bootstrap/bus-relay-start.ts": "a77a01c5de30a627",
       "aimeat/src/services/process-lease.ts": "56b5c28544c3d11b",
       "aimeat/src/services/ai-jobs/reclaim.ts": "46edaddf7925f44c",
       "aimeat/src/services/workflow/engine-lock.ts": "51637ef3a2de157d",

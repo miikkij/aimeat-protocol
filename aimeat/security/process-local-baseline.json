@@ -473,6 +473,10 @@
       "count": 1,
       "reason": "The relays this process started, so its stop closes their listening connections. Each process has its own connection by design; nothing is shared through it."
     },
+    "src/services/bus-relay.ts :: interval :: startBusRelay": {
+      "count": 1,
+      "reason": "Each process compares the stored registry marks with the ones it read and reads a registry again whose mark moved; the marks are in storage, so every process finds a change whose event it missed."
+    },
     "src/services/cache-cleanup.ts :: interval :: startCacheCleanupJob": {
       "count": 1,
       "reason": "DEBT"

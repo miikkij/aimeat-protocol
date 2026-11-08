@@ -11,7 +11,8 @@
  *   per-agent payloads are not broadcast to UI clients.
  * @structure emitChange/emitRecordChange/emitRecordChangePriorUnknown/onChangeEvent/offChangeEvent (change) +
  *   emitDelivery/onDeliveryEvent/offDeliveryEvent (delivery), and the task-moved, publicActivity,
- *   memoryWritten, rowsAppended and appChange channels; addBusTransport/emitRemote/isRemoteEvent (other processes).
+ *   memoryWritten, rowsAppended, appChange, aiJobCancel and tunnelControl channels;
+ *   addBusTransport/emitRemote/isRemoteEvent (other processes).
  * @usage import { emitDelivery } from '../services/event-bus.js';
  * @version-history
  *   v1.0.0 — pre-2026-06 — Initial change-event bus for SSE live updates.
@@ -48,6 +49,9 @@
  *     a data product, a tracked response) runs only for its own process's events; a listener that
  *     tells a browser, a tunnel or a cache runs for every process's events. With no transport (SQLite,
  *     one process) nothing here changes (codebase analysis 2026-11-03, HA stage 2, e2-bus).
+ *   v1.11.0 — 2026-11-08 — The `aiJobCancel` and `tunnelControl` channels: a cancel of an AI job that
+ *     another process runs, and a tunnel revocation, stop or permission change for a socket another
+ *     process holds (secaudit2026nov08 round 14). Their listeners act only on another process's event.
  */
 import { EventEmitter } from 'node:events';
 
@@ -66,7 +70,8 @@ bus.setMaxListeners(0); // unlimited — each SSE client adds a listener
 // object as it is, and a field added here would reach every visitor's page.
 
 /** The channels of this bus. Every one of them reaches the node's other processes. */
-export type BusChannelName = 'change' | 'delivery' | 'task-moved' | 'publicActivity' | 'memoryWritten' | 'rowsAppended' | 'appChange';
+export type BusChannelName = 'change' | 'delivery' | 'task-moved' | 'publicActivity' | 'memoryWritten' | 'rowsAppended' | 'appChange'
+  | 'aiJobCancel' | 'tunnelControl';
 
 /** What carries this process's events to the node's other processes (services/bus-relay.ts). Never throws. */
 export interface BusTransport { publish(channel: BusChannelName, evt: object): void }
@@ -423,4 +428,57 @@ export function onAppChangeEvent(handler: (evt: AppChangeEvent) => void): void {
 
 export function offAppChangeEvent(handler: (evt: AppChangeEvent) => void): void {
   bus.off('appChange', handler);
+}
+
+// ── aiJobCancel ──────────────────────────────────────────────────────────────────────────────────
+// A cancel of an AI job that another process of the node runs (services/ai-jobs/service.ts
+// cancelJob). The process that took the cancel stored the job as cancelled; the process that runs it
+// aborts its provider call when it hears this. It carries ids only. With one process nothing listens
+// to another process's event, so nothing changes there.
+
+export interface AiJobCancelEvent {
+  /** The node the job belongs to: a process may serve more than one node in the multi-node suites. */
+  nodeId: string;
+  jobId: string;
+  timestamp: number;
+}
+
+export function emitAiJobCancel(evt: Omit<AiJobCancelEvent, 'timestamp'>): void {
+  fire('aiJobCancel', { ...evt, timestamp: Date.now() } satisfies AiJobCancelEvent);
+}
+
+export function onAiJobCancelEvent(handler: (evt: AiJobCancelEvent) => void): void {
+  bus.on('aiJobCancel', handler);
+}
+
+export function offAiJobCancelEvent(handler: (evt: AiJobCancelEvent) => void): void {
+  bus.off('aiJobCancel', handler);
+}
+
+// ── tunnelControl ────────────────────────────────────────────────────────────────────────────────
+// A change to what a connector tunnel may hold, made on one process, for the tunnel sockets other
+// processes hold (services/connect-tunnel/cross-process.ts): an agent deleted, moved or rekeyed, an
+// account deactivated, a token revoked, an agent stopped or started, a permission change. A token is
+// named by its id (auth/jwt.ts tokenIdOf), never by the token itself.
+
+/** One decision about a tunnel identity. */
+export type TunnelControl =
+  | { op: 'gaii'; gaii: string; reason: 'moved' | 'deleted' | 'rekeyed' }
+  | { op: 'owner'; owner: string }
+  | { op: 'token'; tokenId: string }
+  | { op: 'stopped'; gaii: string; stopped: boolean }
+  | { op: 'scopes'; gaii: string };
+
+export type TunnelControlEvent = TunnelControl & { nodeId: string; timestamp: number };
+
+export function emitTunnelControl(nodeId: string, control: TunnelControl): void {
+  fire('tunnelControl', { ...control, nodeId, timestamp: Date.now() } satisfies TunnelControlEvent);
+}
+
+export function onTunnelControlEvent(handler: (evt: TunnelControlEvent) => void): void {
+  bus.on('tunnelControl', handler);
+}
+
+export function offTunnelControlEvent(handler: (evt: TunnelControlEvent) => void): void {
+  bus.off('tunnelControl', handler);
 }

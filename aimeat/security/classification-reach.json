@@ -2759,6 +2759,12 @@
       },
       "why": "Reviewed 2026-11-04 (codebase analysis wave 3, HA stage 2), the node's own read: the process leases and the held and sweep leases under lease.*, owned by the node's system identity; no person's content is read and nothing read here reaches a caller."
     },
+    "src/services/bus-relay.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-08 (secaudit2026nov08 round 14), the node's own read: the registry marks under bus.registry-version.*, owned by the node's system identity (a random id and a time per registry); no person's content is read and nothing read here reaches a caller."
+    },
     "src/services/provenance-embed/index.ts": {
       "reads": {
         "getStorageFile": 1

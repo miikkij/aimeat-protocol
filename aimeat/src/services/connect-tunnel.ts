@@ -25,6 +25,9 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   2026-11-08 -- A revocation (token, agent delete, move, rekey, account deactivation), an agent stop or start and a
+ *     permission change made on one process reach the sockets the node's other processes hold
+ *     (./connect-tunnel/cross-process.ts; secaudit2026nov08 round 14).
  *   2026-11-04 -- The running manager is nodeContext().tunnel (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-10-31 -- A dm.inbound reaches an identity without messages:read as an arrival notice (secaudit2026oct31w2 round 10).
  *   2026-10-16 -- closeForGaii takes 'rekeyed' (connect-tunnel-revocation.ts; QA audit F03b-01).
@@ -109,7 +112,7 @@ import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { setTokenRevokedHook, type VerifiedToken } from '../auth/jwt.js';
+import { setTokenRevokedHook, tokenIdOf, type VerifiedToken } from '../auth/jwt.js';
 import { SocketIndex, Fairness } from './connect-tunnel-multiplex.js';
 import { forwardRequest } from './connect-tunnel-forward.js';
 import { sendBacklog, pushTaskCancellations, onMemoryWrite, notifyScopesChanged } from './connect-tunnel-push.js';
@@ -137,7 +140,8 @@ export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
-import { revokeByToken, revokeByGaii, revokeByOwner, type GaiiCutReason } from './connect-tunnel-revocation.js';
+import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason } from './connect-tunnel-revocation.js';
+import { tellOtherProcesses, listenToOtherProcesses, type TunnelControlTarget } from './connect-tunnel/cross-process.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel-connection.js';
 import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel-hooks.js';
@@ -160,7 +164,7 @@ import { nodeContext, provideNodeService } from './node-context.js';
  */
 const ACK_DEDUP_WINDOW = 500;
 
-export class ConnectTunnelManager {
+export class ConnectTunnelManager implements TunnelControlTarget {
   private connections = new Map<string, ConnectConnection>();
   /** Which identities ride which socket. See ./connect-tunnel-multiplex.ts. */
   private sockets = new SocketIndex();
@@ -179,6 +183,8 @@ export class ConnectTunnelManager {
   private spaceSubscribers = new Map<string, Set<string>>();
   private readonly deliveryHandler: (evt: DeliveryEvent) => void;
   private readonly memoryWriteHandler: (evt: MemoryWriteEvent) => void;
+  /** Stops applying the decisions the node's other processes make (./connect-tunnel/cross-process.ts). */
+  private readonly stopListeningToOthers: () => void;
   private stats: ConnectTunnelStats = {
     activeConnections: 0,
     connectionsTotal: 0,
@@ -222,6 +228,10 @@ export class ConnectTunnelManager {
 
     // P2: revoking a token pushes `auth_revoked` to its live socket (if any) + closes it.
     setTokenRevokedHook((token) => this.onTokenRevoked(token));
+
+    // A revocation, a stop or a permission change another process of this node made reaches the
+    // sockets this process holds (./connect-tunnel/cross-process.ts).
+    this.stopListeningToOthers = listenToOtherProcesses(config.nodeId, this);
   }
 
   /** Is `principal` (a GAII/GEAI) currently holding a live tunnel socket? Used by presence to show an
@@ -675,23 +685,30 @@ export class ConnectTunnelManager {
    * in ./connect-tunnel-revocation.ts, where the three predicates sit side by side — the next time
    * something needs a socket closed, the question is which of these already reaches it.
    */
-  onTokenRevoked(rawToken: string): void { revokeByToken(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), rawToken); }
+  /** Each of these applies to this process's sockets and then tells the node's other processes,
+   *  which apply it to theirs (./connect-tunnel/cross-process.ts; secaudit2026nov08 round 14). */
+  onTokenRevoked(rawToken: string): void { const tokenId = tokenIdOf(rawToken); this.revokeTokenIdHere(tokenId); tellOtherProcesses(this.config.nodeId, { op: 'token', tokenId }); }
+  revokeTokenIdHere(tokenId: string): void { revokeByTokenId(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), tokenId); }
 
   /** Deleting ONE agent: its socket goes, and nothing else on that daemon is touched. */
   /** An agent was stopped or started (services/agent-stop.ts). On a start the backlog goes out again, so what waited reaches the runtime. */
   /** Whether a connected agent is stopped, from memory; undefined when it holds no socket here, so the caller reads its record. */
   stoppedOf(gaii: string): boolean | undefined { return this.connections.get(gaii)?.stopped; }
-  setStopped(gaii: string, stopped: boolean): void { const c = this.connections.get(gaii); if (!c) return; c.stopped = stopped; if (!stopped) void sendBacklog(this.pushCtx(), c); }
+  setStopped(gaii: string, stopped: boolean): void { this.setStoppedHere(gaii, stopped); tellOtherProcesses(this.config.nodeId, { op: 'stopped', gaii, stopped }); }
+  setStoppedHere(gaii: string, stopped: boolean): void { const c = this.connections.get(gaii); if (!c) return; c.stopped = stopped; if (!stopped) void sendBacklog(this.pushCtx(), c); }
 
-  closeForGaii(gaii: string, reason: GaiiCutReason = 'deleted'): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
+  closeForGaii(gaii: string, reason: GaiiCutReason = 'deleted'): void { this.closeForGaiiHere(gaii, reason); tellOtherProcesses(this.config.nodeId, { op: 'gaii', gaii, reason }); }
+  closeForGaiiHere(gaii: string, reason: GaiiCutReason): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
 
   /** Deactivating an account: every principal acting for that owner. */
-  closeForOwner(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }
+  closeForOwner(owner: string): void { this.closeForOwnerHere(owner); tellOtherProcesses(this.config.nodeId, { op: 'owner', owner }); }
+  closeForOwnerHere(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }
 
   /** A permission change told to one live identity WITHOUT detaching it. Body in
    *  ./connect-tunnel-push.ts, beside the other server→client pushes — it closes nothing, which is
    *  what keeps it out of the revocation file above. */
-  notifyScopesChanged(gaii: string): void { notifyScopesChanged(this.pushCtx(), gaii); }
+  notifyScopesChanged(gaii: string): void { this.notifyScopesChangedHere(gaii); tellOtherProcesses(this.config.nodeId, { op: 'scopes', gaii }); }
+  notifyScopesChangedHere(gaii: string): void { notifyScopesChanged(this.pushCtx(), gaii); }
   /** A cancel marker resolved to its agents and pushed. Body in ./connect-tunnel-push.ts. */
   private async pushTaskCancellations(ownerGaii: string, key: string): Promise<void> {
     await pushTaskCancellations(this.pushCtx(), ownerGaii, key);
@@ -778,6 +795,7 @@ export class ConnectTunnelManager {
   async shutdown(): Promise<void> {
     offDeliveryEvent(this.deliveryHandler);
     offMemoryWrittenEvent(this.memoryWriteHandler);
+    this.stopListeningToOthers();
     setTokenRevokedHook(null);
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
