@@ -48,15 +48,21 @@
  *     (codebase analysis 2026-11-03, item B3).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
+ *   v1.4.0 — 2026-11-08 — The report mail goes through notification-create.ts mailOwnerFrom under the
+ *     outside app's sender key (`ecosystem:<geai>`): the per-sender daily limit, the Email page's
+ *     mail log, and the owner's mute of that app on the Notifications page apply. The in-app record
+ *     says `emailSkipped: 'muted' | 'limit'` when the mail did not go (secaudit2026nov08 round 14,
+ *     ecosystem-automation-notify:automation-report-mail-uncounted-unmuted).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord, GHIIRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { nodeContext } from './node-context.js';
 import { provenOwnerAddress, notificationEmailUnverified } from './owner-mail-address.js';
-import { sendMail } from './mail-gate.js';
+import { mailOwnerFrom } from './notification-create.js';
+import { readNotificationSettings, prefsFor, senderKey, type NotifSource } from './notification-settings.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';
 import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
+import { localAccountName, buildGEAI } from '../utils/gaii.js';
 import { systemReader, type ContentReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 
@@ -305,15 +311,26 @@ export async function notifyAutomationTaskComplete(
       }
       return;
     }
-    const sent = await sendMail(emailSvc, { kind: 'owner', account: ghii }, { form: 'notification', subject, body: bodyText }) === 'sent';
-    if (sent) {
+    // The report is the outside app's: its sender key is the app's GEAI, so the owner's mute of that
+    // app on the Notifications page stops the mail, and mailOwnerFrom counts it against the app's
+    // daily limit (email.reports_per_sender_day) and writes the Email page's mail log
+    // (secaudit2026nov08 round 14, automation-report-mail-uncounted-unmuted).
+    const geai = buildGEAI(auto.app, ownerName, config.nodeId);
+    const source: NotifSource = { kind: 'ecosystem', name: auto.app, id: geai };
+    const muted = prefsFor(await readNotificationSettings(storage, ownerGhii), source, 'ecosystem').muted;
+    const outcome = muted ? 'muted'
+      : await mailOwnerFrom(storage, config, ownerGhii, senderKey(source), subject, bodyText, { email: emailSvc, logKind: 'notification' });
+    if (outcome === 'sent') {
       logger.info('automation report email sent', { owner: ownerName, recipe: auto.recipeId });
-      // Reflect that the email went out on the in-app record (best-effort).
-      try {
-        await storage.setMemory({ ...reportRecord, value: { ...(reportRecord.value as object), emailed: true }, version: 2, updatedAt: new Date().toISOString() });
-      } catch (err) { logger.warn('portalBase: best-effort', { error: String(err) }); }
     } else {
-      logger.warn('automation report email send returned false', { owner: ownerName, recipe: auto.recipeId });
+      logger.warn('automation report email not sent', { owner: ownerName, recipe: auto.recipeId, outcome });
+    }
+    // Reflect on the in-app record whether the email went out, and why not when muted or over the limit (best-effort).
+    const note = outcome === 'sent' ? { emailed: true } : outcome === 'muted' || outcome === 'limit' ? { emailSkipped: outcome } : null;
+    if (note) {
+      try {
+        await storage.setMemory({ ...reportRecord, value: { ...(reportRecord.value as object), ...note }, version: 2, updatedAt: new Date().toISOString() });
+      } catch (err) { logger.warn('automation report: the mail note was not stored', { error: String(err) }); }
     }
   } catch (err) {
     // Absolute isolation: B6 must never break task completion.

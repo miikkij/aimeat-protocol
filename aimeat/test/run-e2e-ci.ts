@@ -1768,6 +1768,9 @@ const ALL_SUITES = [
     'test/e2e-ecosystem-events.ts',
     'test/e2e-ecosystem-capabilities.ts',
     'test/e2e-ecosystem-validation.ts',
+    // An outside app's approval grants a word outside every wildcard only when the owner names it,
+    // and its notification names the app as its sender (secaudit2026nov08 round 14).
+    'test/e2e-ecosystem-own-tick-sender.ts',
     'test/e2e-agent-governance.ts',
     'test/e2e-workflows.ts',
     'test/e2e-workflows-human.ts',

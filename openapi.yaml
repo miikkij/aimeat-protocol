@@ -8342,7 +8342,9 @@ paths:
             another key than the pinned one); a key change also carries `pinned_key_fingerprint` and
             `key_fingerprint`, so the owner can see that approving replaces the key of a working
             connection. A reconnect with the pinned key also carries `key_proven`: true when the hello
-            signed its `proof` with that key, false when it only named the key.
+            signed its `proof` with that key, false when it only named the key. `own_tick_scopes`
+            lists the requested words outside every wildcard (receivers:manage, the read-as-owner
+            words and the rest): the owner grants each one by naming it in the approval's `scopes`.
         '403':
           description: Owner role required.
   /v1/ecosystem-apps/{userCode}/approve:
@@ -8354,7 +8356,10 @@ paths:
         the node's `maxEcoScopes` ceiling) and the data-area allowlist. On approve the GEAI principal
         is created (or re-approval rotates the pinned key) and the credential becomes issuable. A
         re-approval that changes the pinned key ends the sessions issued under the old key; one with
-        the same key keeps them.
+        the same key keeps them. Without `scopes` the approval grants what the app asked for except
+        the words outside every wildcard, which it grants only when the app already held them from an
+        earlier approval; the answer's `held_back_scopes` names the ones not granted, and naming them
+        in `scopes` grants them.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -8381,7 +8386,7 @@ paths:
                   items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
       responses:
         '200':
-          description: Approved (returns geai) or denied.
+          description: Approved (returns geai, existing_app and held_back_scopes) or denied.
         '400':
           description: Invalid action or scopes exceed the node ceiling.
         '403':
@@ -50917,7 +50922,7 @@ paths:
         `/v1/` once its dot segments resolve. Any other action, and one of an unknown kind, is left out
         of the answer and logged, whatever wrote the record.
 
-        Every row also carries `source` ({ kind: aimeat|app|extension|agent|owner, name, id? }, derived
+        Every row also carries `source` ({ kind: aimeat|app|extension|agent|owner|ecosystem, name, id? }, derived
         from the title prefix for rows written before it travelled with them), `group` (organisms,
         messages, workflows, apps, account, other) and, for the node's own kinds, `i18n` ({ key, vars })
         so a client can say the title and body in the reader's language. `total` is the whole inbox.
@@ -50946,6 +50951,10 @@ paths:
         App-grant sessions (role `app`) need `notifications:send` in their grant; an app
         notification gets the app's name prefixed to the title (provenance) and `link` defaults to
         the app's own open URL (`/v1/apps/{owner}/{file}?mode=inline`) so the click reopens the app.
+        An outside app (role `ecosystem`) needs `notifications:send` among its approved scopes; its
+        notification gets the app's name prefixed to the title, `source.kind` `ecosystem` with its
+        GEAI as `source.id`, and `link` defaults to the Outside apps page, so the owner can tell it
+        apart from their own notices and mute it on its own.
         `created` says whether the notification was STORED — that it is in the bell and will be
         there when the owner next looks. It is not a claim about the browser push, which is
         best-effort on top and can fail without changing `created`. A notification the owner has
@@ -51087,7 +51096,8 @@ paths:
       summary: Who may notify this owner, and what each did in 30 days
       description: >-
         The node's own six groups with counts, the apps whose grant carries notifications:send, the
-        owner's agents with the scope, and the extensions that have notified, each with the count in
+        owner's agents with the scope, the owner's outside apps (kind `ecosystem`) that hold the scope
+        or mail an automation report, and the extensions that have notified, each with the count in
         the last 30 days, the last time, and the owner's decision (push, muted). Owner only.
       tags: [Notifications]
       security: [{ BearerAuth: [] }]

@@ -5,13 +5,17 @@
  * @description A principal notifying its OWN owner: the one implementation behind
  *   POST /v1/notifications and the aimeat_notify MCP tool. Validates the four fields, names the
  *   sender (an app gets its name in front of the title and its own page as the default link, an
- *   agent its name, an owner session is the owner), and hands the record to notify(), which
+ *   agent its name, an outside app its name, an owner session is the owner), and hands the record to notify(), which
  *   applies the owner's settings. Self-targeted only: the recipient is always the owner behind the
  *   caller's session; there is no surface for pushing at arbitrary owners.
  * @structure NotificationCreateError · createPrincipalNotification · MailOwnerOptions · mailOwnerFrom ·
  *   ownerMailLimitReached
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.6.0 — 2026-11-08 — An outside app (role `ecosystem`) is its own sender: source kind `ecosystem`
+ *     with its GEAI, its name before the title, type `ecosystem`, so its notice and mail are told
+ *     apart from the owner's own and the owner can mute it (secaudit2026nov08 round 14,
+ *     notification-create:ecosystem-sender-labelled-as-owner).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.5.1 — 2026-11-04 — mailOwnerFrom sends through mail-gate.ts sendMail, which keeps the per-sender
@@ -139,6 +143,15 @@ export async function createPrincipalNotification(
     finalLink = finalLink ?? '/v1/profile?tab=agents';
     finalType = finalType ?? 'agent';
     source = { kind: 'agent', name: agentName, id: auth.sub };
+  } else if (auth.roles.includes('ecosystem')) {
+    // An outside app (GEAI): its own sender, named like an app grant, so the owner tells it apart
+    // from their own notices and mutes it on its own (secaudit2026nov08 round 14).
+    const eco = await storage.getEcosystemApp(auth.sub);
+    const appName = eco?.displayName || eco?.app || auth.sub.replace(/^eco:/, '').split('#')[0] || 'App';
+    finalTitle = `${appName}: ${finalTitle}`;
+    finalLink = finalLink ?? '/v1/profile?tab=ecosystem';
+    finalType = finalType ?? 'ecosystem';
+    source = { kind: 'ecosystem', name: appName, id: auth.sub };
   } else {
     finalType = finalType ?? 'custom';
     source = { kind: 'owner', name: auth.owner };

@@ -17,6 +17,9 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   2026-11-08 — GET /senders lists the owner's outside apps (kind `ecosystem`) that hold
+ *     notifications:send or mail an automation report, each with the owner's decision, so the owner
+ *     can mute one (secaudit2026nov08 round 14, notification-create:ecosystem-sender-labelled-as-owner).
  *   2026-11-04 — No per-key loop for a storage without bulkBinMemory or bulkDeleteMemory: both are
  *     required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — GET reads the page it answers with and the unread and total counts in SQL
@@ -70,6 +73,7 @@ import { listOwnerNotifications, readNotificationInbox, findOwnerNotificationsBy
 import { logger } from '../utils/logger.js';
 import { answerNotifications, outcomeOfAction, type NotifAnswer } from '../services/notification-answers.js';
 import { isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string; source?: NotifSource; i18n?: unknown; held?: boolean; answered?: NotifAnswer }
 
@@ -185,10 +189,17 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       if (!(a.defaultScopes ?? []).includes('notifications:send')) continue;
       add({ kind: 'agent', name: a.displayName || a.name, id: a.gaii }, { last_seen: a.lastSeen ?? null });
     }
+    // The owner's outside apps that may notify them or mail them an automation report, each its own
+    // sender the owner can mute (secaudit2026nov08 round 14).
+    const mailingApps = new Set((await storage.listAutomationRecipesByOwner(owner)).filter(r => r.email === true).map(r => r.app));
+    for (const e of await storage.getEcosystemAppsByOwner(owner)) {
+      if (e.status === 'revoked' || !(scopeIsCovered(e.scopes ?? [], 'notifications:send') || mailingApps.has(e.app))) continue;
+      add({ kind: 'ecosystem', name: e.displayName || e.app, id: e.geai }, { granted_at: e.createdAt });
+    }
     const seen = new Set(senders.map(s => s.key as string));
     for (const n of rows) {
       const src = sourceOf(n);
-      if (src.kind !== 'extension' && src.kind !== 'app' && src.kind !== 'agent') continue;
+      if (src.kind !== 'extension' && src.kind !== 'app' && src.kind !== 'agent' && src.kind !== 'ecosystem') continue;
       const key = senderKey(src);
       if (seen.has(key)) continue;
       seen.add(key);

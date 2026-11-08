@@ -22,6 +22,10 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.12.0 — 2026-11-08 — A word outside every wildcard is granted only when the owner names it:
+ *     GET /pending names them (`own_tick_scopes`), an approval without `scopes` grants the request
+ *     without them unless the app already held them, and names the rest (`held_back_scopes`)
+ *     (secaudit2026nov08 round 14, older item O5).
  *   v1.11.0 — 2026-10-27 — A hello for an app already connected may carry `proof`, a signature by the
  *     pinned key (services/device-return-proof.ts), and GET /pending says on a same-key reconnect
  *     whether it was proven (`key_proven`), so the owner sees a request that only names the app's
@@ -91,6 +95,7 @@ import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
 import { ecoHelloProofVerifies, markReturnProven, returnProven } from '../services/device-return-proof.js';
 import { reconnectView } from './ecosystem-apps-reconnect.js';
+import { approvalScopes, ownTickWords } from '../services/eco-own-tick-scopes.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -323,6 +328,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
         display_name: r.displayName,
         description: r.description,
         requested_scopes: r.scopes ?? config.defaultEcoScopes,
+        // The requested words outside every wildcard: the owner ticks each one (older item O5).
+        own_tick_scopes: ownTickWords(r.scopes ?? config.defaultEcoScopes),
         requested_data_areas: r.dataAreas ?? [],
         status: r.status,
         // Static-validation outcome: 'validated' | 'failed' | 'none' (no manifest submitted).
@@ -377,7 +384,11 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     }
 
     // Owner may narrow the requested scopes/areas; fall back to what the app asked for, then defaults.
-    const finalScopes: string[] = Array.isArray(scopes) ? scopes : (request.scopes ?? config.defaultEcoScopes);
+    // Without a body list, a word outside every wildcard is granted only when the app already held
+    // it; the rest wait for the owner's own tick (services/eco-own-tick-scopes.ts, older item O5).
+    const existing = await storage.getEcosystemAppByOwnerAndApp(request.ownerName, request.app);
+    const { scopes: finalScopes, heldBack } = approvalScopes(Array.isArray(scopes) ? scopes : undefined,
+      request.scopes ?? config.defaultEcoScopes, existing?.scopes);
     const finalAreas: EcoDataAreaGrant[] = Array.isArray(data_areas)
       ? (data_areas as EcoDataAreaGrant[])
       : (request.dataAreas ?? []);
@@ -389,7 +400,6 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     }
 
     const geai = buildGEAI(request.app, request.ownerName, config.nodeId);
-    const existing = await storage.getEcosystemAppByOwnerAndApp(request.ownerName, request.app);
     // The app brings its OWN verification key (submitted at hello, pinned TOFU). Unlike agents, the
     // node does not mint a keypair — the connector signs with the app's own private half. A
     // re-approval after a fresh hello re-pins whatever key that hello carried (key rotation).
@@ -485,6 +495,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
       geai,
       app: request.app,
       existing_app: !!existing,
+      // The words outside every wildcard the app asked for and did not get: name them in `scopes` to grant them.
+      held_back_scopes: heldBack,
     }));
     emitChange('ecosystem-apps');
   });
