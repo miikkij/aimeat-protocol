@@ -24,13 +24,20 @@
  *   books the plan's beneficiaries. A plan whose price went up since the buyer agreed is charged only
  *   after the buyer allows the new price with one press. A failed charge tells the buyer once per period and is tried again
  *   each day; the subscription ends at its date by itself. Cancelling stops renewal and keeps the
- *   period that was paid for.
+ *   period that was paid for, also when the cancel lands while a daily run is in progress. A charge
+ *   whose period could not be written is refunded, or, when the refund does not go through, kept for
+ *   the seller as an undelivered payment and never charged again.
  *
  *   READING: an extension sees the caller's running subscriptions to it on `ctx.caller.subscriptions`
  *   (services/extension-invoke.ts); the buyer lists and cancels theirs on /v1/commerce/subscriptions.
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   2026-11-08 — The claim on a period reads the stored auto_renew and kept card, so a cancel stored
+ *     after the daily run read its list is not charged; a renewal charged whose period write failed is
+ *     refunded, or kept as an undelivered payment for the seller and the operator and marked so no
+ *     later run charges it again (secaudit2026nov08b round 15, claimPeriod:cancelled-subscription-
+ *     still-claimed, renewOne:charged-renewal-failed-write-unrecorded).
  *   2026-11-08 — A renewal claims its period on the record's version before the card is charged, so
  *     two renewals of one period at the same moment (two daily runs, or the buyer's allow of a raised
  *     price beside the daily run) charge and extend it once (secaudit2026nov08 round 14,
@@ -53,7 +60,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 import { agentSessionCaller } from '../services/caller-context.js';
-import type { Sellable, SavedPayment } from './types.js';
+import type { Sellable, SavedPayment, PaymentHandler, CheckoutSessionRecord } from './types.js';
+import { refundCollected, recordUndeliveredPayment, UNDELIVERED_PREFIX } from './undelivered-payment.js';
 import type { SellableResolver } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { getPaymentHandler, listPaymentHandlers } from './payment-handlers.js';
@@ -108,6 +116,12 @@ export interface SubscriptionRecord {
   price_question?: SubscriptionPriceQuestion;
   /** The renewal charging this period now: its reference and when it claimed the period (claimPeriod). */
   renewing?: { reference: string; at: string };
+  /**
+   * A renewal that charged the card, could not record the period and could not return the charge
+   * (chargedNotRecorded): no later run charges this reference again. The seller holds the
+   * undelivered-payment record under the same reference.
+   */
+  unsettled_renewal?: { reference: string; tracking_code: string; at: string };
   updated_at: string;
 }
 
@@ -279,17 +293,26 @@ const RENEWAL_CLAIM_HOLD_MS = 60 * 60_000;
  * (secaudit2026nov08 round 14). Written on the record's version, and refused when the period was
  * renewed already, has moved on, or another renewal holds a live claim on it. Of two callers that read
  * the same period (two daily runs, or the buyer's allow beside the daily run), one claims and charges.
+ *
+ * The stored record decides whether the subscription still renews: the daily run reads its list once
+ * at its start, so a cancel stored after that read answers 'off' here and nothing is charged
+ * (secaudit2026nov08b round 15). A period whose earlier charge was kept and not recorded
+ * (unsettled_renewal) is not claimed again.
  */
-async function claimPeriod(storage: Storage, sub: SubscriptionRecord, reference: string): Promise<boolean> {
-  const out = { claimed: false };
+async function claimPeriod(storage: Storage, sub: SubscriptionRecord, reference: string): Promise<'claimed' | 'off' | 'taken'> {
+  const out: { answer: 'claimed' | 'off' | 'taken' } = { answer: 'taken' };
   await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => {
+    out.answer = 'taken';
+    if (cur && (cur.auto_renew !== true || !cur.kept_payment?.payment_method)) { out.answer = 'off'; return UNCHANGED; }
     const held = cur?.renewing && Date.now() - Date.parse(cur.renewing.at) < RENEWAL_CLAIM_HOLD_MS;
-    out.claimed = !!cur && cur.active_until === sub.active_until && cur.last_order !== reference && !held;
-    if (!out.claimed) return UNCHANGED;
+    const claimed = !!cur && cur.active_until === sub.active_until && cur.last_order !== reference && !held
+      && cur.unsettled_renewal?.reference !== reference;
+    if (!claimed) return UNCHANGED;
+    out.answer = 'claimed';
     const at = new Date().toISOString();
     return { ...cur!, renewing: { reference, at }, updated_at: at };
   }, { tag: SUBSCRIPTION_ACTION });
-  return out.claimed;
+  return out.answer;
 }
 
 /** The record without a renewal's claim on its period. */
@@ -339,9 +362,16 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
         cur => ({ ...(cur ?? sub), price_question: q, updated_at: new Date().toISOString() }), { tag: SUBSCRIPTION_ACTION });
     });
   }
+  // A charge for this period the seller holds as undelivered is not taken again, even when the mark on
+  // the buyer's record could not be written (secaudit2026nov08b round 15).
+  if (await storage.getMemory(sellerGhii, `${UNDELIVERED_PREFIX}${reference}`)) {
+    return { result: 'skipped', detail: 'this period was charged and not recorded; the seller holds the payment' };
+  }
   // The period is claimed before the charge: another renewal of the same period at the same moment
   // charges nothing (secaudit2026nov08 round 14).
-  if (!await claimPeriod(storage, sub, reference)) {
+  const claim = await claimPeriod(storage, sub, reference);
+  if (claim === 'off') return { result: 'skipped', detail: 'renewal was turned off' };
+  if (claim !== 'claimed') {
     return { result: 'skipped', detail: 'already renewed, or being renewed, for this period' };
   }
   const seller = { ghii: sellerGhii, owner: ext.installedBy, psp: (await storage.getMemory(sellerGhii, 'commerce.psp'))?.value ?? undefined };
@@ -385,22 +415,96 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
   // The seller's net of the renewal, shared with the plan's payees by the seller's split, as at checkout.
   // Booked in one transaction with the renewal write (commerce/settle-purchase.ts).
   const net = plan.amount - percentFee(plan.amount, commerceFeePercent(config));
-  const { delivered: renewed } = await settlePurchase(storage, config, {
-    from: 'paid',
-    deliver: () => updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
-      ...withoutClaim(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
-      active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
-      last_order: reference, updated_at: new Date().toISOString(),
-    }), { tag: SUBSCRIPTION_ACTION }),
-    steps: [{
-      books: [{
-        kind: 'shares', sellerGhii, ext: sub.ext, action: SUBSCRIPTION_ACTION, net, currency: plan.currency,
-        designations: designationsOf(plan), trackingCode: `sub_${trackingCode}`, buyerRef: sub.buyer_ghii, reference,
+  let renewed: SubscriptionRecord | null | undefined;
+  try {
+    ({ delivered: renewed } = await settlePurchase(storage, config, {
+      from: 'paid',
+      deliver: () => updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
+        ...withoutClaim(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
+        active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
+        last_order: reference, updated_at: new Date().toISOString(),
+      }), { tag: SUBSCRIPTION_ACTION }),
+      steps: [{
+        books: [{
+          kind: 'shares', sellerGhii, ext: sub.ext, action: SUBSCRIPTION_ACTION, net, currency: plan.currency,
+          designations: designationsOf(plan), trackingCode: `sub_${trackingCode}`, buyerRef: sub.buyer_ghii, reference,
+        }],
+        tolerant: { message: 'subscriptions: the renewal\'s revenue split was not booked; the seller keeps the whole cut', context: { reference } },
       }],
-      tolerant: { message: 'subscriptions: the renewal\'s revenue split was not booked; the seller keeps the whole cut', context: { reference } },
-    }],
-  });
+    }));
+  } catch (err) {
+    return chargedNotRecorded({ storage, config }, { sub, plan, reference, trackingCode, handler, seller, spend, agent }, err);
+  }
   const nextUntil = renewed!.active_until;
   emitChange('commerce', sub.buyer_ghii);
   return { result: 'renewed', detail: nextUntil };
+}
+
+/**
+ * The card was charged and the period could not be written (a storage fault, or the record changing
+ * under every compare-and-set attempt). The charge is refunded through the payment method, as the
+ * package renewal and a checkout do (secaudit2026nov08b round 15). A refund that went through frees
+ * the period and gives the agent's daily count back, so the next daily run tries it again as after a
+ * declined card. A refund that did not go through is kept for the seller and the operator
+ * (undelivered-payment.ts) under the renewal's reference, and the period is marked so no later run
+ * charges it again. The buyer is told either way.
+ */
+async function chargedNotRecorded(
+  ctx: { storage: Storage; config: AimeatConfig },
+  r: {
+    sub: SubscriptionRecord; plan: SubscriptionPlan; reference: string; trackingCode: string; handler: PaymentHandler;
+    seller: { ghii: string; owner: string; psp: unknown };
+    spend: Parameters<typeof releaseAgentPurchase>[1]; agent: Parameters<typeof releaseAgentPurchase>[2];
+  },
+  err: unknown,
+): Promise<Pick<SubscriptionRenewalOutcome, 'result' | 'detail'>> {
+  const { storage } = ctx;
+  const { sub, plan, reference, trackingCode, handler, seller } = r;
+  const reason = err instanceof Error ? err.message : String(err);
+  const refund = await refundCollected(ctx, handler, { buyerGhii: sub.buyer_ghii, amount: plan.amount, trackingCode, seller });
+  const returned = refund.outcome === 'refunded' || refund.outcome === 'nothing_captured';
+  if (returned) {
+    await releaseAgentPurchase(storage, r.spend, r.agent)
+      .catch(e => logger.warn('subscriptions: could not give back an agent\'s purchase count', { reference, error: String(e) }));
+  } else {
+    await recordUndeliveredPayment(ctx, {
+      session: {
+        id: reference, buyerGhii: sub.buyer_ghii, sellerGhii: seller.ghii, total: plan.amount, currency: plan.currency,
+        items: [{ title: `Renewal of the subscription ${plan.title}` }],
+      } as unknown as CheckoutSessionRecord,
+      trackingCode, rail: handler.id, refund, reason: `The renewal was charged and its period could not be recorded: ${reason}`,
+    });
+  }
+  logger.error('subscriptions: a renewal was charged and its period could not be recorded', {
+    buyer: sub.buyer_ghii, ext: sub.ext, plan: sub.plan, reference, trackingCode, refund: refund.outcome, error: reason,
+  });
+  const at = new Date().toISOString();
+  const said = returned ? 'the charge was refunded' : `the charge was not returned (${refund.outcome})`;
+  try {
+    await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => (cur ? {
+      ...withoutClaim(cur),
+      last_failure: { at, reason: `[${sub.active_until}] The renewal was charged and could not be recorded; ${said}.` },
+      ...(returned ? {} : { unsettled_renewal: { reference, tracking_code: trackingCode, at } }),
+      updated_at: at,
+    } : UNCHANGED), { tag: SUBSCRIPTION_ACTION });
+  } catch (e) {
+    // The seller's undelivered record (read before every claim) still keeps a later run from charging.
+    logger.error('subscriptions: the renewal\'s failure could not be written on the subscription', { reference, error: String(e) });
+  }
+  const date = sub.active_until.slice(0, 10);
+  await notify(storage, sub.buyer_ghii, returned ? {
+    type: 'subscription_renewal_refunded',
+    title: `The renewal of ${plan.title} did not go through`,
+    body: `Your card was charged, and the renewal could not be saved, so the charge was refunded. The subscription ends on ${date} unless a renewal goes through. The renewal is tried again each day until then.`,
+    i18n: { key: 'subscription_renewal_refunded', vars: { name: plan.title, date } },
+  } : {
+    type: 'subscription_renewal_not_recorded',
+    title: `The renewal of ${plan.title} was charged and not saved`,
+    body: 'Your card was charged, and the renewal could not be saved. The refund did not go through, so the money was not returned. '
+      + `Contact the seller, or the people who run this node, and give them the reference ${reference}: the seller has a record of this payment. `
+      + 'This period is not charged again.',
+    i18n: { key: 'subscription_renewal_not_recorded', vars: { name: plan.title, reference } },
+  });
+  emitChange('notifications', sub.buyer_ghii);
+  return { result: 'failed', detail: `${reason}; ${said}` };
 }
