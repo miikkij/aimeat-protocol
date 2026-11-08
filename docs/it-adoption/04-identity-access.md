@@ -93,7 +93,7 @@ flowchart LR
   idp["Directory: user disabled or deleted"] -->|SCIM active:false or DELETE| deact
   op["Operator: Deactivate on the Owners tab, or aimeat_admin_owner_disable"] --> deact
   deact["Account deactivated<br/>flag written first"] --> creds["Every credential ends in the same request"]
-  deact --> bg["Schedules, workflow triggers, unattended extension runs wait"]
+  deact --> bg["Schedules, workflow triggers, unattended extension runs, queued AI jobs wait"]
   deact --> data["Data, memberships and history stay"]
   data -->|operator or the person, in person| erase["Erasure: DELETE /v1/owners/:name"]
   deact -->|aimeat_admin_owner_enable| react["Reactivated: the person signs in again, old credentials stay dead"]
@@ -105,9 +105,10 @@ flowchart LR
 | Personal access tokens | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
 | App grants | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
 | MCP OAuth tokens | Refused at every request; refresh tokens deleted | `aimeat/src/services/owner-lifecycle.ts` |
-| Live connector tunnels | Closed | `aimeat/src/services/owner-lifecycle.ts` |
+| Live connector tunnels | Closed, on every process of the node | `aimeat/src/services/owner-lifecycle.ts`, `aimeat/src/services/connect-tunnel-cross-process.ts` |
 | New sign-in | 403 `ACCOUNT_DISABLED` on every method, SAML included | `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/src/routes/saml-login.ts` |
 | Schedules, workflow triggers, unattended extension runs | Skipped with a log line, kept | `aimeat/src/services/owner-lifecycle.ts` |
+| AI jobs already queued, and jobs a restart or another process takes up | Wait in the queue with a sentence that names the deactivation; nothing is paid or written; they run after reactivation | `aimeat/src/services/ai-jobs/run-gate.ts` |
 | Data, organism memberships, history | Kept | [Organisation node sign-in](../organisation-node-sign-in.md), section 7 |
 | Other federated nodes | The federation attestation refuses the account | `aimeat/test/e2e-owner-deactivation.ts` |
 

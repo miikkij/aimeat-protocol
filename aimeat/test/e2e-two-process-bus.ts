@@ -16,7 +16,12 @@
  *     6. after the listening connections of A and B are dropped (pg_terminate_backend), B reads its
  *        registries again when it listens again, so a setting changed in the database while no
  *        event could arrive (registration closed with no NOTIFY) is in force on B; before the drop
- *        B does not see it, which shows the reconnect is what applied it.
+ *        B does not see it, which shows the reconnect is what applied it;
+ *     7-10. an agent rekeyed, an agent deleted and an account deactivated on A: the agent's tunnel on
+ *        B is told (auth_revoked) and detached, and a task created afterwards is not pushed there; a
+ *        still-valid agent's tunnel on B gets its task (secaudit2026nov08 round 14);
+ *     11. a peer removal committed with its registry mark but whose event never went out is in force
+ *        on B within the resync time (services/bus-relay.ts RegistryVersions).
  *
  *   WHY. With the bus in one process, a change made on A reached only A: B's pages did not update,
  *   B kept accepting a peer the operator had removed in an emergency, and B ran with the old settings
@@ -28,6 +33,8 @@
  *   so on a SQLite run the suite is skipped with that reason.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-two-process-bus
  * @version-history
+ *   v1.2.0 — 2026-11-08 — Cases 7-11: tunnel revocations across processes and a lost registry event
+ *     (secaudit2026nov08 round 14); cases 1-6 unchanged.
  *   v1.1.1 — 2026-11-05 — Both processes start with AIMEAT_NODE_PROCESSES=multiple, which several
  *     processes on one database now need (Jouni 2026-11-05, decision 6a); no assertion changed.
  *   v1.1.0 — 2026-11-04 — Case 6: a dropped listening connection, and the registries read again
@@ -303,6 +310,115 @@ try {
             await admin.end();
             await json('A', '/v1/admin/config', { method: 'PUT', token: op.token, body: JSON.stringify({ changes: [{ path: 'registration.mode', value: 'open' }] }) });
         }
+    });
+
+    // ── secaudit2026nov08 round 14: what a revocation on A does to a tunnel held by B ──
+    /** An agent of `owner` registered on A, with its tunnel connected to B. */
+    async function agentTunnelOnB(owner: RegisteredOwner, name: string) {
+        const reg = await json('A', '/v1/agents', { method: 'POST', token: owner.token, body: JSON.stringify({ name, owner: owner.name, capabilities: ['memory'], scopes: ['*'] }) });
+        assert(reg.status === 201, `agent ${name} on A: ${reg.status} ${short(reg.body)}`);
+        const gaii = reg.body.data.agent.gaii as string;
+        const timestamp = new Date().toISOString();
+        const tok = await json('A', '/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature: await sign(reg.body.data.private_key, gaii + timestamp) }) });
+        assert(tok.status === 200 && !!tok.body.data?.token, `agent token: ${tok.status} ${short(tok.body)}`);
+        const tunnel = await TunnelClient.connect(base('B'), tok.body.data.token);
+        await tunnel.waitForBacklog(3_000);
+        return { gaii, tunnel };
+    }
+    /** A task for `agent` (which still exists) created on A reaches nobody on B within 2 s. */
+    async function noDeliverAfter(owner: RegisteredOwner, agent: string, tunnel: TunnelClient): Promise<void> {
+        const t = await json('A', `/v1/agents/${agent}/tasks`, { method: 'POST', token: owner.token, body: JSON.stringify({ title: 'After the revocation', description: 'x', status: 'queued' }) });
+        assert(t.status === 201, `task on A: ${t.status} ${short(t.body)}`);
+        const d = await tunnel.waitForDeliver(2_000);
+        assert(d === null, `the tunnel on B still got a deliver frame after the revocation on A: ${short(d)}`);
+    }
+
+    await test('7. An agent rekeyed on A: its tunnel on B is told and detached, and a task created after it is not pushed there', async () => {
+        if (!op) skip('no setup');
+        const { gaii, tunnel } = await agentTunnelOnB(op, 'busrekey');
+        try {
+            const rk = await json('A', `/v1/agents/${encodeURIComponent(gaii)}/rekey`, { method: 'POST', token: op.token });
+            assert(rk.status === 200, `rekey on A: ${rk.status} ${short(rk.body)}`);
+            const revoked = await tunnel.waitForAuthRevoked(3_000);
+            assert(revoked !== null, 'the tunnel on B got no auth_revoked after the rekey on A');
+            await noDeliverAfter(op, 'busrekey', tunnel);
+        } finally { await tunnel.close(); }
+    });
+
+    await test('8. An agent deleted on A: its tunnel on B is told the reason', async () => {
+        if (!op) skip('no setup');
+        const { tunnel } = await agentTunnelOnB(op, 'busdel');
+        try {
+            const del = await json('A', '/v1/agents/busdel', { method: 'DELETE', token: op.token });
+            assert(del.status === 200, `delete on A: ${del.status} ${short(del.body)}`);
+            const revoked = await tunnel.waitForAuthRevoked(3_000);
+            assert(revoked !== null && (revoked as any).reason === 'deleted', `the tunnel on B: ${short(revoked)}`);
+        } finally { await tunnel.close(); }
+    });
+
+    await test('9. An account deactivated on A: its agent\'s tunnel on B is closed; reactivated, the account signs in again', async () => {
+        if (!op || !plain) skip('no setup');
+        const { tunnel } = await agentTunnelOnB(plain, 'busdeact');
+        try {
+            const off = await json('A', `/v1/admin/owners/${plain.name}/disable`, { method: 'POST', token: op.token });
+            assert(off.status === 200, `deactivate on A: ${off.status} ${short(off.body)}`);
+            const revoked = await tunnel.waitForAuthRevoked(3_000);
+            assert(revoked !== null, 'the tunnel on B got no auth_revoked after the deactivation on A');
+        } finally {
+            await tunnel.close();
+            await json('A', `/v1/admin/owners/${plain.name}/enable`, { method: 'POST', token: op.token });
+        }
+    });
+
+    await test('10. Control: a still-valid agent\'s tunnel on B gets its task after another agent was revoked', async () => {
+        if (!op) skip('no setup');
+        const { tunnel } = await agentTunnelOnB(op, 'buskeep');
+        try {
+            const t = await json('A', '/v1/agents/buskeep/tasks', { method: 'POST', token: op.token, body: JSON.stringify({ title: 'Still delivered', description: 'x', status: 'queued' }) });
+            assert(t.status === 201, `task on A: ${t.status} ${short(t.body)}`);
+            const d = await tunnel.waitForDeliver(3_000);
+            assert(d !== null && (d.payload as any)?.id === t.body.data.task.id, `deliver: ${short(d)}`);
+        } finally { await tunnel.close(); }
+    });
+
+    await test('11. A peer removal whose event never reached B is in force on B within the resync time', async () => {
+        if (!op || !nodeDb) skip('no setup');
+        const keys = await generateKeyPair();
+        const peerId = `aimeat-bus-lost-${stamp}`;
+        const add = await json('A', '/v1/federation/peers', { method: 'POST', token: op.token, body: JSON.stringify({ node_id: peerId, url: 'http://127.0.0.1:28768', public_key: keys.publicKey }) });
+        assert(add.status === 201, `add the peer on A: ${add.status} ${short(add.body)}`);
+        const act = await json('A', `/v1/federation/peers/${peerId}`, { method: 'PUT', token: op.token, body: JSON.stringify({ status: 'active' }) });
+        assert(act.status === 200, `activate the peer on A: ${act.status} ${short(act.body)}`);
+        let tick = 0;
+        const presence = async () => {
+            const timestamp = new Date(Date.now() + tick++).toISOString();
+            const signed = presenceSignString(peerId, timestamp, []);
+            return json('B', '/v1/federation/presence', {
+                method: 'POST',
+                body: JSON.stringify({ from_node_id: peerId, timestamp, updates: [], signature: await sign(keys.privateKey, signed), ...await audienceProof(keys.privateKey, signed, NODE_ID) }),
+            });
+        };
+        let known = await presence();
+        for (let i = 0; i < 20 && known.status !== 200; i++) { await sleep(100); known = await presence(); }
+        assert(known.status === 200, `B did not accept the peer A added: ${known.status} ${short(known.body)}`);
+
+        // The removal as a process that committed it and moved the registry's mark, then crashed
+        // before its NOTIFY went out: the row and the mark change in the database, and no event is sent.
+        const pg = (await import('pg')).default;
+        const admin = new pg.Client(nodeDb.dbUrl);
+        await admin.connect();
+        try {
+            const gone = await admin.query('DELETE FROM "FederationPeer" WHERE "nodeId" = $1', [peerId]);
+            assert(gone.rowCount === 1, `the peer row: ${gone.rowCount}`);
+            const mark = await admin.query(`UPDATE "Memory" SET "value" = jsonb_build_object('mark', md5(random()::text), 'at', now()::text)
+                WHERE "ownerGaii" = $1 AND "key" = 'bus.registry-version.federation'`, [`system@${NODE_ID}`]);
+            assert(mark.rowCount === 1, `the federation registry mark (written by the changes above): ${mark.rowCount} row(s)`);
+        } finally { await admin.end(); }
+        const removedAt = Date.now();
+        let after = await presence();
+        while (after.status === 200 && Date.now() - removedAt < 45_000) { await sleep(500); after = await presence(); }
+        assert(after.status !== 200, `B still accepts the removed peer ${Date.now() - removedAt} ms after the removal: ${after.status} ${short(after.body)}`);
+        console.log(`     (B dropped the peer ${Math.round((Date.now() - removedAt) / 1000)} s after the removal, with no event)`);
     });
 } finally {
     for (const p of procs) if (p.exit() === null) p.proc.kill();
