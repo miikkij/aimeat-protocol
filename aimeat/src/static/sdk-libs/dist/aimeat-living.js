@@ -3406,6 +3406,8 @@
       "shell.windowsRun": "Aja sitten tämä komento samassa kansiossa",
       "inward.keyWhere": "Liitä API-avain kutsuun kohtaan {placeholder}. Yllä oleva linkki avaa sivun, joka näyttää avaimen vain kerran, kun teet sen. Kopioi avain silloin.",
       "inward.ownerWhere": "Kirjoita käyttäjätunnuksesi kohtaan {placeholder}.",
+      "inward.signInWhy": "Ohjelman osoitteessa pitää olla käyttäjätunnuksesi, ja tämä sivu tietää sen vasta, kun olet kirjautunut. Kirjaudu sisään, niin tunnuksesi tulee alla olevaan kutsuun kohdan {placeholder} tilalle.",
+      "inward.signIn": "Kirjaudu sisään",
       "inward.agent": "Sano tämä omalle tekoälyllesi",
       "inward.range": "Sallittu väli",
       "outward.title": "Kun tämä muuttuu, kerro jollekin",
@@ -3478,6 +3480,8 @@
       "shell.windowsRun": "Then run this command in the same folder",
       "inward.keyWhere": "Put the API key in place of {placeholder} in the call. The link above opens the page that shows the key once, when you make it, so copy it then.",
       "inward.ownerWhere": "Write your username in place of {placeholder}.",
+      "inward.signInWhy": "The program's address must have your username, and this page knows it only when you are signed in. Sign in, and the call below gets your username in place of {placeholder}.",
+      "inward.signIn": "Sign in",
       "inward.agent": "Say this to your own AI",
       "inward.range": "The range it accepts",
       "outward.title": "When this changes, tell someone",
@@ -5398,6 +5402,8 @@
       key,
       owner,
       ownerKnown: !!owner,
+      /** The page does not know the account name: the dialog says so and offers the sign-in (ownerNotice). */
+      signInNeeded: !owner,
       keyPlaceholder: KEY_PLACEHOLDER,
       ownerPlaceholder: OWNER_PLACEHOLDER,
       settings: apex + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
@@ -5406,6 +5412,10 @@
       /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
       windows: windowsCall(address, KEY_PLACEHOLDER, { value: sample })
     };
+  }
+  function ownerNotice(receiver, canSignIn) {
+    if (receiver && receiver.ownerKnown) return null;
+    return canSignIn ? { kind: "signIn", words: "inward.signInWhy", button: "inward.signIn" } : { kind: "write", words: "inward.ownerWhere" };
   }
   function inwardShape(ctx) {
     const doc = ctx.doc || {};
@@ -5644,6 +5654,24 @@
       return "";
     }
   }
+  function signInOffer() {
+    try {
+      const auth = (
+        /** @type {any} */
+        window.AIMEAT && /** @type {any} */
+        window.AIMEAT.auth
+      );
+      if (!auth || typeof auth.signIn !== "function") return null;
+      if (typeof auth.getSession === "function" && auth.getSession()) return null;
+      return function() {
+        return Promise.resolve(auth.signIn());
+      };
+    } catch (e) {
+      console.warn("[aimeat-living] The page's sign-in could not be read:", e && /** @type {Error} */
+      e.message);
+      return null;
+    }
+  }
   async function ownerRead(path) {
     try {
       const ns = (
@@ -5842,6 +5870,31 @@
     copyBlock(fold, { label: words2("shell.windowsRun"), text: call.curl, langs });
     host.appendChild(fold);
   }
+  function ownerNoticeBlock(host, notice, placeholder, words2, signIn, onSignedIn) {
+    if (!notice) return;
+    const box = document.createElement("div");
+    box.className = "ak-living__dialog-signin";
+    box.setAttribute("data-ak-part", "signIn");
+    const line = document.createElement("p");
+    line.className = "ak-living__dialog-signin-text";
+    line.textContent = fill(words2(notice.words), { placeholder });
+    box.appendChild(line);
+    if (notice.kind === "signIn" && signIn) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ak-btn ak-btn--primary ak-living__dialog-test";
+      button.textContent = words2(notice.button);
+      button.addEventListener("click", function() {
+        signIn().then(function(session) {
+          if (session) onSignedIn(session);
+        }).catch(function(e) {
+          console.debug("[aimeat-living] sign-in closed", e);
+        });
+      });
+      box.appendChild(button);
+    }
+    host.appendChild(box);
+  }
   function openInward(spec) {
     const langs = typeof spec.langs === "function" ? spec.langs : function() {
       return [];
@@ -5855,14 +5908,14 @@
       return say(key, langs());
     };
     const subjectNode = (((spec.doc || {}).model || {}).nodes || {})[shape.subject] || {};
-    const draft = {
+    const draft = Object.assign({
       road: shape.road,
       url: shape.url,
       path: shape.path,
       every: shape.every,
       key: shape.key,
       headers: Object.assign({}, subjectNode.headers || {})
-    };
+    }, spec.draft || {});
     let vault = [];
     const k = kit();
     const handle = k.dialog({
@@ -5968,6 +6021,17 @@
         receiverLink.textContent = words2("inward.receiverMake");
         receiverLine.appendChild(receiverLink);
         keyRoad.body.appendChild(receiverLine);
+        ownerNoticeBlock(
+          keyRoad.body,
+          ownerNotice(shape.receiver, !!signInOffer()),
+          shape.receiver.ownerPlaceholder,
+          words2,
+          signInOffer(),
+          function() {
+            handle.close("signed-in");
+            openInward(Object.assign({}, spec, { draft: Object.assign({}, draft) }));
+          }
+        );
         copyBlock(keyRoad.body, {
           label: words2("inward.receiverCall") + " (" + words2("shell.posix") + ")",
           text: shape.receiver.curl,
@@ -5976,7 +6040,7 @@
         windowsBlock(keyRoad.body, shape.receiver.windows, words2, langs);
         const keyWhere = document.createElement("p");
         keyWhere.className = "ak-living__dialog-range";
-        keyWhere.textContent = fill(words2("inward.keyWhere"), { placeholder: shape.receiver.keyPlaceholder }) + (shape.receiver.ownerKnown ? "" : " " + fill(words2("inward.ownerWhere"), { placeholder: shape.receiver.ownerPlaceholder }));
+        keyWhere.textContent = fill(words2("inward.keyWhere"), { placeholder: shape.receiver.keyPlaceholder });
         keyRoad.body.appendChild(keyWhere);
         copyBlock(keyRoad.body, {
           label: words2("inward.write") + " (" + words2("shell.posix") + ")",

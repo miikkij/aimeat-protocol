@@ -26,9 +26,11 @@
  *   both ordinary states on a new account, and a select with no options in it reads as a broken
  *   control. Both answer with one sentence and a door to where the thing is made.
  * @structure group · fields · copyBlock · statusLine · vocabularyNote · apexPage · signedInOwner ·
- *   ownerRead · pickOrWords · secretPicker · headerEditor
+ *   signInOffer · ownerRead · pickOrWords · secretPicker · headerEditor
  * @usage  import { group, fields, copyBlock, headerEditor } from './dialog-parts.js';
  * @version-history
+ *   v0.7.2 -- 2026-11-08 -- signInOffer(): the page's own sign-in, when the auth library is here and
+ *     nobody is signed in, for the inward dialog's program road (secaudit2026nov08b round 15c).
  *   v0.7.1 -- 2026-11-08 -- signedInOwner(): the session's account name, which the inward dialog puts
  *     in the program road's address (secaudit2026nov08b round 15b).
  *   v0.7.0 — 2026-09-06 — The header editor, the secret picker over the owner's vault, and
@@ -166,6 +168,26 @@ export function signedInOwner() {
     // The address then keeps its placeholder, and the dialog says what goes in its place.
     console.warn('[aimeat-living] The signed-in account could not be read:', e && /** @type {Error} */ (e).message);
     return '';
+  }
+}
+
+/**
+ * The page's interactive sign-in (AIMEAT.auth.signIn), when the auth library is loaded and nobody is
+ * signed in. Null otherwise: on a page without the library, and when a session exists already
+ * (signIn() would answer that session again). Called inside a click, because on an app origin it
+ * opens the grant window, and a browser opens a window only inside a user gesture.
+ * @returns {(() => Promise<any>)|null}
+ */
+export function signInOffer() {
+  try {
+    const auth = /** @type {any} */ (window).AIMEAT && /** @type {any} */ (window).AIMEAT.auth;
+    if (!auth || typeof auth.signIn !== 'function') return null;
+    if (typeof auth.getSession === 'function' && auth.getSession()) return null;
+    return function () { return Promise.resolve(auth.signIn()); };
+  } catch (e) {
+    // The notice then says to write the username in, as on a page without the auth library.
+    console.warn('[aimeat-living] The page\'s sign-in could not be read:', e && /** @type {Error} */ (e).message);
+    return null;
   }
 }
 

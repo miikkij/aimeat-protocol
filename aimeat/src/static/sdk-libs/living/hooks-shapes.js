@@ -18,11 +18,15 @@
  *   is opened. Not a sample, not a schema: the object that would leave if the machine moved now,
  *   built by the same payload.js the delivery uses. If those two ever disagree, the dialog is
  *   lying, which is why they are one function called twice rather than two functions.
- * @structure inwardShape(ctx) · outwardShape(ctx) · memoryKeyFor(doc, id) · ownerForAddress(owner, nodeId)
+ * @structure inwardShape(ctx) · outwardShape(ctx) · memoryKeyFor(doc, id) · ownerForAddress(owner, nodeId) ·
+ *   ownerNotice(receiver, canSignIn)
  * @usage
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.5 -- 2026-11-08 -- The program road carries `signInNeeded`, and ownerNotice() says what the
+ *     dialog shows when the address cannot carry the account name: a sign-in on a page that can sign
+ *     the person in, a line to write the name on a page that cannot (secaudit2026nov08b round 15c).
  *   v0.7.4 -- 2026-11-08 -- The key's placeholder says `<your API key>`: a receiver is an incoming
  *     webhook and its key an API key in every text (developer, 2026-11-08; secaudit2026nov08b round 15b).
  *   v0.7.3 -- 2026-11-08 -- The program road's address is the node's own (ctx.apex), not the app's
@@ -144,6 +148,8 @@ function receiverRoad(apex, owner, key, doc, id, sample) {
     key: key,
     owner: owner,
     ownerKnown: !!owner,
+    /** The page does not know the account name: the dialog says so and offers the sign-in (ownerNotice). */
+    signInNeeded: !owner,
     keyPlaceholder: KEY_PLACEHOLDER,
     ownerPlaceholder: OWNER_PLACEHOLDER,
     settings: apex + '/v1/profile?tab=receivers&new=key&key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name),
@@ -155,6 +161,23 @@ function receiverRoad(apex, owner, key, doc, id, sample) {
     /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
     windows: windowsCall(address, KEY_PLACEHOLDER, { value: sample }),
   };
+}
+
+/**
+ * What the program road says about the account name in its address. Null when the address carries
+ * it. Otherwise a notice above the call: `signIn` on a page that can sign the person in (the auth
+ * library is loaded and nobody is signed in), with the sentence and the button's words; `write` on a
+ * page that cannot (no auth library, or a session whose name this node's address cannot carry),
+ * where the person writes the name in place of the placeholder. The words are keys of hooks-words.js
+ * and their `{placeholder}` is the receiver's ownerPlaceholder.
+ * @param {{ ownerKnown?: boolean }|null|undefined} receiver @param {boolean} canSignIn
+ * @returns {{ kind: 'signIn', words: string, button: string }|{ kind: 'write', words: string }|null}
+ */
+export function ownerNotice(receiver, canSignIn) {
+  if (receiver && receiver.ownerKnown) return null;
+  return canSignIn
+    ? { kind: 'signIn', words: 'inward.signInWhy', button: 'inward.signIn' }
+    : { kind: 'write', words: 'inward.ownerWhere' };
 }
 
 /**
