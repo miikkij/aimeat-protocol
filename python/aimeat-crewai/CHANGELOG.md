@@ -3,7 +3,10 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
-## 0.39.1 - 2026-11-08
+## 0.40.0 - 2026-11-08
+
+A minor release, as 0.39.0 was: two calls that went out before are now refused, each with the reason
+and what to do instead.
 
 - **A stored agent token goes only to that agent's own node.** When one connector home holds
   agents on two nodes, `decide()`, `capabilities()`, `node_llm()` and a crew's node LLM sent the
