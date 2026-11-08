@@ -19,6 +19,10 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   2026-11-08 — A form writes its submissions as the identity that stored its config record, not as
+ *     the `ownerGhii` the config value names (services/intake/form-owner.ts): a manager's plain memory
+ *     write of a config, and a restored backup of another member's form, named another account there
+ *     (secaudit2026nov08b round 15, routes/organisms/intake:form-config-ownerGhii-trusted-from-stored-value).
  *   2026-10-25 — POST, GET and DELETE /v1/intake/forms refuse an agent that an organism with
  *     agentAccess 'listed' does not admit, 403 AGENT_NOT_ADMITTED, as every /v1/organisms/:id route
  *     does (secaudit2026oct22, intake.ts:requireWsOwner:listed-agent-gate-missing).
@@ -84,6 +88,7 @@ import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { agentBarred, agentBarredMessage } from '../../services/organism-agent-access.js';
+import { formConfigOfRecord } from '../../services/intake/form-owner.js';
 
 /** Server-trusted intake-form config, stored at organism.{org}.w.{ws}.meta.intake.{formId}. */
 interface IntakeFormConfig {
@@ -134,8 +139,9 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
    *  submission obeys, and only the workspace's creator or an organism admin writes it. */
   const readFormRecord = (org: string, ws: string, formId: string) =>
     readWorkspaceMetaRecord(storage, org, ws, `meta.intake.${formId}`, config.nodeId);
+  /** The form's owner is the identity that stored the config record (services/intake/form-owner.ts). */
   async function readForm(org: string, ws: string, formId: string): Promise<IntakeFormConfig | null> {
-    return ((await readFormRecord(org, ws, formId))?.value as IntakeFormConfig | undefined) ?? null;
+    return formConfigOfRecord<IntakeFormConfig>(await readFormRecord(org, ws, formId));
   }
 
   /** Only the workspace creator (or an org admin) may manage that workspace's intake forms. Returns the

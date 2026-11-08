@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-08 -- e2e-intake-form-owner.ts joins the list (not the guard tier): a public intake form writes its submissions as the identity that stored its config, not as an account the config value names (secaudit2026nov08b round 15).
  *   2026-11-08 -- e2e-workspace-reserved-parts.ts joins the list (not the guard tier): the node-reserved parts of a workspace are no space of any manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
  *   2026-11-08 -- e2e-schema-lock-holders.ts joins the list (not the guard tier): a CSM's lock belongs to its registering account, a wildcard lock does not outrank another account's deeper lock, a package's cortex asks the lock rule, and an erased account's locks do not pass to the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-08 -- e2e-csm-ownership.ts joins the list (not the guard tier): only the registering account's own receivers block a CSM delete, a package CSM takes the installer's prefix, the next account of an erased name has no CSM rights, a private CSM's schema-lock row is not public (secaudit2026nov08 round 14).
@@ -1275,6 +1276,9 @@ const ALL_SUITES = [
     // only way out of it. Four refusals guard the door, including an operator's own '*' agent.
     'test/e2e-organism-owner-repair.ts',
     'test/e2e-intake.ts',
+    // A form writes its submissions as the identity that stored its config, never as an account
+    // the config value names.
+    'test/e2e-intake-form-owner.ts',
     // A conversation through an intake form: a visitor's token opens one conversation and no
     // other, and the node's caps refuse before a write.
     'test/e2e-intake-thread.ts',
