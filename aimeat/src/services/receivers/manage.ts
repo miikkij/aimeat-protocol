@@ -28,6 +28,8 @@
  *   operatorSetStopped · operatorDecide · mintReceiverKey · receiversUsingCsm
  * @usage const out = await createOrPropose(deps, caller, body, { propose: false });
  * @version-history
+ *   2026-11-08 — receiversUsingCsm names each receiver's account, so a CSM delete is blocked only by
+ *     the registering account's own receivers (ruling 2 of 2026-11-08; secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { randomUUID } from 'node:crypto';
@@ -40,7 +42,7 @@ import { appMayWriteKey, isServerWrittenKey } from '../../utils/reserved-keys.js
 import { localAccountName } from '../../utils/gaii.js';
 import { isSecretRecordKey } from '../secret-records.js';
 import { newPartyKey, hashPartyKey } from '../parties/keys.js';
-import { getCsmCompiled, csmMayRead } from '../csm-service.js';
+import { getCsmCompiled, csmMayRead, type CsmUse } from '../csm-service.js';
 import {
     RECEIVERS_READ_SCOPE, RECEIVERS_MANAGE_SCOPE, RECEIVER_KEY_PREFIX, RECEIVER_MAXIMA, RECEIVER_DEFAULTS,
     normalizeReceiverInput, receiverView, effectiveState, validateReceiverName,
@@ -404,11 +406,20 @@ export async function operatorDecide(deps: ReceiverDeps, caller: CallerContext, 
     return { receiver: { owner, ...view(deps, owner, out) } };
 }
 
-/** The receivers that check messages against a CSM, as "owner/name": the CSM delete refuses while there are any. */
-export async function receiversUsingCsm(storage: Storage, csmName: string): Promise<string[]> {
+/**
+ * The receivers that check messages against a CSM, as "receiver owner/name" with the owning account.
+ * The CSM delete refuses while the registering account has any; another account's receiver keeps its
+ * own copy of the schema and its owner is told instead (csm-service.ts deleteCsmAs, ruling 2 of 2026-11-08).
+ */
+export async function receiversUsingCsm(storage: Storage, csmName: string): Promise<CsmUse[]> {
     const all = await listAllReceivers(storage);
     return all.filter(x => x.receiver.schema?.csm === csmName)
-        .map(x => `receiver ${localAccountName(x.ownerGhii)}/${x.receiver.name}`);
+        .map(x => ({
+            label: `receiver ${localAccountName(x.ownerGhii)}/${x.receiver.name}`,
+            account: localAccountName(x.ownerGhii),
+            name: x.receiver.name,
+            link: '/v1/profile?tab=receivers',
+        }));
 }
 
 /** The verbs a receiver takes, for a reader that names them. */
