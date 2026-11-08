@@ -7,6 +7,9 @@
  *   create is upsert (re-upload replaces), sumStorageBytesForOwners is one cross-identity aggregate,
  *   listStorageFiles omits the bytes.
  * @version-history
+ *   2026-11-08 — `rowVersion` (migration 0128): every write of a row gives it a new random token, and
+ *     moveStorageFileBytes writes only where the bytes live, and only while the row still has the token
+ *     the move read (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
  *   2026-10-30 — listStorageFilesInDatabase is listStorageFilesIn: the files of the database or of one
  *     store id (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — `blobRef` is written and read on every path (migration 0121): a row whose bytes are an
@@ -28,8 +31,9 @@
  *     string V8 refuses, and the process exited. createStorageFile binds the bytes once (the update
  *     half reads `excluded`): bound twice, a file over 512 MB passed Postgres's 1 GB message limit.
  */
+import { randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
-import type { ChunkedUploadRecord, StorageFileRecord } from '../../../interface.js';
+import type { ChunkedUploadRecord, StorageFileBytesMove, StorageFileRecord } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { utf8VerdictFor } from '../../../../utils/app-content-type.js';
 
@@ -77,12 +81,12 @@ async function readInSlices(self: PostgresKyselyStorage, ownerGaii: string, key:
 }
 
 /** Every column except the bytes: what a metadata read, a listing and a range reply select. */
-const META_COLUMNS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'aiProvenanceId', 'blobRef', 'createdAt'] as const;
+const META_COLUMNS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'aiProvenanceId', 'blobRef', 'rowVersion', 'createdAt'] as const;
 
 interface FileRow {
   key: string; ownerGaii: string; visibility: string; groupId: string | null; workspaceRef: string | null;
   mimeType: string; size: number; tags: string[] | null; federate: boolean | null; utf8Verified?: boolean | null;
-  aiProvenanceId: string | null; blobRef: string | null; createdAt: Date | string;
+  aiProvenanceId: string | null; blobRef: string | null; rowVersion?: string | null; createdAt: Date | string;
 }
 
 /** One row shape, one record shape: `data` is passed in because only the caller knows whether it read the bytes. */
@@ -93,6 +97,7 @@ function toRecord(r: FileRow, data: Buffer): StorageFileRecord {
     size: r.size, data, tags: r.tags || [], federate: r.federate ?? false,
     aiProvenanceId: r.aiProvenanceId ?? undefined,
     blobRef: r.blobRef ?? undefined,
+    rowVersion: r.rowVersion ?? undefined,
     utf8Verified: r.utf8Verified ?? undefined,
     createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
   };
@@ -110,6 +115,8 @@ export const fileMethods = {
       // A re-upload under the same key replaces the record too: new bytes, new statement or none.
       aiProvenanceId: file.aiProvenanceId ?? null,
       blobRef: file.blobRef ?? null,
+      // Never the caller's: a write is a new version of the row, whatever the record it came from.
+      rowVersion: randomUUID(),
     };
     // THE BYTES ARE BOUND ONCE. The update half names the row the insert proposed (`excluded`)
     // instead of repeating the values. Repeating them bound `data` as two parameters of one
@@ -123,8 +130,9 @@ export const fileMethods = {
         groupId: eb.ref('excluded.groupId'), workspaceRef: eb.ref('excluded.workspaceRef'),
         createdAt: eb.ref('excluded.createdAt'), utf8Verified: eb.ref('excluded.utf8Verified'),
         aiProvenanceId: eb.ref('excluded.aiProvenanceId'), blobRef: eb.ref('excluded.blobRef'),
+        rowVersion: eb.ref('excluded.rowVersion'),
       }))).execute();
-    return { ...file, utf8Verified: utf8Verified ?? undefined };
+    return { ...file, rowVersion: shared.rowVersion, utf8Verified: utf8Verified ?? undefined };
   },
 
   async getStorageFile(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
@@ -206,28 +214,46 @@ export const fileMethods = {
   },
 
   async updateFileTagsByKey(this: PostgresKyselyStorage, ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null> {
-    const r = await this.db.updateTable('StorageFile').set({ tags }).where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
+    const r = await this.db.updateTable('StorageFile').set({ tags, rowVersion: randomUUID() }).where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
     if (Number(r.numUpdatedRows ?? 0) === 0) return null;
     return this.getStorageFile(ownerGaii, key);
   },
 
   async updateFileVisibility(this: PostgresKyselyStorage, ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null> {
-    const data = workspaceRef === undefined ? { visibility } : { visibility, workspaceRef: workspaceRef || null };
+    const rowVersion = randomUUID();
+    const data = workspaceRef === undefined ? { visibility, rowVersion } : { visibility, workspaceRef: workspaceRef || null, rowVersion };
     const r = await this.db.updateTable('StorageFile').set(data).where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
     if (Number(r.numUpdatedRows ?? 0) === 0) return null;
     return this.getStorageFile(ownerGaii, key);
   },
 
   async setStorageFileProvenance(this: PostgresKyselyStorage, ownerGaii: string, key: string, aiProvenanceId: string): Promise<boolean> {
-    const r = await this.db.updateTable('StorageFile').set({ aiProvenanceId })
+    const r = await this.db.updateTable('StorageFile').set({ aiProvenanceId, rowVersion: randomUUID() })
       .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) > 0;
   },
 
   async setStorageFileBlobRef(this: PostgresKyselyStorage, ownerGaii: string, key: string, blobRef: string, size: number): Promise<boolean> {
-    const r = await this.db.updateTable('StorageFile').set({ blobRef, data: Buffer.alloc(0) })
+    const r = await this.db.updateTable('StorageFile').set({ blobRef, data: Buffer.alloc(0), rowVersion: randomUUID() })
       .where('ownerGaii', '=', ownerGaii).where('key', '=', key)
       .where('blobRef', 'is', null).where('size', '=', size).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+
+  async moveStorageFileBytes(this: PostgresKyselyStorage, ownerGaii: string, key: string, move: StorageFileBytesMove): Promise<boolean> {
+    // Only the columns that say where the bytes are. The others (visibility, tags, provenance, the
+    // workspace binding) are not written at all, and the compare on the version keeps a move from
+    // landing on a row that changed after it was read. NULL compares as a value: a row from before
+    // migration 0128 has no version until its first write.
+    const r = await this.db.updateTable('StorageFile')
+      .set({
+        blobRef: move.blobRef ?? null, data: move.data, size: move.size,
+        utf8Verified: move.utf8Verified ?? null, rowVersion: randomUUID(),
+      })
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key)
+      .where(sql<boolean>`"rowVersion" IS NOT DISTINCT FROM ${move.expect.rowVersion ?? null}`)
+      .where(sql<boolean>`"blobRef" IS NOT DISTINCT FROM ${move.expect.blobRef ?? null}`)
+      .executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) > 0;
   },
 

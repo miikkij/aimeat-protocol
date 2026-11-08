@@ -11,7 +11,8 @@
  *   BY ITSELF. It runs once when the node starts and with the daily file store sweep (core-jobs.ts), so
  *   an operator runs nothing. Each run moves at most RETURN_MAX_PER_RUN files and the next run goes on.
  *   A move keeps the file's key, owner, visibility, tags and provenance; only where its bytes live
- *   changes (relocateStorageFile, which leaves a file alone that changed while it was being moved).
+ *   changes (relocateStorageFile, whose write lands only on the row it read, so a change made while
+ *   the bytes were on their way stays; a file that keeps changing is left where it is for the next run).
  *
  *   A store this node can no longer reach is passed over: its files cannot be read to be moved.
  *
@@ -23,6 +24,8 @@
  * @structure RETURN_MAX_PER_RUN · ReturnResult · returnUntakenFiles
  * @usage const r = await returnUntakenFiles({ storage, config });
  * @version-history
+ *   v1.0.2 — 2026-11-08 — The header says how a move keeps a change made during it (secaudit2026nov08b
+ *     round 15b, file-store/relocate-from-store-rewrites-stale-row); the code is unchanged.
  *   v1.0.1 — 2026-11-08 — The per-file ceiling and, for a person's own store, the storage quota decide
  *     whether a file comes into the database (secaudit2026nov08b round 15,
  *     file-store/relocate-to-database-without-file-or-quota-ceiling).

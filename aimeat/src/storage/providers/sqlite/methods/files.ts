@@ -8,6 +8,9 @@
  * @structure fileMethods
  * @usage Object.assign(SqliteStorage.prototype, fileMethods) in ../index.ts
  * @version-history
+ *   2026-11-08 — `rowVersion` (Postgres 0128): every write of a row gives it a new random token, and
+ *     moveStorageFileBytes writes only where the bytes live, and only while the row still has the token
+ *     the move read (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
  *   2026-10-30 — listStorageFilesInDatabase is listStorageFilesIn: the files of the database or of one
  *     store id (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — `blobRef` written and read on every path (Postgres 0121), the caller's UTF-8 verdict
@@ -20,7 +23,8 @@
  *     from identity-nodes.ts; 11 methods (createStorageFile, getStorageFile, getStorageFileMeta, …) moved
  *     here from storage-files.ts so the file mirrors postgres-kysely/methods/files.ts (secaudit 2026-10, M8).
  */
-import type { ChunkedUploadRecord, StorageFileRecord } from '../../../interface.js';
+import { randomUUID } from 'node:crypto';
+import type { ChunkedUploadRecord, StorageFileBytesMove, StorageFileRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { sumStorageBytesForOwners as sumStorageBytesForOwnersRepo } from '../repos/storage-file.js';
 import { utf8VerdictFor } from '../../../../utils/app-content-type.js';
@@ -47,12 +51,13 @@ function fileRowToRecord(r: Record<string, unknown>, data: Buffer): StorageFileR
   if (r.utf8Verified !== null && r.utf8Verified !== undefined) record.utf8Verified = r.utf8Verified === 1;
   if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId as string;
   if (r.blobRef) record.blobRef = r.blobRef as string;
+  if (r.rowVersion) record.rowVersion = r.rowVersion as string;
   return record;
 }
 
 /** Everything except the bytes — the columns a metadata read, a listing and a range reply all need. */
 const META_COLUMNS =
-  'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, aiProvenanceId, blobRef, createdAt';
+  'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, aiProvenanceId, blobRef, rowVersion, createdAt';
 
 /** What a font file is, by its name or by its type. The same test on Postgres (methods/files.ts). */
 const FONT_FILE_WHERE =
@@ -94,6 +99,8 @@ export const fileMethods = {
     // A row whose bytes are an object elsewhere keeps the verdict the file-store wrapper settled from
     // the real bytes; the empty `data` it arrives with would measure as valid.
     const utf8Verified = file.blobRef ? (file.utf8Verified ?? null) : utf8VerdictFor(file);
+    // Never the caller's: a write is a new version of the row, whatever the record it came from.
+    const rowVersion = randomUUID();
     this.db.prepare(
       // The `accessCode` column stays in the table and is written by nobody. It was on
       // StorageFileRecord, stored here and absent from Postgres entirely, and no route on either
@@ -101,8 +108,8 @@ export const fileMethods = {
       // which have their own field and their own doors. Removed from the record on 2026-09-06
       // (review item 5.7) rather than mirrored into Postgres: a field nothing keeps is the same
       // false promise that hid the two real ones beside it, and the column is always NULL.
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, tags, createdAt, federate, utf8Verified, aiProvenanceId, blobRef)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, tags, createdAt, federate, utf8Verified, aiProvenanceId, blobRef, rowVersion)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       file.ownerGaii, file.key, file.visibility, file.groupId ?? null, file.workspaceRef ?? null,
       file.mimeType, file.size, file.data,
@@ -111,8 +118,9 @@ export const fileMethods = {
       utf8Verified === null ? null : (utf8Verified ? 1 : 0),
       file.aiProvenanceId ?? null,
       file.blobRef ?? null,
+      rowVersion,
     );
-    return { ...file, utf8Verified: utf8Verified ?? undefined };
+    return { ...file, rowVersion, utf8Verified: utf8Verified ?? undefined };
   },
 
   async getStorageFile(this: SqliteStorage, ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
@@ -187,8 +195,8 @@ export const fileMethods = {
 
   async updateFileTagsByKey(this: SqliteStorage, ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null> {
     const result = this.db.prepare(
-      'UPDATE storage_files SET tags = ? WHERE ownerGaii = ? AND key = ?'
-    ).run(JSON.stringify(tags), ownerGaii, key);
+      'UPDATE storage_files SET tags = ?, rowVersion = ? WHERE ownerGaii = ? AND key = ?'
+    ).run(JSON.stringify(tags), randomUUID(), ownerGaii, key);
     if (result.changes === 0) return null;
     return this.getStorageFile(ownerGaii, key);
   },
@@ -197,23 +205,35 @@ export const fileMethods = {
     // workspaceRef undefined → change visibility only (keep any existing ref); provided → set both
     // (pass '' to clear). Lets a caller flip a file to 'workspace' AND bind it to its org/ws in one call.
     const result = workspaceRef === undefined
-      ? this.db.prepare('UPDATE storage_files SET visibility = ? WHERE ownerGaii = ? AND key = ?').run(visibility, ownerGaii, key)
-      : this.db.prepare('UPDATE storage_files SET visibility = ?, workspaceRef = ? WHERE ownerGaii = ? AND key = ?').run(visibility, workspaceRef || null, ownerGaii, key);
+      ? this.db.prepare('UPDATE storage_files SET visibility = ?, rowVersion = ? WHERE ownerGaii = ? AND key = ?').run(visibility, randomUUID(), ownerGaii, key)
+      : this.db.prepare('UPDATE storage_files SET visibility = ?, workspaceRef = ?, rowVersion = ? WHERE ownerGaii = ? AND key = ?').run(visibility, workspaceRef || null, randomUUID(), ownerGaii, key);
     if (result.changes === 0) return null;
     return this.getStorageFile(ownerGaii, key);
   },
 
   async setStorageFileProvenance(this: SqliteStorage, ownerGaii: string, key: string, aiProvenanceId: string): Promise<boolean> {
     const result = this.db.prepare(
-      'UPDATE storage_files SET aiProvenanceId = ? WHERE ownerGaii = ? AND key = ?',
-    ).run(aiProvenanceId, ownerGaii, key);
+      'UPDATE storage_files SET aiProvenanceId = ?, rowVersion = ? WHERE ownerGaii = ? AND key = ?',
+    ).run(aiProvenanceId, randomUUID(), ownerGaii, key);
     return result.changes > 0;
   },
 
   async setStorageFileBlobRef(this: SqliteStorage, ownerGaii: string, key: string, blobRef: string, size: number): Promise<boolean> {
     const result = this.db.prepare(
-      "UPDATE storage_files SET blobRef = ?, data = X'' WHERE ownerGaii = ? AND key = ? AND blobRef IS NULL AND size = ?",
-    ).run(blobRef, ownerGaii, key, size);
+      "UPDATE storage_files SET blobRef = ?, data = X'', rowVersion = ? WHERE ownerGaii = ? AND key = ? AND blobRef IS NULL AND size = ?",
+    ).run(blobRef, randomUUID(), ownerGaii, key, size);
+    return result.changes > 0;
+  },
+
+  async moveStorageFileBytes(this: SqliteStorage, ownerGaii: string, key: string, move: StorageFileBytesMove): Promise<boolean> {
+    // Only the columns that say where the bytes are, and only while the row is the one the move read.
+    // `IS` compares NULL as a value: a row from before the rowVersion column has none until its first write.
+    const v = move.utf8Verified;
+    const result = this.db.prepare(
+      `UPDATE storage_files SET blobRef = ?, data = ?, size = ?, utf8Verified = ?, rowVersion = ?
+       WHERE ownerGaii = ? AND key = ? AND rowVersion IS ? AND blobRef IS ?`,
+    ).run(move.blobRef ?? null, move.data, move.size, v === undefined ? null : (v ? 1 : 0), randomUUID(),
+      ownerGaii, key, move.expect.rowVersion ?? null, move.expect.blobRef ?? null);
     return result.changes > 0;
   },
 
