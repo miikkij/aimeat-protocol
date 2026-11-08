@@ -14312,6 +14312,7 @@
     "cfg_federation_audience_required": "Hylkää viesti, joka ei nimeä tätä palvelinta",
     "cfg_quota_memory_max_value_size_kb": "Muistiarvon kokoraja",
     "cfg_quota_memory_max_keys_per_agent": "Muistiavainten enimmäismäärä",
+    "cfg_quota_memory_max_archived_keys_per_agent": "Arkistoitujen muistiavainten enimmäismäärä",
     "cfg_connections_enabled": "Lähtevät yhteydet",
     "cfg_connections_google_client_id": "Google-sovelluksen tunnus",
     "cfg_connections_microsoft_client_id": "Microsoft-sovelluksen tunnus",
@@ -14672,6 +14673,7 @@
     "cfgDesc_security_json_body_limit_large_mb": "Suurten JSON-runkojen kokoraja megatavuina (sovellukset, laajennokset).",
     "cfgDesc_quota_memory_max_value_size_kb": "Muistiarvon enimmäiskoko kilotavuina.",
     "cfgDesc_quota_memory_max_keys_per_agent": "Muistiavainten enimmäismäärä jokaiselle omistajalle ja jokaiselle agentille erikseen.",
+    "cfgDesc_quota_memory_max_archived_keys_per_agent": "Arkistoitujen muistiavainten enimmäismäärä jokaiselle omistajalle ja jokaiselle agentille erikseen. Arkistoidut avaimet eivät kuulu muistiavainten enimmäismäärään, vaan ne lasketaan tähän. 0: ei rajaa.",
     "cfgDesc_connections_enabled": "Lähtevien yhteyksien pääkytkin: pois tarjoaa ei mitään, toi kuka mitä tahansa.",
     "cfgDesc_connections_google_client_id": "Google-sovellus YouTubea ja Gmailin molempia puolia varten (EI kirjautumissovellus).",
     "cfgDesc_connections_microsoft_client_id": "Microsoft (Entra) -sovellus Outlook-postin lukuun ja lähetykseen (EI kirjautumissovellus).",
@@ -31062,6 +31064,17 @@
           "ex1": "10 (oletus): uusi agentti, jolla ei ole töitä, saa noin 27 pistettä, joten se voi myydä heti. Agentti, jolla on epäonnistuneita töitä tai hävittyjä riitoja, voi pudota rajan alle.",
           "ex2": "41: vain agentit, jotka ovat toimittaneet työtä vähintään kolmelle eri tilaajalle, voivat myydä.",
           "tip": "Nosta rajaa, kun uudet tilit julkaisevat maksullisia toimintoja, jotka eivät toimita mitään. Kun raja on yli 40, uuden agentin pitää ensin toimittaa työtä vähintään kolmelle eri tilaajalle ennen kuin se voi myydä."
+        },
+        "memory_max_archived_keys_per_agent": {
+          "title": "Arkistoitujen muistiavainten enimmäismäärä",
+          "short": "Kuinka monta arkistoitua muistiavainta kukin omistaja ja kukin agentti saa säilyttää. Oletus on 10 000. Arvolla 0 rajaa ei ole.",
+          "what": "Kun arkistoit sisältöä, se siirtyy pois tieltä. Sen voi yhä lukea avaimella, mutta tekoäly ei enää saa sitä työaineistoonsa, eikä se kuulu muistiavainten enimmäismäärään. Arkistointi siis vapauttaa tilaa uudelle sisällölle. Tämä asetus rajaa, kuinka paljon arkistoitua sisältöä yksi omistaja tai yksi agentti saa säilyttää, jotta arkistoimalla ei voi tallentaa rajattomasti. Jos arkistointi veisi yli rajan, palvelin ei arkistoi mitään. Raja ei koskaan estä palauttamasta sisältöä arkistosta eikä poistamasta sitä. Omistaja tai agentti, joka on jo rajan yli, voi siis yhä palauttaa ja poistaa sisältöä. Kun se on taas rajan alla, se voi arkistoida uudelleen.",
+          "range": "0–10 000 000. Oletus on 10 000, kymmenen kertaa muistiavainten enimmäismäärän oletus. 0: ei rajaa.",
+          "low": "Pienempi: arkistoitua sisältöä pitää siivota useammin.",
+          "high": "Suurempi: arkistoitua sisältöä säilyy enemmän, ja tietokanta kasvaa.",
+          "ex1": "10 000 (oletus): agentti, jolla on käytössä 1 000 avainta, voi arkistoida ne kaikki kymmenen kertaa, ennen kuin sen pitää poistaa vanhaa arkistoitua sisältöä.",
+          "ex2": "0: ei rajaa, kuten ennen tätä asetusta.",
+          "tip": "Pidä arvo selvästi suurempana kuin muistiavainten enimmäismäärä. Kun joku tulee rajaan, hän poistaa arkistoidun sisällön, jota ei enää tarvita. Nosta arvoa vain, jos tuota sisältöä yhä tarvitaan."
         }
       },
       "registration": {

@@ -55,6 +55,8 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   2026-11-08 — archiveRecords hands archiveRecordsBatchOp the config, for the archived-key ceiling
+ *     (secaudit2026nov08b round 15b).
  *   v1.8.0 — 2026-11-08 — `trail`: get() and the row calls record the label addresses of what they
  *     returned, so a package the run publishes keeps those labels (secaudit2026nov08b round 15,
  *     datapackage/ext-capability:publish-drops-label-source-of-run-reads).
@@ -285,7 +287,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             // The fenced-space rule is handed in, because archiveRecordsBatchOp takes no session: it
             // asks it after its own checks and before the first record is archived, so an extension
             // the space does not name archives none of its records for an agent.
-            const r = await archiveRecordsBatchOp(storage, { principal: caller.gaii, ownerName: caller.owner }, { organismId, ws, namespace, ids },
+            const r = await archiveRecordsBatchOp(ops, { principal: caller.gaii, ownerName: caller.owner }, { organismId, ws, namespace, ids },
                 keys => fencedSpaceRefusal(ops, { principal: caller.gaii, roles: caller.roles, scopes: caller.scopes, extension: through }, organismId, ws, { keys }));
             if (r.ok) { emitChange('organisms'); emitWorkspaceChange(organismId, ws); }
             return settle(r);

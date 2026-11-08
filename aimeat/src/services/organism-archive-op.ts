@@ -20,6 +20,10 @@
  *   const out = await organismArchiveOp({ storage, config }, caller, organismId, 'archive', body);
  *   if (!out.ok) render(out.status, out.code, out.message, out.details);
  * @version-history
+ *   2026-11-08 — An archive asks the archived-key ceiling (memoryMaxArchivedKeysPerAgent) of the
+ *     archiving account, in person and through its agents, and is rolled back whole with a refusal
+ *     that names the setting (secaudit2026nov08b round 15b, storage/memory-totals:
+ *     postgres-archived-rows-count-no-bytes).
  *   2026-11-08 — An unarchive asks the memory limits of the unarchiving account only (in person and
  *     through its agents); another member's key count no longer refuses it, and that member is not
  *     charged overage for it (secaudit2026nov08b round 15, unarchive:other-principal-ceiling-refuses-
@@ -31,8 +35,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { archiveTarget, unarchiveTarget, archiveRoleOf, archivedOwnersUnder, type ArchiveLevel, type ArchiveTarget } from './archive.js';
-import { flipWithinCeilings } from './memory-ceilings.js';
+import { archiveTarget, unarchiveTarget, archiveRoleOf, archivedOwnersUnder, liveOwnersUnder, type ArchiveLevel, type ArchiveTarget } from './archive.js';
+import { archiveWithinCeiling, flipWithinCeilings } from './memory-ceilings.js';
 import { archiveFenceTarget, fencedSpaceRefusal } from './fenced-space.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { emitChange } from './event-bus.js';
@@ -95,7 +99,15 @@ export async function organismArchiveOp(
   let result;
   try {
     if (mode === 'archive') {
-      result = await archiveTarget(storage, v.target, caller.principal);
+      // An archive takes rows out of the key count, and archived keys have a ceiling of their own
+      // (memoryMaxArchivedKeysPerAgent), asked of the archiving account in person and through its
+      // agents, as the unarchive below asks its limits; another member's rows are archived without
+      // asking that member's count (secaudit2026nov08b round 15b).
+      const target = v.target;
+      const own = (await liveOwnersUnder(storage, target)).filter(o => isSameOwner(o, caller.principal));
+      const kept = await archiveWithinCeiling(deps, own, () => archiveTarget(storage, target, caller.principal));
+      if (!kept.ok) return { ok: false, status: kept.refusal.status, code: kept.refusal.code, message: kept.refusal.message };
+      result = kept.value;
     } else {
       // An unarchive returns rows to their principals' key counts (and, on PostgreSQL, bytes), so it
       // asks the same limits a write asks, and is rolled back whole when it would pass one

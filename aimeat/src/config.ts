@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   2026-11-08 — memoryMaxArchivedKeysPerAgent (AIMEAT_MEMORY_MAX_ARCHIVED_KEYS, default 10000): archived memory keys get a ceiling of their own (secaudit2026nov08b round 15b).
  *   v1.40.0 — 2026-11-07 — microservicesCentralUrl (AIMEAT_MSC_CENTRAL_URL, default none): a Microservices Central the app-building guidance names (services/appdev/microservices.ts).
  *   v1.39.0 — 2026-11-06 — extensionZipMaxFiles (AIMEAT_EXT_ZIP_MAX_FILES, default 1000): files one extension or cortex ZIP may hold (was a fixed 50 in upload-zip.ts).
  *   v1.38.0 — 2026-11-03 — mcpCapabilityUseApproval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL, default operators; secaudit2026nov02d round 13b).
@@ -360,6 +361,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     memoryQuotaMb: parseInt(process.env.AIMEAT_MEMORY_QUOTA_MB ?? '10', 10),
     memoryMaxValueSizeKb: parseInt(process.env.AIMEAT_MEMORY_MAX_VALUE_SIZE_KB ?? '1024', 10),
     memoryMaxKeysPerAgent: parseInt(process.env.AIMEAT_MEMORY_MAX_KEYS ?? '1000', 10),
+    // Ten times the key ceiling's default: archived content is finished work kept for reference, so
+    // a principal may archive its whole live set ten times over before it is asked to clean up.
+    memoryMaxArchivedKeysPerAgent: parseInt(process.env.AIMEAT_MEMORY_MAX_ARCHIVED_KEYS ?? '10000', 10),
     memoryDeleteGraceDays: parseInt(process.env.AIMEAT_MEMORY_DELETE_GRACE_DAYS ?? '7', 10),
     organismDecisionLogCap: parseInt(process.env.AIMEAT_ORGANISM_DECISION_LOG_CAP ?? '500', 10),
     appAuditKeepDefault: Math.max(0, parseInt(process.env.AIMEAT_APP_AUDIT_KEEP ?? '0', 10) || 0),

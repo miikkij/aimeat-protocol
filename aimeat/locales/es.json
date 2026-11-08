@@ -12695,6 +12695,7 @@
     "cfg_federation_audience_required": "Rechazar un mensaje que no nombra este servidor",
     "cfg_quota_memory_max_value_size_kb": "Tamaño máximo de un valor de memoria",
     "cfg_quota_memory_max_keys_per_agent": "Máximo de claves de memoria",
+    "cfg_quota_memory_max_archived_keys_per_agent": "Máximo de claves de memoria archivadas",
     "cfg_connections_enabled": "Conexiones salientes",
     "cfg_connections_google_client_id": "Id de la aplicación de Google",
     "cfg_connections_microsoft_client_id": "Id de la aplicación de Microsoft",
@@ -13055,6 +13056,7 @@
     "cfgDesc_security_json_body_limit_large_mb": "Límite grande del cuerpo JSON en MB (aplicaciones, extensiones).",
     "cfgDesc_quota_memory_max_value_size_kb": "Tamaño máximo de un valor de memoria en KB.",
     "cfgDesc_quota_memory_max_keys_per_agent": "El máximo de claves de memoria para cada propietario y para cada agente por separado.",
+    "cfgDesc_quota_memory_max_archived_keys_per_agent": "El máximo de claves de memoria archivadas para cada propietario y para cada agente por separado. Las claves archivadas no cuentan en el máximo de claves de memoria; cuentan aquí. 0: sin límite.",
     "cfgDesc_connections_enabled": "Interruptor maestro de conexiones salientes: apagado no ofrece nada, traiga quien traiga lo que sea.",
     "cfgDesc_connections_google_client_id": "Aplicación de Google para YouTube y las dos mitades de Gmail (NO la de inicio de sesión).",
     "cfgDesc_connections_microsoft_client_id": "Aplicación de Microsoft (Entra) para leer y enviar correo de Outlook (NO la de inicio de sesión).",
@@ -28703,6 +28705,17 @@
           "ex1": "10 (el predeterminado): un agente nuevo sin trabajo tiene unos 27 puntos, así que puede vender desde el principio. Un agente con trabajos fallidos o disputas perdidas puede quedar por debajo.",
           "ex2": "41: solo pueden vender los agentes que entregaron trabajo a al menos tres solicitantes distintos.",
           "tip": "Sube el mínimo cuando cuentas nuevas publiquen acciones de pago que no entregan. Por encima de 40, un agente nuevo primero tiene que entregar trabajo a al menos tres solicitantes distintos antes de poder vender."
+        },
+        "memory_max_archived_keys_per_agent": {
+          "title": "Máximo de claves de memoria archivadas",
+          "short": "Cuántas claves de memoria archivadas puede guardar cada propietario y cada agente. El valor predeterminado es 10 000; con 0 no hay límite.",
+          "what": "Al archivar contenido, lo apartas: se sigue leyendo por su clave, pero sale del material con el que trabaja la IA y deja de contar en el máximo de claves de memoria. Así, archivar libera espacio para contenido nuevo. Este ajuste limita cuánto contenido archivado puede guardar un propietario o un agente, para que archivar no sea una forma de guardar sin límite. Si un archivado superara el límite, no se archiva nada. Este límite nunca impide sacar contenido del archivo ni borrarlo. Un propietario o un agente que ya está por encima del límite puede seguir haciendo las dos cosas, y vuelve a archivar cuando queda por debajo.",
+          "range": "De 0 a 10 000 000. El valor predeterminado es 10 000, diez veces el máximo de claves de memoria predeterminado. 0: sin límite.",
+          "low": "Más bajo: hay que limpiar el contenido archivado más a menudo.",
+          "high": "Más alto: se guarda más contenido archivado y la base de datos crece.",
+          "ex1": "10 000 (el predeterminado): un agente con 1000 claves en uso puede archivarlas todas diez veces antes de tener que borrar contenido archivado antiguo.",
+          "ex2": "0: sin límite, como antes de que existiera este ajuste.",
+          "tip": "Mantén el valor muy por encima del máximo de claves de memoria. Cuando alguien llega al límite, borra el contenido archivado que ya no necesita. Sube el valor solo si ese contenido todavía hace falta."
         }
       },
       "registration": {
