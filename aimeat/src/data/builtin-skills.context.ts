@@ -16,6 +16,8 @@
  * @usage
  *   import { CONTEXT_SKILL_ENTRY } from './builtin-skills.context.js';
  * @version-history
+ *   v1.2.0 — 2026-11-09 — `compose`: or, and, xor and not over other contexts, computed on
+ *     ontology ids; references between ontology modules; an app's context wider than its spec.
  *   v1.1.0 — 2026-11-08 — Opt-in: a context starts only when the person asks for one; the AI no
  *     longer offers one when a topic repeats. A context that exists is still kept up to date.
  *   v1.0.0 — 2026-11-08 — Initial (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
@@ -134,6 +136,32 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
 - **Including and excluding** is the person's choice: add \`context:<slug>\` to \`includes\` or
   \`excludes\` when they say so ("the wedding plan includes the catering", "keep my health out
   of work").
+- **Composing** goes further, when the person asks for it: \`compose\` is an expression over
+  other contexts.
+  \`\`\`
+  expr := "context:<slug>" | { "or": [expr, ...] } | { "and": [expr, ...] }
+        | { "xor": [expr, expr] } | { "not": expr }
+  \`\`\`
+  The context's own content always belongs to the result; \`includes\` is shorthand for \`or\`
+  and \`excludes\` for \`not\`; in one object the operators apply in the order and, xor, or, not.
+  On contexts with an ontology the operators work on ids, never on wording: **or** is
+  everything any part holds; **and** keeps only what every part holds (the same registry
+  person, group or app, or a concept one part references by id in the other); **xor** gives
+  two lists, what only one side holds and what only the other holds; **not** keeps a context
+  closed and out of the answer. Two items are the same when they share an \`@id\`, one names
+  the other with \`skos:exactMatch\`, or both point at the same registry entity. Without an
+  ontology there are no ids: say that the comparison was made by reading.
+  Typical uses: an app's umbrella context is its spec OR its research OR its marketing; "what
+  do we promise that is not built" is marketing XOR spec; "what do these two matters share" is
+  an AND.
+- **References between ontology modules:** a concept may point at a concept in another
+  context's module by its id. Follow it only into a context you may read and that the current
+  one does not exclude; otherwise say there is a reference you cannot open, and never fill it
+  in.
+- **An app's context is wider than its spec.** Reference the app's own spec records (design
+  spec, data map, roadmap, development notes) instead of copying them, so they stay current;
+  keep work about the app that is not in the spec (marketing, research, sales) in contexts of
+  their own that name the same app, and compose them.
 - **Splitting or merging** two contexts happens on its own only when both have the same
   readers. When their readers differ, ask the person first: a merge can show one person's
   material to someone who was not given it.
