@@ -2,6 +2,31 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-11-08",
+      "kind": "fix",
+      "id": "2026-11-08-read-a-message-request-in-full-on-a-phone",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Read a message request in full on a phone",
+        "fi": "Viestipyynnön voi lukea kokonaan puhelimessa"
+      },
+      "summary": {
+        "en": "Tap a message request to read all of it before you accept or block it.",
+        "fi": "Napauta viestipyyntöä, niin luet sen kokonaan ennen kuin hyväksyt tai estät sen."
+      },
+      "impact": {
+        "en": "Nothing to do: requests open on a tap, and the Messages page's buttons fit on a phone screen.",
+        "fi": "Sinun ei tarvitse tehdä mitään: pyyntö aukeaa napautuksella, ja Viestit-sivun napit mahtuvat puhelimen näytölle."
+      },
+      "body": {
+        "en": "Tap a request to read its whole first message before you accept or block it. The sender's name and address show in full, and the Messages page's buttons fit on a phone screen.",
+        "fi": "Pyynnön koko viesti aukeaa napautuksella ennen kuin hyväksyt tai estät sen. Lähettäjän nimi ja osoite näkyvät kokonaan, ja Viestit-sivun napit mahtuvat puhelimen näytölle."
+      }
+    },
+    {
       "date": "2026-11-07",
       "kind": "feature",
       "id": "2026-11-07-your-ai-in-the-sign-in-pill",
