@@ -22,6 +22,10 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.21.0 -- 2026-11-08 -- An erased account's job is let go with nothing written under its identity:
+ *     run-gate.ts answers `drop`, and dropAccountJobs, which the owner erasure calls, aborts the
+ *     account's live jobs and takes them off the index; each paid or writing step asks first whether
+ *     the runner still holds the entry (secaudit2026nov08b round 15, runGate:erased-account-runs-as-active).
  *   v1.20.0 -- 2026-11-08 -- Before a job runs, the runner asks its account and its starter as they are
  *     now (run-gate.ts runGate): a deactivated account's job waits queued and runs after reactivation,
  *     a starter that is gone ends the job before anything is paid, and a narrowed starter's job runs
@@ -138,7 +142,7 @@ import { provideNodeService } from '../node-context.js';
 import { emitAiJobCancel, onAiJobCancelEvent, isRemoteEvent, type AiJobCancelEvent } from '../event-bus.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
-    addToActiveIndex, removeFromActiveIndex,
+    addToActiveIndex, removeFromActiveIndex, readActiveIndex,
 } from './store.js';
 import {
     AiJobError,
@@ -472,6 +476,9 @@ export class AiJobService implements AiJobStarter {
             if (gate.action === 'run') { entry.job = gate.job; narrowed = gate.narrowed; break; }
             this.pool.release(owner);
             if (gate.action === 'end') { await this.finish(jobId, { state: 'failed', error: gate.error }); return; }
+            // An erased account: nothing is paid, folded or written under its identity; only the
+            // node's own index entry goes (secaudit2026nov08b round 15).
+            if (gate.action === 'drop') { await this.dropErased(jobId, gate.reason); return; }
             // A deactivated account: the job stays queued and says why, and asks again until the
             // account is reactivated, the job is cancelled or the node stops.
             if (entry.job.waiting !== gate.reason) {
@@ -496,8 +503,9 @@ export class AiJobService implements AiJobStarter {
         try {
             // A starter the owner narrowed reads the inputs again with what it may read now.
             if (narrowed) entry.prompt = (await this.prepareInput(entry.job.owner, entry.job)).prompt;
-            // Several processes: a job another process cancelled or took over is not paid for here.
-            if (!await stillHeld(deps, entry.job)) { this.dropHere(jobId); return; }
+            // Several processes: a job another process cancelled or took over is not paid for here. One
+            // process: a job its account's erasure let go meanwhile (dropAccountJobs) is not either.
+            if (!this.ownsEntry(entry) || !await stillHeld(deps, entry.job)) { this.dropHere(jobId); return; }
             const running: AiJobRecord = { ...entry.job, state: 'running', started_at: new Date().toISOString() };
             delete running.waiting;
             entry.job = running;
@@ -533,10 +541,12 @@ export class AiJobService implements AiJobStarter {
                 return;
             }
             // The answer is written and on_done runs only where the job is still held (run-gate.ts).
+            if (!this.ownsEntry(entry)) return;
             if (!await stillHeld(deps, entry.job)) { await filePicture(); this.dropHere(jobId); return; }
 
             const written = await writeJobResult({ storage: this.storage, config: this.config }, entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
             await filePicture(written.requestId);
+            if (!this.ownsEntry(entry)) return;
             // Before the callback, so readResult already hands the answer to the on_done action.
             // Stored too, not only kept in this process: a restart during on_done folds the stored
             // record into the log, and ctx.ai.result reads the answer from there. The visibility is
@@ -546,7 +556,7 @@ export class AiJobService implements AiJobStarter {
 
             // The callback, and the reason a green job can still be a failure. See on-done.ts.
             if (entry.job.on_done) {
-                if (!await stillHeld(deps, entry.job)) { this.dropHere(jobId); return; }
+                if (!this.ownsEntry(entry) || !await stillHeld(deps, entry.job)) { this.dropHere(jobId); return; }
                 const outcome = await fireOnDone(
                     { storage: this.storage, config: this.config, service: this, emailService: this.emailService },
                     { ...entry.job, ...spend, state: 'done' },
@@ -626,6 +636,50 @@ export class AiJobService implements AiJobStarter {
         if (!entry) return;
         this.live.delete(jobId);
         entry.resolveFinished();
+    }
+
+    /** Whether the runner still holds this entry in this process: false once its account's erasure let it go. */
+    private ownsEntry(entry: LiveEntry): boolean {
+        return this.live.get(entry.job.id) === entry;
+    }
+
+    /**
+     * A job whose account was erased (run-gate.ts `drop`): let go here and take its entry off the
+     * node's index, which is the node's own record. Nothing is written under the erased identity.
+     */
+    private async dropErased(jobId: string, reason: string): Promise<void> {
+        this.dropHere(jobId);
+        await removeFromActiveIndex(this.storage, this.config.nodeId, jobId)
+            .catch(err => logger.warn(`[ai-jobs] could not take ${jobId} off the active index`, { error: String(err) }));
+        logger.info(`[ai-jobs] ${jobId} dropped: ${reason}; nothing was run or written`);
+    }
+
+    /**
+     * The account was erased (services/owner-erasure.ts, after its transaction): every live job of the
+     * account and of its agents is let go in this process, its provider call or its wait for a slot is
+     * aborted, and its index entry goes. The runner's own steps then find the entry gone, so nothing is
+     * paid after this, and no answer, record or day log is written under the erased identity. A job of
+     * the account that another process of the node runs is told on the bus (emitAiJobCancel), and that
+     * process finds the stored job gone (run-gate.ts stillHeld). Answers how many jobs it let go.
+     */
+    async dropAccountJobs(ownerGhii: string): Promise<number> {
+        const account = ownerGhiiOf(ownerGhii);
+        const here: string[] = [];
+        for (const [jobId, entry] of [...this.live]) {
+            if (ownerGhiiOf(entry.job.owner) !== account) continue;
+            // Let go first, then abort: the runner's finish() then finds no entry and folds nothing.
+            this.dropHere(jobId);
+            entry.controller.abort();
+            here.push(jobId);
+        }
+        const refs = (await readActiveIndex(this.storage, this.config.nodeId)).filter(r => ownerGhiiOf(r.ownerGhii) === account);
+        for (const ref of refs) {
+            await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId);
+            if (!here.includes(ref.jobId)) emitAiJobCancel({ nodeId: this.config.nodeId, jobId: ref.jobId });
+        }
+        const dropped = new Set([...here, ...refs.map(r => r.jobId)]).size;
+        if (dropped) logger.info(`[ai-jobs] the account ${account} was erased: ${dropped} live job(s) let go, nothing written for them`);
+        return dropped;
     }
 
     /**

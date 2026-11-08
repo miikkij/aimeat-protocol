@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-08 — After the transaction the account's live AI jobs are let go in the runner, with nothing
+ *     written under the erased identity, and the log names `ai_jobs:<n>` when there were some
+ *     (secaudit2026nov08b round 15, runGate:erased-account-runs-as-active).
  *   2026-11-08 — After the commit, the account's open MCP sessions are closed on every process
  *     (accountErased; secaudit2026nov08b round 15, eraseOwner/mcp-sessions-not-closed).
  *   2026-11-08 — After the commit, the account's live tunnel sockets are closed on every process, as
@@ -504,6 +507,18 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     emitAccountErased(nodeId, name);
   } catch (err) {
     logger.warn('eraseOwner: the MCP sessions of the erased account were not told to close', { owner: name, error: String(err) });
+  }
+
+  // The account's AI jobs live in the runner of this process, beside their stored records, and a job
+  // that waited for a deactivated account or sat in the queue would otherwise run now, pay, and write
+  // its record, its answer and its day log under the erased identity again. After the transaction, so
+  // a rolled-back erasure keeps its jobs (services/ai-jobs/service.ts dropAccountJobs; secaudit2026nov08b
+  // round 15, runGate:erased-account-runs-as-active).
+  const aiJobs = nodeContext().aiJobs;
+  if (aiJobs) {
+    const n = await aiJobs.dropAccountJobs(ghii)
+      .catch(err => { logger.warn('owner-erasure: the account\'s AI jobs were not let go', { name, error: String(err) }); return 0; });
+    if (n) deletionLog.push(`ai_jobs:${n}`);
   }
 
   // The erasure is a data subject request the node carried out (GDPR art. 17): it logs itself in the

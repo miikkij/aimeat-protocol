@@ -43,6 +43,8 @@ type Service = InstanceType<typeof AiJobService>;
 const NODE = 'aimeat-local-001-dev';
 const OWNER = `alice@${NODE}`;
 const AGENT = `helper#alice@${NODE}`;
+const APP = 'alice/tool.html';
+const ECO = `eco:tool#alice@${NODE}`;
 const base = {
     nodeId: NODE, aiJobSlots: 1, aiJobMaxChain: 3, aiJobMaxQueued: 10, aiJobMaxQueuedPerOwner: 10,
     aiJobMaxPromptBytes: 1_000_000, aiJobLogRetentionDays: 7, sttMaxMb: 1, classificationMode: 'off',
@@ -54,8 +56,13 @@ const procB = { ...base, port: 40002, nodeProcesses: 'multiple' } as unknown as 
 
 interface World {
     storage: Storage; rows: Map<string, MemoryRecord>;
-    owner: { disabledAt?: string | null };
+    owner: { disabledAt?: string | null; createdAt?: string };
     agent: { defaultScopes: string[] } | null;
+    /** The account was erased: no owner record (round 15). */
+    erased?: boolean;
+    /** alice's grant for APP, and the ecosystem app ECO (round 15). */
+    appGrant?: { revoked?: boolean; scopes: string[] } | null;
+    eco?: { status: string; scopes: string[] } | null;
 }
 
 function world(): World {
@@ -83,9 +90,15 @@ function world(): World {
         transaction: async <T>(fn: () => Promise<T>) => fn(),
         getAgentsByOwner: async () => [],
         getEcosystemAppsByOwner: async () => [],
-        getOwner: async (name: string) => (name === 'alice' ? { name, ...w.owner } : null),
+        getOwner: async (name: string) => (name === 'alice' && !w.erased ? { name, ...w.owner } : null),
         getAgent: async (gaii: string) => (gaii === AGENT && w.agent ? { gaii, name: 'helper', owner: 'alice', ...w.agent } : null),
         listPats: async () => [],
+        getAppGrantByOwnerAndApp: async (owner: string, app: string) => (owner === 'alice' && app === APP && w.appGrant && !w.appGrant.revoked
+            ? { grantId: 'grant-1', owner, app, appName: 'Tool', ...w.appGrant } : null),
+        getAppGrant: async (id: string) => (id === 'grant-1' && w.appGrant ? { grantId: id, owner: 'alice', app: APP, appName: 'Tool', ...w.appGrant } : null),
+        getEcosystemApp: async (geai: string) => (geai === ECO && w.eco ? { geai, app: 'tool', displayName: 'Tool', owner: 'alice', ...w.eco } : null),
+        // An ecosystem app's answer is stamped with a provenance row (memory-write.ts).
+        createAiProvenance: async (r: unknown) => r,
     } as unknown as Storage;
     return w;
 }
@@ -284,5 +297,149 @@ describe('several processes (service.ts:run/no-fencing-on-active-index-claim)', 
         expect(logged(w, job_id).map(e => e.state)).toEqual(['done']);
         expect(answerOf(w, 'out.plain')).toBe('the answer');
         expect(model.calls).toBe(1);
+    });
+});
+
+// ── round 15 (secaudit2026nov08b) ─────────────────────────────────────────────
+
+/** What eraseOwner does to the account's records: the owner record and every record under its GHII go. */
+function erase(w: World): void {
+    w.erased = true;
+    for (const [k, r] of w.rows) if (r.ownerGaii === OWNER) w.rows.delete(k);
+}
+const underOwner = (w: World) => [...w.rows.values()].filter(r => r.ownerGaii === OWNER).map(r => r.key);
+const indexed = async (w: World, id: string) => (await readActiveIndex(w.storage, NODE)).some(r => r.jobId === id);
+
+describe('an erased account (runGate:erased-account-runs-as-active)', () => {
+    it('a waiting job of a deactivated account that is then erased is dropped: nothing is paid and nothing is written under the erased identity', async () => {
+        const w = world();
+        w.owner.disabledAt = '2026-11-08T10:00:00.000Z';
+        const s = new AiJobService(single, w.storage);
+        shorten(s);
+        const { job_id } = await s.startJob({ prompt: 'x', result_key: 'out.erased' }, { ownerGhii: OWNER, createdBy: OWNER });
+        await settle(60);
+        expect(jobOf(w, job_id)?.waiting).toMatch(/deactivated/);
+
+        erase(w);
+        await settle(200);
+        expect(model.calls).toBe(0);
+        expect(underOwner(w)).toEqual([]);
+        expect(await indexed(w, job_id)).toBe(false);
+        expect(s.stats().live).toBe(0);
+    });
+
+    it('the name registered again before the next check: the earlier holder\'s job does not run in the new account', async () => {
+        const w = world();
+        w.owner.disabledAt = '2026-11-08T10:00:00.000Z';
+        const s = new AiJobService(single, w.storage);
+        shorten(s);
+        const { job_id } = await s.startJob({ prompt: 'x', result_key: 'out.reused' }, { ownerGhii: OWNER, createdBy: OWNER });
+        await settle(60);
+        erase(w);
+        // A new account under the same name, made after the job was queued.
+        w.erased = false;
+        w.owner = { disabledAt: null, createdAt: new Date(Date.now() + 1_000).toISOString() };
+        await settle(200);
+        expect(model.calls).toBe(0);
+        expect(underOwner(w)).toEqual([]);
+        expect(await indexed(w, job_id)).toBe(false);
+    });
+
+    it('the erasure stops the account\'s running and queued jobs in this process: no answer, no day log, no index entry', async () => {
+        const w = world();
+        model.hold = true;
+        const s = new AiJobService(single, w.storage);
+        const running = await s.startJob({ prompt: 'x', result_key: 'out.running' }, { ownerGhii: OWNER, createdBy: OWNER });
+        await until(() => model.calls === 1);
+        const queued = await s.startJob({ prompt: 'x', result_key: 'out.queued' }, { ownerGhii: OWNER, createdBy: AGENT });
+        erase(w);
+        expect(await s.dropAccountJobs(OWNER)).toBe(2);
+        model.hold = false;
+        model.release.forEach(r => r());
+        await settle(150);
+        expect(model.calls).toBe(1);
+        expect(underOwner(w)).toEqual([]);
+        expect(await indexed(w, running.job_id)).toBe(false);
+        expect(await indexed(w, queued.job_id)).toBe(false);
+        expect(s.stats().live).toBe(0);
+    });
+
+    it('what stays: another account\'s job is not touched by the erasure, and runs to done', async () => {
+        const w = world();
+        const s = new AiJobService(single, w.storage);
+        expect(await s.dropAccountJobs(`bob@${NODE}`)).toBe(0);
+        const { job_id } = await s.startJob({ prompt: 'x', result_key: 'out.kept' }, { ownerGhii: OWNER, createdBy: OWNER });
+        await until(() => logged(w, job_id).length > 0);
+        expect(logged(w, job_id)[0]).toMatchObject({ state: 'done' });
+        expect(answerOf(w, 'out.kept')).toBe('the answer');
+    });
+});
+
+const startedByApp = (scopes: string[]) => ({ principal: OWNER, owner: 'alice', roles: ['app'], scopes, app: APP });
+const startedByEco = (scopes: string[]) => ({ principal: ECO, owner: 'alice', roles: ['ecosystem'], scopes });
+
+describe('the starter\'s permission to start, asked again (runGate:start-permission-not-reasked)', () => {
+    it('an agent the owner took ai:use from: its queued job ends before the provider is called, with the address to give it back', async () => {
+        const w = world();
+        w.agent = { defaultScopes: ['memory:write'] };
+        const s = new AiJobService(single, w.storage);
+        const { job_id } = await s.startJob({ prompt: 'x', result_key: 'out.noai' },
+            { ownerGhii: OWNER, createdBy: AGENT, startedBy: startedByAgent(['ai:use', 'memory:write']) });
+        await until(() => logged(w, job_id).length > 0);
+        expect(model.calls).toBe(0);
+        expect(logged(w, job_id)[0]).toMatchObject({ state: 'failed', error: { code: 'SCOPE_DENIED' } });
+        // ai:use is a word the person ticks on the agent's own page (config-posture.ts POWERFUL_AGENT_SCOPES).
+        expect(logged(w, job_id)[0].error.message).toMatch(/helper.*AI.*\/v1\/profile\?tab=agents&agent=helper.*yourself/);
+        expect(answerOf(w, 'out.noai')).toBeUndefined();
+    });
+
+    it('an app whose grant the owner revoked: its queued job ends AI_JOB_STARTER_GONE before the provider is called', async () => {
+        const w = world();
+        w.appGrant = { revoked: true, scopes: ['ai:use'] };
+        const s = new AiJobService(single, w.storage);
+        const { job_id } = await s.startJob({ prompt: 'x', result_key: 'out.appgone' },
+            { ownerGhii: OWNER, createdBy: OWNER, startedBy: startedByApp(['ai:use']) });
+        await until(() => logged(w, job_id).length > 0);
+        expect(model.calls).toBe(0);
+        expect(logged(w, job_id)[0]).toMatchObject({ state: 'failed', error: { code: 'AI_JOB_STARTER_GONE' } });
+        expect(answerOf(w, 'out.appgone')).toBeUndefined();
+    });
+
+    it('an app whose grant the owner narrowed without ai:use: the job ends SCOPE_DENIED before the provider is called', async () => {
+        const w = world();
+        w.appGrant = { scopes: ['memory:read'] };
+        const s = new AiJobService(single, w.storage);
+        const { job_id } = await s.startJob({ prompt: 'x', result_key: 'out.appnoai' },
+            { ownerGhii: OWNER, createdBy: OWNER, startedBy: startedByApp(['ai:use', 'memory:read']) });
+        await until(() => logged(w, job_id).length > 0);
+        expect(model.calls).toBe(0);
+        expect(logged(w, job_id)[0]).toMatchObject({ state: 'failed', error: { code: 'SCOPE_DENIED' } });
+    });
+
+    it('an ecosystem app the owner disconnected: its queued job ends AI_JOB_STARTER_GONE before the provider is called', async () => {
+        const w = world();
+        w.eco = { status: 'revoked', scopes: ['ai:use'] };
+        const s = new AiJobService(single, w.storage);
+        const { job_id } = await s.startJob({ prompt: 'x', result_key: 'out.ecogone' },
+            { ownerGhii: OWNER, createdBy: ECO, startedBy: startedByEco(['ai:use']) });
+        await until(() => logged(w, job_id).length > 0);
+        expect(model.calls).toBe(0);
+        expect(logged(w, job_id)[0]).toMatchObject({ state: 'failed', error: { code: 'AI_JOB_STARTER_GONE' } });
+    });
+
+    it('what stays: a live app\'s job and a live ecosystem app\'s job run to done with the permissions they stored', async () => {
+        const w = world();
+        w.appGrant = { scopes: ['ai:use'] };
+        w.eco = { status: 'active', scopes: ['ai:use'] };
+        const s = new AiJobService(single, w.storage);
+        const app = await s.startJob({ prompt: 'x', result_key: 'out.applive' },
+            { ownerGhii: OWNER, createdBy: OWNER, startedBy: startedByApp(['ai:use']) });
+        await until(() => logged(w, app.job_id).length > 0);
+        expect(logged(w, app.job_id)[0]).toMatchObject({ state: 'done', started_by: { scopes: ['ai:use'] } });
+        const eco = await s.startJob({ prompt: 'x', result_key: 'out.ecolive' },
+            { ownerGhii: OWNER, createdBy: ECO, startedBy: startedByEco(['ai:use']) });
+        await until(() => logged(w, eco.job_id).length > 0);
+        expect(logged(w, eco.job_id)[0]).toMatchObject({ state: 'done' });
+        expect(model.calls).toBe(2);
     });
 });

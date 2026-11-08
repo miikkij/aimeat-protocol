@@ -119,6 +119,7 @@ Receiver keys and outside party keys are not revoked: they are refused while the
 
 - Each deactivation and reactivation by an operator writes an operator trail: a usage row, a log line and a line on the person's feed (`aimeat/src/services/owner-lifecycle.ts`).
 - Erasure is a separate, final act. The person, or an operator, both in person, call `DELETE /v1/owners/:name` (`aimeat/src/routes/owners.ts`). An organism the person owned passes to an admin or member, or is left without a seated owner when there is nobody (`aimeat/src/services/owner-erasure.ts`).
+- AI jobs of the person and their agents that are still queued, running, or waiting for a deactivated account stop at the erasure. Nothing more is paid for them, and no job record, answer or job log is written for the erased account, so a later account with the same name finds none (`aimeat/src/services/ai-jobs/service.ts`, `aimeat/src/services/ai-jobs/run-gate.ts`).
 
 ## Organism code keys
 
