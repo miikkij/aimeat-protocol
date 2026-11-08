@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-08 — FINISH names the four owed items (it named two), and "just build it the usual way"
+ *     skips the proposal, never the research (instruction re-check over MCP).
  *   2026-11-08 — Step 0 says the genre fork is for the level `fine`, and a `proto` or `plain` app
  *     starts from `shell-atelier` (instruction audit re-check, round 2).
  *   2026-11-06 — Search engines: the switch needs 150 words of the app's own text, written first as
@@ -259,9 +261,12 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
    decided NOW. A role belongs to the PERSON: a member's agents inherit it.
 3. PROPOSE the frame to the user in 3-5 lines; adjust.
 4. BUILD flexibly within the frame; verify locally; publish (presigned upload > ~1 KB).
-5. FINISH: agent face + bound skill (\`metadata.binding\`), \`aimeat_app_template_propose\`,
-   \`aimeat_appdev_pitfall_report\` — the publish response's \`next_steps\` shows what is missing.
-The user can always say "just build it the usual way" — then skip 1-3.
+5. FINISH: the four things every app owes — agent face, bound skill (\`metadata.binding\`), data map
+   (\`aimeat_datamap_set\`) and design spec (\`aimeat_app_manage { action: "spec_set" }\`) — then
+   \`aimeat_app_template_propose\` and \`aimeat_appdev_pitfall_report\`; the publish response's
+   \`next_steps\` shows what is missing.
+The user can always say "just build it the usual way" — then skip the proposal in 3. The research in
+1 still runs: it is how you find what already exists.
 
 ## Build → ship loop
 1. Build the artifact locally (HTML app, extension ZIP, or cortex ZIP).

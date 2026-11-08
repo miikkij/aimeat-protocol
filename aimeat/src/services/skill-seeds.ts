@@ -46,6 +46,8 @@
  *   import { seedBuiltinSkills } from '../services/skill-seeds.js';
  *   seedBuiltinSkills(storage, config).then(r => ...);
  * @version-history
+ *   v2.2.0 -- 2026-11-08 -- A pre-fingerprint copy still at version 1.0.0 is updated: it was seeded and
+ *     never published again, so it is not an edit. Two such copies on production never moved.
  *   v2.1.0 -- 2026-09-19 -- Removes a retired built-in skill from a node that never edited it.
  *   v2.0.0 -- 2026-08-25 -- Follows the repo on an unedited node instead of never updating. Returns
  *     counts per outcome rather than one number.
@@ -59,6 +61,7 @@ import type { Storage } from '../storage/interface.js';
 import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
 import { RETIRED_BUILTIN_SKILLS } from '../data/builtin-skills.retired.js';
 import { deleteSkill, publishSkill, readNodeSkillBody, scopeOwnerGhii } from './skills.js';
+import { manifestKey } from './skill-refs.js';
 import { logger } from '../utils/logger.js';
 
 /** What to do with one built-in skill this startup. */
@@ -90,9 +93,13 @@ export const skillFingerprint = (text: string): string =>
  *   stamp — the fingerprint of what we wrote last time, or null if we never wrote one
  *   repo  — what this build ships
  */
-export function decideSeedAction(live: string | null, stamp: string | null, repo: string): SeedAction {
+export function decideSeedAction(live: string | null, stamp: string | null, repo: string, neverRepublished = false): SeedAction {
   if (live === null) return 'create';
-  if (stamp === null) return live === repo ? 'adopt' : 'keep-unknown';
+  // A copy from before fingerprints that is still at its first version was written by the seeder
+  // and never published again, so nobody edited it here: an edit on the node is a publish, and a
+  // publish bumps the version. Production held aimeat-node-guide and aimeat-open-items that way at
+  // 1.0.0 for months, the first still sending a new app to the Classic track (2026-11-08).
+  if (stamp === null) return live === repo ? 'adopt' : neverRepublished ? 'update' : 'keep-unknown';
   if (skillFingerprint(live) !== stamp) return 'keep-edited';
   return live === repo ? 'current' : 'update';
 }
@@ -136,7 +143,9 @@ export async function seedBuiltinSkills(storage: Storage, config: AimeatConfig):
       const live = await readNodeSkillBody(storage, config, builtin.name);
       const stampRecord = await storage.getMemory(systemGhii, seedStampKey(builtin.name));
       const stamp = stampRecord ? String((stampRecord.value as { fingerprint?: unknown })?.fingerprint ?? '') || null : null;
-      const action = decideSeedAction(live, stamp, builtin.skillMd);
+      const manifest = stamp === null && live !== null ? await storage.getMemory(systemGhii, manifestKey(builtin.name)) : null;
+      const neverRepublished = (manifest?.value as { version?: unknown } | null)?.version === '1.0.0';
+      const action = decideSeedAction(live, stamp, builtin.skillMd, neverRepublished);
 
       if (action === 'keep-edited' || action === 'keep-unknown') {
         result.diverged.push(builtin.name);

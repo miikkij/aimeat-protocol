@@ -14,6 +14,8 @@
  * @structure dataMapTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-11-08 — aimeat_datamap_get and aimeat_datamap_set on the `appdev` surface too: the publish
+ *     there answers that a data map is owed, and the surface had no tool to write one.
  *   2026-11-01 — The `data_map` parameter of aimeat_datamap_set names the optional row field `publishable` (plan doc-mvwxcas3dom3, D9.1).
  *   2026-10-28 — The `data_map` parameter of aimeat_datamap_set names the app-level `aiAct` (the maker's EU AI Act answers) and the finding DATAMAP_AI_ACT_UNANSWERED.
  *   2026-10-28 — The `data_map` parameter of aimeat_datamap_set names the row's `domains` and the finding DATAMAP_PERSONAL_NO_DOMAIN.
@@ -60,7 +62,8 @@ export const dataMapTools = [
         // No new word for the data map. It reads and writes a memory record, and a `datamap:*` word
         // would be a permission that has to be enforced on every door or does not exist (invariant 15).
         scope: 'memory:read',
-        surfaces: ['agent'],
+        // On `appdev` too since 2026-11-08: every publish there answers that a data map is owed.
+        surfaces: ['agent', 'appdev'],
         input: {
             app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
         },
@@ -72,7 +75,7 @@ export const dataMapTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
         scope: 'memory:write',
-        surfaces: ['agent'],
+        surfaces: ['agent', 'appdev'],
         input: {
             app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
             data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[]. A held row may also carry `isA`, the semantic type its records ARE — schema:Person, aimeat:Task, or a full IRI (GET /v1/ns lists the ones this node names). `kind` and `holds` say what the data is in the app\'s own words, and `isA` says the same in a word other systems already know, which is what makes the family findable with the type filter on memory search. A family that is genuinely nothing standard leaves it out rather than reaching for the nearest wrong type. A held row may also carry `classification`, the label id of the classification the app expects for that family by default, such as "luottamuksellinen" (1 to 40 lowercase letters, digits and dashes). It labels nothing and never refuses the map; an id of the wrong shape comes back as a finding. A held row may also carry `agent`, the bare name of one of the owner\'s own agents whose work the row reads, with `madeFor: true` when the app was built for that agent. That row is the tie between the app and the agent: the agent\'s page lists the app, and it grants nothing. A held row with personalData "yes" also carries `domains`, the regulated data domains of that personal data by id: "employment" for CVs, competence ratings, staffing and HR, "health" for patient data, "children" for minors, and the others GET /v1/compliance/catalog lists; [] when none applies. The domain sets the classification floor and the AI Act risk area of the app, and a personal row without it comes back as the finding DATAMAP_PERSONAL_NO_DOMAIN. A held row may also carry `publishable: true`: the family may be published as a data package, and a data product (aimeat_dataproduct, an app source) reads only the families marked so. `isA`, `classification`, `agent`, `madeFor`, `domains` and `publishable` are the only optional fields on a row. An app that asks for organism:invite can invite people into organisms, and an invitation can create a new account: say so with "invites-people" in `machinery`, or the optional app-level `invites`: { "does": ["sends-email-invitations" | "mints-access-codes" | "creates-accounts" | "grants-workspace-access" | "manages-members"], "into": "which organisms" }. Without either, such an app gets the finding DATAMAP_INVITES_UNSTATED. An app that uses AI also carries the app-level `aiAct`: its maker\'s answers to the node\'s EU AI Act questions, { "answers": { "<question id>": true | false | "<option value>" }, "notes": { "<question id>": "why, in one or two sentences" } }. aimeat_datamap_get lists the questions under `ai_act`; the node\'s administrator approves the answers, and an AI app without them gets the finding DATAMAP_AI_ACT_UNANSWERED. Public like the rest of the map.' },
