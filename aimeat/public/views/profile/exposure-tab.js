@@ -7,6 +7,11 @@
  *   /v1/exposure/mine; the person's AI reads the same report with aimeat_exposure_report, so the page
  *   and the chat answer with one list.
  *
+ *   HOW IT EXPLAINS ITSELF (.claude/rules/page-guidance.md): the title's question mark is
+ *   concept.audience (who can read a thing, level by level, and when to give a permission instead),
+ *   and the page's start (PageStart) says what the page is for, gives the prompt that has one's own
+ *   AI read the same report, and says what happens next.
+ *
  *   THE COUNTS FIRST, then the things. The strip counts by level, widest first (open to everyone,
  *   anyone with the link, every account signed in here, the members of one organism); the list under
  *   it is the report's own order, widest first. Each row says what the thing is, where it is (its
@@ -39,6 +44,10 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.7.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head and the title's question mark, concept.audience. The head's second
+ *     sentence about one's own AI and the hint under the list with the question to ask it go: the
+ *     start's prompt says it, and the head keeps two sentences.
  *   v1.6.0 — 2026-11-02 — The data packages, the named shares and the outside parties are ONE Data row with
  *     the counts and a way to "Data you share" (exposure/named.js secData; WP11, board Mita-muut-nakevat);
  *     the strip counts the four levels. The report itself keeps every item.
@@ -79,6 +88,7 @@ import { Note } from '/components/Note.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 import { openTab } from '/components/Rail.js';
 import { useConfirm } from '/components/Modal.js';
+import { PageStart } from '/components/PageStart.js';
 import * as dp from '/js/services/dataproducts.js';
 import { secData, NAMED_KINDS } from './exposure/named.js';
 import { closeText, titleOf, noteTexts } from './exposure/words.js';
@@ -369,7 +379,9 @@ export default function ExposureTab({ showToast }) {
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.exposure')]}
       title=${x('title')}
-      desc=${`${x('intro')} ${x('introAi')}`}
+      help="concept.audience"
+      desc=${x('intro')}
+      start=${html`<${PageStart} id="exposure" />`}
       strip=${report ? html`<${Strip} report=${report} />` : html`<${FigureStrip} lead stacked loading=${4} />`}
       after=${html`<${ConfirmUI} />`}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
@@ -398,7 +410,6 @@ export default function ExposureTab({ showToast }) {
             render=${(item) => html`<${ItemRow} key=${`${item.kind}|${item.id}|${item.level}`} item=${item}
               busy=${busy === `${item.kind}|${item.id}`} onClose=${onClose} onCopied=${copied} />`} />
           ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
-          <${Note} kind="hint">${x('askYourAi')}<//>
         <//>
         <${Section} fold id="ex-notes" num=${num(3)} title=${x('notesTitle')} sub=${x('notesSub')}>
           ${noteTexts(report).map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}

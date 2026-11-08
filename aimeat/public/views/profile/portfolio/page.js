@@ -6,13 +6,20 @@
  *   mast and the strip say whether it is public and since when; then where it is (the two
  *   addresses), who can see it (the two switches and the member showcase, in words), the page
  *   itself (title, preview, who wrote it, size, where it is stored), the three ways to change it
- *   (ask your AI, the builder, bring a finished HTML) and the rule an agent gets. With no page yet
- *   the first section is the three roads to one, and a page taken off the web keeps its preview and
- *   the way back. Pure render over the ctx bag.
+ *   (ask your AI, the builder, bring a finished HTML) and the rule an agent gets with what a publish
+ *   does and does not do. With no page yet the first section is the three roads to one, and a page
+ *   taken off the web keeps its preview and the way back. The page explains itself the designed way
+ *   (.claude/rules/page-guidance.md): the page's start (PageStart "portfolio") and the title's
+ *   question mark (concept.portfolio). Pure render over the ctx bag.
  * @structure renderPage · mast · strip · secAddresses · secVisibility · secPage · secChange ·
  *   secFirst · secAgent
  * @usage import { renderPage } from './portfolio/page.js';
  * @version-history
+ *   v1.19.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "portfolio" in the start slot (folded once a page is stored; its button opens the
+ *     builder) and the title's question mark concept.portfolio. Section 05 loses its lead paragraph
+ *     (pfpage.aiIntro), which explained the concept; the concept says it now, and the section keeps
+ *     the rule to copy and the limits of a publish.
  *   v1.18.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip, rail and hidden file field as data; FigureStrip; Facts with the state words Tinted; List with the page's Thumb; PagePreview; Roads; TextArea; FileDrop; Box; Label; Code; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.17.0 -- 2026-09-26 -- The requests to paste are the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -60,6 +67,7 @@ import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { x, apexUrl, dateWord, timeWord, writtenBy, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { PageStart } from '/components/PageStart.js';
 
 const copyDoor = (text, label, onCopied) => html`<${Action} small copy=${text} copiedLabel=${t('common.copied')} onCopied=${onCopied}>${label}<//>`;
 const openDoor = (href, words, soft = true) => html`<${Action} small soft=${soft} href=${href} newTab>${words}<//>`;
@@ -76,10 +84,15 @@ export function renderPage(ctx) {
       ? [['02', 'pf-visibility', x('secVisibility'), ''], ['03', 'pf-page', x('secPage'), d?.html ? x('kb', { n: d.html.size_kb }) : ''], ['04', 'pf-change', x('secChange'), ''], ['05', 'pf-ai', x('secAi'), '']]
       : [['01', 'pf-addresses', x('secAddresses'), ctx.standaloneUrl ? '2' : '1'], ['02', 'pf-visibility', x('secVisibility'), ''], ['03', 'pf-page', x('secPage'), d?.html ? x('kb', { n: d.html.size_kb }) : ''], ['04', 'pf-change', x('secChange'), ''], ['05', 'pf-ai', x('secAi'), '']];
 
+  // The start: folded once a page is stored; its button opens the builder.
+  const start = html`<${PageStart} id="portfolio" done=${state === 'loading' ? null : hasPage}
+    action=${{ onClick: () => ctx.navigate('/v1/portfolio') }} />`;
   return html`
     <${SettingsPage} name="portfolio"
       crumb=${crumb()}
       ...${mast(ctx, state)}
+      help="concept.portfolio"
+      start=${start}
       strip=${strip(ctx, state)}
       railTitle=${x('railTitle')}
       sections=${rail.map(([num, id, label, count]) => ({ id, num, label, count }))}
@@ -283,7 +296,6 @@ function secFirst(ctx) {
 function secAgent(ctx, state) {
   return html`
     <${PageSection} id="pf-ai" num="05" title=${x('secAi')} count=${null}>
-      <${Note} kind="lead">${x('aiIntro')}<//>
       <${Box} doors=${html`<${Action} small onClick=${() => ctx.copyRule()}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody')}<//>

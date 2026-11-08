@@ -2,8 +2,13 @@
  * @file services-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab for publishing/managing services and browsing the catalogue.
+ * @description Profile tab for publishing/managing services and browsing the catalogue. The page
+ *   explains itself the designed way (.claude/rules/page-guidance.md): the page's start (PageStart
+ *   "actions") and the title's question mark (concept.service).
  * @version-history
+ *   v1.21.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "actions" in the start slot (its button opens the Catalogue view, where the first
+ *     search happens) and the title's question mark concept.service.
  *   v1.20.0 -- 2026-11-04 -- My services lists the services the owner published, by the owner's GHII, and
  *     the tab's service count follows. It listed the first 20 services of the whole node, each with a
  *     Delete that answered "not owned by you" (codebase analysis 2026-11-03, item A6).
@@ -69,6 +74,7 @@ import { Fields, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Space } from '/components/Layout.js';
+import { PageStart } from '/components/PageStart.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
 import { apiGet } from '/js/api.js';
 import { getNodeId } from '/js/services/auth.js';
@@ -281,7 +287,10 @@ export default function ServicesTab({ session, showToast, onStats }) {
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.services')]}
       title=${t('profile.services.title')}
+      help="concept.service"
       desc=${t('profile.services.desc')}
+      start=${html`<${PageStart} id="actions"
+        action=${{ onClick: () => { setSvcSubTab('catalogue'); if (!catalogue) loadCatalogueData(catFilter); } }} />`}
       after=${html`<${ConfirmUI} />`}>
       <${Tabs} bar kind="view" value=${svcSubTab}
         onSelect=${(v) => { setSvcSubTab(v); if (v === 'catalogue' && !catalogue) loadCatalogueData(catFilter); }}

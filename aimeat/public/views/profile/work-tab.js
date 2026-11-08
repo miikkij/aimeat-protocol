@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for managing incoming and outgoing work requests.
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
- *   and a rating modal for completed deliveries.
+ *   and a rating modal for completed deliveries. How the page explains itself
+ *   (.claude/rules/page-guidance.md): PageStart "work" under the head and the title's question mark
+ *   concept.work_request.
  * @version-history
+ *   v1.18.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a work item is listed) and the title's question mark concept.work_request; the head's paragraph is two sentences.
  *   v1.17.1 -- 2026-10-11 -- The pacing amount is read where the work routes put it, `cost.toll` (then `cost.base_price`, then the flat fields), so a work item in the inbox and in the sent list shows "pacing N morsels" again.
  *   v1.17.0 -- 2026-10-11 -- A work item's morsels read "pacing N morsels" (toll, then the 3.x base_price mirror, then toll_morsels / price_morsels), not "Cost: N ❤️": a morsel is pacing, not a price.
  *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
@@ -53,6 +56,7 @@ import { Modal } from '/components/Modal.js';
 import { timeAgo } from '/js/utils.js';
 import { pacingOf } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
@@ -231,8 +235,10 @@ export default function WorkTab({ session, showToast, onStats }) {
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.tabs.work')]}
-      title=${t('profile.work.title')}
-      desc=${t('profile.work.desc')}>
+      title=${t('profile.work.title')} help="concept.work_request"
+      desc=${t('profile.work.desc')}
+      start=${/* Folded once either list has a work item; a request is sent by one's own AI, so no button. */
+        html`<${PageStart} id="work" done=${workInbox === null || workSent === null ? null : (workInbox.length + workSent.length) > 0} />`}>
       <${Tabs} bar kind="view" value=${workSubTab} onSelect=${setWorkSubTab} items=${[
         { value: 'inbox', label: t('profile.work.inbox') },
         { value: 'sent', label: t('profile.work.sent') },

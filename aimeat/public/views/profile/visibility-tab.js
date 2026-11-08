@@ -13,11 +13,18 @@
  *   one sentence what its numbers are worth, and the page says plainly what it cannot see: the
  *   question a person asked the AI.
  *
- *   IT BORROWS NOTHING AND INVENTS NOTHING: SettingsPage, Tabs, FigureStrip, List, Note, Check and
- *   TextField; the page writes no class.
+ *   HOW IT EXPLAINS ITSELF (.claude/rules/page-guidance.md): the title's question mark is
+ *   concept.ai_visibility (what is counted, what is never seen, when to use What others can see
+ *   instead), and the page's start (PageStart) says what the page is for, gives the prompt that has
+ *   one's own AI read the same report, and says what happens next.
+ *
+ *   IT BORROWS NOTHING AND INVENTS NOTHING: SettingsPage, PageStart, Tabs, FigureStrip, List, Note,
+ *   Check and TextField; the page writes no class.
  * @structure PARTS · PERIODS · VisibilityTab (default) · the six parts as small functions
  * @usage Registered in views/profile.js as the `visibility` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head and the title's question mark, concept.ai_visibility.
  *   v1.0.1 — 2026-10-11 — A purchase total in morsels reads "pacing N morsels": a morsel is pacing, not a price.
  *   v1.0.0 — 2026-10-09 — Initial (AI visibility, the owner panel for layers A to E), approved by Jouni on the sandbox.
  */
@@ -27,6 +34,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
 import { Note } from '/components/Note.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -256,7 +264,9 @@ export default function VisibilityTab() {
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.visibility')]}
       title=${v('title')}
-      desc=${v('intro')}>
+      help="concept.ai_visibility"
+      desc=${v('intro')}
+      start=${html`<${PageStart} id="visibility" />`}>
       ${controls}
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${message ? html`<${Note} kind="message">${message}<//>` : null}

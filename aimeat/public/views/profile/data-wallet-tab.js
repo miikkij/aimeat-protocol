@@ -5,7 +5,8 @@
  * @description Profile tab: the Data Wallet in the poster face. What you own (memory keys and
  *   files), who reaches it and by which permission (grouped by what the permission opens: an
  *   organism with its workspaces, or a key area), what was refused (the trail grouped by who tried
- *   what), a grant form as a fold, everything you own as one file, and how your AI uses the wallet.
+ *   what), a grant form as a fold, and everything you own as one file; what the wallet is and what
+ *   one's own AI may do with it are the title's question mark (concept.data_wallet).
  *   This file holds the reads and the handlers: the composite mount (consents, the grouped trail,
  *   the summary, the names), the trail's window, the rows of one group page by page, a grant (a
  *   workspace role through the workspace door, anything else through the consent door), a revoke,
@@ -15,6 +16,8 @@
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.3.1 — 2026-11-08 — The description says what the page shows now: the section on how one's own
+ *     AI uses the wallet left the page for the start and the question mark (data-wallet/page.js v1.26.0).
  *   v2.3.0 — 2026-11-01 — The outside parties (WP9a): their state is useParties (data-wallet/parties.js),
  *     ctx.parties.
  *   v2.2.0 — 2026-10-20 — What is known about your content (wish-sis-ll-n-purku-luokittelu-ja-owl):

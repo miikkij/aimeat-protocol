@@ -162,6 +162,7 @@ The rules that apply only to certain code live in `.claude/rules/`, and each loa
 | A tool has three surfaces | `tool-surfaces.md` | `aimeat/src/mcp/`, `aimeat/src/cli/`, `python/aimeat-crewai/` |
 | Extension, cortex and app namespaces; a memory value is a record | `namespaces-memory.md` | `aimeat/src/` services, routes, storage, mcp, data; sdk-libs; cortex-bundled; `packages/` |
 | Frontend; browser verification | `frontend.md` | `aimeat/public/`, `aimeat/src/static/` |
+| How a page explains itself: the page start, the page's and a setting's question mark, the tooltip, what not to build | `page-guidance.md` | `aimeat/public/views/profile/` and `admin/`, the guidance components, `aimeat/locales/` |
 | Guard tier; claims from a full sweep; which of three a green test was | `testing.md` | `aimeat/test/`, the test-env and gate scripts, `.github/workflows/` |
 | Pre-commit hook and `pnpm gate`; `pnpm debt`; ratchet seeding; protocol versions | `gates-ratchets.md` | `.githooks/`, `aimeat/scripts/`, `security/`, workflows, `CLAUDE.md`, `.claude/rules/` |
 | Licensing | `licensing.md` | `aimeat/public/lib/`, `package.json`, the licence and notices scripts |

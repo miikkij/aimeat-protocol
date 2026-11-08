@@ -7,7 +7,10 @@
  *   /v1/datapackages/shared; the person's AI reads the same view with aimeat_dataproduct action
  *   "shared", so the page and the chat answer with one list.
  *
- *   IN THE BOARD'S ORDER. The head and its sentence; the filters with their counts (All, Public, Named
+ *   IN THE BOARD'S ORDER. The head and its sentence, with the title's question mark
+ *   (concept.shared_data); the page's start (PageStart: what the page is for, the prompt that has
+ *   one's own AI make a data product, whose button is "Make a data product", and what happens next);
+ *   the filters with their counts (All, Public, Named
  *   shares, For sale, Data space); "Data products" with "Make a data product" as the one loud action;
  *   "Shares to people" (each live named share, its package, until when, its last read, with "Data
  *   Wallet" for an outside party and "End share"); "Who reads" (the party read log: who, which package,
@@ -17,10 +20,15 @@
  *
  *   ?product=<name> opens one product; an old ?tab=offers&product=<name> arrives here through
  *   landing-page.helpers.js redirectMovedTab. Live data by the `aimeat-live-update` event, never a timer.
- *   Made of the component kit: it passes data and never a class.
+ *   Made of the component kit: it passes data and never a class. How the page explains itself:
+ *   .claude/rules/page-guidance.md.
  * @structure SharedDataTab (default) · frame · crumbOf
  * @usage registered in views/profile.js TABS as id 'sharedData'
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head (folded once the person shares a package or has a product; its button
+ *     opens the wizard) and the title's question mark, concept.shared_data. The hint at the foot
+ *     with the question for one's own AI goes: the start's prompt is that sentence now.
  *   v1.0.0 — 2026-11-02 — Initial (WP11, board Jakamasi-data); the data products moved here from Offers.
  */
 import { h } from 'preact';
@@ -32,6 +40,7 @@ import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
+import { PageStart } from '/components/PageStart.js';
 import * as dp from '/js/services/dataproducts.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
@@ -123,18 +132,22 @@ export default function SharedDataTab({ session, showToast }) {
   if (view.kind === 'wizard') return html`<${DataWizard} ctx=${ctx} /><${ConfirmUI} />`;
 
   const loading = shared === null || products === null;
+  // The start: folded once something is shared or a product exists; its button is the page's wizard.
+  const start = html`<${PageStart} id="sharedData" done=${loading ? null : (shared.packages || []).length + products.length > 0}
+    action=${{ onClick: () => pickView({ kind: 'wizard' }) }} />`;
   return html`
     <${SettingsPage}
       crumb=${crumbOf(ctx, [])}
       title=${S('title')}
+      help="concept.shared_data"
       desc=${S('lead')}
+      start=${start}
       after=${html`<${ConfirmUI} />`}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${loading ? html`<${Note} kind="loading" />` : html`
         ${secFilters({ counts: shared.counts || {}, filter, setFilter })}
         ${secProducts({ ctx, shared, products, filter, orgNames })}
         ${secPeople({ people: shared.people || [], busy, onEnd: endShare })}
-        ${secReaders({ readers: shared.readers || [] })}
-        <${Note} kind="hint">${S('askAi')}<//>`}
+        ${secReaders({ readers: shared.readers || [] })}`}
     <//>`;
 }

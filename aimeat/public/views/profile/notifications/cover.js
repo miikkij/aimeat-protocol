@@ -3,14 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Notifications page in the poster face (design canvas "AIMEAT Ilmoitusten sivu",
- *   direction A). Three sections and two folds: what happened (the bell's list with the sender
+ *   direction A). Three sections and a fold: what happened (the bell's list with the sender
  *   shown, filters, the actions), who may notify you (the node's groups, the apps with the grant,
  *   the extensions and agents, each with the owner's decision), where notifications arrive (this
- *   browser, the other devices, the email digest), quiet hours, and how a notification is born.
- *   Pure render functions over the ctx bag.
- * @structure renderCover · secInbox · secSenders · secDevices · quietFold · howFold
+ *   browser, the other devices, the email digest), and quiet hours. The page's start (PageStart:
+ *   the prompt asks the person's AI for a test notification, push in this browser is its button)
+ *   and the title's question mark (concept.notification: who may notify whom, push, mute, the
+ *   digest, how long a notification is kept). Pure render functions over the ctx bag. How the
+ *   page explains itself: .claude/rules/page-guidance.md.
+ * @structure renderCover · secInbox · secSenders · secDevices · quietFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.19.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart and the title's question mark concept.notification; the fold "How a notification is
+ *     born" (nt-how) is gone, what it said is in the concept.
  *   v1.18.0 -- 2026-11-08 -- An outside app (kind `ecosystem`) is a sender row of its own, with what it
  *     is and a way to the Outside apps page, so the owner can mute it (secaudit2026nov08 round 14).
  *   v1.17.0 -- 2026-10-16 -- A failed first load of the inbox shows the could-not-load note with Retry
@@ -52,8 +58,8 @@ import { FigureStrip } from '/components/FigureStrip.js';
 import { More } from '/components/List.js';
 import { Box } from '/components/Box.js';
 import { Card, CardGrid } from '/components/Card.js';
-import { Roads, Road } from '/components/Roads.js';
 import { Tabs } from '/components/Tabs.js';
+import { PageStart } from '/components/PageStart.js';
 import { Fields, Field, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
@@ -86,10 +92,19 @@ export function renderCover(ctx) {
     { key: 'senders', n: senderNames.length, label: c('stripSenders'), sub: senderNames.slice(0, 4).map(([k, n]) => `${k} ${n}`).join(' · ') || c('nothingYet') },
     { key: 'devices', n: devices, label: c('stripDevices'), sub: devices ? ctx.devices.map(d => (d.thisBrowser ? c('thisBrowser') : c('family.' + d.family))).join(' · ') : c('stripDevicesNone') },
   ]} />`;
+  // The start: folded once a notification has arrived; its button turns push on in this browser
+  // while it is off and the browser and the server can do it.
+  const mine = ctx.devices.some(d => d.thisBrowser);
+  const canPush = !mine && ctx.pushSupport !== false && ctx.vapid !== false;
+  const start = html`<${PageStart} id="notifications"
+    done=${ctx.itemsFailed || (ctx.loading && !items.length) ? null : items.length > 0}
+    action=${canPush ? { onClick: () => ctx.subscribe() } : undefined} />`;
   return html`
     <${SettingsPage} name="nt"
       crumb=${crumb()}
       title=${c('title')}
+      help="concept.notification"
+      start=${start}
       marks=${[
         unread ? mark(unread, 'chipUnread', 'coral') : null,
         mark(recent.length, 'chipRecent'),
@@ -107,7 +122,6 @@ export function renderCover(ctx) {
         { id: 'nt-senders', num: '02', label: c('secSenders'), count: ctx.senders.length + 1 },
         { id: 'nt-devices', num: '03', label: c('secDevices'), count: devices },
         { id: 'nt-quiet', num: '04', label: c('quietTitle'), count: '' },
-        { id: 'nt-how', num: '05', label: c('howTitle'), count: '' },
       ]}
       pagesLabel=${c('pages')}
       pages=${pageLinks()}
@@ -116,7 +130,6 @@ export function renderCover(ctx) {
       ${secSenders(ctx)}
       ${secDevices(ctx)}
       <${FoldSection} id="nt-quiet" num="04" title=${c('quietTitle')} sub=${quietSub(ctx)} open=${ctx.folds.quiet} onToggle=${() => ctx.setFold('quiet', !ctx.folds.quiet)}>${quietFold(ctx)}<//>
-      <${FoldSection} id="nt-how" num="05" title=${c('howTitle')} sub=${c('howSub')} open=${ctx.folds.how} onToggle=${() => ctx.setFold('how', !ctx.folds.how)}>${howFold()}<//>
     <//>`;
 }
 
@@ -225,17 +238,6 @@ function quietFold(ctx) {
     <${FormActions}>
       <${Loud} control disabled=${ctx.busy} onClick=${save}>${c('save')}<//>
     <//>`;
-}
-
-function howFold() {
-  const road = (k, title, body, code) => html`<${Road} key=${k} kicker=${c('how.' + k + 'K')} name=${title} text=${body} codeLine=${code} />`;
-  return html`
-    <${Roads} cols="three">
-      ${road('app', c('how.appTitle'), c('how.appBody'), "await session.notify('Report ready', { body: 'Q2 numbers are in.' })")}
-      ${road('ext', c('how.extTitle'), c('how.extBody'), "await ctx.notify(message, { title, link })")}
-      ${road('agent', c('how.agentTitle'), c('how.agentBody'), 'aimeat_notify { title, body, link }')}
-    <//>
-    <${Hint}>${c('how.hint')}<//>`;
 }
 
 export { firstLine };

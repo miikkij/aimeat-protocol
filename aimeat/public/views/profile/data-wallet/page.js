@@ -2,19 +2,27 @@
  * @file public/views/profile/data-wallet/page.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The Data Wallet page in the poster face: the mast says what the wallet is and
- *   opens the grant form; the strip says what you own, how many permissions stand, what was refused
- *   this window and what you revoked; 01 who reaches what (one row per target, turnable by people,
- *   the revoked ones); 02 what happened (the trail grouped: who tried what, how many times, with the
- *   grants and revocations read off the permissions' own timestamps); 03 the grant form as a fold;
- *   04 everything you own as one file, with what is inside; 05 classification (classification.js);
- *   06 what is known about your content (content-classes.js); 07 how your AI uses the wallet. A
- *   wallet that lives on another server shows one box. Pure render over the ctx bag; the rows are
- *   rows.js.
- * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport ·
- *   secRoads
+ * @description The Data Wallet page in the poster face: the mast says what the wallet is, carries
+ *   the title's question mark (concept.data_wallet: what the wallet is, how a permission comes to be,
+ *   what one's own AI may do) and opens the grant form; the page's start (PageStart: what the page is
+ *   for, the prompt that has one's own AI say who reaches the data, and what happens next); the
+ *   strip says what you own, how many permissions stand, what was refused this window and what you
+ *   revoked; 01 who reaches what (one row per target, turnable by people, the revoked ones); 02 the
+ *   outside parties (parties.js); 03 what happened (the trail grouped: who tried what, how many
+ *   times, with the grants and revocations read off the permissions' own timestamps); 04 the grant
+ *   form as a fold; 05 everything you own as one file, with what is inside; 06 classification
+ *   (classification.js); 07 what is known about your content (content-classes.js). A wallet that
+ *   lives on another server shows one box. Pure render over the ctx bag; the rows are rows.js. How
+ *   the page explains itself: .claude/rules/page-guidance.md.
+ * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.26.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head and the title's question mark, concept.data_wallet. The section "How
+ *     your AI uses the data wallet" (dw-roads) and the head's way to it go: its request is the
+ *     start's prompt, and what the AI may do is in the concept. It also said the AI reads the trail
+ *     of refusals, and no MCP tool reads it. The box "How a permission comes to be" under 01 goes into
+ *     the concept as well.
  *   v1.25.0 — 2026-11-01 — Section 02 is the outside parties (data-wallet/parties.js; WP9a, design
  *     canvas "Data ulos", board Tietolompakko), after who reaches what; the rest move one number on.
  *   v1.24.0 — 2026-10-20 — Section 06 is what is known about your content (content classes,
@@ -66,7 +74,7 @@ import { t } from '/js/i18n.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
-import { scrollToSection } from '/components/Rail.js';
+import { PageStart } from '/components/PageStart.js';
 import { Tabs } from '/components/Tabs.js';
 import { List, Filter, More } from '/components/List.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -74,7 +82,6 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Box, SettingBox } from '/components/Box.js';
 import { Card, CardGrid } from '/components/Card.js';
-import { Roads, Road } from '/components/Roads.js';
 import { Row as Line } from '/components/Layout.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
 import { Choice } from '/components/Choice.js';
@@ -100,10 +107,11 @@ export function renderPage(ctx) {
     { id: 'dw-export', num: '05', label: x('secExport'), count: ov ? n(ov.permSummary.total_memory_keys) : '' },
     { id: 'dw-class', num: '06', label: x('cls.title'), count: classificationCount(ctx.cls) },
     { id: 'dw-content', num: '07', label: x('cc.title'), count: contentCount(ctx.content) },
-    { id: 'dw-roads', num: '08', label: x('secRoads'), count: '' },
   ];
+  // The start: the page's own list answers the same question, so there is no button and no done.
+  const start = html`<${PageStart} id="dataWallet" />`;
   return html`
-    <${SettingsPage} name="dw" crumb=${crumb()} ...${head(ctx)} strip=${strip(ctx)}
+    <${SettingsPage} name="dw" crumb=${crumb()} ...${head(ctx)} start=${start} strip=${strip(ctx)}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${!ov ? (ctx.failed ? html`<${Note} kind="quiet">${x('loadFailed')}<//>` : html`<${Note} kind="loading">${x('loading')}<//>`) : html`
@@ -113,19 +121,18 @@ export function renderPage(ctx) {
         ${secGrant(ctx)}
         ${secExport(ctx)}
         ${secClassification(ctx, '06')}
-        ${secContentClasses(ctx, '07')}
-        ${secRoads()}`}
+        ${secContentClasses(ctx, '07')}`}
     <//>`;
 }
 
 function federated(ctx) {
   return html`
-    <${SettingsPage} name="dw" crumb=${crumb()} title=${t('profile.tabs.dataWallet')} sub=${x('titleSub')} desc=${x('desc')}>
+    <${SettingsPage} name="dw" crumb=${crumb()} title=${t('profile.tabs.dataWallet')} help="concept.data_wallet" sub=${x('titleSub')} desc=${x('desc')}>
       <${SettingBox} label=${x('federatedLabel')} irreversible>${x('federatedBody', { node: ctx.session?.homeNode || '?' })}<//>
     <//>`;
 }
 
-/** The mast as SettingsPage's head props: title, the tags, the words, the grant slab and its doors. */
+/** The mast as SettingsPage's head props: title, its question mark, the tags, the words, the grant slab and the export. */
 function head(ctx) {
   const ov = ctx.ov;
   const ps = ov?.permSummary;
@@ -140,9 +147,8 @@ function head(ctx) {
     <${Note} kind="hint" slab inline>${x('grantSlabHint')}<//>
     <${Actions}>
       <${Action} small disabled=${ctx.exporting} onClick=${() => ctx.exportAll()}>${ctx.exporting ? x('exporting') : x('exportDoor')}<//>
-      <${Action} small soft onClick=${() => scrollToSection('dw-roads')}>${x('toAi')}<//>
     <//>`;
-  return { title: t('profile.tabs.dataWallet'), sub: x('titleSub'), marks, desc: x('desc'), actions };
+  return { title: t('profile.tabs.dataWallet'), help: 'concept.data_wallet', sub: x('titleSub'), marks, desc: x('desc'), actions };
 }
 
 function strip(ctx) {
@@ -189,7 +195,6 @@ function secTargets(ctx) {
           empty=${html`<${Note} kind="quiet"><b>${x('noGrantsTitle')}</b> ${x('noGrantsBody')}<//>`}>
           ${list.map((r) => targetRow(ctx, r))}
         <//>`}
-      <${Box}><b>${x('howTitle')}</b> ${x('howBody')}<//>
     <//>`;
 }
 
@@ -296,20 +301,7 @@ function secExport(ctx) {
     <//>`;
 }
 
-/* ── 07 (05, the classification, is data-wallet/classification.js; 06, what is known about your
-   content, is data-wallet/content-classes.js) ─────────────────────────────────────────────────── */
-
-function secRoads() {
-  const ask = x('roadAskPrompt');
-  return html`
-    <${Section} id="dw-roads" num="08" title=${x('secRoads')}>
-      <${Roads} wide>
-        <${Road} lead name=${x('roadAskTitle')} text=${x('roadAskBody')} code=${ask}
-          doors=${html`<${Action} small soft copy=${ask}>${x('copyPrompt')}<//>`} />
-        <${Road} name=${x('roadAgentTitle')} text=${x('roadAgentBody')}
-          meta=${`aimeat_consent_list · aimeat_consent_grant · aimeat_consent_revoke · ${x('roadAgentScope')}`} />
-      <//>
-    <//>`;
-}
+/* 06, the classification, is data-wallet/classification.js; 07, what is known about your content,
+   is data-wallet/content-classes.js. */
 
 export { whoOf, groupId };

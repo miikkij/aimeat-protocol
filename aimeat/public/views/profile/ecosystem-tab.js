@@ -7,9 +7,12 @@
  *   "hello integration" requests (approve with a scope preset / deny), the connected-GEAI list, and
  *   per-app grants + outbound event subscriptions + the account-correspondence binding with a
  *   typed-name revoke. Listens for aimeat-live-update and polls pending requests, like the Agents tab.
+ *   How the page explains itself (.claude/rules/page-guidance.md): PageStart "ecosystem" under the
+ *   head and the title's question mark concept.outside_app.
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.26.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once an app is connected) and the title's question mark concept.outside_app, which now holds what the automation's "How this works" fold said.
  *   v3.25.0 -- 2026-11-08 -- A waiting request lists the words no access level carries, unticked, and the approval adds only the ones the owner ticked to the access level's scopes (ecosystem-tab.pending.js; secaudit2026nov08 round 14, older item O5).
  *   v3.24.0 -- 2026-11-08 -- The disconnect dialog says which receivers the app made, that they keep working, and offers one press that pauses them (receivers/maker-receivers.js; secaudit2026nov08 round 14, ruling 3).
  *   v3.23.0 -- 2026-10-25 -- A waiting request lists the data areas the app asked for, each with a tick, and the approval sends data_areas from the ticks; a reconnect and a key change are marked, with both key fingerprints (ecosystem-tab.pending.js; secaudit2026oct22, leads 2378 and 2415).
@@ -162,6 +165,7 @@ import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './e
 import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Folds } from '/components/Folds.js';
 import { Action, Loud, Icon, Actions } from '/components/Action.js';
@@ -282,9 +286,11 @@ export default function EcosystemTab({ onStats, showToast }) {
 
   if (loading) return html`<${LoadingLine} />`;
 
+  // The start folds once an app is connected; connecting happens in the app, so it has no button here.
   return html`<${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.ecosystem')]}
-    title=${t('profile.ecosystem.title')} sub=${html`<${Mark} kind="count" tone="tally">${apps.length}<//>`}
+    title=${t('profile.ecosystem.title')} help="concept.outside_app" sub=${html`<${Mark} kind="count" tone="tally">${apps.length}<//>`}
     desc=${t('profile.ecosystem.desc')}
+    start=${html`<${PageStart} id="ecosystem" done=${apps.length > 0} />`}
     after=${html`
       <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
         footer=${html`

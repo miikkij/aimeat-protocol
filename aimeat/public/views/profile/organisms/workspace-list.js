@@ -10,6 +10,8 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.21.0 -- 2026-11-08 -- The archived mark, the to-review mark and the archived fold's title have no
+ *     emoji (no emoji in the interface).
  *   v1.20.0 -- 2026-10-27 -- The new workspace's name stops at the node's name limit (js/input-limits.js).
  *   v1.19.0 -- 2026-10-25 -- An access request answered no or taken back shows that answer, not Approve
  *     and Deny again, and an open request inbox reads again on the live `organisms` event (the developer's review).
@@ -395,7 +397,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
         open=${peopleOpen || reqOpen} panel=${html`${peopleOpen ? peopleList(w) : null}${reqOpen ? requestList(w) : null}`}>
         <${Lead} text=${'🗂'} />
         <${Name} onOpen=${locked ? undefined : () => onOpen(w.id)}
-          after=${html`${w.archived ? html` <${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${'🗄️ '}${t('organisms.archived') || 'archived'}<//>` : null}${reviews > 0 ? html` <${Mark} kind="status" tone="attention">${'📨 '}${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}<//>` : null}`}
+          after=${html`${w.archived ? html` <${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}${reviews > 0 ? html` <${Mark} kind="status" tone="attention">${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}<//>` : null}`}
           meta=${locked ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?') : metaLine(w)}>${(w.name || w.id)}<//>
         <${Cell} line>${locked ? html`<span>${'🔒'}</span>` : null}<//>
         <${Stats}>
@@ -442,7 +444,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
           ${sortMode === 'custom' && activeSorted.length > 1 ? html`
             <${Note}>${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}<//>` : null}
           ${archivedList.length > 0 ? html`
-            <${FoldSection} num="" title=${'🗄️ ' + (t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archivedList.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
+            <${FoldSection} num="" title=${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archivedList.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
               <${List} cols="mark-name-tags-stats-doors" keepCols>${archivedList.map(w => renderWsRow(w, false))}<//>
             <//>` : null}`}
 

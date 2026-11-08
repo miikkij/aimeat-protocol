@@ -8,10 +8,16 @@
  *   (a search field first, then the catalogue with one door per row), whose agent is away, and what
  *   is for sale. An offer opens as its own page (offer-page.js), a delivery as its own page
  *   (inbox.js); the inbox, the map (map-page.js) and the selling register are pages from the rail.
- *   Made of the component kit: the page passes data and never a class.
+ *   Made of the component kit: the page passes data and never a class. The cover explains itself the
+ *   designed way (.claude/rules/page-guidance.md): the page's start (PageStart "offers") and the
+ *   title's question mark (concept.offer).
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v2.4.0 -- 2026-11-08 -- The cover explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "offers" in the start slot (folded once a delivery has come back; its button goes to
+ *     section 03) and the title's question mark concept.offer, so a first-time reader learns what an
+ *     offer is and where to begin.
  *   v2.3.0 -- 2026-11-02 -- The data products moved to "Data you share" (views/profile/shared-data-tab.js):
  *     section 06, the products page, a product's page and the wizard are that tab's now; this page keeps
  *     the agents' offers (WP11, board Jakamasi-data).
@@ -69,6 +75,7 @@ import { Box } from '/components/Box.js';
 import { Note } from '/components/Note.js';
 import { Stack } from '/components/Layout.js';
 import { StepStrip } from '/components/StepStrip.js';
+import { PageStart } from '/components/PageStart.js';
 import { scrollToSection } from '/components/Rail.js';
 import { groupItems } from './model.js';
 import { c, word, agentMark, getWord, costTime, statusWord, deliveryRows, rel, crumb, pageLinks, renderPage } from './frame.js';
@@ -113,9 +120,12 @@ function renderCover(ctx) {
       <${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')}<//>
       <${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'map' })}>${c('map')}<//>
     <//>`;
+  // The start: folded once something has come back from an agent; its button goes to the catalogue.
+  const start = html`<${PageStart} id="offers" done=${ctx.loadingDeliveries ? null : m.latest.length > 0}
+    action=${{ onClick: () => scrollToSection('op-ask') }} />`;
   return html`
-    <${SettingsPage} name="op" crumb=${crumb(ctx, [])} title=${t('profile.tabs.offers')} marks=${marks} desc=${c('desc')}
-      actions=${actions} strip=${strip} railTitle=${c('railTitle')}
+    <${SettingsPage} name="op" crumb=${crumb(ctx, [])} title=${t('profile.tabs.offers')} help="concept.offer" marks=${marks} desc=${c('desc')}
+      actions=${actions} start=${start} strip=${strip} railTitle=${c('railTitle')}
       sections=${[
         { id: 'op-back', num: '01', label: c('secBack'), count: m.latest.length },
         { id: 'op-auto', num: '02', label: c('secAuto'), count: m.chains.length + m.autoSingles.length },

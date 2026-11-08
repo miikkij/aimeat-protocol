@@ -6,13 +6,21 @@
  *   direction A): the mast and the strip; the two prompts a build starts from and the three tiers;
  *   the pitfalls the owner's agents filed, with severity, area and model filters, a text search,
  *   twenty rows at a time and a panel that opens under one; the template proposals; the platform's
- *   own registry, counts first and rows on demand; and how the page accrues. A person whose agents
+ *   own registry, counts first and rows on demand. How it accrues is the title's question mark
+ *   (concept.appdev), and the page's start (PageStart "appdev") gives the first build's prompt with
+ *   the flow prompt as the page's own button (.claude/rules/page-guidance.md). A person whose agents
  *   have filed nothing yet gets the same page with the empty sections saying what will appear.
  *   Pure render over the ctx bag, made of the component kit (the page passes data and never a
  *   class); the rows are in rows.js.
- * @structure renderPage · secStart · secLearned · secProposals · secCurated · secHow
+ * @structure renderPage · secStart · secLearned · secProposals · secCurated
  * @usage import { renderPage } from './appdev/page.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "appdev" (folded once an agent has filed a pitfall; its button copies the flow
+ *     prompt) and the title's question mark concept.appdev. Section 05 "How this accrues" explained
+ *     the concept, so its words moved into the concept and the section is gone; its line on other
+ *     owners' shared pitfalls, a live count, now stands under the list in 02. The head's paragraph
+ *     is two sentences.
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip, the two
  *     prompts and the three lists the List (the pitfall lists its state-name-who-doors cut; the flow
@@ -55,7 +63,7 @@ import { FigureStrip } from '/components/FigureStrip.js';
 import { List, Row, Name, Desc, Cell, Doors, Panel, Filters, Filter, SearchLine, More } from '/components/List.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
-import { Facts } from '/components/Facts.js';
+import { PageStart } from '/components/PageStart.js';
 import { a, areaLabel, crumb, pageLinks, buildPromptFileUrl, catalogUrl } from './frame.js';
 import { learnedRow, proposalRow, curatedRow } from './rows.js';
 
@@ -93,17 +101,19 @@ export function renderPage(ctx) {
   const actions = html`
     <${Loud} control copy=${ctx.flow} copiedLabel=${a('promptCopied')} disabled=${!ctx.flow} onCopied=${() => ctx.showToast?.(a('flowCopiedToast'))}>${a('flowSlab')}<//>
     <${Actions}><${Action} small onClick=${() => ctx.goTab('apps')}>${a('appsDoor')}<//><//>`;
+  // The start: folded once an agent has filed what it learned; its button copies the flow prompt.
+  const start = html`<${PageStart} id="appdev" done=${L ? filed > 0 : null}
+    action=${ctx.flow ? { copy: ctx.flow } : undefined} />`;
 
   return html`
-    <${SettingsPage} name="appdev" crumb=${crumb()} title=${t('profile.tabs.appDev')} sub=${a('titleSub')} marks=${marks}
-      desc=${none ? a('descEmpty') : a('desc')} actions=${actions} strip=${strip}
+    <${SettingsPage} name="appdev" crumb=${crumb()} title=${t('profile.tabs.appDev')} sub=${a('titleSub')} help="concept.appdev" marks=${marks}
+      desc=${none ? a('descEmpty') : a('desc')} actions=${actions} start=${start} strip=${strip}
       railTitle=${a('railTitle')}
       sections=${[
         { id: 'ad-start', num: '01', label: a('secStart'), count: '' },
         { id: 'ad-learned', num: '02', label: a('secLearned'), count: L ? filed : '' },
         { id: 'ad-proposals', num: '03', label: a('secProposals'), count: proposals.length },
         { id: 'ad-curated', num: '04', label: a('secCurated'), count: curatedTotal },
-        { id: 'ad-how', num: '05', label: a('secHow'), count: '' },
       ]}
       pagesLabel=${a('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
@@ -111,7 +121,6 @@ export function renderPage(ctx) {
       ${secLearned(ctx, none)}
       ${secProposals(ctx, proposals)}
       ${secCurated(ctx, none)}
-      ${secHow(ctx, none)}
     <//>`;
 }
 
@@ -200,7 +209,8 @@ function secLearned(ctx, none) {
         <//>
         <${More} label=${a('showMore', { n: Math.min(L.limit, L.total - rows.length) })} onMore=${rows.length < L.total ? ctx.loadMore : null}
           disabled=${ctx.busy === 'more'} note=${a('shownOf', { shown: rows.length, total: L.total })} />
-        <${Note}>${a('learnedHint')}<//>`}
+        <${Note}>${a('learnedHint')}<//>
+        <${Note}>${L.community ? a('communityHint', { n: L.community }) : a('communityNone')}<//>`}
     <//>`;
 }
 
@@ -240,19 +250,5 @@ function secCurated(ctx, none) {
             ${rows.map((p) => curatedRow(ctx, p))}
           <//>` : null}`}
       <${Note}>${none ? a('curatedHintNew') : a('curatedHint')}<//>
-    <//>`;
-}
-
-/* ── 05 · How this accrues ────────────────────────────────────────────────────────────────────── */
-
-function secHow(ctx, none) {
-  return html`
-    <${Section} id="ad-how" num="05" title=${a('secHow')} count=${null}>
-      <${Facts} wide flush rows=${[
-        { k: a('how.before.k'), v: a('how.before.v'), sub: a('how.before.s') },
-        { k: a('how.after.k'), v: a('how.after.v'), sub: a('how.after.s') },
-        { k: a('how.you.k'), v: a('how.you.v'), sub: a('how.you.s') },
-      ]} />
-      ${none ? null : html`<${Note}>${ctx.learned?.community ? a('communityHint', { n: ctx.learned.community }) : a('communityNone')}<//>`}
     <//>`;
 }

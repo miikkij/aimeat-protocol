@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for managing AI chat sessions connected via agents.
  *   Shows active sessions, allows creating new ones via prompt copy, and
- *   removing existing sessions.
+ *   removing existing sessions. The page's start (PageStart: what the page shows, the prompt
+ *   that connects the person's AI over MCP with this server's address) and the title's question
+ *   mark (concept.connect). How the page explains itself: .claude/rules/page-guidance.md.
  * @version-history
+ *   v1.17.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart and the title's question mark concept.connect; the head's paragraph is two sentences.
  *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.16.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage, the create card the Card's section tone, the sessions the List whose row opens its panel (the Facts, the copy and the remove at its foot), the copy the Action's copy; it writes no class.
  *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -62,6 +66,8 @@ import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Row, Space } from '/components/Layout.js';
 import { listChatSessions, deleteAgent } from '/js/services/agents.js';
+import { getNodeUrl } from '/js/services/auth.js';
+import { PageStart } from '/components/PageStart.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
@@ -132,7 +138,8 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
   if (!chatSessions) return html`<${LoadingLine} text=${t('profile.chatSessions.loading')} />`;
   return html`
     <${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuActivity'), t('profile.tabs.chatSessions')]}
-      title=${t('profile.chatSessions.title')} desc=${t('profile.chatSessions.desc')}>
+      title=${t('profile.chatSessions.title')} help="concept.connect" desc=${t('profile.chatSessions.desc')}
+      start=${html`<${PageStart} id="chatsessions" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${chatSessions.length > 0} />`}>
 
     <${Space} below="large">
       <${Card} tone="section" title=${t('profile.chatSessions.createTitle')}>

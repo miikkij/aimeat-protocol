@@ -10,11 +10,15 @@
  *   /v1/goals/{id}, the call the person's own AI makes with aimeat_goal_set; a change that would end
  *   running work is shown first (preview) and asked about.
  *
- *   The words a person may not know carry their question mark (explain.concept.*). Composed from
- *   library components only; it has no sheet of its own.
+ *   The words a person may not know carry their question mark (explain.concept.*). The list starts
+ *   with PageStart "goals" under the head, beside the title's question mark concept.goal
+ *   (.claude/rules/page-guidance.md). Composed from library components only; it has no sheet of its own.
  * @structure GoalsTab (default) · GoalRules({ goal, agents, onSaved, confirm, showToast })
  * @usage Registered in profile.js TABS as { id: 'goals', component: GoalsTab }.
  * @version-history
+ *   v1.1.0 — 2026-11-08 — PageStart under the list's head: what goals are for, the prompt that asks
+ *     one's own AI to propose a goal, and what follows; folded once a goal is listed
+ *     (.claude/rules/page-guidance.md).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { h } from 'preact';
@@ -29,6 +33,7 @@ import { useConfirm } from '/components/Modal.js';
 import { useOpenItem } from '/js/open-item.js';
 import { listAgents } from '/js/services/agents.js';
 import { PageHead } from '/components/PageHead.js';
+import { PageStart } from '/components/PageStart.js';
 import { PageSection } from '/components/PageSection.js';
 import { BackLink } from '/components/BackLink.js';
 import { Fields } from '/components/Field.js';
@@ -243,6 +248,9 @@ export default function GoalsTab({ showToast }) {
     <${ConfirmUI} />
     <${PageHead} title=${g('title', 'Goals')} help="concept.goal"
       desc=${g('desc', 'Every goal you or your AI gave your agents. Here are the rules the work moves by: who takes part, what the coordinator may do, the reactions, the rounds, the limits and the whole chain.')} />
+    ${/* The start (page-guidance.md) stands under the head; a goal is given on the home or by one's own
+          AI, so it has no button here. It folds once the list has a goal. */''}
+    <${PageStart} id="goals" done=${goals === null ? null : goals.length > 0} />
     <${Choice} tone="filter" ariaLabel=${g('show', 'Show')} value=${filter} onChange=${setFilter} options=${[
       ['running', g('fRunning', 'Running')], ['done', g('fDone', 'Done')], ['stopped', g('fStopped', 'Stopped')], ['expired', g('fExpired', 'Ended')], ['all', g('fAll', 'All')]]} />
     ${err && html`<${ErrorNote} text=${err} />`}
