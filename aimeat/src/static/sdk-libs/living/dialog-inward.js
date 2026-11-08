@@ -31,6 +31,9 @@
  *   import { openInward } from './dialog-inward.js';
  *   openInward({ id, node, doc, graph, hooks, langs, base, onSave });
  * @version-history
+ *   v0.8.4 -- 2026-11-08 -- The vault is read only when the sign-in can list it (vaultNames), so the
+ *     dialog inside an app makes no refused request; the picker then says the list is not available
+ *     here (secaudit2026nov08b round 15c).
  *   v0.8.3 -- 2026-11-08 -- When the page does not know who is signed in, a notice above the program
  *     road's call says the address needs the person signed in and offers the page's own sign-in
  *     (AIMEAT.auth.signIn); after it the dialog draws again with the name in the call and the road
@@ -54,7 +57,8 @@ import { say, fill } from './hooks-words.js';
 import { inwardShape, ownerNotice } from './hooks-shapes.js';
 import { asRaw } from './sources-url.js';
 import {
-  group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, headerEditor, apexPage, signedInOwner, signInOffer,
+  group, fields, copyBlock, statusLine, vocabularyNote, headerEditor, apexPage, signedInOwner, signInOffer,
+  secretsListable, vaultNames,
 } from './dialog-parts.js';
 import { NODE_ID } from '../_core/config.js';
 
@@ -138,8 +142,12 @@ export function openInward(spec) {
     road: shape.road, url: shape.url, path: shape.path, every: shape.every, key: shape.key,
     headers: Object.assign({}, subjectNode.headers || {}),
   }, spec.draft || {});
-  /** The vault's names, once they arrive. Never a value: the route does not carry one. */
-  let vault = [];
+  /**
+   * The vault's names, once they arrive. Never a value: the route does not carry one. Null when this
+   * sign-in cannot list them, which the picker shows as "not available here".
+   * @type {string[]|null}
+   */
+  let vault = secretsListable() ? [] : null;
 
   const k = kit();
   const handle = k.dialog({
@@ -198,11 +206,11 @@ export function openInward(spec) {
         secrets: function () { return vault; },
         onChange: function (map) { draft.headers = map; },
       });
-      ownerRead('/v1/secrets').then(function (data) {
-        const list = data && Array.isArray(data.secrets) ? data.secrets : [];
-        vault = list.map(function (s) { return String(s && s.name ? s.name : s); }).filter(Boolean);
-        headers.refresh();
-      });
+      // Asked only when this sign-in can list the vault; inside an app without that permission the
+      // picker says so, and no request is refused on every opening (dialog-parts.js vaultNames).
+      if (vault !== null) {
+        vaultNames().then(function (names) { vault = names; headers.refresh(); });
+      }
 
       expected.block = copyBlock(urlRoad.body, {
         label: words('inward.expected'), text: JSON.stringify(shape.expected, null, 2), langs: langs,

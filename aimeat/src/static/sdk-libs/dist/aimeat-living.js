@@ -3408,6 +3408,8 @@
       "inward.ownerWhere": "Kirjoita käyttäjätunnuksesi kohtaan {placeholder}.",
       "inward.signInWhy": "Ohjelman osoitteessa pitää olla käyttäjätunnuksesi, ja tämä sivu tietää sen vasta, kun olet kirjautunut. Kirjaudu sisään, niin tunnuksesi tulee alla olevaan kutsuun kohdan {placeholder} tilalle.",
       "inward.signIn": "Kirjaudu sisään",
+      "inward.keyPlaceholder": "<API-avaimesi>",
+      "inward.tokenPlaceholder": "<tokenisi>",
       "inward.agent": "Sano tämä omalle tekoälyllesi",
       "inward.range": "Sallittu väli",
       "outward.title": "Kun tämä muuttuu, kerro jollekin",
@@ -3433,6 +3435,8 @@
       "secret.pick": "Lisää salaisuus",
       "secret.none": "Yhtään salaisuutta ei ole vielä tallessa.",
       "secret.add": "Lisää sellainen Pääsy-sivulla",
+      "secret.unavailable": "Tämä sivu ei näe salaisuuksiesi luetteloa. Kirjoita salaisuuden nimi arvoon muodossa {{secret:NIMI}}.",
+      "secret.see": "Katso salaisuutesi Pääsy-sivulla",
       "agent.pick": "Valitse agentti",
       "agent.none": "Yksikään agenteistasi ei voi vielä toimia.",
       "agent.connect": "Yhdistä agentti Agenttisi-sivulla",
@@ -3482,6 +3486,8 @@
       "inward.ownerWhere": "Write your username in place of {placeholder}.",
       "inward.signInWhy": "The program's address must have your username, and this page knows it only when you are signed in. Sign in, and the call below gets your username in place of {placeholder}.",
       "inward.signIn": "Sign in",
+      "inward.keyPlaceholder": "<your API key>",
+      "inward.tokenPlaceholder": "<your token>",
       "inward.agent": "Say this to your own AI",
       "inward.range": "The range it accepts",
       "outward.title": "When this changes, tell someone",
@@ -3507,6 +3513,8 @@
       "secret.pick": "Insert a secret",
       "secret.none": "No secrets are kept yet.",
       "secret.add": "Add one on the Access page",
+      "secret.unavailable": "This page cannot list your secrets. Write a secret's name into the value as {{secret:NAME}}.",
+      "secret.see": "See your secrets on the Access page",
       "agent.pick": "Pick an agent",
       "agent.none": "None of your agents can act yet.",
       "agent.connect": "Connect one on the Your agents page",
@@ -5388,13 +5396,18 @@
   }
   var OWNER_PLACEHOLDER = "<owner>";
   var KEY_PLACEHOLDER = "<your API key>";
+  var TOKEN_PLACEHOLDER = "<your token>";
+  function placeholderIn(key, langs, fallback) {
+    const word = say(key, langs);
+    return /^<[^"$`\\%!'<>]+>$/.test(word) ? word : fallback;
+  }
   function ownerForAddress(owner, nodeId) {
     let name = typeof owner === "string" ? owner.trim() : "";
     const at = name.indexOf("@");
     if (at >= 0) name = nodeId && name.slice(at + 1) === String(nodeId) ? name.slice(0, at) : "";
     return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) ? name : "";
   }
-  function receiverRoad(apex, owner, key, doc, id, sample) {
+  function receiverRoad(apex, owner, key, doc, id, sample, keyPlaceholder) {
     const name = receiverNameFor(doc, id);
     const address = apex + "/v1/receive/" + (owner || OWNER_PLACEHOLDER) + "/" + name;
     return {
@@ -5404,13 +5417,13 @@
       ownerKnown: !!owner,
       /** The page does not know the account name: the dialog says so and offers the sign-in (ownerNotice). */
       signInNeeded: !owner,
-      keyPlaceholder: KEY_PLACEHOLDER,
+      keyPlaceholder,
       ownerPlaceholder: OWNER_PLACEHOLDER,
       settings: apex + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
       address,
-      curl: "curl -X POST " + shellQuoted(address) + ' -H "Content-Type: application/json" -H "Authorization: Bearer ' + KEY_PLACEHOLDER + '" -d ' + shellQuoted(JSON.stringify({ value: sample })),
+      curl: "curl -X POST " + shellQuoted(address) + ' -H "Content-Type: application/json" -H "Authorization: Bearer ' + keyPlaceholder + '" -d ' + shellQuoted(JSON.stringify({ value: sample })),
       /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
-      windows: windowsCall(address, KEY_PLACEHOLDER, { value: sample })
+      windows: windowsCall(address, keyPlaceholder, { value: sample })
     };
   }
   function ownerNotice(receiver, canSignIn) {
@@ -5431,6 +5444,9 @@
     const path = String(subject.path || "");
     const expected = subject.raw ? sample : shapeFor(path || "value", sample);
     const base = String(ctx.base || "");
+    const apex = String(ctx.apex || base);
+    const keyPlaceholder = placeholderIn("inward.keyPlaceholder", wanted, KEY_PLACEHOLDER);
+    const tokenPlaceholder = placeholderIn("inward.tokenPlaceholder", wanted, TOKEN_PLACEHOLDER);
     const key = memoryKeyFor(doc, subjectId);
     const body = { key, value: { value: sample } };
     const hasRange = typeof subject.min === "number" || typeof subject.max === "number" || typeof subject.step === "number";
@@ -5453,13 +5469,14 @@
         key,
         request: {
           method: "POST",
-          url: base + "/v1/memory",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer <your token>" },
+          url: apex + "/v1/memory",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + tokenPlaceholder },
           body
         },
-        curl: "curl -X POST " + base + '/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d ' + shellQuoted(JSON.stringify(body)),
+        tokenPlaceholder,
+        curl: "curl -X POST " + shellQuoted(apex + "/v1/memory") + ' -H "Content-Type: application/json" -H "Authorization: Bearer ' + tokenPlaceholder + '" -d ' + shellQuoted(JSON.stringify(body)),
         /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
-        windows: windowsCall(base + "/v1/memory", "<your token>", body)
+        windows: windowsCall(apex + "/v1/memory", tokenPlaceholder, body)
       },
       /**
        * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through
@@ -5468,7 +5485,7 @@
        * hold: a personal access token writes into its own test identity, and an agent token reaches
        * all of the owner's memory. `settings` opens the owner's Receivers page with this key filled in.
        */
-      receiver: receiverRoad(String(ctx.apex || base), ownerForAddress(ctx.owner, ctx.nodeId), key, doc, subjectId, sample),
+      receiver: receiverRoad(apex, ownerForAddress(ctx.owner, ctx.nodeId), key, doc, subjectId, sample, keyPlaceholder),
       /** The agent road: the same thing said out loud, in the language the page is reading. */
       sentence: fill(say("sentence.write", wanted), {
         key,
@@ -5672,6 +5689,52 @@
       return null;
     }
   }
+  var SECRETS_SCOPE = "secrets:manage";
+  function tokenClaims(jwt) {
+    const parts = String(jwt || "").split(".");
+    if (parts.length !== 3) return null;
+    try {
+      return JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    } catch (e) {
+      console.warn("[aimeat-living] The session's token could not be read:", e && /** @type {Error} */
+      e.message);
+      return null;
+    }
+  }
+  function canListSecrets(session) {
+    if (!session || typeof session.fetch !== "function") return false;
+    const claims = tokenClaims(session.jwt) || {};
+    const scopes = Array.isArray(claims.scopes) ? claims.scopes : [];
+    if (scopes.indexOf(SECRETS_SCOPE) >= 0) return true;
+    if (session._appOrigin || claims.app) return false;
+    const roles = Array.isArray(claims.roles) ? claims.roles : Array.isArray(session.roles) ? session.roles : [];
+    return roles.indexOf("owner") >= 0;
+  }
+  function currentSession2() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.auth && typeof ns.auth.getSession === "function" ? ns.auth.getSession() : null;
+  }
+  function secretsListable() {
+    try {
+      return canListSecrets(currentSession2());
+    } catch (e) {
+      console.warn("[aimeat-living] The session could not be read:", e && /** @type {Error} */
+      e.message);
+      return false;
+    }
+  }
+  async function vaultNames() {
+    if (!secretsListable()) return null;
+    const data = await ownerRead("/v1/secrets");
+    if (!data) return null;
+    const list = Array.isArray(data.secrets) ? data.secrets : [];
+    return list.map(function(s) {
+      return String(s && s.name ? s.name : s);
+    }).filter(Boolean);
+  }
   async function ownerRead(path) {
     try {
       const ns = (
@@ -5703,6 +5766,13 @@
     const langs = typeof spec.langs === "function" ? spec.langs : function() {
       return [];
     };
+    if (spec.names === null) {
+      return pickOrWords({
+        words: say("secret.unavailable", langs()),
+        doorWords: say("secret.see", langs()),
+        href: apexPage("/v1/profile?tab=access")
+      });
+    }
     const names = Array.isArray(spec.names) ? spec.names : [];
     if (!names.length) {
       return pickOrWords({
@@ -5788,7 +5858,8 @@
     }
     function draw() {
       while (list.firstChild) list.removeChild(list.firstChild);
-      const names = spec.secrets() || [];
+      const got = spec.secrets();
+      const names = got === null ? null : got || [];
       rows.forEach(function(row, i) {
         const name = (
           /** @type {HTMLInputElement} */
@@ -5916,7 +5987,7 @@
       key: shape.key,
       headers: Object.assign({}, subjectNode.headers || {})
     }, spec.draft || {});
-    let vault = [];
+    let vault = secretsListable() ? [] : null;
     const k = kit();
     const handle = k.dialog({
       title: words2("inward.title"),
@@ -5975,13 +6046,12 @@
             draft.headers = map;
           }
         });
-        ownerRead("/v1/secrets").then(function(data) {
-          const list = data && Array.isArray(data.secrets) ? data.secrets : [];
-          vault = list.map(function(s) {
-            return String(s && s.name ? s.name : s);
-          }).filter(Boolean);
-          headers.refresh();
-        });
+        if (vault !== null) {
+          vaultNames().then(function(names) {
+            vault = names;
+            headers.refresh();
+          });
+        }
         expected.block = copyBlock(urlRoad.body, {
           label: words2("inward.expected"),
           text: JSON.stringify(shape.expected, null, 2),
@@ -6129,7 +6199,7 @@
       enabled: shape.enabled,
       headers: Object.assign({}, writtenHeaders)
     };
-    let vault = [];
+    let vault = secretsListable() ? [] : null;
     const k = kit();
     const handle = k.dialog({
       title: words2("outward.title"),
@@ -6209,13 +6279,12 @@
             draft.headers = map;
           }
         });
-        ownerRead("/v1/secrets").then(function(data) {
-          const list = data && Array.isArray(data.secrets) ? data.secrets : [];
-          vault = list.map(function(s) {
-            return String(s && s.name ? s.name : s);
-          }).filter(Boolean);
-          headers.refresh();
-        });
+        if (vault !== null) {
+          vaultNames().then(function(names) {
+            vault = names;
+            headers.refresh();
+          });
+        }
         const agentBox = el("div", { class: "ak-living__dialog-fields" });
         agentRoad.body.appendChild(agentBox);
         fields(agentBox, [
