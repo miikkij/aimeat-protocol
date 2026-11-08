@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-11-08 — Initial (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  */
 import { describe, expect, it } from 'vitest';
-import { contextIndexLine, CONTEXT_INDEX_MAX, CONTEXT_TYPE } from '../../src/services/context/index-line.js';
+import { contextIndexLine, CONTEXT_INDEX_MAX, CONTEXT_TYPE, CONTEXT_STALE_DAYS, CONTEXT_CORE_LARGE } from '../../src/services/context/index-line.js';
 import { instructionsFor } from '../../src/mcp/instructions.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
@@ -72,6 +72,26 @@ describe('contextIndexLine', () => {
         const line = await contextIndexLine(storageWith(rows), config, 'alice');
         expect(line!.split('\n').filter(l => l.startsWith('- '))).toHaveLength(CONTEXT_INDEX_MAX);
         expect(line).toContain('…and 3 more');
+    });
+
+    it('marks a context untouched past CONTEXT_STALE_DAYS and one whose core grew large', async () => {
+        const now = Date.parse('2026-11-08T00:00:00Z');
+        const old = ctx('mokki', '2026-06-01T00:00:00Z');
+        const big = ctx('hanke', '2026-11-07T00:00:00Z', 'owner', { core: 'x'.repeat(CONTEXT_CORE_LARGE + 1) });
+        const fresh = ctx('trip', '2026-11-06T00:00:00Z');
+        const line = await contextIndexLine(storageWith([old, big, fresh]), config, 'alice', true, now);
+        const of = (k: string) => line!.split('\n').find(l => l.includes(`(context.${k})`))!;
+        expect(of('mokki')).toContain(`untouched since 2026-06-01`);
+        expect(of('hanke')).toContain('core has grown large');
+        expect(of('trip')).not.toContain('[');
+        expect(CONTEXT_STALE_DAYS).toBe(90);
+    });
+
+    it('leaves an archived context off the list', async () => {
+        const archived = ctx('mokki', '2026-06-01', 'owner', { lifecycle: { shapedAt: '2026-06-01', archivedAt: '2026-11-01' } });
+        const line = await contextIndexLine(storageWith([archived, ctx('trip', '2026-11-01')]), config, 'alice');
+        expect(line).not.toContain('context.mokki');
+        expect(line).toContain('context.trip');
     });
 
     it('answers null when the store cannot be read, and for no owner', async () => {

@@ -141,13 +141,56 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
 The context is kept for an AI. A person gets a view: ask who it is for and write it in their
 words, at their level, from the context. A view keeps the facts and changes only how they are
 told. When the person wants a view kept up to date, add it to \`views\` with \`keep\` and write
-its newest text into \`last\`.
+its newest text into \`last\`. For a view on a clock ("every Monday"), create a schedule of kind
+\`ai\` over the context's key with \`aimeat_schedule_create\`, its prompt the view request, so the
+node writes the view even when no AI is connected.
+
+**The fingerprint** shows at a glance what a context is made of: which parts are fact, analysis,
+opinion, instruction, decision or narrative, and what each rests on (+ a source, ~ a named person,
+? nothing, x replaced). Make one when the person asks how solid a context is, or before you lean
+on a factual context for something that matters: \`aimeat_content_inspect\` with
+\`stages: ["profile"]\` on the context's key, after the person says yes, then
+\`aimeat_content_facts\` to read it. In a factual context a large share of ? is worth saying first;
+in a creative one, narrative is what you expect.
+
+## Ageing
+
+The list of contexts you receive when you connect marks a context nobody has shaped for a long
+time, and one whose core has grown large. When such a context comes up, ask the person once:
+
+- **keep** it: stamp \`lifecycle.shapedAt\`, and the mark goes away;
+- **condense** it: rewrite the core to what still matters and move the rest into \`material\`;
+- **archive** it: set \`lifecycle.archivedAt\` to now. An archived context leaves the list you
+  receive on connecting and stays readable by its key; clearing \`archivedAt\` brings it back;
+- **delete** it, only when they say so: \`aimeat_memory_delete\`, which they can still undo for a
+  while.
+
+For a large core, offer to move detail into \`material\` or to split it. Never archive, condense,
+split or delete without their yes.
 
 ## Sharing
 
 A context is shared like any record: with a person or an organism by consent, or into a
-workspace. Including another context never shares that one too. A person whose AI is not on
-AIMEAT gets a link and a ready prompt; their reply comes back by email.
+workspace. Including another context never shares that one too.
+
+**Someone whose AI is not on AIMEAT** (a repair shop with its own ChatGPT, say) gets a link and a
+ready prompt. Never open the context itself to the internet; give them a view made for them:
+
+1. Ask what they may see, and for how long (two weeks if the person does not say).
+2. Write that view as a Markdown page in one of the person's workspaces
+   (\`aimeat_workspace_write\`, then \`aimeat_workspace_publish\`). Leave out excluded contexts,
+   other people's material and anything the person did not agree to.
+3. Share that one page: \`aimeat_workspace_share\` with \`space\`, \`id\`, \`access: "open"\` and
+   \`until\`.
+4. Hand the person two things to send: the page's plain-text address,
+   \`<node>/v1/organisms/<org>/workspace/public/document?ws=<ws>&type=<space>&id=<id>&format=md\`,
+   which any AI can read, and a short prompt: who this is from, what the reader's AI should do
+   with it, and to answer by replying to the person's email.
+5. When the reply arrives in the person's connected mailbox, read it (\`aimeat_mail_search\`,
+   \`aimeat_mail_read\`), tell the person what it says, and write it into the context. Ask before
+   you write a price, a date or a commitment.
+6. When the context changes in a way the reader needs, update the page. When the work is done,
+   stop the share (\`shared: false\`).
 
 ## Speaking about it
 
