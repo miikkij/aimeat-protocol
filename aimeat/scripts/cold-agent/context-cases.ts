@@ -31,6 +31,8 @@
  *   cd aimeat && pnpm cold-agent --suite context --onto off --runs 3
  *   cd aimeat && pnpm cold-agent --suite context --onto on --tasks ctx-terms,ctx-transfer
  * @version-history
+ *   v1.0.2 — 2026-11-08 — The record shape, the seeding helpers and the tool list are exported for
+ *     context-private.ts, which builds the same records from a fixture directory given at run time.
  *   v1.0.1 — 2026-11-08 — Three faults of the checks, found in the first baseline: the judge's empty
  *     --tools value was dropped by the shell, so no view or scene got a verdict; ctx-terms failed a
  *     right answer that named today's date in November; ctx-create found the bike notes an earlier
@@ -44,9 +46,9 @@ import { api, type Task, type TaskContext } from './tasks.js';
 export const CONTEXT_TYPE = 'aimeat.context/v1';
 export type Onto = 'on' | 'off' | 'auto';
 
-interface Concept { term: string; means: string; broader?: string; replacedBy?: string }
-interface Reference { ref: string; what: string; openWhen: string }
-interface Fixture {
+export interface Concept { term: string; means: string; broader?: string; replacedBy?: string }
+export interface Reference { ref: string; what: string; openWhen: string }
+export interface Fixture {
     slug: string;
     name: string;
     summary: string;
@@ -62,7 +64,7 @@ interface Fixture {
 }
 
 /** The record as the context skill writes it. Concepts only in the `on` arm. */
-function record(f: Fixture, onto: Onto): Record<string, unknown> {
+export function record(f: Fixture, onto: Onto): Record<string, unknown> {
     const now = new Date().toISOString();
     return {
         type: CONTEXT_TYPE,
@@ -80,12 +82,12 @@ function record(f: Fixture, onto: Onto): Record<string, unknown> {
     };
 }
 
-async function put(ctx: Omit<TaskContext, 'metrics'>, key: string, value: unknown, token = ctx.ownerToken, visibility = 'owner'): Promise<void> {
+export async function put(ctx: Omit<TaskContext, 'metrics'>, key: string, value: unknown, token = ctx.ownerToken, visibility = 'owner'): Promise<void> {
     const r = await api(ctx.baseUrl, '/v1/memory', token, { method: 'POST', body: { key, value, visibility } });
     if (r.status >= 300) throw new Error(`seeding ${key} answered ${r.status}`);
 }
 
-async function drop(ctx: TaskContext, keys: string[], token = ctx.ownerToken): Promise<void> {
+export async function drop(ctx: TaskContext, keys: string[], token = ctx.ownerToken): Promise<void> {
     if (ctx.keep) return;
     for (const k of keys) await api(ctx.baseUrl, `/v1/memory/${encodeURIComponent(k)}`, token, { method: 'DELETE' });
 }
@@ -286,7 +288,7 @@ export function judge(rubric: string, context: string, answer: string): Promise<
 
 // ── Tasks ──────────────────────────────────────────────────────────────────────────────────────
 
-const GOOD = ['aimeat_memory_list', 'aimeat_memory_read', 'aimeat_memory_search', 'aimeat_discover'];
+export const GOOD = ['aimeat_memory_list', 'aimeat_memory_read', 'aimeat_memory_search', 'aimeat_discover'];
 
 export function contextTasks(onto: Onto): Task[] {
     const tasks: Task[] = [

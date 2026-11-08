@@ -38,7 +38,17 @@
  *   cd aimeat && pnpm cold-agent --compare .cold-agent/<a> .cold-agent/<b>
  *   cd aimeat && pnpm cold-agent --tasks propose-agent --runs 1 --keep   # leave the proposal to approve
  *   cd aimeat && pnpm cold-agent --suite context --onto on       # a person's contexts (context-cases.ts)
+ *   cd aimeat && pnpm cold-agent --suite context-private --fixtures "<dir>" --onto on   # own material (context-private.ts)
+ *   cd aimeat && pnpm cold-agent --suite context-large --onto off   # invented material at real scale (context-large.ts)
  * @version-history
+ *   v1.5.0 — 2026-11-08 — `--suite context-large`: the context questions over a 40-session invented
+ *     context and a second context that shares words with it (context-large.ts), with the same
+ *     `--onto` arms. A session's budget defaults to $3 there, since the answer is in one of forty
+ *     records.
+ *   v1.4.0 — 2026-11-08 — `--suite context-private --fixtures <dir>`: the context suite on a fixture
+ *     directory named at run time (context-private.ts). Its transcripts and report go into
+ *     `<dir>/runs/`, not `.cold-agent/`, because they quote the fixture's material. A session's
+ *     budget defaults to $3 there, since the records it reads are long.
  *   v1.3.0 — 2026-11-08 — `--suite context` with `--onto on|off|auto`: the context suite, whose
  *     arm says whether each seeded context carries its concepts (context-cases.ts). `--effort`,
  *     high by default, passed to the CLI.
@@ -62,6 +72,8 @@ import { compareReports, renderReport, type RunRecord } from './report.js';
 import { scriptedTranscript } from './scripted.js';
 import { skillTasks } from './skill-cases.js';
 import { contextTasks, type Onto } from './context-cases.js';
+import { largeContextTasks } from './context-large.js';
+import { privateContextTasks } from './context-private.js';
 import { SANDBOX_MAX_APPS } from '../lib/sandbox-limits.js';
 
 const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -69,10 +81,14 @@ const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 interface Args {
     driver: 'claude' | 'scripted';
     /** `tasks`: did the person get what they asked for. `skills`: did the right skill get loaded.
-     *  `context`: did the agent use the person's contexts correctly (context-cases.ts). */
-    suite: 'tasks' | 'skills' | 'context';
+     *  `context`: did the agent use the person's contexts correctly (context-cases.ts).
+     *  `context-private`: the same on a fixture directory given with `--fixtures` (context-private.ts).
+     *  `context-large`: the same on the committed invented fixture at real scale (context-large.ts). */
+    suite: 'tasks' | 'skills' | 'context' | 'context-private' | 'context-large';
     /** The context suite's arm: whether each seeded context carries its concepts block. */
     onto: Onto;
+    /** `--fixtures <dir>`: the context-private suite's fixture directory, kept outside the repository. */
+    fixtures: string | null;
     model: string;
     /** The CLI's effort level. High by the developer's ruling of 2026-11-08: the same model and
      *  effort the developer works with in chat. */
@@ -100,12 +116,13 @@ function parseArgs(argv: string[]): Args {
     const get = (name: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : undefined; };
     const ci = argv.indexOf('--compare');
     const asked = get('suite');
-    const suite = asked === 'skills' ? 'skills' : asked === 'context' ? 'context' : 'tasks';
+    const suite = asked === 'skills' ? 'skills' : asked === 'context' ? 'context' : asked === 'context-private' ? 'context-private' : asked === 'context-large' ? 'context-large' : 'tasks';
     const onto = get('onto');
     return {
         driver: get('driver') === 'scripted' ? 'scripted' : 'claude',
         suite,
         onto: onto === 'on' || onto === 'auto' ? onto : 'off',
+        fixtures: get('fixtures') ?? null,
         // Opus, by the developer's ruling of 2026-09-18: the point is what a GOOD model does here.
         // Tuning the node's guidance until a weaker model copes measures the wrong reader, and the
         // first baseline, taken on Sonnet, had to be taken again.
@@ -116,7 +133,7 @@ function parseArgs(argv: string[]): Args {
         arm: get('arm') ?? null,
         preface: get('preface') ?? null,
         // A skill case measures the decision to load, which happens in the first few turns.
-        maxBudgetUsd: Number(get('max-budget-usd') ?? (suite === 'skills' ? 0.5 : 1.5)),
+        maxBudgetUsd: Number(get('max-budget-usd') ?? (suite === 'skills' ? 0.5 : suite === 'context-private' || suite === 'context-large' ? 3 : 1.5)),
         claudeCmd: get('claude-cmd') ?? process.env.AIMEAT_CLAUDE_CMD ?? 'claude',
         maxTotalUsd: Number(get('max-total-usd') ?? 10),
         // Leave what a run made on the sandbox (a task's verify skips its clean-up), to carry on
@@ -301,14 +318,24 @@ async function main(): Promise<void> {
     const args = parseArgs(process.argv.slice(2));
     if (args.compare) { console.log(compareReports(args.compare[0], args.compare[1])); return; }
 
+    if (args.suite === 'context-private' && !args.fixtures) {
+        throw new Error('--suite context-private needs --fixtures <dir>: the directory with contexts/, records/ and tasks.json. '
+            + 'It is kept outside the repository; the format is in the header of scripts/cold-agent/context-private.ts.');
+    }
+    if (args.fixtures && !existsSync(args.fixtures)) throw new Error(`--fixtures ${args.fixtures}: no such directory`);
     const s = loadSandbox();
-    const suite = args.suite === 'skills' ? skillTasks() : args.suite === 'context' ? contextTasks(args.onto) : TASKS;
+    const suite = args.suite === 'skills' ? skillTasks()
+        : args.suite === 'context' ? contextTasks(args.onto)
+            : args.suite === 'context-private' ? privateContextTasks(args.onto, args.fixtures!)
+                : args.suite === 'context-large' ? largeContextTasks(args.onto)
+                    : TASKS;
     // A task marked `byNameOnly` runs when it is asked for and never as part of "everything": the
     // ten-task baseline is compared run to run, and a three-dollar build must not join it by default.
     const tasks = suite.filter(t => (args.tasks ? args.tasks.some(want => t.id === want || t.id.startsWith(`${want}:`)) : !t.byNameOnly));
     await refuseAFullCatalogue(s, tasks.map(t => t.id), args.runs, args.driver);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const outDir = join(AIMEAT, '.cold-agent', stamp);
+    // A private fixture's transcripts quote its material, so they stay beside it, outside the repository.
+    const outDir = args.suite === 'context-private' ? join(args.fixtures!, 'runs', stamp) : join(AIMEAT, '.cold-agent', stamp);
     mkdirSync(outDir, { recursive: true });
 
     const arm = args.arm ? await applyArm(s, args.arm) : null;
@@ -328,6 +355,9 @@ async function main(): Promise<void> {
                 const rec = await runOne(task, run, s, args, outDir);
                 spent += rec.metrics.costUsd ?? 0;
                 records.push(rec);
+                // Written after every run: a long suite (the private context suite takes about five
+                // minutes a run) shows its verdicts while it runs, and a stopped run keeps them.
+                writeFileSync(join(outDir, 'results.partial.json'), JSON.stringify({ records }, null, 2));
                 console.log(`${rec.ok ? '✓' : rec.unverified ? '? UNVERIFIED' : '✗'} ${rec.detail} (${rec.metrics.toolCalls.length} calls, ${rec.metrics.errors} errors${rec.metrics.costUsd === null ? '' : `, $${rec.metrics.costUsd.toFixed(2)}`})`);
             }
         }
@@ -335,7 +365,7 @@ async function main(): Promise<void> {
         if (arm) await restoreArm(s, arm.ids);
     }
 
-    const meta = { stamp, driver: args.driver, model: args.driver === 'scripted' ? 'none' : args.model, runs: args.runs, arm: arm?.name ?? (args.preface ? 'preface:' + basename(args.preface) : args.suite === 'context' ? `onto:${args.onto}` : 'baseline'), spentUsd: spent };
+    const meta = { stamp, driver: args.driver, model: args.driver === 'scripted' ? 'none' : args.model, runs: args.runs, arm: arm?.name ?? (args.preface ? 'preface:' + basename(args.preface) : args.suite === 'context' ? `onto:${args.onto}` : args.suite === 'context-large' ? `large:onto:${args.onto}` : args.suite === 'context-private' ? `private:onto:${args.onto}` : 'baseline'), spentUsd: spent };
     writeFileSync(join(outDir, 'results.json'), JSON.stringify({ meta, records }, null, 2));
     const report = renderReport(meta, records, suite);
     writeFileSync(join(outDir, 'report.md'), report);
