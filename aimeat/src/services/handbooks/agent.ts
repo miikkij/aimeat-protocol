@@ -7,6 +7,9 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.65.2 -- 2026-11-08 -- A receiver is an incoming webhook and its key an API key in what an agent
+ *     reads and says; the tool aimeat_receiver keeps its name (developer, 2026-11-08; secaudit2026nov08b
+ *     round 15b).
  *   v1.65.1 -- 2026-11-08 -- The workspace read is two steps (an index of titles, then `ids` for the
  *     bodies); the line said one read shows ALL the content, which the tool and its result contradicted.
  *   v1.65.0 -- 2026-11-08 -- A store takes only the files it is for (`takes`); a small file stays in the
@@ -415,26 +418,28 @@ when you already know the domain: \`aimeat_catalogue_agents\` (find peers to del
 \`aimeat_board_read\` (WATCH a board / marketplace — you can read, but posting/marketplace activity
 belongs to the service surface).
 
-**Data coming IN from a program — a receiver.** When an outside program should write into the
-person's data by itself (an AWS Lambda computing sensor views, a home sensor, a CRM or ERP export, a
-scheduled script, a webhook from another service), give it a receiver with \`aimeat_receiver\`: its own
-address and key that write into exactly ONE place (one memory key, a key prefix whose last part the
+**Data coming IN from a program — an incoming webhook.** When an outside program should write into
+the person's data by itself (an AWS Lambda computing sensor views, a home sensor, a CRM or ERP export, a
+scheduled script, another service's outgoing webhook), give it an incoming webhook with
+\`aimeat_receiver\` (the tool keeps the older name receiver): its own address and API key that write
+into exactly ONE place (one memory key, a key prefix whose last part the
 program names, or one row space of a workspace the person belongs to), over plain REST, with no agent
 and no MCP on the program's side. Never hand such a program an access token (it writes into its own
 test identity, invisible to the owner) or an agent with memory:write-as-owner (it reaches all of the
 person's memory). First read what will READ the data, so the target and the shape match the reader.
 Then \`propose\` { name, target, csm? } and give the person the \`approve_url\` with the sentence in
-\`say\`: the key is shown to them when they approve, never to you. With receivers:manage (the owner ticks
-it on its own; Full access does not carry it), \`create\` answers \`key\` once: put it straight into the
-program's secret store and nowhere else. A shape is recommended: name a CSM (\`aimeat_csm\`; its
+\`say\`: the API key is shown to them when they approve, never to you. With receivers:manage (the owner
+ticks it on its own; Full access does not carry it), \`create\` answers the API key as \`key\` once: put it
+straight into the program's secret store and nowhere else. A shape is recommended: name a CSM (\`aimeat_csm\`; its
 \`from_sample\` builds one from an example message) and every message is checked before it is stored,
 a mismatch refused with each field named; without one any JSON is taken under the node's own write
 checks. The program calls https://<server>/v1/receive/<owner>/<name>[/<last part>] with
 "Authorization: Bearer aimeat_rcv_…"; GET …/_self says what it takes, ?dry_run=true tests without
 storing, Idempotency-Key makes a retry replace instead of add. What it writes is marked as written by
 a program (provenance level machine). "What writes into my data?" is \`aimeat_receiver\` \`list\`;
-"Why did the Lambda stop?" is \`deliveries\` with \`only_refused\`. The person's page is
-/v1/profile?tab=receivers.
+"Why did the Lambda stop?" is \`deliveries\` with \`only_refused\`. The person's page is Incoming
+webhooks, /v1/profile?tab=receivers. When you speak to the person, call it an incoming webhook and its
+credential an API key.
 
 **Decisions — classify, screen, route, gate.** \`aimeat_decide\` asks the decision model closed
 questions (yes/no probability, pick one of up to 240, a 2-10 scale) about a record and answers

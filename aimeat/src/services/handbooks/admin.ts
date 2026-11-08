@@ -6,6 +6,9 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.35.1 -- 2026-11-08 -- A receiver is an incoming webhook and its key an API key in what the
+ *     operator reads; the tool and the setting keep their names (developer, 2026-11-08; secaudit2026nov08b
+ *     round 15b).
  *   v1.35.0 -- 2026-11-08 -- The erased lock holders incident's locks are entries decided with "pseudonymise"
  *     or "keep" (secaudit2026nov08 round 14b).
  *   v1.34.0 -- 2026-11-07 -- aimeat_admin_receivers and visibility.receivers_mode: every receiver, the stop and the decision.
@@ -200,15 +203,17 @@ owner); \`aimeat_app_internet_close\` with \`owner\` closes any opening; \`aimea
 lets an owner open on their own or takes that back. Decide only as the operator says. How apps are
 opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
 
-Receivers are the addresses outside programs (a Lambda, a sensor, a CRM export) write into owners' data
-through, each with its own key and exactly one target. \`aimeat_admin_receivers\` \`list\` answers the
-setting, the counts (active, waiting, writes and refusals today, wrong keys) and every receiver with its
-owner; no key and no content. \`stop\` { owner, name, reason } stops one for everybody, and the owner reads
-the reason and cannot start it again; \`start\` lets it work; \`decide\` { owner, name, decision } answers
-one waiting for the operator. Who may make receivers is \`visibility.receivers_mode\`: auto (operator on
-a node with signed-in content access, self elsewhere), off, operator or self; change it with
-\`aimeat_admin_config_set\` only on the operator's word. Five wrong keys in an hour for one receiver open
-a security incident. The page is the admin Receivers page.
+Incoming webhooks (the tool and the setting keep the older name receiver) are the addresses outside
+programs (a Lambda, a sensor, a CRM export) write into owners' data through, each with its own API key
+and exactly one target. \`aimeat_admin_receivers\` \`list\` answers the setting, the counts (active,
+waiting, writes and refusals today, wrong API keys) and every incoming webhook with its owner; no API key
+and no content. \`stop\` { owner, name, reason } stops one for everybody, and the owner reads the reason
+and cannot start it again; \`start\` lets it work; \`decide\` { owner, name, decision } answers one waiting
+for the operator. Who may make incoming webhooks is \`visibility.receivers_mode\`: auto (operator on a
+node with signed-in content access, self elsewhere), off, operator or self; change it with
+\`aimeat_admin_config_set\` only on the operator's word. Five wrong API keys in an hour for one incoming
+webhook open a security incident. The page is the admin page Incoming webhooks. When you speak to the
+operator, call it an incoming webhook and its credential an API key.
 
 When \`consent.party_self_registration\` is apps-ask, an app's owner asks to let people register to it
 without an account here. \`aimeat_admin_app_party_registrations\` lists the apps that asked (state
