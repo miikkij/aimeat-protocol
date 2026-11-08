@@ -22,6 +22,9 @@
  * @structure recordsAudienceCap · readRecordsSource · readAppSource · readMemorySource · familyMatches · descriptionsOfJson
  * @usage const src = await readMemorySource(call);
  * @version-history
+ *   v1.4.0 — 2026-11-08 — A memory source and an app source name the label address of every record they
+ *     copied, as a records source does (secaudit2026nov08b round 15,
+ *     dataproduct/sources-io:derived-product-drops-upstream-version-label-source).
  *   v1.3.0 — 2026-11-08 — A records source names the label address of every record it copied
  *     (labelSources), so the version keeps the strictest of their labels and a reader the label keeps
  *     out reads no row of it (secaudit2026nov08 round 14,
@@ -214,6 +217,7 @@ export async function readAppSource(call: SourceCall, exporting: boolean): Promi
     return {
         ...table, personal: personalFamily ? new Set(table.columns) : new Set(),
         audience: narrowest(shown.map(r => audienceOfStored(r.visibility))), fetchedAt: now(),
+        labelSources: shown.map(r => memoryTarget(r.ownerGaii, r.key)),
         provenance: { kind: 'app', address: `${caller.owner}/${appId}:${spec.key_prefix}` },
     };
 }
@@ -246,7 +250,8 @@ export async function readMemorySource(call: SourceCall, exporting: boolean): Pr
     await mayLeave(call, [rec], exporting);
     const table = tableOf(spec.id, shapeRows(rowsOfValue(call, rec), spec.columns));
     return {
-        ...table, audience: audienceOfStored(rec.visibility), fetchedAt: now(),
+        // The record's label travels with the copy, as a records source's do.
+        ...table, audience: audienceOfStored(rec.visibility), fetchedAt: now(), labelSources: [memoryTarget(rec.ownerGaii, rec.key)],
         provenance: { kind: 'memory', address: `${rec.ownerGaii}:${key}${spec.rows_at ? `#${spec.rows_at}` : ''}` },
     };
 }

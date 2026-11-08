@@ -37,13 +37,15 @@
  *   lower-ranked label with a narrower audience was dropped, and a label set after the build on any
  *   item but the picked one never reached the version (secaudit2026nov08b round 15,
  *   datapackage/source-labels:single-rank-picked-source-stands-for-all-labels).
- * @structure SOURCE_LABELS_PREFIX · SOURCE_TARGETS_KEPT · versionSourceTargets · recordVersionLabelSource ·
- *   versionLabelSources · hiddenByLabelSources · hiddenBySourceLabel · packageVersionOfFile ·
- *   packageFileHiddenBySourceLabel
+ * @structure SOURCE_LABELS_PREFIX · SOURCE_TARGETS_KEPT · versionSourceTargets · onePerLabel · recordVersionLabelSource ·
+ *   versionLabelSources · packageCopyTargets · fileCopyTargets · hiddenByLabelSources · hiddenBySourceLabel ·
+ *   packageVersionOfFile · packageFileHiddenBySourceLabel
  * @usage
  *   const targets = await versionSourceTargets(deps, sources.flatMap(s => s.labelSources ?? []));
  *   if (await hiddenBySourceLabel(deps, reader, ownerGhii, name, hash)) return null;
  * @version-history
+ *   v2.1.0 — 2026-11-08 — packageCopyTargets and fileCopyTargets: what a copy of a package version or
+ *     of a stored file carries, for a derived product (secaudit2026nov08b round 15).
  *   v2.0.0 — 2026-11-08 — Every copied item is the label source, not the highest-ranked one; the read
  *     asks one item per effective label; a recorded single target still reads (secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14).
@@ -54,8 +56,8 @@ import { serviceRecords } from '../service-records.js';
 import { activePolicies, type ContentReader } from '../classification/reader.js';
 import { effectiveLabels } from '../classification/effective.js';
 import { labelById, type ClassificationLabel } from '../classification/defaults.js';
-import { targetId } from '../classification/labels.js';
-import { bare } from './contract.js';
+import { fileTarget, targetId } from '../classification/labels.js';
+import { bare, resourceKey } from './contract.js';
 
 /** The service-owned prefix, in the package owner's service namespace. */
 export const SOURCE_LABELS_PREFIX = 'datapkg-labels.';
@@ -112,7 +114,12 @@ export async function versionSourceTargets(deps: Deps, targets: readonly Content
     const kept = [...distinct.values()].filter(t => policies.has(t.scope));
     if (!kept.length) return null;
     if (kept.length <= SOURCE_TARGETS_KEPT) return kept;
-    return (await labelGroups(deps, kept)).map(g => g.items[0]!);
+    return onePerLabel(deps, kept);
+}
+
+/** One item of each effective label among the targets, in the scopes where classification is on. */
+export async function onePerLabel(deps: Deps, targets: readonly ContentLabelTarget[]): Promise<ContentLabelTarget[]> {
+    return (await labelGroups(deps, targets)).map(g => g.items[0]!);
 }
 
 /** Record (or, with null or none, clear) the label source of one version of `name`. Written before the version is readable. */
@@ -127,6 +134,26 @@ export async function recordVersionLabelSource(
 /** The label source of one version: the items it was copied from, none when it was built from no labelled source. */
 export async function versionLabelSources(storage: Storage, ownerGhii: string, name: string, contentHash: string): Promise<ContentLabelTarget[]> {
     return (await records(storage).get(ownerGhii, recordKey(name, contentHash)))?.targets ?? [];
+}
+
+/**
+ * What a copy of one resource of a package version carries: the version's own label source and the
+ * label of the resource file itself, so a product or an extension that reads the rows and publishes
+ * them again keeps the readers of both (secaudit2026nov08b round 15,
+ * dataproduct/sources-io:derived-product-drops-upstream-version-label-source).
+ */
+export async function packageCopyTargets(
+    storage: Storage, ownerGhii: string, name: string, contentHash: string, resource: string,
+): Promise<ContentLabelTarget[]> {
+    const key = resourceKey(name, contentHash, resource);
+    const meta = await storage.getStorageFileMeta(ownerGhii, key);
+    return [...(await versionLabelSources(storage, ownerGhii, name, contentHash)), fileTarget(ownerGhii, key, meta?.workspaceRef)];
+}
+
+/** What a copy of one stored file carries: its own label, and a package version's label source when it is a package file. */
+export async function fileCopyTargets(storage: Storage, ownerGaii: string, key: string, workspaceRef?: string | null): Promise<ContentLabelTarget[]> {
+    const v = packageVersionOfFile(key);
+    return [fileTarget(ownerGaii, key, workspaceRef), ...(v ? await versionLabelSources(storage, ownerGaii, v.name, v.hash) : [])];
 }
 
 /** True when one of the items' labels keeps this reader out. One item per label is asked (file header). */

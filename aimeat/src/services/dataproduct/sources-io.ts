@@ -15,10 +15,14 @@
  *                only when its visibility admits the caller. CSV is read with the data package parser;
  *                XLSX through the spreadsheet reader, one sheet.
  *   datapackage  openPackage and readAllRows as the caller, so a package's audience decides; the
- *                version read goes into the new version's lineage.
+ *                version read goes into the new version's lineage, and its label source and its file's
+ *                label into the new version's (labelSources), as a file source's file label does.
  * @structure readExtensionSource · readFileSource · readDatapackageSource · typedFromStrings
  * @usage const src = await readFileSource(call, exporting);
  * @version-history
+ *   v1.2.0 — 2026-11-08 — A datapackage source carries the version's label source and its file's label,
+ *     and a file source its file's label, so a derived product keeps the readers of what it copied
+ *     (secaudit2026nov08b round 15, dataproduct/sources-io:derived-product-drops-upstream-version-label-source).
  *   v1.1.1 — 2026-11-01 — A package source's audience is the service's record (trustedPackageOf), not
  *     the pointer's visibility (WP9e, incident ...-mvxozs2r).
  *   v1.1.0 — 2026-11-01 — An extension action's output schema gives its columns' types and descriptions,
@@ -35,6 +39,7 @@ import { extractFileText } from '../file-text/index.js';
 import { fromCsv } from '../datapackage/table.js';
 import { openPackage, readAllRows } from '../datapackage/store.js';
 import { trustedPackageOf } from '../datapackage/audience-record.js';
+import { fileCopyTargets, packageCopyTargets } from '../datapackage/source-labels.js';
 import { atPath } from '../workflow/engine-step-rows.js';
 import { findExtension } from '../component-address.js';
 import { logger } from '../../utils/logger.js';
@@ -164,6 +169,7 @@ export async function readFileSource(call: SourceCall, exporting: boolean): Prom
     const typed = typedFromStrings(table.rows, table.columns);
     return {
         ...table, types: typed.types, audience: audienceOfStored(file.visibility), fetchedAt: now(),
+        labelSources: await fileCopyTargets(deps.storage, file.ownerGaii, file.key, file.workspaceRef),
         provenance: { kind: 'file', address: `${file.ownerGaii}/${file.key}`, title: file.key.split('/').pop() },
     };
 }
@@ -192,8 +198,10 @@ export async function readDatapackageSource(call: SourceCall): Promise<ResolvedS
     const ownerGhii = owner.includes('@') ? owner : `${owner}@${deps.config.nodeId}`;
     const pkg = await trustedPackageOf(deps.storage, deps.config.nodeId, ownerGhii, spec.name!);
     const license = d.licenses?.[0]?.name ?? d.aimeat.license;
+    // The labels the version read keeps travel with the copy (datapackage/source-labels.ts).
+    const labelSources = await packageCopyTargets(deps.storage, ownerGhii, spec.name!, d.aimeat.contentHash, resource!);
     return {
-        ...table, descriptions, audience: audienceOfStored(pkg ? pkg.trusted.visibility ?? 'public' : 'private'), fetchedAt: now(),
+        ...table, descriptions, audience: audienceOfStored(pkg ? pkg.trusted.visibility ?? 'public' : 'private'), fetchedAt: now(), labelSources,
         lineage: `${d.aimeat.packageId}@${d.aimeat.contentHash}`,
         provenance: { kind: 'datapackage', address: opened.descriptorUrl, ...(d.title ? { title: d.title } : {}), ...(license ? { license } : {}) },
     };
