@@ -79473,10 +79473,10 @@ paths:
                             type: object
                             description: |
                               Present only on the first sign-in of an account a code key made: the key is
-                              replaced by a new password, shown here once. The same details are emailed to
-                              the account's address when the account has verified it. When it has not,
-                              nothing is mailed now, `email_held` is true and `email_note` says so, and the
-                              mail goes when the address is verified (unless the password has changed by
+                              replaced by a new password, shown here once. Nothing is mailed at this
+                              sign-in. When the account had verified its address before it, no mail
+                              follows. When it had not, `email_held` is true and `email_note` says so, and
+                              the mail goes when the address is verified (unless the password has changed by
                               then), by a code asked for after this sign-in. A first sign-in by an emailed
                               link or an identity provider replaces the key too; its details are given by
                               `POST /v1/ghii/key-credentials`.

@@ -8,17 +8,17 @@
  *   so it is a poor durable password AND its displayed form (an uppercase EXC_VIP_NN display name)
  *   does not match the real login username. On the account's FIRST successful sign-in we therefore
  *   ISSUE durable credentials: a freshly generated, validator-clean, dash-free password that replaces
- *   the code, delivered to the user as the exact login username + password. Delivery is BOTH:
- *     1. returned to the just-authenticated owner in the login response (so the entry surface — e.g.
- *        M-ROOM — can show it, and so it survives a disabled/failed mail transport), and
- *     2. emailed (best effort), to the account's own address when the account has proven it.
+ *   the code, delivered to the user as the exact login username + password. The credentials are
+ *   returned to the just-authenticated owner in the login response, so the entry surface shows them.
+ *   Nothing is mailed at the first sign-in: an address proven before it may be one that whoever knew
+ *   the key proved (the developer's ruling 1 of 2026-11-08).
  *   The rotation runs exactly once, gated by the invitation flipping from pending → accepted.
  *
- *   THE MAIL WAITS FOR A PROVEN ADDRESS. The address a code key names is chosen by whoever minted the
- *   key, and signing in with the key does not prove that the holder reads it, so the credentials mail
- *   is an owner mail like every other mail to the account's address (mail-gate.ts kind `owner`,
- *   owner-mail-address.ts provenOwnerAddress). When the address is not proven at the first sign-in,
- *   the issued password is kept sealed with the node's data key (encryption.ts encryptBound) in the
+ *   THE MAIL WAITS FOR AN ADDRESS THE HOLDER PROVES. The address a code key names is chosen by whoever
+ *   minted the key, and signing in with the key does not prove that the holder reads it, so the
+ *   credentials mail is an owner mail like every other mail to the account's address (mail-gate.ts kind
+ *   `owner`, owner-mail-address.ts provenOwnerAddress). When the address is not proven at the first
+ *   sign-in, the issued password is kept sealed with the node's data key (encryption.ts encryptBound) in the
  *   pseudo-owner namespace NS_HELD, one record per account under HELD_KEY_PREFIX, which the data key's
  *   re-encrypt job lists (key-reencrypt/sources.ts), and the login response says so
  *   (`email_held`, `email_note`). When the account then proves its address (routes/ghii/web-verify.ts,
@@ -32,6 +32,8 @@
  *   const cred = await issueFirstLoginKeyCredentials(storage, config, ghiiRecord); // null if N/A
  *   await sendHeldKeyCredentials(storage, config, ghii);                           // after the address is proven
  * @version-history
+ *   v1.2.1 — 2026-11-08 — secaudit2026nov08 round 14b. An address proven before the first sign-in no
+ *     longer gets the credentials mail at that sign-in; the login response carries them (ruling 1).
  *   v1.2.0 — 2026-11-08 — secaudit2026nov08 round 14. The first sign-in is decided by the key's
  *     invitation for every sign-in road (services/owner-session.ts establishOwnerSession): a link or an
  *     identity provider replaces the key at once and the details wait for that session's screen
@@ -170,8 +172,8 @@ export async function keyCredentialsPending(storage: Storage, nodeId: string, us
 /**
  * If `ghii` is a provisioned-code account signing in for the first time, rotate its bootstrap code to
  * a durable clean password, flip the invitation to accepted (so this happens once), and return the
- * issued credentials (also emailed, best effort, to a proven address; else held until the address is
- * proven). Returns null for any account not created by a code key or already activated. Never throws —
+ * issued credentials (not mailed now; held for an unproven address until the holder proves one).
+ * Returns null for any account not created by a code key or already activated. Never throws —
  * a failure here must not break login.
  */
 export async function issueFirstLoginKeyCredentials(
@@ -197,12 +199,13 @@ export async function issueFirstLoginKeyCredentials(
     const now = new Date().toISOString();
     await storage.updateInvitation(inv.id, { acceptedAt: now, acceptedBy: ghii.username });
 
-    // Deliver by email too (best effort — the credentials are already in the login response), to the
-    // account's address when it is proven; otherwise the password waits for the address.
+    // The credentials are in the login response. An address proven before this first sign-in gets no
+    // mail: whoever knew the key could prove an address of their own on the account before the holder
+    // signed in (the developer's ruling 1 of 2026-11-08, secaudit2026nov08 round 14b). An unproven
+    // address holds the password until the holder proves an address with a code asked for after this
+    // sign-in (sendHeldKeyCredentials).
     const emailSvc = nodeContext().email;
-    if (!emailSvc?.enabled) return { username: ghii.username, password, email_sent: false };
-    const outcome = await sendMail(emailSvc, { kind: 'owner', account: ghii }, await credentialsMessage(storage, config, inv, ghii, password));
-    if (outcome !== 'no_address') return { username: ghii.username, password, email_sent: outcome === 'sent' };
+    if (!emailSvc?.enabled || provenOwnerAddress(ghii)) return { username: ghii.username, password, email_sent: false };
     const held = await holdCredentials(storage, config, inv, ghii, password, passwordHash);
     return { username: ghii.username, password, email_sent: false, email_held: held, email_note: held ? HELD_NOTE : NOT_HELD_NOTE };
   } catch (err) {
