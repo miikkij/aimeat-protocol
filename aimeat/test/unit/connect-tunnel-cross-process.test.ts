@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A tunnel decision made on another process of the node reaches the socket this process
- *   holds (services/connect-tunnel-cross-process.ts; secaudit2026nov08 round 14,
+ *   holds (services/connect-tunnel/cross-process.ts; secaudit2026nov08 round 14,
  *   connect-tunnel-revocation.ts:revoke-process-local-while-bus-delivers-cross-process). The manager
  *   here is process B: it holds the agent's socket, and the decision arrives as an event of another
  *   process (emitRemote), the way services/bus-relay.ts tells it. Covered: agent rekeyed, deleted and

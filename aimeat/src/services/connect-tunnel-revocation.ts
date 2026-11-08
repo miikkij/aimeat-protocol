@@ -21,7 +21,7 @@
  *   nobody closed goes on reporting itself as online.
  *
  *   Each acts on the sockets of ONE process. The manager tells the node's other processes, which
- *   apply the same predicate to theirs (connect-tunnel-cross-process.ts, since 2026-11-08).
+ *   apply the same predicate to theirs (connect-tunnel/cross-process.ts, since 2026-11-08).
  * @structure revokeByToken() · revokeByTokenId() · revokeByGaii() · revokeByOwner()
  * @usage
  *   import { revokeByGaii } from './connect-tunnel-revocation.js';
@@ -93,7 +93,7 @@ export function revokeByToken(connections: Map<string, Closable>, send: Send, de
 
 /**
  * revokeByToken by the token's id: what another process of the node is told, so the token itself
- * never travels between processes (connect-tunnel-cross-process.ts).
+ * never travels between processes (connect-tunnel/cross-process.ts).
  */
 export function revokeByTokenId(connections: Map<string, Closable>, send: Send, detach: Detach, revokedId: string): void {
   for (const conn of connections.values()) {

@@ -105,7 +105,7 @@ flowchart LR
 | Personal access tokens | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
 | App grants | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
 | MCP OAuth tokens | Refused at every request; refresh tokens deleted | `aimeat/src/services/owner-lifecycle.ts` |
-| Live connector tunnels | Closed, on every process of the node | `aimeat/src/services/owner-lifecycle.ts`, `aimeat/src/services/connect-tunnel-cross-process.ts` |
+| Live connector tunnels | Closed, on every process of the node | `aimeat/src/services/owner-lifecycle.ts`, `aimeat/src/services/connect-tunnel/cross-process.ts` |
 | New sign-in | 403 `ACCOUNT_DISABLED` on every method, SAML included | `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/src/routes/saml-login.ts` |
 | Schedules, workflow triggers, unattended extension runs | Skipped with a log line, kept | `aimeat/src/services/owner-lifecycle.ts` |
 | AI jobs already queued, and jobs a restart or another process takes up | Wait in the queue with a sentence that names the deactivation; nothing is paid or written; they run after reactivation | `aimeat/src/services/ai-jobs/run-gate.ts` |

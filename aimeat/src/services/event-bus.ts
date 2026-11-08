@@ -457,7 +457,7 @@ export function offAiJobCancelEvent(handler: (evt: AiJobCancelEvent) => void): v
 
 // ── tunnelControl ────────────────────────────────────────────────────────────────────────────────
 // A change to what a connector tunnel may hold, made on one process, for the tunnel sockets other
-// processes hold (services/connect-tunnel-cross-process.ts): an agent deleted, moved or rekeyed, an
+// processes hold (services/connect-tunnel/cross-process.ts): an agent deleted, moved or rekeyed, an
 // account deactivated, a token revoked, an agent stopped or started, a permission change. A token is
 // named by its id (auth/jwt.ts tokenIdOf), never by the token itself.
 

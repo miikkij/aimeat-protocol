@@ -219,7 +219,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:cb2dbc02d33589022831e012"
+      "digest": "sha256:66c6245ad35d88144c018d66"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -416,7 +416,7 @@
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
       "aimeat/src/services/once-only-step.ts": "12c59204aa41d7f2",
-      "aimeat/src/services/event-bus.ts": "c26623487c299869",
+      "aimeat/src/services/event-bus.ts": "af3e5e48485c304d",
       "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
       "aimeat/src/mcp/legacy-sessions.ts": "4784fea1f0026443",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",

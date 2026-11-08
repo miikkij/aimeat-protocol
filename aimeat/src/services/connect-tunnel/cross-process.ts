@@ -1,5 +1,5 @@
 /**
- * @file src/services/connect-tunnel-cross-process.ts
+ * @file src/services/connect-tunnel/cross-process.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A tunnel decision made on one process reaches the sockets the node's other processes
@@ -29,9 +29,9 @@
 import {
   emitTunnelControl, onTunnelControlEvent, offTunnelControlEvent, isRemoteEvent,
   type TunnelControl, type TunnelControlEvent,
-} from './event-bus.js';
-import { runAsNode } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
+} from '../event-bus.js';
+import { runAsNode } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
 
 export type { TunnelControl };
 

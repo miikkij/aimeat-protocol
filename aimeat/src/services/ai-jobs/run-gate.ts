@@ -36,7 +36,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { isOwnerInPerson } from '../../utils/gaii.js';
+import { credentialKind } from '../caller-facts.js';
 import { intersectScopes } from '../../auth/effective-scopes.js';
 import { deactivatedAccountOf } from '../account-deactivated.js';
 import { saverAuthority } from '../workflow/trigger-authority.js';
@@ -61,9 +61,7 @@ export type RunGate =
  * permissions live in a record the owner edits. Everyone else keeps the list the job stored.
  */
 function isAgentStarter(s: AiJobStartedBy): boolean {
-    if (isOwnerInPerson(s) || s.federated || s.app) return false;
-    const roles = s.roles ?? [];
-    return roles.includes('agent') && !roles.includes('app') && !roles.includes('ecosystem') && s.principal.includes('#');
+    return credentialKind(s) === 'agent' && !s.app && s.principal.includes('#');
 }
 
 /** Same members in the same order: the stored list is unchanged. */

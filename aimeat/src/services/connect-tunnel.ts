@@ -27,7 +27,7 @@
  * @version-history
  *   2026-11-08 -- A revocation (token, agent delete, move, rekey, account deactivation), an agent stop or start and a
  *     permission change made on one process reach the sockets the node's other processes hold
- *     (./connect-tunnel-cross-process.ts; secaudit2026nov08 round 14).
+ *     (./connect-tunnel/cross-process.ts; secaudit2026nov08 round 14).
  *   2026-11-04 -- The running manager is nodeContext().tunnel (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-10-31 -- A dm.inbound reaches an identity without messages:read as an arrival notice (secaudit2026oct31w2 round 10).
  *   2026-10-16 -- closeForGaii takes 'rekeyed' (connect-tunnel-revocation.ts; QA audit F03b-01).
@@ -141,7 +141,7 @@ export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './conn
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
 import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason } from './connect-tunnel-revocation.js';
-import { tellOtherProcesses, listenToOtherProcesses, type TunnelControlTarget } from './connect-tunnel-cross-process.js';
+import { tellOtherProcesses, listenToOtherProcesses, type TunnelControlTarget } from './connect-tunnel/cross-process.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel-connection.js';
 import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel-hooks.js';
@@ -183,7 +183,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
   private spaceSubscribers = new Map<string, Set<string>>();
   private readonly deliveryHandler: (evt: DeliveryEvent) => void;
   private readonly memoryWriteHandler: (evt: MemoryWriteEvent) => void;
-  /** Stops applying the decisions the node's other processes make (./connect-tunnel-cross-process.ts). */
+  /** Stops applying the decisions the node's other processes make (./connect-tunnel/cross-process.ts). */
   private readonly stopListeningToOthers: () => void;
   private stats: ConnectTunnelStats = {
     activeConnections: 0,
@@ -230,7 +230,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
     setTokenRevokedHook((token) => this.onTokenRevoked(token));
 
     // A revocation, a stop or a permission change another process of this node made reaches the
-    // sockets this process holds (./connect-tunnel-cross-process.ts).
+    // sockets this process holds (./connect-tunnel/cross-process.ts).
     this.stopListeningToOthers = listenToOtherProcesses(config.nodeId, this);
   }
 
@@ -686,7 +686,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
    * something needs a socket closed, the question is which of these already reaches it.
    */
   /** Each of these applies to this process's sockets and then tells the node's other processes,
-   *  which apply it to theirs (./connect-tunnel-cross-process.ts; secaudit2026nov08 round 14). */
+   *  which apply it to theirs (./connect-tunnel/cross-process.ts; secaudit2026nov08 round 14). */
   onTokenRevoked(rawToken: string): void { const tokenId = tokenIdOf(rawToken); this.revokeTokenIdHere(tokenId); tellOtherProcesses(this.config.nodeId, { op: 'token', tokenId }); }
   revokeTokenIdHere(tokenId: string): void { revokeByTokenId(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), tokenId); }
 
