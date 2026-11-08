@@ -21,6 +21,7 @@
  * @structure genreKeptShare(html, genreId) · genreForkFindings(html)
  * @usage const hints = genreForkFindings(html);
  * @version-history
+ *   v1.1.1 — 2026-11-08 — The hand-rolled finding names 390×844 and 1280×900, the skill's size matrix.
  *   v1.1.0 — 2026-09-20 — designBookStep asks for the REASON now (the `made` list of the page's
  *     build notes) and no longer for a proposal. Ruled the same day: a finished build is not the
  *     moment anything goes into the Book, because an app is often rebuilt before anybody likes it.
@@ -118,7 +119,7 @@ export function genreForkFindings(html: string): AppArtifactFinding[] {
       + 'a genre\'s name over a look preset with components stacked in it is the default page every app looks like. Fork the genre '
       + `(\`aimeat_app_template_get { id: "genre-${register}" }\`), keep its composition, its type and its physics, and change the words, `
       + 'the sources and the images. If this page has a look of its own, say so instead: `content="custom:<name>"`. Then put it beside '
-      + 'the genre at 390 and 1440 px and ask whether it holds up.',
+      + 'the genre at 390×844 and 1280×900 and ask whether it holds up.',
     url: `/v1/appdev/pitfalls/${PITFALL}`,
   }];
 }

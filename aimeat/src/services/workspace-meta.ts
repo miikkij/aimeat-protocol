@@ -84,6 +84,10 @@
  *     itself, meta.share, meta.intake, meta.fingerprint and the other node meta records, access.*,
  *     skills.*), naming the part and a namespace to use; meta.goals, meta.plans and meta.decisions stay
  *     free. A full replace keeps a space the stored manifest already declares (secaudit2026nov08 round 14).
+ *   v1.14.0 — 2026-11-08 — backfillManifestEnvelope fills each space's defaults too (schemaRef,
+ *     backing, writeRole, cardinality, versioned, mode), the ones add_spaces already filled, through
+ *     one helper (withSpaceDefaults): aimeat_workspace_create said an objectTypes-only manifest is
+ *     accepted and refused one for a missing schemaRef.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -264,6 +268,19 @@ export function normalizeObjectTypes(
   });
 }
 
+/**
+ * One space with the defaults of the backing it is added with; a value the caller gave always wins.
+ * A row space is never versioned and has no `mode`; a memory space is a records space unless it is a
+ * document. Shared by add_spaces (unionObjectTypes) and a create's manifest (backfillManifestEnvelope).
+ */
+function withSpaceDefaults(raw: Record<string, unknown>): Record<string, unknown> {
+  const isRows = (raw.backing ?? 'memory') === 'rows';
+  const defaults: Record<string, unknown> = isRows
+    ? { backing: 'rows', writeRole: 'member', cardinality: 'many', versioned: false }
+    : { mode: raw.kind === 'document' ? 'document' : 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true };
+  return { ...defaults, ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1` };
+}
+
 /** Backfill the manifest envelope fields a model routinely omits — manifestVersion, id, name, kind,
  *  status — so a create/replace that supplies only `objectTypes` validates on the FIRST call instead
  *  of bouncing off the meta-schema's required-field check (organism.*.meta.manifest requires all five).
@@ -275,8 +292,16 @@ export function backfillManifestEnvelope(
   opts: { orgId: string; fallbackName?: string },
 ): Record<string, unknown> {
   const nonEmpty = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  // Each space gets the same defaults add_spaces fills (spaceDefaults), so the objectTypes-only
+  // manifest the create tool describes is accepted: a real build on aimeat.io (2026-11-08) sent
+  // { name, namespace, mode } as told and was refused for a missing schemaRef.
+  const objectTypes = Array.isArray(man.objectTypes)
+    ? (man.objectTypes as unknown[]).map(o => (o && typeof o === 'object' && (o as Record<string, unknown>).name
+      ? withSpaceDefaults(o as Record<string, unknown>) : o))
+    : man.objectTypes;
   return {
     ...man,
+    ...(objectTypes !== undefined ? { objectTypes } : {}),
     manifestVersion: nonEmpty(man.manifestVersion) ?? '1.0',
     id: opts.orgId,
     name: nonEmpty(man.name) ?? nonEmpty(opts.fallbackName) ?? 'Workspace',
@@ -354,13 +379,7 @@ export function unionObjectTypes(
     // MEMORY space stores what it holds (a schema-locked record or a markdown page); a row space
     // has neither, so stamping `mode: 'records'` on it tells every reader whose test is the mode
     // that this is a records space.
-    const isRows = (raw.backing ?? 'memory') === 'rows';
-    const defaults: Record<string, unknown> = isRows
-      ? { backing: 'rows', writeRole: 'member', cardinality: 'many', versioned: false }
-      : { mode: raw.kind === 'document' ? 'document' : 'records', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true };
-    const ot: Record<string, unknown> = normalizeObjectTypes([{
-      ...defaults, ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1`,
-    }])[0];
+    const ot: Record<string, unknown> = normalizeObjectTypes([withSpaceDefaults(raw)])[0];
     existing.push(stamp ? { ...ot, ...stamp } : ot); haveName.add(raw.name); haveNs.add(raw.namespace); added.push(String(raw.name));
   }
   return { objectTypes: existing, added, skipped };

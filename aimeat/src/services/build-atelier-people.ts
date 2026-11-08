@@ -24,6 +24,8 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.7.1 — 2026-11-08 — The fork's sign-in sample uses onSession: with onLogin a person who comes
+ *     back on a saved session got an empty app (appdev pitfall handle-both-auth-paths).
  *   v1.7.0 — 2026-11-07 — The proposal offers three to five designs and one is always the clean look
  *     (it replaced "Two or three genres"), states the introduction the interview agreed, and on
  *     `plain` keeps the designs as looks and the introduction (build-introduction-step.ts). Jouni:
@@ -149,7 +151,7 @@ export const ATELIER_FORK_PEOPLE_SECTION = '## A fork people sign in to, in two 
   + '  }\n'
   + '  i18n.onChange(paint);   // the bar\'s switch fires this; never build a switch of your own\n'
   + '  paint();\n'
-  + '  AIMEAT.auth.mountLoginButton(\'#pill\', { onLogin: start, onLogout: paint });\n'
+  + '  AIMEAT.auth.mountLoginButton(\'#pill\', { onSession: start, onLogout: paint });   // never onLogin: it misses a reload\n'
   + '</script>\n'
   + '```\n\n'
   + 'The switch must keep what the person was doing: a conversation, a half-filled form and the settings survive it, because `paint()` changes words and nothing else. Numbers, dates and money follow the language too (`toLocaleString(i18n.lang())`). Languages of speech recognition or of an AI answer are separate settings; do not tie them to this switch unless the owner asks.\n\n'

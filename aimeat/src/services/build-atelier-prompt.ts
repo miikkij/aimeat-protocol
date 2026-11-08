@@ -189,8 +189,8 @@ const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
 export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; example: string }> = [
   {
     id: 'app',
-    summary: 'The shell that carries the whole ceremony: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve, and the ambient layer behind the frame (the look decides; `ambient` names a preset, `{ preset, alpha, speed }`, or `false`). Fill handle.main; switch states with handle.status().',
-    example: "var a = AIMEAT.atelier.app({ title: 'Errands', look: 'vivid', onReady: function (s) { render(a, s); } });",
+    summary: 'The shell that carries the whole ceremony: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve, and the ambient layer behind the frame (the look decides; `ambient` names a preset, `{ preset, alpha, speed }`, or `false`). Fill handle.main; switch states with handle.status(). SIGN-IN IS ON BY DEFAULT: a signed-out visitor sees only "Log in to continue". An app used without signing in passes `requireLogin: false`, and onReady runs at once with a null session.',
+    example: "var a = AIMEAT.atelier.app({ title: 'Errands', look: 'vivid', onReady: function (s) { render(a, s); } });   // add requireLogin: false for an app anyone uses signed out",
   },
   {
     id: 'hero',
@@ -522,7 +522,7 @@ function composeBody(config: AimeatConfig): string {
   const following = genres.filter(g => g.light === 'follows').map(g => '`' + g.id + '`');
   body += 'FIXED OR FOLLOWING is the owner\'s choice, and both are right. A FIXED genre is a finished object with its own colours: it looks the same at noon and at night, and the sign-in bar\'s light/dark control stands down on it. A FOLLOWING page is drawn in the theme\'s `--ak-*` tokens and changes with the person\'s light/dark and palette, which is what a tool people work in all day usually wants. '
     + (following.length ? 'Following today: ' + following.join(', ') + '; every other genre is fixed. ' : 'Every genre is fixed today. ')
-    + 'A fixed genre becomes a following one by replacing its hardcoded colours with `--ak-*` tokens and changing `<meta name="aimeat-light">` to `follows`: keep the composition, the type and the physics, and check it in BOTH modes beside the original, because a palette that was tuned for one ground rarely survives the other untouched. Every picture of a genre is one address away (`See it`), and the whole shelf is ' + bookUrl + '/v1/design-book; give the owner the links, do not describe a look in words when they can look.\n\n';
+    + 'A fixed genre becomes a following one by replacing its hardcoded colours with `--ak-*` tokens and changing `<meta name="aimeat-light">` to `follows`: keep the composition, the type and the physics, and check it in BOTH modes beside the original, because a palette that was tuned for one ground rarely survives the other untouched. Every picture of a genre is one address away (`See it`); give the owner those links, do not describe a look in words when they can look.\n\n';
   body += 'THE TRAP THIS SECTION EXISTS TO STOP: a mosaic block stack wearing a look is a tool '
     + 'screen, never a statement — assembling components and applying a world reads as "the '
     + 'same dashboard in new paint" no matter which world. When a page must IMPRESS, start '

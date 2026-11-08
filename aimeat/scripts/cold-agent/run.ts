@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm cold-agent --compare .cold-agent/<a> .cold-agent/<b>
  *   cd aimeat && pnpm cold-agent --tasks propose-agent --runs 1 --keep   # leave the proposal to approve
  * @version-history
+ *   v1.2.3 — 2026-11-08 — A run that throws is recorded as that run's failure and the measurement goes
+ *     on; a verify's "fetch failed" had ended a whole run after five tasks.
  *   v1.2.2 — 2026-11-08 — A verdict can be `unverified`: the check could not decide, the run is no
  *     pass, and the report lists it for a person to read (the house-rules check, round 2 re-check).
  *   v1.2.1 — 2026-11-08 — An arm that names a code-built specification (build-app, build-app-atelier,
@@ -310,7 +312,12 @@ async function main(): Promise<void> {
                     break rounds;
                 }
                 process.stdout.write(`${task.id} #${run} … `);
-                const rec = await runOne(task, run, s, args, outDir);
+                // One task's failure is that run's result, never the end of the whole measurement:
+                // a verify that threw on 2026-11-08 stopped a run after five of its tasks.
+                const rec = await runOne(task, run, s, args, outDir).catch((e: unknown): RunRecord => ({
+                    task: task.id, run, marker: '', ok: false, detail: `the runner failed: ${e instanceof Error ? e.message : String(e)}`,
+                    wandered: [], metrics: parseTranscript(''),
+                }));
                 spent += rec.metrics.costUsd ?? 0;
                 records.push(rec);
                 console.log(`${rec.ok ? '✓' : rec.unverified ? '? UNVERIFIED' : '✗'} ${rec.detail} (${rec.metrics.toolCalls.length} calls, ${rec.metrics.errors} errors${rec.metrics.costUsd === null ? '' : `, $${rec.metrics.costUsd.toFixed(2)}`})`);

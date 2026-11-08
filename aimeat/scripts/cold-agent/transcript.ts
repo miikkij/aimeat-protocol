@@ -18,6 +18,7 @@
  *   import { parseTranscript } from './transcript.js';
  *   const metrics = parseTranscript(readFileSync(path, 'utf8'));
  * @version-history
+ *   v1.2.0 — 2026-11-08 — Duration and tokens are summed over the turns as the cost is.
  *   v1.1.0 — 2026-10-30 — A task of several turns: the cost is the sum of its sessions, and turnTexts keeps each turn's last message.
  *   v1.0.0 — 2026-09-18 — Initial (wish-kylm-agentti-ja-oikea-teht-v-mittaus-...).
  */
@@ -71,6 +72,10 @@ export function parseTranscript(raw: string): RunMetrics {
     let result: Record<string, unknown> | null = null;
     // A task of several turns is one session per turn, each ending in its own result with its own cost.
     let cost: number | null = null;
+    // Duration and tokens are summed over the turns too: the last turn alone made a three-turn build
+    // look as long and as heavy as its "yes, publish it".
+    let duration: number | null = null;
+    const used = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0 };
     const turnTexts: string[] = [];
 
     for (const line of raw.split('\n')) {
@@ -101,11 +106,14 @@ export function parseTranscript(raw: string): RunMetrics {
         } else if (ev.type === 'result') {
             result = ev;
             if (typeof ev.total_cost_usd === 'number') cost = (cost ?? 0) + ev.total_cost_usd;
+            if (typeof ev.duration_ms === 'number') duration = (duration ?? 0) + ev.duration_ms;
+            const u = (ev.usage ?? {}) as Record<string, number>;
+            for (const k of Object.keys(used) as Array<keyof typeof used>) used[k] += typeof u[k] === 'number' ? u[k] : 0;
             turnTexts.push(typeof ev.result === 'string' && ev.result ? ev.result : lastText);
         }
     }
 
-    const usage = (result?.usage ?? {}) as Record<string, number>;
+    const usage = used;
     const distinct = [...new Set(order.map(c => c.name))];
     return {
         turns: typeof result?.num_turns === 'number' ? result.num_turns : turns,
@@ -118,7 +126,7 @@ export function parseTranscript(raw: string): RunMetrics {
         outputTokens: usage.output_tokens ?? 0,
         cacheReadTokens: usage.cache_read_input_tokens ?? 0,
         costUsd: cost,
-        durationMs: typeof result?.duration_ms === 'number' ? result.duration_ms : null,
+        durationMs: duration,
         finalText: typeof result?.result === 'string' && result.result ? result.result : lastText,
         turnTexts: turnTexts.length ? turnTexts : [lastText],
         finished: result?.subtype === 'success',

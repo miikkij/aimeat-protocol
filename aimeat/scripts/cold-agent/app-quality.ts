@@ -15,6 +15,8 @@
  * @structure appQuality(baseUrl, ownerName, filename, toolCalls) → AppQuality
  * @usage const q = await appQuality(ctx.baseUrl, ctx.ownerName, app.filename, ctx.metrics.toolCalls);
  * @version-history
+ *   v1.2.2 — 2026-11-08 — The page is read through a redirect to `<label>.apps.localhost` by asking the
+ *     node's address with that Host; Node could not resolve the name and the run stopped.
  *   v1.2.1 — 2026-09-20 — A kit alias goes into its pattern through utils/regex-literal. The escape
  *     here covered `$` and left the backslash, which is the character that changes what the pattern
  *     means (CodeQL js/incomplete-sanitization, alert 1644).
@@ -98,9 +100,37 @@ function kitAliases(html: string): string[] {
     return [...new Set(['a', 'A', ...bound])];
 }
 
+/**
+ * The published page's bytes. The node may answer with a redirect to the app's own subdomain, and on
+ * a local node that is `<label>.apps.localhost`, a name Node's resolver does not find on Windows
+ * ("fetch failed", which stopped a whole run on 2026-11-08). Such a redirect is followed by asking
+ * the node's own address with the subdomain as the Host, which is what a browser's lookup reaches.
+ */
+async function publishedHtml(url: string): Promise<string> {
+    const res = await fetch(url, { redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+        const to = new URL(res.headers.get('location')!, url);
+        if (to.hostname.endsWith('.localhost')) {
+            const { request } = await import('node:http');
+            return new Promise<string>((resolve) => {
+                const req = request({ host: '127.0.0.1', port: to.port || 80, path: to.pathname + to.search, headers: { Host: to.host } }, (r) => {
+                    let body = '';
+                    r.setEncoding('utf8');
+                    r.on('data', (c: string) => { body += c; });
+                    r.on('end', () => resolve((r.statusCode ?? 500) < 300 ? body : ''));
+                });
+                req.on('error', () => resolve(''));
+                req.end();
+            });
+        }
+        const next = await fetch(to);
+        return next.ok ? next.text() : '';
+    }
+    return res.ok ? res.text() : '';
+}
+
 export async function appQuality(baseUrl: string, ownerName: string, filename: string, toolCalls: Call[]): Promise<AppQuality> {
-    const res = await fetch(`${baseUrl}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}?mode=inline`);
-    const html = res.ok ? await res.text() : '';
+    const html = await publishedHtml(`${baseUrl}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}?mode=inline`).catch(() => '');
     const lint = html
         ? await lintAppArtifact(html, { baseUrl, nodeId: 'cold-agent' } as AimeatConfig)
         : { blocking: [], warnings: [] };

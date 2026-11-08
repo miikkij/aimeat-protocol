@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   (2026-11-08) aimeat_appdev_pitfall_list names each row's `open` call instead of a rule to pick one.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-01 — aimeat_consent_grant takes a party recipient with pinned_version, allow_url_key and
  *     terms_required: a named share of a data package (plan doc-mvwxcas3dom3, D3.4).
@@ -562,7 +563,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_appdev_pitfall_list',
-        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. One full learned entry: aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one (the list names its owner); curated detail via GET /v1/appdev/pitfalls/{id}.',
+        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. Every row carries `open`, the exact call that opens it in full (aimeat_memory_read for your own entry, aimeat_memory_read_public with its owner for a shared one, a GET address for a curated one).',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List AppDev Pitfalls', readOnlyHint: true },

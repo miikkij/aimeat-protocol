@@ -14,6 +14,8 @@
  *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   2026-11-08 -- Every index row carries `open`, the exact call that opens it: a real build read an
+ *     own entry with the shared-entry tool, because the hint named both and the row did not say which.
  *   2026-11-04 -- A pitfall delete is announced with emitRecordChangePriorUnknown: the same streams hear
  *     it, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   2026-10-20 -- listOwnerScopeMemory and listOwnerScopeShown take an optional `view` (the reader's
@@ -481,6 +483,12 @@ function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): 
         shared: rec.visibility === 'public',
         // Another owner's entry is read by naming its holder (aimeat_memory_read_public {gaii, key}).
         ...(source === 'learned-shared' ? { owner: rec.ownerGaii } : {}),
+        // The exact call that opens this row. A real build on aimeat.io (2026-11-08) read an own
+        // entry with the shared-entry tool and got "not found": the hint named both and the row
+        // did not say which applied.
+        open: source === 'learned-shared'
+            ? `aimeat_memory_read_public ${JSON.stringify({ gaii: rec.ownerGaii, key: rec.key })}`
+            : `aimeat_memory_read ${JSON.stringify({ key: rec.key, owner_scope: true })}`,
         ...(warning ? { classificationWarning: warning } : {}),
     };
 }
@@ -521,6 +529,7 @@ export async function pitfallIndex(
                 status: p.status ?? 'active', updated: p.updatedAt, shared: true,
                 verified_at: p.verifiedAt ?? null, verified_version: p.verifiedVersion ?? null,
                 detail_url: `/v1/appdev/pitfalls/${p.id}`,
+                open: `GET ${config.baseUrl.replace(/\/+$/, '')}/v1/appdev/pitfalls/${p.id}`,
             } as PitfallLike);
         }
         for (const rec of await sharedPitfallRecords(storage, config, reader)) entries.push(asIndexEntry('learned-shared', rec));
@@ -536,7 +545,7 @@ export async function pitfallIndex(
         offset: page.offset,
         limit: page.limit,
         facets: page.filtered_facets,
-        hint: 'One full learned entry: aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one. Curated detail: GET /v1/appdev/pitfalls/{id}.',
+        hint: 'Each row\'s `open` is the exact call that opens it in full.',
     };
 }
 

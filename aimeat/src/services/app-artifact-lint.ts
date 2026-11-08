@@ -41,6 +41,10 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   (2026-11-08) A straight genre fork publishes quietly: hardcoded-theme-colors stands down for an
+ *     Atelier page drawn in `--ak-*` tokens or declaring `aimeat-light`, and names the Atelier fix
+ *     when it does speak; the daisyUI half of track-mixing ignores a class the page defines in its
+ *     own styles. 22 of 24 genres drew one or both (test/unit/app-artifact-lint-genres.test.ts).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-31 — Refuses a page that calls AIMEAT.atelier without loading the kit (app-lint-kit-loaded.ts; v28 #13).
  *   2026-10-27 — collectAssetRefs reads the tags with one linear scan (utils/html-tag-scan.ts), not a
@@ -198,6 +202,18 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
  * told when it draws the shell (that is an Atelier app with the wrong track line, and the line is
  * how it escapes the register), and when it calls nothing in the kit at all (a load with no use).
  */
+/** daisyUI's class names that an Atelier page uses without defining them in its own styles. */
+function undefinedDaisyClasses(html: string): string[] {
+  const DAISY = /^(btn|card|navbar|modal|drawer|badge|alert|menu|tabs|table|input|select|toggle|stat)$/i;
+  const used = new Set<string>();
+  for (const m of html.matchAll(/class\s*=\s*["']([^"']*)["']/gi)) {
+    for (const c of m[1].split(/\s+/)) if (DAISY.test(c)) used.add(c.toLowerCase());
+  }
+  if (used.size === 0) return [];
+  const styles = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
+  return [...used].filter(c => !new RegExp('\\.' + c + '(?![\\w-])', 'i').test(styles));
+}
+
 function checkTrackMixing(html: string): AppArtifactFinding[] {
   const out: AppArtifactFinding[] = [];
   const head = html.slice(0, SCAN_BYTES);
@@ -232,7 +248,10 @@ function checkTrackMixing(html: string): AppArtifactFinding[] {
     // The escape hatch for raw markup in an Atelier app is a section body the app fills itself.
     // daisyUI-shaped class strings with no section call anywhere means the raw markup has no
     // declared home, which is the class soup the track separation exists to prevent.
-    const daisyClasses = /class\s*=\s*["'][^"']*\b(btn|card|navbar|modal|drawer|badge|alert|menu|tabs|table|input|select|toggle|stat)\b/i.test(html);
+    // A class the page defines in its own styles is the page's vocabulary, not daisyUI: every genre
+    // names `.label`, `.stat` or `.menu` for itself, and a straight fork was told it mixed tracks
+    // (a real build on aimeat.io, 2026-11-08).
+    const daisyClasses = undefinedDaisyClasses(html).length > 0;
     const usesSection = /\bsection\s*\(/.test(html);
     if (daisyClasses && !usesSection) {
       out.push(finding('track-mixing', 'warn',
@@ -690,17 +709,27 @@ function checkTheme(html: string): AppArtifactFinding[] {
   const usesTokens = /var\(\s*--(color-|text-|elev-|motion-|aimeat-)/i.test(html);
   const ownColorScheme = hasColorSchemeMediaQuery(html);
   const ownHexes = (html.match(/[:\s]#[0-9a-f]{3,8}\b/gi) ?? []).length;
+  const head = html.slice(0, SCAN_BYTES);
+  const atelier = declaredTrack(head) === 'atelier';
 
   if (usesPlatformTheme || usesTokens) return [];
+  // An Atelier page draws in the kit's `--ak-*` tokens, and a genre that keeps its own colours says
+  // so with `<meta name="aimeat-light" content="fixed">`, where the pill's light/dark control stands
+  // down on purpose. Both are the track's own design; a straight genre fork was told to load the
+  // Classic theme stylesheet (a real build on aimeat.io, 2026-11-08).
+  if (atelier && (/var\(\s*--ak-/i.test(html) || /<meta\b[^>]*name\s*=\s*["']aimeat-light["'][^>]*content\s*=\s*["'](fixed|follows)["']/i.test(head))) return [];
   if (!ownColorScheme && ownHexes < 6) return [];
 
   return [finding('hardcoded-theme-colors', 'warn',
-    'This app paints its own colours (no platform theme stylesheet and no theme tokens'
+    'This app paints its own colours (no theme tokens'
     + (ownColorScheme ? ', and it decides light/dark from prefers-color-scheme' : '')
     + '), so the login pill\'s light/dark switch and palette picker do nothing for its chrome — the '
-    + 'user clicks and nothing happens. Load /lib/aimeat-theme.css and style with the tokens '
-    + '(var(--color-primary), base-100/200/300); then all five palettes work for free and the user\'s '
-    + 'stored choice wins over the OS preference.')];
+    + 'user clicks and nothing happens. '
+    + (atelier
+      ? 'On the Atelier track, draw in the kit\'s `--ak-*` tokens so the page follows the person\'s theme, '
+        + 'or declare `<meta name="aimeat-light" content="fixed">` when it keeps its own colours on purpose.'
+      : 'Load /lib/aimeat-theme.css and style with the tokens (var(--color-primary), base-100/200/300); '
+        + 'then all five palettes work for free and the user\'s stored choice wins over the OS preference.'))];
 }
 
 /**

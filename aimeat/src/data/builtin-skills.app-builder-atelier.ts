@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-08 — Step 3 says the shell shows a signed-out visitor only "Log in to continue" and names
+ *     `requireLogin: false`; step 9 names `legal_pages` as recommended, not owed (two real builds on
+ *     aimeat.io met both only after publishing).
  *   v1.41.0 — 2026-11-07 — The interview asks about an introduction (scope, diagrams or pictures,
  *     prompts for the person's AI), and the proposal offers three to five designs, one always the
  *     clean look (build-introduction-step.ts).
@@ -305,7 +308,8 @@ moved under you says so.
    difference (Postinjalostamo, 2026-09-28: three rounds of corrections).
 3. **Build** — on the level \`fine\` (and on a page that states no level), start from a GENRE, never
    from the bare shell; a \`proto\` or \`plain\` page starts from the shell \`shell-atelier\` and skips
-   the genre and the register. On \`fine\`: pick the register the page belongs
+   the genre and the register. The shell shows a signed-out visitor only "Log in to continue": an
+   app used without signing in passes \`requireLogin: false\` to \`app()\`. On \`fine\`: pick the register the page belongs
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
    and keep its \`<meta name="aimeat-register">\` line (or name your own register with
    \`custom:<name>\`); the publish refuses an Atelier app that names none. Then compose screens
@@ -488,7 +492,8 @@ moved under you says so.
    for each family of keys or files, where it lives, who owns and reads it and one sentence on why
    there) and the **design spec** (\`design_spec_present\`: \`aimeat_app_manage\`
    \`{ action: "spec_set" }\`). Write the two documents after the first publish and again after
-   any publish that changed the screens, the decisions or where data lives.
+   any publish that changed the screens, the decisions or where data lives. The terms and privacy
+   pages are recommended, not owed: \`legal_pages\` names the missing ones and how to write them.
 10. **Write down why, and put nothing into the Design Book because the build is finished.** As
    you choose, the page carries your reasons, one true sentence each, in
    \`<script type="application/json" id="aimeat-build-notes">\`: \`took\` (a Book part in this

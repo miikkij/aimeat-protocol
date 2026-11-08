@@ -7,6 +7,8 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.7.1 — 2026-11-08 — shell-atelier says sign-in is on by default and names requireLogin: false
+ *     for an app used signed out; a prototype built from it shipped as "Log in to continue" only.
  *   v1.7.0 — 2026-10-31 — The first-paint restore is light unless the person chose: a stored 'dark'
  *     is dark, a stored 'auto' follows the OS, anything else is light (Jouni, v31 K65), as
  *     /lib/aimeat-boot.js decides.
@@ -343,6 +345,9 @@ entry: index.html
       look: 'vivid', // vivid | calm-card | editorial | sticker | neon-dense | poster | flat
       footer: '{{footer text}}',
       onReady: function (session) { render(session); },
+      // Sign-in is ON by default: a signed-out visitor sees only "Log in to continue". For an app
+      // anyone uses signed out, set requireLogin: false; onReady then runs with a null session.
+      // requireLogin: false,
     });
 
     function render(session) {

@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.38.1 — 2026-11-08 — aimeat-agentface has a promptLine, so both build specifications' library
+ *     lists name it: the publish answer asked for it and the list said it did not exist.
  *   v1.38.0 — 2026-11-07 — aimeat-auth's aiDoc: the pill's AI light and bolt, an app's needs beside them,
  *     and the ai:use scope that shows them.
  *   v1.37.1 — 2026-11-05 — aimeat-auth's aiDoc: the libraries' dates and numbers follow the person's
@@ -728,6 +730,10 @@ export const SDK_PACKS: LibraryPack[] = [
     sizeEstimate: '~3KB',
     status: 'stable',
     modelTier: 'needs-doc',
+    // Listed in both build specifications since 2026-11-08: the publish answer owes an agent face
+    // through this library, and the Atelier list says an address not in it does not exist.
+    promptGroup: 'core',
+    promptLine: "- aimeat-agentface.js — the app's agent face, owed by every app after its publish: `AIMEATAgentFace.publish({ title, sections }, { app: 'my-app.html' })` writes the public markdown agents read. Public data only: an app whose data is private describes what it does, never its records. Also `copyText(text)` for Copy buttons. Requires aimeat-auth.",
   },
   {
     id: 'aimeat-webmcp',
