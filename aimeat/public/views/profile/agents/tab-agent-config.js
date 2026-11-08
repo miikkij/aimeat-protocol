@@ -6,6 +6,8 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   2026-11-08 -- The delete box says which receivers the agent made, that they keep working, and
+ *     offers one press that pauses them (MakerReceivers; secaudit2026nov08 round 14, ruling 3).
  *   2026-10-15 -- Save sends the version the list read; an upload is created with POST into the
  *     agent's namespace under `agents.config.<agent name>.`, the prefix the list reads
  *     (agent-config-files.js) (feature-list audit #78).
@@ -81,6 +83,7 @@ import { Row as Line, Split, Space } from '/components/Layout.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { AgentAiSection } from './agent-ai-section.js';
 import { CONFIG_PREFIX, configFileName, uploadRequest, saveRequest } from './agent-config-files.js';
+import { MakerReceivers } from '../receivers/maker-receivers.js';
 
 const html = htm.bind(h);
 
@@ -142,6 +145,7 @@ function AgentDangerZone({ agent, agentName, onDeleteClick }) {
         <${Note} inline>${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}<//>
         <${Action} small tone="danger" expanded=${open} onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…<//>
       <//>
+      ${open && html`<${MakerReceivers} maker=${agent?.gaii} label=${agentName} />`}
       ${open && html`
         <${SettingConfirm}>
           <${TextField} label=${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}

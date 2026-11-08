@@ -17,9 +17,15 @@
  *
  *   WRONG KEYS are counted on the receiver for its owner (./deliveries.ts) and, when one receiver meets
  *   WRONG_KEY_INCIDENT_AT wrong keys in an hour in this process, the operator gets one security incident.
+ *
+ *   A DEACTIVATED ACCOUNT. After the key matched, a receiver of an account the operator or SCIM
+ *   deactivated answers 403 ACCOUNT_DISABLED and writes, reads and deletes nothing. The receiver is
+ *   kept, so it works again on reactivation (services/account-deactivated.ts).
  * @structure ReceiverContext · verifyReceiverRequest · WRONG_KEY_INCIDENT_AT
  * @usage const v = await verifyReceiverRequest(deps, req); if (!v.ok) res.status(v.status).json(...)
  * @version-history
+ *   v1.1.0 — 2026-11-08 — A deactivated account's receiver answers 403 ACCOUNT_DISABLED until the account
+ *     is reactivated (secaudit2026nov08 round 14, owner-deactivation-not-asked).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -31,6 +37,7 @@ import { RECEIVER_KEY_PREFIX, RECEIVER_NAME_RE, receiverPrincipalOf, effectiveSt
 import { getReceiver } from './store.js';
 import { noteWrongKey, logDelivery } from './deliveries.js';
 import { receiversModeOf } from './policy.js';
+import { deactivatedSince } from '../account-deactivated.js';
 
 /** A receiver whose key matched, as the write path reads it. */
 export interface ReceiverContext {
@@ -120,6 +127,12 @@ export async function verifyReceiverRequest(
         return refuse(status, code, message);
     };
     if (receiversModeOf(deps.config) === 'off') return logged(503, 'RECEIVERS_OFF', 'The operator of this node has switched receivers off. Nothing was written.');
+    // A deactivated account's receivers wait, as its schedules do: nothing is deleted, and the key
+    // works again when the operator reactivates the account (services/account-deactivated.ts).
+    const deactivated = await deactivatedSince(deps.storage, ownerGhii);
+    if (deactivated) {
+        return logged(403, 'ACCOUNT_DISABLED', `The account this receiver writes for was deactivated on ${deactivated}. Nothing was written. The receiver works again when the operator of this node reactivates the account.`);
+    }
     const state = effectiveState(receiver, now);
     switch (state) {
         case 'active': break;

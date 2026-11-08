@@ -10,6 +10,8 @@
  * @structure RECEIVERS_SKILL_ENTRY
  * @usage import { RECEIVERS_SKILL_ENTRY } from './builtin-skills.receivers.js';
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The receiver outlives its maker and waits while the account is deactivated
+ *     (ACCOUNT_DISABLED) (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import type { BuiltinSkill } from './builtin-skills.js';
@@ -76,7 +78,8 @@ Give the person the \`approve_url\` and the sentence in \`say\`. The key is made
 shown to them, never to you. If you hold receivers:manage (the person ticks it on its own; Full access
 does not carry it), \`create\` makes it at once and answers \`key\` ONCE: put it straight into the
 program's secret store (AWS Secrets Manager, an environment secret) and nowhere else, not in a chat, a
-repository or a memory record.
+repository or a memory record. The receiver is the person's, not yours: it keeps working if you are
+removed later, and the person is told then which receivers you made.
 
 ## 4. Wire the program
 
@@ -93,7 +96,7 @@ Idempotency-Key: <a stable id of this message>
   its own target only) and \`delete\`.
 - \`Idempotency-Key\` makes a retry replace the same row instead of adding another.
 - Answers: 201 written, 200 replaced, 401 wrong key (the same for every reason), 403 paused, stopped,
-  expired or waiting for approval, 409 a full prefix or a stale If-Match, 413 too large, 415 not JSON,
+  expired, waiting for approval or the person's account deactivated (\`ACCOUNT_DISABLED\`), 409 a full prefix or a stale If-Match, 413 too large, 415 not JSON,
   422 the shape, 429 limits (Retry-After).
 
 What a receiver writes is recorded as written by a program (provenance level \`machine\`): neither as
@@ -104,7 +107,8 @@ the person's own words nor as AI.
 \`aimeat_receiver\` \`deliveries\` { name, only_refused: true } says what was refused and why, without the
 content. Common reasons: a changed key the program still holds (rotate gives an overlap), a field the
 shape does not have, the day limit, the end date (receivers expire after a year by default; \`update\`
-with \`expires_days\` extends), or the operator stopped it (the reason is on the receiver). The person's
+with \`expires_days\` extends), the operator stopped it (the reason is on the receiver), or the operator
+deactivated the person's account (it works again when the account is reactivated). The person's
 page is /v1/profile?tab=receivers.
 `,
 };

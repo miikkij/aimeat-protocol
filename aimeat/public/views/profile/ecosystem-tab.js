@@ -10,6 +10,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.24.0 -- 2026-11-08 -- The disconnect dialog says which receivers the app made, that they keep working, and offers one press that pauses them (receivers/maker-receivers.js; secaudit2026nov08 round 14, ruling 3).
  *   v3.23.0 -- 2026-10-25 -- A waiting request lists the data areas the app asked for, each with a tick, and the approval sends data_areas from the ticks; a reconnect and a key change are marked, with both key fingerprints (ecosystem-tab.pending.js; secaudit2026oct22, leads 2378 and 2415).
  *   v3.22.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage (the count the tally Mark), the waiting requests the small attention note with a List (the grant level a Select that keeps its choice), the apps the List whose row opens its panel (a revoked app faded, main's .pf-eco-card-revoked), each part of the panel the heavy-ruled Split under its Sub-heading, the written data the Folds, the revoke dialog the Action, Loud and TextField. The empty part the panel drew between "ask in Claude" and the data (a bare heavy rule) goes. It writes no class.
  *   v3.21.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -169,6 +170,7 @@ import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { Row as LRow, Stack, Space } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { MakerReceivers } from './receivers/maker-receivers.js';
 
 /** An app's state as a Status tone: approved is fine, waiting needs a look, revoked is danger. */
 const appStatusTone = (s) => (['active', 'approved'].includes(s) ? 'fine' : ['pending', 'validating'].includes(s) ? 'attention' : s === 'revoked' ? 'danger' : 'off');
@@ -289,6 +291,7 @@ export default function EcosystemTab({ onStats, showToast }) {
           <//>`}>
         <${Stack} gap="medium">
           <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
+          ${revokeApp && html`<${MakerReceivers} maker=${apps.find(a => a.app === revokeApp)?.geai} label=${revokeApp} />`}
           <${TextField} value=${revokeInput} ariaLabel=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
             placeholder=${revokeApp || ''} onInput=${v => setRevokeInput(v)} />
         <//>

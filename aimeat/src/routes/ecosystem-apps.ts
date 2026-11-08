@@ -22,6 +22,8 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.12.0 — 2026-11-08 — DELETE /v1/ecosystem-apps/:app answers `receivers_kept` (the receivers the
+ *     app made, which keep working) and tells the owner (secaudit2026nov08 round 14, maker-lifecycle-not-surfaced).
  *   v1.11.0 — 2026-10-27 — A hello for an app already connected may carry `proof`, a signature by the
  *     pinned key (services/device-return-proof.ts), and GET /pending says on a same-key reconnect
  *     whether it was proven (`key_proven`), so the owner sees a request that only names the app's
@@ -78,6 +80,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAppName, validateOwnerName, buildGEAI, generateUserCode } from '../utils/gaii.js';
+import { receiversMadeBy, noticeReceiversKept } from '../services/receivers/makers.js';
 import { exceedsCeiling } from '../utils/scope-coverage.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
 import { validateEcoManifest } from '../models/ecosystem-manifest.js';
@@ -767,9 +770,12 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     }
 
     // NOTE: the app's DEPOSITED insight data (its eco: namespace writes into the owner's Memory)
-    // is the owner's refined data and is intentionally LEFT IN PLACE.
+    // is the owner's refined data and is intentionally LEFT IN PLACE. So are the receivers it made:
+    // they are the owner's and keep working; the answer and a notice say so (ruling 3, 2026-11-08).
+    const receiversKept = await receiversMadeBy(storage, ownerGhii, record.geai);
+    await noticeReceiversKept(storage, ownerGhii, app, receiversKept);
 
-    res.json(success(config.nodeId, { deleted: true, app, geai: record.geai }));
+    res.json(success(config.nodeId, { deleted: true, app, geai: record.geai, receivers_kept: receiversKept }));
     emitChange('ecosystem-apps');
   });
 

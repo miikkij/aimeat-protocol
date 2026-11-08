@@ -33,6 +33,8 @@
  * @structure INVITE_TTL_DAYS · inviteLinkOf · sendShareLink · shareAndSend · previewInvite · redeemInvite
  * @usage const out = await sendShareLink(ctx, 'matti', { share, email, locale });
  * @version-history
+ *   v1.3.0 — 2026-11-08 — A link of a deactivated account answers 403 ACCOUNT_DISABLED, in the preview and
+ *     the redeem, until the account is reactivated (secaudit2026nov08 round 14, older item O3).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-11-04 — The mail allowance is counted in the node's storage (takeMailSendOnNode; codebase analysis 2026-11-03, HA stage 2).
@@ -64,6 +66,8 @@ import { changeParty, findParty, readParties } from './store.js';
 import { mintPartyToken } from './token.js';
 import { connectionFileOf, descriptorFor, isLiveShare, packageOfPattern, partySharesOf, setShareMeta, shareMetaOf, shareView } from './shares.js';
 import { shareWithParty, type PartyAnswer, type PartyServiceCtx } from './service.js';
+import { OWNER_DEACTIVATED } from './verify.js';
+import { deactivatedSince } from '../account-deactivated.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type Refusal = Extract<PartyAnswer<never>, { ok: false }>;
@@ -257,6 +261,9 @@ async function inviteOf(deps: Deps, code: unknown): Promise<
     if (invite.usedAt) return refuse(410, 'INVITE_USED', 'This link was used already. The key was shown to whoever opened it. Ask the person who shared the data for a new link.');
     if (Date.parse(invite.expiresAt) <= Date.now()) return refuse(410, 'INVITE_EXPIRED', 'This link has expired. Ask the person who shared the data to send it again.');
     if (party.status !== 'active') return refuse(403, 'PARTY_STOPPED', 'This share is stopped. Contact the person who shared the data.');
+    // The link waits while the owner's account is deactivated, as the party's key does (./verify.ts).
+    const deactivated = await deactivatedSince(deps.storage, ownerGhii);
+    if (deactivated) return refuse(403, 'ACCOUNT_DISABLED', OWNER_DEACTIVATED(deactivated));
     const share = (await partySharesOf(deps.storage, ownerGhii, party, deps.config.nodeId)).find(s => s.id === invite!.share);
     if (!share || !isLiveShare(share)) return refuse(410, 'SHARE_ENDED', 'This share has ended, so the link no longer works.');
     return { ok: true, owner, ownerGhii, party, invite, share };
