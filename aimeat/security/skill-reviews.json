@@ -361,14 +361,14 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-receivers": {
-      "reviewedOn": "2026-11-07",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/services/receivers/contract.ts",
         "aimeat/src/services/receivers/receive.ts",
         "aimeat/src/services/receivers/manage.ts",
         "aimeat/src/tool-catalog/definitions/receivers.ts"
       ],
-      "digest": "sha256:7a3d71160e4685916faf4949"
+      "digest": "sha256:7f5b1a6f0014cc472710d460"
     },
     "node:aimeat-agent-capability": {
       "reviewedOn": "2026-11-07",
@@ -844,7 +844,7 @@
     "node:aimeat-receivers": {
       "aimeat/src/services/receivers/contract.ts": "337d964b23dbafbf",
       "aimeat/src/services/receivers/receive.ts": "eb48bc222c34b250",
-      "aimeat/src/services/receivers/manage.ts": "af4cba285f0918ce",
+      "aimeat/src/services/receivers/manage.ts": "016321d6aeff0f76",
       "aimeat/src/tool-catalog/definitions/receivers.ts": "4e4b7bbb567c7c72"
     }
   }

@@ -150,7 +150,7 @@ async function tellOtherUsers(storage: Storage, config: AimeatConfig, name: stri
       await notify(storage, `${account}@${config.nodeId}`, {
         type: 'csm_removed',
         title: `The data description ${name} was removed`,
-        body: `Its owner or the node's operator removed the data description (CSM) ${name}. Your receivers that use it: ${names}. `
+        body: `Its owner or whoever runs this service removed the data description (CSM) ${name}. Your receivers that use it: ${names}. `
           + 'They keep checking messages against the copy of its shape they hold, so they go on working. To use another shape, make a new receiver.',
         ...(link ? { link } : {}),
         i18n: { key: 'csm_removed', vars: { csm: name, uses: names } },
