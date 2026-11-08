@@ -129,9 +129,10 @@ export interface CapabilityLogEntry {
 export interface CapabilityFilter {
   ownerGhii?: string;
   visibility?: string;
-  /** When set to a GHII, restricts results to `visibility='public' OR ownerGhii=<this>` — public
-   *  capabilities plus the caller's OWN (any visibility). Stops a registered non-owner from seeing
-   *  other owners' private rows (webhookUrl/ownerGhii) via the discovery list. */
+  /** When set to a GHII, restricts results to `(visibility='public' AND status='active') OR
+   *  ownerGhii=<this>`: other owners' published capabilities plus the caller's OWN (any visibility,
+   *  any status). Stops a registered non-owner from seeing other owners' private rows
+   *  (webhookUrl/ownerGhii), drafts, entries waiting for review and rejected ones via the list. */
   publicOrOwner?: string;
   status?: string;
   sourceType?: string;

@@ -11,6 +11,10 @@
  * @structure renderPackage · entryRow · sourceRows · relationDoors
  * @usage import { renderPackage } from './package.js';
  * @version-history
+ *   v1.19.0 -- 2026-11-08 -- The sharing rows explain themselves: each row's name opens its question
+ *     mark (HelpLabel; knowledge.library, knowledge.clone, knowledge.federation, knowledge.toOrganism),
+ *     with facts from routes/knowledge/sharing.ts, routes/knowledge/organism.ts, services/consent.ts,
+ *     services/memory-replication.ts and services/directory.ts.
  *   v1.18.1 -- 2026-11-05 -- An entry's visibility button no longer steps through "group", which it stored with no group.
  *   v1.18.0 -- 2026-10-18 -- Who can read the package is the first tag under its title, and a read-only entry's tag, the AudienceBadge (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.17.0 -- 2026-09-26 -- On the component kit (page group G7): the page is the SettingsPage (via
@@ -58,6 +62,7 @@ import { Tinted } from '/components/Figure.js';
 import { Facts } from '/components/Facts.js';
 import { Select } from '/components/Select.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Note } from '/components/Note.js';
 import { Tab } from '/components/Tabs.js';
 import { Action, Actions, Loud } from '/components/Action.js';
@@ -165,13 +170,15 @@ export function renderPackage(ctx, pkg) {
       .map(([n, sid, label]) => ({ key: sid, section: sid, mark: n, label, count: sid === 'kp-entries' ? entries.length : undefined })) },
     others.length ? { label: c('otherPackages'), items: others.map(p => ({ key: pkgId(p), mark: '→', label: manifestOf(p).name || c('untitled'), onClick: () => ctx.pickView({ kind: 'package', id: pkgId(p) }) })) } : null,
   ];
-  const toggle = (field, on, label, hint) => ({ k: label, v: html`<${Switch} on=${on} label=${hint} disabled=${saving} onToggle=${() => ctx.handleSharingChange(pkg, field, !on)} />` });
+  // A sharing row's name opens its explanation (explain.knowledge.*), facts from the routes that act on it.
+  const named = (term, label) => html`<${HelpLabel} term=${term} label=${label}>${label}<//>`;
+  const toggle = (field, on, term, label, hint) => ({ k: named(term, label), v: html`<${Switch} on=${on} label=${hint} disabled=${saving} onToggle=${() => ctx.handleSharingChange(pkg, field, !on)} />` });
   const contribute = () => ctx.contributeToOrganism(pkg);
   const sharing = [
-    toggle('catalog_listed', listed, c('kLibrary'), listed ? c('listedHint') : c('notListedHint')),
-    toggle('allow_clone', !!m.sharing?.allow_clone, c('kClone'), m.sharing?.allow_clone ? c('cloneOn') : c('cloneOff')),
-    { k: c('kFederation'), v: html`<${Switch} on=${federated} label=${federated ? c('fedOn') : c('fedOff')} disabled=${ctx.togglingFed === pkg.key} onToggle=${() => ctx.toggleFederation(pkg)} />` },
-    ctx.organisms.length ? { k: c('kOrganism'), controls: true, v: html`
+    toggle('catalog_listed', listed, 'knowledge.library', c('kLibrary'), listed ? c('listedHint') : c('notListedHint')),
+    toggle('allow_clone', !!m.sharing?.allow_clone, 'knowledge.clone', c('kClone'), m.sharing?.allow_clone ? c('cloneOn') : c('cloneOff')),
+    { k: named('knowledge.federation', c('kFederation')), v: html`<${Switch} on=${federated} label=${federated ? c('fedOn') : c('fedOff')} disabled=${ctx.togglingFed === pkg.key} onToggle=${() => ctx.toggleFederation(pkg)} />` },
+    ctx.organisms.length ? { k: named('knowledge.toOrganism', c('kOrganism')), controls: true, v: html`
       <${Select} ariaLabel=${c('kOrganism')} placeholder=${c('pickOrganism')} value=${ctx.shareOrg} onChange=${(v) => ctx.setShareOrg(v)}
         options=${ctx.organisms.map(o => ({ value: o.id || o.organismId, label: o.name || o.id }))} />
       <${Action} small disabled=${!ctx.shareOrg} onClick=${contribute}>${t('knowledge.organisms.contribute')}<//>` } : null,

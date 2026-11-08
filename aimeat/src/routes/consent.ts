@@ -13,6 +13,8 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   2026-11-08 — POST /v1/consent passes `role` (read | write) to the service, which refuses write
+ *     where no write check reads it; the purpose text no longer decides write access.
  *   2026-10-15 — POST /v1/consent stamps how the consent was given (web form for the person, API call
  *     by an agent or app), which the consent receipt reads (feature-list audit #161).
  *   v1.3.0 — 2026-10-15 — The owner in person lists, reads and revokes the consents their agents filed
@@ -59,6 +61,8 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             scope,
             expires = null,
             metadata,
+            // read (absent) or write; the service decides where write is possible (consentWsRole).
+            role,
         } = req.body ?? {};
 
     // ONE implementation (services/consent-write.ts): the recipient shapes, the quota, the record,
@@ -70,7 +74,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
       roles: req.auth!.roles,
       // How it was given, for the consent receipt (feature-list audit #161).
       collectionMethod: consentCollectionMethod('rest', callerOf(req, config.nodeId, storage)),
-    }, { recipient, dataPattern: data_pattern, purpose, scope, expires, metadata });
+    }, { recipient, dataPattern: data_pattern, purpose, scope, expires, metadata, role });
     if (!granted.ok) {
       res.status(granted.status).json(error(config.nodeId, granted.code, granted.message));
       return;

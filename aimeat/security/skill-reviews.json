@@ -62,11 +62,11 @@
       "digest": "sha256:631e9a4390b6c8e8e4eaa6c1"
     },
     "node:aimeat-first-conversation": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/services/model-recommendation.ts"
       ],
-      "digest": "sha256:e5261b549688d46e3fd9e97e",
+      "digest": "sha256:151344e28d26294c42633854",
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
@@ -131,7 +131,7 @@
         "aimeat/src/services/app-size-health.ts",
         "aimeat/src/services/app-publish-next-steps.ts"
       ],
-      "digest": "sha256:2157c1e2938f9f389f64f1de"
+      "digest": "sha256:a0bed1e1a9483bbcc5abdeb8"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-04",
@@ -151,7 +151,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:0ea0caad521b8458e5eb4ba8"
+      "digest": "sha256:6d3c58e491d1dcfcc704420a"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -553,7 +553,7 @@
       "aimeat/src/services/open-items.ts": "43236657d5a52e6f"
     },
     "node:aimeat-first-conversation": {
-      "aimeat/src/services/model-recommendation.ts": "de4a67fa19cb459f"
+      "aimeat/src/services/model-recommendation.ts": "6fcabd4bfc91255b"
     },
     "node:aimeat-welcome-pages": {
       "aimeat/src/mcp/portfolio.ts": "604995ccbf786988"
@@ -571,7 +571,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app-size-health.ts": "b0683f91995656e0",
-      "aimeat/src/services/app-publish-next-steps.ts": "9071edecc382cdd4"
+      "aimeat/src/services/app-publish-next-steps.ts": "17597f25d428f122"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
@@ -579,7 +579,7 @@
       "aimeat/src/services/app-spec-gate.ts": "1c415a82078c0a0f"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "acea28a8a709f11e",
+      "aimeat/src/services/build-atelier-prompt.ts": "df377e110e185adf",
       "aimeat/src/services/build-atelier-layers.ts": "411311b063ad4591",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "eb3ec036ab55c7ac",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"

@@ -7,6 +7,10 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 -- The settings a label cannot explain carry their question mark: the publish cadence
+ *     (ecosystem.cadence) and the guidance delivery (ecosystem.delivery) on their step's words, the
+ *     trigger key (ecosystem.triggerKey) on its field. The trigger key's hint and the two delivery
+ *     choices' hints go: the explanations carry their words (.claude/rules/page-guidance.md).
  *   2026-11-08 -- The "How this works" fold goes: what the automation does (the app publishes, AIMEAT
  *     hands the data to your agent, the agent writes its results, they come back to you) is said once in
  *     the page's question mark, concept.outside_app (.claude/rules/page-guidance.md).
@@ -76,6 +80,10 @@ import { TextField } from '/components/TextField.js';
 import { Tab } from '/components/Tabs.js';
 import { Row, Stack, Split } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { HelpLabel } from '/components/HelpTip.js';
+
+/** A step's heading whose words open the explanation of the setting under it (explain.<term>.*). */
+const helpWords = (term, words) => html`<${HelpLabel} term=${term} label=${words}>${words}<//>`;
 
 /** A part of an opened app: the heavy rule of a new thing, its sub-heading, then what it holds. */
 export const EcoSection = ({ title, children }) => html`<${Split} heavy above="small" pad="small" gap="small">
@@ -485,7 +493,7 @@ export function EcoAutomationSection({ app, showToast }) {
         <//>
 
         <!-- ② Run on a schedule -->
-        <${FlowStep} num=${t('profile.ecosystem.autoStep2')} off=${!primary}>
+        <${FlowStep} num=${helpWords('ecosystem.cadence', t('profile.ecosystem.autoStep2'))} off=${!primary}>
           <${Row} wrap gap="medium">
             <${Select} fit value=${cadence} disabled=${!primary} ariaLabel=${t('profile.ecosystem.autoStep2')}
               onChange=${v => setCadence(v)}
@@ -506,12 +514,10 @@ export function EcoAutomationSection({ app, showToast }) {
         <//>
 
         <!-- ⑤ Deliver guidance -->
-        <${FlowStep} num=${t('profile.ecosystem.autoStep5')}>
+        <${FlowStep} num=${helpWords('ecosystem.delivery', t('profile.ecosystem.autoStep5'))}>
           <${Stack}>
-            <${Check} radio name=${`eco-delivery-${app.app}`} checked=${requireApproval} onChange=${() => setRequireApproval(true)}
-              hint=${t('profile.ecosystem.recipeDeliveryApproveHint')}>${t('profile.ecosystem.recipeDeliveryApprove')}<//>
-            <${Check} radio name=${`eco-delivery-${app.app}`} checked=${!requireApproval} onChange=${() => setRequireApproval(false)}
-              hint=${t('profile.ecosystem.recipeDeliveryPushHint')}>${t('profile.ecosystem.recipeDeliveryPush')}<//>
+            <${Check} radio name=${`eco-delivery-${app.app}`} checked=${requireApproval} onChange=${() => setRequireApproval(true)}>${t('profile.ecosystem.recipeDeliveryApprove')}<//>
+            <${Check} radio name=${`eco-delivery-${app.app}`} checked=${!requireApproval} onChange=${() => setRequireApproval(false)}>${t('profile.ecosystem.recipeDeliveryPush')}<//>
           <//>
           <${Check} checked=${email} onChange=${on => setEmail(on)}>${t('profile.ecosystem.recipeEmail')}<//>
         <//>
@@ -522,7 +528,7 @@ export function EcoAutomationSection({ app, showToast }) {
             ${t('profile.ecosystem.autoAdvanced')}
           <//></div>
           ${showAdvanced && html`
-            <${TextField} label=${t('profile.ecosystem.recipeTriggerLabel')} hint=${t('profile.ecosystem.recipeTriggerHelp')}
+            <${TextField} label=${t('profile.ecosystem.recipeTriggerLabel')} help="ecosystem.triggerKey"
               value=${triggerGlob} placeholder=${defaultTriggerGlob(app)}
               onInput=${v => setTriggerGlob(v)} />`}
         <//>

@@ -9,6 +9,8 @@
  * @structure secInstructions · orgPromptBlock
  * @usage import { secInstructions } from './instructions.js';
  * @version-history
+ *   v2.1.0 — 2026-11-08 — The organism prompt's lead says only what this block does (mcppage.orgCreatesLead);
+ *     what an organism is moved to its question mark, concept.organism (components/HelpTip.js).
  *   v2.0.0 — 2026-09-26 — Every part is a component call that gets data (page group G6): Section
  *     (fold in Folds), Note (lead, loading, the Form message), Select or a read-only TextField for the
  *     organism, a TextField for the purpose, the Code block (tall) for the prompt, Action with
@@ -38,6 +40,7 @@ import { Folds } from '/components/Folds.js';
 import { Action, Actions } from '/components/Action.js';
 import { Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { Space } from '/components/Layout.js';
@@ -75,7 +78,7 @@ export function secInstructions(ctx) {
 function orgPromptBlock(ctx) {
   const f = ctx.found;
   return html`
-    <${Note} kind="lead">${m('orgLead')}<//>
+    <${Note} kind="lead">${m('orgCreatesLead')} <${HelpTip} term="concept.organism" label=${m('orgLabel')} /><//>
     <${TextField} label=${m('orgPurposeLabel')} value=${ctx.purpose} placeholder=${m('orgPurposePh')} onInput=${ctx.setPurpose} />
     <${Code} block tall>${ctx.orgPrompt}<//>
     <${Actions}>

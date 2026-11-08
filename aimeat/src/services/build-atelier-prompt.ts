@@ -182,6 +182,7 @@ import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
 import { ornamentsPromptPart } from '../data/atelier-ornaments.js';
 import { KIT_PROMPT_PARAGRAPH } from './design-book/kit.js';
+import { MODEL_QUALITY_ADVICE } from './model-recommendation.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -791,8 +792,7 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
   }
   if (opts.idea) full += `The app idea, in the owner's words: ${opts.idea}\n\n`;
   full += '## First, a short interview\n\n'
-    + 'Unless you are Claude Opus or Claude Fable, open that message with one sentence: apps built '
-    + 'with Claude Opus or Claude Fable turn out noticeably better, and they can switch now or go on with you.\n'
+    + MODEL_QUALITY_ADVICE + '\n'
     + 'Ask, in one message, and wait for answers:\n'
     + '0. Which level: a quick prototype, an ordinary page or the finest ("Then propose" says what each gets)? If their first words say it ("just quick"), that is the answer.\n'
     + '1. What should the app do, in one or two sentences?\n'

@@ -11,6 +11,9 @@
  * @structure renderCompany · secFacts · secFront · secActors · secEvents · smtpFold · chatFold
  * @usage import { renderCompany } from './companies/company.js';
  * @version-history
+ *   v1.16.0 -- 2026-11-08 -- The E-invoice operator (its field and its Facts row's name) and the SMTP
+ *     "TLS on connect" check open their explanations (help company.einvoiceOperator, company.smtpTls),
+ *     written from what the finance and company SMTP services do with each.
  *   v1.15.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and three-group rail as data; FigureStrip; Facts with the missing details grey; Fields, TextField, TextArea, Select, Check, Choice, FileDrop; Roads; Note; Action; Layout): the page passes data and writes no class. Put back from main: who sends and who acts are dim tags (page group G8).
  *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.13.0 -- 2026-09-25 -- "No organisms yet" is the quiet sentence (.poster-quiet), a unification: Jouni's decision "Empty line"; the file picker's label loses the hint class it only used for its place.
@@ -56,6 +59,15 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { c, crumb, pageLinks, goTab, FIELDS, fieldLabel, factsOf, missingWord, kindWord } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
+
+/** The registered details that open an explanation: the wire name and its `explain.<term>`. */
+const FIELD_HELP = { einvoice_operator: 'company.einvoiceOperator' };
+
+/** A Facts row's name, with its explanation when the detail has one. */
+const factName = (wire) => (FIELD_HELP[wire]
+  ? html`<${HelpLabel} term=${FIELD_HELP[wire]} label=${fieldLabel(wire)}>${fieldLabel(wire)}<//>`
+  : fieldLabel(wire));
 
 export function renderCompany(ctx) {
   const co = ctx.company;
@@ -125,14 +137,14 @@ function secFacts(ctx, co) {
       ${ctx.editingFacts ? html`
         <${Fields} cols=${2}>
           ${FIELDS.map(([wire]) => html`
-            <${TextField} key=${wire} label=${fieldLabel(wire)} value=${ctx.factValues[wire] ?? ''} onInput=${(v) => ctx.setFact(wire, v)} />`)}
+            <${TextField} key=${wire} label=${fieldLabel(wire)} help=${FIELD_HELP[wire]} value=${ctx.factValues[wire] ?? ''} onInput=${(v) => ctx.setFact(wire, v)} />`)}
         <//>
         <${FormActions}>
           <${Loud} control disabled=${ctx.busy} onClick=${() => ctx.saveFacts()}>${t('profile.companies.save')}<//>
           <${Action} small soft onClick=${() => ctx.cancelFacts()}>${t('common.cancel')}<//>
         <//>`
       : html`
-        <${Facts} rows=${FIELDS.map(([wire, rec, tag]) => ({ key: wire, k: fieldLabel(wire), v: co[rec] || missingWord(tag), missing: !co[rec] }))} />`}
+        <${Facts} rows=${FIELDS.map(([wire, rec, tag]) => ({ key: wire, k: factName(wire), v: co[rec] || missingWord(tag), missing: !co[rec] }))} />`}
       <${Hint}>${c('factsHint')}<//>
     <//>`;
 }
@@ -230,7 +242,7 @@ function smtpFold(ctx) {
       ${field('from_address', t('profile.companies.smtp.fromAddress'), { placeholder: 'laskutus@yritys.fi' })}
       ${field('from_name', t('profile.companies.smtp.fromName'))}
       ${field('reply_to', t('profile.companies.smtp.replyTo'))}
-      <${Check} checked=${f.secure} onChange=${(on) => ctx.setSmtpField('secure', on)}>${t('profile.companies.smtp.secure')}<//>
+      <${Check} help="company.smtpTls" checked=${f.secure} onChange=${(on) => ctx.setSmtpField('secure', on)}>${t('profile.companies.smtp.secure')}<//>
     <//>
     <${FormActions}>
       <${Loud} control disabled=${ctx.busy || !f.host.trim() || !f.from_address.trim()} onClick=${() => ctx.saveSmtp()}>${t('profile.companies.smtpSave')}<//>

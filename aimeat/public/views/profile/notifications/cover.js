@@ -14,6 +14,10 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.20.0 -- 2026-11-08 -- The settings explain themselves: notify.senderPush by the senders'
+ *     title (the hint under the rows is gone, its words are in it), notify.digest on the email
+ *     digest card's name (the same term as the Email page's digest row), notify.quietZone beside the
+ *     quiet hours' time zone (.claude/rules/page-guidance.md).
  *   v1.19.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart and the title's question mark concept.notification; the fold "How a notification is
  *     born" (nt-how) is gone, what it said is in the concept.
@@ -70,6 +74,7 @@ import { Row as Line } from '/components/Layout.js';
 import { groupWord, kindWord, sourceName, titleOf } from '/js/services/notifications.js';
 import { c, rel, day, firstLine, Switch, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { HelpTip, HelpLabel } from '/components/HelpTip.js';
 import { LoadFailed } from '/js/load-state.js';
 
 const PAGE = 12;
@@ -172,12 +177,14 @@ function secSenders(ctx) {
       : r.kind === 'agent' ? html`<${Action} small soft onClick=${() => ctx.openTab('agents')}>${t('profile.tabs.agents')}<//>`
       : r.kind === 'ecosystem' ? html`<${Action} small soft onClick=${() => ctx.openTab('ecosystem')}>${t('profile.tabs.ecosystem')}<//>` : null,
   }));
+  // The push switch on every row is one setting per sender: its question mark stands once, by the
+  // section's title, and carries what the grey hint under the rows said (notify.senderPush).
+  const title = html`${c('secSenders')} <${HelpTip} term="notify.senderPush" label=${c('secSenders')} />`;
   return html`
-    <${PageSection} id="nt-senders" num="02" title=${c('secSenders')} count=${c('secSendersSub')}>
+    <${PageSection} id="nt-senders" num="02" title=${title} count=${c('secSendersSub')}>
       ${senderRows({ ...ctx, setPref: (r, patch) => ctx.setPref(r, patch) }, [aimeatRow])}
       ${ctx.groupsOpen ? html`<${Box} tone="edge">${senderRows(ctx, groupRows, { under: true })}<//>` : null}
       ${others.length ? senderRows(ctx, others) : html`<${Note} kind="quiet">${c('noOtherSenders')}<//>`}
-      <${Hint}>${c('sendersHint')}<//>
     <//>`;
 }
 
@@ -198,7 +205,8 @@ function secDevices(ctx) {
         ${ctx.devices.filter(d => !d.thisBrowser).map(d => html`
           <${Card} tone="framed" key=${d.endpoint} name=${c('family.' + d.family)} meta=${c('deviceSince', { added: day(d.created_at), used: rel(d.last_used_at) })}
             doors=${html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.removeDevice(d)}>${c('remove')}<//>`} />`)}
-        <${Card} tone="framed" state=${digest.enabled ? undefined : 'off'} name=${c('emailDigest')}
+        <${Card} tone="framed" state=${digest.enabled ? undefined : 'off'}
+          name=${html`<${HelpLabel} term="notify.digest" label=${c('emailDigest')}>${c('emailDigest')}<//>`}
           meta=${ctx.emailVerified === false ? c('emailNotVerified') : digest.enabled ? c('digestOn', { h: digest.afterHours }) : c('digestOff')}
           doors=${html`
             ${digest.enabled ? html`<${Select} fit ariaLabel=${c('emailDigest')} value=${String(digest.afterHours)} onChange=${(v) => setDigest({ afterHours: Number(v) })}
@@ -228,6 +236,7 @@ function quietFold(ctx) {
           –
           <${TextField} type="time" size="short" ariaLabel=${c('quietWhen')} value=${f.end} disabled=${!f.enabled} onInput=${(v) => set({ end: v })} />
           <${TextField} size="medium" ariaLabel=${c('quietWhen')} value=${f.tz} disabled=${!f.enabled} placeholder="Europe/Helsinki" onInput=${(v) => set({ tz: v })} />
+          <${HelpTip} term="notify.quietZone" />
         <//>
       <//>
       <${Choice} multi label=${c('breakthrough')} help="notify.breakthrough" disabled=${!f.enabled}

@@ -12,6 +12,10 @@
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.21.0 -- 2026-11-08 -- The hand-added form's Webhook address and "Visible to agents" open their
+ *     explanations (help capabilities.webhook, capabilities.public). The line beside the Add button
+ *     (capspage.formHint) goes: the webhook's explanation says what it said, and FormActions loses
+ *     `apart`, which only spread that line from the button.
  *   v1.20.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart "capabilities" in the start slot and the title's question mark concept.node_capability.
  *     Section 05 loses its lead paragraph (capspage.aiIntro) and the "Two catalogues" row
@@ -195,13 +199,12 @@ function secOther(ctx, num, other, canCreate) {
             <${Space} above="large">
               <${Fields} cols=${2}>
                 <${TextField} label=${x('formName')} value=${f.name} onInput=${(name) => ctx.setForm({ name })} />
-                <${TextField} label=${x('formWebhook')} placeholder="https://" value=${f.webhookUrl} onInput=${(webhookUrl) => ctx.setForm({ webhookUrl })} />
+                <${TextField} label=${x('formWebhook')} help="capabilities.webhook" placeholder="https://" value=${f.webhookUrl} onInput=${(webhookUrl) => ctx.setForm({ webhookUrl })} />
                 <${TextArea} wide label=${x('formSummary')} rows=${2} value=${f.summary} onInput=${(summary) => ctx.setForm({ summary })} />
                 <${TextField} label=${x('formTags')} value=${f.tags} onInput=${(tags) => ctx.setForm({ tags })} />
-                <${Check} checked=${f.visibility === 'public'} onChange=${(on) => ctx.setForm({ visibility: on ? 'public' : 'private' })}>${x('formPublic')}<//>
+                <${Check} help="capabilities.public" checked=${f.visibility === 'public'} onChange=${(on) => ctx.setForm({ visibility: on ? 'public' : 'private' })}>${x('formPublic')}<//>
               <//>
-              <${FormActions} apart>
-                <${Note} inline>${x('formHint')}<//>
+              <${FormActions}>
                 <${Action} small disabled=${ctx.busy === 'create' || !f.name.trim()} onClick=${() => ctx.createManual()}>${x('formCreate')}<//>
               <//>
             <//>` : null}` : null}`}

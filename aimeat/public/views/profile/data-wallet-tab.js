@@ -8,14 +8,20 @@
  *   what), a grant form as a fold, and everything you own as one file; what the wallet is and what
  *   one's own AI may do with it are the title's question mark (concept.data_wallet).
  *   This file holds the reads and the handlers: the composite mount (consents, the grouped trail,
- *   the summary, the names), the trail's window, the rows of one group page by page, a grant (a
- *   workspace role through the workspace door, anything else through the consent door), a revoke,
- *   the export. The render is data-wallet/page.js and data-wallet/rows.js; the classification
+ *   the summary, the names), the trail's window, the rows of one group page by page, a grant (always
+ *   POST /v1/consent, with the purpose sentence and an explicit role: read, or write where the server
+ *   supports it), a revoke, the export. The render is data-wallet/page.js and data-wallet/rows.js; the classification
  *   section's reads and handlers are data-wallet/classification.js, passed to the render as ctx.cls,
  *   and the content class section's are data-wallet/content-classes.js, passed as ctx.content.
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.4.0 — 2026-11-08 — A grant is always POST /v1/consent with the purpose sentence and an explicit
+ *     role (read, or write for a person on a workspace, canWriteFor in data-wallet/frame.js). Read and
+ *     write was kept only for a person on a workspace with no end date on this server, and that path
+ *     dropped the purpose; every other case filed a read-only permission, and a purpose typed as
+ *     `workspace-contributor` gave write. An organism's members cannot be given a key area (empty
+ *     recipient): page.js no longer offers the pair.
  *   v2.3.1 — 2026-11-08 — The description says what the page shows now: the section on how one's own
  *     AI uses the wallet left the page for the start and the question mark (data-wallet/page.js v1.26.0).
  *   v2.3.0 — 2026-11-01 — The outside parties (WP9a): their state is useParties (data-wallet/parties.js),
@@ -36,12 +42,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'preact/hooks'
 import { t, getLocale } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
-import { apiGet, apiPost } from '/js/api.js';
+import { apiGet } from '/js/api.js';
 import * as consentService from '/js/services/consent.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { renderPage } from './data-wallet/page.js';
-import { x, targetRows, targetOf, targetWords, whoOf, roleOf, consentEvents, openTab } from './data-wallet/frame.js';
+import { x, targetRows, targetOf, targetWords, whoOf, roleOf, canWriteFor, consentEvents, openTab } from './data-wallet/frame.js';
 import { groupId } from './data-wallet/rows.js';
 import { useClassification } from './data-wallet/classification.js';
 import { useContentClasses } from './data-wallet/content-classes.js';
@@ -226,18 +232,15 @@ export default function DataWalletTab({ session, showToast }) {
     if (!recipient) { flash(x('form.needWho'), true); return; }
     const pattern = f.what === 'key' ? f.key.trim() : f.what === 'ws' ? `organism.${f.orgId}.w.${f.wsId}.**` : `organism.${f.orgId}.**`;
     const expires = f.untilKind === 'date' && f.until ? new Date(f.until + 'T23:59:59').toISOString() : null;
+    // What they may do is its own field, every time: read, or write where the server supports it
+    // (canWriteFor). The purpose sentence is saved as typed and decides nothing. A person on a
+    // workspace granted by its creator is that person's workspace role, the one the Shared places
+    // page lists (services/workspace-roles.ts consentWsRole).
+    const role = canWriteFor(f) && f.may === 'write' ? 'write' : 'read';
     setBusy('grant');
     try {
-      if (f.what === 'ws' && f.whoKind === 'contact' && !expires && f.scope === 'private') {
-        // A person on a workspace is a workspace role: the same door the Organisms page uses, so the
-        // member list there and the permission here are one record.
-        const grantee = who.includes('#') ? who : who.includes('@') ? who : `${who}@${nodeId}`;
-        const r = await apiPost(`/v1/organisms/${encodeURIComponent(f.orgId)}/workspace-access/grant`, { ws: f.wsId, grantee, role: f.may === 'write' ? 'contributor' : 'viewer' });
-        if (r?.ok === false) throw r;
-      } else {
-        const r = await consentService.grantConsent({ data_pattern: pattern, recipient, purpose: f.why.trim() || 'general', scope: f.scope, expires });
-        if (r?.ok === false) throw r;
-      }
+      const r = await consentService.grantConsent({ data_pattern: pattern, recipient, purpose: f.why.trim() || 'general', role, scope: f.scope, expires });
+      if (r?.ok === false) throw r;
       const said = x('granted', { who: whoOf(recipient, names).name });
       flash(said);
       toast(said);

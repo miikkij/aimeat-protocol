@@ -7,9 +7,14 @@
  *   make later (statement, done-when, limits, participants, coordinator, end date, reactions, rounds).
  *   A change that touches running work is answered first as a preview when `preview` is asked: which
  *   taken works it ends and what they cost so far, so a person or their AI sees it before it happens.
- * @structure GoalInputSchema · GoalPatchSchema · buildGoal() · applyPatch() · previewPatch()
+ *   A change to the rounds merges into the rounds the goal has (roundsFrom): a field the caller leaves
+ *   out keeps its value, and a clock round with no cron is refused on create and on change.
+ * @structure GoalInputSchema · GoalPatchSchema · roundsFrom() · buildGoal() · applyPatch() · previewPatch()
  * @usage const goal = buildGoal(access, GoalInputSchema.parse(body), now);
  * @version-history
+ *   v1.2.0 — 2026-11-08 — A change to the rounds keeps what it does not name: the Settings page's save
+ *     (trigger and cron only) had removed the goal's time zone and its works per round. A clock round
+ *     with an empty cron is refused on change too, not only on create (group k3-goalrounds).
  *   v1.1.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
@@ -20,7 +25,7 @@ import { GoalError, logEntry, newId, type GoalAccess } from './goals-store.js';
 import { WorkSpecSchema, makeWork, parseWorkSpec, appendWorks } from './goals-work.js';
 import {
   DEFAULT_DAYS, DEFAULT_LIMITS, GOAL_MODES, GOAL_SPEC, GOAL_TAG, HUMAN_KINDS, MAX_REACTIONS, RENEW_DAYS, ROUND_TRIGGERS, TEXT_MAX, TITLE_MAX,
-  type GoalReaction, type GoalRecord, type WorkSpec,
+  type GoalReaction, type GoalRecord,
 } from './goals-types.js';
 
 const AgentName = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/i).max(INPUT_LIMITS.name);
@@ -106,6 +111,32 @@ function checkCron(cron: string | undefined, timezone: string | undefined): stri
   }
 }
 
+type RoundsInput = z.infer<typeof RoundsSchema>;
+
+/** A string that holds only spaces counts as not given. */
+const filled = (s: string | undefined): string | undefined => (s && s.trim() ? s : undefined);
+
+/**
+ * The rounds a goal runs by, from the caller's input and the rounds it has now (null on create).
+ * A field the caller leaves out keeps its current value: the Settings page sends the trigger and the
+ * cron, and the goal's time zone and its works per round stay. The exceptions are the fields the new
+ * trigger does not use: a manual round keeps no cron, and only a condition round keeps its condition.
+ * An empty string or an empty list clears a field. A clock round with no cron is refused before
+ * anything is built or written, on create and on change alike.
+ */
+function roundsFrom(r: RoundsInput, cur: GoalRecord['rounds'] = null): NonNullable<GoalRecord['rounds']> {
+  const cron = r.cron !== undefined ? filled(r.cron) : (r.trigger === 'manual' ? undefined : cur?.cron);
+  const condition = r.condition !== undefined ? filled(r.condition) : (r.trigger === 'condition' ? cur?.condition : undefined);
+  const timezone = r.timezone !== undefined ? filled(r.timezone) : cur?.timezone;
+  if (r.trigger === 'clock' && !cron) throw new GoalError(400, 'INVALID_INPUT', 'A goal whose rounds run by the clock names rounds.cron.');
+  return {
+    trigger: r.trigger, cron, timezone, condition,
+    count: cur?.count ?? 0, ...(cur?.lastAt ? { lastAt: cur.lastAt } : {}),
+    nextAt: checkCron(cron, timezone),
+    template: r.works !== undefined ? r.works.map(w => parseWorkSpec(w)) : (cur?.template ?? []),
+  };
+}
+
 function reactionFrom(r: z.infer<typeof ReactionSchema>): GoalReaction {
   if (!r.when.works?.length && !r.when.wants) throw new GoalError(400, 'INVALID_INPUT', 'A reaction names the works it waits for (when.works) or a skill (when.wants).');
   return {
@@ -148,7 +179,7 @@ function limitsFrom(l: z.infer<typeof LimitsSchema> | undefined, base = DEFAULT_
 export function buildGoal(access: GoalAccess, input: GoalInput, now = new Date()): GoalRecord {
   const iso = now.toISOString();
   const rounds = input.rounds ?? null;
-  const roundTemplate: WorkSpec[] = (rounds?.works ?? []).map(w => parseWorkSpec(w));
+  const madeRounds = rounds ? roundsFrom(rounds) : null;
   const mode = input.mode ?? (input.coordinator ? 'coordinator' : 'single');
   if (mode === 'coordinator' && !input.coordinator) throw new GoalError(400, 'INVALID_INPUT', 'A goal in coordinator mode names its coordinator (an agent of this account).');
   const endsAt = input.ends_at === undefined
@@ -170,16 +201,12 @@ export function buildGoal(access: GoalAccess, input: GoalInput, now = new Date()
     planWorkflowId: input.plan_workflow_id ?? null,
     parentGoalId: input.parent_goal_id ?? null,
     subgoals: [],
-    rounds: rounds ? {
-      trigger: rounds.trigger, cron: rounds.cron, timezone: rounds.timezone, condition: rounds.condition, count: 0,
-      nextAt: checkCron(rounds.cron, rounds.timezone), template: roundTemplate,
-    } : null,
+    rounds: madeRounds,
     reactions: (input.reactions ?? []).map(reactionFrom),
     material: [], works: [], log: [], changes: [],
     spent: { usd: 0, tasks: 0, day: iso.slice(0, 10), dayTasks: 0 },
     plannedBy: access.who, createdBy: access.who, createdAt: iso, updatedAt: iso,
   };
-  if (rounds?.trigger === 'clock' && !rounds.cron) throw new GoalError(400, 'INVALID_INPUT', 'A goal whose rounds run by the clock names rounds.cron.');
   // The works the caller gave are made one by one, so a later work's `after` may name an earlier one
   // by its position: "#1" is the first work given.
   const made: string[] = [];
@@ -258,12 +285,10 @@ export function applyPatch(goal: GoalRecord, patch: GoalPatch, access: GoalAcces
   if (patch.workplace !== undefined) { next.workplace = patch.workplace ? { organismId: patch.workplace.organism_id, workspaceId: patch.workplace.workspace_id } : null; what.push('where the results show'); }
   if (patch.plan_workflow_id !== undefined) { next.planWorkflowId = patch.plan_workflow_id; what.push('the plan'); }
   if (patch.reactions) { next.reactions = patch.reactions.map(reactionFrom); what.push('the reactions'); }
+  // A change to the rounds merges into the rounds the goal has: what the caller leaves out stays
+  // (roundsFrom), so a save that names only the trigger and the cron keeps the time zone and the works.
   if (patch.rounds !== undefined) {
-    next.rounds = patch.rounds ? {
-      trigger: patch.rounds.trigger, cron: patch.rounds.cron, timezone: patch.rounds.timezone, condition: patch.rounds.condition,
-      count: goal.rounds?.count ?? 0, lastAt: goal.rounds?.lastAt, nextAt: checkCron(patch.rounds.cron, patch.rounds.timezone),
-      template: (patch.rounds.works ?? []).map(w => parseWorkSpec(w)),
-    } : null;
+    next.rounds = patch.rounds ? roundsFrom(patch.rounds, goal.rounds) : null;
     what.push('the rounds');
   }
   if (!what.length) throw new GoalError(400, 'INVALID_INPUT', 'Nothing to change.');

@@ -12,6 +12,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.27.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: a waiting request's access level (ecosystem.grantLevel), and on the app's card the publish cadence, the guidance delivery, the trigger key (ecosystem-tab.automation.js) and the event picker (ecosystem-tab.cards.js) (.claude/rules/page-guidance.md).
  *   v3.26.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once an app is connected) and the title's question mark concept.outside_app, which now holds what the automation's "How this works" fold said.
  *   v3.25.0 -- 2026-11-08 -- A waiting request lists the words no access level carries, unticked, and the approval adds only the ones the owner ticked to the access level's scopes (ecosystem-tab.pending.js; secaudit2026nov08 round 14, older item O5).
  *   v3.24.0 -- 2026-11-08 -- The disconnect dialog says which receivers the app made, that they keep working, and offers one press that pauses them (receivers/maker-receivers.js; secaudit2026nov08 round 14, ruling 3).
@@ -164,6 +165,7 @@ import { EcoAutomationSection, EcoSection } from './ecosystem-tab.automation.js'
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
 import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
@@ -332,7 +334,7 @@ export default function EcosystemTab({ onStats, showToast }) {
                     onWordTick=${(w, v) => setWordsByCode(m => ({ ...m, [r.user_code]: { ...(m[r.user_code] || {}), [w]: v } }))} />
                 <//>
                 <${Doors}>
-                  <${Label}>${t('profile.ecosystem.grantLevel')}<//>
+                  <${HelpLabel} term="ecosystem.grantLevel" label=${t('profile.ecosystem.grantLevel')}><${Label}>${t('profile.ecosystem.grantLevel')}<//><//>
                   <${Select} fit ariaLabel=${t('profile.ecosystem.grantLevel')} value=${presetByCode[r.user_code] || 'standard'}
                     onChange=${v => setPresetByCode(p => ({ ...p, [r.user_code]: v }))}
                     options=${[['standard', t('profile.ecosystem.presetStandard')], ['readonly', t('profile.ecosystem.presetReadonly')], ['full', t('profile.ecosystem.presetFull')]]} />

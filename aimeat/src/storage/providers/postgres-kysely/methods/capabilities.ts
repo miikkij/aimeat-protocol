@@ -8,6 +8,8 @@
  *   cost/examples/tags JSON columns) are stored as JSONB, so the increment/trust mutators are
  *   read-modify-write on the JSON blob — identical semantics to the Prisma (Mongo/PG) implementation.
  * @version-history
+ *   2026-11-08 — publicOrOwner lists another owner's entry only when it is public AND active: a draft,
+ *     an entry waiting for review and a rejected one were listed to every signed-in account.
  *   2026-11-04 — getCapabilitiesBySourceRefs: many source refs in one read (codebase analysis
  *     2026-11-03, item C7).
  *   v1.2.0 — 2026-10-13 — A stored `cost.morsels` reads as `cost.toll_morsels` (utils/toll-name.ts;
@@ -131,7 +133,12 @@ export const capabilityMethods = {
     let base = this.db.selectFrom('Capability');
     if (filters.ownerGhii) base = base.where('ownerGhii', '=', filters.ownerGhii);
     if (filters.visibility) base = base.where('visibility', '=', filters.visibility);
-    if (filters.publicOrOwner) base = base.where(eb => eb.or([eb('visibility', '=', 'public'), eb('ownerGhii', '=', filters.publicOrOwner!)]));
+    // Another owner's entry is listed only when it is public AND active, the same rule a single read and
+    // the MCP search apply (services/capability-reach.ts); the caller's own entries in any state.
+    if (filters.publicOrOwner) base = base.where(eb => eb.or([
+      eb.and([eb('visibility', '=', 'public'), eb('status', '=', 'active')]),
+      eb('ownerGhii', '=', filters.publicOrOwner!),
+    ]));
     if (filters.status) base = base.where('status', '=', filters.status);
     if (filters.sourceType) base = base.where('sourceType', '=', filters.sourceType);
     if (filters.authRequired) base = base.where('authRequired', '=', filters.authRequired);

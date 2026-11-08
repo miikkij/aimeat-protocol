@@ -18,9 +18,13 @@
  *
  *   The skills aimeat-first-conversation and aimeat-guided-journey read these names too (since
  *   2026-10-03; the first had been pinned to the aimeat.io copy by a digest until then).
- * @structure MODEL_RECOMMENDATION · MODEL_REVIEW_MAX_AGE_DAYS · modelReviewAgeDays()
+ * @structure MODEL_RECOMMENDATION · MODEL_QUALITY_ADVICE · MODEL_REVIEW_MAX_AGE_DAYS · modelReviewAgeDays()
  * @usage import { MODEL_RECOMMENDATION as M } from './model-recommendation.js';   // M.claude → 'Opus 5'
  * @version-history
+ *   v1.2.1 — 2026-11-08 — MODEL_QUALITY_ADVICE ends by suggesting a switch to a stronger model that
+ *     handles complex work (Jouni).
+ *   v1.2.0 — 2026-11-08 — MODEL_QUALITY_ADVICE: the builder's own-model rule, by quality and never by
+ *     name, read by the Atelier spec, the Classic skill and the full and appdev handbooks.
  *   v1.1.0 — 2026-10-30 — Checked at the vendors: GPT-6 replaced Latest in ChatGPT's model menu on
  *     2026-10-07 (help.openai.com/en/articles/20001354); Opus 5 is still the floor, Opus 5.5 the latest.
  *   v1.0.1 — 2026-10-03 — The comment names the two skills that read it now. No value changed.
@@ -36,6 +40,14 @@ export const MODEL_RECOMMENDATION = {
   /** ISO date the names and the vendors' menu paths were last checked at the source. */
   reviewedOn: '2026-10-30',
 } as const;
+
+/**
+ * What a builder is told about its own model, in every place that tells it. No model is named: names
+ * change and there are good ones from more than one vendor, so the rule is the quality, and the
+ * person hears it when the work shows it (Jouni, 2026-11-08). It replaced "Unless you are Claude
+ * Opus or Claude Fable, say once…", which named two models and was skipped by the weaker ones.
+ */
+export const MODEL_QUALITY_ADVICE = 'This work needs a high-quality model. If errors keep coming (three you cannot explain, or one refusal twice), tell the person plainly that their model seems too weak to do this safely, and suggest they switch to a stronger one that handles complex work.';
 
 export const MODEL_REVIEW_MAX_AGE_DAYS = 90;
 

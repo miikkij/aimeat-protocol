@@ -10,8 +10,13 @@
  *   the service-owned key; an agent without task:write on every write route and without task:read on
  *   the reads; and the four MCP tools driven by the owner's AI, with another owner's agent refused; a
  *   work the node's model does (against a local OpenAI-compatible stand-in), the spending limit
- *   holding it, and a goal the owner's AI proposes, which only the person approves.
+ *   holding it, and a goal the owner's AI proposes, which only the person approves; a change to the
+ *   rounds that keeps what it does not name, on REST and over MCP, and a clock round's empty cron
+ *   refused on update.
  * @version-history
+ *   v1.4.0 — 2026-11-08 — Tests 28 and 29: updating the rounds with only the cron keeps the time zone
+ *     and the works per round (REST and aimeat_goal_set), and an empty cron on a clock round is refused
+ *     on update (group k3-goalrounds).
  *   v1.3.0 — 2026-10-29 — Tests 26 and 27: a model work an agent without ai:use asked for waits for
  *     the owner's one press; one with ai:use runs at once (secaudit2026oct26 round 8c, background-05).
  *   v1.2.0 — 2026-10-25 — Tests 20 to 22: the node's model as a worker, its limit, and a proposal.
@@ -102,6 +107,7 @@ let tokenB = '';
 let ownerAObj: { name: string; token: string };
 let aiSession: McpSession;
 let ownAiToken = '';
+let ownAiName = '';
 let grok1: Agent; let grok2: Agent; let writer: Agent; let chat: Agent; let otherAgent: Agent;
 let goalId = '';
 let w1 = ''; let w2 = ''; let w3 = '';
@@ -360,6 +366,7 @@ await test('19. the four MCP tools: the owner\'s AI makes, reads, moves and answ
   const s = await openSession(BASE, ai.token, 'e2e-goals');
   aiSession = s;
   ownAiToken = ai.token;
+  ownAiName = ai.name;
   const made = await callTool(s, 'aimeat_goal_set', { action: 'create', reason: 'MCP test', input: {
     statement: 'Tell the owner which day suits a meeting.',
     works: [{ title: 'Which day?', kind: 'human', human_kind: 'choose', options: [{ id: 'mon', label: 'Monday' }, { id: 'tue', label: 'Tuesday' }] }, { title: 'Book it', wants: ['tutkimus'] }],
@@ -561,6 +568,47 @@ await test('27. usage: an agent holding ai:use asks for a model work and it runs
     return w.status === 'done' || w.status === 'failed' ? w : null;
   }, 30_000);
   assert(done.status === 'done' && !done.spend_request, `it ran without a question: ${JSON.stringify({ status: done.status, reason: done.reason })}`);
+});
+
+console.log('\nRounds: a change keeps what it does not name');
+
+// Group k3-goalrounds, 2026-11-08: the Settings page saves the rounds with the trigger and the cron
+// only, and the update replaced the rounds whole, so the goal lost its time zone and its works per round.
+await test('28. updating the rounds with only the cron keeps the time zone and the works per round', async () => {
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({
+    statement: 'Read the overnight orders every weekday morning.',
+    rounds: { trigger: 'clock', cron: '0 7 * * 1-5', timezone: 'Europe/Helsinki', works: [{ title: 'Read the orders' }, { title: 'Write the summary' }] },
+  }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id;
+  // The body the Settings page sends (goals-tab.js, the Rounds save).
+  const r = await json(`/v1/goals/${id}`, { method: 'PATCH', headers: auth(tokenA), body: JSON.stringify({ rounds: { trigger: 'clock', cron: '0 9 * * 1' }, reason: 'changed in Settings & Controls' }) });
+  assert(r.status === 200, `update: ${r.status} ${JSON.stringify(r.body.error)}`);
+  const g = await readGoal(tokenA, id);
+  assert(g.rounds.cron === '0 9 * * 1', `the new cron: ${JSON.stringify(g.rounds)}`);
+  assert(g.rounds.timezone === 'Europe/Helsinki', `the time zone stays: ${JSON.stringify(g.rounds)}`);
+  assert(JSON.stringify(g.rounds.template.map((w: any) => w.title)) === '["Read the orders","Write the summary"]', `the works per round stay: ${JSON.stringify(g.rounds.template)}`);
+  // The same service answers the owner's AI over MCP: its coordinator changes the cron, and the rest stays.
+  const m = await json(`/v1/goals/${id}`, { method: 'PATCH', headers: auth(tokenA), body: JSON.stringify({ mode: 'coordinator', coordinator: ownAiName }) });
+  assert(m.status === 200, `make the AI the coordinator: ${m.status} ${JSON.stringify(m.body.error)}`);
+  const t = await callTool(aiSession, 'aimeat_goal_set', { action: 'update', goal_id: id, reason: 'MCP test', rounds: { trigger: 'clock', cron: '30 6 * * *' } });
+  assert(!t.isError, `aimeat_goal_set update: ${t.text.slice(0, 300)}`);
+  const g2 = await readGoal(tokenA, id);
+  assert(g2.rounds.cron === '30 6 * * *' && g2.rounds.timezone === 'Europe/Helsinki' && g2.rounds.template.length === 2, `over MCP the rest stays too: ${JSON.stringify(g2.rounds)}`);
+});
+
+await test('29. an empty cron on a clock round is refused on update, and the goal keeps its rounds', async () => {
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Clock round refusal test.', rounds: { trigger: 'clock', cron: '0 7 * * *' } }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id;
+  const empty = await json(`/v1/goals/${id}`, { method: 'PATCH', headers: auth(tokenA), body: JSON.stringify({ rounds: { trigger: 'clock', cron: '' } }) });
+  assert(empty.status === 400 && empty.body.error.code === 'INVALID_INPUT', `an empty cron: ${empty.status} ${JSON.stringify(empty.body.error)}`);
+  const m = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Manual round refusal test.', rounds: { trigger: 'manual' } }) });
+  assert(m.status === 201, `create manual: ${m.status} ${JSON.stringify(m.body.error)}`);
+  const none = await json(`/v1/goals/${m.body.data.goal.id}`, { method: 'PATCH', headers: auth(tokenA), body: JSON.stringify({ rounds: { trigger: 'clock' } }) });
+  assert(none.status === 400, `a manual goal switched to the clock without a cron: ${none.status} ${JSON.stringify(none.body.error)}`);
+  const g = await readGoal(tokenA, id);
+  assert(g.rounds.trigger === 'clock' && g.rounds.cron === '0 7 * * *' && g.rounds.next_at, `the rounds are unchanged: ${JSON.stringify(g.rounds)}`);
 });
 
 await provider.close();

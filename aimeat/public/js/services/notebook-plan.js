@@ -7,13 +7,21 @@
  *   over the note); each step is then EXECUTED here over the generic AI + librarian APIs (no-SSR), and
  *   the result is folded back into the note with a structured Sources/References trail. Phase 1 runs
  *   two self-fulfilled step kinds: `llm_reason` (expand using only the note) and `librarian_assess`
- *   (summarise the user's OWN existing material found via the librarian).
+ *   (summarise the user's OWN existing material found via the librarian). The run loop is here too:
+ *   the automatic run starts only the steps whose `gate` is false and stops at the first step that
+ *   asks the person first.
  * @structure
  *   - buildCatalogue(feed) — compact [{agent,offerId,title,ask,latency,cost}] from the /v1/offers feed
  *   - generatePlan(text, catalogue) — POST /v1/librarian/plan (slow AI call; full timeout, no retry)
  *   - runStep(step, ctx) — execute one plan step → EnrichmentResult { stepId, kind, markdown, sources }
+ *   - stepAsksFirst(step) — whether a step waits for the person's press (its `gate`)
+ *   - runPlanSteps(steps, { isHandled, execute, stopAtGate }) — the run loop; the automatic run stops at
+ *     the first step that asks first
  *   - composeEnrichedMarkdown(noteText, enrichments) — note + folded results + Sources section
  * @version-history
+ *   v1.2.0 — 2026-11-08 — The automatic run reads each step's `gate`: runPlanSteps stops before the
+ *     first step that asks first, so a step that goes to an agent no longer starts without the
+ *     person's press when "Run plan automatically" is on.
  *   v1.0.0 — 2026-06-21 — Initial (Phase 1): plan generate + reason/librarian-assess execution.
  *   v1.1.0 — 2026-06-21 — Phase 2: `delegate` execution — dispatch a fleet agent offer via offers.ask(),
  *     await the task (SSE + poll), read the deliverable back, fold it in with agent provenance.
@@ -184,6 +192,29 @@ export async function runStep(step, ctx) {
     markdown: (content || '').trim(),
     sources: [{ producer: model || 'ai', origin: null, label: 'AI reasoning', retrievedAt }],
   };
+}
+
+/** True when a plan step asks the person before it runs. The planner (src/services/notebook-plan.ts
+ *  resolveSteps) sets `gate` on every step and defaults it to true, so only an explicit `false` lets a
+ *  step start without a press. */
+export function stepAsksFirst(step) {
+  return step?.gate !== false;
+}
+
+/** Run plan steps in order. `isHandled(step)` is read live before each step, so a skip pressed during
+ *  the run is honoured. With `stopAtGate` (the automatic run), the loop stops BEFORE the first step
+ *  that asks first and returns it, so the card can ask the person; without it (a press on Run all
+ *  steps) every step runs. An error from `execute` stops the loop and propagates to the caller.
+ *  @param {Array<{id: string, gate?: boolean}>} steps
+ *  @param {{ isHandled: (step: object) => boolean, execute: (step: object) => Promise<void>, stopAtGate?: boolean }} opts
+ *  @returns {Promise<object|null>} the step the run stopped at to ask, or null when it ran to the end */
+export async function runPlanSteps(steps, { isHandled, execute, stopAtGate = false }) {
+  for (const step of (steps || [])) {
+    if (isHandled(step)) continue;
+    if (stopAtGate && stepAsksFirst(step)) return step;
+    await execute(step);
+  }
+  return null;
 }
 
 /** Compose the enriched note body: original note + each enrichment + a Sources/References section.

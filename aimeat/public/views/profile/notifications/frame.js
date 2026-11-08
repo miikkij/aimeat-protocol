@@ -6,9 +6,12 @@
  *   family, the switch), the rows of the inbox table with their doors and actions, the sender rows
  *   with their decisions, the crumb and the rail. Every machine word (a group, a kind, an action id)
  *   is turned into the reader's language here.
- * @structure c · rel · Switch · inboxRows · inboxHead · senderRows · crumb · pageLinks
+ * @structure c · rel · Switch · inboxRows · inboxHead · hasOwnPush · senderRows · crumb · pageLinks
  * @usage import { c, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.13.0 -- 2026-11-08 -- The "AIMEAT itself" row draws no push switch (hasOwnPush). The switch
+ *     always showed on and pressing it saved nothing, because the node's own notifications are
+ *     pushed or not per group, and the row has no group; its words and its By group door say so.
  *   v1.12.0 -- 2026-10-27 -- A notice whose kind has an explanation gets a question mark first among its doors (helpTermOf; Jouni, 2026-10-27).
  *   v1.11.0 -- 2026-10-25 -- A decided notice shows who decided what and when, and where to change it,
  *     and no buttons; Open stays only where it leads to another page (secaudit2026oct22).
@@ -92,6 +95,14 @@ export function inboxRows(ctx, rows) {
   <//>`;
 }
 
+/**
+ * Does this row carry a push decision of its own? The node's own notifications are decided per
+ * GROUP (prefsFor in src/services/notification-settings.ts reads settings.groups and has no key for
+ * the node as a whole), so the "AIMEAT itself" row, a kind `aimeat` row with no group, has none: its
+ * words say "push by group" and its door opens the groups. Every other row does.
+ */
+export const hasOwnPush = (r) => r.kind !== 'aimeat' || !!r.group;
+
 /** "Who may notify you": a mark (a sender that is not AIMEAT is the agent's mark), the name and
  *  what it is, what it did, the decision (mute, or push on and off; a muted one says so). */
 export function senderRows(ctx, rows, { under = false } = {}) {
@@ -104,9 +115,10 @@ export function senderRows(ctx, rows, { under = false } = {}) {
         <${Doors}>
           ${r.door}
           ${r.kind === 'aimeat' ? null : html`<${Action} small row soft disabled=${ctx.busy} onClick=${() => ctx.setPref(r, { muted: !p.muted })}>${p.muted ? c('unmute') : c('mute')}<//>`}
-          ${p.muted
-            ? html`<${Mark} kind="status" tone="off">${c('mutedWord')}<//>`
-            : html`<${Switch} on=${p.push !== false} label=${c('push')} disabled=${ctx.busy} onToggle=${() => ctx.setPref(r, { push: p.push === false })} />`}
+          ${!hasOwnPush(r) ? null
+            : p.muted
+              ? html`<${Mark} kind="status" tone="off">${c('mutedWord')}<//>`
+              : html`<${Switch} on=${p.push !== false} label=${c('push')} disabled=${ctx.busy} onToggle=${() => ctx.setPref(r, { push: p.push === false })} />`}
         <//>
       <//>`; })}
   <//>`;

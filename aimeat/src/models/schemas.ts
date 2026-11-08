@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   2026-11-08 — ConsentCreateSchema takes `role` (read | write) for POST /v1/consent: what the
+ *     recipient may do, never read off the purpose text.
  *   2026-11-02 — TwoStepStartSchema and TwoStepFinishSchema for POST /v1/ghii/login/two-step/start and
  *     /finish (required two-step sign-in).
  *   2026-10-31 — PeerSettlementCeilingSchema for PUT /v1/federation/peers/:nodeId/settlement-ceiling
@@ -420,6 +422,9 @@ export const ConsentCreateSchema = z.object({
     scope: z.enum(CONSENT_REACH_INPUTS).optional(),
     expires: z.string().datetime().nullable().optional().default(null),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    // What the recipient may do. Absent: read. Write is decided in services/workspace-roles.ts
+    // (consentWsRole), never from the purpose text.
+    role: z.enum(['read', 'write']).optional(),
 });
 
 export const ConsentAuditQuerySchema = z.object({

@@ -6,14 +6,17 @@
  *   settings record. The morning pass: when an owner's quiet hours have just ended, the pushes that
  *   were held during them go out as ONE push ("N notifications while you were quiet"), and the held
  *   marks are cleared. The digest pass: an owner who asked for it gets one email listing what has
- *   stayed unread for longer than they chose, sent to the verified address on their account, at most
- *   once per new batch. Neither pass ever creates a notification; neither runs when the owner has
- *   not asked.
+ *   stayed unread for longer than they chose, sent to the verified address on their account, each
+ *   notification in exactly one digest (the bookmark is the last run's cutoff). Neither pass ever
+ *   creates a notification; neither runs when the owner has not asked.
  * @structure sweepHeldPushes · sweepNotificationDigests · digestSectionOf · digestText ·
  *   listOwnerNotificationRecords and listOwnerNotifications (the shared owner-exact reads) ·
  *   readNotificationInbox and findOwnerNotificationsByIds (the bell's page and the by-id lookup)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.5.1 -- 2026-11-08 -- The digest bookmark (lastDigestAt) is the run's cutoff, not its send time, so a
+ *     notification that arrived in the hours before a digest goes in the next one; until now it was never
+ *     mailed. sweepNotificationDigests takes the clock as an optional third argument, for tests.
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
@@ -201,12 +204,19 @@ export async function sweepHeldPushes(storage: Storage, _config: AimeatConfig, p
 /**
  * The digest email. Hourly: an owner with the digest on and a verified address gets one email for
  * the unread notifications older than their chosen number of hours that have not been mailed yet.
+ *
+ * THE BOOKMARK IS THE CUTOFF, NOT THE SEND TIME. A run mails what arrived after the bookmark and at
+ * or before its cutoff (now minus the owner's hours), then moves the bookmark to that cutoff. So the
+ * windows of consecutive runs meet end to end: every notification that stays unread for the hours
+ * lands in exactly one digest, and none in two. Until 2026-11-08 the bookmark was the send time, so a
+ * notification that arrived in the hours before a digest was too young for it and older than the
+ * bookmark for every later run, and it was never mailed. `nowMs` is the clock, for tests.
  */
-export async function sweepNotificationDigests(storage: Storage, config: AimeatConfig): Promise<{ owners: number; sent: number }> {
+export async function sweepNotificationDigests(storage: Storage, config: AimeatConfig, nowMs: number = Date.now()): Promise<{ owners: number; sent: number }> {
   const email = nodeContext().email;
   if (!email?.enabled) return { owners: 0, sent: 0 };
   let owners = 0, sent = 0;
-  const now = Date.now();
+  const now = nowMs;
   for (const { ghii, settings } of await ownersWithSettings(storage)) {
     if (!settings.emailDigest.enabled) continue;
     owners++;
@@ -242,7 +252,9 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
       // timers at boot), one moves it and sends, the other finds it moved and sends nothing. It was
       // moved after the send before, so both sent. Only the bookmark is written, on top of the
       // record as it is NOW, so a save the owner made meanwhile stays (docs/pitfalls.md §84).
-      const lastDigestAt = new Date(now).toISOString();
+      // The new bookmark is this run's cutoff: what is younger than it waits for the next run. `due`
+      // is not empty, so the cutoff is past the old bookmark and the bookmark only moves forward.
+      const lastDigestAt = new Date(cutoff).toISOString();
       const readAt = settings.lastDigestAt ?? null;
       let claimed = false;
       await updateNotificationSettings(storage, ghii, current => {
