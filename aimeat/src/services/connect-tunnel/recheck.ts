@@ -76,7 +76,8 @@ export async function recheckHeldIdentities(
         detached++;
         continue;
       }
-      if (!conn.identity.roles?.includes('agent')) continue;
+      // An ecosystem app has no agent record, so it reads as not stopped, as the backlog reads it
+      // (connect-tunnel-push.ts sendBacklog).
       const stopped = isStopped(await storage.getAgent(conn.principal));
       if (stopped !== !!conn.stopped) {
         target.setStoppedHere(conn.principal, stopped);

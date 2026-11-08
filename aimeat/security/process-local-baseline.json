@@ -634,8 +634,8 @@
       "reason": "DEBT"
     },
     "src/services/connect-tunnel.ts :: interval :: startHeartbeatMonitor": {
-      "count": 1,
-      "reason": "DEBT"
+      "count": 2,
+      "reason": "DEBT: the heartbeat monitor; and, with several processes, the re-check of the sockets this process holds, which reads each decision from storage (connect-tunnel/recheck.ts, secaudit2026nov08b round 15)"
     },
     "src/services/connections/media-handoff.ts :: map :: held": {
       "count": 1,

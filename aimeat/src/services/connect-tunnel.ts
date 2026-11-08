@@ -802,6 +802,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
     // Several processes per node: a revocation or a stop told by a tunnelControl event that was lost
     // is applied here within HELD_IDENTITY_RECHECK_MS (./connect-tunnel/recheck.ts). One process: no timer.
     if (!singleProcess(this.config) && !this.recheckInterval) {
+      // process-local: each process checks the sockets it holds itself; the decisions are read from storage.
       this.recheckInterval = setInterval(() => { void this.recheckHeld(); }, HELD_IDENTITY_RECHECK_MS);
       this.recheckInterval.unref?.();
     }
