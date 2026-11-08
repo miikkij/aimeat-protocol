@@ -29,6 +29,8 @@
  *   providerOffer · locateNegotiation
  * @usage const out = await requestNegotiation(deps, participant, req.body); res.status(out.status).json(out.body);
  * @version-history
+ *   2026-11-08 — providerTerminate takes EndOptions and answers whether it moved the record
+ *     (secaudit2026nov08 round 14b, ./source-share.ts).
  *   2026-11-08 — providerAgree claims the record before it materialises, so a second approval that
  *     arrives meanwhile writes nothing; a call that loses the move takes back only its own addition to
  *     the contract slot (secaudit2026nov08 round 14).
@@ -60,7 +62,7 @@ import { changeNegotiation, createNegotiation, readNegotiation, sweepArchive } f
 import { autoAgreeFor, nodeParticipantId, processRoomRefusal, tckModeOn } from './settings.js';
 import { negotiationScript, tckDataset, tckOwnerGhii } from './tck.js';
 import type { Participant } from './verifier.js';
-import { endAgreementTransfers } from './transfer.js';
+import { endAgreementTransfers, type EndOptions } from './transfer.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 export interface DspAnswer { status: number; body: Record<string, unknown> }
@@ -200,18 +202,28 @@ export async function providerFinalize(deps: Deps, n: NegotiationRecord): Promis
     if (!out.ok) await moveBack(deps, n, 'VERIFIED', 'FINALIZED', out.error);
 }
 
-/** Terminate as the provider: end what an agreement made, move to TERMINATED, send the termination. */
-export async function providerTerminate(deps: Deps, n: NegotiationRecord, code: string, reason: string, by: 'provider' | 'owner'): Promise<void> {
+/**
+ * Terminate as the provider: end what an agreement made, move to TERMINATED, send the termination.
+ * Answers whether this call moved the record. `opts` as in ./transfer.ts EndOptions: `keepKey` leaves
+ * the share's transfer keys to expire, `sendLater` sends the messages after the current answer, so the
+ * local end never waits on the consumer (./source-share.ts).
+ */
+export async function providerTerminate(deps: Deps, n: NegotiationRecord, code: string, reason: string, by: 'provider' | 'owner', opts: EndOptions = {}): Promise<boolean> {
     const moved = await move(deps, n, ['REQUESTED', 'OFFERED', 'ACCEPTED', 'AGREED', 'VERIFIED'], 'TERMINATED', 'termination', by, { waitingForOwner: false, endedReason: reason });
-    if (!moved) return;
+    if (!moved) return false;
     if (moved.materialised) {
-        await endAgreement(deps, moved, 'dsp-terminated');
-        await endAgreementTransfers(deps, moved, 'The agreement was terminated.');
+        await endAgreement(deps, moved, 'dsp-terminated', { keepKeys: opts.keepKey === true });
+        await endAgreementTransfers(deps, moved, 'The agreement was terminated.', opts);
     }
-    const out = await sendCallback(deps.config, to(n), cbUrl(n, 'termination'), dspBody('ContractNegotiationTerminationMessage', {
-        providerPid: n.providerPid, consumerPid: n.consumerPid, code, reason: [reason],
-    }));
-    if (!out.ok) await changeNegotiation(deps.storage, n.ownerGhii, locatePid(n.providerPid, 'cn')!.hex, cur => ({ ...cur, callbackError: out.error }));
+    const send = async (): Promise<void> => {
+        const out = await sendCallback(deps.config, to(n), cbUrl(n, 'termination'), dspBody('ContractNegotiationTerminationMessage', {
+            providerPid: n.providerPid, consumerPid: n.consumerPid, code, reason: [reason],
+        }));
+        if (!out.ok) await changeNegotiation(deps.storage, n.ownerGhii, locatePid(n.providerPid, 'cn')!.hex, cur => ({ ...cur, callbackError: out.error }));
+    };
+    if (opts.sendLater) later(send);
+    else await send();
+    return true;
 }
 
 /** The offer of a request: the one published for the dataset to this participant, or the refusal. */

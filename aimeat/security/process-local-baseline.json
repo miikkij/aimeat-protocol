@@ -689,6 +689,14 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/dataspace/source-share.ts :: let :: installed": {
+      "count": 1,
+      "reason": "The function that removes this process's registration of the step after a share ended, so a second install in the same process replaces the first. Every process installs its own at boot (routes/dsp/index.ts); nothing breaks with a second process."
+    },
+    "src/services/parties/shares.ts :: set :: sharesEndedHooks": {
+      "count": 1,
+      "reason": "The steps that run after an owner's named share ended. Every process registers the same steps at its own boot, and a step runs in the process that ended the share, against the shared store; nothing breaks with a second process."
+    },
     "src/services/content/intake.ts :: let :: installed": {
       "count": 1,
       "reason": "DEBT"

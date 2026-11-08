@@ -1874,6 +1874,7 @@
           "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät",
           "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
           "erasure_leftover_schedules": "Poistetuilta tileiltä jääneet ajastukset",
+          "erased_lock_holders": "Lukitukset, jotka voivat olla poistetun tilin",
           "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa",
           "platform_fee_records": "Rahamaksujen tietueet, joiden kirjoittajaa ei tiedetä",
           "federation_settlement": "Vertaisen selvitykset, jotka ylittivät päivärajan"
@@ -1911,6 +1912,7 @@
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
             "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset.",
+            "erased_lock_holders": "Nämä lukitukset tehtiin ennen kuin käyttäjänimen nykyinen tili rekisteröitiin. Lukitus määrää, mitä jokainen tili saa kirjoittaa sen avaimen alle, ja lukituksen haltija voi muuttaa tai poistaa sen. Ennen 8.11.2026 tilin poistaminen ei irrottanut sen lukituksia käyttäjänimestä. Siksi alla oleva lukitus voi olla poistetun tilin, vaikka sen haltija on nyt tili, joka rekisteröi saman nimen myöhemmin. Valitse jokaisesta lukituksesta, kenen se on. Mikään ei muutu, ennen kuin valitset. Palvelin irrotti jo käynnistyessään kaikista tileistä ne lukitukset, joiden käyttäjänimellä ei nyt ole tiliä.",
             "subdomain_site_origin": "Toisen ihmisen julkaisema sovellus avautuu myös oman verkkotunnuksesi osoitteesta. Valitse jokaiselle osoitteelle, mistä sovellus avautuu jatkossa. Siihen asti kaikki toimii kuten ennen.",
             "platform_fee_records": "Ennen 27.10.2026 mikä tahansa tili pystyi kirjoittamaan rahamaksun tietueen omaan muistiinsa, ja Talous-sivu laski sen sinulle kuuluviin maksuihin. Valitse jokaisesta alla olevasta tietueesta, lasketaanko se. Mitään ei poisteta, ja kunnes valitset, jokainen tietue lasketaan kuten ennenkin."
           },
@@ -1923,15 +1925,18 @@
           },
           "action": {
             "subdomain": "Vain sovellus",
-            "platform_fee": "Älä laske"
+            "platform_fee": "Älä laske",
+            "schema_lock": "Poistetun tilin"
           },
           "keepAction": {
             "subdomain": "Oma sivusto",
-            "platform_fee": "Laske"
+            "platform_fee": "Laske",
+            "schema_lock": "Tämän tilin"
           },
           "confirm": {
             "subdomain": "Teetkö tästä pelkän sovellusosoitteen? {line} Kun joku avaa osoitteen omassa verkkotunnuksessasi, hänet ohjataan sovelluksen omaan osoitteeseen. Siellä sovellus toimii kuten ennenkin.",
-            "platform_fee": "Jätetäänkö tämä tietue pois rahamaksuistasi? {line} Tietue säilyy, mutta Talous-sivu ei enää laske sitä."
+            "platform_fee": "Jätetäänkö tämä tietue pois rahamaksuistasi? {line} Tietue säilyy, mutta Talous-sivu ei enää laske sitä.",
+            "schema_lock": "Irrotetaanko lukitus tilistä? {line} Lukitus pysyy voimassa, mutta millään tilillä ei ole sitä. Voit yhä muuttaa tai poistaa sen."
           },
           "rowResolved": "Olet päättänyt jokaisesta tietueesta.",
           "clear": "Tyhjennä",
@@ -1950,7 +1955,8 @@
             "datapackage": "Datapaketti {name} tiedostoineen",
             "schedule": "Ajastus ”{label}”, jonka {maker} teki tilille {owner} (käynnistyy: {cron})",
             "subdomain": "{label}: sovellus {app}, jonka julkaisi {owner}",
-            "platform_fee": "{amount} tilin {owner} muistissa ({key}), myyjä {seller}, ostaja {buyer}"
+            "platform_fee": "{amount} tilin {owner} muistissa ({key}), myyjä {seller}, ostaja {buyer}",
+            "schema_lock": "Avaimen {pattern} lukitus. Haltija {holder}, voimassa {setAt} alkaen. Tili {account} rekisteröitiin {registered}."
           }
         },
         "source": {

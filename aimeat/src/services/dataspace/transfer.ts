@@ -24,6 +24,8 @@
  * @structure requestTransfer · readTransferFor · transferMessage · endAgreementTransfers · locateTransfer
  * @usage const out = await requestTransfer(deps, participant, req.body);
  * @version-history
+ *   2026-11-08 — endAgreementTransfers takes EndOptions: keep the key to expire, send the message after
+ *     the answer (secaudit2026nov08 round 14b, ./source-share.ts).
  *   v1.0.1 — 2026-11-02 — A new transfer asks the process room (./settings.ts processRoomRefusal): ended
  *     processes take none, one participant a share only (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.4).
@@ -132,18 +134,28 @@ async function providerStart(deps: Deps, t: TransferRecord): Promise<TransferRec
     return moved;
 }
 
+/**
+ * How the provider ends a transfer: `keepKey` leaves the transfer's key to expire (its share has ended,
+ * so it opens nothing), `sendLater` sends the message after the current answer (./callbacks.ts later).
+ */
+export interface EndOptions { keepKey?: boolean; sendLater?: boolean }
+
 /** End, complete or suspend as the provider: the key goes, the record moves, the message goes out. */
-async function providerEnd(deps: Deps, t: TransferRecord, step: Exclude<TransferStep, 'start'>, reason: string): Promise<void> {
+async function providerEnd(deps: Deps, t: TransferRecord, step: Exclude<TransferStep, 'start'>, reason: string, opts: EndOptions = {}): Promise<void> {
     const plan = { terminate: { from: ['REQUESTED', 'STARTED', 'SUSPENDED'], to: 'TERMINATED', type: 'TransferTerminationMessage', path: 'termination' },
         complete: { from: ['STARTED'], to: 'COMPLETED', type: 'TransferCompletionMessage', path: 'completion' },
         suspend: { from: ['STARTED'], to: 'SUSPENDED', type: 'TransferSuspensionMessage', path: 'suspension' } }[step] as { from: TransferState[]; to: TransferState; type: string; path: string };
     const moved = await move(deps, t, plan.from, plan.to, step);
     if (!moved) return;
-    if (moved.keyId && moved.partyName) await dropTransferKey(deps.storage, t.ownerGhii, moved.partyName, moved.keyId);
-    const out = await sendCallback(deps.config, to(t), callbackUrl(t.callbackAddress, 'transfers', t.consumerPid, plan.path), dspBody(plan.type, {
-        providerPid: t.providerPid, consumerPid: t.consumerPid, ...(step !== 'complete' ? { code: 'PROVIDER', reason: [reason] } : {}),
-    }));
-    if (!out.ok) await changeTransfer(deps.storage, t.ownerGhii, hexOf(t), cur => ({ ...cur, callbackError: out.error }));
+    if (moved.keyId && moved.partyName && !opts.keepKey) await dropTransferKey(deps.storage, t.ownerGhii, moved.partyName, moved.keyId);
+    const send = async (): Promise<void> => {
+        const out = await sendCallback(deps.config, to(t), callbackUrl(t.callbackAddress, 'transfers', t.consumerPid, plan.path), dspBody(plan.type, {
+            providerPid: t.providerPid, consumerPid: t.consumerPid, ...(step !== 'complete' ? { code: 'PROVIDER', reason: [reason] } : {}),
+        }));
+        if (!out.ok) await changeTransfer(deps.storage, t.ownerGhii, hexOf(t), cur => ({ ...cur, callbackError: out.error }));
+    };
+    if (opts.sendLater) later(send);
+    else await send();
 }
 
 /** Act out a TCK script's steps, a second apart. */
@@ -246,11 +258,11 @@ export async function transferMessage(
 }
 
 /** Terminate every live transfer of an agreement, as the provider. */
-export async function endAgreementTransfers(deps: Deps, n: NegotiationRecord, reason: string): Promise<number> {
+export async function endAgreementTransfers(deps: Deps, n: NegotiationRecord, reason: string, opts: EndOptions = {}): Promise<number> {
     let ended = 0;
     for (const t of await listTransfers(deps.storage, n.ownerGhii)) {
         if (t.negotiationPid !== n.providerPid || TRANSFER_TERMINAL.includes(t.state)) continue;
-        await providerEnd(deps, t, 'terminate', reason);
+        await providerEnd(deps, t, 'terminate', reason, opts);
         ended++;
     }
     return ended;

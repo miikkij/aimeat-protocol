@@ -37,12 +37,15 @@
  *   party declining it, by the party's deletion, and by the package's withdrawal; each of the last
  *   three sets status `revoked` with `endedReason` (`declined`, `party-deleted`, `package-withdrawn`).
  *   The share a Dataspace agreement on a share offer made stands on the share the offer named
- *   (`sourceShare`): when that one ends, reads through the agreement's share are refused too.
+ *   (`sourceShare`): when that one ends, reads through the agreement's share are refused too, and the
+ *   steps registered with onSharesEnded run (the Dataspace provider ends that agreement).
  * @structure SHARE_PATTERN_PREFIX · sharePatternOf · packageOfPattern · ShareMeta · shareMetaOf ·
- *   isLiveShare · standingShares · partySharesOf · normalizePartyShare · endShares · endSharesListed · setShareMeta ·
- *   connectionFileOf · shareView
+ *   isLiveShare · standingShares · partySharesOf · normalizePartyShare · endShares · endSharesListed ·
+ *   onSharesEnded · sharesEnded · setShareMeta · connectionFileOf · shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   2026-11-08 — onSharesEnded and sharesEnded: a step that runs after an owner's named share ended,
+ *     from setShareMeta, endSharesListed and consent-write.ts revokeConsent (secaudit2026nov08 round 14b).
  *   2026-11-08 — `sourceShare` (node-written) and standingShares: a Dataspace agreement made on a share
  *     offer reads only while the share it stood on is live (secaudit2026nov08 round 14,
  *     dataspace:agreement:share-offer-outlives-source-share).
@@ -339,8 +342,45 @@ async function packageShareTerms(
     return { ok: true, packageName, ...(pinnedVersion ? { pinnedVersion } : {}), expires, own };
 }
 
+/**
+ * What runs after an owner's named share ends (a revocation, a decline, a withdrawal, a party's
+ * deletion): the Dataspace provider ends the agreements made on a share offer that stood on it
+ * (services/dataspace/source-share.ts registers it at boot). A list, not an import, because the
+ * Dataspace modules import this file.
+ */
+type SharesEndedHook = (storage: Storage, ownerGhii: string) => Promise<unknown>;
+// process-local: nothing breaks; every process registers the same steps at its own boot, and a step runs in the process that ended the share.
+const sharesEndedHooks = new Set<SharesEndedHook>();
+
+/** Register a step that runs after a share of an owner ended. Answers the function that removes it. */
+export function onSharesEnded(hook: SharesEndedHook): () => void {
+    sharesEndedHooks.add(hook);
+    return () => { sharesEndedHooks.delete(hook); };
+}
+
+/**
+ * Run the registered steps for an owner whose named share ended. Never throws: the share has ended
+ * whatever a step does, and a step's failure is logged (secaudit2026nov08 round 14b).
+ */
+export async function sharesEnded(storage: Storage, ownerGhii: string): Promise<void> {
+    for (const hook of sharesEndedHooks) {
+        try {
+            await hook(storage, ownerGhii);
+        } catch (err) {
+            logger.warn('parties: a step after a share ended failed', { owner: ownerGhii, error: String(err) });
+        }
+    }
+}
+
 /** Change a share's node-written metadata (terms acceptance, a decline). Answers the share as written. */
 export async function setShareMeta(storage: Storage, share: ConsentRecord, change: Partial<ShareMeta>, status?: ConsentRecord['status']): Promise<ConsentRecord | null> {
+    const written = await setShareMetaOnly(storage, share, change, status);
+    if (status === 'revoked' && written) await sharesEnded(storage, ownerGhiiOf(share.ownerGaii));
+    return written;
+}
+
+/** setShareMeta without the steps after a share ended; endSharesListed runs them once for its whole list. */
+async function setShareMetaOnly(storage: Storage, share: ConsentRecord, change: Partial<ShareMeta>, status?: ConsentRecord['status']): Promise<ConsentRecord | null> {
     const metadata = { ...(share.metadata ?? {}), ...change };
     return storage.updateConsent(share.id, {
         metadata, ...(status ? { status } : {}), ...(status === 'revoked' ? { revokedAt: new Date().toISOString() } : {}),
@@ -361,10 +401,11 @@ export async function endSharesListed(storage: Storage, ownerGhii: string, match
     const ended: ConsentRecord[] = [];
     for (const c of active) {
         if (!isNamedShare(c) || !match(c)) continue;
-        await setShareMeta(storage, c, { endedReason: reason }, 'revoked');
+        await setShareMetaOnly(storage, c, { endedReason: reason }, 'revoked');
         await auditDataAccess(storage, c.id, c.ownerGaii, c.recipient, c.dataPattern, 'revoke', true);
         ended.push(c);
     }
+    if (ended.length) await sharesEnded(storage, ownerGhii);
     return ended;
 }
 

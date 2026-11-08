@@ -33,6 +33,8 @@
  * @structure Materialised · AgreementSale · materialiseAgreement · bookAgreementSale · endAgreement
  * @usage const m = await materialiseAgreement(deps, negotiation); if (!m.ok) terminate(m.message);
  * @version-history
+ *   2026-11-08 — endAgreement's keepKeys leaves the share's transfer keys to expire, for an agreement
+ *     that ends because the share it stood on ended (secaudit2026nov08 round 14b).
  *   2026-11-08 — endAgreement's keepSlot takes back only one call's addition when another call made the
  *     same negotiation's agreement (secaudit2026nov08 round 14).
  *   2026-11-08 — A share offer's agreement records the share it stood on and is made only while that
@@ -224,9 +226,11 @@ export async function bookAgreementSale(deps: Deps, n: NegotiationRecord, sale: 
 /**
  * End what an agreement made: its share, its part of the contract, and every transfer key of the share.
  * `opts.keepSlot`: another call made this negotiation's agreement on the same contract slot, so only
- * what this call added is taken back and the slot stays.
+ * what this call added is taken back and the slot stays. `opts.keepKeys`: the transfer keys of the
+ * share stay on the party until they expire; they open nothing once the share has ended, and a read
+ * with one is refused SHARE_ENDED, which tells the reader why (./source-share.ts).
  */
-export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: string, opts: { keepSlot?: boolean } = {}): Promise<number> {
+export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: string, opts: { keepSlot?: boolean; keepKeys?: boolean } = {}): Promise<number> {
     const { storage, config } = deps;
     const m = n.materialised;
     if (!m) return 0;
@@ -234,7 +238,7 @@ export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: str
     const owner = localAccountName(n.ownerGhii);
     const ref = partyRefOf(owner, m.partyName, config.nodeId);
     if (m.entitlementId && n.packageName) await undoContract(storage, n, ref, owner, opts.keepSlot === true);
-    await changeParty(storage, n.ownerGhii, m.partyName, p => {
+    if (!opts.keepKeys) await changeParty(storage, n.ownerGhii, m.partyName, p => {
         const keys = p.keys.filter(k => k.share !== m.shareId);
         return keys.length === p.keys.length ? UNCHANGED : { ...p, keys };
     });

@@ -28,6 +28,9 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-08 — Revoking a named share runs the steps after a share ended (parties/shares.ts
+ *     sharesEnded): a Dataspace agreement made on a share offer that stood on it ends
+ *     (secaudit2026nov08 round 14b).
  *   2026-11-01 — A grant of `datapkg:<name>` to a GHII is a named share to a person on another AIMEAT
  *     node (services/parties/shares.ts normalizeVisitorShare): an account of this node is refused, and
  *     party:manage, the package, the pin and the end are checked as for a party share (WP9c).
@@ -76,7 +79,7 @@ import { COLLECTION_METHOD_KEY } from './mydata-receipt.js';
 import { notifyDirectoryChange } from './directory.js';
 import { callerFromAuth } from './caller-context.js';
 import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
-import { normalizePartyShare, normalizeVisitorShare, packageOfPattern } from './parties/shares.js';
+import { isNamedShare, normalizePartyShare, normalizeVisitorShare, packageOfPattern, sharesEnded } from './parties/shares.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -382,6 +385,8 @@ export async function revokeConsent(
     const now = new Date().toISOString();
     await storage.updateConsent(consentId, { status: 'revoked', revokedAt: now });
     await auditDataAccess(storage, consentId, consent.ownerGaii, consent.recipient, consent.dataPattern, 'revoke', true);
+    // A Dataspace agreement made on a share offer stood on this share: it ends with it.
+    if (isNamedShare(consent)) await sharesEnded(storage, ownerGhiiOf(consent.ownerGaii));
 
     // Withdrawing is the half that must not be missed: the person is in the directory with their
     // display name, bio, city and coordinates until the index hears about it.

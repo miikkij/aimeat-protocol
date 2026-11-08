@@ -3,12 +3,15 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description services/key-credentials.ts: the first sign-in's credentials mail of a code-key
- *   account is an owner mail. A proven address gets it at the first sign-in; an address nobody proved
- *   gets nothing then, the password waits sealed and the login answer says so, and the mail goes once
- *   the address is verified (sendHeldKeyCredentials). A password changed since, or a node with no data
- *   key, sends nothing later (codebase analysis 2026-11-03, decision 14a of 2026-11-05).
+ *   account is an owner mail. An address proven before the first sign-in gets nothing (ruling 1 of
+ *   2026-11-08); an address nobody proved gets nothing then, the password waits sealed and the login
+ *   answer says so, and the mail goes once the address is verified (sendHeldKeyCredentials). A password
+ *   changed since, or a node with no data key, sends nothing later (codebase analysis 2026-11-03,
+ *   decision 14a of 2026-11-05).
  * @usage pnpm exec vitest run test/unit/key-credentials-held.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-08 — An address proven before the first sign-in gets no credentials mail; the
+ *     developer approved changing this one assertion (secaudit2026nov08 round 14b).
  *   v1.1.0 — 2026-11-08 — A proof asked for before the first sign-in does not receive the held password
  *     (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 14a of 2026-11-05).
@@ -61,13 +64,17 @@ beforeEach(() => { mail = mailer(); provideNodeService('email', mail.svc); });
 afterEach(() => { provideNodeService('email', null); });
 
 describe('the first sign-in of a code-key account', () => {
-  it('mails the credentials at once to a proven address, and holds nothing', async () => {
+  // The developer's ruling 1 of 2026-11-08 (secaudit2026nov08 round 14b): an address proven before the
+  // holder's first sign-in may be one that whoever knew the key proved, so the credentials are shown to
+  // the session that signed in and are not mailed.
+  it('mails nothing to an address proven before the first sign-in, holds nothing, and answers the credentials', async () => {
     const s = fakeStorage(true);
     const cred = await issueFirstLoginKeyCredentials(s as never, config(), { ...s.ghii } as never);
-    expect(cred?.email_sent).toBe(true);
+    expect(cred?.username).toBe('bob');
+    expect(typeof cred?.password).toBe('string');
+    expect(cred?.email_sent).toBe(false);
     expect(cred?.email_held).toBeUndefined();
-    expect(mail.sendKeyCredentials).toHaveBeenCalledTimes(1);
-    expect(mail.sendKeyCredentials).toHaveBeenCalledWith(ADDRESS, expect.objectContaining({ username: 'bob', password: cred!.password }), 'en');
+    expect(mail.sendKeyCredentials).not.toHaveBeenCalled();
     expect(s.memory.size).toBe(0);
   });
 

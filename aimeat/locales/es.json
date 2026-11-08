@@ -974,6 +974,7 @@
           "classification_default_caps": "Límites de quién puede ver el contenido clasificado",
           "anonymous_principal_records": "Lo que escribió el agente anónimo compartido",
           "erasure_leftover_schedules": "Programaciones que quedaron de cuentas eliminadas",
+          "erased_lock_holders": "Bloqueos que pueden ser de una cuenta eliminada",
           "subdomain_site_origin": "Aplicaciones de otras personas en direcciones de tu dominio",
           "platform_fee_records": "Registros de comisiones en dinero sin autor conocido",
           "federation_settlement": "Liquidaciones de un par que pasaban el límite diario"
@@ -1011,6 +1012,7 @@
           "lead": {
             "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión.",
             "erasure_leftover_schedules": "Estas programaciones son de cuentas que se eliminaron antes del 25 de octubre de 2026. En ese entonces, eliminar una cuenta quitaba las programaciones de la persona, pero no las que habían hecho sus agentes y sus aplicaciones. Si otra persona registra el mismo nombre de usuario, o ya lo registró, ve estas programaciones, y pueden ejecutarse a su nombre. Elimina cada programación que nadie necesite. Nada cambia hasta que elijas.",
+            "erased_lock_holders": "Estos bloqueos se crearon antes de que se registrara la cuenta que hoy tiene ese nombre de usuario. Un bloqueo decide qué puede escribir cada cuenta bajo su clave, y la cuenta que lo tiene puede cambiarlo o quitarlo. Antes del 8 de noviembre de 2026, eliminar una cuenta no separaba sus bloqueos del nombre de usuario. Por eso un bloqueo de esta lista puede ser de una cuenta eliminada, aunque ahora lo tenga la cuenta que registró el mismo nombre después. Elige de quién es cada bloqueo. Nada cambia hasta que elijas. Al iniciar, el servidor ya separó de todas las cuentas los bloqueos cuyo nombre de usuario hoy no usa ninguna cuenta.",
             "subdomain_site_origin": "Una aplicación que publicó otra persona también se abre en una dirección de tu dominio. Elige para cada dirección dónde se abre la aplicación de ahora en adelante. Hasta que elijas, todo funciona como antes.",
             "platform_fee_records": "Antes del 27 de octubre de 2026, cualquier cuenta podía escribir un registro de comisión en dinero en su propia memoria, y la página Economía lo contaba en las comisiones que te corresponden. Elige para cada registro de abajo si se cuenta. No se elimina nada y, hasta que elijas, cada registro se cuenta como antes."
           },
@@ -1023,15 +1025,18 @@
           },
           "action": {
             "subdomain": "Solo aplicación",
-            "platform_fee": "No contar"
+            "platform_fee": "No contar",
+            "schema_lock": "De una cuenta eliminada"
           },
           "keepAction": {
             "subdomain": "Mi propio sitio",
-            "platform_fee": "Contar"
+            "platform_fee": "Contar",
+            "schema_lock": "De esta cuenta"
           },
           "confirm": {
             "subdomain": "¿Quieres que esta sea solo una dirección de la aplicación? {line} Quien la abra en tu dominio irá a la dirección propia de la aplicación, donde la aplicación funciona como antes.",
-            "platform_fee": "¿Dejar este registro fuera de tus comisiones en dinero? {line} El registro se conserva, pero la página Economía ya no lo cuenta."
+            "platform_fee": "¿Dejar este registro fuera de tus comisiones en dinero? {line} El registro se conserva, pero la página Economía ya no lo cuenta.",
+            "schema_lock": "¿Separar este bloqueo de la cuenta? {line} El bloqueo sigue vigente, pero ninguna cuenta lo tiene. Aún puedes cambiarlo o quitarlo."
           },
           "rowResolved": "Todos los registros están decididos.",
           "clear": "Vaciar",
@@ -1050,7 +1055,8 @@
             "datapackage": "El paquete de datos {name}, con sus archivos",
             "schedule": "La programación «{label}», que {maker} hizo para la cuenta {owner} (se ejecuta: {cron})",
             "subdomain": "{label}: la aplicación {app}, publicada por {owner}",
-            "platform_fee": "{amount} en la memoria de {owner} ({key}), vendedor {seller}, comprador {buyer}"
+            "platform_fee": "{amount} en la memoria de {owner} ({key}), vendedor {seller}, comprador {buyer}",
+            "schema_lock": "El bloqueo de {pattern}, que tiene {holder} desde {setAt}. La cuenta {account} se registró el {registered}."
           }
         },
         "source": {

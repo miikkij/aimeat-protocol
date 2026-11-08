@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-11-08 — An address proven before a code key's first sign-in gets no credentials mail; the
+ *     first sign-in's answer carries them (ruling 1, secaudit2026nov08 round 14b).
  *   2026-11-05 — The first sign-in's credentials mail waits for a verified address: the first sign-in
  *     sends nothing and says so, and verifying the address sends it (Jouni 2026-11-05, decision 14a).
  *     The operator's group mail skips an unverified address and says how many, and app invitations an
@@ -613,6 +615,44 @@ async function run(): Promise<void> {
         assert(mail.text.includes(`Password: ${issued}`), 'the mail must carry the password the login issued, verbatim');
         const again = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: keyName, password: issued }) });
         assert(again.status === 200, `the emailed password must sign in: ${again.status} ${short(again.body)}`);
+    });
+
+    // The developer's ruling 1 of 2026-11-08 (secaudit2026nov08 round 14b): an address proven BEFORE
+    // the holder's first sign-in can be one that whoever knew the key proved, so the first sign-in
+    // shows the new password in its answer and mails it to nobody.
+    await test('an address proven before the first sign-in gets no credentials mail, and the shown password signs in', async () => {
+        const preName = `edkeypre${STAMP}`;
+        const preEmail = `${preName}@aimeat.test`;
+        const preCode = 'KeyBefore7x';
+        smtp!.clear();
+        const mint = await json(`/v1/organisms/${organismId}/invitations/code`, {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ email: preEmail, username: preName, code: preCode, display_name: 'Key Holder Before' }),
+        });
+        assert(mint.status === 201, `code mint ${mint.status}: ${short(mint.body)}`);
+        await smtp!.waitForMail(preEmail, new RegExp(preCode));
+
+        const attach = await json('/v1/ghii/login/attach-email', {
+            method: 'POST', body: JSON.stringify({ username: preName, password: preCode, email: preEmail }),
+        });
+        assert(attach.status === 200, `attach-email ${attach.status}: ${short(attach.body)}`);
+        const codeMail = await smtp!.waitForMail(preEmail, /\b\d{6}\b/);
+        const verified = await json('/v1/ghii/verify-email', {
+            method: 'POST', body: JSON.stringify({ verification_id: attach.body.data.verification_id, code: sixDigits(codeMail) }),
+        });
+        assert(verified.status === 200, `verify-email ${verified.status}: ${short(verified.body)}`);
+
+        smtp!.clear();
+        const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: preName, password: preCode }) });
+        assert(login.status === 200, `first login ${login.status}: ${short(login.body)}`);
+        const kc = login.body.data?.key_credentials;
+        assert(typeof kc?.password === 'string' && kc.password.length > 0 && kc.username === preName,
+            `the first sign-in must answer the new details: ${short(kc)}`);
+        assert(kc.email_sent === false && kc.email_held === undefined, `nothing is mailed or held: ${short(kc)}`);
+        await sleep(800);
+        assert(!smtp!.mailTo(preEmail).some(m => m.text.includes(kc.password)), 'no credentials mail may reach an address proven before the first sign-in');
+        const again = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: preName, password: kc.password }) });
+        assert(again.status === 200 && !again.body.data.key_credentials, `the shown password must sign in: ${again.status} ${short(again.body)}`);
     });
 
     await test('a mailing node offers the registration invite in getting_started', async () => {

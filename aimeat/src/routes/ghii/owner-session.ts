@@ -17,6 +17,7 @@
  * @structure completeOwnerLogin(config, storage, req, res, args) -> writes the response itself
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
+ *   2026-11-08 — The key_credentials comment says they are not mailed now (secaudit2026nov08 round 14b).
  *   2026-11-08 — A code key's first sign-in is decided in establishOwnerSession by its invitation, not
  *     here by the login count (secaudit2026nov08 round 14).
  *   2026-11-02 — args.extra: fields the calling route adds to the answer (the backup codes of a
@@ -174,7 +175,7 @@ export async function completeOwnerLogin(
       // the client keeps the key it already holds in IndexedDB (see above).
       ...(ownerKeyPair ? { owner_private_key: ownerKeyPair.privateKey } : {}),
       owner_public_key: ownerKeyPair?.publicKey ?? ownerRecord?.publicKey ?? '',
-      // First-login durable credentials for a provisioned-code account (also emailed). Lets the
+      // First-login durable credentials for a provisioned-code account (not mailed now). Lets the
       // entry surface show the exact username + password the login form accepts. Absent otherwise.
       ...(keyCredentials ? { key_credentials: keyCredentials } : {}),
       // What the route that ended here adds: the backup codes of a two-step enrolment (login-two-step.ts).
