@@ -219,7 +219,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:f46a149d93fcb75ed2f6dc32"
+      "digest": "sha256:5bc2626a3b830781190d3356"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -416,7 +416,7 @@
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
       "aimeat/src/services/once-only-step.ts": "12c59204aa41d7f2",
-      "aimeat/src/services/event-bus.ts": "b875cc652740db83",
+      "aimeat/src/services/event-bus.ts": "a9b8c62b29da76ce",
       "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
       "aimeat/src/mcp/legacy-sessions.ts": "e1e17ec26e540150",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
@@ -432,7 +432,7 @@
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
       "aimeat/src/services/notification-sweeps.ts": "79e7a75daebd3d89",
-      "aimeat/src/services/bus-relay.ts": "5e9b72921927da36",
+      "aimeat/src/services/bus-relay.ts": "cd9d487584979f5e",
       "aimeat/src/server-bootstrap/bus-relay-start.ts": "a77a01c5de30a627",
       "aimeat/src/services/process-lease.ts": "56b5c28544c3d11b",
       "aimeat/src/services/ai-jobs/reclaim.ts": "46edaddf7925f44c",

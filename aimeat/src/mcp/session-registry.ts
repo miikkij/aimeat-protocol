@@ -20,6 +20,10 @@
  *   AN ERASED ACCOUNT. services/owner-erasure.ts cannot import from src/mcp/ (the dependency rules
  *   refuse a service that does), so it tells the `accountErased` event, which reaches every process
  *   of the node, and this file closes the sessions each process holds for that account.
+ *
+ *   ON EVERY PROCESS. A session lives on the process that took its initialize. closeMcpSessionsForGaii
+ *   closes the ones this process holds and tells the `mcpSessionsClose` event, and every other
+ *   process of the node closes the ones it holds. With one process nothing else hears it.
  * @structure noteMcpSession(sessionId, principal, close) · forgetMcpSession(sessionId) ·
  *   closeMcpSessionsForGaii(principal) → number · closeMcpSessionsForAccount(ghii) → number
  * @usage
@@ -28,13 +32,16 @@
  *   // routes/agents/management.ts, beside the tunnel close
  *   closeMcpSessionsForGaii(agent.gaii);
  * @version-history
+ *   2026-11-08 — closeMcpSessionsForGaii also closes the principal's sessions on the node's other
+ *     processes (the mcpSessionsClose event), so agent delete, rekey and device re-approval reach them
+ *     at once (secaudit2026nov08b round 15b).
  *   2026-11-08 — closeMcpSessionsForAccount, called on every process for an erased account
  *     (accountErased; secaudit2026nov08b round 15, eraseOwner/mcp-sessions-not-closed).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10,
  *     mcp-oauth:access-token-without-session-survives-agent-delete).
  */
 import { logger } from '../utils/logger.js';
-import { onAccountErasedEvent } from '../services/event-bus.js';
+import { onAccountErasedEvent, onMcpSessionsCloseEvent, emitMcpSessionsClose, isRemoteEvent } from '../services/event-bus.js';
 
 /** One open MCP session: whose it is, and how to close it. */
 interface OpenSession {
@@ -55,12 +62,31 @@ export function forgetMcpSession(sessionId: string): void {
 }
 
 /**
- * Close every open MCP session of `principal` and answer how many there were. Best effort: a close
- * that throws is swallowed, because the caller is a route that has already ended the credential and
- * a socket that refuses to close must not fail that answer. The entry is dropped here as well as in
- * the transport's own onclose, so a failed close leaves nothing behind in this map either.
+ * Close every open MCP session of `principal`, on this process and on the node's other processes,
+ * and answer how many this process held. The sessions here close at once; the other processes hear
+ * the `mcpSessionsClose` event and close the ones they hold. With one process no other process hears
+ * it, and the close and the count are what they were.
+ *
+ * WHY. A session lives on the process that took its initialize, and a load balancer may send the
+ * delete, the rekey or the re-approval to another one: the session there stayed open until its
+ * client's next request was refused (auth/agent-alive.ts) or the idle sweep ended it
+ * (secaudit2026nov08b round 15b). The bus delivers at most once, so a lost event leaves that refusal
+ * on the next request as the bound.
  */
 export function closeMcpSessionsForGaii(principal: string): number {
+  const closed = closeHere(principal);
+  emitMcpSessionsClose(principal);
+  return closed;
+}
+
+/**
+ * Close the open MCP sessions of `principal` that this process holds, and tell nobody. Best effort:
+ * a close that throws is swallowed, because the caller is a route that has already ended the
+ * credential and a socket that refuses to close must not fail that answer. The entry is dropped here
+ * as well as in the transport's own onclose, so a failed close leaves nothing behind in this map
+ * either.
+ */
+function closeHere(principal: string): number {
   let closed = 0;
   for (const [id, session] of openSessions) {
     if (session.principal !== principal) continue;
@@ -90,10 +116,18 @@ export function closeMcpSessionsForAccount(ghii: string): number {
   const suffix = `#${ghii}`;
   let closed = 0;
   for (const { principal } of [...openSessions.values()]) {
-    if (principal === ghii || principal.endsWith(suffix)) closed += closeMcpSessionsForGaii(principal);
+    if (principal === ghii || principal.endsWith(suffix)) closed += closeHere(principal);
   }
   return closed;
 }
+
+// An agent's sessions closed on another process of the node: this process closes the ones it holds.
+// Its own events are skipped, because closeMcpSessionsForGaii closed this process's sessions first.
+onMcpSessionsCloseEvent((evt) => {
+  if (!isRemoteEvent(evt)) return;
+  const closed = closeHere(evt.principal);
+  if (closed) logger.info('MCP sessions closed on another process were closed here too', { principal: evt.principal, closed });
+});
 
 // An account erased on any process of the node: this process closes the sessions it holds for it.
 onAccountErasedEvent((evt) => {

@@ -11,7 +11,8 @@
  *   per-agent payloads are not broadcast to UI clients.
  * @structure emitChange/emitRecordChange/emitRecordChangePriorUnknown/onChangeEvent/offChangeEvent (change) +
  *   emitDelivery/onDeliveryEvent/offDeliveryEvent (delivery), and the task-moved, publicActivity,
- *   memoryWritten, rowsAppended, appChange, aiJobCancel, tunnelControl and accountErased channels;
+ *   memoryWritten, rowsAppended, appChange, aiJobCancel, tunnelControl, accountErased and
+ *   mcpSessionsClose channels;
  *   addBusTransport/emitRemote/isRemoteEvent (other processes).
  * @usage import { emitDelivery } from '../services/event-bus.js';
  * @version-history
@@ -55,6 +56,8 @@
  *   2026-11-08 — A tunnelControl `owner` decision carries `erased` when the account was erased, so its
  *     sockets are told "Account deleted"; the `accountErased` channel, which ends the erased account's
  *     open MCP sessions on every process (secaudit2026nov08b round 15).
+ *   2026-11-08 — The `mcpSessionsClose` channel: an agent deleted, rekeyed or approved again closes its
+ *     open MCP sessions on the node's other processes too (secaudit2026nov08b round 15b).
  */
 import { EventEmitter } from 'node:events';
 
@@ -74,7 +77,7 @@ bus.setMaxListeners(0); // unlimited — each SSE client adds a listener
 
 /** The channels of this bus. Every one of them reaches the node's other processes. */
 export type BusChannelName = 'change' | 'delivery' | 'task-moved' | 'publicActivity' | 'memoryWritten' | 'rowsAppended' | 'appChange'
-  | 'aiJobCancel' | 'tunnelControl' | 'accountErased';
+  | 'aiJobCancel' | 'tunnelControl' | 'accountErased' | 'mcpSessionsClose';
 
 /** What carries this process's events to the node's other processes (services/bus-relay.ts). Never throws. */
 export interface BusTransport { publish(channel: BusChannelName, evt: object): void }
@@ -510,4 +513,28 @@ export function onAccountErasedEvent(handler: (evt: AccountErasedEvent) => void)
 
 export function offAccountErasedEvent(handler: (evt: AccountErasedEvent) => void): void {
   bus.off('accountErased', handler);
+}
+
+// ── mcpSessionsClose ─────────────────────────────────────────────────────────────────────────────
+// One principal's open MCP sessions end: the agent was deleted, its key rotated, or it was approved
+// again with its other sessions ended (routes/agents/). The process that served the request closes
+// the sessions it holds before it tells this event (mcp/session-registry.ts closeMcpSessionsForGaii),
+// so the listener acts only on another process's event.
+
+export interface McpSessionsCloseEvent {
+  /** The principal whose sessions end: a full GAII, which names its node. */
+  principal: string;
+  timestamp: number;
+}
+
+export function emitMcpSessionsClose(principal: string): void {
+  fire('mcpSessionsClose', { principal, timestamp: Date.now() } satisfies McpSessionsCloseEvent);
+}
+
+export function onMcpSessionsCloseEvent(handler: (evt: McpSessionsCloseEvent) => void): void {
+  bus.on('mcpSessionsClose', handler);
+}
+
+export function offMcpSessionsCloseEvent(handler: (evt: McpSessionsCloseEvent) => void): void {
+  bus.off('mcpSessionsClose', handler);
 }
