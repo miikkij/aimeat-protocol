@@ -10,7 +10,10 @@
  *                           from the offer, marked with the agreement (`dspAgreement`, node-written).
  *                           The share is no wider than the offer: an open offer stood on the package
  *                           being public, so its share reads what a public reader reads (`publicOnly`);
- *                           a share offer keeps the version the share it stood on pins.
+ *                           a share offer keeps the version the share it stood on pins, and stands
+ *                           on that share (`sourceShare`): it is made only while that share is live,
+ *                           and reads only while it stays live (services/parties/shares.ts
+ *                           standingShares).
  *     exchange offer        an EXCHANGE contract: an entitlement on the listing's coordinate, prepaid
  *                           for what the compensate duty prices (a month of reads, or a block of
  *                           PER_READ_BLOCK reads), the share bound to it (`contract`), and the sale
@@ -30,6 +33,8 @@
  * @structure Materialised · AgreementSale · materialiseAgreement · bookAgreementSale · endAgreement
  * @usage const m = await materialiseAgreement(deps, negotiation); if (!m.ok) terminate(m.message);
  * @version-history
+ *   2026-11-08 — A share offer's agreement records the share it stood on and is made only while that
+ *     share is live (secaudit2026nov08 round 14).
  *   v1.1.0 — 2026-11-02 — The sale is booked once, when the agreement is made (bookAgreementSale), never
  *     for one that is not; ending one of several stacked priced agreements takes back only what it
  *     added (secaudit2026nov02d round 13).
@@ -41,7 +46,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { grantConsent } from '../consent-write.js';
-import { endShares, setShareMeta, shareMetaOf, sharePatternOf } from '../parties/shares.js';
+import { endShares, isLiveShare, setShareMeta, shareMetaOf, sharePatternOf } from '../parties/shares.js';
 import { partyRefOf } from '../parties/contract.js';
 import { changeParty } from '../parties/store.js';
 import { UNCHANGED } from '../record-cas.js';
@@ -130,6 +135,13 @@ async function sharePin(storage: Storage, n: NegotiationRecord): Promise<string 
 export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Promise<Materialised> {
     const { storage, config } = deps;
     if (n.offerKind === 'tck' || !n.packageName || !n.agreementId) return { ok: true, value: null };
+    // A share offer stands on a live share: one the owner ended before the agreement makes nothing.
+    let sourceShare: string | undefined;
+    if (n.offerKind === 'share') {
+        const source = n.offerRef ? await storage.getConsent(n.offerRef) : null;
+        if (!source || !isLiveShare(source)) return { ok: false, code: 'OFFER_GONE', message: 'The share this offer stood on has ended.' };
+        sourceShare = source.id;
+    }
     const party = await ensureParticipantParty(storage, n.ownerGhii, n.participantId, `dsp:${n.providerPid}`);
     if (party === 'full') return { ok: false, code: 'QUOTA_EXCEEDED', message: 'The provider holds the most outside parties one account may.' };
     if (party === 'taken') return { ok: false, code: 'PARTY_EXISTS', message: 'The provider has another party under this participant\'s name.' };
@@ -173,6 +185,7 @@ export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Pr
     const publicOnly = n.offerKind === 'open';
     const share = await setShareMeta(storage, granted.value, {
         dspAgreement: n.agreementId, termsAcceptedAt: new Date().toISOString(), ...(contract ? { contract } : {}), ...(publicOnly ? { publicOnly: true } : {}),
+        ...(sourceShare ? { sourceShare } : {}),
     });
     if (!share && publicOnly) {
         // A share that does not say it reads what a public reader reads would be wider than the offer.

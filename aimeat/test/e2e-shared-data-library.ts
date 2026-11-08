@@ -19,6 +19,8 @@
  *   list is in the compliance report and an owner gets 403. Each fails on the code before WP11: the
  *   reaches, the view and shared_data did not exist.
  * @version-history
+ *   2026-11-08 — A share pinned to an earlier version: the party's row carries that version's facts
+ *     (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-02 — Initial (WP11).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=shared-data-library
@@ -216,8 +218,42 @@ await test('a withdrawn package leaves every list', async () => {
     assert(!own.names.includes(MEM), `A's own still lists it: ${JSON.stringify(own.names)}`);
 });
 
+// secaudit2026nov08 round 14 (datapackage:visible:party-listing-reader-omits-share-limits): the party's
+// row is built through the reader the read builds from the same share, so a share pinned to an earlier
+// version shows that version's facts, never the newest version's description, tables and row counts.
+const PIN = `sdlpin${stamp}`;
+await test('a share pinned to an earlier version: the party\'s row carries that version\'s facts, and the read serves that version', async () => {
+    const pub = (title: string, description: string, resources: unknown[]) => call('/v1/datapackages', {
+        token: A.token, body: { name: PIN, title, description, changes: title, visibility: 'private', resources },
+    });
+    const p1 = await pub('Pinned first', 'The first quarter.', [{ name: 'rows', rows: [{ id: 1 }, { id: 2 }] }]);
+    assert(p1.status === 201, `v1: ${show(p1)}`);
+    const v1 = String(p1.body.data.content_hash);
+    const party = await call('/v1/parties', { token: A.token, body: { name: 'pinned', kind: 'program' } });
+    assert(party.status === 201, `party: ${show(party)}`);
+    const key = String(party.body.data.key);
+    const share = await call('/v1/consent', { token: A.token, body: {
+        recipient: `party:${A.name}/pinned@${node}`, data_pattern: `datapkg:${PIN}`, purpose: 'The first quarter only', metadata: { pinned_version: v1 },
+    } });
+    assert(share.status === 201, `pinned share: ${show(share)}`);
+    const p2 = await pub('Pinned second', 'The second quarter.', [
+        { name: 'rows', rows: [{ id: 1, extra: 'x' }, { id: 2, extra: 'y' }, { id: 3, extra: 'z' }] },
+        { name: 'more', rows: [{ a: 1 }] },
+    ]);
+    assert(p2.status === 201 && p2.body.data.content_hash !== v1, `v2: ${show(p2)}`);
+    const bareHash = (h: unknown) => String(h ?? '').replace(/^sha256:/, '');
+    const l = await listed('party', { basic: `${A.name}/pinned:${key}` });
+    assert(l.r.status === 200 && l.names.length === 1 && l.names[0] === PIN, `the pinned party lists its one share: ${show(l.r)}`);
+    const row = l.r.body.data.packages[0].datapackage;
+    assert(bareHash(row.content_hash) === bareHash(v1), `the row names the pinned version: ${JSON.stringify(row)}`);
+    assert(row.tables === 1 && row.rows === 2 && row.title === 'Pinned first' && row.description === 'The first quarter.', `the row carries v1's facts: ${JSON.stringify(row)}`);
+    assert(!l.r.text.includes('The second quarter.') && !l.r.text.includes('Pinned second'), `no fact of v2 in the listing: ${show(l.r)}`);
+    const read = await call(`/v1/datapackages/${A.name}/${PIN}`, { basic: `${A.name}/pinned:${key}` });
+    assert(read.status === 200 && read.text.includes(bareHash(v1)), `the read through the same share serves v1: ${show(read)}`);
+});
+
 await test('cleanup', async () => {
-    for (const n of [PUB, ORG, PRIV]) await call(`/v1/datapackages/${A.name}/${n}`, { token: A.token, method: 'DELETE' });
+    for (const n of [PUB, ORG, PRIV, PIN]) await call(`/v1/datapackages/${A.name}/${n}`, { token: A.token, method: 'DELETE' });
     if (orgId) await call(`/v1/organisms/${orgId}`, { token: A.token, method: 'DELETE' });
 });
 
