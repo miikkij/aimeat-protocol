@@ -11,8 +11,13 @@
  *   - createGenesisSyncService(config, storage): returns { start, stop, syncNow } or null when disabled
  *   - fetchPeerCatalogue(peer): pulls a peer's cross-catalogue (SSRF-guarded)
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
+ *   - federableCatalogue(storage): the public federable CSMs and their actions, which the push sends
  *
  * @version-history
+ *   2026-11-08 — The catalogue push sends a federable CSM only when it is public, and the actions tied to
+ *     those (federableCatalogue), as the local cross-catalogue lists them; a private, members or organism
+ *     CSM marked federable was sent by name and listed publicly on the genesis peer (secaudit2026nov08b
+ *     round 15, push-lists-non-public-federable-csms).
  *   2026-10-31 — syncSubscribedMemory sends a record only when one of its owner's active federation
  *     consents covers its key (federationConsentCovers), as memory replication does, and obeys only the
  *     subscription record the operator's PUT wrote (its tag). A peer's catalogue entry is stored under
@@ -33,7 +38,7 @@
  */
 
 import type { AimeatConfig } from '../config.js';
-import type { Storage, GenesisPeerRecord } from '../storage/interface.js';
+import type { Storage, GenesisPeerRecord, CsmRecord, ActionRecord } from '../storage/interface.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
@@ -43,6 +48,7 @@ import { logger } from '../utils/logger.js';
 import { leaveToPeer } from './classification/egress.js';
 import { presentActionPricing } from './action-pacing.js';
 import { federationConsentCovers } from './memory-replication.js';
+import { csmMayReadAs } from './csm/readers.js';
 import {
   GENESIS_CACHE_TAG, GENESIS_SUBSCRIPTION_TAG, genesisPeerKey, genesisSubscriptionKey, isGenesisSubscriptionRecord,
 } from './genesis-memory-cache.js';
@@ -66,6 +72,25 @@ export interface GenesisSyncService {
   start(): NodeJS.Timeout;
   stop(): void;
   syncNow(): Promise<GenesisSyncResult>;
+}
+
+/**
+ * What the catalogue push sends a genesis peer: the CSMs marked federable that are public, and the
+ * actions tied to one of them (by category or a `csm:<name>` tag) or tagged `federate:`. The peer
+ * stores the push as public genesis entries and lists them to anyone, so a private, members or
+ * organism CSM stays out, as it does from the local cross-catalogue and the peer service summary
+ * (ruling 2 of 2026-11-07: a CSM the caller may not read answers as a missing one).
+ */
+export async function federableCatalogue(storage: Storage): Promise<{ csms: CsmRecord[]; actions: ActionRecord[] }> {
+  const csms: CsmRecord[] = [];
+  for (const c of await storage.listCsms()) if (c.federate === true && await csmMayReadAs(storage, c, null)) csms.push(c);
+  const actions = (await storage.listActions()).filter(action =>
+    csms.some(csm => {
+      const def = csm.definition as { service?: { type?: string } };
+      return action.category === def?.service?.type || action.tags.includes(`csm:${csm.name}`);
+    }) || action.tags.some(t => t.startsWith('federate:')),
+  );
+  return { csms, actions };
 }
 
 export function createGenesisSyncService(config: AimeatConfig, storage: Storage): GenesisSyncService | null {
@@ -131,16 +156,7 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
         return { success: false, error: `SSRF blocked: ${urlCheck.reason}` };
       }
 
-      const csms = await storage.listCsms();
-      const federableCsms = csms.filter(c => c.federate === true);
-
-      const allActions = await storage.listActions();
-      const federableActions = allActions.filter(action =>
-        federableCsms.some(csm => {
-          const def = csm.definition as { service?: { type?: string } };
-          return action.category === def?.service?.type || action.tags.includes(`csm:${csm.name}`);
-        }) || action.tags.some(t => t.startsWith('federate:')),
-      );
+      const { csms: federableCsms, actions: federableActions } = await federableCatalogue(storage);
 
       const catalogueHash = await computeCatalogueHash(storage);
 
