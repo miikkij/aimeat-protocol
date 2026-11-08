@@ -14,19 +14,27 @@
  *
  *   IT IS A LEAF ON PURPOSE, for the reason mcp/resource-events.ts is one: a route reaching the
  *   registry mcp/index.ts assembles would drag every tool group, and every service those import,
- *   into the route layer. This file imports the logger and nothing else of the node's own.
+ *   into the route layer. This file imports the logger and the event bus (services/event-bus.ts,
+ *   itself a leaf) and nothing else of the node's own.
+ *
+ *   AN ERASED ACCOUNT. services/owner-erasure.ts cannot import from src/mcp/ (the dependency rules
+ *   refuse a service that does), so it tells the `accountErased` event, which reaches every process
+ *   of the node, and this file closes the sessions each process holds for that account.
  * @structure noteMcpSession(sessionId, principal, close) · forgetMcpSession(sessionId) ·
- *   closeMcpSessionsForGaii(principal) → number
+ *   closeMcpSessionsForGaii(principal) → number · closeMcpSessionsForAccount(ghii) → number
  * @usage
  *   // mcp/index.ts, when a session is created and when it closes
  *   noteMcpSession(transport.sessionId, authenticatedGaii, () => transport.close());
  *   // routes/agents/management.ts, beside the tunnel close
  *   closeMcpSessionsForGaii(agent.gaii);
  * @version-history
+ *   2026-11-08 — closeMcpSessionsForAccount, called on every process for an erased account
+ *     (accountErased; secaudit2026nov08b round 15, eraseOwner/mcp-sessions-not-closed).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10,
  *     mcp-oauth:access-token-without-session-survives-agent-delete).
  */
 import { logger } from '../utils/logger.js';
+import { onAccountErasedEvent } from '../services/event-bus.js';
 
 /** One open MCP session: whose it is, and how to close it. */
 interface OpenSession {
@@ -67,3 +75,28 @@ export function closeMcpSessionsForGaii(principal: string): number {
   }
   return closed;
 }
+
+/**
+ * Close every open MCP session that acts for the account `ghii` (`alice@node`): its agents
+ * (`<agent>#alice@node`) and the account itself. Answers how many there were.
+ *
+ * WHY. Erasing an account releases its name, and a 2025-era session forwards notifications by the
+ * GAII string, which the next account of that name with an agent of the same name produces again;
+ * its task notifications reached the erased person's open GET stream until the idle sweep. The
+ * erasure tells every process (`accountErased`, below), and each closes the sessions it holds
+ * (secaudit2026nov08b round 15, eraseOwner/mcp-sessions-not-closed).
+ */
+export function closeMcpSessionsForAccount(ghii: string): number {
+  const suffix = `#${ghii}`;
+  let closed = 0;
+  for (const { principal } of [...openSessions.values()]) {
+    if (principal === ghii || principal.endsWith(suffix)) closed += closeMcpSessionsForGaii(principal);
+  }
+  return closed;
+}
+
+// An account erased on any process of the node: this process closes the sessions it holds for it.
+onAccountErasedEvent((evt) => {
+  const closed = closeMcpSessionsForAccount(`${evt.owner}@${evt.nodeId}`);
+  if (closed) logger.info('MCP sessions of an erased account were closed', { owner: evt.owner, closed });
+});

@@ -23,6 +23,10 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-08 — After the commit, the account's open MCP sessions are closed on every process
+ *     (accountErased; secaudit2026nov08b round 15, eraseOwner/mcp-sessions-not-closed).
+ *   2026-11-08 — After the commit, the account's live tunnel sockets are closed on every process, as
+ *     deactivation closes them (secaudit2026nov08b round 15, eraseOwner/tunnel-sockets-not-detached).
  *   2026-11-08 — Step code_invitation: the pending code key that provisioned the account is closed, so
  *     it does not act on the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-04 — The service_records step erases the person's service namespace (services/service-records.ts),
@@ -99,6 +103,8 @@ import { appendRequest, removeAppDocsOfOwner } from './compliance/docs.js';
 import { eraseNameBoundGrants } from './name-bound-grants-erasure.js';
 import { serviceNamespaceOf } from '../utils/service-namespace.js';
 import { isValidGHII } from '../utils/gaii.js';
+import { nodeContext } from './node-context.js';
+import { emitAccountErased } from './event-bus.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -478,6 +484,27 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     // 3. The per-identity cascade, agents, GHIIs and the owner record.
     await storage.deleteOwner(name);
   });
+
+  // 4. Live connections, as deactivation closes them (owner-lifecycle.ts). A tunnel socket verified
+  //    its bearer only at upgrade, and it stays keyed by a GAII the released name produces again: the
+  //    next account of the name with an agent of the same name had its deliveries pushed to the erased
+  //    person's connector. closeForOwner also tells the node's other processes. Outside the
+  //    transaction, after its commit: a socket close is not a storage write and cannot roll back
+  //    (secaudit2026nov08b round 15, eraseOwner/tunnel-sockets-not-detached).
+  try {
+    nodeContext().tunnel?.closeForOwner(name, 'erased');
+  } catch (err) {
+    logger.warn('eraseOwner: tunnel close failed', { owner: name, error: String(err) });
+  }
+  //    The open MCP sessions of the account's agents, on every process: a 2025-era session forwards
+  //    notifications by the GAII string the next account of the name produces again. A service does
+  //    not import src/mcp/, so the session registry hears the event (mcp/session-registry.ts;
+  //    secaudit2026nov08b round 15, eraseOwner/mcp-sessions-not-closed).
+  try {
+    emitAccountErased(nodeId, name);
+  } catch (err) {
+    logger.warn('eraseOwner: the MCP sessions of the erased account were not told to close', { owner: name, error: String(err) });
+  }
 
   // The erasure is a data subject request the node carried out (GDPR art. 17): it logs itself in the
   // node's request list, so the operator can show it was done and when (plan doc-mvlftkh9zmc9, C4.3).

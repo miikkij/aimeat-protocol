@@ -41,7 +41,7 @@
  *   v1.1.1 — 2026-11-08 — Several processes: the registries are read once after the first listen, so a
  *     change another process made while this one started is in force; publish counts its own new mark
  *     as read only when the mark before it was the one read here (secaudit2026nov08b round 15,
- *     bus-relay.ts:resync/first-mark-taken-without-read).
+ *     bus-relay.ts:resync/first-mark-taken-without-read). The accountErased channel (owner-erasure.ts).
  *   v1.1.0 — 2026-11-08 — Registry marks and the resync timer on a node with several processes, so a
  *     lost event cannot keep a removed peer or a closed opening in force (secaudit2026nov08 round 14,
  *     registry-reload/no-resync-after-lost-notify); the aiJobCancel and tunnelControl channels.
@@ -69,7 +69,7 @@ const PART_TTL_MS = 30_000;
 /** At most this many cut messages are joined at once. */
 const MAX_JOINING = 256;
 
-const CHANNELS: ReadonlySet<string> = new Set<BusChannelName>(['change', 'delivery', 'task-moved', 'publicActivity', 'memoryWritten', 'rowsAppended', 'appChange', 'aiJobCancel', 'tunnelControl']);
+const CHANNELS: ReadonlySet<string> = new Set<BusChannelName>(['change', 'delivery', 'task-moved', 'publicActivity', 'memoryWritten', 'rowsAppended', 'appChange', 'aiJobCancel', 'tunnelControl', 'accountErased']);
 
 /** How often a process with several siblings compares the registries' stored marks with what it read (resync). */
 export const REGISTRY_RESYNC_MS = 30_000;

@@ -42,7 +42,7 @@ export type { TunnelControl };
 export interface TunnelControlTarget {
   revokeTokenIdHere(tokenId: string): void;
   closeForGaiiHere(gaii: string, reason: 'moved' | 'deleted' | 'rekeyed'): void;
-  closeForOwnerHere(owner: string): void;
+  closeForOwnerHere(owner: string, why?: 'deactivated' | 'erased'): void;
   setStoppedHere(gaii: string, stopped: boolean): void;
   notifyScopesChangedHere(gaii: string): void;
 }
@@ -56,7 +56,7 @@ function apply(target: TunnelControlTarget, evt: TunnelControlEvent): void {
   switch (evt.op) {
     case 'token': target.revokeTokenIdHere(evt.tokenId); return;
     case 'gaii': target.closeForGaiiHere(evt.gaii, evt.reason); return;
-    case 'owner': target.closeForOwnerHere(evt.owner); return;
+    case 'owner': target.closeForOwnerHere(evt.owner, evt.erased ? 'erased' : 'deactivated'); return;
     case 'stopped': target.setStoppedHere(evt.gaii, evt.stopped); return;
     case 'scopes': target.notifyScopesChangedHere(evt.gaii); return;
   }

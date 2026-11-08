@@ -143,7 +143,7 @@ export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
-import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason } from './connect-tunnel-revocation.js';
+import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason, type OwnerCutWhy } from './connect-tunnel-revocation.js';
 import { tellOtherProcesses, listenToOtherProcesses, type TunnelControlTarget } from './connect-tunnel/cross-process.js';
 import { recheckHeldIdentities, HELD_IDENTITY_RECHECK_MS } from './connect-tunnel/recheck.js';
 import { singleProcess } from './process-lease.js';
@@ -709,8 +709,9 @@ export class ConnectTunnelManager implements TunnelControlTarget {
   closeForGaiiHere(gaii: string, reason: GaiiCutReason): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
 
   /** Deactivating an account: every principal acting for that owner. */
-  closeForOwner(owner: string): void { this.closeForOwnerHere(owner); tellOtherProcesses(this.config.nodeId, { op: 'owner', owner }); }
-  closeForOwnerHere(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }
+  /** Erasing an account closes them the same way (owner-erasure.ts); `why` only changes the message. */
+  closeForOwner(owner: string, why: OwnerCutWhy = 'deactivated'): void { this.closeForOwnerHere(owner, why); tellOtherProcesses(this.config.nodeId, { op: 'owner', owner, ...(why === 'erased' ? { erased: true } : {}) }); }
+  closeForOwnerHere(owner: string, why: OwnerCutWhy = 'deactivated'): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner, why); }
 
   /** A permission change told to one live identity WITHOUT detaching it. Body in
    *  ./connect-tunnel-push.ts, beside the other server→client pushes — it closes nothing, which is

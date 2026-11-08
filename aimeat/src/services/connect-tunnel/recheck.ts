@@ -19,7 +19,10 @@
  *   WHAT IS ASKED. Per held identity, the question every request asks (auth/credential-revoked.ts
  *   credentialRevoked: token revoked, session ended, agent deleted or rekeyed, account erased or
  *   deactivated, app gone); a revoked one is told `auth_revoked` and detached, as a revocation
- *   event would do. For an agent, its record's stop flag; a change is applied as a stop or start
+ *   event would do. A token revoked by itself is answered through the revocation cache of
+ *   auth/jwt.ts (60 s), so for that one case the bound is that much longer; an ended session, a
+ *   deleted or rekeyed agent and an erased or deactivated account are read from storage each round.
+ *   For an agent, its record's stop flag; a change is applied as a stop or start
  *   event would apply it. A credential that still holds is left as it is, so a valid connector sees
  *   no difference. With one process per node (the default) no timer runs.
  * @structure HELD_IDENTITY_RECHECK_MS · HeldIdentity · RecheckTarget · recheckHeldIdentities(storage, held, target)

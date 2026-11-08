@@ -27,6 +27,8 @@
  *   import { revokeByGaii } from './connect-tunnel-revocation.js';
  *   revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii);
  * @version-history
+ *   2026-11-08 — revokeByOwner takes why: an erased account's sockets are told "Account deleted"
+ *     (owner-erasure.ts; secaudit2026nov08b round 15).
  *   2026-11-08 — revokeByTokenId: revokeByToken by the token's id, which another process of the node
  *     is told (secaudit2026nov08 round 14).
  *   2026-10-16 — revokeByGaii takes 'rekeyed': an agent whose key was rotated loses its socket, with no reason on the frame, so its connector reports it refused and keeps it (QA audit F03b-01).
@@ -139,13 +141,16 @@ export function revokeByGaii(connections: Map<string, Closable>, send: Send, det
  * (owner-lifecycle.ts) revokes session rows, but a tunnel verified its bearer only at upgrade,
  * so without this the deactivated owner's agents keep receiving pushes until their own exp.
  * Matched on the verified token's `owner` claim, which is the bare owner name on every
- * principal family this tunnel accepts (agents and ecosystem apps).
+ * principal family this tunnel accepts (agents and ecosystem apps). Erasing an account
+ * (owner-erasure.ts) closes them the same way; only the message differs, and neither sends a reason.
  */
-export function revokeByOwner(connections: Map<string, Closable>, send: Send, detach: Detach, owner: string): void {
+export type OwnerCutWhy = 'deactivated' | 'erased';
+
+export function revokeByOwner(connections: Map<string, Closable>, send: Send, detach: Detach, owner: string, why: OwnerCutWhy = 'deactivated'): void {
   // Snapshot first: detach deletes from the very map this walks, and a shared socket means several
   // of this owner's identities are in it at once.
   for (const conn of [...connections.values()]) {
     if (conn.identity.owner !== owner) continue;
-    cut(send, detach, conn, 'Account deactivated', 'closeForOwner');
+    cut(send, detach, conn, why === 'erased' ? 'Account deleted' : 'Account deactivated', 'closeForOwner');
   }
 }
