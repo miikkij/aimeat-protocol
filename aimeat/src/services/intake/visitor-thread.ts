@@ -15,12 +15,17 @@
  *   const cfg = await readThreadForm(storage, nodeId, org, ws, formId);   // null: unknown, off, or an ordinary form
  *   const opened = await visitorThread(storage, nodeId, { org, ws, formId }, token);   // null: no conversation opens
  * @version-history
+ *   v1.1.0 — 2026-11-08 — readThreadForm takes the form's owner from the identity that stored the config
+ *     record, so a conversation form writes its thread and signal records as that identity, not as an
+ *     account the config value names (./form-owner.ts; secaudit2026nov08b round 15,
+ *     routes/organisms/intake:form-config-ownerGhii-trusted-from-stored-value).
  *   v1.0.0 — 2026-11-05 — Moved out of routes/organisms/intake-thread.ts unchanged (codebase analysis
  *     2026-11-03, decision 2 of 2026-11-05).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { readWorkspaceMetaRecord } from '../workspace-meta-read.js';
 import { threadIdOf, type IntakeThreadConfig } from '../intake-thread.js';
+import { formConfigOfRecord } from './form-owner.js';
 
 /** The part of a form's stored config the conversation routes read (routes/organisms/intake.ts writes it). */
 export interface ThreadFormConfig {
@@ -33,7 +38,8 @@ export type ThreadForm = ThreadFormConfig & { thread: IntakeThreadConfig };
 
 /** A form that takes a conversation, or null: unknown, switched off, or an ordinary form. */
 export async function readThreadForm(storage: Storage, nodeId: string, org: string, ws: string, formId: string): Promise<ThreadForm | null> {
-  const cfg = (await readWorkspaceMetaRecord(storage, org, ws, `meta.intake.${formId}`, nodeId))?.value as ThreadFormConfig | undefined;
+  // The form's owner is the identity that stored the config record (./form-owner.ts).
+  const cfg = formConfigOfRecord<ThreadFormConfig>(await readWorkspaceMetaRecord(storage, org, ws, `meta.intake.${formId}`, nodeId));
   return cfg && cfg.enabled && cfg.thread ? cfg as ThreadForm : null;
 }
 

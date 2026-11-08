@@ -48,6 +48,11 @@
  *     owner's allowance, budget, the agent's cap, the app rules and the owner's own key apply; the
  *     read side keeps the caller's own identity (secaudit2026nov08 round 14,
  *     aimeat/notebook-ai/payer-is-caller-identity-not-owner).
+ *   v1.4.1 — 2026-11-08 — An app grant is named as its app on classify/plan/distribute (the credential's
+ *     `app` claim, as POST /v1/ai/complete takes it), so the owner's allowlist, per-app quota, policy
+ *     for apps and per-app model list apply and the use is booked under that app; it was planned as the
+ *     owner in person under the notebook feature id (secaudit2026nov08b round 15,
+ *     librarian:notebook-app-grant-planned-as-owner).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -62,7 +67,7 @@ import { denyScope403 } from '../auth/deny.js';
 import { librarianSearch } from '../services/librarian.js';
 import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
-import { aiCallerOfPrincipal, type AiCallerContext } from '../services/ai/caller-context.js';
+import { aiCallerFromCredential, type AiCallerContext } from '../services/ai/caller-context.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 import { planNote } from '../services/notebook-plan.js';
@@ -95,11 +100,14 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
 
   /**
    * Who pays for a notebook AI call and who asks: the owner GHII pays (caller-facts.ts
-   * payerOfPrincipal), and an agent or an outside app is named as the asker, as POST /v1/ai/complete
-   * does. The owner in person and an app grant (whose identity is the owner GHII) are the owner, as before.
+   * payerOfPrincipal), and an agent, an outside app or an app grant is named as the asker, from the
+   * credential as POST /v1/ai/complete does (routes/ai-policy.ts aiCallerOf). An app grant's identity
+   * is the owner GHII with its app beside it, so the principal alone planned it as the owner in person
+   * under the notebook feature id, outside the owner's rules for that app (secaudit2026nov08b round 15).
+   * The owner in person is the owner, as before.
    */
   function notebookPayer(req: Request): { gaii: string; who: AiCallerContext } {
-    return { gaii: callerOf(req, config.nodeId, storage).payer.payer, who: aiCallerOfPrincipal(resolveIdentity(req.auth!, config.nodeId)) };
+    return { gaii: callerOf(req, config.nodeId, storage).payer.payer, who: aiCallerFromCredential(req.auth!, resolveIdentity(req.auth!, config.nodeId)) };
   }
 
   // GET /v1/librarian/search — ranked full-text search across all of the caller's content.
