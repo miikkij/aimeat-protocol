@@ -51312,9 +51312,12 @@ paths:
         Same body shape and creator/admin gate as POST /v1/organisms/{id}/archive.
 
         Restored rows count toward their principals' memory limits again, so an unarchive asks the
-        limits a write asks: one that would take a principal past the node's memory key limit
+        limits a write asks of the account that unarchives: one that would take that account, in
+        person or through one of its agents, past the node's memory key limit
         (`memoryMaxKeysPerAgent`) or memory quota (`memoryQuotaMb`) answers 413 QUOTA_EXCEEDED naming
-        that setting, and nothing is brought back.
+        that setting, and nothing is brought back. Rows of other members come back without asking
+        their limits, and those members are not charged overage for them: a member cannot unarchive,
+        and the account that does cannot change another member's count.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -51337,7 +51340,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '413': { description: 'QUOTA_EXCEEDED. Bringing the content back would pass a principal''s memory key limit or memory quota; the message names the setting, and nothing is brought back.' }
+        '413': { description: 'QUOTA_EXCEEDED. Bringing the content back would pass the memory key limit or memory quota of the unarchiving account or one of its agents; the message names the setting, and nothing is brought back.' }
 
   /v1/organisms/{id}/revert:
     post:

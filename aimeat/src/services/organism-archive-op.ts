@@ -20,6 +20,10 @@
  *   const out = await organismArchiveOp({ storage, config }, caller, organismId, 'archive', body);
  *   if (!out.ok) render(out.status, out.code, out.message, out.details);
  * @version-history
+ *   2026-11-08 — An unarchive asks the memory limits of the unarchiving account only (in person and
+ *     through its agents); another member's key count no longer refuses it, and that member is not
+ *     charged overage for it (secaudit2026nov08b round 15, unarchive:other-principal-ceiling-refuses-
+ *     and-charges).
  *   2026-11-08 — An unarchive asks the memory key ceiling and byte quota of every principal it returns
  *     rows to, and is rolled back with a refusal that names the setting (secaudit2026nov08 round 14,
  *     services/memory-ceilings:count-returning-transitions-skip-ceiling).
@@ -33,6 +37,7 @@ import { archiveFenceTarget, fencedSpaceRefusal } from './fenced-space.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { isSameOwner } from '../utils/gaii.js';
 
 /** Who archives: the resolved principal, the account it acts for, and the session's roles and scopes. */
 export interface OrganismArchiveCaller {
@@ -94,9 +99,13 @@ export async function organismArchiveOp(
     } else {
       // An unarchive returns rows to their principals' key counts (and, on PostgreSQL, bytes), so it
       // asks the same limits a write asks, and is rolled back whole when it would pass one
-      // (secaudit2026nov08 round 14).
+      // (secaudit2026nov08 round 14). The limits asked are those of the unarchiving account, in person
+      // and through its agents: another member's rows come back without asking that member's count or
+      // charging that member overage, because the member cannot unarchive and the creator cannot change
+      // the member's count (secaudit2026nov08b round 15, other-principal-ceiling-refuses-and-charges).
       const target = v.target;
-      const kept = await flipWithinCeilings(deps, await archivedOwnersUnder(storage, target),
+      const own = (await archivedOwnersUnder(storage, target)).filter(o => isSameOwner(o, caller.principal));
+      const kept = await flipWithinCeilings(deps, own,
         () => unarchiveTarget(storage, target, caller.principal),
         { act: 'Bringing this back from the archive', stays: 'It stays archived.' });
       if (!kept.ok) return { ok: false, status: kept.refusal.status, code: kept.refusal.code, message: kept.refusal.message };
