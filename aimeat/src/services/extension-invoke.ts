@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-08 — One label trail per run, shared by ctx.workspace, ctx.files and ctx.datapackage, so a
+ *     package the run publishes keeps the labels of what it read (secaudit2026nov08b round 15).
  *   2026-11-08 — A named refusal answers EXTENSION_REFUSED with the script's code as `reason`, never
  *     the script's code as the response code (instruction audit re-check, round 2).
  *   2026-11-08 — A refusal the script names (`CODE: …`, not a platform code) keeps its code and a 4xx
@@ -74,6 +76,7 @@ import { executeExtensionAction } from './extension-runtime.js';
 import { emitChange } from './event-bus.js';
 import { makeExtensionFiles } from './extension-files.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
+import { makeLabelTrail } from './datapackage/label-trail.js';
 import { invokingActor } from './publish-actors.js';
 import { logger } from '../utils/logger.js';
 import { redactCredentialText } from '../utils/redact-credentials.js';
@@ -309,9 +312,12 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
     // The caller's organism workspace, as the caller, with the caller's own scopes deciding the
     // authority question the way requireScope would (services/extension-workspace.ts). Each consumer
     // gets its own copy of the lists, so nothing the script does to ctx.caller reaches them.
+    // One label trail for the run: what ctx.workspace, ctx.files and ctx.datapackage read, so a package
+    // the run publishes keeps those labels (services/datapackage/label-trail.ts).
+    const trail = makeLabelTrail({ storage, config });
     if (!bare) {
       wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
-        caller: { gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] } });
+        caller: { gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] }, trail });
     }
     const callerView: ExtensionCtx['caller'] = {
       gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles],
@@ -363,7 +369,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
       // A public file or package asks the node's publish gate about the caller, as the upload and
       // data package routes do (services/publish-actors.ts; secaudit 2026-10, v68 and v69).
       files: makeExtensionFiles({ config, storage, callerGaii: caller.gaii, callerOwner: caller.owner, callerRoles: [...caller.roles], callerScopes: [...caller.scopes], extName: ext.name,
-        publishers: [invokingActor(storage, config.nodeId, account)] }),
+        publishers: [invokingActor(storage, config.nodeId, account)], trail }),
       // Data packages land in the OWNER's namespace whichever principal called, so one package has
       // one permanent address; `producedBy` still records the exact principal.
       datapackage: makeExtensionDataPackage({
@@ -373,6 +379,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
         // (services/datapackage/personal-guard.ts); it is not stored.
         producedBy: { gaii: caller.gaii, kind: producerKindOf(account.kind), ref: `${ext.name}/${action.id}`, extension: ext.name },
         publishers: [invokingActor(storage, config.nodeId, account)],
+        trail,
       }),
       // Background model calls are billed to the INSTALLER, read from the record, never the caller.
       ai: maybeExtensionAi({

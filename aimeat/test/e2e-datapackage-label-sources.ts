@@ -14,7 +14,7 @@
  *     R3  A second product whose datapackage source is the product of R1: C reads no row of it. Fails
  *         before round 15, where the derived version kept no label.
  *     R4  A product whose memory source is an hr-labelled organism record (a plain memory record the
- *         organism's members read): C reads no row of it.
+ *         organism's members read): C reads no row of it; C's own product over A's private record is 403.
  *     R5  An extension A calls reads the hr record and publishes it with ctx.datapackage.publish at the
  *         organism: C reads no row of that package.
  *     R6  The same extension run unattended (a data product's extension source) reads the row space,
@@ -75,6 +75,7 @@ const org = () => `organism:${orgId}`;
 const recordKey = (ns: string, id: string) => `organism.${orgId}.w.${ws}.${ns}.${id}`;
 const noteKey = (id: string) => `organism.${orgId}.notes.${id}`;
 const OWN_NOTE = `dlsnote.open${stamp}`;
+const PRIVATE_NOTE = `dlsnote.private${stamp}`;
 const records = (space: string) => ({ kind: 'records', organism_id: orgId, ws, space });
 const define = (token: string, name: string, sources: unknown[], visibility = org()) =>
     call('PUT', `/v1/dataproducts/${name}`, token, { visibility, sources });
@@ -173,8 +174,8 @@ await test('Setup: an organism with classification on, two labels, records, rows
     assert(opened.status === 200 || opened.status === 201, `open the workspace: ${show(opened)}`);
     // A plain organism record the organism's members read, labelled below; and A's own record at
     // the organism's audience, unlabelled.
-    for (const [key, note] of [[noteKey('hrnote'), HR], [OWN_NOTE, OPEN]] as const) {
-        const m = await call('POST', '/v1/memory', A.token, { key, value: { note }, visibility: org() });
+    for (const [key, note, visibility] of [[noteKey('hrnote'), HR, org()], [OWN_NOTE, OPEN, org()], [PRIVATE_NOTE, HR, 'private']] as const) {
+        const m = await call('POST', '/v1/memory', A.token, { key, value: { note }, visibility });
         assert(m.status === 200 || m.status === 201, `note ${key}: ${show(m)}`);
     }
     const manifest = JSON.stringify({
@@ -246,6 +247,10 @@ await test('R4. A product whose memory source is the hr-labelled organism record
     assert(!direct.text.includes(HR), `C reads the labelled record directly: ${show(direct)}`);
     await build(N('mem'), [{ kind: 'memory', key: noteKey('hrnote') }]);
     await keptFromC(N('mem'), HR);
+    // A memory source reads another account's record only where that account lets the maker read it:
+    // C's product over A's private record is refused.
+    const byC = await call('PUT', `/v1/dataproducts/${N('cmem')}`, C.token, { visibility: 'private', sources: [{ kind: 'memory', owner: A.name, key: PRIVATE_NOTE }] });
+    assert(byC.status === 403 && !byC.text.includes(HR), `C's product over A's private record: ${show(byC)}`);
 });
 
 await test('R5. An extension A calls reads the hr record and publishes it at the organism: C reads no row', async () => {

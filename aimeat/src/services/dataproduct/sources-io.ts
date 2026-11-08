@@ -20,6 +20,9 @@
  * @structure readExtensionSource · readFileSource · readDatapackageSource · typedFromStrings
  * @usage const src = await readFileSource(call, exporting);
  * @version-history
+ *   v1.2.1 — 2026-11-08 — An extension source carries the labels of what the run read (labelSources from
+ *     runExtensionActionAsSystem; secaudit2026nov08b round 15,
+ *     datapackage/ext-capability:publish-drops-label-source-of-run-reads).
  *   v1.2.0 — 2026-11-08 — A datapackage source carries the version's label source and its file's label,
  *     and a file source its file's label, so a derived product keeps the readers of what it copied
  *     (secaudit2026nov08b round 15, dataproduct/sources-io:derived-product-drops-upstream-version-label-source).
@@ -30,6 +33,7 @@
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.1).
  */
 import type { FieldType } from '../datapackage/contract.js';
+import type { ContentLabelTarget } from '../../storage/interface.js';
 import { runExtensionActionAsSystem } from '../extension-system-run.js';
 import { personalRowsFor } from '../datapackage/personal-guard.js';
 import { resolveFileRef } from '../file-refs.js';
@@ -55,6 +59,7 @@ export async function readExtensionSource(call: SourceCall): Promise<ResolvedSou
     const { deps, caller, spec } = call;
     needWord(call, 'ext:invoke');
     let result: unknown;
+    let labelSources: ContentLabelTarget[];
     try {
         const out = await runExtensionActionAsSystem(deps, {
             extensionName: spec.ext!, actionId: spec.action!, input: spec.input ?? {},
@@ -64,6 +69,8 @@ export async function readExtensionSource(call: SourceCall): Promise<ResolvedSou
             producerRef: `dataproducts.${call.productName}`,
         });
         result = out.result;
+        // What the run read: the rows of its answer keep those labels (datapackage/label-trail.ts).
+        labelSources = out.labelSources ?? [];
     } catch (err) {
         throw sourceError(spec, 'SOURCE_FAILED', (err as Error).message, 502);
     }
@@ -79,7 +86,7 @@ export async function readExtensionSource(call: SourceCall): Promise<ResolvedSou
     const personal = (await personalRowsFor(deps.storage, caller.ownerGhii, call.productName, { extension: spec.ext! })).length > 0;
     return {
         ...table, ...(rowSchema && !spec.columns ? { descriptions: descriptionsOfJson(rowSchema) } : {}),
-        personal: personal ? new Set(table.columns) : new Set(), audience: 'public', fetchedAt: now(),
+        personal: personal ? new Set(table.columns) : new Set(), audience: 'public', fetchedAt: now(), labelSources,
         provenance: { kind: 'extension', address: `ext:${spec.ext}/${spec.action}` },
     };
 }
