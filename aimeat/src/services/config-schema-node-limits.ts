@@ -9,6 +9,7 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
+ *   2026-11-08 — mcp.legacy_sessions_per_owner (secaudit2026nov08 round 14).
  *   2026-11-04 — storage.request_statement_ms (codebase analysis 2026-11-03, item C8),
  *     mcp.legacy_sessions_per_principal and mcp.legacy_sessions_total (item C5).
  *   2026-10-31 — schedules.max_per_owner, schedules.min_interval_seconds and realtime.rooms_per_owner
@@ -82,7 +83,10 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'mcpLegacySessionsPerPrincipal', dotPath: 'mcp.legacy_sessions_per_principal', envVar: 'AIMEAT_MCP_LEGACY_SESSIONS_PER_PRINCIPAL', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'The most open MCP sessions of the older (2025) protocol one AI or person keeps. A new session past it closes their least recently used one, and that client connects again by itself. 0 = no limit',
     range: '0-100000' },
+  { key: 'mcpLegacySessionsPerOwner', dotPath: 'mcp.legacy_sessions_per_owner', envVar: 'AIMEAT_MCP_LEGACY_SESSIONS_PER_OWNER', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most open MCP sessions of the older (2025) protocol one person and all of their AIs keep together. A new session past it closes their least recently used one, and that client connects again by itself. 0 = no limit',
+    range: '0-100000' },
   { key: 'mcpLegacySessionsTotal', dotPath: 'mcp.legacy_sessions_total', envVar: 'AIMEAT_MCP_LEGACY_SESSIONS_TOTAL', type: 'number', validate: wholeOrOff, immutable: false,
-    description: 'The most open MCP sessions of the older (2025) protocol on the whole node. Each holds its own copy of the tool list in memory. A new session past it closes the least recently used one, and that client connects again by itself. 0 = no limit',
+    description: 'The most open MCP sessions of the older (2025) protocol on the whole node. Each holds its own copy of the tool list in memory. A new session past it closes the least recently used session of the person holding the most sessions, and that client connects again by itself. 0 = no limit',
     range: '0-1000000' },
 ];
