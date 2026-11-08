@@ -2980,9 +2980,9 @@
     },
     "src/services/skill-seeds.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Seed fingerprint stamps."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Seed fingerprint stamps. 2026-11-08: also the node skill's own manifest, read only for its version number (system@{nodeId}, unreachable by any principal)."
     },
     "src/services/skills.ts": {
       "reads": {
