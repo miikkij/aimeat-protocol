@@ -780,6 +780,7 @@ def create_liaison_agent(
     verbose: bool = False,
     allow_delegation: bool = False,
     max_iter: int = 10,
+    agent_identity: str | None = None,
     **agent_kwargs: Any,
 ) -> Iterator[Agent]:
     """
@@ -840,6 +841,12 @@ def create_liaison_agent(
             caps agents built by THIS factory; a crew that attaches AIMEAT tools
             to its own agents via `liaison_tools()` sets max_iter on those
             agents itself.
+        agent_identity: The full identity `agent#owner@node` of `agent_name`,
+            when the caller knows it. The offers publish tool then picks its
+            credential by the identity, so a connector home where another
+            owner's agent carries the same name still publishes as this
+            agent; the memory key stays `agents.{agent_name}.offers`.
+            `run_crew_daemon` passes it. Left out, the bare name is used.
         **agent_kwargs: Any extra kwargs forwarded to crewai.Agent.
 
     Yields:
@@ -931,8 +938,10 @@ def create_liaison_agent(
         # Agent below), so offers_tools() will not raise.
         # The publish tool is bound to this liaison's agent: a daemon can serve several agents from
         # one home, and the agent name in a tool call is the model's (secaudit2026nov08 round 14).
+        # With the full identity known, the tool picks the credential by it (secaudit2026nov08b round 15).
         if include_offers_tools:
-            tools.extend(offers_tools(agent_name=agent_name))
+            same_agent = bool(agent_identity and agent_name and agent_identity.partition("#")[0] == agent_name)
+            tools.extend(offers_tools(agent_name=agent_identity if same_agent else agent_name))
 
         agent_args: dict[str, Any] = {
             "role": role,

@@ -31,6 +31,9 @@
  *   import { openInward } from './dialog-inward.js';
  *   openInward({ id, node, doc, graph, hooks, langs, base, onSave });
  * @version-history
+ *   v0.8.1 -- 2026-11-08 -- Each curl line's label says it is for macOS and Linux, and a closed fold
+ *     under it holds the same call for PowerShell and Command Prompt: the body to save as value.json
+ *     and a curl.exe line that reads it (secaudit2026nov08b round 15).
  *   v0.8.0 — 2026-11-07 — The memory road leads with the program road: a receiver made for this key
  *     on the owner's Receivers page, and the call a program sends through it. The call with the
  *     owner's own token stays below it, for the owner's own tools.
@@ -39,7 +42,7 @@
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
 import { kit } from './dom.js';
-import { say } from './hooks-words.js';
+import { say, fill } from './hooks-words.js';
 import { inwardShape } from './hooks-shapes.js';
 import { asRaw } from './sources-url.js';
 import { group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, headerEditor } from './dialog-parts.js';
@@ -49,6 +52,25 @@ function reading(value) {
   if (value == null) return '';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+/**
+ * The Windows form of one call, folded: the JSON body to save as value.json, and the curl.exe line
+ * that reads it in the same folder. Closed until the person opens it.
+ * @param {HTMLElement} host @param {{ file: string, body: string, curl: string }} call
+ * @param {(key: string) => string} words @param {() => string[]} langs
+ */
+function windowsBlock(host, call, words, langs) {
+  if (!call) return;
+  const fold = document.createElement('details');
+  fold.className = 'ak-living__copy';
+  const summary = document.createElement('summary');
+  summary.className = 'ak-living__copy-label';
+  summary.textContent = words('shell.windows');
+  fold.appendChild(summary);
+  copyBlock(fold, { label: fill(words('shell.windowsFile'), { file: call.file }), text: call.body, langs: langs });
+  copyBlock(fold, { label: words('shell.windowsRun'), text: call.curl, langs: langs });
+  host.appendChild(fold);
 }
 
 /**
@@ -171,12 +193,16 @@ export function openInward(spec) {
       receiverLink.textContent = words('inward.receiverMake');
       receiverLine.appendChild(receiverLink);
       keyRoad.body.appendChild(receiverLine);
+      // Each call twice: the line for sh, bash and zsh, and, folded under it, the same call for a
+      // Windows shell, whose line carries no live data (hooks-shapes.js windowsCall).
       copyBlock(keyRoad.body, {
-        label: words('inward.receiverCall'), text: shape.receiver.curl, langs: langs,
+        label: words('inward.receiverCall') + ' (' + words('shell.posix') + ')', text: shape.receiver.curl, langs: langs,
       });
+      windowsBlock(keyRoad.body, shape.receiver.windows, words, langs);
       copyBlock(keyRoad.body, {
-        label: words('inward.write'), text: shape.write.curl, langs: langs,
+        label: words('inward.write') + ' (' + words('shell.posix') + ')', text: shape.write.curl, langs: langs,
       });
+      windowsBlock(keyRoad.body, shape.write.windows, words, langs);
 
       // ── The agent road, always on the screen: it is the one most people will use ──
       copyBlock(host, { label: words('inward.agent'), text: shape.sentence, langs: langs });
