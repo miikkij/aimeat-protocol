@@ -24,6 +24,8 @@
  * @structure ReceiverContext · verifyReceiverRequest · WRONG_KEY_INCIDENT_AT
  * @usage const v = await verifyReceiverRequest(deps, req); if (!v.ok) res.status(v.status).json(...)
  * @version-history
+ *   v1.1.1 — 2026-11-08 — The refusal and incident messages say incoming webhook and API key; every
+ *     code stays (secaudit2026nov08b round 15b).
  *   v1.1.0 — 2026-11-08 — A deactivated account's receiver answers 403 ACCOUNT_DISABLED until the account
  *     is reactivated (secaudit2026nov08 round 14, owner-deactivation-not-asked).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -56,7 +58,7 @@ const OWNER_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 /** Compared when there is no receiver, so a missing one costs the same as a wrong key. */
 const NO_RECEIVER_HASH = hashPartyKey(`${RECEIVER_KEY_PREFIX}no-such-receiver`);
 
-const UNAUTHORIZED = 'This address takes the receiver\'s own key as "Authorization: Bearer aimeat_rcv_…". The key was missing, or it is not this receiver\'s key.';
+const UNAUTHORIZED = 'This address takes the incoming webhook\'s own API key as "Authorization: Bearer aimeat_rcv_…". The API key was missing, or it is not this webhook\'s API key.';
 
 // process-local: each process counts its own wrong keys for the incident; the owner's count is in storage.
 const wrongKeys = new Map<string, { start: number; count: number; reported: boolean }>();
@@ -72,7 +74,7 @@ function countWrongKey(deps: { storage: Storage; config: AimeatConfig }, ctx: { 
         const principal = receiverPrincipalOf(ctx.owner, ctx.name, deps.config.nodeId);
         void recordSecurityIncident(deps.storage, deps.config, {
             type: 'receiver_key', code: 'RECEIVER_WRONG_KEYS', actorGhii: principal, actorName: `${ctx.owner}/${ctx.name}`,
-            detail: `The receiver ${ctx.owner}/${ctx.name} was sent a wrong key ${w.count} times within an hour. Someone may be guessing, or a program still holds a key that was changed. The owner sees the count on the receiver's page; the operator can stop the receiver.`,
+            detail: `The incoming webhook ${ctx.owner}/${ctx.name} was sent a wrong API key ${w.count} times within an hour. Someone may be guessing, or a program still holds an API key that was changed. The owner sees the count on the webhook's page; the operator can stop the webhook.`,
             source: 'receiver',
         }).catch(err => logger.warn('receiver: the wrong-key incident could not be recorded', { error: String(err) }));
     }
@@ -99,7 +101,7 @@ export async function verifyReceiverRequest(
 ): Promise<{ ok: true; ctx: ReceiverContext } | Refusal> {
     const refuse = (status: number, code: string, message: string): Refusal => ({ ok: false, status, code, message });
     if (rq.keyInAddress) {
-        return refuse(400, 'KEY_IN_ADDRESS', 'A receiver key never travels in the address, where logs keep it. Send it as "Authorization: Bearer aimeat_rcv_…", and change this key now: it has been written down somewhere.');
+        return refuse(400, 'KEY_IN_ADDRESS', 'An incoming webhook\'s API key never travels in the address, where logs keep it. Send it as "Authorization: Bearer aimeat_rcv_…", and change this API key now: it has been written down somewhere.');
     }
     const header = rq.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
@@ -126,20 +128,20 @@ export async function verifyReceiverRequest(
         logDelivery(deps.storage, ownerGhii, name, { at: new Date(now).toISOString(), verb: rq.method ?? 'call', status, code, reason: message, bytes: 0 });
         return refuse(status, code, message);
     };
-    if (receiversModeOf(deps.config) === 'off') return logged(503, 'RECEIVERS_OFF', 'The operator of this node has switched receivers off. Nothing was written.');
+    if (receiversModeOf(deps.config) === 'off') return logged(503, 'RECEIVERS_OFF', 'The operator of this node has switched incoming webhooks off. Nothing was written.');
     // A deactivated account's receivers wait, as its schedules do: nothing is deleted, and the key
     // works again when the operator reactivates the account (services/account-deactivated.ts).
     const deactivated = await deactivatedSince(deps.storage, ownerGhii);
     if (deactivated) {
-        return logged(403, 'ACCOUNT_DISABLED', `The account this receiver writes for was deactivated on ${deactivated}. Nothing was written. The receiver works again when the operator of this node reactivates the account.`);
+        return logged(403, 'ACCOUNT_DISABLED', `The account this incoming webhook writes for was deactivated on ${deactivated}. Nothing was written. The webhook works again when the operator of this node reactivates the account.`);
     }
     const state = effectiveState(receiver, now);
     switch (state) {
         case 'active': break;
-        case 'paused': return logged(403, 'PAUSED', 'The owner has paused this receiver. Nothing was written.');
-        case 'stopped': return logged(403, 'STOPPED', 'The operator of this node has stopped this receiver. Nothing was written.');
-        case 'expired': return logged(403, 'EXPIRED', 'This receiver has passed its end date. The owner extends it on the receiver\'s page. Nothing was written.');
-        case 'awaiting_operator': return logged(403, 'NOT_APPROVED', 'This receiver waits for the operator of this node to approve it. Nothing was written.');
+        case 'paused': return logged(403, 'PAUSED', 'The owner has paused this incoming webhook. Nothing was written.');
+        case 'stopped': return logged(403, 'STOPPED', 'The operator of this node has stopped this incoming webhook. Nothing was written.');
+        case 'expired': return logged(403, 'EXPIRED', 'This incoming webhook has passed its end date. The owner extends it on the webhook\'s page. Nothing was written.');
+        case 'awaiting_operator': return logged(403, 'NOT_APPROVED', 'This incoming webhook waits for the operator of this node to approve it. Nothing was written.');
         default: return refuse(401, 'UNAUTHORIZED', UNAUTHORIZED);
     }
     return { ok: true, ctx: { ownerGhii, owner, name, principal: receiverPrincipalOf(owner, name, deps.config.nodeId), receiver } };

@@ -61,7 +61,7 @@
         "aimeat/src/services/receivers/verify.ts",
         "aimeat/src/services/receivers/policy.ts"
       ],
-      "digest": "sha256:e50c26a79cb482eef49b7fce"
+      "digest": "sha256:1cea539dc3c13169239d0361"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-02",
@@ -86,7 +86,7 @@
       "digest": "sha256:d614ef16d1670fe28cf7b8f7"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/config-posture.ts",
         "aimeat/src/middleware/cors.ts",
@@ -98,7 +98,7 @@
       "digest": "sha256:a9d9bdbfca78821daf30f9b3"
     },
     "08-threat-model.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "docs/security/threat-model.md",
         "aimeat/src/cli/connect/command-trust.ts"
@@ -154,7 +154,7 @@
         "aimeat/src/services/receivers/receive.ts",
         "aimeat/src/services/receivers/contract.ts"
       ],
-      "digest": "sha256:feddf1398ce6ea70c001a240"
+      "digest": "sha256:aabdb44d6088d2ccfe057188"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-04",
@@ -312,7 +312,7 @@
       "aimeat/src/services/two-step-setup.ts": "e8f73c13e7d1f680",
       "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c",
       "aimeat/src/services/place-agent-scopes.ts": "dfc05b718b9315bc",
-      "aimeat/src/services/receivers/verify.ts": "d931e93283b32a26",
+      "aimeat/src/services/receivers/verify.ts": "e16675f72802f2d5",
       "aimeat/src/services/receivers/policy.ts": "be9c20d1ec9ab8bb"
     },
     "05-data-protection.md": {
@@ -369,8 +369,8 @@
       "aimeat/src/services/mcp-client/personal-sign-in.ts": "fd79749d63cbfc91",
       "aimeat/src/services/mcp-client/capability-consent.ts": "0c5c747d1d1aafc7",
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "c79f3a0670fd31eb",
-      "aimeat/src/services/receivers/receive.ts": "eb48bc222c34b250",
-      "aimeat/src/services/receivers/contract.ts": "e0d05e6a43614044"
+      "aimeat/src/services/receivers/receive.ts": "23774d484171476e",
+      "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87"
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",

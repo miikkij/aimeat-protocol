@@ -12,6 +12,8 @@
  *   deleteReceiverRecord · listAllReceivers
  * @usage const r = await getReceiver(storage, 'alice@node', 'ruuvi');
  * @version-history
+ *   v1.0.1 — 2026-11-08 — The refusal messages say incoming webhook; every code stays
+ *     (secaudit2026nov08b round 15b).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -47,10 +49,10 @@ export async function getReceiver(storage: Storage, ownerGhii: string, name: str
 export async function createReceiverRecord(storage: Storage, ownerGhii: string, record: ReceiverRecord): Promise<void> {
     const existing = await listReceivers(storage, ownerGhii);
     if (existing.some(r => r.name === record.name)) {
-        throw new ReceiverError(409, 'NAME_TAKEN', `You already have a receiver called "${record.name}". Choose another name, or change that one.`);
+        throw new ReceiverError(409, 'NAME_TAKEN', `You already have an incoming webhook called "${record.name}". Choose another name, or change that one.`);
     }
     if (existing.length >= MAX_RECEIVERS) {
-        throw new ReceiverError(409, 'TOO_MANY', `An account holds at most ${MAX_RECEIVERS} receivers. Delete one you no longer use first.`);
+        throw new ReceiverError(409, 'TOO_MANY', `An account holds at most ${MAX_RECEIVERS} incoming webhooks. Delete one you no longer use first.`);
     }
     const ns = serviceNamespaceOf(ownerGhii);
     const at = new Date().toISOString();
@@ -59,7 +61,7 @@ export async function createReceiverRecord(storage: Storage, ownerGhii: string, 
         visibility: 'private', tags: ['receiver'], ttlHours: null, version: 1, createdAt: at, updatedAt: at,
     };
     if (!(await storage.createMemoryIfAbsent(row))) {
-        throw new ReceiverError(409, 'NAME_TAKEN', `You already have a receiver called "${record.name}". Choose another name, or change that one.`);
+        throw new ReceiverError(409, 'NAME_TAKEN', `You already have an incoming webhook called "${record.name}". Choose another name, or change that one.`);
     }
 }
 
@@ -80,7 +82,7 @@ export async function updateReceiver(
         },
         { tag: 'receiver' },
     );
-    if (missing || !out) throw new ReceiverError(404, 'NOT_FOUND', `You have no receiver called "${name}".`);
+    if (missing || !out) throw new ReceiverError(404, 'NOT_FOUND', `You have no incoming webhook called "${name}".`);
     return out;
 }
 

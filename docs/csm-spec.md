@@ -54,8 +54,8 @@ The node keeps these beside the YAML; none of them is a key of the YAML itself
   `schema_hash`, the sha256 of its stable JSON (object keys sorted), so a program
   can tell whether the shape changed.
 - **In use.** While the registering account itself uses a CSM (its own
-  receivers), `DELETE` answers 409 `IN_USE` and names those uses. Another
-  account's receiver does not stop the delete: it keeps checking messages
+  incoming webhooks), `DELETE` answers 409 `IN_USE` and names those uses. Another
+  account's incoming webhook does not stop the delete: it keeps checking messages
   against the copy of the schema it holds, and its owner gets a notice that the
   CSM was removed (developer ruling of 2026-11-08).
 - **The registering account.** The account that registered a CSM writes it. A

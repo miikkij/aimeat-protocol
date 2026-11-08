@@ -23,6 +23,8 @@
  *   const kept = await receiversMadeBy(storage, ownerGhii, agent.gaii);     // before the delete
  *   await noticeReceiversKept(storage, ownerGhii, agent.name, kept);         // after it
  * @version-history
+ *   v1.1.1 — 2026-11-08 — The notices' English words say incoming webhook and API key; the notice
+ *     types and i18n keys stay (secaudit2026nov08b round 15b).
  *   v1.1.0 — 2026-11-08 — Receivers whose working key the removed principal was answered are listed
  *     (`why: 'key'`) with a notice of their own (secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14, maker-lifecycle-not-surfaced).
@@ -77,8 +79,8 @@ export async function noticeReceiversKept(storage: Storage, ownerGhii: string, l
         const names = namesOf(made);
         await notify(storage, ownerGhii, {
             type: 'receivers_kept_after_maker',
-            title: `${label} is removed, and the receivers it made keep working`,
-            body: `${label} made ${made.length} receiver(s): ${names}. They are yours, so they keep working: a program that holds a receiver's key still writes into your data. If you do not know that program, pause or delete the receiver on the Receivers page.`,
+            title: `${label} is removed, and the incoming webhooks it made keep working`,
+            body: `${label} made ${made.length} incoming webhook(s): ${names}. They are yours, so they keep working: a program that holds a webhook's API key still writes into your data. If you do not know that program, pause or delete the webhook on the Incoming webhooks page.`,
             link: '/v1/profile?tab=receivers',
             i18n: { key: 'receivers_kept_after_maker', vars: { maker: label, count: made.length, names } },
         }).catch(failed);
@@ -87,8 +89,8 @@ export async function noticeReceiversKept(storage: Storage, ownerGhii: string, l
         const names = namesOf(held);
         await notify(storage, ownerGhii, {
             type: 'receivers_key_kept_after_holder',
-            title: `${label} is removed, and the receivers whose key it changed keep working`,
-            body: `${label} changed the key of ${held.length} receiver(s) and got the new key: ${names}. They are yours, so they keep working: a program that holds a receiver's key still writes into your data. If you do not know that program, change the key or pause the receiver on the Receivers page.`,
+            title: `${label} is removed, and the incoming webhooks whose API key it changed keep working`,
+            body: `${label} changed the API key of ${held.length} incoming webhook(s) and got the new API key: ${names}. They are yours, so they keep working: a program that holds a webhook's API key still writes into your data. If you do not know that program, change the API key or pause the webhook on the Incoming webhooks page.`,
             link: '/v1/profile?tab=receivers',
             i18n: { key: 'receivers_key_kept_after_holder', vars: { maker: label, count: held.length, names } },
         }).catch(failed);

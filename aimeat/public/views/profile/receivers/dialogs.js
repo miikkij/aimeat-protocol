@@ -13,6 +13,8 @@
  *   keyDialog · keyOnce · dryRunBlock · extendDialog
  * @usage ${renderDialogs(ctx)} after the page
  * @version-history
+ *   v1.1.1 — 2026-11-08 — The English sentence for one's AI says API key; it stays English, as the
+ *     key.aiHint line tells the reader (secaudit2026nov08b round 15b).
  *   v1.1.0 — 2026-11-08 — The form's "What it takes" choice has the question mark that explains a
  *     data description (concept.data_description).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -227,7 +229,7 @@ function keyDialog(ctx, d) {
 function keyOnce(ctx, d) {
   const r = d.receiver;
   const curl = curlFor(r);
-  const forAi = `${d.say || ''} The key is in the secret AIMEAT_RECEIVER_KEY.`.trim();
+  const forAi = `${d.say || ''} The API key is in the secret AIMEAT_RECEIVER_KEY.`.trim();
   return html`
     <${Stack} gap="large">
       <${Box} tone="raised" name=${x('key.onceTitle')}>

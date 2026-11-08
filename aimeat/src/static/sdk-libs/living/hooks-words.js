@@ -19,6 +19,8 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.8.2 -- 2026-11-08 -- The program road says incoming webhook and API key where it said receiver
+ *     and receiver key; the outgoing hook's refusal says recipient (secaudit2026nov08b round 15b).
  *   v0.8.1 -- 2026-11-08 -- The words that name the shell a curl line is for (shell.*), and the two
  *     steps of the Windows form (secaudit2026nov08b round 15).
  *   v0.8.0 — 2026-11-07 — The words of the program road (inward.receiverWhy, inward.receiverMake,
@@ -49,9 +51,9 @@ export const WORDS = {
     'inward.expected': 'Näin vastauksen pitää näyttää',
     'inward.testRead': 'Kokeile lukemista',
     'inward.write': 'Kirjoita arvo omalla tunnuksellasi',
-    'inward.receiverWhy': 'Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon vastaanottimen kautta. Vastaanottimen avain kirjoittaa vain tähän avaimeen.',
-    'inward.receiverMake': 'Tee vastaanotin tälle arvolle',
-    'inward.receiverCall': 'Ohjelman kutsu vastaanottimeen',
+    'inward.receiverWhy': 'Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon saapuvan webhookin kautta. Webhookin API-avain kirjoittaa vain tähän muistiavaimeen.',
+    'inward.receiverMake': 'Tee saapuva webhook tälle arvolle',
+    'inward.receiverCall': 'Ohjelman kutsu saapuvaan webhookiin',
     'shell.posix': 'macOS ja Linux',
     'shell.windows': 'Windowsissa: PowerShell tai komentokehote',
     'shell.windowsFile': 'Tallenna tämä tiedostoon {file}',
@@ -119,9 +121,9 @@ export const WORDS = {
     'inward.expected': 'This is the shape the answer must have',
     'inward.testRead': 'Test read',
     'inward.write': 'Write the value with your own sign-in',
-    'inward.receiverWhy': 'A program, such as a sensor or a cloud function, writes the value through a receiver. The receiver\'s key writes into this key only.',
-    'inward.receiverMake': 'Make a receiver for this value',
-    'inward.receiverCall': 'The program\'s call to the receiver',
+    'inward.receiverWhy': 'A program, such as a sensor or a cloud function, writes the value through an incoming webhook. The webhook\'s API key writes into this memory key only.',
+    'inward.receiverMake': 'Make an incoming webhook for this value',
+    'inward.receiverCall': 'The program\'s call to the incoming webhook',
     'shell.posix': 'macOS and Linux',
     'shell.windows': 'On Windows: PowerShell or Command Prompt',
     'shell.windowsFile': 'Save this as {file}',
@@ -167,7 +169,7 @@ export const WORDS = {
     'refusal.ALLOWLIST_REFUSED': 'This address is not one this node is allowed to call.',
     'refusal.RATE_LIMITED': 'Too many calls have been made this minute.',
     'refusal.PAYLOAD_TOO_LARGE': 'The message is too big to send.',
-    'refusal.UPSTREAM_FAILED': 'The receiver did not answer.',
+    'refusal.UPSTREAM_FAILED': 'The recipient did not answer.',
     'refusal.NO_EXTENSION': 'This node\'s living-hooks extension did not answer.',
     'refusal.UNKNOWN': 'The call did not go through.',
     'sentence.write': 'Write into AIMEAT memory, under the key {key}, the value {sample}. The document "{title}" reads it from there.',

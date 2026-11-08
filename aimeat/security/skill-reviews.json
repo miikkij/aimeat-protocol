@@ -247,12 +247,12 @@
       "digest": "sha256:e5bb7af9f5f88e3f4098b88f"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-11-07",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/services/ai/provenance-input.ts",
         "aimeat/src/services/ai/provenance.ts"
       ],
-      "digest": "sha256:aa019797a3decc91a21ee743"
+      "digest": "sha256:5c7fea7dd0017128af1a94f9"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-11-05",
@@ -368,7 +368,7 @@
         "aimeat/src/services/receivers/manage.ts",
         "aimeat/src/tool-catalog/definitions/receivers.ts"
       ],
-      "digest": "sha256:7dd1ef283c4a5c7ac80b57cc"
+      "digest": "sha256:9db5b30b9b19e5f5cf51eff7"
     },
     "node:aimeat-agent-capability": {
       "reviewedOn": "2026-11-07",
@@ -645,7 +645,7 @@
     },
     "node:ai-transparency": {
       "aimeat/src/services/ai/provenance-input.ts": "16c4870673b47869",
-      "aimeat/src/services/ai/provenance.ts": "0061b362330ed1d0"
+      "aimeat/src/services/ai/provenance.ts": "68296bdb24b7667c"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
@@ -842,10 +842,10 @@
       "aimeat/src/services/ai/image.ts": "6d50752cd6532f76"
     },
     "node:aimeat-receivers": {
-      "aimeat/src/services/receivers/contract.ts": "e0d05e6a43614044",
-      "aimeat/src/services/receivers/receive.ts": "eb48bc222c34b250",
-      "aimeat/src/services/receivers/manage.ts": "da7ffccd299d68fc",
-      "aimeat/src/tool-catalog/definitions/receivers.ts": "4e4b7bbb567c7c72"
+      "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
+      "aimeat/src/services/receivers/receive.ts": "23774d484171476e",
+      "aimeat/src/services/receivers/manage.ts": "1ea16e7f680c543e",
+      "aimeat/src/tool-catalog/definitions/receivers.ts": "58f218873b049c7d"
     }
   }
 }

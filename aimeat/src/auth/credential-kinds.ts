@@ -15,6 +15,8 @@
  * @structure CREDENTIAL_KINDS · CredentialKind
  * @usage import { CREDENTIAL_KINDS, type CredentialKind } from './credential-kinds.js';
  * @version-history
+ *   v1.2.1 — 2026-11-08 — The 'receiver' kind's text says incoming webhook and API key; the kind keeps
+ *     its name (secaudit2026nov08b round 15b).
  *   v1.2.0 — 2026-11-07 — 'receiver': an outside program's key for one receiver of an owner
  *     (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.1.0 — 2026-11-05 — 'intake-visitor', 'docsign-wallet', 'party-optional', 'federation-peer',
@@ -88,10 +90,11 @@ export const CREDENTIAL_KINDS = {
         admitsNoCredential: false,
     },
     receiver: {
-        credential: 'An outside program writing through a receiver of an owner: Authorization: Bearer aimeat_rcv_… for the '
-            + 'route\'s :owner and :name, compared with the receiver\'s stored SHA-256 in constant time '
-            + '(services/receivers/verify.ts). No key, a wrong key and no such receiver are the same 401; a key in the '
-            + 'address is 400; a paused, stopped, expired or unapproved receiver 403; receivers switched off 503.',
+        credential: 'An outside program writing through an incoming webhook of an owner (the credential kind `receiver`): '
+            + 'its API key as Authorization: Bearer aimeat_rcv_… for the route\'s :owner and :name, compared with the '
+            + 'webhook\'s stored SHA-256 in constant time (services/receivers/verify.ts). No API key, a wrong API key and '
+            + 'no such webhook are the same 401; an API key in the address is 400; a paused, stopped, expired or '
+            + 'unapproved webhook 403; incoming webhooks switched off 503.',
         admitsNoCredential: false,
     },
     'package-claimant': {
