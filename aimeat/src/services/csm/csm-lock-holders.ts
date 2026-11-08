@@ -70,7 +70,7 @@ export const CSM_LOCK_HOLDERS_KEY = 'migrations.secaudit2026nov08b.csm-lock-hold
  */
 function reachedBy(all: CsmRecord[], keyPattern: string): { csms: CsmRecord[]; everyCsm: boolean } {
   const segments = keyPattern.slice('csm.'.length).split('.');
-  const firstWild = segments.findIndex(s => s.includes('*'));
+  const firstWild = segments.findIndex(s => /\*/.test(s));
   const literal = firstWild < 0 ? segments : segments.slice(0, firstWild);
   if (literal.length === 0) return { csms: all, everyCsm: true };
   const name = literal.join('.');

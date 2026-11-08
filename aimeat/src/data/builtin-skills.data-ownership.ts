@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-08 — Section 2: under a CSM the person may not read, the CSM's lock answers as no lock on a
+ *     copy, as on every memory write (secaudit2026nov08b round 15, routes/memory/bulk.ts and copy.ts).
  *   2026-11-08 — Sections 4 and 5: a restore and an unarchive answer QUOTA_EXCEEDED past the memory key
  *     limit or quota (secaudit2026nov08 round 14, services/memory-ceilings.ts flipWithinCeilings).
  *   2026-11-08 — Section 6: erasure closes the still-open access key that made the account
@@ -193,7 +195,9 @@ What an export leaves out, and why:
   \`POST /v1/memory/copy\` (an agent's call). It keeps the source's classification and never lowers it;
   for a record of a workspace or an organism that is the higher of its own and the workspace's or
   organism's classification.
-  A schema lock on the key holds for the copy too: a value that does not match is refused (422).
+  A schema lock on the key holds for the copy too: a value that does not match is refused (422). Under
+  the keys of a data description (CSM) the person may not read, its lock answers as no lock, as on
+  every memory write.
 
 ## 3. Who wrote this
 
