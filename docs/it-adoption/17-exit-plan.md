@@ -78,7 +78,7 @@ Once the node key and the process are gone, every token the node issued to peopl
 
 ### Erasing one account while the node runs
 
-`DELETE /v1/owners/:name` erases an account in one transaction: the person's and every agent's records and files, consents, memberships, sessions, keys, schedules, connections, attached servers, apps and extensions. It is immediate, with no grace window. What other people also hold (finished work, disputes, their ledger lines and receipts, AI provenance records) stays under a pseudonym `erased:<hash>` ([Data ownership](../data-ownership.md#6-a-person-can-leave), `aimeat/src/services/owner-erasure.ts`).
+`DELETE /v1/owners/:name` erases an account in one transaction: the person's and every agent's records and files, consents, memberships, sessions, keys, schedules, connections, attached servers, apps and extensions. It is immediate, with no grace window. What other people also hold (finished work, disputes, their ledger lines and receipts, AI provenance records, the structure locks the person or their agents set on keys other accounts write) stays under a pseudonym `erased:<hash>`, so whoever registers the released name next holds none of it ([Data ownership](../data-ownership.md#6-a-person-can-leave), `aimeat/src/services/owner-erasure.ts`).
 
 | Detail | What happens | Source |
 |---|---|---|

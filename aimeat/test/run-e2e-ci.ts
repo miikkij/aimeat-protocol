@@ -13,6 +13,7 @@
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
  *   2026-11-08 -- e2e-workspace-reserved-parts.ts joins the list (not the guard tier): the node-reserved parts of a workspace are no space of any manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
+ *   2026-11-08 -- e2e-schema-lock-holders.ts joins the list (not the guard tier): a CSM's lock belongs to its registering account, a wildcard lock does not outrank another account's deeper lock, a package's cortex asks the lock rule, and an erased account's locks do not pass to the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-07 -- e2e-csm.ts joins the list (not the guard tier): a new CSM's name gets the owner's prefix, its visibility filters every read, PUT keeps versions and refuses a stale one, the draft stores nothing, an agent needs csm:write (developer ruling 2026-11-07).
  *   2026-11-07 -- e2e-receivers.ts joins the list (not the guard tier): receivers, the address and key an outside program writes into one place of an owner's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-11-07 -- e2e-rows-schema.ts joins the list (not the guard tier): a row space's JSON Schema binds every writer, and only the creator or an admin changes it (developer ruling 2026-11-07).
@@ -1640,6 +1641,8 @@ const ALL_SUITES = [
     'test/e2e-ontology.ts',
     // Who may set a schema lock on which pattern; a delete or a cortex deactivation removes only its own row.
     'test/e2e-schema-lock-rule.ts',
+    // Who holds a lock: a CSM's, a wildcard over a deeper lock, a package's cortex, an erased account's.
+    'test/e2e-schema-lock-holders.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',

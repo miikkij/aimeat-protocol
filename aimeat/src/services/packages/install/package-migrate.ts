@@ -29,6 +29,9 @@
  *   import { applyInstanceMigration } from './package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   2026-11-08 — Each registration names the migrating caller (`lockCaller`), so a cortex's schema parts
+ *     ask the schema lock rule as that caller, the dry run before the delete included (secaudit2026nov08
+ *     round 14).
  *   v1.9.0 — 2026-10-31 — applyInstanceMigration answers 402 PURCHASE_REQUIRED for a package its author
  *     sells to accounts when the owner holds no paid purchase of it (sale/package-account-entitlement.ts).
  *   v1.8.0 — 2026-10-29 — With install role operator, a replaced, custom or new extension in an account
@@ -85,6 +88,7 @@ import { logger } from '../../../utils/logger.js';
 import { carryFirstUseKeep, keepsPreAuditFirstUse } from '../../extension-first-use-keep.js';
 import { purchaseRefusal } from '../sale/package-account-entitlement.js';
 import type { ExtensionCodeAwaiting } from './package-install.js';
+import { packageLockCaller } from './package-schema-lock.js';
 
 export const MIGRATION_ACTIONS = ['replace', 'skip', 'custom', 'install_new'] as const;
 export type MigrationAction = (typeof MIGRATION_ACTIONS)[number];
@@ -247,6 +251,8 @@ export async function applyInstanceMigration(
     const { storage, config } = deps;
     const { owner, ownerGhii } = caller;
     const { instanceId, targetVersion, actions } = input;
+    // Who migrates, for the schema lock rule on a cortex's schema parts (package-schema-lock.ts).
+    const lockCaller = await packageLockCaller(storage, caller);
 
     if (!targetVersion || typeof targetVersion !== 'string') {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'targetVersion is required' };
@@ -414,7 +420,7 @@ export async function applyInstanceMigration(
             packageTags: targetPkg.tags,
             packageDescription: targetPkg.description,
             meta: targetComp?.meta,
-            callerGaii: caller.sub,
+            callerGaii: caller.sub, lockCaller,
             urlRewrites,
             packageContext,
         });
@@ -497,7 +503,7 @@ export async function applyInstanceMigration(
                     packageTags: targetPkg.tags,
                     packageDescription: targetPkg.description,
                     meta: targetComp?.meta,
-                    callerGaii: caller.sub,
+                    callerGaii: caller.sub, lockCaller,
                     codeWriter: codeWriterOf(caller),
                     urlRewrites,
                     packageContext,
@@ -555,7 +561,7 @@ export async function applyInstanceMigration(
                     packageTags: targetPkg.tags,
                     packageDescription: targetPkg.description,
                     meta: targetComp.meta,
-                    callerGaii: caller.sub,
+                    callerGaii: caller.sub, lockCaller,
                     codeWriter: codeWriterOf(caller),
                     urlRewrites,
                     packageContext,

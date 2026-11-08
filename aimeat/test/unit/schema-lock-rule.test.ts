@@ -5,13 +5,15 @@
  * @description The pattern half of the schema lock rule (services/schema-lock-rule.ts) and the
  *   per-kind scope on editing and running a schedule (services/schedule-gate.ts), without a node.
  * @version-history
+ *   2026-11-08 — Cases for rule 4 over the keys a wildcard reaches (wildcardTakesOver) and rule 5, the
+ *     csm. family (secaudit2026nov08 round 14).
  *   2026-10-20 — The `extension` kind asks ext:invoke, so the "kind with no word" example is `core`,
  *     and a case covers ext:invoke on create, edit and run (secaudit 2026-10,
  *     SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke).
  *   2026-10-16 — Initial (QA audit S2-04, F05a-01, F08a-02).
  */
 import { describe, it, expect } from 'vitest';
-import { schemaPatternRefusal, schemaLockRefusal } from '../../src/services/schema-lock-rule.js';
+import { schemaPatternRefusal, schemaLockRefusal, wildcardTakesOver } from '../../src/services/schema-lock-rule.js';
 import { scheduleKindScopeRefusal } from '../../src/services/schedule-gate.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, SchemaRecord } from '../../src/storage/interface.js';
@@ -76,6 +78,54 @@ describe('schemaLockRefusal', () => {
         const deps = { storage: storageWith([row('notes', 'prefix', 'bob')]), config };
         expect(await schemaLockRefusal(deps, plain, 'notes', 'exact', async (who) => { asked.push(who); return true; })).toBeNull();
         expect(asked).toEqual(['bob']);
+    });
+});
+
+describe('wildcardTakesOver (rule 4 for the keys a wildcard reaches)', () => {
+    it.each([
+        ['recipes.*.*', 'recipes.italian'],
+        ['recipes.**', 'recipes.italian'],
+        ['csm.alice.**', 'csm.alice.weather'],
+        ['recipes.*.x', 'recipes.italian'],
+        ['chart:*', 'chart:sales'],
+        ['profile.*.*', 'profile.*.interests'],
+    ])('%s outranks the prefix lock %s on a key both reach', (pattern, other) => {
+        expect(wildcardTakesOver(pattern, { keyPattern: other, applyTo: 'prefix' })).toBe(true);
+    });
+    it.each([
+        ['recipes.*.*', 'notes.italian', 'prefix'],
+        ['recipes.*', 'recipes.*.x', 'prefix'],
+        ['recipes.*.*', 'recipes.italian', 'exact'],
+        ['recipes.*.*', 'recipes.*.*', 'prefix'],
+        ['recipes.italian', 'recipes.italian.x', 'prefix'],
+        ['chart:*', 'drawing:x', 'prefix'],
+    ] as const)('%s does not take over %s (%s)', (pattern, other, applyTo) => {
+        expect(wildcardTakesOver(pattern, { keyPattern: other, applyTo })).toBe(false);
+    });
+});
+
+describe('schemaLockRefusal: a wildcard over another account\'s deeper lock, and the csm. family', () => {
+    function withCsms(locks: SchemaRecord[], csms: Array<{ name: string; registeredBy: string }>): Storage {
+        return { ...storageWith(locks), async listSchemas() { return locks; }, async listCsms() { return csms; } } as unknown as Storage;
+    }
+    it('refuses a wildcard that outranks another account\'s two-segment lock, and admits it over the account\'s own', async () => {
+        const theirs = { storage: withCsms([row('recipes.italian', 'prefix', 'bob')], []), config };
+        expect((await schemaLockRefusal(theirs, plain, 'recipes.*.*', 'prefix', async () => false))?.code).toBe('SCHEMA_LOCKED_BY_OTHER');
+        const own = { storage: withCsms([row('recipes.italian', 'prefix', 'bot#alice@node-1')], []), config };
+        expect(await schemaLockRefusal(own, plain, 'recipes.*.*', 'prefix', async () => false)).toBeNull();
+        expect(await schemaLockRefusal(theirs, plain, 'recipes.*.*', 'prefix', async () => true)).toBeNull();
+    });
+    it('reserves csm.<name> to the registering account, and an unregistered name to the account it starts with', async () => {
+        const deps = { storage: withCsms([], [{ name: 'bob.sensor', registeredBy: 'bob' }, { name: 'legacy', registeredBy: 'alice' }]), config };
+        expect((await schemaPatternRefusal(deps, plain, 'csm.bob.sensor'))?.code).toBe('SCHEMA_PATTERN_NOT_YOURS');
+        expect((await schemaPatternRefusal(deps, plain, 'csm.bob.later'))?.code).toBe('SCHEMA_PATTERN_NOT_YOURS');
+        expect((await schemaPatternRefusal(deps, plain, 'csm.**'))?.code).toBe('SCHEMA_PATTERN_NOT_YOURS');
+        expect((await schemaPatternRefusal(deps, plain, 'csm'))?.code).toBe('SCHEMA_PATTERN_NOT_YOURS');
+        expect(await schemaPatternRefusal(deps, plain, 'csm.alice.later')).toBeNull();
+        expect(await schemaPatternRefusal(deps, plain, 'csm.legacy.detail')).toBeNull();
+        expect(await schemaPatternRefusal(deps, { ...plain, principal: 'bot#alice@node-1', roles: ['agent'] }, 'csm.alice.**')).toBeNull();
+        expect(await schemaPatternRefusal(deps, operator, 'csm.bob.sensor')).toBeNull();
+        expect(await schemaPatternRefusal(deps, plain, 'csmnotes.x')).toBeNull();
     });
 });
 
