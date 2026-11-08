@@ -23,6 +23,9 @@
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.2 -- 2026-11-08 -- Each road carries `windows`: the same call for Command Prompt and PowerShell,
+ *     with the JSON body as its own block (value.json) and a curl.exe line that reads it, so the line
+ *     holds no live data. The POSIX lines are unchanged (secaudit2026nov08b round 15).
  *   v0.7.1 — 2026-11-08 — The two copyable curl lines quote their JSON body for the shell: a single
  *     quote in the live value becomes '\'' inside the quoted argument, so the value stays one argument.
  *     A value without a single quote gives the same line as before (secaudit2026nov08 round 14).
@@ -77,6 +80,29 @@ function shellQuoted(text) {
   return "'" + String(text).replace(/'/g, "'\\''") + "'";
 }
 
+/** The file the Windows line reads its body from. */
+const WINDOWS_BODY_FILE = 'value.json';
+
+/**
+ * The same call for Command Prompt and PowerShell. Neither shell has a quoting that holds any text
+ * (cmd.exe toggles on every double quote and expands %NAME% inside quotes; PowerShell ends a single-
+ * quoted string at the POSIX '\'' form), so the line carries no live data at all: the JSON body is its
+ * own block, saved as value.json, and curl.exe reads it. `curl.exe`, because `curl` is a name for
+ * Invoke-WebRequest in Windows PowerShell 5.1. The address and the headers are double-quoted.
+ * @param {string} address @param {string} bearer @param {any} body
+ * @returns {{ file: string, body: string, curl: string }}
+ */
+function windowsCall(address, bearer, body) {
+  return {
+    file: WINDOWS_BODY_FILE,
+    body: JSON.stringify(body),
+    curl: 'curl.exe -X POST "' + address + '"'
+      + ' -H "Content-Type: application/json"'
+      + ' -H "Authorization: Bearer ' + bearer + '"'
+      + ' --data-binary "@' + WINDOWS_BODY_FILE + '"',
+  };
+}
+
 /** The program road of the inward dialog: where the owner makes the receiver, and the call a program sends. */
 function receiverRoad(base, key, doc, id, sample) {
   const name = receiverNameFor(doc, id);
@@ -90,6 +116,8 @@ function receiverRoad(base, key, doc, id, sample) {
       + ' -H "Content-Type: application/json"'
       + ' -H "Authorization: Bearer <the receiver key>"'
       + ' -d ' + shellQuoted(JSON.stringify({ value: sample })),
+    /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
+    windows: windowsCall(address, '<the receiver key>', { value: sample }),
   };
 }
 
@@ -150,6 +178,8 @@ export function inwardShape(ctx) {
         + ' -H "Content-Type: application/json"'
         + ' -H "Authorization: Bearer <your token>"'
         + ' -d ' + shellQuoted(JSON.stringify(body)),
+      /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
+      windows: windowsCall(base + '/v1/memory', '<your token>', body),
     },
     /**
      * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through

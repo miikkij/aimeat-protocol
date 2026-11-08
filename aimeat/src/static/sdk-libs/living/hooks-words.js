@@ -19,6 +19,8 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.8.1 -- 2026-11-08 -- The words that name the shell a curl line is for (shell.*), and the two
+ *     steps of the Windows form (secaudit2026nov08b round 15).
  *   v0.8.0 — 2026-11-07 — The words of the program road (inward.receiverWhy, inward.receiverMake,
  *     inward.receiverCall); the memory road's own call says it writes with one's own sign-in.
  *   v0.7.0 — 2026-09-06 — The words the header editor, the secret picker and the agent pick say,
@@ -50,6 +52,10 @@ export const WORDS = {
     'inward.receiverWhy': 'Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon vastaanottimen kautta. Vastaanottimen avain kirjoittaa vain tähän avaimeen.',
     'inward.receiverMake': 'Tee vastaanotin tälle arvolle',
     'inward.receiverCall': 'Ohjelman kutsu vastaanottimeen',
+    'shell.posix': 'macOS ja Linux',
+    'shell.windows': 'Windowsissa: PowerShell tai komentokehote',
+    'shell.windowsFile': 'Tallenna tämä tiedostoon {file}',
+    'shell.windowsRun': 'Aja sitten tämä komento samassa kansiossa',
     'inward.agent': 'Sano tämä omalle tekoälyllesi',
     'inward.range': 'Sallittu väli',
     'outward.title': 'Kun tämä muuttuu, kerro jollekin',
@@ -116,6 +122,10 @@ export const WORDS = {
     'inward.receiverWhy': 'A program, such as a sensor or a cloud function, writes the value through a receiver. The receiver\'s key writes into this key only.',
     'inward.receiverMake': 'Make a receiver for this value',
     'inward.receiverCall': 'The program\'s call to the receiver',
+    'shell.posix': 'macOS and Linux',
+    'shell.windows': 'On Windows: PowerShell or Command Prompt',
+    'shell.windowsFile': 'Save this as {file}',
+    'shell.windowsRun': 'Then run this command in the same folder',
     'inward.agent': 'Say this to your own AI',
     'inward.range': 'The range it accepts',
     'outward.title': 'When this changes, tell someone',

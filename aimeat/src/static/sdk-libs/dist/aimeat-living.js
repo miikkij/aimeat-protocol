@@ -3400,6 +3400,10 @@
       "inward.receiverWhy": "Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon vastaanottimen kautta. Vastaanottimen avain kirjoittaa vain tähän avaimeen.",
       "inward.receiverMake": "Tee vastaanotin tälle arvolle",
       "inward.receiverCall": "Ohjelman kutsu vastaanottimeen",
+      "shell.posix": "macOS ja Linux",
+      "shell.windows": "Windowsissa: PowerShell tai komentokehote",
+      "shell.windowsFile": "Tallenna tämä tiedostoon {file}",
+      "shell.windowsRun": "Aja sitten tämä komento samassa kansiossa",
       "inward.agent": "Sano tämä omalle tekoälyllesi",
       "inward.range": "Sallittu väli",
       "outward.title": "Kun tämä muuttuu, kerro jollekin",
@@ -3466,6 +3470,10 @@
       "inward.receiverWhy": "A program, such as a sensor or a cloud function, writes the value through a receiver. The receiver's key writes into this key only.",
       "inward.receiverMake": "Make a receiver for this value",
       "inward.receiverCall": "The program's call to the receiver",
+      "shell.posix": "macOS and Linux",
+      "shell.windows": "On Windows: PowerShell or Command Prompt",
+      "shell.windowsFile": "Save this as {file}",
+      "shell.windowsRun": "Then run this command in the same folder",
       "inward.agent": "Say this to your own AI",
       "inward.range": "The range it accepts",
       "outward.title": "When this changes, tell someone",
@@ -5362,6 +5370,14 @@
   function shellQuoted(text) {
     return "'" + String(text).replace(/'/g, "'\\''") + "'";
   }
+  var WINDOWS_BODY_FILE = "value.json";
+  function windowsCall(address, bearer, body) {
+    return {
+      file: WINDOWS_BODY_FILE,
+      body: JSON.stringify(body),
+      curl: 'curl.exe -X POST "' + address + '" -H "Content-Type: application/json" -H "Authorization: Bearer ' + bearer + '" --data-binary "@' + WINDOWS_BODY_FILE + '"'
+    };
+  }
   function receiverRoad(base, key, doc, id, sample) {
     const name = receiverNameFor(doc, id);
     const address = base + "/v1/receive/<owner>/" + name;
@@ -5370,7 +5386,9 @@
       key,
       settings: base + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
       address,
-      curl: "curl -X POST " + address + ' -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>" -d ' + shellQuoted(JSON.stringify({ value: sample }))
+      curl: "curl -X POST " + address + ' -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>" -d ' + shellQuoted(JSON.stringify({ value: sample })),
+      /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
+      windows: windowsCall(address, "<the receiver key>", { value: sample })
     };
   }
   function inwardShape(ctx) {
@@ -5413,7 +5431,9 @@
           headers: { "Content-Type": "application/json", Authorization: "Bearer <your token>" },
           body
         },
-        curl: "curl -X POST " + base + '/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d ' + shellQuoted(JSON.stringify(body))
+        curl: "curl -X POST " + base + '/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d ' + shellQuoted(JSON.stringify(body)),
+        /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
+        windows: windowsCall(base + "/v1/memory", "<your token>", body)
       },
       /**
        * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through
@@ -5780,6 +5800,18 @@
     if (typeof value2 === "object") return JSON.stringify(value2);
     return String(value2);
   }
+  function windowsBlock(host, call, words2, langs) {
+    if (!call) return;
+    const fold = document.createElement("details");
+    fold.className = "ak-living__copy";
+    const summary = document.createElement("summary");
+    summary.className = "ak-living__copy-label";
+    summary.textContent = words2("shell.windows");
+    fold.appendChild(summary);
+    copyBlock(fold, { label: fill(words2("shell.windowsFile"), { file: call.file }), text: call.body, langs });
+    copyBlock(fold, { label: words2("shell.windowsRun"), text: call.curl, langs });
+    host.appendChild(fold);
+  }
   function openInward(spec) {
     const langs = typeof spec.langs === "function" ? spec.langs : function() {
       return [];
@@ -5903,15 +5935,17 @@
         receiverLine.appendChild(receiverLink);
         keyRoad.body.appendChild(receiverLine);
         copyBlock(keyRoad.body, {
-          label: words2("inward.receiverCall"),
+          label: words2("inward.receiverCall") + " (" + words2("shell.posix") + ")",
           text: shape.receiver.curl,
           langs
         });
+        windowsBlock(keyRoad.body, shape.receiver.windows, words2, langs);
         copyBlock(keyRoad.body, {
-          label: words2("inward.write"),
+          label: words2("inward.write") + " (" + words2("shell.posix") + ")",
           text: shape.write.curl,
           langs
         });
+        windowsBlock(keyRoad.body, shape.write.windows, words2, langs);
         copyBlock(host, { label: words2("inward.agent"), text: shape.sentence, langs });
         if (shape.range) {
           const line = document.createElement("p");
