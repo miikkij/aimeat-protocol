@@ -11,7 +11,7 @@
  *   per-agent payloads are not broadcast to UI clients.
  * @structure emitChange/emitRecordChange/emitRecordChangePriorUnknown/onChangeEvent/offChangeEvent (change) +
  *   emitDelivery/onDeliveryEvent/offDeliveryEvent (delivery), and the task-moved, publicActivity,
- *   memoryWritten, rowsAppended, appChange, aiJobCancel and tunnelControl channels;
+ *   memoryWritten, rowsAppended, appChange, aiJobCancel, tunnelControl and accountErased channels;
  *   addBusTransport/emitRemote/isRemoteEvent (other processes).
  * @usage import { emitDelivery } from '../services/event-bus.js';
  * @version-history
@@ -52,6 +52,9 @@
  *   v1.11.0 — 2026-11-08 — The `aiJobCancel` and `tunnelControl` channels: a cancel of an AI job that
  *     another process runs, and a tunnel revocation, stop or permission change for a socket another
  *     process holds (secaudit2026nov08 round 14). Their listeners act only on another process's event.
+ *   2026-11-08 — A tunnelControl `owner` decision carries `erased` when the account was erased, so its
+ *     sockets are told "Account deleted"; the `accountErased` channel, which ends the erased account's
+ *     open MCP sessions on every process (secaudit2026nov08b round 15).
  */
 import { EventEmitter } from 'node:events';
 
@@ -71,7 +74,7 @@ bus.setMaxListeners(0); // unlimited — each SSE client adds a listener
 
 /** The channels of this bus. Every one of them reaches the node's other processes. */
 export type BusChannelName = 'change' | 'delivery' | 'task-moved' | 'publicActivity' | 'memoryWritten' | 'rowsAppended' | 'appChange'
-  | 'aiJobCancel' | 'tunnelControl';
+  | 'aiJobCancel' | 'tunnelControl' | 'accountErased';
 
 /** What carries this process's events to the node's other processes (services/bus-relay.ts). Never throws. */
 export interface BusTransport { publish(channel: BusChannelName, evt: object): void }
@@ -464,7 +467,7 @@ export function offAiJobCancelEvent(handler: (evt: AiJobCancelEvent) => void): v
 /** One decision about a tunnel identity. */
 export type TunnelControl =
   | { op: 'gaii'; gaii: string; reason: 'moved' | 'deleted' | 'rekeyed' }
-  | { op: 'owner'; owner: string }
+  | { op: 'owner'; owner: string; erased?: true }
   | { op: 'token'; tokenId: string }
   | { op: 'stopped'; gaii: string; stopped: boolean }
   | { op: 'scopes'; gaii: string };
@@ -481,4 +484,30 @@ export function onTunnelControlEvent(handler: (evt: TunnelControlEvent) => void)
 
 export function offTunnelControlEvent(handler: (evt: TunnelControlEvent) => void): void {
   bus.off('tunnelControl', handler);
+}
+
+// ── accountErased ────────────────────────────────────────────────────────────────────────────────
+// An account was erased (services/owner-erasure.ts), told after the erasure committed. A process ends
+// the live state it holds for the account that no storage write reaches: the open MCP sessions of its
+// agents (mcp/session-registry.ts). It reaches every process of the node, and each one acts on its
+// own sessions, so its listeners run for this process's events and for the others'.
+
+export interface AccountErasedEvent {
+  /** The node of the account: a process may serve more than one node in the multi-node suites. */
+  nodeId: string;
+  /** The bare account name, released for reuse by the erasure. */
+  owner: string;
+  timestamp: number;
+}
+
+export function emitAccountErased(nodeId: string, owner: string): void {
+  fire('accountErased', { nodeId, owner, timestamp: Date.now() } satisfies AccountErasedEvent);
+}
+
+export function onAccountErasedEvent(handler: (evt: AccountErasedEvent) => void): void {
+  bus.on('accountErased', handler);
+}
+
+export function offAccountErasedEvent(handler: (evt: AccountErasedEvent) => void): void {
+  bus.off('accountErased', handler);
 }

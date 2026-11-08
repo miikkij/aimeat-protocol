@@ -25,6 +25,9 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   2026-11-08 -- Several processes: the held identities are checked again every HELD_IDENTITY_RECHECK_MS, so a
+ *     revocation or a stop whose tunnelControl event was lost is in force here within that bound
+ *     (./connect-tunnel/recheck.ts; secaudit2026nov08b round 15).
  *   2026-11-08 -- A revocation (token, agent delete, move, rekey, account deactivation), an agent stop or start and a
  *     permission change made on one process reach the sockets the node's other processes hold
  *     (./connect-tunnel/cross-process.ts; secaudit2026nov08 round 14).
@@ -140,8 +143,10 @@ export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
-import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason } from './connect-tunnel-revocation.js';
+import { revokeByTokenId, revokeByGaii, revokeByOwner, type GaiiCutReason, type OwnerCutWhy } from './connect-tunnel-revocation.js';
 import { tellOtherProcesses, listenToOtherProcesses, type TunnelControlTarget } from './connect-tunnel/cross-process.js';
+import { recheckHeldIdentities, HELD_IDENTITY_RECHECK_MS } from './connect-tunnel/recheck.js';
+import { singleProcess } from './process-lease.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel-connection.js';
 import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel-hooks.js';
@@ -171,6 +176,9 @@ export class ConnectTunnelManager implements TunnelControlTarget {
   /** Per-identity in-flight cap and response-size cap — a shared wire needs what a private one did not. */
   private fairness: Fairness;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  /** Several processes: the timer that checks the held identities again (./connect-tunnel/recheck.ts). */
+  private recheckInterval: ReturnType<typeof setInterval> | null = null;
+  private rechecking = false;
   private readonly loopbackBase: string;
   /** Per-agent set of RECENT deliver ids the agent has acked (in-session dedup only, capped at
    *  ACK_DEDUP_WINDOW — see that constant for why the cap exists). */
@@ -701,8 +709,9 @@ export class ConnectTunnelManager implements TunnelControlTarget {
   closeForGaiiHere(gaii: string, reason: GaiiCutReason): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
 
   /** Deactivating an account: every principal acting for that owner. */
-  closeForOwner(owner: string): void { this.closeForOwnerHere(owner); tellOtherProcesses(this.config.nodeId, { op: 'owner', owner }); }
-  closeForOwnerHere(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }
+  /** Erasing an account closes them the same way (owner-erasure.ts); `why` only changes the message. */
+  closeForOwner(owner: string, why: OwnerCutWhy = 'deactivated'): void { this.closeForOwnerHere(owner, why); tellOtherProcesses(this.config.nodeId, { op: 'owner', owner, ...(why === 'erased' ? { erased: true } : {}) }); }
+  closeForOwnerHere(owner: string, why: OwnerCutWhy = 'deactivated'): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner, why); }
 
   /** A permission change told to one live identity WITHOUT detaching it. Body in
    *  ./connect-tunnel-push.ts, beside the other server→client pushes — it closes nothing, which is
@@ -790,6 +799,22 @@ export class ConnectTunnelManager implements TunnelControlTarget {
       this.stats.activeConnections = this.connections.size;
     }, checkInterval);
     logger.info('Connect tunnel heartbeat monitor started', { checkInterval, offlineThreshold });
+    // Several processes per node: a revocation or a stop told by a tunnelControl event that was lost
+    // is applied here within HELD_IDENTITY_RECHECK_MS (./connect-tunnel/recheck.ts). One process: no timer.
+    if (!singleProcess(this.config) && !this.recheckInterval) {
+      // process-local: each process checks the sockets it holds itself; the decisions are read from storage.
+      this.recheckInterval = setInterval(() => { void this.recheckHeld(); }, HELD_IDENTITY_RECHECK_MS);
+      this.recheckInterval.unref?.();
+    }
+  }
+
+  /** One round of ./connect-tunnel/recheck.ts over the identities this process holds; a round still running is not doubled. */
+  private async recheckHeld(): Promise<void> {
+    if (this.rechecking) return;
+    this.rechecking = true;
+    try {
+      await runAsNode(this.config.nodeId, () => recheckHeldIdentities(this.storage, [...this.connections.values()], this));
+    } finally { this.rechecking = false; }
   }
 
   async shutdown(): Promise<void> {
@@ -801,6 +826,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
+    if (this.recheckInterval) { clearInterval(this.recheckInterval); this.recheckInterval = null; }
     for (const [principal, conn] of this.connections) {
       try { conn.ws.close(1000, 'shutdown'); } catch (err) { logger.warn('shutdown: ignore', { error: String(err) }); }
       this.connections.delete(principal);

@@ -17,13 +17,16 @@
  *   of one process's events, so a delivery sent after the revocation reaches the other process after
  *   the socket was detached there. A token is named by its id (auth/jwt.ts tokenIdOf), never sent.
  *   With one process (SQLite, or one process on PostgreSQL) no other process hears it, and nothing
- *   changes.
+ *   changes. The bus delivers at most once, so an event can be lost: each process of a node with
+ *   several processes also checks the identities it holds every HELD_IDENTITY_RECHECK_MS
+ *   (./recheck.ts), which bounds how long a lost revocation or stop stays out of force there.
  * @structure TunnelControlTarget · TunnelControl · tellOtherProcesses(nodeId, control) ·
  *   listenToOtherProcesses(nodeId, target)
  * @usage
  *   tellOtherProcesses(config.nodeId, { op: 'gaii', gaii, reason });
  *   const stop = listenToOtherProcesses(config.nodeId, this);   // in the manager's constructor
  * @version-history
+ *   2026-11-08 -- The header names the bound for a lost event (./recheck.ts; secaudit2026nov08b round 15).
  *   v1.0.0 -- 2026-11-08 -- Initial (secaudit2026nov08 round 14).
  */
 import {
@@ -39,7 +42,7 @@ export type { TunnelControl };
 export interface TunnelControlTarget {
   revokeTokenIdHere(tokenId: string): void;
   closeForGaiiHere(gaii: string, reason: 'moved' | 'deleted' | 'rekeyed'): void;
-  closeForOwnerHere(owner: string): void;
+  closeForOwnerHere(owner: string, why?: 'deactivated' | 'erased'): void;
   setStoppedHere(gaii: string, stopped: boolean): void;
   notifyScopesChangedHere(gaii: string): void;
 }
@@ -53,7 +56,7 @@ function apply(target: TunnelControlTarget, evt: TunnelControlEvent): void {
   switch (evt.op) {
     case 'token': target.revokeTokenIdHere(evt.tokenId); return;
     case 'gaii': target.closeForGaiiHere(evt.gaii, evt.reason); return;
-    case 'owner': target.closeForOwnerHere(evt.owner); return;
+    case 'owner': target.closeForOwnerHere(evt.owner, evt.erased ? 'erased' : 'deactivated'); return;
     case 'stopped': target.setStoppedHere(evt.gaii, evt.stopped); return;
     case 'scopes': target.notifyScopesChangedHere(evt.gaii); return;
   }

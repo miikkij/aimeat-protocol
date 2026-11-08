@@ -13,6 +13,7 @@
  *   decision for another node is ignored. test/e2e-two-process-bus.ts runs it over PostgreSQL.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connect-tunnel-cross-process.test.ts
  * @version-history
+ *   2026-11-08 -- An account erased on another process (secaudit2026nov08b round 15); the earlier cases unchanged.
  *   v1.0.0 -- 2026-11-08 -- Initial (secaudit2026nov08 round 14).
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -92,6 +93,15 @@ describe('a revocation made on another process', () => {
   it('an account deactivated there closes every socket of that account here, and no other', () => {
     const b = processB();
     fromOtherProcess({ op: 'owner', owner: 'alice' });
+    expect(b.mgr.isConnected(AGENT)).toBe(false);
+    expect(b.mgr.isConnected(OTHER)).toBe(true);
+  });
+
+  it('an account erased there closes every socket of that account here, told as deleted, and no other', () => {
+    const b = processB();
+    fromOtherProcess({ op: 'owner', owner: 'alice', erased: true });
+    expect(b.frames('auth_revoked')[0]).toMatchObject({ agent: AGENT, message: 'Account deleted' });
+    expect(b.frames('auth_revoked')[0]).not.toHaveProperty('reason');
     expect(b.mgr.isConnected(AGENT)).toBe(false);
     expect(b.mgr.isConnected(OTHER)).toBe(true);
   });
