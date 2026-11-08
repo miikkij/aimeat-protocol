@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit 78d1b3950) on 2026-11-08. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 46461ce7f) on 2026-11-08. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -119,6 +119,12 @@ Receiver keys and outside party keys are not revoked: they are refused while the
 
 - Each deactivation and reactivation by an operator writes an operator trail: a usage row, a log line and a line on the person's feed (`aimeat/src/services/owner-lifecycle.ts`).
 - Erasure is a separate, final act. The person, or an operator, both in person, call `DELETE /v1/owners/:name` (`aimeat/src/routes/owners.ts`). An organism the person owned passes to an admin or member, or is left without a seated owner when there is nobody (`aimeat/src/services/owner-erasure.ts`).
+
+## Organism code keys
+
+- An owner of an organism can make a code key: the node makes an account whose password is the code that owner chose, so that owner knows it until the holder signs in. The holder's first sign-in replaces the code with a new password, whichever method it is: password, passkey, sign-in link by email, or an identity provider (`aimeat/src/services/owner-session.ts`, `aimeat/src/services/key-credentials.ts`).
+- The new password is shown to the browser that completed the first sign-in. After a password or passkey sign-in it is in the sign-in answer, and it is also mailed when the account's address is verified. After a sign-in link or an identity provider, the code stops working at once and the new password is shown once to that browser session, never mailed (`aimeat/src/routes/ghii/key-credentials-screen.ts`). On the same screen the holder can add a passkey and confirm an email address of their own (`aimeat/src/static/sdk-libs/auth/modal-key-credentials.js`).
+- A code key acts only on the account it made. Erasing that account closes the key, and an account registered later with the same name is not listed, cancelled or given a new password by the old key (`aimeat/src/services/owner-erasure.ts`, `aimeat/src/routes/organisms/workspace-access.ts`).
 
 ## Passkeys and the domain
 

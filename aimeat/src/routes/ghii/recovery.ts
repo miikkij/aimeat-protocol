@@ -6,6 +6,8 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — The held first sign-in credentials go only to an address whose code was asked for after
+ *     that sign-in (secaudit2026nov08 round 14, attach-email:pending-code-key-accepts-any-address).
  *   2026-11-05 — A verified address receives the first sign-in's credentials that waited for it
  *     (key-credentials.ts sendHeldKeyCredentials; codebase analysis 2026-11-03, decision 14a of 2026-11-05).
  *   2026-11-04 — The code, reset and username mails go through mail-gate.ts sendMail as sign-in mail (codebase analysis 2026-11-03, item B3).
@@ -265,7 +267,7 @@ export function registerRecoveryRoutes(
         await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
             .catch(err => { logger.warn('recovery: app invitations are best-effort', { error: String(err) }); });
         // A code key's first sign-in credentials that waited for a proven address go now (never throws).
-        await sendHeldKeyCredentials(storage, config, ghii);
+        await sendHeldKeyCredentials(storage, config, ghii, record.createdAt);
 
         res.json(success(config.nodeId, {
             ok: true,

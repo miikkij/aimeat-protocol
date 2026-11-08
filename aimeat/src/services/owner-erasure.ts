@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-08 — Step code_invitation: the pending code key that provisioned the account is closed, so
+ *     it does not act on the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-04 — The service_records step erases the person's service namespace (services/service-records.ts),
  *     and the log names it only when it held records (codebase analysis 2026-11-03, item B6).
  *   2026-11-02 — The mcp_user_credentials step erases the person's own sign-ins on shared MCP servers.
@@ -419,6 +421,18 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const c = await eraseNameBoundGrants(storage, nodeId, name);
       const n = c.approvals + c.accountantLists + c.agreements;
       return n ? `name_bound_grants:${n}` : null;
+    }, deletionLog, storage);
+
+    // The code key that provisioned this account, while it is still pending. It names the account by
+    // its bare name, which is released for reuse, so a pending key would list, cancel and rotate the
+    // password of the next holder of the name. Closed, not deleted: the organism's list of keys is its
+    // history (secaudit2026nov08 round 14). The key routes also ask whether the account holding the
+    // name is the one the key made (key-credentials.ts accountMadeBy), for keys an older erasure left.
+    await step('code_invitation', async () => {
+      const inv = await storage.getCodeInvitationByProvisionedOwner(name);
+      if (!inv || inv.status !== 'pending') return null;
+      await storage.updateInvitation(inv.id, { status: 'cancelled' });
+      return 'code_invitation';
     }, deletionLog, storage);
 
     // Passkeys. The row is found by credential id and names the account by its bare name, which is

@@ -1021,6 +1021,9 @@ const ALL_SUITES = [
     'test/e2e-operator-welcome.ts',
     'test/e2e-registration-invites.ts',
     'test/e2e-login-by-email.ts',
+    // A code key's first sign-in replaces the key whichever way in, and a key acts only on its own
+    // account (secaudit2026nov08 round 14).
+    'test/e2e-code-key-first-sign-in.ts',
     'test/e2e-owner-usage.ts',
     'test/e2e-owner-home.ts',
     // One export, every section of it: the Article 15 and 20 door read against fixtures built first.

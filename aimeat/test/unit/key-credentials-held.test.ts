@@ -9,6 +9,8 @@
  *   key, sends nothing later (codebase analysis 2026-11-03, decision 14a of 2026-11-05).
  * @usage pnpm exec vitest run test/unit/key-credentials-held.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-08 — A proof asked for before the first sign-in does not receive the held password
+ *     (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 14a of 2026-11-05).
  */
 import { createHash } from 'node:crypto';
@@ -114,6 +116,21 @@ describe('the held mail, once the address is verified', () => {
     expect(await sendHeldKeyCredentials(s as never, config(), GHII)).toBe(false);
     expect(mail.sendKeyCredentials).not.toHaveBeenCalled();
     expect(s.memory.size, 'the held record is gone either way').toBe(0);
+  });
+
+  // secaudit2026nov08 round 14 (attach-email:pending-code-key-accepts-any-address): a code asked for
+  // before the first sign-in, by anyone who knew the key, and confirmed after it, proved an address
+  // the held password then went to.
+  it('a proof asked for before the first sign-in does not receive the held password; the holder\'s later proof does', async () => {
+    const s = fakeStorage(false);
+    const cred = await issueFirstLoginKeyCredentials(s as never, config(), { ...s.ghii } as never);
+    const heldAt = Date.parse(String(s.memory.get(`${NS_HELD} ${heldKey(GHII)}`)!.createdAt));
+    prove(s);
+    expect(await sendHeldKeyCredentials(s as never, config(), GHII, new Date(heldAt - 60_000).toISOString())).toBe(false);
+    expect(mail.sendKeyCredentials).not.toHaveBeenCalled();
+    expect(s.memory.size, 'the password keeps waiting for the holder').toBe(1);
+    expect(await sendHeldKeyCredentials(s as never, config(), GHII, new Date(heldAt + 1_000).toISOString())).toBe(true);
+    expect(mail.sendKeyCredentials).toHaveBeenCalledWith(ADDRESS, expect.objectContaining({ password: cred!.password }), 'en');
   });
 
   it('an account with nothing held sends nothing', async () => {

@@ -17,6 +17,8 @@
  *   /v1/ghii/username-available, GET /v1/auth/providers (OIDC providers + listed SSO connections).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   2026-11-08 — A code key's first sign-in by a provider goes to the sign-in details screen first
+ *     (secaudit2026nov08 round 14).
  *   2026-10-27 — GET /v1/ghii/login/pending reads the pending sign-up through readPendingSignup (the
  *     `__Host-` cookie over https; secaudit2026oct26).
  *   2026-10-25 — The callback applies the provider's link-domain fence (OidcProvider.emailLinkFence)
@@ -184,9 +186,10 @@ export function oauthLoginRouter(
           return;
         }
 
-        await establishForGhii(storage, config, req, res, result.ghii);
+        // A code key's first sign-in shows its new sign-in details first (secaudit2026nov08 round 14).
+        const screen = await establishForGhii(storage, config, req, res, result.ghii, postLoginPath);
         // Redirect back to the SPA — it boots logged-in from the refresh cookie.
-        res.redirect(`${config.baseUrl}${postLoginPath}`);
+        res.redirect(screen ?? `${config.baseUrl}${postLoginPath}`);
       } catch (err) {
         // Deactivated account (BR-04): the IdP authenticated the person, but this node's answer is
         // no — establishOwnerSession refused before writing anything. A named error, not a generic

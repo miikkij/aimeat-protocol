@@ -8,6 +8,7 @@
  * @structure ephemeralClaimMethods
  * @usage Object.assign(SqliteStorage.prototype, ephemeralClaimMethods) in ../index.ts
  * @version-history
+ *   2026-11-08 — releaseEphemeralCounter (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, high-availability stage 2).
  */
 import type { SqliteStorage } from '../index.js';
@@ -66,6 +67,11 @@ export const ephemeralClaimMethods = {
        RETURNING count, expiresAt`,
     ).get(kind, id, end, opts.staleBefore, opts.staleBefore, opts.sliding ? 1 : 0, end) as { count: number; expiresAt: number };
     return { count: Number(row.count), expiresAt: Number(row.expiresAt) };
+  },
+
+  async releaseEphemeralCounter(this: SqliteStorage, kind: string, id: string, now: number): Promise<void> {
+    this.db.prepare('UPDATE ephemeral_claim SET count = count - 1 WHERE kind = ? AND id = ? AND count > 0 AND expiresAt > ?')
+      .run(kind, id, now);
   },
 
   async readEphemeralCounter(this: SqliteStorage, kind: string, id: string): Promise<EphemeralCount | null> {

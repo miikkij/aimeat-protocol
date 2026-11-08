@@ -39,6 +39,8 @@
  *   if (!await spendOnce('signature', sig, Date.now() + 300_000)) refuse();
  *   const c = await windowCounter('mail-send').bump(account, { windowMs: 60_000 });
  * @version-history
+ *   v1.1.0 — 2026-11-08 — windowCounter(kind).release(key): take back a count reserved before a check
+ *     (secaudit2026nov08 round 14, services/admin-password.ts).
  *   v1.0.1 — 2026-11-04 — The payload's AES-GCM goes through utils/aes-gcm.ts, the node's one
  *     implementation; the stored form is unchanged (codebase analysis 2026-11-03, item B9).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, high-availability stage 2, items 2.3 and 2.4).
@@ -242,6 +244,8 @@ export interface BumpOptions { windowMs: number; now?: number; staleBefore?: num
 export interface WindowCounter {
   /** Count one against `key` and answer the counter after it. */
   bump(key: string, opts: BumpOptions): Promise<EphemeralCount>;
+  /** Take back one count under `key` while its window has not ended (a count reserved before a check). */
+  release(key: string, now?: number): Promise<void>;
   /** The counter under `key`, its window ended or not, or null. */
   read(key: string): Promise<EphemeralCount | null>;
   /** Forget the counter under `key`. */
@@ -249,6 +253,7 @@ export interface WindowCounter {
   /** The same counter in this process's memory only, for a caller that cannot wait. */
   here: {
     bump(key: string, opts: BumpOptions): EphemeralCount;
+    release(key: string, now?: number): void;
     read(key: string): EphemeralCount | null;
     clear(key: string): void;
     /** Forget every counter of this kind this process holds in memory (a test's clean start). */
@@ -272,6 +277,10 @@ export function windowCounter(kind: string): WindowCounter {
       localWrite(kind, key, next, now);
       return { count: next.count, expiresAt: next.expiresAt };
     },
+    release(key: string, now = Date.now()): void {
+      const row = local.get(kind)?.get(key);
+      if (row && row.count > 0 && row.expiresAt > now) row.count -= 1;
+    },
     read(key: string): EphemeralCount | null {
       const row = local.get(kind)?.get(key);
       return row ? { count: row.count, expiresAt: row.expiresAt } : null;
@@ -293,6 +302,11 @@ export function windowCounter(kind: string): WindowCounter {
       });
       sweepSoon(storage, now);
       return counted;
+    },
+    async release(key, now = Date.now()) {
+      const storage = claimStorage();
+      if (!storage) { here.release(key, now); return; }
+      await storage.releaseEphemeralCounter(kind, rowId(kind, key), now);
     },
     async read(key) {
       const storage = claimStorage();

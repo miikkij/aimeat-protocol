@@ -10,6 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.10.0 — 2026-11-08 — `?auth_step=key_credentials` opens the sign-in dialog on a code key's new
+ *     sign-in details (secaudit2026nov08 round 14); the bundle version moves.
  *   v1.9.0 — 2026-11-05 — AIMEAT.auth.displayPrefs(): the signed-in person's own region and clock,
  *     read from their profile (display-prefs.js), which the served libraries' dates and numbers now
  *     follow; the bundle version moves. Codebase analysis 2026-11-03, decision 10b of 2026-11-05.
@@ -45,7 +47,7 @@
  *     stored palette applied at parse time (theme system v2).
  *   v1.0.0 — 2026-07-19 — Componentized rewrite of src/routes/libs/auth-lib*.ts (SDK-libs migration Phase 3).
  */
-import { auth, refreshOnFocus } from './session.js';
+import { auth, refreshOnFocus, authApi } from './session.js';
 import { maybeShowGoogleSignup } from './signup.js';
 import { readAuthError, readAuthStep, readTwoStepToken } from './auth-error.js';
 import { showLoginModal } from './modal.js';
@@ -84,6 +86,24 @@ function maybeShowAuthError() {
       showLoginModal({ i18n: i18n || {}, twoStepSetup: setupToken }, function () {});
     });
   }
+  // A code key's first sign-in by an emailed link or a provider: signed in, and the new sign-in
+  // details wait for this browser's session, once (POST /v1/ghii/key-credentials).
+  if (step === 'key_credentials') showOwedKeyCredentials();
+}
+
+function showOwedKeyCredentials() {
+  Promise.all([loadModalI18n(currentModalLang()), auth.login()]).then(function (got) {
+    var session = /** @type {any} */ (got[1]);
+    if (!session || !session.jwt) return null;
+    return authApi('/v1/ghii/key-credentials', session.jwt, { method: 'POST', body: '{}' }).then(function (r) {
+      showLoginModal({ i18n: got[0] || {}, keyCredentials: {
+        credentials: r.data.key_credentials, jwt: session.jwt, continueTo: r.data.continue_to || null,
+      } }, function () {});
+    });
+  }).catch(function (e) {
+    // Already shown once, or the wait lapsed: the person is signed in either way.
+    console.warn('[aimeat-auth] The new sign-in details could not be shown:', e && e.message);
+  });
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', maybeShowAuthError);
@@ -129,4 +149,4 @@ if (typeof document !== 'undefined' && document.readyState === 'loading' && docu
 }
 
 const ns = attach('auth', auth);
-ns.version = '2026-11-05-001';
+ns.version = '2026-11-08-001';

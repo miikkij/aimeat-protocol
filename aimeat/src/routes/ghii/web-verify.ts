@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — The held first sign-in credentials go only to an address whose code was asked for after
+ *     that sign-in; a code key is the account's only while the account is the one the key made
+ *     (secaudit2026nov08 round 14).
  *   2026-11-06 — verify-email and the magic link do not raise the login count of a code key's holder
  *     whose first sign-in is still to come (key-credentials.ts keyCredentialsPending): that sign-in
  *     replaces the key.
@@ -518,7 +521,7 @@ export function registerWebVerifyRoutes(
         // A code key's holder on a node that requires a confirmed address confirms it before the first
         // sign-in. Counted as a login, it made that sign-in look like a later one, and the sign-in that
         // replaces the key with the holder's own password (key-credentials.ts) never ran.
-        const keyFirstSignInPending = await keyCredentialsPending(storage, record.ownerName);
+        const keyFirstSignInPending = await keyCredentialsPending(storage, config.nodeId, record.ownerName);
         await storage.updateGHII(ghii, {
             emailHash: record.emailHash,
             emailVerifiedAt: now,
@@ -538,7 +541,7 @@ export function registerWebVerifyRoutes(
         await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
             .catch(err => { logger.warn('verify-email: app invitations are best-effort', { error: String(err) }); });
         // A code key's first sign-in credentials that waited for a proven address go now (never throws).
-        await sendHeldKeyCredentials(storage, config, ghii);
+        await sendHeldKeyCredentials(storage, config, ghii, record.createdAt);
 
         // Create an agent if not exists, then issue JWT
         const { agent, privateKey: agentPrivKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);
@@ -657,7 +660,7 @@ export function registerWebVerifyRoutes(
         const ghii = redeemed.ghii.ghii;
         // The link gives the agent key, not the owner's sign-in, so for a code key's holder it is not
         // the first sign-in either (the same rule as verify-email above).
-        const keyFirstSignInPending = await keyCredentialsPending(storage, redeemed.ghii.ownerName);
+        const keyFirstSignInPending = await keyCredentialsPending(storage, config.nodeId, redeemed.ghii.ownerName);
         await storage.updateGHII(ghii, {
             lastLoginAt: now,
             loginCount: (redeemed.ghii.loginCount ?? 0) + (keyFirstSignInPending ? 0 : 1),

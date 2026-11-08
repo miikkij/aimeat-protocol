@@ -28,11 +28,14 @@
  *   if (!signatureTimestampFresh(timestamp)) return refuse('Timestamp too old or too far in the future');
  *   if (!await spendSignature(signature)) return refuse('That signature has already been used');
  * @version-history
+ *   v1.2.0 — 2026-11-08 — spendSignature spends the decoded signature bytes, not the text, so a second
+ *     base64 spelling of a spent signature is refused (secaudit2026nov08 round 14).
  *   v1.1.0 — 2026-11-04 — spendSignature spends in the node's storage, so a signature spent on one
  *     process is refused on another; resetSpentSignatures is removed, nothing called it (codebase
  *     analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-09-06 — Written for review item 2.3: a replayable signature in a GET query string.
  */
+import { createHash } from 'node:crypto';
 import { spendOnce } from '../services/ephemeral-claims.js';
 
 /**
@@ -61,5 +64,15 @@ export function signatureTimestampFresh(timestamp: string, windowMs = SIGNATURE_
  */
 export function spendSignature(signature: string, windowMs = SIGNATURE_WINDOW_MS): Promise<boolean> {
     const now = Date.now();
-    return spendOnce('signature', String(signature), now + windowMs, now);
+    return spendOnce('signature', signatureSpendKey(signature), now + windowMs, now);
+}
+
+/**
+ * The value a signature is spent under: a SHA-256 of the bytes keypair.verify() decodes, not the text.
+ * One signature has several base64 spellings (padding, the URL alphabet, spare bits, whitespace), and
+ * a spend keyed on the text let the same signature through once per spelling. The federation guard
+ * (services/signed-node-request.ts signedMessageOnce) keys on the bytes in the same way.
+ */
+function signatureSpendKey(signature: string): string {
+    return createHash('sha256').update(Buffer.from(String(signature), 'base64')).digest('hex');
 }
