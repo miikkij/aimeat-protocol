@@ -5,6 +5,7 @@
  *   barcode and the hover card take the node's ink, lines, surfaces and fonts in both themes. The
  *   six genre colours stay the kit's validated defaults (aimeat-atelier/fingerprint.css).
  * @version-history
+ *   v0.2.0 — 2026-11-09 — .node-fp--opens: the compact row that opens the whole fingerprint.
  *   v0.1.0 — 2026-11-09 — Draft (the Contexts page).
  */
 .node-fp {
@@ -20,4 +21,15 @@
   --ak-gap: 12px;
   --ak-shadow: var(--shadow-sm);
   --ak-err: var(--danger);
+}
+
+/* The compact row that opens the whole fingerprint (Fingerprint expandable). */
+.node-fp--opens {
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+}
+.node-fp--opens:hover,
+.node-fp--opens:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 4px;
 }

@@ -86,6 +86,8 @@
   "contexts.fingerprintMade": "Made on {date}.",
   "contexts.fingerprintOlder": "Made on {date}. The context has changed since, so ask for a new one.",
   "fingerprint.failed": "The fingerprint could not be drawn. Reload the page to try again.",
+  "fingerprint.open": "Show the whole fingerprint",
+  "fingerprint.close": "Show less",
   "contexts.conflict": "The context changed a moment ago, probably in chat. The page now shows the newest version. Try again.",
   "contexts.failed": "That did not work. Try again.",
   "contexts.archived": "\"{name}\" is archived. Your AI no longer gets it in its list, and can still open it by its key.",

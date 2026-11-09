@@ -86,6 +86,8 @@
   "contexts.fingerprintMade": "Hecha el {date}.",
   "contexts.fingerprintOlder": "Hecha el {date}. El contexto ha cambiado desde entonces: pide una nueva.",
   "fingerprint.failed": "No se pudo dibujar la huella. Recarga la página para intentarlo de nuevo.",
+  "fingerprint.open": "Ver la huella completa",
+  "fingerprint.close": "Ver menos",
   "contexts.conflict": "El contexto cambió hace un momento, seguramente en el chat. La página muestra ahora la versión más reciente. Intenta de nuevo.",
   "contexts.failed": "No funcionó. Intenta de nuevo.",
   "contexts.archived": "«{name}» quedó archivado. Tu IA ya no lo recibe en su lista, pero todavía puede abrirlo con su clave.",

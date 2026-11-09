@@ -9,14 +9,21 @@
  *   css/components/fingerprint.css maps the kit's --ak-* tokens to the node's theme tokens, so the
  *   drawing takes the node's ink, lines and fonts in both themes.
  *
+ *   EXPANDABLE. With `expandable` it shows the compact row (seal, kind, the barcode with its marks),
+ *   the overview a page needs; pressing it, or Enter or Space on it, opens the whole fingerprint in
+ *   place (the panel: the trust bar, the lines and the three quadrant views), and "Show less" folds
+ *   it back (the developer's call, 2026-11-09: "kompakti riittää ... jos sitä klikkaa se voisi avata
+ *   sen isomman näkymän").
+ *
  *   DRAFT (2026-11-09): first used by the Contexts page, waiting for the developer's look before it
  *   goes to main.
  *
  *   IT RENDERS; IT DOES NOT FETCH the profile. When the drawing cannot load, the component says so in
  *   one quiet line.
- * @structure Fingerprint({ profile, sections, title, view }) · loadDrawing()
- * @usage html`<${Fingerprint} profile=${facts.profile} sections=${profileSections} title=${name} />`
+ * @structure Fingerprint({ profile, sections, title, view, expandable }) · loadDrawing()
+ * @usage html`<${Fingerprint} profile=${facts.profile} sections=${profileSections} title=${name} expandable />`
  * @version-history
+ *   v0.2.0 — 2026-11-09 — `expandable`: the compact row opens the whole fingerprint in place.
  *   v0.1.0 — 2026-11-09 — Draft (the Contexts page).
  */
 import { h } from 'preact';
@@ -24,6 +31,7 @@ import htm from 'htm';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { Note } from '/components/Note.js';
+import { Action, Actions } from '/components/Action.js';
 
 const html = htm.bind(h);
 
@@ -49,24 +57,36 @@ function loadDrawing() {
   return loading;
 }
 
-export function Fingerprint({ profile, sections = null, title = '', view = 'panel' }) {
+export function Fingerprint({ profile, sections = null, title = '', view = 'panel', expandable = false }) {
   const host = useRef(null);
   const drawn = useRef(null);
   const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
+  const shown = expandable ? (open ? 'panel' : 'row') : view;
 
   useEffect(() => {
     let live = true;
     loadDrawing().then((atelier) => {
       if (!live || !host.current) return;
       const data = { profile, sections, title };
-      if (drawn.current) drawn.current.set({ data });
-      else drawn.current = atelier.fingerprint({ target: host.current, view, data });
+      if (drawn.current) drawn.current.set({ data, view: shown });
+      else drawn.current = atelier.fingerprint({ target: host.current, view: shown, data });
     }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, [profile, sections, title, view]);
+  }, [profile, sections, title, shown]);
 
   useEffect(() => () => { drawn.current?.destroy?.(); drawn.current = null; }, []);
 
   if (failed) return html`<${Note} kind="quiet">${t('fingerprint.failed')}<//>`;
-  return html`<div class="node-fp" ref=${host}></div>`;
+  // ONE host element in every state: the drawing lives in it, and set() switches its view in place.
+  const opens = expandable && !open;
+  const press = (e) => { if (e.type === 'click' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } };
+  return html`
+    <div class=${opens ? 'node-fp node-fp--opens' : 'node-fp'} ref=${host}
+      role=${opens ? 'button' : undefined} tabindex=${opens ? '0' : undefined}
+      aria-label=${opens ? t('fingerprint.open') : undefined} title=${opens ? t('fingerprint.open') : undefined}
+      onClick=${opens ? press : undefined} onKeyDown=${opens ? press : undefined}></div>
+    ${expandable && open
+      ? html`<${Actions}><${Action} small control onClick=${() => setOpen(false)}>${t('fingerprint.close')}<//><//>`
+      : null}`;
 }

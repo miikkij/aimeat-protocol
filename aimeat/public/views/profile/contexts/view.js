@@ -20,6 +20,7 @@
  * @version-history
  *   v1.4.0 — 2026-11-09 — DRAFT for the developer's look: the fingerprint as the first numbered part
  *     (components/Fingerprint.js, the drawing Pages shows), or the sentence that asks the AI for one.
+ *     Compact by default; pressing it opens the whole fingerprint (the developer's call, same day).
  *   v1.3.0 — 2026-11-08 — The guidance follows the page-guidance rule: the page's own introduction is
  *     gone, and the head's paragraph, the title's question mark (concept.context), the standard
  *     PageStart and the list's empty line carry it; the view toggle lost its tooltip-only words.
@@ -207,7 +208,7 @@ function fingerprintPart(ctx, c, nextNum) {
   const older = fp.madeAt && c.shapedAt && String(c.shapedAt) > String(fp.madeAt);
   return html`
     <${PageSection} id="ctx-fingerprint" num=${nextNum()} title=${x('fingerprint')}>
-      <${Fingerprint} profile=${fp.profile} sections=${fp.sections} title=${c.name} />
+      <${Fingerprint} profile=${fp.profile} sections=${fp.sections} title=${c.name} expandable />
       <${Note} kind="hint">${older
         ? x('fingerprintOlder', { date: date(fp.madeAt) })
         : x('fingerprintMade', { date: date(fp.madeAt) })}<//>

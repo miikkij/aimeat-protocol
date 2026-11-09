@@ -86,6 +86,8 @@
   "contexts.fingerprintMade": "Tehty {date}.",
   "contexts.fingerprintOlder": "Tehty {date}. Kontekstia on muutettu sen jälkeen, joten pyydä uusi.",
   "fingerprint.failed": "Sormenjälkeä ei voitu piirtää. Lataa sivu uudelleen ja yritä uudestaan.",
+  "fingerprint.open": "Näytä koko sormenjälki",
+  "fingerprint.close": "Näytä vähemmän",
   "contexts.conflict": "Konteksti muuttui juuri, luultavasti keskustelussa. Sivulla on nyt uusin versio. Yritä uudelleen.",
   "contexts.failed": "Se ei onnistunut. Yritä uudelleen.",
   "contexts.archived": "”{name}” on arkistoitu. Tekoälysi ei enää saa sitä listallaan, mutta voi yhä avata sen avaimella.",
