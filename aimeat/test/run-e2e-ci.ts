@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-10 -- e2e-memory-tab-summary.ts joins the list (not the guard tier): the Memory page's summary says what the full answer gives, and a key space's pages reach every key once.
  *   2026-11-08 -- e2e-package-file-label-reads.ts joins the list (not the guard tier): the reads of a data package's stored files ask the labels the version keeps, as GET /v1/pub does (secaudit2026nov08b round 15b).
  *   2026-11-08 -- e2e-datapackage-label-sources.ts joins the list (not the guard tier): a data package version keeps the labels of every item it was copied from (secaudit2026nov08b round 15).
  *   2026-11-08 -- e2e-intake-form-owner.ts joins the list (not the guard tier): a public intake form writes its submissions as the identity that stored its config, not as an account the config value names (secaudit2026nov08b round 15).
@@ -1294,6 +1295,7 @@ const ALL_SUITES = [
     'test/e2e-write-guards.ts',
     'test/e2e-wallet-page.ts',
     'test/e2e-data-wallet-page.ts',
+    'test/e2e-memory-tab-summary.ts',
     'test/e2e-model-suite.ts',
     'test/e2e-access-page.ts',
     'test/e2e-invitations.ts',

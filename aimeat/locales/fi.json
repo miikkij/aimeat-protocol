@@ -24020,6 +24020,8 @@
         "federation": "federaatio",
         "federate": "Jaa federaatioon",
         "showAll": "näytä kaikki {n}",
+        "showMoreKeys": "näytä {n} lisää",
+        "showMoreFiles": "näytä {n} lisää",
         "searchResults": "{n} osumaa",
         "cartEmpty": "Kokoelma on tyhjä. Lisää siihen tietueita ja tiedostoja niiden omilta sivuilta, ja vie ne sitten listana, ZIP-pakettina tai työtilan lähteeksi.",
         "exportHint": "JSON-varmuuskopio tämän muistin jokaisesta avaimesta (valitun agentin, jos agentti on valittu). Yhden avainavaruuden voi viedä sen omalta sivulta.",

@@ -18781,6 +18781,18 @@ paths:
             type: string
             enum: [meta]
           description: 'When "meta", omit each entry''s `value` and report its size in `bytes` instead — fast for listing thousands of keys (values fetched per-key on demand).'
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [updated, key, size]
+          description: 'With include=meta: the order before the page is cut. `updated` newest change first, `key` alphabetical, `size` largest first. Omitted, the listing''s own order.'
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: 'With include=meta: rows to skip before the page (with `limit`, one page of a key space). Echoed back when given.'
       responses:
         '200':
           description: |
@@ -85793,9 +85805,22 @@ paths:
         upload limit, the consent grants, the sharing groups the owner owns or belongs to, and the
         organisms they are a member of. No memory values are loaded. The individual endpoints stay
         for interactive re-fetches. Owner role only, which is stricter than the endpoints it folds.
+        With `summary=true` the memory section carries `summary` (what the page's cover shows) and
+        an empty `items`; `total` and `quota` are the same either way.
       tags: [Memory]
       security:
         - BearerAuth: []
+      parameters:
+        - name: summary
+          in: query
+          required: false
+          schema: { type: string, enum: ['true'] }
+          description: Send the cover's summary instead of every key row (additive).
+        - name: today_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: The reader's own start of today, for `summary.changed_today`.
       responses:
         '200':
           description: The Memory tab composite
@@ -85830,6 +85855,41 @@ paths:
                                     flagCount: { type: integer }
                                     created_at: { type: string, format: date-time }
                                     updated_at: { type: string, format: date-time }
+                              summary:
+                                type: object
+                                description: With summary=true. Rows inside it have the shape of `items`.
+                                properties:
+                                  spaces:
+                                    type: array
+                                    description: Every key space, newest change first. A key space is `organism.<uuid>`, the part of a key before its first dot, or `_other`.
+                                    items:
+                                      type: object
+                                      properties:
+                                        id: { type: string }
+                                        kind: { type: string, enum: [organism, plain, other] }
+                                        uuid: { type: string }
+                                        count: { type: integer }
+                                        bytes: { type: integer }
+                                        public_n: { type: integer }
+                                        members_n: { type: integer }
+                                        latest: { type: object, nullable: true }
+                                  changed_today: { type: integer }
+                                  recent: { type: array, items: { type: object }, description: The five newest changes }
+                                  stale:
+                                    type: object
+                                    description: Keys nobody changed in 90 days; the eight oldest
+                                    properties:
+                                      count: { type: integer }
+                                      items: { type: array, items: { type: object } }
+                                  public:
+                                    type: object
+                                    properties:
+                                      count: { type: integer }
+                                      keys: { type: array, items: { type: string }, description: The three newest public keys }
+                                  members:
+                                    type: object
+                                    properties:
+                                      count: { type: integer }
                               total: { type: integer }
                               quota:
                                 type: object

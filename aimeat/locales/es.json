@@ -21915,6 +21915,8 @@
         "federation": "federación",
         "federate": "Compartir con la federación",
         "showAll": "mostrar todas ({n})",
+        "showMoreKeys": "mostrar {n} más",
+        "showMoreFiles": "mostrar {n} más",
         "searchResults": "{n} coincidencias",
         "cartEmpty": "La colección está vacía. Agrega registros y archivos desde sus páginas y luego expórtalos como lista, como ZIP o como fuente de un espacio de trabajo.",
         "exportHint": "Una copia JSON de cada clave de esta memoria (la del agente elegido, si hay uno). Un espacio de claves se exporta solo desde su propia página.",

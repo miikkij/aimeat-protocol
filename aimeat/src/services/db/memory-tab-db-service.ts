@@ -13,6 +13,9 @@
  * @structure MemoryTabService.overview(reader, ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
  * @usage const m = await createMemoryTabService(config, storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.5.0 — 2026-11-10 — `summary` (additive): the memory section carries the cover's summary
+ *     (memory-tab-summary.ts) and no rows, 6.4 MB less at a heavy account's size; without it the answer
+ *     is unchanged.
  *   v1.4.0 — 2026-10-30 — Each file row says its `store`, as GET /v1/memory/files does: the tab's first
  *     load showed no place until the list was read again (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.3.0 — 2026-10-09 — The agents go out without their webhook signing secret (agentRecordView),
@@ -30,7 +33,7 @@ import { LegacyMemoryAdapter } from '../../storage/adapter/legacy-memory-adapter
 import { MemoryRepository } from '../../storage/repositories-impl/memory-repository.js';
 import { MemoryDbService } from './memory-db-service.js';
 import { resolveOwnerIdentities } from './owner-identity.js';
-import { visibilityToZone } from '../../routes/memory/shared.js';
+import { metaRowView, summarizeMemory, type MemorySummary } from './memory-tab-summary.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
 import { agentRecordView } from '../agent-record-view.js';
@@ -39,7 +42,7 @@ import { parseBlobRef } from '../../storage/blob/blob-types.js';
 
 export interface MemoryTabOverview {
   agents: unknown[];
-  memory: { items: Array<Record<string, unknown>>; total: number; quota: Record<string, number> };
+  memory: { items: Array<Record<string, unknown>>; summary?: MemorySummary; total: number; quota: Record<string, number> };
   files: { files: Array<Record<string, unknown>>; total: number; max_file_size_bytes: number };
   consents: { consents: Array<Record<string, unknown>>; total: number };
   groups: { groups: unknown[] };
@@ -62,7 +65,7 @@ export class MemoryTabService {
    * (owner-scope: GHII + agents + eco apps, via MemoryDbService — the same set the standalone endpoint
    * returns), so a large keyspace never loads a single value.
    */
-  overview(reader: ContentReader, ownerName: string, ownerGhii: string): Promise<MemoryTabOverview> {
+  overview(reader: ContentReader, ownerName: string, ownerGhii: string, opts: { summary?: boolean; todayFrom?: string } = {}): Promise<MemoryTabOverview> {
     return runInReadScope(async () => {
       const agents = await this.storage.getAgentsByOwner(ownerName);
       const gaiis = [ownerGhii, ...agents.map(a => a.gaii)];
@@ -82,12 +85,11 @@ export class MemoryTabService {
       // memory (mirrors GET /v1/memory?include=meta): metadata rows + quota, no values.
       let totalBytes = 0;
       for (const r of metaRows) totalBytes += r.byteSize;
+      // With `summary` the page asked for its cover instead of every row (memory-tab-summary.ts):
+      // `items` is empty and `summary` carries what the cover shows; total and quota are the same.
       const memory = {
-        items: metaRows.map(r => ({
-          key: r.key, owner_gaii: r.ownerGaii, bytes: r.byteSize, visibility: r.visibility,
-          zone: visibilityToZone(r.visibility), tags: r.tags, version: r.version,
-          flagCount: r.flagCount ?? 0, created_at: r.createdAt, updated_at: r.updatedAt,
-        })),
+        items: opts.summary ? [] : metaRows.map(metaRowView),
+        ...(opts.summary ? { summary: summarizeMemory(metaRows, opts.todayFrom) } : {}),
         total: metaRows.length,
         quota: {
           max_keys: this.config.memoryMaxKeysPerAgent, used_keys: metaRows.length,

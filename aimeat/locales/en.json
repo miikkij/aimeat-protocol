@@ -23257,6 +23257,8 @@
         "federation": "federation",
         "federate": "Share to the federation",
         "showAll": "show all {n}",
+        "showMoreKeys": "show {n} more",
+        "showMoreFiles": "show {n} more",
         "searchResults": "{n} matches",
         "cartEmpty": "The collection is empty. Add records and files to it from their pages, then export them as a list, a ZIP or a workspace source.",
         "exportHint": "A JSON backup of every key in this memory (the selected agent’s, if one is chosen). A key space can be exported alone from its own page.",

@@ -5,6 +5,11 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.6.0 — 2026-11-10 — Key spaces, paged (Jouni's choice): the mount reads the cover's summary
+ *     (GET /v1/memory/tab?summary=true), a key space its keys a page at a time and a record its own row
+ *     (memory-tab/key-pages.js); the whole list is read once All as keys, Archived, one agent, every
+ *     stale key or every value is asked for (fullList, loadFull), and a live update reads only what
+ *     is open. 6.4 MB on every mount and every live update at a heavy account's size before.
  *   v3.5.1 — 2026-11-05 — handleQuickVis no longer opens the edit form for 'group': that form has no group
  *     picker since v1.1.0 of memory-tab/components.js, so saving it stored a group record with no group.
  *   v3.5.0 — 2026-10-30 — The upload passes on the store the person picked (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -117,6 +122,7 @@ import { fetchFileBytes, uploadFilesPresigned, userFiles } from './memory-tab/fi
 import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
 import { loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
 import { renderMemoryView } from './memory-tab/cover.js';
+import { useKeyPages, prefixOf, todayFrom } from './memory-tab/key-pages.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState } from '/js/load-state.js';
 
@@ -170,6 +176,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // Scalable Memory tab (v2.3): the list loads metadata-only by default (no values) so thousands of
   // keys open fast; values are fetched per-key on expand. memQuota drives the storage-usage bar.
   const [memQuota, setMemQuota] = useState(null);
+  // The cover and a key space read the server's summary and pages (memory-tab/key-pages.js); the
+  // whole key list is read only once a part of the page needs every key (fullList, loadFull).
+  const pages = useKeyPages({ onStats, setMemQuota });
+  const [fullList, setFullList] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);   // true once "Load all contents" pulls values
   const [valueCache, setValueCache] = useState({});       // key → value (lazy-fetched in meta mode)
   const [loadingValueKeys, setLoadingValueKeys] = useState(new Set());
@@ -257,7 +267,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     if (!memFilterMounted.current) { memFilterMounted.current = true; return; }
     // Another agent's list (or the archived set) is a different list: start it from "loading", so a
     // failed read shows as one instead of leaving the previous list under the new choice.
-    if (session) { setMemories(null); memLoad.reset(); loadMemories(); }
+    if (session) { setFullList(true); setMemories(null); memLoad.reset(); loadFull(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgent, memArchived]);
 
@@ -344,16 +354,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // (metadata-only) + files + consent + sharing-groups + organism names. loadMemories owns later
   // (dynamic) memory re-fetches on agent/archived change; on failure we fall back to the six loaders.
   async function loadTab() {
-    const ov = await apiGet('/v1/memory/tab').then(r => r?.data).catch(err => { swallowed('memory-tab: loadTab', err); return null; });
+    const ov = await apiGet(`/v1/memory/tab?summary=true&today_from=${encodeURIComponent(todayFrom())}`).then(r => r?.data).catch(err => { swallowed('memory-tab: loadTab', err); return null; });
     if (!ov) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadShares(); loadOrgNames(); return; }
     setAgents(Array.isArray(ov.agents) ? ov.agents : []);
-    // memory (metadata-only default view — mirrors loadMemories meta path)
-    const items = ov.memory?.items || [];
-    setMemories(items);
-    memLoad.ok();
-    setMemQuota(ov.memory?.quota || null);
+    // memory: the cover's summary, not every key (memory-tab/key-pages.js)
+    if (ov.memory?.summary) pages.applySummary(ov.memory);
+    else pages.loadSummary();
     setValueCache({});
-    if (!memArchived) onStats?.({ memory: items.length });
     // files
     const fileList = userFiles(ov.files?.files);
     setFiles(fileList);
@@ -382,9 +389,29 @@ export default function MemoryTab({ session, showToast, onStats }) {
     setCartOrgs(orgs.map(o => ({ id: o.id, name: o.name })));
   }
 
-  // Refresh the list in whatever mode is active: metadata-only by default (fast for thousands of
-  // keys), or full values once the user pressed "Load all contents".
+  // Refresh what the page shows: the summary and the open key space or record, or the whole list
+  // once a part of the page needed every key.
   async function loadMemories() {
+    if (!fullList) { pages.refreshOpen(view, spaceOfId); return; }
+    return loadFull();
+  }
+
+  /** A key space of the summary as the pages read it: { id, g }. */
+  function spaceOfId(id) {
+    const s = (pages.summary?.spaces || []).find(x => x.id === id);
+    return s ? { id: s.id, g: { id: s.id, kind: s.kind, uuid: s.uuid } } : null;
+  }
+
+  /** The whole key list from now on: All as keys, Archived, one agent, every stale key, every value. */
+  function goFull() {
+    if (fullList) return;
+    setFullList(true);
+    loadFull();
+  }
+
+  // The whole list in whatever mode is active: metadata-only by default (fast for thousands of
+  // keys), or full values once the user pressed "Load all contents".
+  async function loadFull() {
     try {
       const agentGaii = selectedAgent || undefined;
       const memOpts = memArchived ? { archived: 'only' } : undefined;
@@ -413,6 +440,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // "Load all contents" — pull every entry's value so the instant client filter can search values too.
   async function loadFullContents() {
     setFullLoaded(true);
+    setFullList(true);
     try {
       const list = await memoryService.listMemories(selectedAgent || undefined);
       setMemories(Array.isArray(list) ? list : []);
@@ -694,6 +722,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   const [fileTagFilter, setFileTagFilter] = useState(new Set());
   const [fileFilterText, setFileFilterText] = useState('');
+  const [filesShown, setFilesShown] = useState(12);   // the cover's files, a page at a time (cover.js FILES_MORE)
   const [previewFile, setPreviewFile] = useState(null);   // file being previewed in the lightbox modal
 
   async function doPull(key) {
@@ -726,8 +755,22 @@ export default function MemoryTab({ session, showToast, onStats }) {
     else if (mainTab !== 'own') pickMainTab('own');
     if (v.kind === 'page' && v.id === 'archived') setMemArchived(true);
     else if (v.kind !== 'page' && memArchived) setMemArchived(false);
-    if (v.kind === 'record') ensureValue(v.key);
+    if (v.kind === 'page' && v.id === 'all') goFull();
+    if (v.kind === 'record') { ensureValue(v.key); if (!fullList) pages.ensureRecord(v.key); }
+    if (v.kind === 'space' && !fullList) {
+      const space = spaceOfId(v.id);
+      if (space && !prefixOf(space.g)) goFull();
+      else if (space && pages.spacePages[v.id]?.sort !== spaceSort) pages.loadSpacePage(space, spaceSort);
+    }
   };
+  // A key space's order is the server's in summary mode, so a new order reads the page again.
+  const pickSpaceSort = (k) => {
+    setSpaceSort(k);
+    const space = view.kind === 'space' && !fullList ? spaceOfId(view.id) : null;
+    if (space) pages.loadSpacePage(space, k);
+  };
+  // Every stale key is the whole list's to show.
+  const showAllStale = (on) => { setStaleAll(on); if (on) goFull(); };
 
   // Shared render context — the entries / files / browse render functions and browse handlers live
   // in ./memory-tab/ sibling modules; they read the component's state + handlers through this bag.
@@ -736,8 +779,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
     session, showToast, confirm, NODE_URL, loadMemories, currentGhii,
     memFailed: memLoad.failed, filesFailed: filesLoad.failed, loadFiles,
     // the poster face
-    view, pickView, spaceSort, setSpaceSort, showRaw, setShowRaw, sysOpen, setSysOpen, showSearch, setShowSearch,
-    staleAll, setStaleAll, moreOpen, toggleMore, agents, selectedAgent, setSelectedAgent, cart, cartOrgs, removeCartItem, clearCart, mainTab,
+    view, pickView, spaceSort, setSpaceSort: pickSpaceSort, showRaw, setShowRaw, sysOpen, setSysOpen, showSearch, setShowSearch,
+    staleAll, setStaleAll: showAllStale, moreOpen, fullList, keyPages: pages, toggleMore, agents, selectedAgent, setSelectedAgent, cart, cartOrgs, removeCartItem, clearCart, mainTab,
     // entries
     memories, valueOf, valueCopyText, sortBy, setSortBy, memTagFilter, setMemTagFilter, filterText, setFilterText,
     expandedMem, setExpandedMem, ensureValue, selectedKeys, toggleSelected, setSelectedKeys, visPopoverFor,
@@ -751,7 +794,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     memArchived, setMemArchived, showMemForm, setShowMemForm, handleCreateMemory, bulkVis, setBulkVis, applyBulkVis,
     bulkDelete, collapsedGroups, toggleGroupCollapsed, groupLabel, orgNames, deleteGroup,
     // files
-    files, showFileForm, setShowFileForm, handleUploadFiles, fileFilterText, setFileFilterText, fileTagFilter,
+    files, filesShown, setFilesShown, showFileForm, setShowFileForm, handleUploadFiles, fileFilterText, setFileFilterText, fileTagFilter,
     setFileTagFilter, editingFileTags, setEditingFileTags, handleUpdateFileTags, handleUpdateFileVisibility,
     setPreviewFile, handleDownloadFile, handleDeleteFile, fileSizeLimitMb,
     // browse

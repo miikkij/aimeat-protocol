@@ -608,20 +608,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/db/memory-tab-db-service.ts",
-    "to": "src/routes/memory/shared.ts",
-    "unresolvedTo": "../../routes/memory/shared.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/db/notebook-db-service.ts",
     "to": "src/routes/memory/shared.ts",
     "unresolvedTo": "../../routes/memory/shared.js",

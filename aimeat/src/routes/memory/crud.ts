@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-10 — GET /v1/memory?include=meta takes `sort` (updated, key, size) and `offset`, so the
+ *     Memory page reads one key space a page at a time; without them the answer is unchanged.
  *   2026-11-09 — GET /v1/memory with owner_scope or ?agent= lists a same-owner record kept at
  *     organism:<id> when that organism admits the caller (ownerScopeViewAdmitting).
  *   2026-11-09 — POST /v1/memory without `tags` keeps an existing record's tags; `tags: []` clears them.
@@ -104,6 +106,7 @@ import { organismReadableRecords } from '../../services/organism-namespace-acces
 import { callerOf } from '../../middleware/caller.js';
 import { listMemoryMetaFor, searchMemoryRecords } from '../../services/memory-query.js';
 import { memoryPageWithValues, shownMemoryBytes } from '../../services/memory-list-page.js';
+import { sortMetaRows } from '../../services/db/memory-tab-summary.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -433,7 +436,11 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         res.json(success(config.nodeId, { count: allMeta.length }));
         return;
       }
-      const metaRows = limit !== undefined ? allMeta.slice(0, limit) : allMeta;
+      // ?sort and ?offset page one key space for the Memory page (additive): the order is decided
+      // before the page is cut, and without either the answer is what it was.
+      const ordered = sortMetaRows(allMeta, req.query.sort);
+      const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+      const metaRows = limit !== undefined || offset ? ordered.slice(offset, limit !== undefined ? offset + limit : undefined) : ordered;
       // The quota below describes the KEYSPACE, so it is summed over everything that matched. Only
       // `items` is what the caller asked to be handed. Summing the slice instead would make the
       // Memory tab's "used" figure shrink whenever somebody passed a limit.
@@ -459,6 +466,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
           ...warningField(r),
         })),
         total: allMeta.length,
+        ...(offset ? { offset } : {}),
         ...(metaRows.length < allMeta.length
           ? { shown: metaRows.length, truncated: true,
               hint: `Showing the first ${metaRows.length} of ${allMeta.length}. Narrow with prefix/tags, or raise limit (max ${MEMORY_LIST_MAX_LIMIT}).` }

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description AIMEAT Memory Service — key-value memory CRUD, search, file management.
  * @version-history
+ *   2026-11-10 — listMemoriesMetaPage: one page of a key space (prefix, sort, offset, limit).
  *   v1.1.0 — 2026-06-10 — Add getMemory(key) single-entry read (GET /v1/memory/:key).
  *   v1.2.0 — 2026-06-21 — getMemory(key, { soft }) — optional ?soft=1 read returning 200/null
  *                          for keys that may not exist yet (kills browser-console 404 noise).
@@ -45,6 +46,22 @@ export async function listMemoriesMeta(agentGaii, opts) {
   const data = await apiGet(url);
   const list = data?.data?.items || data?.data?.entries || [];
   return { items: Array.isArray(list) ? list : [], quota: data?.data?.quota || null };
+}
+
+/**
+ * One page of the owner-scope metadata listing: the keys under `prefix` in `sort` order (updated,
+ * key, size), `limit` rows from `offset`. Returns the rows and how many match in all.
+ * @param {{ prefix?: string, sort?: string, offset?: number, limit?: number }} opts
+ */
+export async function listMemoriesMetaPage(opts) {
+  const q = new URLSearchParams({ include: 'meta' });
+  if (opts.prefix) q.set('prefix', opts.prefix);
+  if (opts.sort) q.set('sort', opts.sort);
+  if (opts.offset) q.set('offset', String(opts.offset));
+  if (opts.limit) q.set('limit', String(opts.limit));
+  const data = await apiGet('/v1/memory?' + q.toString());
+  const list = data?.data?.items || [];
+  return { items: Array.isArray(list) ? list : [], total: data?.data?.total ?? 0 };
 }
 
 /** Cheap count of owner-scope memory entries (no values transferred). For stat displays. */

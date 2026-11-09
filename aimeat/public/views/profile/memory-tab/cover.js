@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.33.0 -- 2026-11-10 -- The cover reads the server's summary until the page has the whole list (storeOf, classifySummary): the same words, without every key. A key space without the list shows its keys a page at a time with "show N more", in the server's order; a record finds its row through memory-tab/key-pages.js. Files shows its first 12 files and "show N more" adds 50 (FILES_MORE): every file at once was 25 507 of the cover's 26 121 elements at 1 700 files.
  *   v1.32.0 -- 2026-11-09 -- Sorting by time parses each key's date once (a WeakMap), and classify() reuses its last result for the same list: 1.6 s less main-thread time per render at 20 000 keys. Nothing on screen changes.
  *   v1.31.0 -- 2026-11-08 --The import's choice of what happens to a key that already exists has its
  *     question mark beside it: memory.importMode (components/HelpTip.js).
@@ -118,6 +119,9 @@ export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents',
 
 const STALE_DAYS = 90;
 const TABLE_ROWS = 12;   // a table shows this many key spaces before asking for the rest
+// The files on the cover: the first TABLE_ROWS, then this many more a press. Every file drawn at
+// once was 25 507 of the cover's 26 121 elements at 1 700 files (measured 2026-11-10).
+const FILES_MORE = 50;
 const c = (key, fb) => tr('profile.memory.cover.' + key, fb);
 /** "1 key", "12 keys", in the language's plural form; `shown` is the number as written (num()). */
 const keysN = (n, shown = n) => tn('profile.memory.cover.keysN', n, { n: shown });
@@ -147,15 +151,21 @@ export function classify(memories, orgNames) {
   return result;
 }
 
+/** A key space's bucket and its words: an organism's name, the bookkeeping, or one's own. */
+function spaceShape(g, orgNames) {
+  const bucket = g.kind === 'organism' ? 'org' : (SYSTEM_SPACES.has(g.id) ? 'sys' : 'own');
+  const label = g.kind === 'organism' ? (orgNames[g.uuid] || shortTok(g.uuid)) : g.kind === 'other' ? (t('profile.memory.groupOther') || 'other') : g.id;
+  return { id: g.id, g, bucket, label };
+}
+const bucketsOf = (spaces, all) => ({ spaces, own: all.filter(s => s.bucket === 'own'), org: all.filter(s => s.bucket === 'org'), sys: all.filter(s => s.bucket === 'sys') });
+
 function classifyNow(memories, orgNames) {
   const spaces = new Map();
   for (const m of memories || []) {
     const g = groupOfKey(m.key);
     let s = spaces.get(g.id);
     if (!s) {
-      const bucket = g.kind === 'organism' ? 'org' : (SYSTEM_SPACES.has(g.id) ? 'sys' : 'own');
-      const label = g.kind === 'organism' ? (orgNames[g.uuid] || shortTok(g.uuid)) : g.kind === 'other' ? (t('profile.memory.groupOther') || 'other') : g.id;
-      s = { id: g.id, g, bucket, label, items: [], bytes: 0, publicN: 0, membersN: 0 };
+      s = { ...spaceShape(g, orgNames), items: [], bytes: 0, publicN: 0, membersN: 0 };
       spaces.set(g.id, s);
     }
     s.items.push(m);
@@ -164,9 +174,54 @@ function classifyNow(memories, orgNames) {
     if (m.visibility === 'members') s.membersN++;
   }
   const all = [...spaces.values()];
-  for (const s of all) { s.items.sort(byUpdated); s.latest = s.items[0] || null; }
+  for (const s of all) { s.items.sort(byUpdated); s.latest = s.items[0] || null; s.count = s.items.length; }
   all.sort((a, b) => (a.latest && b.latest ? byUpdated(a.latest, b.latest) : b.items.length - a.items.length));
-  return { spaces, own: all.filter(s => s.bucket === 'own'), org: all.filter(s => s.bucket === 'org'), sys: all.filter(s => s.bucket === 'sys') };
+  return bucketsOf(spaces, all);
+}
+
+/** The same buckets from the server's summary: each space has its count and newest key, no items. */
+let lastSummary = null;
+function classifySummary(summary, orgNames) {
+  if (lastSummary && lastSummary.summary === summary && lastSummary.orgNames === orgNames) return lastSummary.result;
+  const spaces = new Map();
+  for (const x of summary.spaces || []) {
+    const g = { id: x.id, kind: x.kind, uuid: x.uuid };
+    spaces.set(x.id, { ...spaceShape(g, orgNames), items: null, count: x.count, bytes: x.bytes, publicN: x.public_n, membersN: x.members_n, latest: x.latest });
+  }
+  const result = bucketsOf(spaces, [...spaces.values()]);
+  lastSummary = { summary, orgNames, result };
+  return result;
+}
+
+/**
+ * What the cover shows, from the whole key list when the page has read it, or from the server's
+ * summary (memory-tab/key-pages.js). Both give the same words; the summary carries the eight oldest
+ * stale keys, and every stale key is the whole list's.
+ */
+function storeOf(ctx) {
+  const { memories, orgNames, fullList, keyPages } = ctx;
+  if (fullList || !keyPages?.summary) {
+    const all = memories || [];
+    const today = new Date().toDateString();
+    const stale = all.filter(isStale).sort((a, b) => -byUpdated(a, b));
+    const publicKeys = all.filter(m => m.visibility === 'public');
+    const recent = [...all].sort(byUpdated).slice(0, 5);
+    return {
+      ready: memories !== null && memories !== undefined, failed: ctx.memFailed || (!fullList && !!keyPages?.summaryFailed), cls: classify(memories, orgNames), total: all.length,
+      bytes: all.reduce((n, m) => n + (Number(m.bytes) || 0), 0),
+      changedToday: all.filter(m => new Date(m.updated_at || m.created_at || 0).toDateString() === today).length,
+      recent, stale: { count: stale.length, items: stale },
+      publicCount: publicKeys.length, publicSome: publicKeys.slice(0, 3).map(m => m.key),
+      membersCount: all.filter(m => m.visibility === 'members').length,
+    };
+  }
+  const s = keyPages.summary;
+  return {
+    ready: true, failed: false, cls: classifySummary(s, orgNames), total: s.total,
+    bytes: (s.spaces || []).reduce((n, x) => n + (Number(x.bytes) || 0), 0),
+    changedToday: s.changed_today || 0, recent: s.recent || [], stale: { count: s.stale?.count || 0, items: s.stale?.items || [] },
+    publicCount: s.public?.count || 0, publicSome: s.public?.keys || [], membersCount: s.members?.count || 0,
+  };
 }
 
 /* Who can read a key, in words (components/AudienceBadge.js): public on the sun, private dim, the rest plain. */
@@ -219,7 +274,7 @@ function spaceTable(ctx, list, { head: head0 = true, id = '' } = {}) {
     <${List} cols="n-name-meta-latest-doors" keepCols head=${head}>
       ${shown.map(s => html`
         <${ListRow} key=${s.id}>
-          <${Num}><${Figure} small end n=${s.items.length} /><//>
+          <${Num}><${Figure} small end n=${s.count} /><//>
           <${Name} onOpen=${() => ctx.pickView({ kind: 'space', id: s.id })}
             end=${s.publicN || s.membersN ? html`<${Marks}>
               ${s.publicN ? html`<${Mark} tone="sun">${tn('profile.memory.cover.publicN', s.publicN)}<//>` : null}
@@ -272,34 +327,28 @@ function fileRows(ctx, files) {
 /* ── The cover ─────────────────────────────────────────────────────────────────────────────── */
 function renderCover(ctx) {
   const {
-    memories, files, memQuota, orgNames, agents, selectedAgent, setSelectedAgent, fedConsents, shares, groups,
+    files, memQuota, agents, selectedAgent, setSelectedAgent, fedConsents, shares, groups,
     sysOpen, setSysOpen, showSearch, setShowSearch, staleAll, setStaleAll, searchInput, setSearchInput, runServerSearch,
     searchResults, searchLoading, clearServerSearch, showMemForm, setShowMemForm, handleCreateMemory, showFileForm,
     setShowFileForm, handleUploadFiles, handleDeleteMemory, pickView,
   } = ctx;
-  const cls = classify(memories, orgNames);
-  const all = memories || [];
+  // The whole list or the server's summary, in the same words (storeOf).
+  const store = storeOf(ctx);
+  const { cls, bytes, changedToday, recent, stale } = store;
   // "Nothing here yet" is said only of a list that loaded. Before that, "Mine" carries the loading
   // line or, after a failed load, the could-not-load note with Retry; the other parts stay blank.
-  const memReady = memories !== null && memories !== undefined;
-  const memPending = ctx.memFailed ? html`<${LoadFailed} onRetry=${ctx.loadMemories} />` : html`<${Note} kind="loading" />`;
+  const memReady = store.ready;
+  const memPending = store.failed ? html`<${LoadFailed} onRetry=${ctx.loadMemories} />` : html`<${Note} kind="loading" />`;
   const none = () => (memReady ? html`<${Note} kind="quiet">${nothingYet()}<//>` : null);
-  const bytes = all.reduce((n, m) => n + (Number(m.bytes) || 0), 0);
-  const today = new Date().toDateString();
-  const changedToday = all.filter(m => new Date(m.updated_at || m.created_at || 0).toDateString() === today).length;
-  const recent = [...all].sort(byUpdated).slice(0, 5);
-  const stale = all.filter(isStale).sort((a, b) => -byUpdated(a, b));
-  const publicKeys = all.filter(m => m.visibility === 'public');
-  const membersKeys = all.filter(m => m.visibility === 'members');
   const fedKeys = Object.keys(fedConsents || {});
   const last = recent[0] || null;
   const agentName = selectedAgent ? (agents.find(a => a.gaii === selectedAgent)?.name || selectedAgent) : (t('profile.memory.defaultAgent') || 'Default agent');
-  const sysCount = cls.sys.reduce((n, s) => n + s.items.length, 0);
+  const sysCount = cls.sys.reduce((n, s) => n + s.count, 0);
   const sysBytes = cls.sys.reduce((n, s) => n + s.bytes, 0);
   const seenRows = [];
-  const publicSome = publicKeys.slice(0, 3).map(m => m.key).join(' · ') + (publicKeys.length > 3 ? ' …' : '');
-  if (publicKeys.length) seenRows.push(html`<${ListRow} key="pub"><${Name} meta=${publicSome}>${tn('profile.memory.cover.publicKeys', publicKeys.length)}<//><${Cell} line>${visMark('public')}<//><${Doors} /><//>`);
-  if (membersKeys.length) seenRows.push(html`<${ListRow} key="mem"><${Name}>${tn('profile.memory.cover.membersKeys', membersKeys.length)}<//><${Cell} line>${visMark('members')}<//><${Doors} /><//>`);
+  const publicSome = store.publicSome.join(' · ') + (store.publicCount > 3 ? ' …' : '');
+  if (store.publicCount) seenRows.push(html`<${ListRow} key="pub"><${Name} meta=${publicSome}>${tn('profile.memory.cover.publicKeys', store.publicCount)}<//><${Cell} line>${visMark('public')}<//><${Doors} /><//>`);
+  if (store.membersCount) seenRows.push(html`<${ListRow} key="mem"><${Name}>${tn('profile.memory.cover.membersKeys', store.membersCount)}<//><${Cell} line>${visMark('members')}<//><${Doors} /><//>`);
   for (const sh of shares || []) {
     const to = ' → ' + (groups.find(g => g.id === sh.group_id)?.name || sh.group_id);
     seenRows.push(html`<${ListRow} key=${'sh' + sh.id}>
@@ -313,12 +362,14 @@ function renderCover(ctx) {
   let counter = 0; const next = () => String(++counter).padStart(2, '0');
   const sections = [];
   const sec = (id, label, count, open) => { const n = next(); sections.push({ id, num: n, label, count, href: '#' + id, open }); return n; };
-  const nOwn = sec('mp-own', c('own', 'Mine'), cls.own.reduce((n, s) => n + s.items.length, 0));
-  const nOrg = sec('mp-org', c('orgs', 'Organisms’'), cls.org.reduce((n, s) => n + s.items.length, 0));
+  const ownCount = cls.own.reduce((n, s) => n + s.count, 0);
+  const orgCount = cls.org.reduce((n, s) => n + s.count, 0);
+  const nOwn = sec('mp-own', c('own', 'Mine'), ownCount);
+  const nOrg = sec('mp-org', c('orgs', 'Organisms’'), orgCount);
   const nSys = sec('mp-sys', c('sys', 'The machine’s bookkeeping'), sysCount, () => setSysOpen(true));
   const nFiles = sec('mp-files', c('files', 'Files'), (files || []).length);
   const nHist = sec('mp-history', c('happened', 'What has happened'), '→');
-  const nStale = sec('mp-stale', c('stale', 'Stale'), stale.length);
+  const nStale = sec('mp-stale', c('stale', 'Stale'), stale.count);
   const nSeen = sec('mp-seen', c('seen', 'Who else sees'), seenRows.length);
 
   const search = () => runServerSearch(searchInput, ctx.searchScopePrefix);
@@ -336,7 +387,7 @@ function renderCover(ctx) {
     <//>` : null;
 
   const marks = [
-    { label: keysN(all.length, num(all.length)) },
+    { label: keysN(store.total, num(store.total)) },
     { label: formatBytes(bytes) },
     changedToday ? { label: c('changedToday', '{n} changed today').replace('{n}', String(changedToday)), tone: 'sun' } : null,
     // Several agents: the drop-down that chooses whose memory is read. One: its name, dim (it chooses nothing).
@@ -353,9 +404,9 @@ function renderCover(ctx) {
     <//>`;
   const strip = html`
     <${FigureStrip} items=${[
-      { key: 'keys', n: num(all.length), label: c('figKeys', 'keys'), sub: `${memQuota?.max_keys ? c('figOf', 'of {n}').replace('{n}', num(memQuota.max_keys)) + ' · ' : ''}${tn('profile.memory.cover.figSpaces', cls.spaces.size)}` },
+      { key: 'keys', n: num(store.total), label: c('figKeys', 'keys'), sub: `${memQuota?.max_keys ? c('figOf', 'of {n}').replace('{n}', num(memQuota.max_keys)) + ' · ' : ''}${tn('profile.memory.cover.figSpaces', cls.spaces.size)}` },
       { key: 'bytes', n: formatBytes(memQuota?.used_bytes ?? bytes), label: '', sub: memQuota?.max_bytes ? c('figOf', 'of {n}').replace('{n}', formatBytes(memQuota.max_bytes)) : '' },
-      { key: 'stale', n: stale.length, label: c('figStale', 'stale'), sub: c('figStaleSub', 'not changed in 90 days') },
+      { key: 'stale', n: stale.count, label: c('figStale', 'stale'), sub: c('figStaleSub', 'not changed in 90 days') },
       { key: 'last', n: last ? formatRelativeTime(last.updated_at || last.created_at) : '·', tone: last ? 'coral' : undefined, label: c('figLast', 'last change'),
         sub: last ? `${agentOf(last.owner_gaii) || c('you', 'you')} ${c('wrote', 'wrote')} ${last.key}` : undefined },
     ]} />
@@ -363,10 +414,10 @@ function renderCover(ctx) {
     ${showMemForm ? html`<${SettingBox} label=${c('newEntry', '+ New entry')} irreversible><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /><//>` : null}
     ${showFileForm ? html`<${SettingBox} label=${c('upload', 'Upload a file')} irreversible><${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} /><//>` : null}`;
   const railTitle = c('railTitle', 'In your memory');
-  const shownStale = staleAll ? stale : stale.slice(0, 8);
+  const shownStale = staleAll ? stale.items : stale.items.slice(0, 8);
 
   // The start (guidance part B): what memory is for, the first prompt, and the page's own form for it.
-  const start = html`<${PageStart} id="memory" done=${memories ? cls.own.length > 0 : null}
+  const start = html`<${PageStart} id="memory" done=${memReady ? cls.own.length > 0 : null}
     action=${{ onClick: () => { setShowFileForm(false); setShowMemForm(true); } }} />`;
 
   return html`
@@ -374,13 +425,13 @@ function renderCover(ctx) {
       desc=${c('desc', 'What you and your agents have written here: notes, settings, research and the organisms’ content. Yours, and yours to decide about.')}
       actions=${actions} start=${start} strip=${strip} railTitle=${railTitle} sections=${sections} pages=${pageDoors(ctx, null)}>
       ${resultRows}
-      <${Section} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${cls.own.reduce((n, s) => n + s.items.length, 0)}
+      <${Section} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${ownCount}
         doors=${html`<${Action} small soft onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')}<//>`}>
         ${!memReady ? memPending : cls.own.length ? spaceTable(ctx, cls.own, { id: 'own' }) : none()}
         <${Note} kind="hint">${c('spaceHint', 'A key space is the first part of a key: document/pitch-2026 belongs to document. It is the unit that is shared, exported and cleaned.')}<//>
       <//>
 
-      <${Section} id="mp-org" num=${nOrg} title=${c('orgs', 'Organisms’')} count=${cls.org.reduce((n, s) => n + s.items.length, 0)}
+      <${Section} id="mp-org" num=${nOrg} title=${c('orgs', 'Organisms’')} count=${orgCount}
         doors=${html`<${Action} small soft onClick=${() => openTab('organisms')}>${t('organisms.title') || 'Organisms'} →<//>`}>
         ${cls.org.length ? spaceTable(ctx, cls.org, { id: 'org' }) : none()}
         <${Note} kind="hint">${c('orgHint', 'An organism’s content lives in your memory when you or your agents wrote it. It is managed on the organism’s page; here it shows so you know what you own and how much it takes.')}<//>
@@ -393,7 +444,9 @@ function renderCover(ctx) {
 
       <${Section} id="mp-files" num=${nFiles} title=${c('files', 'Files')} count=${(files || []).length}
         doors=${html`<${Action} small onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); setTimeout(() => scrollToSection('mp-files'), 30); }}>${c('upload', 'Upload a file')}<//>`}>
-        ${files ? fileRows(ctx, files) : (ctx.filesFailed ? html`<${LoadFailed} onRetry=${ctx.loadFiles} />` : html`<${Note} kind="loading" />`)}
+        ${files ? fileRows(ctx, files.slice(0, ctx.filesShown)) : (ctx.filesFailed ? html`<${LoadFailed} onRetry=${ctx.loadFiles} />` : html`<${Note} kind="loading" />`)}
+        ${files && files.length > ctx.filesShown ? html`<${More} label=${c('showMoreFiles', 'show {n} more').replace('{n}', String(Math.min(FILES_MORE, files.length - ctx.filesShown)))}
+          onMore=${() => ctx.setFilesShown(k => k + FILES_MORE)} />` : null}
       <//>
 
       <${Section} id="mp-history" num=${nHist} title=${c('happened', 'What has happened')}
@@ -403,7 +456,7 @@ function renderCover(ctx) {
             name=${m.key} isKey onClick=${() => pickView({ kind: 'record', key: m.key })} />`)}<//>` : none()}
       <//>
 
-      <${Section} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} count=${stale.length}>
+      <${Section} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} count=${stale.count}>
         <${Note} kind="hint">${c('staleHint', 'Keys nobody has changed in 90 days. Open one to decide; delete what no longer matters.')}<//>
         <${List} cols="key-doors" keepCols empty=${memReady ? c('noStale', 'Nothing has gone stale.') : null}>${shownStale.map(m => html`
           <${ListRow} key=${m.key}>
@@ -413,7 +466,7 @@ function renderCover(ctx) {
               <${Action} small row soft tone="danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn') || 'Delete'}<//>
             <//>
           <//>`)}<//>
-        ${stale.length > 8 && !staleAll ? html`<${More} label=${c('showAll', 'show all {n}').replace('{n}', String(stale.length))} onMore=${() => setStaleAll(true)} />` : null}
+        ${stale.count > 8 && !staleAll ? html`<${More} label=${c('showAll', 'show all {n}').replace('{n}', String(stale.count))} onMore=${() => setStaleAll(true)} />` : null}
       <//>
 
       <${Section} id="mp-seen" num=${nSeen} title=${c('seen', 'Who else sees')} count=${seenRows.length}
@@ -425,27 +478,37 @@ function renderCover(ctx) {
 
 /* ── A key space as a page ─────────────────────────────────────────────────────────────────── */
 function renderSpace(ctx, id) {
-  const { memories, orgNames, spaceSort, setSpaceSort, pickView, handleExport, addCartItems, memCartItem, deleteGroup, openSharePanel, sharePanelFor, setSharePanelFor, sharePattern, setSharePattern, shareGroupId, setShareGroupId, submitShare, groups, showMemForm, setShowMemForm, handleCreateMemory, setShowSearch, setSearchScopePrefix, sharedWith } = ctx;
-  const cls = classify(memories, orgNames);
-  const s = cls.spaces.get(id);
-  if (!s) return renderPage(ctx, { id: 'space', crumbs: [{ label: id }], title: id, children: html`<${Note} kind="quiet">${t('profile.memory.empty') || 'Nothing here.'}<//>` });
+  const { spaceSort, setSpaceSort, pickView, handleExport, addCartItems, memCartItem, deleteGroup, openSharePanel, sharePanelFor, setSharePanelFor, sharePattern, setSharePattern, shareGroupId, setShareGroupId, submitShare, groups, showMemForm, setShowMemForm, handleCreateMemory, setShowSearch, setSearchScopePrefix, sharedWith, keyPages } = ctx;
+  const store = storeOf(ctx);
+  const s = store.cls.spaces.get(id);
+  if (!s) return renderPage(ctx, { id: 'space', crumbs: [{ label: id }], title: id, children: store.ready ? html`<${Note} kind="quiet">${t('profile.memory.empty') || 'Nothing here.'}<//>` : html`<${Note} kind="loading" />` });
   const prefix = s.g.kind === 'organism' ? 'organism.' + s.g.uuid + '.' : s.g.kind === 'plain' ? s.id + '.' : '';
-  const items = [...s.items];
-  if (spaceSort === 'alpha') items.sort((a, b) => a.key.localeCompare(b.key));
-  else if (spaceSort === 'size') items.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
+  // The whole list carries the space's keys; the summary reads them a page at a time, in the
+  // server's order (memory-tab/key-pages.js). The order names stay the page's own.
+  const page = s.items ? null : keyPages.spacePages[id];
+  const items = s.items ? [...s.items] : (page?.rows || []);
+  if (s.items && spaceSort === 'alpha') items.sort((a, b) => a.key.localeCompare(b.key));
+  else if (s.items && spaceSort === 'size') items.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
+  const pageMore = page && items.length < page.total
+    ? html`<${More} disabled=${page.loading} label=${page.loading ? (t('common.loading') || 'Loading…') : c('showMoreKeys', 'show {n} more').replace('{n}', String(Math.min(100, page.total - items.length)))}
+        onMore=${() => keyPages.loadSpacePage(s, spaceSort, true)} />`
+    : null;
+  const pageState = !s.items && (!page || (page.loading && !items.length)) ? html`<${Note} kind="loading" />`
+    : page?.failed ? html`<${LoadFailed} onRetry=${() => keyPages.loadSpacePage(s, spaceSort)} />` : null;
   const kind = s.bucket === 'org' ? c('kindOrg', 'organism') : s.bucket === 'sys' ? c('kindSys', 'bookkeeping') : c('kindOwn', 'your key space');
-  const sub = html`<span>${kind}</span><span>${keysN(s.items.length)}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<${Mark} tone="sun">${tn('profile.memory.cover.publicN', s.publicN)}<//>` : null}`;
+  const sub = html`<span>${kind}</span><span>${keysN(s.count)}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<${Mark} tone="sun">${tn('profile.memory.cover.publicN', s.publicN)}<//>` : null}`;
   const doors = html`
     ${prefix ? html`<${Action} small soft onClick=${() => { setSearchScopePrefix(prefix); setShowSearch(true); pickView({ kind: 'cover' }); }}>${c('searchHere', 'Search this space')}<//>` : null}
     <${Action} small onClick=${() => setShowMemForm(v => !v)}>${c('newEntry', '+ New entry')}<//>`;
   const rail = {
     groups: [
       { label: c('thisSpace', 'This key space'), items: [
-        prefix ? { key: 'share', mark: '·', label: c('shareGroup', 'Share with a group'), count: '→', onClick: () => openSharePanel(s.items[0].key) } : null,
+        prefix ? { key: 'share', mark: '·', label: c('shareGroup', 'Share with a group'), count: '→', onClick: () => openSharePanel((s.items ? s.items[0] : s.latest)?.key || prefix) } : null,
         prefix ? { key: 'export', mark: '·', label: c('exportSpace', 'Export this space'), count: '→', onClick: () => handleExport(prefix) } : null,
-        { key: 'cart', mark: '·', label: c('toCart', 'To the collection'), count: `+${s.items.length}`, onClick: () => addCartItems(s.items.map(memCartItem)) },
+        { key: 'cart', mark: '·', label: c('toCart', 'To the collection'), count: `+${s.count}`,
+          onClick: () => (s.items ? addCartItems(s.items.map(memCartItem)) : keyPages.addSpaceToCart(s, addCartItems, memCartItem)) },
       ] },
-      prefix ? { items: [{ key: 'delete', mark: '·', label: c('deleteSpace', 'Delete the space'), count: '…', onClick: () => deleteGroup(s.g, s.items.length) }] } : null,
+      prefix ? { items: [{ key: 'delete', mark: '·', label: c('deleteSpace', 'Delete the space'), count: '…', onClick: () => deleteGroup(s.g, s.count) }] } : null,
     ],
   };
   const sorts = [['updated', c('sortUpdated', 'by change')], ['alpha', c('sortAlpha', 'alphabetical')], ['size', c('sortSize', 'largest first')]];
@@ -472,17 +535,22 @@ function renderSpace(ctx, id) {
           <${Doors}><${Action} small row onClick=${() => pickView({ kind: 'record', key: m.key })}>${c('open', 'Open')}<//><//>
         <//>`)}
     <//>
+    ${pageState}
+    ${pageMore}
     <${Space} above="medium"><${Tabs} value=${spaceSort} onSelect=${(k) => setSpaceSort(k)} items=${sorts.map(([value, label]) => ({ value, label }))} /><//>` });
 }
 
 /* ── A record as a page ────────────────────────────────────────────────────────────────────── */
 function renderRecord(ctx, key) {
-  const { memories, orgNames, showRaw, setShowRaw, valueCopyText, valueOf, setEditModal, handleQuickVis, editingMemTags, setEditingMemTags, handleUpdateMemoryTags, sharesCovering, revokeCoveringShare, openSharePanel, inCart, memCartItem, toggleCartItem, fedConsents, handleShareToFederation, handleStopSharing, togglingFed, session, doPull, doPush, handleDeleteMemory, showToast, NODE_URL, pickView } = ctx;
-  const m = (memories || []).find(x => x.key === key) || (ctx.searchResults || []).find(x => x.key === key);
+  const { memories, showRaw, setShowRaw, valueCopyText, valueOf, setEditModal, handleQuickVis, editingMemTags, setEditingMemTags, handleUpdateMemoryTags, sharesCovering, revokeCoveringShare, openSharePanel, inCart, memCartItem, toggleCartItem, fedConsents, handleShareToFederation, handleStopSharing, togglingFed, session, doPull, doPush, handleDeleteMemory, showToast, NODE_URL, pickView, fullList, keyPages } = ctx;
+  // The record's row: from the whole list, the search, or what the pages have read (key-pages.js),
+  // which reads it by its key when nothing else had it.
+  const known = fullList ? null : keyPages?.knownRow(key);
+  const m = (memories || []).find(x => x.key === key) || (ctx.searchResults || []).find(x => x.key === key) || (known && !known.missing ? known : null);
   const g = groupOfKey(key);
-  const cls = classify(memories, orgNames);
-  const space = cls.spaces.get(g.id);
+  const space = storeOf(ctx).cls.spaces.get(g.id);
   const crumbs = [{ label: space ? space.label : g.id, go: () => pickView({ kind: 'space', id: g.id }) }, { label: displayRemainder(key, g) }];
+  if (!m && !fullList && !known) return renderPage(ctx, { id: 'record', crumbs, title: key, children: html`<${Note} kind="loading" />` });
   if (!m) return renderPage(ctx, { id: 'record', crumbs, title: key, children: html`<${Note} kind="quiet">${t('profile.memory.empty') || 'Not found.'}<//>` });
   const v = valueOf(m);
   const owner = m.owner_gaii || ctx.currentGhii();

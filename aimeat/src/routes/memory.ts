@@ -7,6 +7,8 @@
  *   under src/routes/memory/ (crud, bulk, federation, files, key); this file wires
  *   them onto one router in registration order (Express matches top-to-bottom).
  * @version-history
+ *   v1.15.0 -- 2026-11-10 -- GET /v1/memory/tab takes summary=true and today_from (additive): the cover's
+ *     summary instead of every key row (services/db/memory-tab-summary.ts).
  *   v1.14.0 -- 2026-11-09 -- GET /v1/memory/history/:key (routes/memory/history.ts): a record's kept
  *     earlier versions and what each write changed; GET /v1/memory/context-check/:slug
  *     (routes/memory/context-check.ts): a machine check of one context.
@@ -87,7 +89,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   const memoryTabDb = createMemoryTabService(config, storage);
   router.get('/v1/memory/tab', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
-    const data = await memoryTabDb.overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${config.nodeId}`);
+    // Additive: summary=true sends the cover's summary instead of every key row; today_from is the
+    // reader's own midnight for "changed today".
+    const todayFrom = typeof req.query.today_from === 'string' && Number.isFinite(Date.parse(req.query.today_from))
+      ? new Date(Date.parse(req.query.today_from)).toISOString() : undefined;
+    const data = await memoryTabDb.overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${config.nodeId}`,
+      { summary: req.query.summary === 'true', todayFrom });
     res.json(success(config.nodeId, data));
   });
 
