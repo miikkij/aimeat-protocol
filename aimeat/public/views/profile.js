@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-11-09 — A tab's module is imported when the tab first opens (TABS `load`, LazyTab), not with
+ *     this file: a Settings page loaded all 53 tabs and 859 module files before (perf round 4).
  *   2026-11-08 — The "Contexts" tab (views/profile/contexts-tab.js, id 'contexts'): the person's
  *     contexts, which their AI keeps and shapes in chat, with who can read each one, archive and
  *     delete (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
@@ -70,146 +72,135 @@ import { getSession, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { apiGet } from '/js/api.js';
 import * as nodesService from '/js/services/nodes.js';
+import { swallowed } from '/js/swallowed.js';
+import { Note } from '/components/Note.js';
+import { LoadingLine } from './profile/shared.js';
 
 // === Landing page (adaptive dashboard) ===
 import LandingPage, { computeTier } from './profile/landing-page.js';
 // === The door a signed-out visitor sees ===
 import SignedOutDoor from './profile/door.js';
 
-// === Tab modules (lazy-loaded on first visit, stay mounted) ===
-import PortfolioTab from './profile/portfolio-tab.js';
-import AgentsTab from './profile/agents-tab.js';
-import FleetTab from './profile/fleet-tab.js';
-import EcosystemTab from './profile/ecosystem-tab.js';
-import ChatSessionsTab from './profile/chat-sessions-tab.js';
-import McpTab from './profile/mcp-tab.js';
-import WalletTab from './profile/wallet-tab.js';
-import UsageTab from './profile/usage-tab.js';
-import VisibilityTab from './profile/visibility-tab.js';
-import { PnlTab } from './profile/pnl-tab.js';
-import { CompaniesTab } from './profile/companies-tab.js';
-import MemoryTab from './profile/memory-tab.js';
-import ContextsTab from './profile/contexts-tab.js';
-import WorkTab from './profile/work-tab.js';
-import ServicesTab from './profile/services-tab.js';
-import BoardsTab from './profile/boards-tab.js';
-import AppsTab from './profile/apps-tab.js';
-import ExtensionsTab from './profile/extensions-tab.js';
-import FederationTab from './profile/federation-tab.js';
-import NodesTab from './profile/nodes-tab.js';
-import AccessTab from './profile/access-tab.js';
-import ExposureTab from './profile/exposure-tab.js';
-import AgreementsTab from './profile/agreements-tab.js';
-import DataWalletTab from './profile/data-wallet-tab.js';
-import SharedDataTab from './profile/shared-data-tab.js';
-import StorageTab from './profile/storage-tab.js';
-import NodeStatsTab from './profile/node-stats-tab.js';
-import AppDevTab from './profile/appdev-tab.js';
-import SecurityTab from './profile/security-tab.js';
-import EmailTab from './profile/email-tab.js';
-import KnowledgeTab from './profile/knowledge-tab.js';
-import SkillsTab from './profile/skills-tab.js';
-import OrganismsTab from './profile/organisms-tab.js';
-import OffersTab from './profile/offers-tab.js';
-import NotificationsTab from './profile/notifications-tab.js';
-import AiSettingsTab from './profile/ai-tab.js';
-import { AiTransparencyCard } from './profile/ai-transparency-card.js';
-import { DecideCard } from './profile/decide-card.js';
-import { ComplianceCard } from './profile/compliance-card.js';
-import CalibratorTab from './profile/calibrator-tab.js';
-import PackagesTab from './profile/packages-tab.js';
-import CapabilitiesTab from './profile/capabilities-tab.js';
-import SchedulerTab from './profile/scheduler-tab.js';
-import WorkflowsTab from './profile/workflows-tab.js';
-import ReceiversTab from './profile/receivers-tab.js';
-import GoalsTab from './profile/goals-tab.js';
-import InboxTab from './profile/inbox-tab.js';
-import ContactsTab from './profile/contacts-tab.js';
-import NotebookTab from './profile/notebook-tab.js';
-import LivingTab from './profile/living-tab.js';
-import DiscoverTab from './profile/discover-tab.js';
-import LibrariesTab from './profile/libraries-tab.js';
+// === Tab modules: each is imported when its tab first opens (LazyTab below), not with this file ===
+const byDefault = (m) => m.default;
 
-// Each tab has a minTier: 'new' | 'active' | 'experienced'
-// Tabs with minTier <= current tier are visible in the tab bar.
-// Deep links (?tab=X) bypass tier filtering.
 // The AI tab (route id 'ai'; 'generator' is its old name and still resolves, because the chat, the
 // home cards and two account-event links point at it): the provider settings in the poster face
 // AND, below them, the owner's own transparency view: what they published with a model in it, how
 // much of it carries a label, and what this node records about a model call (TARGET-058 Phase 8).
-function AiTab(props) {
-  // The page draws the three cards: after itself, or inside "Lisäasetukset" for a buyer (v31 K58).
-  return html`
-    <${AiSettingsTab} ...${props} extras=${html`
-      <${DecideCard} />
-      <${AiTransparencyCard} />
-      <${ComplianceCard} />`} />`;
-}
+const loadAiTab = () => Promise.all([
+  import('./profile/ai-tab.js'),
+  import('./profile/decide-card.js'),
+  import('./profile/ai-transparency-card.js'),
+  import('./profile/compliance-card.js'),
+]).then(([{ default: AiSettingsTab }, { DecideCard }, { AiTransparencyCard }, { ComplianceCard }]) =>
+  function AiTab(props) {
+    // The page draws the three cards: after itself, or inside "Lisäasetukset" for a buyer (v31 K58).
+    return html`
+      <${AiSettingsTab} ...${props} extras=${html`
+        <${DecideCard} />
+        <${AiTransparencyCard} />
+        <${ComplianceCard} />`} />`;
+  });
 
 /** Old tab ids that still arrive in links and in a remembered session. */
 const TAB_ALIASES = { generator: 'ai' };
 const canonicalTab = (id) => TAB_ALIASES[id] || id;
 
+// Each tab has a minTier: 'new' | 'active' | 'experienced'
+// Tabs with minTier <= current tier are visible in the tab bar.
+// Deep links (?tab=X) bypass tier filtering.
+// `load` resolves to the tab's component; it is called the first time the tab opens.
 const TABS = [
-  { id: 'messages',      key: 'profile.tabs.inbox',          component: InboxTab,          minTier: 'new' },
-  { id: 'contacts',      key: 'contacts.tabLabel',           component: ContactsTab,       minTier: 'new' },
-  { id: 'discover',      key: 'discover.tabLabel',           component: DiscoverTab,       minTier: 'new' },
-  { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
-  { id: 'fleet',         key: 'profile.tabs.fleet',          component: FleetTab,          minTier: 'active' },
-  { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
-  { id: 'ecosystem',     key: 'profile.tabs.ecosystem',      component: EcosystemTab,      minTier: 'active' },
-  { id: 'offers',        key: 'profile.tabs.offers',         component: OffersTab,         minTier: 'active' },
-  { id: 'scheduler',     key: 'profile.tabs.scheduler',      component: SchedulerTab,      minTier: 'active' },
-  { id: 'workflows',     key: 'profile.tabs.workflows',      component: WorkflowsTab,      minTier: 'active' },
-  { id: 'receivers',     key: 'profile.tabs.receivers',      component: ReceiversTab,      minTier: 'active' },
-  { id: 'goals',         key: 'profile.tabs.goals',          component: GoalsTab,          minTier: 'active' },
-  { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   component: ChatSessionsTab,   minTier: 'active' },
+  { id: 'messages',      key: 'profile.tabs.inbox',          load: () => import('./profile/inbox-tab.js').then(byDefault),          minTier: 'new' },
+  { id: 'contacts',      key: 'contacts.tabLabel',           load: () => import('./profile/contacts-tab.js').then(byDefault),       minTier: 'new' },
+  { id: 'discover',      key: 'discover.tabLabel',           load: () => import('./profile/discover-tab.js').then(byDefault),       minTier: 'new' },
+  { id: 'portfolio',     key: 'portfolio.tabLabel',          load: () => import('./profile/portfolio-tab.js').then(byDefault),      minTier: 'active' },
+  { id: 'fleet',         key: 'profile.tabs.fleet',          load: () => import('./profile/fleet-tab.js').then(byDefault),          minTier: 'active' },
+  { id: 'agents',        key: 'profile.tabs.agents',         load: () => import('./profile/agents-tab.js').then(byDefault),         minTier: 'active' },
+  { id: 'ecosystem',     key: 'profile.tabs.ecosystem',      load: () => import('./profile/ecosystem-tab.js').then(byDefault),      minTier: 'active' },
+  { id: 'offers',        key: 'profile.tabs.offers',         load: () => import('./profile/offers-tab.js').then(byDefault),         minTier: 'active' },
+  { id: 'scheduler',     key: 'profile.tabs.scheduler',      load: () => import('./profile/scheduler-tab.js').then(byDefault),      minTier: 'active' },
+  { id: 'workflows',     key: 'profile.tabs.workflows',      load: () => import('./profile/workflows-tab.js').then(byDefault),      minTier: 'active' },
+  { id: 'receivers',     key: 'profile.tabs.receivers',      load: () => import('./profile/receivers-tab.js').then(byDefault),      minTier: 'active' },
+  { id: 'goals',         key: 'profile.tabs.goals',          load: () => import('./profile/goals-tab.js').then(byDefault),          minTier: 'active' },
+  { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   load: () => import('./profile/chat-sessions-tab.js').then(byDefault),  minTier: 'active' },
   // 'new', not 'active': this tab hosts Hello MCP, which is the FIRST thing a brand-new user is
   // sent to. Gating it behind 'active' hid the onboarding surface from exactly the people it is for.
-  { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'new' },
-  { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },
-  { id: 'usage',         key: 'profile.tabs.usage',          component: UsageTab,          minTier: 'new' },
-  { id: 'visibility',    key: 'profile.tabs.visibility',     component: VisibilityTab,     minTier: 'new' },
-  { id: 'pnl',           key: 'profile.tabs.pnl',            component: PnlTab,            minTier: 'active' },
-  { id: 'companies',     key: 'profile.tabs.companies',      component: CompaniesTab,      minTier: 'active' },
-  { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },
-  { id: 'skills',        key: 'skills.tabLabel',             component: SkillsTab,         minTier: 'active' },
-  { id: 'organisms',     key: 'profile.tabs.organisms',      component: OrganismsTab,      minTier: 'active' },
-  { id: 'memory',        key: 'profile.tabs.memory',         component: MemoryTab,         minTier: 'new' },
-  { id: 'contexts',      key: 'profile.tabs.contexts',       component: ContextsTab,       minTier: 'new' },
-  { id: 'notebook',      key: 'profile.tabs.notebook',       component: NotebookTab,       minTier: 'new' },
-  { id: 'living',        key: 'profile.tabs.living',         component: LivingTab,         minTier: 'new' },
-  { id: 'work',          key: 'profile.tabs.work',           component: WorkTab,           minTier: 'active' },
-  { id: 'actions',       key: 'profile.tabs.services',       component: ServicesTab,       minTier: 'active' },
-  { id: 'boards',        key: 'profile.tabs.boards',         component: BoardsTab,         minTier: 'active' },
-  { id: 'apps',          key: 'profile.tabs.apps',           component: AppsTab,           minTier: 'active' },
-  { id: 'appdev',        key: 'profile.tabs.appDev',         component: AppDevTab,         minTier: 'active' },
-  { id: 'extensions',    key: 'profile.tabs.extensions',     component: ExtensionsTab,     minTier: 'active' },
-  { id: 'capabilities', key: 'capabilities.tabLabel',       component: CapabilitiesTab,   minTier: 'active' },
-  { id: 'federation',    key: 'profile.tabs.federation',     component: FederationTab,     minTier: 'experienced' },
-  { id: 'nodes',         key: 'profile.tabs.nodes',          component: NodesTab,          minTier: 'experienced' },
-  { id: 'access',        key: 'profile.tabs.access',         component: AccessTab,         minTier: 'new' },
-  { id: 'exposure',      key: 'profile.tabs.exposure',       component: ExposureTab,       minTier: 'new' },
-  { id: 'agreements',    key: 'profile.tabs.agreements',     component: AgreementsTab,     minTier: 'new' },
-  { id: 'sharedData',    key: 'profile.tabs.sharedData',     component: SharedDataTab,     minTier: 'new' },
-  { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     component: DataWalletTab,     minTier: 'active' },
-  { id: 'storage',       key: 'profile.tabs.storage',        component: StorageTab,        minTier: 'new' },
-  { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      component: NodeStatsTab,      minTier: 'experienced' },
+  { id: 'mcp',           key: 'profile.tabs.mcp',            load: () => import('./profile/mcp-tab.js').then(byDefault),            minTier: 'new' },
+  { id: 'wallet',        key: 'profile.tabs.wallet',         load: () => import('./profile/wallet-tab.js').then(byDefault),         minTier: 'new' },
+  { id: 'usage',         key: 'profile.tabs.usage',          load: () => import('./profile/usage-tab.js').then(byDefault),          minTier: 'new' },
+  { id: 'visibility',    key: 'profile.tabs.visibility',     load: () => import('./profile/visibility-tab.js').then(byDefault),     minTier: 'new' },
+  { id: 'pnl',           key: 'profile.tabs.pnl',            load: () => import('./profile/pnl-tab.js').then((m) => m.PnlTab),      minTier: 'active' },
+  { id: 'companies',     key: 'profile.tabs.companies',      load: () => import('./profile/companies-tab.js').then((m) => m.CompaniesTab), minTier: 'active' },
+  { id: 'knowledge',     key: 'knowledge.tabLabel',          load: () => import('./profile/knowledge-tab.js').then(byDefault),      minTier: 'active' },
+  { id: 'skills',        key: 'skills.tabLabel',             load: () => import('./profile/skills-tab.js').then(byDefault),         minTier: 'active' },
+  { id: 'organisms',     key: 'profile.tabs.organisms',      load: () => import('./profile/organisms-tab.js').then(byDefault),      minTier: 'active' },
+  { id: 'memory',        key: 'profile.tabs.memory',         load: () => import('./profile/memory-tab.js').then(byDefault),         minTier: 'new' },
+  { id: 'contexts',      key: 'profile.tabs.contexts',       load: () => import('./profile/contexts-tab.js').then(byDefault),       minTier: 'new' },
+  { id: 'notebook',      key: 'profile.tabs.notebook',       load: () => import('./profile/notebook-tab.js').then(byDefault),       minTier: 'new' },
+  { id: 'living',        key: 'profile.tabs.living',         load: () => import('./profile/living-tab.js').then(byDefault),         minTier: 'new' },
+  { id: 'work',          key: 'profile.tabs.work',           load: () => import('./profile/work-tab.js').then(byDefault),           minTier: 'active' },
+  { id: 'actions',       key: 'profile.tabs.services',       load: () => import('./profile/services-tab.js').then(byDefault),       minTier: 'active' },
+  { id: 'boards',        key: 'profile.tabs.boards',         load: () => import('./profile/boards-tab.js').then(byDefault),         minTier: 'active' },
+  { id: 'apps',          key: 'profile.tabs.apps',           load: () => import('./profile/apps-tab.js').then(byDefault),           minTier: 'active' },
+  { id: 'appdev',        key: 'profile.tabs.appDev',         load: () => import('./profile/appdev-tab.js').then(byDefault),         minTier: 'active' },
+  { id: 'extensions',    key: 'profile.tabs.extensions',     load: () => import('./profile/extensions-tab.js').then(byDefault),     minTier: 'active' },
+  { id: 'capabilities', key: 'capabilities.tabLabel',       load: () => import('./profile/capabilities-tab.js').then(byDefault),   minTier: 'active' },
+  { id: 'federation',    key: 'profile.tabs.federation',     load: () => import('./profile/federation-tab.js').then(byDefault),     minTier: 'experienced' },
+  { id: 'nodes',         key: 'profile.tabs.nodes',          load: () => import('./profile/nodes-tab.js').then(byDefault),          minTier: 'experienced' },
+  { id: 'access',        key: 'profile.tabs.access',         load: () => import('./profile/access-tab.js').then(byDefault),         minTier: 'new' },
+  { id: 'exposure',      key: 'profile.tabs.exposure',       load: () => import('./profile/exposure-tab.js').then(byDefault),       minTier: 'new' },
+  { id: 'agreements',    key: 'profile.tabs.agreements',     load: () => import('./profile/agreements-tab.js').then(byDefault),     minTier: 'new' },
+  { id: 'sharedData',    key: 'profile.tabs.sharedData',     load: () => import('./profile/shared-data-tab.js').then(byDefault),    minTier: 'new' },
+  { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     load: () => import('./profile/data-wallet-tab.js').then(byDefault),    minTier: 'active' },
+  { id: 'storage',       key: 'profile.tabs.storage',        load: () => import('./profile/storage-tab.js').then(byDefault),        minTier: 'new' },
+  { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      load: () => import('./profile/node-stats-tab.js').then(byDefault),     minTier: 'experienced' },
   // 'new', not 'experienced': this tab is where two-step sign-in is switched on, and that is not an
   // expert setting — it is the first thing a careful person looks for after making an account.
   // Behind 'experienced' the control existed and nobody could find it.
-  { id: 'security',      key: 'profile.tabs.security',       component: SecurityTab,       minTier: 'new' },
-  { id: 'email',         key: 'profile.tabs.email',          component: EmailTab,          minTier: 'new' },
-  { id: 'notifications', key: 'profile.tabs.notifications',  component: NotificationsTab,  minTier: 'active' },
+  { id: 'security',      key: 'profile.tabs.security',       load: () => import('./profile/security-tab.js').then(byDefault),       minTier: 'new' },
+  { id: 'email',         key: 'profile.tabs.email',          load: () => import('./profile/email-tab.js').then(byDefault),          minTier: 'new' },
+  { id: 'notifications', key: 'profile.tabs.notifications',  load: () => import('./profile/notifications-tab.js').then(byDefault),  minTier: 'active' },
   // 'new', not 'active', for the same reason as the mcp tab above: the own-key road is one of the
   // two ways OFF the node's key, offered to a brand-new person by the chat's status line — a door
   // that leads to a tab the menu refuses to show is a dead end.
-  { id: 'ai',            key: 'profile.generator.openrouter.title', component: AiTab,           minTier: 'new' },
-  { id: 'calibrator',   key: 'profile.calibrator.tabLabel', component: CalibratorTab,     minTier: 'active' },
+  { id: 'ai',            key: 'profile.generator.openrouter.title', load: loadAiTab,                                                 minTier: 'new' },
+  { id: 'calibrator',   key: 'profile.calibrator.tabLabel', load: () => import('./profile/calibrator-tab.js').then(byDefault),     minTier: 'active' },
   // 'new': the menu shows it as "Get apps" under Apps, the place a newcomer's first apps come from.
-  { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'new' },
-  { id: 'libraries',     key: 'librariesTab.tabLabel',       component: LibrariesTab,      minTier: 'new' },
+  { id: 'packages',      key: 'profile.tabs.packages',       load: () => import('./profile/packages-tab.js').then(byDefault),       minTier: 'new' },
+  { id: 'libraries',     key: 'librariesTab.tabLabel',       load: () => import('./profile/libraries-tab.js').then(byDefault),      minTier: 'new' },
 ];
+
+/** A tab's component once its module has loaded, by tab id, so a tab opened again draws at once. */
+const loadedTabs = new Map();
+
+/**
+ * One tab: its component when its module has loaded, the loading line until then. The module is
+ * imported on the first visit only; the browser keeps the module, and `loadedTabs` the component.
+ */
+function LazyTab({ tab, tabProps }) {
+  const [Component, setComponent] = useState(() => loadedTabs.get(tab.id) || null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (Component) return undefined;
+    let current = true;
+    tab.load().then(
+      (loaded) => {
+        loadedTabs.set(tab.id, loaded);
+        if (current) setComponent(() => loaded);
+      },
+      (err) => {
+        swallowed(`profile: load tab ${tab.id}`, err);
+        if (current) setFailed(true);
+      },
+    );
+    return () => { current = false; };
+  }, [tab, Component]);
+  if (Component) return html`<${Component} ...${tabProps} />`;
+  if (failed) return html`<${Note} error>${t('common.loadFailed')}<//>`;
+  return html`<${LoadingLine} />`;
+}
 
 export default function Profile({ navigate, locale }) {
   const [session, setSession] = useState(null);
@@ -354,7 +345,8 @@ export default function Profile({ navigate, locale }) {
   const renderTab = useCallback((tabId) => {
     const tab = TABS.find(t => t.id === tabId);
     if (!tab) return null;
-    return html`<${tab.component} ...${tabProps} />`;
+    // Keyed by the tab id: another tab is another LazyTab, as another component was before.
+    return html`<${LazyTab} key=${tab.id} tab=${tab} tabProps=${tabProps} />`;
   }, [tabProps]);
 
   // Get tab label by ID
