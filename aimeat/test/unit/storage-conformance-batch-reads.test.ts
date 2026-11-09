@@ -10,6 +10,8 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance-batch-reads.test.ts
  *   (with DATABASE_URL=postgresql://… for the Postgres half)
  * @version-history
+ *   v1.1.0 — 2026-11-09 — The memory lists' tag filter (SQL on SQLite now): every wanted tag, literal
+ *     characters, owners and agents.
  *   v1.0.0 — 2026-11-09 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -26,7 +28,7 @@ const NODE = 'batch-node';
 interface Provider { name: string; storage: Storage }
 const provs: Provider[] = [];
 /** What this run wrote, removed at the end so a shared Postgres database keeps nothing. */
-const made = { agents: [] as string[], files: [] as Array<[string, string]>, orgs: [] as string[], convs: [] as string[] };
+const made = { agents: [] as string[], files: [] as Array<[string, string]>, orgs: [] as string[], convs: [] as string[], memory: [] as Array<[string, string]> };
 
 beforeAll(async () => {
   if (REQUIRE_POSTGRES && !PG_URL) throw new Error('Postgres conformance requires DATABASE_URL.');
@@ -40,6 +42,7 @@ afterAll(async () => {
     for (const gaii of made.agents) await storage.deleteOnboarding(gaii).catch(() => false);
     for (const [owner, key] of made.files) await storage.deleteStorageFile(owner, key).catch(() => false);
     for (const id of made.orgs) await storage.deleteOrganism(id).catch(() => false);
+    for (const [owner] of made.memory) await storage.deleteAllMemory(owner).catch(() => 0);
     if (name === 'postgres-kysely' && made.convs.length) {
       // No delete door exists for a conversation; the rows are this run's own, removed by id.
       const db = (storage as unknown as { db: { deleteFrom: (t: string) => { where: (c: string, o: string, v: string[]) => { execute: () => Promise<unknown> } } } }).db;
@@ -114,6 +117,54 @@ describe.each([0, 1])('batch reads, provider %i', (i) => {
     const one = await storage.listConversationsForParticipants([me, agent], { limit: 1 });
     expect(one[me].map(c => c.id)).toEqual([byId[agent][0].id]);
     expect(one[agent].map(c => c.id)).toEqual([byId[agent][0].id]);
+  });
+
+  it('the memory lists keep exactly the rows that carry every wanted tag', async () => {
+    if (!p()) return;
+    const { storage } = p();
+    const t = tag();
+    const owner = `alice-${t}@${NODE}`, agent = `bot-${t}#alice-${t}@${NODE}`;
+    const now = new Date().toISOString();
+    const put = (who: string, key: string, tags: string[]) => storage.setMemory({
+      key, ownerGaii: who, value: { k: key }, visibility: 'private', tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+    made.memory.push([owner, 'a'], [owner, 'b'], [owner, 'c'], [owner, 'd'], [agent, 'e']);
+    await put(owner, 'a', ['datamap']);
+    await put(owner, 'b', ['datamap', 'workplace']);
+    await put(owner, 'c', ['50%_off', "o'brien"]);
+    await put(owner, 'd', []);
+    await put(agent, 'e', ['datamap']);
+    const keys = (rows: Array<{ key: string }>) => rows.map(r => r.key).sort();
+    expect(keys(await storage.listMemory(owner, { tags: ['datamap'] }))).toEqual(['a', 'b']);
+    expect(keys(await storage.listMemory(owner, { tags: ['datamap', 'workplace'] }))).toEqual(['b']);
+    expect(keys(await storage.listMemory(owner, { tags: ['50%_off'] }))).toEqual(['c']);
+    expect(keys(await storage.listMemory(owner, { tags: ["o'brien"] }))).toEqual(['c']);
+    expect(keys(await storage.listMemory(owner, { tags: ['50%'] }))).toEqual([]);
+    expect(keys(await storage.listMemoryMeta(owner, { tags: ['datamap'] }))).toEqual(['a', 'b']);
+    expect(keys(await storage.listMemoryForOwners([owner, agent], { tags: ['datamap'] }))).toEqual(['a', 'b', 'e']);
+    expect(keys(await storage.listMemoryMetaForOwners([owner, agent], { tags: ['workplace'] }))).toEqual(['b']);
+    expect(keys(await storage.listMemory(owner, {}))).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('countMemory with excludeExpired counts what the list holds, and the plain count stays as it was', async () => {
+    if (!p()) return;
+    const { storage } = p();
+    const owner = `carol-${tag()}@${NODE}`;
+    const now = new Date().toISOString();
+    const old = new Date(Date.now() - 5 * 3_600_000).toISOString();
+    const put = (key: string, ttlHours: number | null, createdAt: string) => storage.setMemory({
+      key, ownerGaii: owner, value: { k: key }, visibility: 'private', tags: [], ttlHours, version: 1, createdAt, updatedAt: createdAt,
+    });
+    made.memory.push([owner, 'x']);
+    await put('live', null, now);
+    await put('fresh-ttl', 24, now);
+    await put('expired', 1, old);
+    // Counted before any list, because a list may sweep the expired key away.
+    const plain = await storage.countMemory([owner]);
+    const live = await storage.countMemory([owner], { excludeExpired: true });
+    expect(plain).toBe(3);
+    expect(live).toBe(2);
+    expect((await storage.listMemoryMeta(owner, {})).length).toBe(live);
   });
 
   it('organismNames gives each existing organism its name and leaves out an unknown id', async () => {

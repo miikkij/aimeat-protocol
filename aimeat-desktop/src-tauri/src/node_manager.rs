@@ -10,19 +10,14 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
-use std::time::Instant;
 use tauri::{AppHandle, Manager};
 
-static NODE_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
-static NODE_START_TIME: Mutex<Option<Instant>> = Mutex::new(None);
-/// The port the node in NODE_PROCESS was started on, while it runs. The owner's password and token
-/// go only to that port, and only while that node runs (ensure_own_node).
-static NODE_PORT: Mutex<Option<u16>> = Mutex::new(None);
+#[path = "node_process.rs"]
+mod process;
+pub use process::{NodeStatus, Phase};
 
 /// What the owner sees when a sign-in or an AI setting would reach a port where this app's node is
 /// not running: whatever answers there is not their node.
@@ -36,19 +31,7 @@ pub fn ensure_own_node(port: u16) -> Result<(), String> {
     if stands_in_for_own_node(port) {
         return Ok(());
     }
-    let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
-    let running = matches!(process.as_mut().map(|child| child.try_wait()), Some(Ok(None)));
-    if !running {
-        return Err(NODE_NOT_RUNNING.to_string());
-    }
-    match NODE_PORT.lock().ok().and_then(|guard| *guard) {
-        Some(started) if started == port => Ok(()),
-        Some(started) => Err(format!(
-            "The AIMEAT node on this computer was started on port {}. Stop it and start it again to use port {}.",
-            started, port
-        )),
-        None => Err(NODE_NOT_RUNNING.to_string()),
-    }
+    process::ensure_owned(port)
 }
 
 /// In a normal build, nothing stands in for the node this app started.
@@ -105,14 +88,6 @@ const DEFAULT_PORT: u16 = 41050;
 const LEGACY_PORT: u16 = 40050;
 /// Default node id used when none has been configured yet.
 const DEFAULT_NODE_ID: &str = "aimeat-local-001-dev";
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct NodeStatus {
-    pub running: bool,
-    pub pid: Option<u32>,
-    pub port: u16,
-    pub uptime_seconds: Option<u64>,
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct NodeConfig {
@@ -188,11 +163,7 @@ pub fn strip_verbatim(p: PathBuf) -> PathBuf {
 fn resolve_runtime(app: &AppHandle) -> Result<Runtime, String> {
     // Writable runtime state always lives in the OS app-data dir.
     // strip_verbatim: paths passed to / used by Node must not carry the `\\?\` prefix.
-    let data_dir = strip_verbatim(
-        app.path()
-            .app_data_dir()
-            .map_err(|e| format!("Failed to resolve app data dir: {}", e))?,
-    );
+    let data_dir = data_dir(app)?;
     let env_file = data_dir.join(".env");
     let log_file = data_dir.join("aimeat-node.log");
 
@@ -241,6 +212,48 @@ fn resolve_runtime(app: &AppHandle) -> Result<Runtime, String> {
         env_file,
         log_file,
     })
+}
+
+/// A separate Desktop data root lets installed-build smoke tests use throwaway state. It never
+/// changes a node's global environment and must be an absolute path explicitly set by its parent.
+pub fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Some(value) = std::env::var_os("AIMEAT_DESKTOP_DATA_DIR") {
+        let path = PathBuf::from(value);
+        if !path.is_absolute() { return Err("AIMEAT_DESKTOP_DATA_DIR must be an absolute path.".into()); }
+        return Ok(strip_verbatim(path));
+    }
+    app.path().app_data_dir().map(strip_verbatim)
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))
+}
+
+/// Desktop-only preferences share the data lease without creating or migrating the node .env.
+pub(crate) fn with_desktop_data<T>(app: &AppHandle, operation: impl FnOnce(&Path) -> Result<T, String>) -> Result<T, String> {
+    let _guard = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;
+    let root = data_dir(app)?;
+    let _data_lock = process::config_lock(&root)?;
+    operation(&root)
+}
+
+/// Diagnostics inspects these paths without initializing configuration or starting the node.
+pub(crate) fn diagnostic_runtime(app: &AppHandle) -> Result<(PathBuf, PathBuf, PathBuf), String> {
+    let runtime = resolve_runtime(app)?;
+    Ok((runtime.node_bin, runtime.server_entry, runtime.env_file))
+}
+
+/// Hold the same lock as start/stop throughout an offline backup or restore.
+pub fn with_stopped_node<T>(app: &AppHandle, operation: impl FnOnce(&Path) -> Result<T, String>) -> Result<T, String> {
+    let _guard = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;
+    process::ensure_stopped()?;
+    let root = data_dir(app)?;
+    let _data_lock = process::lock_data(&root)?;
+    operation(&root)
+}
+
+/// Local AI and configuration writes share this lock with offline backups.
+pub fn with_config_file<T>(app: &AppHandle, operation: impl FnOnce(&Path) -> Result<T, String>) -> Result<T, String> {
+    let _guard = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;
+    let _data_lock = process::config_lock(&data_dir(app)?)?;
+    operation(&resolve_env_file(app)?)
 }
 
 /// Generate a 256-bit secret as a 64-char lowercase hex string, from the OS CSPRNG.
@@ -401,12 +414,11 @@ fn encryption_configured(vars: &HashMap<String, String>) -> bool {
 
 #[tauri::command]
 pub fn start_node(app: AppHandle) -> Result<u32, String> {
-    let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
-    if process.is_some() {
-        return Err("Node is already running".to_string());
-    }
-
+    let _operation = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;
+    let result = (|| {
+    if process::running() { return Err("The node is already running.".into()); }
     let rt = resolve_runtime(&app)?;
+    let data_lock = process::lock_data(&rt.data_dir)?;
     ensure_env_file(&rt)?;
     std::fs::create_dir_all(rt.data_dir.join("data"))
         .map_err(|e| format!("Failed to create data subdir: {}", e))?;
@@ -419,174 +431,33 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
         ));
     }
 
-    // Dated session header so the log carries date/time even if the node crashes.
-    log_marker(&rt.log_file, "AIMEAT node starting");
-    // Diagnostic: record the resolved spawn paths (these must NOT carry a `\\?\` prefix).
-    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&rt.log_file) {
-        let _ = writeln!(f, "  node:  {}", rt.node_bin.display());
-        let _ = writeln!(f, "  entry: {}", rt.server_entry.display());
-        let _ = writeln!(f, "  cwd:   {}", rt.data_dir.display());
-        let _ = writeln!(f, "  env:   {}", rt.env_file.display());
-    }
-
-    // Capture stdout/stderr to the log file.
-    let log_stdout = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&rt.log_file)
-        .map_err(|e| format!("Failed to open log file: {}", e))?;
-    make_private(&rt.log_file, 0o600)?;
-    let log_stderr = log_stdout
-        .try_clone()
-        .map_err(|e| format!("Failed to clone log file handle: {}", e))?;
-
-    // Spawn:  node --env-file <env> <entry> start    (cwd = writable data dir)
-    let mut cmd = Command::new(&rt.node_bin);
-    cmd.arg("--env-file")
-        .arg(&rt.env_file)
-        .arg(&rt.server_entry)
-        .arg("start")
-        .current_dir(&rt.data_dir)
-        .stdout(Stdio::from(log_stdout))
-        .stderr(Stdio::from(log_stderr));
-    // Windows: suppress the spawned node.exe console window (CREATE_NO_WINDOW).
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000);
-    }
-    let child = cmd.spawn().map_err(|e| {
-        format!("Failed to start node ({}): {}", rt.node_bin.display(), e)
-    })?;
-
-    let pid = child.id();
-    *process = Some(child);
-    // The port this node was started on, from the .env it was started with.
-    let started_port = std::fs::read_to_string(&rt.env_file)
-        .ok()
-        .and_then(|content| parse_env(&content).get("AIMEAT_PORT").and_then(|v| v.parse().ok()))
-        .unwrap_or(DEFAULT_PORT);
-    if let Ok(mut port) = NODE_PORT.lock() {
-        *port = Some(started_port);
-    }
-
-    if let Ok(mut start_time) = NODE_START_TIME.lock() {
-        *start_time = Some(Instant::now());
-    }
-
-    // Keep the tray icon in sync (running). refresh_tray must not lock NODE_PROCESS.
-    crate::tray::refresh_tray(&app, true);
-
-    Ok(pid)
+    process::start(&app, &rt, data_lock)
+    })();
+    if let Err(message) = &result { process::record_failure(&app, message); }
+    result
 }
 
-/// Kill the node sidecar unconditionally (used by the app's exit handler so the server doesn't
-/// linger and lock node.exe / better_sqlite3.node for the next install).
-pub fn kill_node() {
-    if let Ok(mut process) = NODE_PROCESS.lock() {
-        if let Some(mut child) = process.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
-    if let Ok(mut start_time) = NODE_START_TIME.lock() {
-        *start_time = None;
-    }
-    if let Ok(mut port) = NODE_PORT.lock() {
-        *port = None;
-    }
+/// Used by Quit and the updater: drain the server before its binaries or data are touched.
+pub fn shutdown_node(app: &AppHandle) -> Result<(), String> {
+    process::stop(app, None)
 }
 
 #[tauri::command]
-pub fn stop_node(app: AppHandle, pid: u32) -> Result<(), String> {
-    let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
-    if let Some(ref mut child) = *process {
-        if child.id() == pid {
-            child
-                .kill()
-                .map_err(|e| format!("Failed to stop node: {}", e))?;
-            *process = None;
-
-            if let Ok(mut start_time) = NODE_START_TIME.lock() {
-                *start_time = None;
-            }
-            if let Ok(mut port) = NODE_PORT.lock() {
-                *port = None;
-            }
-
-            if let Ok(rt) = resolve_runtime(&app) {
-                log_marker(&rt.log_file, "AIMEAT node stopped");
-            }
-
-            crate::tray::refresh_tray(&app, false);
-            return Ok(());
-        }
-    }
-    Err("No matching node process found".to_string())
+pub async fn stop_node(app: AppHandle, pid: u32) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || process::stop(&app, Some(pid)))
+        .await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub fn get_node_status(app: AppHandle) -> Result<NodeStatus, String> {
-    let port = read_configured_port(&app);
-    let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
-
-    // Reap a process that exited on its own (e.g. crashed at startup) so the UI
-    // doesn't keep reporting "running" for a dead node.
-    let exited = matches!(
-        process.as_mut().map(|child| child.try_wait()),
-        Some(Ok(Some(_)))
-    );
-    if exited {
-        *process = None;
-        if let Ok(mut start_time) = NODE_START_TIME.lock() {
-            *start_time = None;
-        }
-        if let Ok(mut port) = NODE_PORT.lock() {
-            *port = None;
-        }
-        // The node died on its own — reflect "stopped" in the tray.
-        crate::tray::refresh_tray(&app, false);
-    }
-
-    let uptime = NODE_START_TIME
-        .lock()
-        .ok()
-        .and_then(|guard| guard.map(|start| start.elapsed().as_secs()));
-
-    match &*process {
-        Some(child) => Ok(NodeStatus {
-            running: true,
-            pid: Some(child.id()),
-            port,
-            uptime_seconds: uptime,
-        }),
-        None => Ok(NodeStatus {
-            running: false,
-            pid: None,
-            port,
-            uptime_seconds: None,
-        }),
-    }
-}
-
-/// Read the configured AIMEAT_PORT from the managed `.env`, falling back to the default.
-fn read_configured_port(app: &AppHandle) -> u16 {
-    if let Ok(rt) = resolve_runtime(app) {
-        if let Ok(content) = std::fs::read_to_string(&rt.env_file) {
-            if let Some(port) = parse_env(&content)
-                .get("AIMEAT_PORT")
-                .and_then(|v| v.parse().ok())
-            {
-                return port;
-            }
-        }
-    }
-    DEFAULT_PORT
+    process::status(&app)
 }
 
 #[tauri::command]
 pub fn write_config(app: AppHandle, config: NodeConfig) -> Result<(), String> {
+    let _operation = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;
     let rt = resolve_runtime(&app)?;
+    let _data_lock = process::config_lock(&rt.data_dir)?;
     ensure_env_file(&rt)?;
 
     let existing = std::fs::read_to_string(&rt.env_file).unwrap_or_default();
@@ -595,12 +466,31 @@ pub fn write_config(app: AppHandle, config: NodeConfig) -> Result<(), String> {
     let env_content = crate::local_ai::sync_env(&compose_env(&existing, &config)?)?;
     std::fs::write(&rt.env_file, env_content)
         .map_err(|e| format!("Failed to write config: {}", e))?;
-    make_private(&rt.env_file, 0o600)
+    make_private(&rt.env_file, 0o600)?;
+    process::publish(&app);
+    Ok(())
 }
 
 /// The .env `write_config` writes: the keys this app manages from `config`, then every other line of
 /// `existing` as it was.
 fn compose_env(existing: &str, config: &NodeConfig) -> Result<String, String> {
+    if config.port < 1024 {
+        return Err("Choose a port from 1024 to 65535.".into());
+    }
+    for value in [Some(config.node_id.as_str()), Some(config.federation_role.as_str()), config.genesis_url.as_deref(), config.ai_endpoint.as_deref()].into_iter().flatten() {
+        if value.chars().any(|c| matches!(c, '\n' | '\r' | '"' | '\0')) {
+            return Err("A setting contains an invalid line break or quote.".into());
+        }
+    }
+    if config.node_id.trim().is_empty() || !["standalone", "personal", "contributor", "operator"].contains(&config.federation_role.as_str()) {
+        return Err("The identifier or federation role is invalid.".into());
+    }
+    if let Some(url) = config.genesis_url.as_deref().filter(|u| !u.is_empty()) {
+        let parsed = reqwest::Url::parse(url).map_err(|_| "Give a valid http or https address.".to_string())?;
+        if !["http", "https"].contains(&parsed.scheme()) || !parsed.username().is_empty() || parsed.password().is_some() {
+            return Err("Give an http or https address without a username or password.".into());
+        }
+    }
     // The listen address is written only when the person chose one; otherwise the line (or its
     // absence, on an install from before this setting) stays as it is.
     let bind_host = config.bind_host.as_deref().map(str::trim).filter(|h| !h.is_empty());
@@ -681,7 +571,9 @@ pub(crate) fn resolve_env_file(app: &AppHandle) -> Result<PathBuf, String> {
 /// Read the AIMEAT `.env` configuration and return parsed values.
 #[tauri::command]
 pub fn read_config(app: AppHandle) -> Result<NodeConfig, String> {
+    let _operation = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;
     let rt = resolve_runtime(&app)?;
+    let _data_lock = process::config_lock(&rt.data_dir)?;
     ensure_env_file(&rt)?;
 
     let content = std::fs::read_to_string(&rt.env_file)
@@ -717,30 +609,22 @@ pub fn read_config(app: AppHandle) -> Result<NodeConfig, String> {
 #[tauri::command]
 pub fn read_node_logs(app: AppHandle, lines: Option<usize>) -> Result<Vec<String>, String> {
     let rt = resolve_runtime(&app)?;
-    let max_lines = lines.unwrap_or(200);
-
-    let file =
-        File::open(&rt.log_file).map_err(|e| format!("Failed to open log file: {}", e))?;
-
-    let reader = BufReader::new(file);
-    let all_lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
-
-    let start = all_lines.len().saturating_sub(max_lines);
-    Ok(all_lines[start..].to_vec())
+    process::tail(&rt.log_file, lines.unwrap_or(200))
 }
 
 /// Clear the node log file.
 #[tauri::command]
 pub fn clear_node_logs(app: AppHandle) -> Result<(), String> {
     let rt = resolve_runtime(&app)?;
-    std::fs::write(&rt.log_file, "")
-        .map_err(|e| format!("Failed to clear log file: {}", e))
+    process::clear_log(&rt.log_file)
 }
 
 /// Open the node's web portal in the user's default browser (uses the configured port).
 #[tauri::command]
 pub fn open_portal(app: AppHandle) -> Result<(), String> {
-    let port = read_configured_port(&app);
+    let status = process::status(&app)?;
+    ensure_own_node(status.port)?;
+    let port = status.port;
     let url = format!("http://localhost:{}/v1/portal", port);
     crate::opener::open_url(&url)
 }
@@ -777,19 +661,7 @@ pub(crate) fn parse_env(content: &str) -> HashMap<String, String> {
 /// Check whether the node process is currently running.
 /// Used by the tray module to determine menu state and tooltip text.
 pub fn is_node_running() -> bool {
-    NODE_PROCESS
-        .lock()
-        .map(|guard| guard.is_some())
-        .unwrap_or(false)
-}
-
-/// Get the PID of the running node process, if any.
-/// Used by the tray module to call stop_node with the correct PID.
-pub fn get_node_pid() -> Option<u32> {
-    NODE_PROCESS
-        .lock()
-        .ok()
-        .and_then(|guard| guard.as_ref().map(|child| child.id()))
+    process::running()
 }
 
 #[cfg(test)]

@@ -60,16 +60,26 @@ pub async fn detect_ai_services() -> Result<Vec<AIService>, String> {
 
 /// Log in to a node (by base URL) as an owner and return the owner JWT.
 /// POST {base}/v1/ghii/login { username, password } -> { data: { token } }.
+#[cfg(test)]
 pub async fn login_at(base_url: &str, username: &str, password: &str) -> Result<String, String> {
+    login_with_code_at(base_url, username, password, None, None).await
+}
+
+async fn login_with_code_at(base_url: &str, username: &str, password: &str, totp_code: Option<&str>, backup_code: Option<&str>) -> Result<String, String> {
     let url = format!("{}/v1/ghii/login", base_url.trim_end_matches('/'));
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| e.to_string())?;
 
+    let mut credentials = serde_json::json!({ "username": username, "password": password });
+    if let Some(code) = totp_code.filter(|c| !c.trim().is_empty()) { credentials["totp_code"] = code.trim().into(); }
+    if let Some(code) = backup_code.filter(|c| !c.trim().is_empty()) { credentials["backup_code"] = code.trim().into(); }
     let resp = client
         .post(&url)
-        .json(&serde_json::json!({ "username": username, "password": password }))
+        .json(&credentials)
         .send()
         .await
         .map_err(|e| format!("Cannot reach {}: {}", base_url, e))?;
@@ -81,27 +91,30 @@ pub async fn login_at(base_url: &str, username: &str, password: &str) -> Result<
         .map_err(|e| format!("Unexpected response from node: {}", e))?;
 
     if !status.is_success() {
-        let msg = body
-            .pointer("/error/message")
-            .and_then(|m| m.as_str())
-            .unwrap_or("Login failed");
-        return Err(msg.to_string());
+        return Err(node_message(&body, "Login failed"));
     }
 
     body.pointer("/data/token")
         .and_then(|t| t.as_str())
+        .filter(|t| !t.trim().is_empty())
         .map(|t| t.to_string())
         .ok_or_else(|| {
-            "Login succeeded but no token was returned (this account may require a TOTP code).".to_string()
+            "[SIGN_IN_SETUP_REQUIRED] Finish setting up two-step sign-in in your AIMEAT browser window, then sign in here.".to_string()
         })
 }
 
 /// Owner login against the AIMEAT on this machine, by port (the machine room's AI section).
-#[tauri::command]
+#[cfg(test)]
 pub async fn node_login(port: u16, username: String, password: String) -> Result<String, String> {
     // The password goes only to the node this app started, while it runs (node_manager.rs).
     crate::node_manager::ensure_own_node(port)?;
-    login_at(&format!("http://localhost:{}", port), &username, &password).await
+    login_at(&format!("http://127.0.0.1:{}", port), &username, &password).await
+}
+
+#[tauri::command]
+pub async fn node_login_with_code(port: u16, username: String, password: String, totp_code: Option<String>, backup_code: Option<String>) -> Result<String, String> {
+    crate::node_manager::ensure_own_node(port)?;
+    login_with_code_at(&format!("http://127.0.0.1:{}", port), &username, &password, totp_code.as_deref(), backup_code.as_deref()).await
 }
 
 /// The AI settings currently stored for the signed-in owner (for display).
@@ -111,6 +124,8 @@ pub struct AiSettings {
     pub base_url: String,
     pub model: String,
     pub has_api_key: bool,
+    pub health: String,
+    pub text_default: bool,
 }
 
 // ── The owner's AI connection, through the provider routes ──────────────────────────────────
@@ -123,8 +138,6 @@ pub struct AiSettings {
 // and on 4.0.0 alike. The web screens do the same through aimeat/public/js/services/ai-connection.js.
 
 /// The provider ids the setting from before providers becomes on the node.
-const CONNECTION_IDS: [&str; 3] = ["openrouter", "lmstudio", "custom"];
-
 /// The provider this app writes: an address on this computer the person chose.
 const DESKTOP_PROVIDER: &str = "custom";
 
@@ -134,16 +147,22 @@ const VIEW_ONLY_FIELDS: [&str; 2] = ["model_status", "model_retires_at"];
 fn node_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| e.to_string())
 }
 
 /// The node's own message from a refusal, or `fallback`.
 fn node_message(body: &serde_json::Value, fallback: &str) -> String {
-    body.pointer("/error/message")
+    let message = body.pointer("/error/message")
         .and_then(|m| m.as_str())
         .unwrap_or(fallback)
-        .to_string()
+        .to_string();
+    match body.pointer("/error/code").and_then(|v| v.as_str()) {
+        Some(code) => format!("[{}] {}", code, message),
+        None => message,
+    }
 }
 
 fn str_at<'a>(v: &'a serde_json::Value, pointer: &str) -> &'a str {
@@ -164,39 +183,48 @@ fn in_use(p: &serde_json::Value) -> bool {
             .unwrap_or(false)
 }
 
-/// The owner's connection among the providers of GET /v1/ai/providers, or None: the provider this
-/// app writes when it is in use, then the migrated one, then one in use or with a key, then one that
-/// needs no key, then any. The node's own providers are never the owner's connection.
+/// Prefer the owner's first text routing default, whether it selects an owner or node provider.
+/// Without that default, keep the legacy owner selection, then the local provider Desktop carries
+/// into the node. Unrelated node providers are not shown as the owner's saved connection.
 fn connection_of(view: &serde_json::Value) -> Option<&serde_json::Value> {
+    let providers = view.pointer("/data/providers").and_then(|v| v.as_array());
+    let default = view.pointer("/data/routing/defaults/text/0").and_then(|v| v.as_str());
+    if let Some(selected) = providers.and_then(|list| list.iter().find(|p| Some(str_at(p, "/id")) == default)) {
+        return Some(selected);
+    }
     let own: Vec<&serde_json::Value> = view
         .pointer("/data/providers")
         .and_then(|p| p.as_array())
         .map(|list| {
             list.iter()
-                .filter(|p| str_at(p, "/source") == "owner" && CONNECTION_IDS.contains(&str_at(p, "/id")))
+                .filter(|p| str_at(p, "/source") == "owner")
                 .collect()
         })
         .unwrap_or_default();
     let has_key = |p: &serde_json::Value| p.pointer("/auth/has_key").and_then(|b| b.as_bool()) == Some(true);
-    own.iter().find(|p| str_at(p, "/id") == DESKTOP_PROVIDER && in_use(p))
+    own.iter().find(|p| Some(str_at(p, "/id")) == default)
+        .or_else(|| own.iter().find(|p| str_at(p, "/id") == DESKTOP_PROVIDER && in_use(p)))
         .or_else(|| own.iter().find(|p| p.get("migrated_from").is_some()))
         .or_else(|| own.iter().find(|p| in_use(p) || has_key(p)))
         .or_else(|| own.iter().find(|p| str_at(p, "/auth/type") == "none"))
         .or_else(|| own.first())
         .copied()
+        .or_else(|| providers.and_then(|list| list.iter().find(|p| str_at(p, "/id") == crate::local_ai::PROVIDER_ID && str_at(p, "/source") == "node")))
 }
 
 /// The connection in the fields the machine room shows. No connection reads as empty: the node's
 /// own default answers.
 fn settings_of(p: Option<&serde_json::Value>) -> AiSettings {
     let Some(p) = p else {
-        return AiSettings { provider: String::new(), base_url: String::new(), model: String::new(), has_api_key: false };
+        return AiSettings { provider: String::new(), base_url: String::new(), model: String::new(), has_api_key: false, health: "untested".into(), text_default: false };
     };
     AiSettings {
         provider: str_at(p, "/id").to_string(),
         base_url: if str_at(p, "/type") == "openrouter" { String::new() } else { str_at(p, "/base_url").to_string() },
         model: str_at(p, "/capabilities/text/model").to_string(),
         has_api_key: p.pointer("/auth/has_key").and_then(|b| b.as_bool()) == Some(true),
+        health: p.pointer("/health/text/status").and_then(|s| s.as_str()).unwrap_or("untested").to_string(),
+        text_default: false,
     }
 }
 
@@ -259,6 +287,11 @@ async fn providers_view(client: &reqwest::Client, base: &str, token: &str) -> Re
     if !status.is_success() {
         return Err(node_message(&body, "Failed to read AI settings"));
     }
+    // An unknown view is not an empty account: saving from it would lose the existing custom
+    // provider's key setting and other capabilities. Refuse before any write or model test.
+    if body.pointer("/data/providers").and_then(|v| v.as_array()).is_none() {
+        return Err("[AI_SETTINGS_UNREADABLE] The node did not return its AI provider list. No settings were changed.".into());
+    }
     Ok(body)
 }
 
@@ -266,18 +299,17 @@ async fn providers_view(client: &reqwest::Client, base: &str, token: &str) -> Re
 #[tauri::command]
 pub async fn get_ai_settings(port: u16, token: String) -> Result<AiSettings, String> {
     crate::node_manager::ensure_own_node(port)?;
-    let base = format!("http://localhost:{}", port);
+    let base = format!("http://127.0.0.1:{}", port);
     let view = providers_view(&node_client()?, &base, &token).await?;
-    Ok(settings_of(connection_of(&view)))
+    let mut settings = settings_of(connection_of(&view));
+    settings.text_default = view.pointer("/data/routing/defaults/text/0").and_then(|v| v.as_str()) == Some(settings.provider.as_str());
+    Ok(settings)
 }
 
 /// Save the chosen AI endpoint as the owner's `custom` provider, in use for text:
 /// PUT /v1/ai/providers/custom { type: "openai-compatible", baseUrl, auth, capabilities }, then,
-/// when the node has not tested its text capability yet, POST /v1/ai/providers/custom/test once, as
-/// the node routes to an owner's provider only once its capability was tested (under the rule
-/// "only tested providers"). The test is one short call to the chosen server and costs nothing
-/// (accept_cost false); a failed test is not an error here, because the AI page's providers table
-/// shows it.
+/// POST /v1/ai/providers/custom/test once. A saved provider is not proof that its model works.
+/// A remote provider can charge for the text test. The UI explains this before the save action.
 #[tauri::command]
 pub async fn save_ai_endpoint(
     port: u16,
@@ -286,9 +318,23 @@ pub async fn save_ai_endpoint(
     model: String,
 ) -> Result<(), String> {
     crate::node_manager::ensure_own_node(port)?;
-    let base = format!("http://localhost:{}", port);
+    let endpoint = reqwest::Url::parse(&base_url).map_err(|_| "[INVALID_ADDRESS] Enter a full http or https address.".to_string())?;
+    if !matches!(endpoint.scheme(), "http" | "https") || endpoint.host_str().is_none()
+        || !endpoint.username().is_empty() || endpoint.password().is_some() || endpoint.query().is_some() || endpoint.fragment().is_some() {
+        return Err("[INVALID_ADDRESS] Use an http or https address without credentials, a query or a fragment.".into());
+    }
+    if model.trim().is_empty() { return Err("[MODEL_REQUIRED] Choose a model before testing this connection.".into()); }
+    let base = format!("http://127.0.0.1:{}", port);
     let client = node_client()?;
     let view = providers_view(&client, &base, &token).await?;
+    let carried = view.pointer("/data/providers").and_then(|v| v.as_array()).and_then(|list| list.iter().find(|p| {
+        str_at(p, "/id") == crate::local_ai::PROVIDER_ID && str_at(p, "/source") == "node"
+            && trimmed_url(str_at(p, "/base_url")) == trimmed_url(&base_url)
+            && str_at(p, "/capabilities/text/model") == model.trim()
+    }));
+    if carried.is_some() {
+        return test_provider(&client, &base, &token, crate::local_ai::PROVIDER_ID).await;
+    }
     let existing = view
         .pointer("/data/providers")
         .and_then(|p| p.as_array())
@@ -307,21 +353,28 @@ pub async fn save_ai_endpoint(
     let status = resp.status();
     let body: serde_json::Value = resp.json().await.unwrap_or_default();
     if !status.is_success() {
+        let local_policy_problem = "baseUrl: on this public node an owner's provider cannot be on the node's own machine. Your own computer connects through the desktop app, not by address.";
+        if str_at(&body, "/error/code") == "INVALID_PROVIDER"
+            && str_at(&body, "/error/message") == local_policy_problem
+            && crate::local_ai::local_ai_of(&base_url, &model).is_some() {
+            return Err("[LOCAL_AI_RESTART_REQUIRED] This local model needs a node provider. Save it for this computer, restart the node, then test it.".into());
+        }
         return Err(node_message(&body, "Failed to save AI settings"));
     }
+    test_provider(&client, &base, &token, DESKTOP_PROVIDER).await
+}
 
-    let tested = matches!(
-        body.pointer("/data/provider/health/text/status").and_then(|s| s.as_str()),
-        Some(s) if s != "untested"
-    );
-    if !model.trim().is_empty() && !tested {
-        // Best effort: the outcome is recorded on the node and shown on the AI page.
-        let _ = client
-            .post(format!("{}/v1/ai/providers/{}/test", base, DESKTOP_PROVIDER))
-            .bearer_auth(&token)
+async fn test_provider(client: &reqwest::Client, base: &str, token: &str, id: &str) -> Result<(), String> {
+    let tested = client
+            .post(format!("{}/v1/ai/providers/{}/test", base, id))
+            .bearer_auth(token)
             .json(&serde_json::json!({ "capability": "text", "accept_cost": false }))
             .send()
-            .await;
+            .await.map_err(|e| format!("[AI_TEST_FAILED] The provider was saved, but its model test could not finish: {}", e))?;
+    let status = tested.status();
+    let result: serde_json::Value = tested.json().await.unwrap_or_default();
+    if !status.is_success() || result.pointer("/data/ok").and_then(|v| v.as_bool()) != Some(true) {
+        return Err(format!("[AI_TEST_FAILED] The provider was saved, but its model test failed. {}", node_message(&result, "No successful model response was returned.")));
     }
     Ok(())
 }
@@ -381,15 +434,15 @@ mod tests {
 
     /// One request the stub node received: method, path and body.
     #[derive(Clone, Debug)]
-    struct Seen {
-        method: String,
-        path: String,
-        body: serde_json::Value,
+    pub(super) struct Seen {
+        pub(super) method: String,
+        pub(super) path: String,
+        pub(super) body: serde_json::Value,
     }
 
     /// A node on a free local port that answers each request with `answer(method, path)` and
     /// records what it received. Every response closes its connection, so a request is one connection.
-    fn stub_node(
+    pub(super) fn stub_node(
         answer: impl Fn(&str, &str) -> (u16, serde_json::Value) + Send + 'static,
     ) -> (u16, Arc<Mutex<Vec<Seen>>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -441,7 +494,7 @@ mod tests {
         (port, seen)
     }
 
-    fn not_found() -> (u16, serde_json::Value) {
+    pub(super) fn not_found() -> (u16, serde_json::Value) {
         (404, serde_json::json!({ "error": { "code": "NOT_FOUND", "message": "No such route on the stub node." } }))
     }
 
@@ -511,6 +564,38 @@ mod tests {
         assert_eq!(test.body["capability"], "text");
         assert_eq!(test.body["accept_cost"], false);
         assert!(seen.iter().all(|s| !s.path.starts_with("/v1/openrouter")), "{:?}", seen);
+    }
+
+    #[test]
+    fn a_failed_ai_test_never_reports_successful_setup() {
+        for status in [200, 503] {
+            let (port, _) = stub_node(move |method, path| match (method, path) {
+                ("GET", "/v1/ai/providers") => (200, serde_json::json!({ "data": { "providers": [] } })),
+                ("PUT", "/v1/ai/providers/custom") => (200, serde_json::json!({ "data": { "provider": {
+                    "id": "custom", "source": "owner", "health": {} } } })),
+                ("POST", "/v1/ai/providers/custom/test") => (status, serde_json::json!({
+                    "data": { "ok": false }, "error": { "message": "The model did not answer." } })),
+                _ => not_found(),
+            });
+            let result = tauri::async_runtime::block_on(save_ai_endpoint(
+                port, "jwt".into(), "http://localhost:11434/v1".into(), "missing".into(),
+            ));
+            assert!(result.is_err(), "A failed model test must not report success ({status})");
+        }
+    }
+
+    #[test]
+    fn the_configured_text_default_is_displayed_under_its_own_name() {
+        let view = serde_json::json!({ "data": {
+            "routing": { "defaults": { "text": ["my-local"] } },
+            "providers": [
+                { "id": "custom", "source": "owner", "capabilities": { "text": { "pool": true } } },
+                { "id": "my-local", "source": "owner", "type": "openai-compatible",
+                  "base_url": "http://localhost:1234/v1", "capabilities": { "text": { "model": "local-model" } } }
+            ]
+        } });
+        let selected = settings_of(connection_of(&view));
+        assert_eq!(selected.provider, "my-local");
     }
 
     #[test]
@@ -638,3 +723,7 @@ mod tests {
         assert_eq!(seen[0].body["username"], "owner");
     }
 }
+
+#[cfg(test)]
+#[path = "ai_connector_regressions.rs"]
+mod regressions;

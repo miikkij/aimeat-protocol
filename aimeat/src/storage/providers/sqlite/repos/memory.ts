@@ -18,6 +18,7 @@
  *   listKeyActivity
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   2026-11-09 — tagsSql: a wanted tag tested in SQL on the row's JSON tag list.
  *   2026-11-04 — sumMemoryBytes reads the kept total (memory_totals) (codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — memoryPageSql: the page of a keyspace listing in SQL (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
@@ -104,6 +105,20 @@ export function memoryPageSql(opts: MemoryListOpts | undefined, nowIso: string):
   };
 }
 
+/**
+ * Each wanted tag as a test in SQL on the row's JSON tag list, so a row without it is never read:
+ * the tag was tested in JavaScript after every row of the owner, values included, had been read and
+ * parsed (readAgentTies read 35 564 rows to find none, 374 ms at 20 000 keys, 2026-11-09). The
+ * caller's own check after the read stays, so the answer is the same.
+ */
+export function tagsSql(tags?: readonly string[]): { sql: string; params: string[] } {
+  if (!tags?.length) return { sql: '', params: [] };
+  return {
+    sql: tags.map(() => ' AND EXISTS (SELECT 1 FROM json_each(memory.tags) WHERE json_each.value = ?)').join(''),
+    params: [...tags],
+  };
+}
+
 export function archivedSql(archived?: ArchiveFilter): string {
   const notDeleted = NOT_DELETED_SQL;
   if (archived === 'include') return notDeleted;
@@ -180,7 +195,7 @@ export function countMemoryWithOrigins(db: Database.Database): number {
   return row.c;
 }
 
-export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] }): number {
+export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[]; excludeExpired?: boolean }): number {
   if (ownerGaiis.length === 0) return 0;
   const placeholders = ownerGaiis.map(() => '?').join(',');
   let sql = `SELECT COUNT(DISTINCT key) AS c FROM memory WHERE ownerGaii IN (${placeholders})`;
@@ -189,8 +204,10 @@ export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: 
   for (const p of opts?.excludePrefixes ?? []) { sql += ' AND key NOT GLOB ?'; params.push(globPrefix(p)); }
   if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
   sql += archivedSql(opts?.archived);
-  // NB: does not subtract not-yet-pruned TTL-expired rows (a stat-display approximation); the
-  // value-loading list path prunes those lazily. Negligible for a "N Muistit" counter.
+  // Without `excludeExpired` it does not subtract not-yet-pruned TTL-expired rows (a stat-display
+  // approximation); the list paths prune those lazily. With it, the lists' own rule, in SQL: the
+  // expression the expiry index (schema-memory-indexes.ts) is built on.
+  if (opts?.excludeExpired) sql += " AND (ttlHours IS NULL OR ttlHours = 0 OR julianday(createdAt) + ttlHours / 24.0 >= julianday('now'))";
   const row = db.prepare(sql).get(...params) as { c: number };
   return row.c;
 }

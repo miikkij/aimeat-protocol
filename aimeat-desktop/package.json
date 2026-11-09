@@ -1,9 +1,10 @@
 {
   "name": "aimeat-desktop",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "AIMEAT Personal Node — Desktop GUI (Tauri)",
   "private": true,
   "scripts": {
+    "test": "node --test test/*.test.mjs test/*.test.cjs",
     "dev": "pnpm stage && tauri dev",
     "build": "pnpm package",
     "package": "pnpm stage && tauri build && node scripts/report-bundles.mjs",
@@ -12,6 +13,7 @@
     "stage:webview2": "node scripts/stage-webview2.mjs",
     "stage:server": "node scripts/stage-server.mjs",
     "stage:licenses": "node scripts/stage-licenses.mjs",
+    "test:runtime": "cargo test --manifest-path src-tauri/Cargo.toml backup_runtime_smoke -- --ignored --nocapture",
     "tauri": "tauri"
   },
   "dependencies": {},

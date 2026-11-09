@@ -15,9 +15,8 @@
  *     3. Copy aimeat package.json (+ lockfile) so the prod install resolves the
  *        right versions. better-sqlite3 13 ships its native binary for each
  *        platform in prebuilds/, so nothing is compiled.
- *     4. `pnpm install --prod --no-optional` in resources/server/ — runtime deps
- *        only; --no-optional drops Prisma engines (Mongo/Postgres are excluded
- *        from the SQLite desktop bundle).
+ *     4. `pnpm install --prod` in resources/server/ with a flat dependency tree.
+ *        SQLite is the Desktop storage provider. Optional runtime WASM packages stay.
  *     5. Assert the better-sqlite3 native binary is present.
  *   Between the install and the assert, the files no running server reads are taken out
  *   (step 5c), and so are the native prebuilds for other platforms (step 5d). Every install
@@ -68,14 +67,15 @@ if (!existsSync(distDir)) {
 rmSync(serverDir, { recursive: true, force: true });
 mkdirSync(serverDir, { recursive: true });
 cpSync(distDir, join(serverDir, 'dist'), { recursive: true });
+// Desktop owns the parent/child adapter. The bundled core server stays unchanged.
+copyFileSync(join(desktopRoot, 'runtime', 'desktop-parent.mjs'), join(serverDir, 'desktop-parent.mjs'));
 
 // 3. Copy runtime assets the server reads from the package root (not from dist/).
 //    These mirror aimeat package.json "files": docs read at startup
 //    (e.g. routes/bootstrap.ts loads ../../../docs/AIMEAT_Help_Prompt.md).
-const helpPrompt = join(aimeatDir, 'docs', 'AIMEAT_Help_Prompt.md');
-if (existsSync(helpPrompt)) {
+for (const filename of ['AIMEAT_Help_Prompt.md', 'AIMEAT_Help_Prompt_Person.md']) {
   mkdirSync(join(serverDir, 'docs'), { recursive: true });
-  copyFileSync(helpPrompt, join(serverDir, 'docs', 'AIMEAT_Help_Prompt.md'));
+  copyFileSync(join(aimeatDir, 'docs', filename), join(serverDir, 'docs', filename));
 }
 const csmExamples = join(aimeatDir, 'docs', 'csm-examples');
 if (existsSync(csmExamples)) {
@@ -83,9 +83,8 @@ if (existsSync(csmExamples)) {
 }
 
 // 4. Write the staging package.json (carries "type":"module" + the pnpm build settings),
-//    but with optionalDependencies stripped. The ONLY optional dep is @prisma/client,
-//    which the SQLite bundle never imports and whose engines are large. We must NOT use
-//    pnpm's --no-optional, though: quickjs-emscripten pulls quickjs-emscripten-core and
+//    but without the core package's optional providers. Keep transitive optional packages:
+//    quickjs-emscripten pulls quickjs-emscripten-core and
 //    the @jitl/quickjs-wasmfile-* WASM variants, which pnpm treats as platform-optional —
 //    --no-optional would drop the entire QuickJS runtime and crash the server at startup.
 const pkg = JSON.parse(readFileSync(join(aimeatDir, 'package.json'), 'utf8'));
@@ -117,7 +116,7 @@ if (existsSync(lockfile)) {
 //      isolated linker uses symlinks with absolute build-machine targets, which the
 //      NSIS/MSI bundler breaks on copy — severing module resolution in the installed app
 //      (manifests as ERR_MODULE_NOT_FOUND / "lstat 'C:'" at startup). Hoisted = real dirs.
-//    --no-frozen-lockfile : reconcile the lockfile with the prisma-stripped package.json.
+//    --no-frozen-lockfile : reconcile the lockfile with the staged package.json.
 //    Optionals stay ON so QuickJS's WASM variants ship.
 run('pnpm install --prod --no-frozen-lockfile --node-linker=hoisted --config.confirmModulesPurge=false', serverDir);
 

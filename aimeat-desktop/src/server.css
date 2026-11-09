@@ -1,0 +1,46 @@
+/**
+ * @file server.css
+ * @description Desktop server layout; shared tokens and shapes stay in house.css.
+ * @version-history 2026-11-09: extracted from server.html; Desktop lifecycle and recovery controls.
+ */
+/* This page's own layout. The faces, the tokens and the shapes are in house.css. */
+.back { margin-bottom: 1.6rem; }
+.state-line { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; font-size: 1.05rem; }
+.service { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.service .name { font-weight: var(--font-poster-strong-weight); flex: 0 0 8rem; }
+.service .where { font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); flex: 1; min-width: 10rem; }
+.service select {
+  background: transparent; color: var(--text); border: 0; border-bottom: 3px solid var(--text);
+  border-radius: 0; font-family: var(--font-mono); font-size: .85rem; padding: .2rem 0; max-width: 16rem;
+}
+.service select:focus { outline: none; border-color: var(--accent); }
+.service select option { background: var(--card-bg); color: var(--text); }
+.danger { color: var(--accent); border-bottom-color: var(--accent); }
+.acts .spacer { flex: 1; }
+.checks { display: flex; gap: 1.4rem; flex-wrap: wrap; font-size: .85rem; color: var(--text-dim); }
+.checks input { accent-color: var(--accent); margin-right: .35rem; }
+.log {
+  border: 2px solid var(--text); background: var(--card-bg); padding: .8rem 1rem; margin-top: 1rem;
+  font-family: var(--font-mono); font-size: .75rem; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-all; max-height: 26rem; overflow: auto;
+}
+.toast {
+  position: fixed; right: 1.2rem; bottom: 1.2rem; max-width: 26rem; z-index: 10;
+  border: 2px solid var(--text); background: var(--card-bg); color: var(--text);
+  box-shadow: 4px 4px 0 var(--sun); padding: .8rem 1rem; font-size: .9rem;
+}
+.toast.error { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
+dialog {
+  color: var(--text); background: var(--card-bg); border: 2px solid var(--text);
+  width: min(38rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);
+  overflow: auto; margin: auto; padding: 1.5rem; box-sizing: border-box;
+}
+dialog::backdrop { background: var(--bg); opacity: .8; }
+dialog .poster-action { max-width: 100%; white-space: normal; text-align: left; }
+#restoreSummary, #backupResult, #lastBackup, #stateError { overflow-wrap: anywhere; white-space: pre-wrap; }
+#backupPasswordFile { overflow-wrap: anywhere; }
+.service > * { min-width: 0; }
+.service select { min-height: 2.5rem; max-width: 100%; }
+@media (max-width: 600px) {
+  .toast { left: 1rem; right: 1rem; max-width: none; }
+}

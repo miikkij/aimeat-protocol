@@ -6,10 +6,9 @@
 # nothing checking that the desktop app still built against any of them. A tag-only build finds
 # that out at release time, which is the worst moment to learn it.
 #
-# It is deliberately NOT the installer build. `pnpm stage` builds the whole node server and a
-# production install of its dependencies, and `tauri build` then bundles NSIS and MSI; that belongs
-# in release-desktop.yml, on a tag. Here only the Node sidecar is staged, because tauri-build
-# validates `externalBin` while cargo compiles, and the Rust crate is compiled and tested.
+# The Windows job also starts the staged server, saves an isolated account's memory, backs it up,
+# restores it and reads it again. Core changes trigger this Desktop consumer check too. Installer
+# generation still belongs to release-desktop.yml, which runs the same runtime check on each OS.
 #
 # Three jobs, one per platform an installer ships for since 2026-09-29: `check` on Windows,
 # `check-linux` and `check-macos`. Each compiles code the others never do: the `#[cfg(unix)]` parts
@@ -22,10 +21,12 @@ on:
   push:
     paths:
       - 'aimeat-desktop/**'
+      - 'aimeat/**'
       - '.github/workflows/desktop-check.yml'
   pull_request:
     paths:
       - 'aimeat-desktop/**'
+      - 'aimeat/**'
       - '.github/workflows/desktop-check.yml'
   workflow_dispatch: {}
 
@@ -87,6 +88,27 @@ jobs:
         run: cargo test
         working-directory: aimeat-desktop/src-tauri
 
+      - name: Desktop UI and parent lifecycle tests
+        run: node --test test/*.test.mjs test/*.test.cjs
+        working-directory: aimeat-desktop
+
+      - name: Install pnpm for the packaged runtime check
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Install server build dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: aimeat
+
+      - name: Stage the unchanged core and Desktop adapter
+        run: node scripts/stage-server.mjs
+        working-directory: aimeat-desktop
+
+      - name: Prove offline backup and recovery with the staged runtime
+        env:
+          AIMEAT_DESKTOP_SMOKE_PORT: '40497'
+        run: cargo test backup_runtime_smoke -- --ignored --nocapture
+        working-directory: aimeat-desktop/src-tauri
+
   check-linux:
     runs-on: ubuntu-latest
     steps:
@@ -138,6 +160,10 @@ jobs:
         run: cargo test
         working-directory: aimeat-desktop/src-tauri
 
+      - name: Desktop UI and parent lifecycle tests
+        run: node --test test/*.test.mjs test/*.test.cjs
+        working-directory: aimeat-desktop
+
   check-macos:
     runs-on: macos-latest
     steps:
@@ -174,3 +200,7 @@ jobs:
       - name: Tests
         run: cargo test
         working-directory: aimeat-desktop/src-tauri
+
+      - name: Desktop UI and parent lifecycle tests
+        run: node --test test/*.test.mjs test/*.test.cjs
+        working-directory: aimeat-desktop

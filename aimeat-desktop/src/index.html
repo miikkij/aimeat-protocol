@@ -1,430 +1,49 @@
 <!DOCTYPE html>
-<!--
-  AIMEAT Desktop — the front door: which AIs on this computer are attached to the person's AIMEAT.
-
-  This screen is the reason the app exists. A person installs one program and their own AI is
-  attached, without a terminal and without walking a settings menu. The work is done by
-  src-tauri/src/connectors.rs, which reads and edits each tool's own config file; this page shows
-  the state and offers the two verbs, add and remove. "Added" is all this page can know: the tool's
-  config file names the person's AIMEAT. Whether the person has signed in lives in the tool itself,
-  so the page says how to sign in and never claims that it happened.
-
-  THE LOOK IS THE HOUSE POSTER FACE, from house.css, which this page shares with the machine room.
-
-  THE WORDS ARE THE PAGE'S OWN, in English and Finnish. The Rust side returns ids and state, never
-  sentences: a refusal there is a safety net in English, and what a person reads is here, in their
-  language. `node` and `solmu` never appear in what a person reads (skill `aimeat-writing`).
-
-  The machine room (server.html: run an AIMEAT on this computer, the AI on this computer, its
-  settings and its log) is reached from the link at the foot of this page.
--->
+<!-- AIMEAT Desktop: attach this computer's AI tools, then verify the first read in the tool. -->
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AIMEAT</title>
   <link rel="stylesheet" href="house.css" />
-  <style>
-    /* This page's own layout. The faces, the tokens and the shapes are in house.css. */
-    .update { margin-bottom: 2rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
-    .field { margin-top: 2.5rem; }
-    .tool { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
-    .tool .name { font-weight: var(--font-poster-strong-weight); font-size: 1.05rem; flex: 0 0 9.5rem; }
-    .tool .state { flex: 1; min-width: 12rem; }
-    .path { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); word-break: break-all; margin-top: .35rem; }
-    .why { color: var(--text-dim); font-size: .9rem; margin-top: .35rem; max-width: 52ch; }
-    .snippet {
-      border: 2px solid var(--text); background: var(--card-bg); padding: .8rem 1rem; margin-top: .6rem;
-      font-family: var(--font-mono); font-size: .75rem; white-space: pre; overflow-x: auto;
-    }
-    .acts { gap: 1.2rem; }
-  </style>
+  <link rel="stylesheet" href="frontdoor.css" />
+  <link rel="stylesheet" href="desktop-tools.css" />
 </head>
 <body>
   <div class="wrap">
     <header class="head">
       <span class="wordmark">AIME<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C5 16 2 12.5 2 8.8 2 6.1 4.1 4 6.8 4c1.7 0 3.3.8 4.2 2.1L12 7.2l1-1.1C13.9 4.8 15.5 4 17.2 4 19.9 4 22 6.1 22 8.8c0 3.7-3 7.2-10 12.2z"/></svg><span class="at">AT</span></span>
-      <span class="poster-crumb" id="crumb"></span>
-      <span class="spacer"></span>
+      <span class="poster-crumb" id="crumb"></span><span class="spacer"></span>
       <span class="version" id="version"></span>
-      <select class="lang" id="lang" aria-label="Language">
-        <option value="en">EN</option>
-        <option value="fi">FI</option>
-      </select>
+      <select class="lang" id="lang" aria-label="Language"><option value="en">EN</option><option value="fi">FI</option></select>
     </header>
-
     <main>
       <div id="update"></div>
-      <h1 class="poster-page-title" id="t-title">Your AI tools</h1>
-      <p class="lead" id="t-lead"></p>
-
-      <div class="field">
-        <label class="poster-label" for="addr" id="t-addrLabel"></label>
-        <input id="addr" type="text" spellcheck="false" autocomplete="off" />
-        <p class="hint" id="t-addrHint"></p>
-        <p style="margin-top:.8rem"><button class="poster-action" id="recheck"></button></p>
+      <h1 class="poster-page-title" data-text="title">Your AI tools</h1>
+      <p class="lead" data-text="lead"></p>
+      <p class="below"><a class="poster-action" href="#desktopTools" data-tools-text="toolsLink"></a></p>
+      <div class="environment">
+        <div class="field"><label class="poster-label" for="environment" data-text="environment"></label><select id="environment"></select></div>
+        <div class="field"><label class="poster-label" for="environmentName" data-text="name"></label><input id="environmentName" type="text" maxlength="80" autocomplete="off" /></div>
+        <div class="field"><label class="poster-label" for="addr" data-text="address"></label><input id="addr" type="text" spellcheck="false" autocomplete="off" aria-describedby="addressHint" /><p class="hint" id="addressHint" data-text="addressHint"></p></div>
+        <div class="acts below"><button class="poster-action" id="recheck" data-text="check"></button><button class="poster-action" id="newEnvironment" data-text="newEnvironment"></button><button class="poster-action" id="access" data-text="access"></button></div>
+        <p class="hint" data-text="environmentHint"></p>
       </div>
-
-      <section class="poster-section">
-        <h2 class="poster-section-title" id="t-listTitle"></h2>
-        <div id="list"></div>
-        <div id="notice"></div>
-        <p style="margin-top:1.8rem"><button class="poster-slab" id="connectAll" hidden></button></p>
+      <div id="notice" role="status" aria-live="polite"></div>
+      <section class="poster-section" aria-labelledby="listTitle">
+        <h2 class="poster-section-title" id="listTitle" data-text="listTitle"></h2><div id="list"></div>
+        <p class="below"><button class="poster-slab" id="connectAll" data-text="addAll" hidden></button></p>
       </section>
-
-      <div class="foot">
-        <a class="poster-action" href="server.html" id="t-legacy"></a>
-      </div>
+      <section class="poster-section" aria-labelledby="firstTitle">
+        <h2 class="poster-section-title" id="firstTitle" data-text="firstTitle"></h2>
+        <p class="lead" data-text="firstHint"></p><pre class="snippet" id="firstPrompt"></pre>
+        <button class="poster-action" id="copyPrompt" data-text="copyPrompt"></button><p class="hint" data-text="firstPrivacy"></p>
+      </section>
+      <div id="desktopTools"></div>
+      <div class="foot"><a class="poster-action" href="server.html" data-text="local"></a></div>
     </main>
   </div>
-
-  <script>
-    // Tauri v2 exposes the invoke API at window.__TAURI__.core.invoke. Opened in a plain browser
-    // (handy for looking at the layout) there is no backend, and the page says so rather than
-    // failing silently.
-    const TAURI = window.__TAURI__ && window.__TAURI__.core;
-    const invoke = TAURI ? TAURI.invoke : null;
-
-    const STRINGS = {
-      en: {
-        title: 'Your AI tools',
-        lead: 'These are the AI tools on this computer. Added means the tool knows the address of your AIMEAT. It reads and writes there as you after you sign in once, in the tool itself.',
-        addrLabel: 'Your AIMEAT',
-        addrHint: 'The address you sign in to. aimeat.io, unless you run your own server.',
-        recheck: 'Check again',
-        listTitle: 'On this computer',
-        stAbsent: 'not on this computer',
-        stOff: 'not added',
-        stOn: '✓ added',
-        stOther: 'added for another address',
-        stCloud: 'in its own settings',
-        connect: 'Add',
-        disconnect: 'Remove',
-        copy: 'Copy the lines',
-        copyAddress: 'Copy the address',
-        connectAll: 'Add them all',
-        where: 'Its settings file:',
-        restart: 'Restart {tool}, and it will find your AIMEAT. The first time it asks, sign in as yourself.',
-        restartAll: 'Restart the tools you added, and they will find your AIMEAT. The first time each one asks, sign in as yourself.',
-        signIn: 'This app cannot see whether you have signed in. The first time you use {tool}, it asks you to sign in to your AIMEAT in your browser.',
-        'signIn.claude-code': 'This app cannot see whether you have signed in. To sign in, type /mcp in Claude Code, choose aimeat, then Authenticate. Your browser opens, and you sign in to your AIMEAT there.',
-        removed: '{tool} no longer reaches your AIMEAT. Restart it to be sure.',
-        copied: 'Copied. Paste it where {tool} asks for it, then restart {tool}.',
-        failed: 'Did not work: {why}',
-        noBackend: 'This page is open in a plain browser, so it cannot see the tools on this computer.',
-        legacy: 'Run an AIMEAT of your own on this computer',
-        updateFound: 'Version {version} is out. You have {current}.',
-        updateInstall: 'Install it',
-        updateWorking: 'Installing. The app closes and opens again by itself.',
-        'note.claude-desktop': 'Claude Desktop is attached in its own settings: Settings, then Connectors, then Add custom connector. Paste the address below into it. Claude then signs you in through your browser.',
-        'note.codex': 'Codex keeps its tools in a TOML file, which this app does not edit yet. Paste these lines into it. The address only works once the client they switch on is running, so both spellings are there and your version ignores the one it does not know.',
-        warnLocal: 'Claude reaches this address from Anthropic’s cloud, not from this computer, so an AIMEAT that answers only here cannot be attached to Claude Desktop. Use an AIMEAT that answers from the internet, or attach a tool that runs on this computer, such as Claude Code.',
-      },
-      fi: {
-        title: 'Tekoälysi',
-        lead: 'Nämä ovat tämän koneen tekoälyohjelmat. Lisätty tarkoittaa, että ohjelma tuntee AIMEATisi osoitteen. Ohjelma lukee ja kirjoittaa siellä sinun nimissäsi, kun olet kirjautunut kerran sisään ohjelmassa itsessään.',
-        addrLabel: 'Oma AIMEATisi',
-        addrHint: 'Osoite, johon kirjaudut. aimeat.io, jos et pidä omaa palvelinta.',
-        recheck: 'Tarkista uudelleen',
-        listTitle: 'Tällä koneella',
-        stAbsent: 'ei tällä koneella',
-        stOff: 'ei lisätty',
-        stOn: '✓ lisätty',
-        stOther: 'lisätty toiseen osoitteeseen',
-        stCloud: 'omissa asetuksissaan',
-        connect: 'Lisää',
-        disconnect: 'Poista',
-        copy: 'Kopioi rivit',
-        copyAddress: 'Kopioi osoite',
-        connectAll: 'Lisää kaikki',
-        where: 'Sen asetustiedosto:',
-        restart: 'Käynnistä {tool} uudelleen, niin se löytää AIMEATisi. Kun se ensimmäisen kerran kysyy, kirjaudu sisään omana itsenäsi.',
-        restartAll: 'Käynnistä lisäämäsi ohjelmat uudelleen, niin ne löytävät AIMEATisi. Kun ohjelma ensimmäisen kerran kysyy, kirjaudu sisään omana itsenäsi.',
-        signIn: 'Tämä sovellus ei näe, oletko kirjautunut. Ensimmäisellä käyttökerralla {tool} pyytää sinua kirjautumaan AIMEATiisi selaimessa.',
-        'signIn.claude-code': 'Tämä sovellus ei näe, oletko kirjautunut. Kirjaudu näin: kirjoita Claude Codessa /mcp, valitse aimeat ja sitten Authenticate. Selain avautuu, ja kirjaudut siellä AIMEATiisi.',
-        removed: '{tool} ei enää tavoita AIMEATiasi. Käynnistä se uudelleen varmuuden vuoksi.',
-        copied: 'Kopioitu. Liitä se siihen mihin {tool} sitä pyytää ja käynnistä {tool} uudelleen.',
-        failed: 'Ei onnistunut: {why}',
-        noBackend: 'Tämä sivu on auki tavallisessa selaimessa, joten se ei näe tämän koneen ohjelmia.',
-        legacy: 'Oma AIMEAT tällä koneella',
-        updateFound: 'Versio {version} on julkaistu. Sinulla on {current}.',
-        updateInstall: 'Asenna se',
-        updateWorking: 'Asennan. Sovellus sulkeutuu ja avautuu itse uudelleen.',
-        'note.claude-desktop': 'Claude Desktop liitetään sen omista asetuksista: Asetukset, sitten Liittimet, sitten Lisää oma liitin. Liitä alla oleva osoite siihen. Claude kirjaa sinut sisään selaimessa.',
-        'note.codex': 'Codex pitää työkalunsa TOML-tiedostossa, jota tämä sovellus ei vielä muokkaa. Liitä nämä rivit siihen. Osoite toimii vasta kun rivien kytkemä asiakasohjelma on käytössä, joten mukana ovat molemmat kirjoitusasut ja versiosi ohittaa sen jota se ei tunne.',
-        warnLocal: 'Claude ottaa yhteyden tähän osoitteeseen Anthropicin pilvestä eikä tältä koneelta, joten AIMEATia joka vastaa vain täällä ei voi liittää Claude Desktopiin. Käytä AIMEATia joka vastaa internetistä, tai kytke ohjelma joka toimii tällä koneella, esimerkiksi Claude Code.',
-      },
-    };
-
-    const DEFAULT_ADDRESS = 'https://aimeat.io';
-    let lang = pickLang();
-    let connectors = [];
-
-    function pickLang() {
-      try {
-        const saved = localStorage.getItem('aimeat.lang');
-        if (saved && STRINGS[saved]) return saved;
-      } catch (e) { /* private mode: fall through to the browser's own language */ }
-      const os = (navigator.language || 'en').slice(0, 2).toLowerCase();
-      return STRINGS[os] ? os : 'en';
-    }
-
-    function t(key, vars) {
-      let s = (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key] || key;
-      if (vars) for (const k of Object.keys(vars)) s = s.split('{' + k + '}').join(vars[k]);
-      return s;
-    }
-
-    function address() {
-      const raw = document.getElementById('addr').value.trim();
-      return raw.replace(/\/+$/, '') || DEFAULT_ADDRESS;
-    }
-
-    function hostOf(url) {
-      try { return new URL(url).host; } catch (e) { return url; }
-    }
-
-    function el(tag, className, text) {
-      const node = document.createElement(tag);
-      if (className) node.className = className;
-      if (text !== undefined) node.textContent = text;
-      return node;
-    }
-
-    function say(message, kind) {
-      const box = document.getElementById('notice');
-      box.innerHTML = '';
-      if (!message) return;
-      const aside = el('div', 'poster-aside', message);
-      if (kind === 'error') aside.style.borderStyle = 'solid';
-      box.appendChild(aside);
-    }
-
-    function applyLanguage() {
-      document.documentElement.lang = lang;
-      document.getElementById('t-title').textContent = t('title');
-      document.getElementById('t-lead').textContent = t('lead');
-      document.getElementById('t-addrLabel').textContent = t('addrLabel');
-      document.getElementById('t-addrHint').textContent = t('addrHint');
-      document.getElementById('recheck').textContent = t('recheck');
-      document.getElementById('t-listTitle').textContent = t('listTitle');
-      document.getElementById('t-legacy').textContent = t('legacy');
-      document.getElementById('connectAll').textContent = t('connectAll');
-      document.getElementById('lang').value = lang;
-    }
-
-    function statusOf(c) {
-      if (!c.installed) return { text: t('stAbsent'), cls: 'poster-chip poster-chip--dim' };
-      // A cloud tool keeps its connectors in the person's own account, so this app cannot see
-      // whether it is attached. Saying "not connected" would be a guess dressed as a fact.
-      if (c.method === 'cloud') return { text: t('stCloud'), cls: 'poster-chip poster-chip--dim' };
-      if (c.connected) return { text: t('stOn'), cls: 'poster-chip poster-chip--on' };
-      if (c.connected_url) return { text: t('stOther'), cls: 'poster-chip' };
-      return { text: t('stOff'), cls: 'poster-chip' };
-    }
-
-    function render() {
-      const list = document.getElementById('list');
-      list.innerHTML = '';
-      document.getElementById('crumb').textContent = hostOf(address());
-
-      for (const c of connectors) {
-        const row = el('div', 'poster-row');
-        const line = el('div', 'tool');
-        line.appendChild(el('div', 'name', c.name));
-
-        const state = el('div', 'state');
-        const status = statusOf(c);
-        const chip = el('span', status.cls, status.text);
-        state.appendChild(chip);
-        if (c.installed && !c.connected && c.connected_url) {
-          state.appendChild(el('div', 'path', c.connected_url));
-        }
-        line.appendChild(state);
-
-        // A cloud tool whose address answers only here cannot be attached at all, so it is offered
-        // no action: a copy button would hand the person an address that cannot work.
-        const unreachable = c.method === 'cloud' && c.address_is_local;
-        const acts = el('div', 'acts');
-        if (c.installed && c.method === 'file') {
-          const button = el('button', 'poster-action', c.connected ? t('disconnect') : t('connect'));
-          button.addEventListener('click', () => (c.connected ? disconnectOne(c) : connectOne(c)));
-          acts.appendChild(button);
-        } else if (c.installed && !unreachable) {
-          const button = el('button', 'poster-action', c.method === 'cloud' ? t('copyAddress') : t('copy'));
-          button.addEventListener('click', () => copySnippet(c));
-          acts.appendChild(button);
-        }
-        line.appendChild(acts);
-        row.appendChild(line);
-
-        if (c.installed && c.method !== 'file') {
-          row.appendChild(el('div', 'why', unreachable ? t('warnLocal') : t('note.' + c.id)));
-          if (c.config_path) {
-            row.appendChild(el('div', 'path', t('where') + ' ' + c.config_path));
-          }
-          if (!unreachable) {
-            const pre = el('div', 'snippet', '');
-            pre.id = 'snippet-' + c.id;
-            pre.hidden = true;
-            row.appendChild(pre);
-          }
-        } else if (c.installed && c.config_path) {
-          // Added means the config file names this AIMEAT, nothing more. The sign-in lives in the
-          // tool (Claude Code keeps it in the system keychain), so the row says how to do it rather
-          // than claiming it happened. On 2026-10-21 a person read "connected" here while every
-          // sign-in was being refused.
-          if (c.connected) {
-            const key = 'signIn.' + c.id;
-            row.appendChild(el('div', 'why', t(STRINGS.en[key] ? key : 'signIn', { tool: c.name })));
-          }
-          row.appendChild(el('div', 'path', c.config_path));
-        }
-
-        list.appendChild(row);
-      }
-
-      const pending = connectors.filter((c) => c.installed && c.method === 'file' && !c.connected);
-      const all = document.getElementById('connectAll');
-      all.hidden = pending.length < 2;
-    }
-
-    async function refresh() {
-      document.getElementById('crumb').textContent = hostOf(address());
-      if (!invoke) { say(t('noBackend'), 'error'); return; }
-      try {
-        connectors = await invoke('detect_connectors', { nodeUrl: address() });
-        render();
-      } catch (e) {
-        say(t('failed', { why: String(e) }), 'error');
-      }
-    }
-
-    function remember() {
-      try { localStorage.setItem('aimeat.address', address()); } catch (e) { /* private mode */ }
-    }
-
-    async function connectOne(c) {
-      remember();
-      try {
-        const updated = await invoke('connect_connector', { id: c.id, nodeUrl: address() });
-        replace(updated);
-        render();
-        say(t('restart', { tool: c.name }));
-      } catch (e) {
-        say(t('failed', { why: String(e) }), 'error');
-      }
-    }
-
-    async function disconnectOne(c) {
-      try {
-        const updated = await invoke('disconnect_connector', { id: c.id, nodeUrl: address() });
-        replace(updated);
-        render();
-        say(t('removed', { tool: c.name }));
-      } catch (e) {
-        say(t('failed', { why: String(e) }), 'error');
-      }
-    }
-
-    async function connectEvery() {
-      remember();
-      const pending = connectors.filter((c) => c.installed && c.method === 'file' && !c.connected);
-      for (const c of pending) {
-        try {
-          replace(await invoke('connect_connector', { id: c.id, nodeUrl: address() }));
-        } catch (e) {
-          render();
-          say(t('failed', { why: String(e) }), 'error');
-          return;
-        }
-      }
-      render();
-      say(t('restartAll'));
-    }
-
-    async function copySnippet(c) {
-      try {
-        const text = await invoke('connector_snippet', { id: c.id, nodeUrl: address() });
-        const pre = document.getElementById('snippet-' + c.id);
-        if (pre) { pre.textContent = text; pre.hidden = false; }
-        await navigator.clipboard.writeText(text);
-        say(t('copied', { tool: c.name }));
-      } catch (e) {
-        say(t('failed', { why: String(e) }), 'error');
-      }
-    }
-
-    function replace(updated) {
-      connectors = connectors.map((c) => (c.id === updated.id ? updated : c));
-    }
-
-    // ── Updates ───────────────────────────────────────────────────────────
-    // One mechanism, not two. The Tauri updater polls the fixed address in tauri.conf.json,
-    // compares the versions itself and verifies the installer's minisign signature; this page
-    // only asks it and shows the answer. The hand-rolled check that used to live in the old
-    // window read the repository's `releases/latest`, which stopped being a desktop release in
-    // June, so it went quiet exactly when it was needed. A version is never written here either:
-    // it is read from the app itself.
-    let appVersion = '';
-
-    async function showVersion() {
-      const app = window.__TAURI__ && window.__TAURI__.app;
-      if (!app || !app.getVersion) return;
-      try {
-        appVersion = await app.getVersion();
-        document.getElementById('version').textContent = 'v' + appVersion;
-      } catch (e) { /* the version is a nicety, not a reason to stop */ }
-    }
-
-    async function checkUpdate() {
-      if (!invoke) return;
-      let version = null;
-      try {
-        version = await invoke('check_update');
-      } catch (e) {
-        // No manifest at the address yet, or no network. Neither is the person's problem.
-        console.warn('update check: ' + e);
-        return;
-      }
-      if (!version) return;
-      const box = document.getElementById('update');
-      box.innerHTML = '';
-      const aside = el('div', 'poster-aside update');
-      aside.appendChild(el('span', '', t('updateFound', { version, current: appVersion })));
-      const button = el('button', 'poster-action', t('updateInstall'));
-      button.addEventListener('click', async () => {
-        button.disabled = true;
-        say(t('updateWorking'));
-        try {
-          await invoke('install_update');
-        } catch (e) {
-          button.disabled = false;
-          say(t('failed', { why: String(e) }), 'error');
-        }
-      });
-      aside.appendChild(button);
-      box.appendChild(aside);
-    }
-
-    document.getElementById('lang').addEventListener('change', (e) => {
-      lang = e.target.value;
-      try { localStorage.setItem('aimeat.lang', lang); } catch (err) { /* private mode */ }
-      applyLanguage();
-      // Through refresh rather than render, so any notice on screen is said again in the new
-      // language instead of standing there in the old one.
-      refresh();
-    });
-    document.getElementById('recheck').addEventListener('click', () => { remember(); refresh(); });
-    document.getElementById('addr').addEventListener('change', () => { remember(); refresh(); });
-    document.getElementById('connectAll').addEventListener('click', connectEvery);
-
-    let saved = null;
-    try { saved = localStorage.getItem('aimeat.address'); } catch (e) { /* private mode */ }
-    document.getElementById('addr').value = saved || DEFAULT_ADDRESS;
-    applyLanguage();
-    refresh();
-    showVersion().then(checkUpdate);
-  </script>
+  <script src="frontdoor-state.js"></script><script src="frontdoor.js"></script><script src="updates.js"></script>
+  <script src="desktop-tools-strings.js"></script><script src="desktop-tools.js"></script>
 </body>
 </html>

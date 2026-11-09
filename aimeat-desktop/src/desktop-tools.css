@@ -1,0 +1,29 @@
+/**
+ * @file desktop-tools.css
+ * @description Layout for Desktop preferences and local diagnostic results, using house tokens.
+ * @version-history 2026-11-09: shared controls on both Desktop screens.
+ */
+.desktop-tools .poster-action, [data-tools-text="toolsLink"] { white-space: normal; text-align: left; max-width: 100%; }
+.desktop-preferences { border-top: 2px solid var(--text); padding-top: 1rem; }
+.desktop-preferences summary { cursor: pointer; font-weight: 700; min-height: 2.75rem; }
+.desktop-preferences summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.desktop-choice { margin: 1.2rem 0; }
+.desktop-choice label { display: flex; align-items: flex-start; gap: .65rem; cursor: pointer; min-height: 2.75rem; }
+.desktop-choice input { width: 1.2rem; height: 1.2rem; margin-top: .25rem; flex-shrink: 0; accent-color: var(--accent); }
+.desktop-check-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+.desktop-check p { margin: .65rem 0; }
+.desktop-tools-dialog {
+  color: var(--text); background: var(--card-bg); border: 2px solid var(--text);
+  width: min(44rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);
+  overflow: auto; margin: auto; padding: 1.5rem; box-sizing: border-box;
+}
+.desktop-tools-dialog::backdrop { background: var(--bg); opacity: .8; }
+.desktop-tools-dialog textarea {
+  display: block; width: 100%; min-width: 0; margin-top: 1rem; padding: .6rem;
+  background: var(--bg); color: var(--text); border: 1px solid var(--text);
+  font-family: var(--font-mono); font-size: .8rem; line-height: 1.5;
+  resize: vertical; height: min(18rem, calc(100dvh - 20rem)); min-height: 6rem;
+  max-height: 50dvh; box-sizing: border-box;
+}
+.desktop-tools-dialog .poster-action { white-space: normal; text-align: left; }
+#desktopTools, #settingsSection, #backupSection, #aiSection, #logSection { scroll-margin-top: 1.5rem; }

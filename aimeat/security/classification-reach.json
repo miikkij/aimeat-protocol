@@ -1704,11 +1704,9 @@
     },
     "src/services/db/data-wallet-db-service.ts": {
       "reads": {
-        "listMemoryMeta": 1,
-        "listStorageFiles": 1,
         "getMemoryByKeysAnyOwner": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Key and file metadata and the workspace registry index; no values."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: the workspace registry index; no values. Since 2026-11-09 the key and file totals are counted (countMemory, sumStorageBytesForOwners), not listed."
     },
     "src/services/db/knowledge-tab-db-service.ts": {
       "reads": {
@@ -2530,9 +2528,10 @@
     },
     "src/services/overview/overview-sources.ts": {
       "reads": {
-        "listMemory": 1
+        "listMemory": 1,
+        "getMemoryByKeysAnyOwner": 1
       },
-      "why": "Reviewed 2026-10-31, the node's own read: the owner's apps' data map documents (public by definition, tag datamap), from which only the organism and workspace ids in a row's whereExactly are taken, and kept only when they name a place the reader is already a member of. The overview shows the owner a line between their app and that place. No content anybody classified; the workspace activity is read through storage.listKeyActivity, which returns keys and times and never a value."
+      "why": "Reviewed 2026-10-31, the node's own read: the owner's apps' data map documents (public by definition, tag datamap), from which only the organism and workspace ids in a row's whereExactly are taken, and kept only when they name a place the reader is already a member of. The overview shows the owner a line between their app and that place. No content anybody classified; the workspace activity is read through storage.listKeyActivity, which returns keys and times and never a value. getMemoryByKeysAnyOwner (2026-11-09) reads the offers document of each of the owner's own agents, by its exact key and kept only under that agent's own identity, to list what the owner's agents offer; it replaced one loadAgentOffers read per agent and reads nothing more."
     },
     "src/services/own-key-coverage.ts": {
       "reads": {
