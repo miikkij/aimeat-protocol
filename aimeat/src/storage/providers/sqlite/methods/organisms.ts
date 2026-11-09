@@ -8,6 +8,7 @@
  * @structure organismMethods
  * @usage Object.assign(SqliteStorage.prototype, organismMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-09 — organismNames: many organisms' names in one query.
  *   v1.0.0 — 2026-10-05 — createOrganism, getOrganism, listOrganisms, updateOrganism, deleteOrganism,
  *     deserializeOrganism moved here from governance.ts; 20 methods (createMembership, getMembership,
  *     listMembers, …) moved here from community.ts so the file mirrors postgres-kysely/methods/organisms.ts
@@ -74,6 +75,15 @@ export const organismMethods = {
   async getOrganism(this: SqliteStorage, id: string): Promise<OrganismRecord | null> {
     const row = this.db.prepare('SELECT * FROM organisms WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     return row ? this.deserializeOrganism(row) : null;
+  },
+
+  async organismNames(this: SqliteStorage, ids: readonly string[]): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    if (ids.length === 0) return out;
+    const rows = this.db.prepare(`SELECT id, name FROM organisms WHERE id IN (${ids.map(() => '?').join(',')})`)
+      .all(...ids) as { id: string; name: string }[];
+    for (const r of rows) out[r.id] = r.name;
+    return out;
   },
 
   async listOrganisms(this: SqliteStorage, opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: ArchiveFilter }): Promise<OrganismRecord[]> {

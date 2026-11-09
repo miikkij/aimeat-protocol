@@ -16,6 +16,10 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-09: The frame first. Until /v1/home/state answers, the home this account had on its last
+ *     visit in this browser picks the layout, so the frame and every block's place draw at once; each
+ *     place shows its heading and the loading line until its data arrives (renderer `placeholders`,
+ *     Jouni's choice of 2026-11-09). A first visit in a browser waits for the state as before.
  *   2026-11-04: /v1/home?settings=1 opens the settings dialog: the name in the login pill links there
  *     (Jouni, 2026-11-04). Closing takes the parameter out of the address, so a reload stays closed.
  *   2026-11-02: Under the change-log band, on a customer's node, "Sillä aikaa kun olit poissa"
@@ -76,6 +80,7 @@ const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { useSession } from '/js/use-session.js';
 import { getSession } from '/js/services/auth.js';
+import { swallowed } from '/js/swallowed.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { Spinner } from '/components/Spinner.js';
 import { PageFrame } from '/components/PageFrame.js';
@@ -98,6 +103,21 @@ import { useHomeVisit } from './visits.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const addressAsksForSettings = () => new URLSearchParams(location.search).get('settings') === '1';
+
+/** Which home an account had when it last opened it in this browser: true (the finished home),
+ *  false (the onboarding one), or null (never here, or storage refused). A per-browser convenience:
+ *  the state from the server always decides once it answers. */
+const homeHintKey = (owner) => `aimeat.home.initialized.${owner}`;
+function rememberedHome(owner) {
+  if (!owner) return null;
+  let v = null;
+  // Storage refused (a private window): nothing remembered, so the page waits for the state.
+  try { v = localStorage.getItem(homeHintKey(owner)); } catch (err) { swallowed('home: remembered home', err); }
+  return v === '1' ? true : v === '0' ? false : null;
+}
+function rememberHome(owner, initialized) {
+  try { localStorage.setItem(homeHintKey(owner), initialized ? '1' : '0'); } catch (err) { swallowed('home: remember home', err); }
+}
 
 
 export default function HomeView({ navigate }) {
@@ -132,9 +152,17 @@ export default function HomeView({ navigate }) {
 
   // Which home to show decides which layout to read, and both are read before either is needed:
   // switching between them mid-session must not blank the page while a second fetch runs.
+  // Until the state answers, the home this account had on its last visit in this browser decides,
+  // so the frame and the blocks' places draw at once instead of one spinner for the whole page.
+  const owner = session?.owner ?? '';
+  const answered = stateReady && state ? !!state.initialized : null;
+  const initialized = answered ?? rememberedHome(owner);
+  useEffect(() => {
+    if (answered !== null && owner) rememberHome(owner, answered);
+  }, [answered, owner]);
   const finished = useSurfaceLayout('home');
   const onboarding = useSurfaceLayout('home-onboarding');
-  const surface = state?.initialized ? finished : onboarding;
+  const surface = initialized ? finished : onboarding;
   // Which visit this is: the store's place times its two offers by it (visits.js).
   const visit = useHomeVisit(!!session);
 
@@ -179,11 +207,12 @@ export default function HomeView({ navigate }) {
       <//>`;
   }
 
-  if (!stateReady || !surface.ready) {
+  // A first visit in this browser has nothing remembered, and waits for the state as before.
+  if ((!stateReady && initialized === null) || !surface.ready) {
     return html`<${PageFrame} loading=${true}><${Spinner} /><//>`;
   }
 
-  if (!state) {
+  if (stateReady && !state) {
     return html`
       <${PageFrame}>
         <${ErrorNote} text=${tr('home.loadFailed', 'Your home could not be loaded just now. Try again in a moment.')} />
@@ -223,7 +252,8 @@ export default function HomeView({ navigate }) {
         freeform=${surface.freeform}
         freeformProvenance=${surface.freeformProvenance}
         ctx=${ctx}
-        locale=${getLocale()} />
+        locale=${getLocale()}
+        placeholders=${true} />
       <${HomeSettingsDialog} open=${settingsOpen} onClose=${closeSettings}
         session=${session} showToast=${showToast} />
       <${ToastBox} toast=${toast ? { msg: toast, type: 'error' } : null} hold role="status" />

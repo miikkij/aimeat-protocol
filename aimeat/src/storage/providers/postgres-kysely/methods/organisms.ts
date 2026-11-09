@@ -7,6 +7,7 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.8.0 — 2026-11-09 — organismNames: many organisms' names in one query.
  *   v1.7.0 — 2026-10-16 — deleteOrganism runs in one transaction, lets every statement's error fail
  *     the call, and answers whether the organism row went, as the SQLite twin does (QA audit D4-10, E6-05).
  *   v1.6.0 — 2026-09-29 — deleteOrganism removes the classification audit log of the organism's content.
@@ -88,6 +89,13 @@ export const organismMethods = {
   async getOrganism(this: PostgresKyselyStorage, id: string): Promise<OrganismRecord | null> {
     const r = await this.db.selectFrom('Organism').selectAll().where('id', '=', id).executeTakeFirst();
     return r ? toOrg(r) : null;
+  },
+  async organismNames(this: PostgresKyselyStorage, ids: readonly string[]): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    if (ids.length === 0) return out;
+    const rows = await this.db.selectFrom('Organism').select(['id', 'name']).where('id', 'in', [...ids]).execute();
+    for (const r of rows) out[r.id] = r.name;
+    return out;
   },
   async listOrganisms(this: PostgresKyselyStorage, opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: ArchiveFilter }): Promise<OrganismRecord[]> {
     // A member-scoped query is naturally bounded (an owner belongs to a finite set of organisms), so it

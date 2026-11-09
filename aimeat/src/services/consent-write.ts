@@ -28,6 +28,8 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-09 — listAccountConsents reads the account's and every agent's consents in one IN query
+ *     (listConsentsForAgents), in the same order: one query per agent was 81 at 79 agents.
  *   2026-11-08 — A grant takes an explicit `role`, read (the default) or write, and the purpose text
  *     decides nothing (services/workspace-roles.ts consentWsRole, before any write): write is the
  *     contributor role on one workspace, for one person on this node, filed under the workspace's
@@ -86,6 +88,7 @@ import { callerFromAuth } from './caller-context.js';
 import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
 import { isNamedShare, normalizePartyShare, normalizeVisitorShare, packageOfPattern, sharesEnded } from './parties/shares.js';
 import { consentWsRole, WS_ROLE_KEY } from './workspace-roles.js';
+import { loadOwnerAgents } from './db/owner-identity.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -121,11 +124,13 @@ export function accountHoldsConsent(account: string, consentOwner: string): bool
 export async function listAccountConsents(
     storage: Storage, account: string, opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {},
 ): Promise<ConsentRecord[]> {
-    const own = await storage.listConsents(account, opts);
     const name = localAccountName(account);
-    const agents = name && !account.includes('#') ? await storage.getAgentsByOwner(name) : [];
-    const theirs = (await Promise.all(agents.map(a => storage.listConsents(a.gaii, opts)))).flat();
-    return [...own, ...theirs];
+    const agents = name && !account.includes('#') ? await loadOwnerAgents(storage, name) : [];
+    if (!agents.length) return storage.listConsents(account, opts);
+    // One IN query for the account and every agent (one per agent was 81 at 79 agents); each list is
+    // newest first as listConsents orders it, the account's own first.
+    const byOwner = await storage.listConsentsForAgents([account, ...agents.map(a => a.gaii)], opts);
+    return [account, ...agents.map(a => a.gaii)].flatMap(g => byOwner[g] ?? []);
 }
 
 export interface ConsentCaller {

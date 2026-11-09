@@ -17,9 +17,12 @@
  *     one atomic debit of the provider that funds a refund or a burn
  *   - applyDailyAllowance: capped daily allowance credit
  *   - calculateEscrow: sum in-escrow amounts across a requester's open work
+ *   - calculateEscrowMany: the same over many requesters from one read of their work
  *   - mintMorsels: operator mint against the daily cap, for every door that mints
  *
  * @version-history
+ *   2026-11-09 — calculateEscrowMany: a person's and their agents' escrow from one read of their work
+ *     (GET /v1/wallet and the Wallet tab read once per identity, 81 reads at 79 agents).
  *   2026-10-16 — disputedAmount() and takeBackFromProvider(): a dispute re-divides the toll delivery
  *     paid the provider, funded by one atomic debit of the provider; it no longer returns the escrow
  *     or pays the provider a second time (QA audit S8-02).
@@ -475,9 +478,21 @@ export async function morselsInCirculation(storage: Storage): Promise<number> {
  * Calculate in_escrow total for an agent.
  */
 export async function calculateEscrow(storage: Storage, gaii: string): Promise<number> {
-    const asRequester = await storage.listWorkByRequester(gaii);
+    return escrowOf(await storage.listWorkByRequester(gaii));
+}
+
+/**
+ * calculateEscrow summed over many requesters (a person and their agents), from ONE read of their work
+ * (listWorkByRequesters): one read per identity was 81 at 79 agents on every cold wallet header.
+ */
+export async function calculateEscrowMany(storage: Storage, gaiis: readonly string[]): Promise<number> {
+    const unique = [...new Set(gaiis)];
+    return unique.length ? escrowOf(await storage.listWorkByRequesters(unique)) : 0;
+}
+
+function escrowOf(work: readonly WorkRecord[]): number {
     let inEscrow = 0;
-    for (const w of asRequester) {
+    for (const w of work) {
         if (['pending', 'accepted', 'in_progress'].includes(w.status)) {
             inEscrow += w.cost.inEscrow;
         }

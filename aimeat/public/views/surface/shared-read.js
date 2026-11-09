@@ -29,9 +29,11 @@
  *
  *   Module-level rather than a context, because the renderer mounts blocks from a map and they share
  *   no parent that could hold the value.
- * @structure useShared · invalidateShared · readShared
+ * @structure useShared · invalidateShared · readShared · onSharedIdle · sharedReadsInFlight
  * @usage const { data, ready } = useShared('usage', '/v1/owner/usage', ['memory', 'files', 'apps']);
  * @version-history
+ *   v1.2.0 — 2026-11-09 — onSharedIdle / sharedReadsInFlight: the renderer's waiting slot learns when
+ *     every read has answered, so a block that draws nothing on purpose does not keep its loading line.
  *   v1.1.0 — 2026-09-06 — Raw cache with a per-reader `pick` (item 7.3), and cleared on
  *     `aimeat-auth-change` (item 7.5).
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -70,9 +72,27 @@ export function readShared(key, path) {
       swallowed(`surface: ${key}`, err);
       cache.set(key, { raw: null, ready: true });
     })
-    .finally(() => { inFlight.delete(key); publish(key); });
+    .finally(() => {
+      inFlight.delete(key);
+      publish(key);
+      if (inFlight.size === 0) for (const fn of [...idleListeners]) fn();
+    });
   inFlight.set(key, p);
   return p;
+}
+
+/** Who waits for every shared read to have answered (renderer.js: a block that drew nothing then). */
+const idleListeners = new Set();
+
+/** Call `fn` each time the last shared read in flight answers; returns the unsubscribe. */
+export function onSharedIdle(fn) {
+  idleListeners.add(fn);
+  return () => { idleListeners.delete(fn); };
+}
+
+/** How many shared reads are on their way right now. */
+export function sharedReadsInFlight() {
+  return inFlight.size;
 }
 
 /** Drop what is cached for a key and read it again. For a block that just wrote something. */

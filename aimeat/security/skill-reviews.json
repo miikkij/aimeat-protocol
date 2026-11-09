@@ -81,13 +81,13 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:0fcb452f71876e5d6e93fe97",
+      "digest": "sha256:425d6db75d64499fad41609f",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -761,7 +761,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "f7e77e3ec980d153",
+      "aimeat/src/services/journey-state.ts": "c386fed71e81bdf0",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "24765a8656779b80"
     },

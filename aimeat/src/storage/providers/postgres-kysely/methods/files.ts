@@ -7,6 +7,7 @@
  *   create is upsert (re-upload replaces), sumStorageBytesForOwners is one cross-identity aggregate,
  *   listStorageFiles omits the bytes.
  * @version-history
+ *   2026-11-09 — storageFileHolders: which identities hold a key, in one query.
  *   2026-11-08 — `rowVersion` (migration 0128): every write of a row gives it a new random token, and
  *     moveStorageFileBytes writes only where the bytes live, and only while the row still has the token
  *     the move read (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
@@ -182,6 +183,13 @@ export const fileMethods = {
       .where('ownerGaii', 'in', ownerGaiis).execute();
     for (const r of rows) (out[r.ownerGaii] ??= []).push(toRecord(r, Buffer.alloc(0)));
     return out;
+  },
+
+  async storageFileHolders(this: PostgresKyselyStorage, ownerGaiis: readonly string[], key: string): Promise<string[]> {
+    if (ownerGaiis.length === 0) return [];
+    const rows = await this.db.selectFrom('StorageFile').select('ownerGaii')
+      .where('key', '=', key).where('ownerGaii', 'in', [...ownerGaiis]).execute();
+    return rows.map(r => r.ownerGaii);
   },
 
   async sumStorageBytesForOwners(this: PostgresKyselyStorage, ownerGaiis: string[]): Promise<{ bytes: number; count: number }> {

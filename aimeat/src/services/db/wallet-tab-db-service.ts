@@ -14,6 +14,7 @@
  * @structure WalletTabService.overview(ownerName, ownerGhii) → { wallet, transactions, checkoutSessions, orders }
  * @usage const w = await createWalletTabService(config, storage).overview(owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.3.1 — 2026-11-09 — The escrow is one read of the person's and their agents' work (calculateEscrowMany).
  *   v1.3.0 — 2026-10-11 — `wallet.pacing_pack`, as GET /v1/wallet answers it: the Wallet tab mounts from
  *     this call, so the pack chip never showed.
  *   v1.2.0 — 2026-09-26 — The escrow sum reads the person's own GHII beside their agents': a request
@@ -25,7 +26,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, WalletTransaction } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { calculateEscrow } from '../morsel.js';
+import { calculateEscrowMany } from '../morsel.js';
 import { cached, TTL } from '../cache.js';
 import { listSessions, listOrders } from '../../commerce/session-service.js';
 import { lifetimeOf } from '../wallet-stats.js';
@@ -61,9 +62,7 @@ export class WalletTabService {
         // owner (same key + domain tags as GET /v1/wallet so the shared cache entry serves both).
         cached(`escrow:${ownerName}`, TTL.dashboard, async () => {
           const agents = await this.storage.getAgentsByOwner(ownerName);
-          let total = 0;
-          for (const id of [identity, ...agents.map(a => a.gaii)]) total += await calculateEscrow(this.storage, id);
-          return total;
+          return calculateEscrowMany(this.storage, [identity, ...agents.map(a => a.gaii)]);
         }, ['domain:work', 'domain:wallet']),
         listSessions(this.storage, ownerGhii, 100),   // buyer's checkout sessions (purchases)
         listOrders(this.storage, ownerGhii, 100),      // seller's received orders (sales)

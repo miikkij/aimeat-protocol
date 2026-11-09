@@ -6,6 +6,7 @@
  *   agentGaii). Agent registration creates one, so this unblocks POST /v1/agents. Translated 1:1 from the
  *   Prisma implementation.
  * @version-history
+ *   v1.2.0 — 2026-11-09 — getOnboardingMany: many agents' records in one IN query.
  *   v1.1.0 — 2026-09-09 — listOnboardingByOwner deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: agent onboarding on Postgres+Kysely.
  */
@@ -77,6 +78,12 @@ export const agentOnboardingMethods = {
   async getOnboarding(this: PostgresKyselyStorage, agentGaii: string): Promise<AgentOnboardingRecord | null> {
     const r = await this.db.selectFrom('AgentOnboarding').selectAll().where('agentGaii', '=', agentGaii).executeTakeFirst();
     return r ? toRecord(r) : null;
+  },
+
+  async getOnboardingMany(this: PostgresKyselyStorage, agentGaiis: readonly string[]): Promise<AgentOnboardingRecord[]> {
+    if (agentGaiis.length === 0) return [];
+    const rows = await this.db.selectFrom('AgentOnboarding').selectAll().where('agentGaii', 'in', [...agentGaiis]).execute();
+    return rows.map(toRecord);
   },
 
   async updateOnboarding(this: PostgresKyselyStorage, agentGaii: string, updates: Partial<AgentOnboardingRecord>): Promise<AgentOnboardingRecord | null> {

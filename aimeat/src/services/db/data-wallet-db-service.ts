@@ -19,6 +19,8 @@
  * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-09 — The organism names come from one query (storage.organismNames), not one whole record
+ *     per organism.
  *   2026-11-04 — No per-organism scan for a storage without getMemoryByKeysAnyOwner: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-09-04 — Audit grouped (consent-audit-groups.ts), newest rows only (entry_limit),
@@ -131,8 +133,9 @@ export class DataWalletService {
     const organisms: Record<string, string> = {};
     const workspaces: Record<string, Record<string, string>> = {};
     if (orgIds.length === 0) return { organisms, workspaces };
-    const records = await Promise.all(orgIds.map(id => this.storage.getOrganism(id)));
-    records.forEach((o, i) => { if (o?.name) organisms[orgIds[i]] = o.name; });
+    // The names only, in one query: each organism read whole was 51 queries at 51 organisms.
+    const names = await this.storage.organismNames(orgIds);
+    for (const id of orgIds) if (names[id]) organisms[id] = names[id];
     const keyToOrg = new Map(orgIds.map(id => [wsRegistryKey(id), id]));
     const regs: MemoryRecord[] = await this.storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()]);
     for (const rec of regs) {
