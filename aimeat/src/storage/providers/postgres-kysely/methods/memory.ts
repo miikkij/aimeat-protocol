@@ -9,6 +9,8 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-11-09 — countMemory counts one owner with count(*) (the key is unique per owner) instead of
+ *     count(distinct), and takes `excludeExpired`; the memory lists test a wanted tag in SQL as before.
  *   2026-11-09 — pruneMemoryHistory keeps a key's newest N archived versions; purgeDeletedMemory
  *     deletes the archived versions of each key it purges, in one transaction with the purge.
  *   2026-11-04 — getMemoryTotals and compactMemoryTotals over the kept totals of migration 0125;
@@ -67,7 +69,7 @@ import { buildSearchBlob, byteSize, isLive, jsonb, rowToMeta, rowToRecord } from
 import { likePrefix } from '../../../key-prefix.js';
 
 type ListOpts = MemoryListOpts;
-type CountOpts = { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] };
+type CountOpts = { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[]; excludeExpired?: boolean };
 
 /** Annotation reader — the archived history keeps who/what changed a value (value._actor / _event). */
 function annotation(value: unknown, field: '_actor' | '_event'): string | null {
@@ -560,11 +562,15 @@ export const memoryMethods = {
 
   async countMemory(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: CountOpts): Promise<number> {
     if (ownerGaiis.length === 0) return 0;
-    let q = this.db.selectFrom('Memory').select(sql<number>`count(distinct "key")`.as('n')).where('ownerGaii', 'in', ownerGaiis);
+    // One owner holds a key once (the unique (ownerGaii, key) index), so its count is count(*), which
+    // needs no sort; count(distinct) sorted every key (85 ms at 17 782 keys, 2026-11-09).
+    const counted = ownerGaiis.length === 1 ? sql<number>`count(*)` : sql<number>`count(distinct "key")`;
+    let q = this.db.selectFrom('Memory').select(counted.as('n')).where('ownerGaii', 'in', ownerGaiis);
     if (opts?.prefix) q = q.where('key', 'like', likePrefix(opts.prefix));
     for (const p of opts?.excludePrefixes ?? []) q = q.where('key', 'not like', likePrefix(p));
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
     q = applyArchive(q, opts?.archived);
+    if (opts?.excludeExpired) q = liveSql(q, new Date());
     const r = await q.executeTakeFirst();
     return Number(r?.n ?? 0);
   },

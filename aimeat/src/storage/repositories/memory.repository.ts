@@ -258,7 +258,9 @@ export interface MemoryRepository {
    * (no values loaded/transferred), mirroring listOwnerScopeMemory's key-dedup. For stat displays
    * (e.g. "N Muistit") that need only the number, not the records.
    */
-  countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] }): Promise<number>;
+  /** `excludeExpired` leaves out a key whose time to live has passed but which no sweep has removed
+   *  yet, as the lists do; without it the count is the stat-display approximation it always was. */
+  countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[]; excludeExpired?: boolean }): Promise<number>;
   /**
    * Count the active memory records, across every owner, that carry a CORS list of their own
    * (allowedOrigins set and non-empty). One number for the operator's CORS page; nothing is loaded.

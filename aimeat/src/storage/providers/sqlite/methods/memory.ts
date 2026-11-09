@@ -8,6 +8,9 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-11-09 — listMemory, listMemoryMeta, listMemoryForOwners and listMemoryMetaForOwners test a
+ *     wanted tag in SQL (repos/memory.ts tagsSql), as the PostgreSQL provider does, so a row without it
+ *     is never read; the check after the read stays.
  *   2026-11-08 — countMemory's type names the `archived` filter it already passed to the repository
  *     (secaudit2026nov08b round 15b, the archived-key count of services/memory-ceilings.ts).
  *   2026-11-04 — META_COLS, rowToMeta and allPaged moved unchanged to ../repos/memory-meta.ts (800-line limit).
@@ -46,7 +49,7 @@ import { searchValueText } from '../../../search-text.js';
 import type { SqliteStorage } from '../index.js';
 import {
   searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo,
-  sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql,
+  sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, tagsSql,
   archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo,
   unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo,
   NOT_DELETED_SQL, LIVE_SQL, deleteExpiredMemory as deleteExpiredMemoryRepo,
@@ -249,6 +252,9 @@ export const memoryMethods = {
       params.push(opts.visibility);
     }
     sql += archivedSql(opts?.archived);
+    const tagged = tagsSql(opts?.tags);
+    sql += tagged.sql;
+    params.push(...tagged.params);
 
     const rows = allPaged(this.db, sql, params, opts);
     const results: MemoryRecord[] = [];
@@ -268,7 +274,7 @@ export const memoryMethods = {
     return results;
   },
 
-  async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] }): Promise<number> {
+  async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[]; excludeExpired?: boolean }): Promise<number> {
     return countMemoryRepo(this.db, ownerGaiis, opts);
   },
 
@@ -696,6 +702,9 @@ export const memoryMethods = {
     if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
+    const tagged = tagsSql(opts?.tags);
+    sql += tagged.sql;
+    params.push(...tagged.params);
 
     const rows = allPaged(this.db, sql, params, opts);
     const out: MemoryMetaRow[] = [];
@@ -724,6 +733,9 @@ export const memoryMethods = {
     if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
+    const tagged = tagsSql(opts?.tags);
+    sql += tagged.sql;
+    params.push(...tagged.params);
     const rows = allPaged(this.db, sql, params, opts);
     const results: MemoryRecord[] = [];
     for (const row of rows) {
@@ -744,6 +756,9 @@ export const memoryMethods = {
     if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
+    const tagged = tagsSql(opts?.tags);
+    sql += tagged.sql;
+    params.push(...tagged.params);
     const rows = allPaged(this.db, sql, params, opts);
     const out: MemoryMetaRow[] = [];
     for (const row of rows) {

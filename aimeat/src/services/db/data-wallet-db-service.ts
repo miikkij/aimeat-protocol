@@ -19,6 +19,8 @@
  * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-09 — The key and file totals are counted (countMemory with excludeExpired,
+ *     sumStorageBytesForOwners) instead of listed and measured; the same numbers.
  *   2026-11-09 — The organism names come from one query (storage.organismNames), not one whole record
  *     per organism.
  *   2026-11-04 — No per-organism scan for a storage without getMemoryByKeysAnyOwner: it is required on
@@ -72,11 +74,14 @@ export class DataWalletService {
    */
   overview(ownerGaii: string, auditDays = 30, entryLimit = DEFAULT_ENTRY_LIMIT): Promise<DataWalletOverview> {
     return runInReadScope(async () => {
-      const [consents, storedAudit, memoryMeta, storageFiles] = await Promise.all([
+      // The two totals are counted, not listed: listing 17 782 keys and 1 275 files to take their
+      // length cost about 75 ms on PostgreSQL at a heavy account's size (2026-11-09). The same rows:
+      // live keys that are not archived or in the bin, and every stored file.
+      const [consents, storedAudit, memoryKeys, fileTotals] = await Promise.all([
         this.storage.listConsents(ownerGaii),
         this.storage.listConsentAudit(ownerGaii, { days: auditDays }),
-        this.storage.listMemoryMeta(ownerGaii, {}),
-        this.storage.listStorageFiles(ownerGaii),
+        this.storage.countMemory([ownerGaii], { excludeExpired: true }),
+        this.storage.sumStorageBytesForOwners([ownerGaii]),
       ]);
 
       const pending = getPendingConsentAudit(ownerGaii, { days: auditDays })
@@ -112,8 +117,8 @@ export class DataWalletService {
           groups: groupConsentAudit(auditEntries),
         },
         permSummary: {
-          total_memory_keys: memoryMeta.length,
-          total_storage_files: storageFiles.length,
+          total_memory_keys: memoryKeys,
+          total_storage_files: fileTotals.count,
           active_consents: active.length,
           consent_quota: CONSENT_QUOTA,
           rules_by_recipient_type: byType,

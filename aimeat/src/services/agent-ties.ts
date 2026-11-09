@@ -26,6 +26,9 @@
  *   readWatchableSpaces · readWorkplace · placeNames · workplaceKey
  * @usage const ties = await readAgentTies({ config, storage }, owner);
  * @version-history
+ *   v1.3.1 — 2026-11-09 — readAgentTies reads the data maps under `apps.` only (the key they are used
+ *     at) instead of the owner's whole store.
+ *     placeNames takes the organisms' names in one query and reads their registries side by side.
  *   v1.3.0 — 2026-10-13 — A watchable space says `tool_only` when it names extensions: an agent
  *     writes there only through the app's own tool. On aimeat.io that day two of three drafts for
  *     one app built the agent on the plain workspace-write tool, and it wrote wrong records past
@@ -121,17 +124,20 @@ export async function placeNames(
   const org = new Map<string, string>();
   const ws = new Map<string, string>();
   const orgIds = [...new Set(records.map(r => r.organism_id))];
-  // A point read and one registry read per organism. The count is the organisms one person's
-  // agents share into, or the organisms one person is in: small by nature.
-  for (const id of orgIds) {
-    const o = await storage.getOrganism(id);
-    if (!o) continue;
-    org.set(id, o.name ?? id);
-    // The organism's workspaces as the workspace routes list them (services/structure-overview.ts).
-    for (const w of await listWorkspaces(storage, id)) {
+  // The names in one query, and each organism's workspace registry read side by side: the two reads
+  // per organism ran one after another, 102 round trips in turn at 51 organisms (2026-11-09). The
+  // registry stays one read per organism because it includes an archived organism's registry, which
+  // a key-IN read would leave out. The maps are filled in organism order, as before.
+  const names = await storage.organismNames(orgIds);
+  const present = orgIds.filter(id => id in names);
+  // The organism's workspaces as the workspace routes list them (services/structure-overview.ts).
+  const lists = await Promise.all(present.map(id => listWorkspaces(storage, id)));
+  present.forEach((id, i) => {
+    org.set(id, names[id] ?? id);
+    for (const w of lists[i]) {
       if (!w.archived) ws.set(`${id}::${w.id}`, w.name ?? w.id);
     }
-  }
+  });
   return { org, ws };
 }
 
@@ -253,7 +259,11 @@ export async function readAgentTies(
   const { config, storage } = deps;
   const ownerGhii = `${owner}@${config.nodeId}`;
   const [mapRecords, placeRecords] = await Promise.all([
-    storage.listMemory(ownerGhii, { tags: ['datamap'] }),
+    // The maps' read narrowed to the keys it can use (a map is used only at apps.<id>.datamap), so it
+    // does not walk the owner's whole store: 65 ms of the agents band's 140 at 20 000 keys on SQLite
+    // (2026-11-09). The workplace read keeps its tag alone: its prefix is service-owned, and a new read
+    // of one goes through serviceRecords(), which the workplace records have not moved to yet.
+    storage.listMemory(ownerGhii, { prefix: 'apps.', tags: ['datamap'] }),
     storage.listMemory(ownerGhii, { tags: [WORKPLACE_TAG] }),
   ]);
 

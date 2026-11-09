@@ -20,6 +20,9 @@
  * @structure usageByActor · appUse · providerUse · workspaceActivity · ownOfferings · OwnOffering
  * @usage const calls = await usageByActor(storage, ownerGhii, fromDay, toDay);
  * @version-history
+ *   v1.1.0 — 2026-11-09 — appPlaces reads only `apps.` keys (it uses apps.<id>.datamap alone).
+ *     ownOfferings reads every agent's offers document in one query
+ *     (getMemoryByKeysAnyOwner, kept only under its own agent): two queries per agent before, 162 at 79.
  *   v1.0.0 — 2026-10-31 — Initial (wish-kokonaiskuva-koneet-agentit-sovellukset-tieto-ja-tarjoukset-).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -28,7 +31,7 @@ import type { AgentRecord } from '../../storage/types/identity.js';
 import { queryUsageRollupLive } from '../usage/usage-read.js';
 import { ownPublicManifests } from '../../commerce/app-tool-catalog.js';
 import { isToolPriced } from '../../models/app-tool-schemas.js';
-import { loadAgentOffers } from '../agent-offers-write.js';
+import { offersKeyFor } from '../agent-offers-write.js';
 import { listOfferings, appToolCoordinate } from '../exchange-market.js';
 import { listEntitlementsByProvider } from '../metered-entitlements.js';
 import { logger } from '../../utils/logger.js';
@@ -151,7 +154,8 @@ export async function appPlaces(
   storage: Storage, ownerGhii: string, known: { organisms: Set<string>; workspaces: Set<string> },
 ): Promise<Map<string, AppPlace[]>> {
   const out = new Map<string, AppPlace[]>();
-  const records = await storage.listMemory(ownerGhii, { tags: ['datamap'] });
+  // Only apps.<id>.datamap is used below, so only those keys are read.
+  const records = await storage.listMemory(ownerGhii, { prefix: 'apps.', tags: ['datamap'] });
   for (const rec of records) {
     const appId = /^apps\.(.+)\.datamap$/.exec(rec.key)?.[1];
     const map = rec.value as { held?: Array<{ where?: string; whereExactly?: string }> } | undefined;
@@ -202,7 +206,7 @@ export interface OwnOffering {
 export async function ownOfferings(
   deps: { storage: Storage; config: AimeatConfig }, ownerName: string, ownerGhii: string, agents: AgentRecord[], callsByCoordinate: Map<string, number>,
 ): Promise<OwnOffering[]> {
-  const { storage, config } = deps;
+  const { storage } = deps;
   const out: OwnOffering[] = [];
   const [manifests, listings, entitlements] = await Promise.all([
     ownPublicManifests(storage, ownerGhii),
@@ -234,25 +238,31 @@ export async function ownOfferings(
     });
   }
 
-  await Promise.all(agents.map(async (a) => {
-    try {
-      const read = await loadAgentOffers({ storage, config }, ownerName, a.name);
-      if (!read.ok) return;
-      for (const offer of read.offers) {
-        const o = offer as { id: string; title: string; visibility?: string; exchange?: boolean; priceMoney?: { amount?: number } | null };
-        const priced = !!o.priceMoney?.amount;
-        const ext = `agentwork:${ownerName}/${a.name}`;
-        out.push({
-          kind: 'agent-offer', source: a.name, offerId: o.id, name: o.title,
-          tools: 1, freeTools: priced ? 0 : 1, pricedTools: priced ? 1 : 0,
-          capability: o.visibility === 'public',
-          exchange: o.exchange === true || listedExt.has(ext),
-          contracts: contractsOn(ext, o.id), calls: callsByCoordinate.get(`${ext}/${o.id}`) ?? 0,
-        });
-      }
-    } catch (err) {
-      logger.warn('overview: agent offers read failed', { agent: a.name, error: String(err) });
+  // Every agent's offers document in ONE read: loadAgentOffers per agent resolved the agent and read
+  // its record, two queries each (162 at 79 agents). These agents are the owner's own already, and a
+  // record is kept only under its own agent's identity, as that read did.
+  let docs = new Map<string, unknown>();
+  try {
+    const keys = [...new Set(agents.map(a => offersKeyFor(a.name)))];
+    const recs = keys.length ? await storage.getMemoryByKeysAnyOwner(keys) : [];
+    docs = new Map(recs.map(r => [`${r.ownerGaii}\n${r.key}`, r.value]));
+  } catch (err) {
+    logger.warn('overview: agent offers read failed', { error: String(err) });
+  }
+  for (const a of agents) {
+    const doc = docs.get(`${a.gaii}\n${offersKeyFor(a.name)}`) as { offers?: unknown[] } | undefined;
+    for (const offer of doc?.offers ?? []) {
+      const o = offer as { id: string; title: string; visibility?: string; exchange?: boolean; priceMoney?: { amount?: number } | null };
+      const priced = !!o.priceMoney?.amount;
+      const ext = `agentwork:${ownerName}/${a.name}`;
+      out.push({
+        kind: 'agent-offer', source: a.name, offerId: o.id, name: o.title,
+        tools: 1, freeTools: priced ? 0 : 1, pricedTools: priced ? 1 : 0,
+        capability: o.visibility === 'public',
+        exchange: o.exchange === true || listedExt.has(ext),
+        contracts: contractsOn(ext, o.id), calls: callsByCoordinate.get(`${ext}/${o.id}`) ?? 0,
+      });
     }
-  }));
+  }
   return out;
 }
