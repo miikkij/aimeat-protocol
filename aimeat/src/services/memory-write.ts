@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-09 — A write to a context or ontology key (`context.`, `vocab.ctx.`) is trackable, so the
+ *     version it replaces is kept, and the key's history is pruned to its newest HISTORY_KEEP versions
+ *     (services/context/history-keys.ts).
  *   2026-11-05 — A write at 'group' that names no group and finds none on the record is refused with 400
  *     INVALID_INPUT, nothing stored (storage/memory-sharing.ts). A row an older node stored that way
  *     stays writable and the write carries the warning GROUP_NOT_NAMED. A group id naming no group is
@@ -173,6 +176,7 @@ import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js'
 import { shadowWarning } from './memory-write-shadow.js';
 import { memoryWriteAsks, fileMemoryWriteAsks } from './memory-write-asks.js';
 import { tallyWriterOf } from './data-map/tally-writer.js';
+import { keepsHistory, HISTORY_KEEP } from './context/history-keys.js';
 import type {
     MemoryWriteFanout, MemoryWriteCaller, MemoryWriteInput, MemoryWriteWarning, AfterMemoryWriteReport, MemoryWriteResult,
     ExchangeReconcileReport,
@@ -500,6 +504,8 @@ export async function writeMemoryRecord(
         ...(existing?.flagCount !== undefined ? { flagCount: existing.flagCount } : {}),
         ...(existing?.allowedOrigins !== undefined ? { allowedOrigins: existing.allowedOrigins } : {}),
         ...(existing?.trackable !== undefined ? { trackable: existing.trackable } : {}),
+        // A context and its ontology keep the version each write replaces (context/history-keys.ts).
+        ...(keepsHistory(input.key) ? { trackable: true } : {}),
     };
     const record = await storage.transaction(async () => {
         let landed: MemoryRecord | null;
@@ -527,6 +533,12 @@ export async function writeMemoryRecord(
     //    its owner reads is told to that owner's streams; one other people read, or one that was
     //    theirs to read until this write, is told to everybody (event-bus.ts emitRecordChange).
     emitRecordChange('memory', caller.targetGaii, input.visibility, ...(existing ? [existing.visibility] : []));
+
+    // 5a. A key that keeps history keeps only its newest HISTORY_KEEP earlier versions.
+    if (existing && keepsHistory(input.key)) {
+        await storage.pruneMemoryHistory(caller.targetGaii, input.key, HISTORY_KEEP)
+            .catch(err => logger.warn('writeMemoryRecord: history prune failed', { key: input.key, error: String(err) }));
+    }
 
     // 6a. Write-time classification (TARGET-082 V3). Scheduled, never awaited, and nothing at all
     //     while classification is off (services/classify-on-write.ts).

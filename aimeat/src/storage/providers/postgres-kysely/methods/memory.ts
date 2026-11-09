@@ -9,6 +9,8 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-11-09 — pruneMemoryHistory keeps a key's newest N archived versions; purgeDeletedMemory
+ *     deletes the archived versions of each key it purges, in one transaction with the purge.
  *   2026-11-04 — getMemoryTotals and compactMemoryTotals over the kept totals of migration 0125;
  *     sumMemoryBytes reads them; setMemory's first read of the row takes version, trackable and
  *     groupId only (codebase analysis 2026-11-03, item C3).
@@ -448,10 +450,17 @@ export const memoryMethods = {
 
   /** The sweeper's hand: the one call in the memory path that destroys anything. */
   async purgeDeletedMemory(this: PostgresKyselyStorage, cutoffIso: string): Promise<number> {
-    const r = await this.db.deleteFrom('Memory')
-      .where('deletedAt', 'is not', null).where('deletedAt', '<', new Date(cutoffIso))
-      .executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
+    const cutoff = new Date(cutoffIso);
+    return this.transaction(async () => {
+      // The archived versions of each purged key first, while the rows that name them still exist.
+      await sql`DELETE FROM "MemoryVersion" v USING "Memory" m
+        WHERE m."ownerGaii" = v."ownerGaii" AND m."key" = v."key"
+          AND m."deletedAt" IS NOT NULL AND m."deletedAt" < ${cutoff}`.execute(this.db);
+      const r = await this.db.deleteFrom('Memory')
+        .where('deletedAt', 'is not', null).where('deletedAt', '<', cutoff)
+        .executeTakeFirst();
+      return Number(r.numDeletedRows ?? 0);
+    });
   },
 
   /**
@@ -674,6 +683,17 @@ export const memoryMethods = {
       actor: r.actor ?? null, event: r.event ?? null,
       recordedAt: (r.recordedAt instanceof Date ? r.recordedAt : new Date(r.recordedAt)).toISOString(),
     }));
+  },
+
+  async pruneMemoryHistory(this: PostgresKyselyStorage, ownerGaii: string, key: string, keep: number): Promise<number> {
+    const cut = await this.db.selectFrom('MemoryVersion').select('version')
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key)
+      .orderBy('version', 'desc').offset(Math.max(0, keep)).limit(1).executeTakeFirst();
+    if (!cut) return 0;
+    const r = await this.db.deleteFrom('MemoryVersion')
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key).where('version', '<=', cut.version)
+      .executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
 
   async archiveMemoryByKey(this: PostgresKyselyStorage, keyOrPrefix: string, opts: { archivedRoot: string; archivedBy: string; archivedAt: string; match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {

@@ -45,12 +45,15 @@
       "digest": "sha256:2aeacaab9c4df95839a5f0e4"
     },
     "node:aimeat-context": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/context/index-line.ts",
-        "aimeat/src/services/mcp-build-inputs.ts"
+        "aimeat/src/services/mcp-build-inputs.ts",
+        "aimeat/src/services/context/history-keys.ts",
+        "aimeat/src/services/context/check.ts",
+        "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:42a24b36c71be7e3fd77b5e2"
+      "digest": "sha256:4852520c5ee55d8417fad430"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -270,12 +273,12 @@
       "digest": "sha256:9bfa24f196e06f9aaa163a0b"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:9a2453c210bd162d663bf27b"
+      "digest": "sha256:a3e7648c1d19f6789731869c"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -659,7 +662,7 @@
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "9f179454eabf4bbe",
+      "aimeat/src/mcp/core.ts": "ee57da5710e8eb6b",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "66f1803515078196"
     },
     "node:manage-my-profile-data": {
@@ -857,7 +860,10 @@
     },
     "node:aimeat-context": {
       "aimeat/src/services/context/index-line.ts": "81fac0dce0f2172f",
-      "aimeat/src/services/mcp-build-inputs.ts": "30340abebd1814dc"
+      "aimeat/src/services/mcp-build-inputs.ts": "30340abebd1814dc",
+      "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
+      "aimeat/src/services/context/check.ts": "8eae091c8256a410",
+      "aimeat/src/services/memory-versions/history.ts": "1e7cb0431167c4d5"
     }
   }
 }

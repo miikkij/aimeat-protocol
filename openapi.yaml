@@ -19500,6 +19500,89 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+  /v1/memory/history/{key}:
+    get:
+      operationId: getMemoryHistory
+      summary: Earlier versions of a record
+      description: >
+        The kept earlier versions of one memory record, newest first, each with
+        what that write changed compared with the version before it (path, added,
+        removed or changed, values cut short). With `version`, that one version's
+        whole value instead. Only a key that keeps history has earlier versions:
+        a person's contexts (`context.`) and ontology modules (`vocab.ctx.`) keep
+        their newest 50, and other trackable keys keep theirs. To restore, write
+        the old value back with `expected_version` set to the current version;
+        the version it replaces is kept in turn.
+
+
+        Read by the record's own principal, or by the same person in person or
+        through an agent holding `memory:read-as-owner` (403 SCOPE_DENIED
+        without it, when the caller sees the current record). An app grant, an
+        ecosystem app and a visitor from another node are refused (403
+        FORBIDDEN). A caller that cannot see the current record gets 404, as for
+        a missing key. Every value passes the caller's classification reader.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+        - name: owner_scope
+          in: query
+          description: Look under the person as well as under the caller.
+          schema: { type: boolean }
+        - name: version
+          in: query
+          description: Return this version's whole value instead of the list.
+          schema: { type: integer, minimum: 0 }
+        - name: limit
+          in: query
+          description: How many versions the list shows (default 20, at most 50).
+          schema: { type: integer, minimum: 1, maximum: 50 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: version or limit is not a whole number
+        '403':
+          description: The caller may not read this record's earlier versions
+        '404':
+          description: No such key for this caller, or the version is not kept
+  /v1/memory/context-check/{slug}:
+    get:
+      operationId: checkContext
+      summary: Check a context by machine
+      description: >
+        Checks one of the person's contexts (`context.<slug>`) and changes
+        nothing. It reports references of kind `memory:` and `context:` that no
+        longer open, included, excluded or composed contexts that are gone, and,
+        when the context names an ontology module (`module`, read through
+        `<module>.index` and its parts, or `ontologyModules`), source quotes no
+        longer found in the records they name (case-insensitive, whitespace
+        collapsed), `vocab:ctx.` ids that name nothing, replacement chains that
+        loop, superseded statements without a replacement and statements with no
+        source; plus the stale and large-core marks. Every read is the caller's
+        own read (same-owner view, organism rule, classification reader), so a
+        target the caller cannot open is reported as "not found or not open to
+        you". At most 400 records are read and 200 findings returned.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: The context's slug, or its key `context.<slug>`.
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: An app grant, an ecosystem app or a visitor from another node
+        '404':
+          description: The context is not found or not open to the caller
   /v1/memory/{key}/restore:
     post:
       operationId: restoreMemory

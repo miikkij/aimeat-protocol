@@ -988,6 +988,8 @@ const ALL_SUITES = [
     'test/e2e-agent-permission-ask.ts',
     // A person's contexts reach every AI they connect that can read memory, and nobody else's.
     'test/e2e-context-index.ts',
+    // A context's earlier versions are kept and restorable, and a machine check says what no longer stands.
+    'test/e2e-context-trust.ts',
     'test/e2e-agent-health.ts',
     'test/e2e-open-items.ts',
     'test/e2e-app-access-code.ts',

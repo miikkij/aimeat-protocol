@@ -14,6 +14,7 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-11-09 — pruneMemoryHistory; purgeDeletedMemory also deletes the purged keys' archived versions.
  *   2026-11-04 — The 14 memory methods that were optional are required: both providers implement
  *     them, and a missing CAS method no longer turns a conditional write into a blind one (codebase
  *     analysis 2026-11-03, item D-e).
@@ -321,7 +322,8 @@ export interface MemoryRepository {
    */
   listAllDeletedMemory(opts?: { prefix?: string; ownerPrefix?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }>;
   /** The sweeper's hand — everything deleted before `cutoffIso` goes for good. The one call in the
-   *  memory path that destroys anything, and what makes "delete" mean delete. */
+   *  memory path that destroys anything, and what makes "delete" mean delete. The archived versions
+   *  of each purged key (memory_history) go in the same call, so a deleted record leaves no copy. */
   purgeDeletedMemory(cutoffIso: string): Promise<number>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
   incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;
@@ -376,6 +378,11 @@ export interface MemoryRepository {
    * were never trackable or never overwritten. Backs the organism structure timeline (Osa D).
    */
   listMemoryHistory(ownerGaii: string, key: string, opts?: { limit?: number }): Promise<MemoryVersionRecord[]>;
+  /**
+   * Keep only the newest `keep` archived versions of one key and delete the older ones. Returns how
+   * many were deleted. The lifecycle of a key that keeps history (services/context/history-keys.ts).
+   */
+  pruneMemoryHistory(ownerGaii: string, key: string, keep: number): Promise<number>;
 
   /**
    * ARCHIVE — flag every currently-ACTIVE memory row under a key (exact or prefix) as archived,

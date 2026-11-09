@@ -17,6 +17,8 @@
  *     (codebase analysis 2026-11-03, item C1).
  *   2026-11-04 — getMemoryMeta: one record's metadata without its value (codebase analysis 2026-11-03,
  *     item C2).
+ *   2026-11-09 — pruneMemoryHistory keeps a key's newest N archived versions; purgeDeletedMemory
+ *     deletes the archived versions of each key it purges (services/context/history-keys.ts).
  *   2026-10-31 — listKeyActivity, over repos/memory.ts (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
  *     (secaudit 2026-10-31 inv-24).
@@ -412,10 +414,25 @@ export const memoryMethods = {
   /** The sweeper's hand. Everything deleted before `cutoff` goes for good — this is the call that
    *  makes "delete" mean delete, and the only one in the memory path that destroys anything. */
   async purgeDeletedMemory(this: SqliteStorage, cutoffIso: string): Promise<number> {
-    const result = this.db.prepare(
-      'DELETE FROM memory WHERE deletedAt IS NOT NULL AND deletedAt < ?'
-    ).run(cutoffIso);
-    return result.changes;
+    return this.db.transaction(() => {
+      // The archived versions of each purged key first, while the rows that name them still exist.
+      this.db.prepare(
+        `DELETE FROM memory_history WHERE EXISTS (SELECT 1 FROM memory m WHERE m.ownerGaii = memory_history.ownerGaii
+         AND m.key = memory_history.key AND m.deletedAt IS NOT NULL AND m.deletedAt < ?)`
+      ).run(cutoffIso);
+      return this.db.prepare(
+        'DELETE FROM memory WHERE deletedAt IS NOT NULL AND deletedAt < ?'
+      ).run(cutoffIso).changes;
+    })();
+  },
+
+  async pruneMemoryHistory(this: SqliteStorage, ownerGaii: string, key: string, keep: number): Promise<number> {
+    const cut = this.db.prepare(
+      'SELECT version FROM memory_history WHERE ownerGaii = ? AND key = ? ORDER BY version DESC LIMIT 1 OFFSET ?'
+    ).get(ownerGaii, key, Math.max(0, keep)) as { version: number } | undefined;
+    if (!cut) return 0;
+    return this.db.prepare('DELETE FROM memory_history WHERE ownerGaii = ? AND key = ? AND version <= ?')
+      .run(ownerGaii, key, cut.version).changes;
   },
 
   /** The TTL sweep across every owner, one statement (repos/memory.ts deleteExpiredMemory). */

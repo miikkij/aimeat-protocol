@@ -64,14 +64,15 @@
       "digest": "sha256:79360de544ab18f6f9fddf99"
     },
     "05-data-protection.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
         "docs/data-classification.md",
-        "aimeat/src/services/connections/drive-files.ts"
+        "aimeat/src/services/connections/drive-files.ts",
+        "aimeat/src/services/context/history-keys.ts"
       ],
-      "digest": "sha256:2771e162385378c51550fefa"
+      "digest": "sha256:2b47a9547faad8b2be7e2f43"
     },
     "06-ai-and-models.md": {
       "reviewedOn": "2026-11-07",
@@ -192,7 +193,7 @@
       "digest": "sha256:4a124591b51f02e11c124e14"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-07",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -219,7 +220,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:03793d7f1e55985fca52f72c"
+      "digest": "sha256:5ae1571adf966e1b746ba869"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -319,7 +320,8 @@
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
       "docs/data-classification.md": "31bca57ac51f0be3",
-      "aimeat/src/services/connections/drive-files.ts": "b49a3a7cea3b7bbe"
+      "aimeat/src/services/connections/drive-files.ts": "b49a3a7cea3b7bbe",
+      "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68"
     },
     "06-ai-and-models.md": {
       "aimeat/src/services/ai/adapters/index.ts": "65c67e56fbf43ea3",
@@ -427,7 +429,7 @@
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "766efa3f33c1b08d",
+      "aimeat/security/process-local-baseline.json": "632dda58ee5015a2",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",

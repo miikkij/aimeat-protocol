@@ -11,11 +11,16 @@
  *   WHY a skill and no new tool: the developer's ruling of 2026-11-08 starts with the smallest
  *   thing that can work, one record and the guidance to use it, and adds MCP tools only when the
  *   context eval suite (scripts/cold-agent/context-cases.ts) shows an AI cannot manage without
- *   them. Every rule below is something that suite measures.
+ *   them. Every rule below is something that suite measures. Two tools came later, because no
+ *   memory read could do their work: aimeat_memory_history (earlier versions) and aimeat_context_check
+ *   (a machine check across hundreds of records).
  * @structure CONTEXT_SKILL_ENTRY
  * @usage
  *   import { CONTEXT_SKILL_ENTRY } from './builtin-skills.context.js';
  * @version-history
+ *   v1.3.0 — 2026-11-09 — When a context goes wrong: earlier versions and how to restore one
+ *     (aimeat_memory_history), the machine check (aimeat_context_check); splitting a part off a large
+ *     context into one the original includes; `module` names the ontology module.
  *   v1.2.0 — 2026-11-09 — `compose`: or, and, xor and not over other contexts, computed on
  *     ontology ids; references between ontology modules; an app's context wider than its spec.
  *   v1.1.0 — 2026-11-08 — Opt-in: a context starts only when the person asks for one; the AI no
@@ -61,6 +66,7 @@ yourself: two copies drift apart, and the next AI reads the wrong one.
   "summary": "One line: what this is, and when to open it.",
   "kind": "factual | creative | mixed",
   "ontology": "on | off | auto",
+  "module": "vocab.ctx.lisbon-trip",
   "core": "Your compact picture: what this is about, where it stands, what is open. Read first.",
   "concepts": [{ "term": "release", "means": "the album coming out", "broader": "album", "replacedBy": null }],
   "references": [{ "ref": "memory:trip.flights", "what": "flight times", "openWhen": "flights or arrival come up" }],
@@ -129,6 +135,11 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
   a term means something else in another of the person's contexts, or when another AI will
   read it. Otherwise leave them out.
 
+A large context may keep its ontology as a module of its own: \`module\` names its key
+\`vocab.ctx.<name>\`, whose index \`vocab.ctx.<name>.index\` lists the parts (each under 30 kB) and
+when to read each. Read the index first and then only the part the question needs. Each
+statement names its source: the record key, the date and a quote of 20 words or fewer.
+
 ## Combining, splitting, merging
 
 - **Combining for an answer:** read both contexts and answer. Write the result only into the
@@ -194,13 +205,39 @@ time, and one whose core has grown large. When such a context comes up, ask the 
 
 - **keep** it: stamp \`lifecycle.shapedAt\`, and the mark goes away;
 - **condense** it: rewrite the core to what still matters and move the rest into \`material\`;
+- **split a part off**: when one part of it has grown into a matter of its own (a sub-project, one
+  party, one period), move that part into a new context \`context.<slug>-<part>\` with its own name,
+  summary and core, and its references and concepts. The original stays where it is, smaller, and
+  names the new one in \`includes\`, so opening the original still reaches everything. Both keep
+  the same visibility; tell the person the new name in one sentence;
 - **archive** it: set \`lifecycle.archivedAt\` to now. An archived context leaves the list you
   receive on connecting and stays readable by its key; clearing \`archivedAt\` brings it back;
 - **delete** it, only when they say so: \`aimeat_memory_delete\`, which they can still undo for a
   while.
 
-For a large core, offer to move detail into \`material\` or to split it. Never archive, condense,
-split or delete without their yes.
+For a large core, offer to move detail into \`material\` or to split a part off. Never archive,
+condense, split or delete without their yes.
+
+## When a context goes wrong
+
+- **A wrong fact:** when the person says something is wrong, write the right one and mark the
+  wrong one \`replacedBy\` (in an ontology, \`aimeat:status\` superseded and \`dcterms:isReplacedBy\`),
+  with the source of the correction. Never delete the old statement.
+- **A bad write:** every write to a context or its ontology keeps the version it replaced (the
+  newest 50). \`aimeat_memory_history\` with the key and \`owner_scope: true\` lists them, each with
+  what that write changed; with \`version\` it gives that version whole. To put one back ("restore
+  yesterday's version"), say which version and what it changes back, and after the person's yes
+  write its value with \`aimeat_memory_write\`, \`owner_scope: true\` and \`expected_version\` set to
+  the current version. The version you replace is kept too, so the restore can be undone.
+- **Is it still sound?** \`aimeat_context_check\` checks it by machine: references that no longer
+  open, included or composed contexts that are gone, and with an ontology module, source quotes
+  no longer found in their records, ids that name nothing, replacement chains that loop. Run it
+  when the person asks how solid a context is, before you lean on it for something that matters,
+  and after a large rewrite. Tell the person what it found in plain words, and fix what you can
+  only with their yes. A context whose statements all name their sources can be rebuilt from
+  those sources when too much has gone wrong.
+- **What is it made of?** For a quick picture of the parts (fact, opinion, decision, narrative)
+  make the fingerprint (below).
 
 ## Sharing
 

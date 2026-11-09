@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-09 -- aimeat_memory_history, a proxy over GET /v1/memory/history/:key; aimeat_context_check,
+ *     over GET /v1/memory/context-check/:slug.
  *   2026-11-01 -- aimeat_consent_grant sends pinned_version, allow_url_key and terms_required as the
  *     consent's metadata, for a party recipient (plan doc-mvwxcas3dom3, D3.4).
  *   2026-11-01 -- aimeat_datapackage_withdraw: a proxy over DELETE /v1/datapackages/{owner}/{name}
@@ -116,6 +118,19 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}${query({
             owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
         })}`),
+    },
+    {
+        name: 'aimeat_memory_history',
+        // A thin proxy: who may read earlier versions is decided in services/memory-history.ts.
+        handler: ({ client }, input) => client.get(`/v1/memory/history/${encodeURIComponent(requiredString(input, 'key'))}${query({
+            owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
+            version: optionalNumber(input, 'version'),
+            limit: optionalNumber(input, 'limit'),
+        })}`),
+    },
+    {
+        name: 'aimeat_context_check',
+        handler: ({ client }, input) => client.get(`/v1/memory/context-check/${encodeURIComponent(requiredString(input, 'context'))}`),
     },
     {
         name: 'aimeat_memory_delete',

@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-11-09 — A merge into a context or ontology key keeps the version it replaces, pruned to the
+ *     newest HISTORY_KEEP (services/context/history-keys.ts).
  *   2026-11-05 — visibility 'group' on a record that has no group is refused with 400 INVALID_INPUT:
  *     this route takes no group id (storage/memory-sharing.ts).
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
@@ -130,6 +132,7 @@ import { stampAgentWrite, storeHeldProvenance } from '../../services/ai/provenan
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';
+import { keepsHistory, HISTORY_KEEP } from '../../services/context/history-keys.js';
 
 /**
  * How many times a losing writer re-reads and re-merges before giving up with a 409.
@@ -425,6 +428,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         updatedAt: now,
         ...(existing?.groupId ? { groupId: existing.groupId } : {}),
         ...(existing?.workspaceRef ? { workspaceRef: existing.workspaceRef } : {}),
+        // A context and its ontology keep the version each write replaces (context/history-keys.ts).
+        ...(keepsHistory(key) ? { trackable: true } : {}),
       };
 
       if (existing) {
@@ -446,6 +451,10 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     // Landed: the record the stored value names is stored now, before anything below announces it.
     await storeHeldProvenance(storage, held);
+    if (!created && keepsHistory(key)) {
+      await storage.pruneMemoryHistory(gaii, key, HISTORY_KEEP)
+        .catch(err => logger.warn('memory patch: history prune failed', { key, error: String(err) }));
+    }
     // Write-time classification of the merged value (TARGET-082 V3): scheduled, never awaited.
     classifyAfterWrite({ storage, config }, gaii, key, record.value);
 

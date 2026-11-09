@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-09 — aimeat_memory_history is registered from core-memory-history.ts.
  *   2026-11-01 — aimeat_discover takes type `dataset` (DISCOVERY_TYPES, the list the REST route reads) and
  *     hands the session's caller to the data package audience rule (plan doc-mvwxcas3dom3, D1.1).
  *   2026-10-25 — aimeat_discover with scope 'shared' needs organism:read, as aimeat_workspace_read
@@ -159,6 +160,7 @@
 
 import { McpServer } from '@modelcontextprotocol/server';
 import { registerMemoryBinTools } from './core-memory-bin.js';
+import { registerMemoryHistoryTool } from './core-memory-history.js';
 import { registerCoreBoardTools } from './core-boards.js';
 import { registerCoreWorkTools } from './core-work.js';
 import type { AimeatConfig } from '../config.js';
@@ -512,6 +514,7 @@ export function registerCoreTools(
     );
 
     registerMemoryBinTools(mcp, { storage, config }, caller);
+    registerMemoryHistoryTool(mcp, { storage, config }, caller, agentGaii);
 
     // ── Tool 4: aimeat_memory_write ──
     mcp.registerTool(

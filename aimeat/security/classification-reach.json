@@ -1362,6 +1362,19 @@
       },
       "why": "Reviewed 2026-11-08 (wish-oma-konteksti): the person's own context records (context.*), listed to write their names and summaries into the MCP instructions and the handbook of that person's own connecting AI. Both callers pass the connecting principal's classification reader (readerForAgent), and the rows go through presentMemories before a line is written, so a context classified away from AI is not named; private contexts are left out for an agent, and a session without memory:read gets no index."
     },
+    "src/services/context/check.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the machine check of one context reads each record it names (references, module parts, source records) under the caller's own principal or, through the same-owner view (ownerScopeView with readsAsOwner), under the caller's person; the organism read rule applies, and every record goes through presentMemory with the caller's classification reader before a single string of it is compared. A record the reader may not see is reported as 'not found or not open to you', the same finding as a missing one."
+    },
+    "src/services/memory-versions/history.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemoryHistory": 1
+      },
+      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the earlier versions of one record, read only by the record's own principal or the same person in person or through memory:read-as-owner; the organism read rule applies, and the current value and every archived version go through presentMemories with the caller's classification reader (and the credential mask) under the record's own target before anything is shown or compared."
+    },
     "src/services/content/classes.ts": {
       "reads": {
         "getMemory": 2
