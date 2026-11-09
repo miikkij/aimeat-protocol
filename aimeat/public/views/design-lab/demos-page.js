@@ -9,6 +9,7 @@
  * @structure PAGE_DEMOS — { [id]: { variants: [{ name, render(ex) }] } }
  * @usage import { PAGE_DEMOS } from './demos-page.js';
  * @version-history
+ *   v1.7.0 — 2026-11-09 — The block slot's waiting look (surface-slot): a heading and the loading line.
  *   v1.6.0 — 2026-10-31 — OverviewMap on a small sample account, every group closed.
  *   v1.5.0 — 2026-10-03 — PageStart: open with the page's button, with a link after the purpose, and
  *     folded.
@@ -39,6 +40,7 @@ import { Masthead, MastheadButton, MastheadCog } from '/components/Masthead.js';
 import { LinkLine } from '/components/LinkLine.js';
 import { StatLine, statSentence } from '/components/StatLine.js';
 import { Band, BandNote } from '/components/Band.js';
+import { Note } from '/components/Note.js';
 import { LineList } from '/components/LineList.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { ThingLink, ThingChip } from '/components/ThingLink.js';
@@ -175,6 +177,11 @@ export const PAGE_DEMOS = {
     { name: 'default', render: (ex) => html`<${Band} title=${ex.title}><${NamedRow} label="Apps"><${ThingLink} href="/v1/apps" n=${12} label="apps" /><//>
         <${BandNote}>A note under the rows.<//><//>` },
     { name: 'tight', render: (ex) => html`<${Band} title=${ex.title} tight=${true}><${QuietNote}>Nothing here yet.<//><//>` },
+  ] },
+  'surface-slot': { variants: [
+    // The waiting look the renderer draws in a home block's place (views/surface/renderer.js).
+    { name: 'waiting', render: () => html`<div class="surface-slot"><div class="surface-slot-wait">
+        <${Band} title="Overview" tight=${true}><${Note} kind="loading" /><//></div><div class="surface-slot-content"></div></div>` },
   ] },
   'line-list': { variants: [
     { name: 'with more', render: (ex) => html`<${LineList} rows=${ex.rows} more=${ex.more} />` },

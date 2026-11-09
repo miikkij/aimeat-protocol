@@ -15,3 +15,6 @@
 
 .surface-slot,
 .surface-slot-content { display: contents; }
+/* The waiting place is the one that draws a box: it holds the heading and the line, and the
+   renderer sets its min-height to the block's remembered height. Its row spacing is in band.css. */
+.surface-slot-wait { display: block; }
