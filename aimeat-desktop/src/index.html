@@ -7,6 +7,7 @@
   <title>AIMEAT</title>
   <link rel="stylesheet" href="house.css" />
   <link rel="stylesheet" href="frontdoor.css" />
+  <link rel="stylesheet" href="desktop-tools.css" />
 </head>
 <body>
   <div class="wrap">
@@ -20,6 +21,7 @@
       <div id="update"></div>
       <h1 class="poster-page-title" data-text="title">Your AI tools</h1>
       <p class="lead" data-text="lead"></p>
+      <p class="below"><a class="poster-action" href="#desktopTools" data-tools-text="toolsLink"></a></p>
       <div class="environment">
         <div class="field"><label class="poster-label" for="environment" data-text="environment"></label><select id="environment"></select></div>
         <div class="field"><label class="poster-label" for="environmentName" data-text="name"></label><input id="environmentName" type="text" maxlength="80" autocomplete="off" /></div>
@@ -37,9 +39,11 @@
         <p class="lead" data-text="firstHint"></p><pre class="snippet" id="firstPrompt"></pre>
         <button class="poster-action" id="copyPrompt" data-text="copyPrompt"></button><p class="hint" data-text="firstPrivacy"></p>
       </section>
+      <div id="desktopTools"></div>
       <div class="foot"><a class="poster-action" href="server.html" data-text="local"></a></div>
     </main>
   </div>
   <script src="frontdoor-state.js"></script><script src="frontdoor.js"></script><script src="updates.js"></script>
+  <script src="desktop-tools-strings.js"></script><script src="desktop-tools.js"></script>
 </body>
 </html>

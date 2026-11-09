@@ -58,6 +58,141 @@ fn restoring_a_backup_keeps_keys_database_files_and_empty_folders_together() {
 }
 
 #[test]
+fn encrypted_backup_hides_names_and_keys_and_restores_with_recovery() {
+    let fixture = Fixture::new();
+    let root = fixture.node();
+    let archive = fixture.0.join("backup.zip.age");
+    let password = SecretString::from("fixture backup password with spaces".to_owned());
+    let mut large = vec![0; 256 * 1024];
+    getrandom::getrandom(&mut large).unwrap();
+    fs::write(root.join("data/storage/multiple-blocks.bin"), &large).unwrap();
+    create_encrypted(&root, &archive, "0.8.0", &password).unwrap();
+    let bytes = fs::read(&archive).unwrap();
+    assert!(bytes.starts_with(b"age-encryption.org/v1\n"));
+    for secret in [b"keep-this-key".as_slice(), b"data/aimeat.db", b"aimeat-backup.json"] {
+        assert!(!bytes.windows(secret.len()).any(|window| window == secret));
+    }
+    assert!(inspect_with_password(&archive, None).is_err());
+    assert_eq!(inspect_with_password(&archive, Some(&password)).unwrap().files.len(), 5);
+    // An unmodified age reader can open our output; encryption is an interoperable envelope.
+    let decryptor = age::Decryptor::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut identity = age::scrypt::Identity::new(password.clone());
+    identity.set_max_work_factor(18);
+    let reader = decryptor.decrypt(std::iter::once(&identity as &dyn age::Identity)).unwrap();
+    assert_eq!(zip::ZipArchive::new(reader).unwrap().len(), 9);
+    fs::write(root.join("newer-only.txt"), b"retained in recovery").unwrap();
+    let (_, recovery) = restore_encrypted(&root, &archive, &archive_digest(&archive).unwrap(), Some(&password)).unwrap();
+    assert_eq!(fs::read(root.join("data/aimeat.db")).unwrap(), b"SQLite format 3\0original database bytes");
+    assert_eq!(fs::read(root.join("data/storage/multiple-blocks.bin")).unwrap(), large);
+    assert_eq!(fs::read(recovery.join("newer-only.txt")).unwrap(), b"retained in recovery");
+    assert!(!root.join("newer-only.txt").exists());
+    assert!(!fs::read_dir(&fixture.0).unwrap().any(|entry| entry.unwrap().file_name().to_string_lossy().starts_with(".aimeat-restore-")));
+}
+
+#[test]
+fn encrypted_restore_refuses_wrong_password_tampering_and_truncation_before_writes() {
+    let fixture = Fixture::new();
+    let root = fixture.node();
+    let archive = fixture.0.join("backup.zip.age");
+    let password = SecretString::from("fixture backup password with spaces".to_owned());
+    let mut large = vec![0; 256 * 1024];
+    getrandom::getrandom(&mut large).unwrap();
+    fs::write(root.join("data/storage/multiple-blocks.bin"), large).unwrap();
+    create_encrypted(&root, &archive, "0.8.0", &password).unwrap();
+    let wrong = SecretString::from("a completely different passphrase".to_owned());
+    let original = fs::read(&archive).unwrap();
+    assert_eq!(restore_encrypted(&root, &archive, &archive_digest(&archive).unwrap(), Some(&wrong)).unwrap_err(), "BACKUP_PASSWORD_INVALID");
+    assert_current_untouched(&root);
+    assert_eq!(fs::read_dir(&fixture.0).unwrap().count(), 2);
+    let mut changed = original.clone();
+    let last = changed.len() - 1;
+    changed[last] ^= 0x80;
+    let mut middle = original.clone();
+    middle[128 * 1024] ^= 0x40;
+    for damaged in [changed, middle, original[..original.len() - 9].to_vec()] {
+        fs::write(&archive, damaged).unwrap();
+        assert_eq!(restore_encrypted(&root, &archive, &archive_digest(&archive).unwrap(), Some(&password)).unwrap_err(), "BACKUP_PASSWORD_INVALID");
+        assert_current_untouched(&root);
+        assert_eq!(fs::read_dir(&fixture.0).unwrap().count(), 2);
+    }
+}
+
+#[test]
+fn encrypted_backup_refuses_short_or_unbounded_password_without_creating_file() {
+    let fixture = Fixture::new();
+    let root = fixture.node();
+    let archive = fixture.0.join("backup.zip.age");
+    for value in ["short".to_owned(), " ".repeat(12), "a".repeat(1025)] {
+        assert!(create_encrypted(&root, &archive, "0.8.0", &SecretString::from(value)).is_err());
+        assert!(!archive.exists());
+    }
+}
+
+#[test]
+fn missing_filesystem_acls_allow_only_ciphertext_backup_destinations() {
+    let fixture = Fixture::new();
+    let encrypted = fixture.0.join("portable.zip.age");
+    let plaintext = fixture.0.join("unsafe.zip");
+    let no_acl = |_: &Path| Err("This filesystem does not support private ACLs.".to_owned());
+    let file = backup_destination(&encrypted, true, no_acl).unwrap();
+    assert_eq!(file.metadata().unwrap().len(), 0);
+    drop(file);
+    assert!(encrypted.exists());
+    assert!(backup_destination(&plaintext, false, no_acl).is_err());
+    assert!(!plaintext.exists());
+    // Privacy fallback does not weaken create-new: an existing file is never overwritten.
+    fs::write(&encrypted, b"existing ciphertext").unwrap();
+    assert!(backup_destination(&encrypted, true, no_acl).is_err());
+    assert_eq!(fs::read(&encrypted).unwrap(), b"existing ciphertext");
+}
+
+#[test]
+fn encrypted_headers_cannot_request_unbounded_key_derivation_or_allocation() {
+    let fixture = Fixture::new();
+    let root = fixture.node();
+    let archive = fixture.0.join("hostile.age");
+    let password = SecretString::from("fixture backup password with spaces".to_owned());
+    // Valid age syntax with a deliberately excessive work factor. No expensive KDF is needed.
+    let costly = b"age-encryption.org/v1\n-> scrypt AAAAAAAAAAAAAAAAAAAAAA 63\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n--- AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n00000000000000000000000000000000";
+    fs::write(&archive, costly).unwrap();
+    assert_eq!(restore_encrypted(&root, &archive, &archive_digest(&archive).unwrap(), Some(&password)).unwrap_err(), "BACKUP_TOO_LARGE");
+    assert_current_untouched(&root);
+    let mut oversized = b"age-encryption.org/v1\n".to_vec();
+    oversized.extend(vec![b'A'; 4096]);
+    fs::write(&archive, oversized).unwrap();
+    assert_eq!(inspect_with_password(&archive, Some(&password)).unwrap_err(), "BACKUP_TOO_LARGE");
+    assert_current_untouched(&root);
+}
+
+#[test]
+fn portable_restore_preserves_this_computers_preferences() {
+    let fixture = Fixture::new();
+    let root = fixture.node();
+    let archive = fixture.0.join("legacy.zip");
+    fs::write(root.join(MACHINE_PREFERENCES), br#"{"start_at_login":true}"#).unwrap();
+    let manifest = create(&root, &archive, "0.8.0").unwrap();
+    assert!(!manifest.files.iter().any(|file| file.path == MACHINE_PREFERENCES));
+    let current = br#"{"start_at_login":false,"language":"fi"}"#;
+    fs::write(root.join(MACHINE_PREFERENCES), current).unwrap();
+    restore(&root, &archive).unwrap();
+    assert_eq!(fs::read(root.join(MACHINE_PREFERENCES)).unwrap(), current);
+
+    // An older or externally produced archive may include this machine-local filename.
+    let mut entries = archive_entries(&archive);
+    let preference_bytes = br#"{"start_at_login":true,"start_local_node":true}"#.to_vec();
+    let (_, bytes) = entries.iter_mut().find(|(name, _)| name == MANIFEST).unwrap();
+    let mut manifest: BackupManifest = serde_json::from_slice(bytes).unwrap();
+    manifest.files.push(BackupFile { path: MACHINE_PREFERENCES.into(), bytes: preference_bytes.len() as u64, sha256: format!("{:x}", Sha256::digest(&preference_bytes)) });
+    manifest.total_bytes += preference_bytes.len() as u64;
+    *bytes = serde_json::to_vec(&manifest).unwrap();
+    entries.push((format!("data/{MACHINE_PREFERENCES}"), preference_bytes));
+    write_entries(&archive, entries, None);
+    fs::remove_file(root.join(MACHINE_PREFERENCES)).unwrap();
+    restore(&root, &archive).unwrap();
+    assert!(!root.join(MACHINE_PREFERENCES).exists());
+}
+
+#[test]
 fn a_backup_cannot_be_written_inside_the_data_it_copies_or_over_an_existing_file() {
     let fixture = Fixture::new();
     let root = fixture.node();

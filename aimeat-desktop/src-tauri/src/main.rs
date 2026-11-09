@@ -15,11 +15,34 @@ mod updater;
 mod tray;
 mod backup_archive;
 mod backup;
+mod diagnostics;
+mod desktop_policy;
+mod desktop_settings;
+mod desktop_lifecycle;
+#[cfg(windows)]
+mod desktop_autostart_windows;
 #[cfg(test)]
 mod webview_policy;
 
 fn main() {
-    tauri::Builder::default()
+    let mut context = tauri::generate_context!();
+    // Isolated review profiles get their own native instance identity, without registering at login.
+    if let Some(root) = std::env::var_os("AIMEAT_DESKTOP_DATA_DIR") {
+        context.config_mut().identifier = desktop_lifecycle::isolated_identifier(
+            &context.config().identifier, std::path::Path::new(&root));
+    }
+    // The native single-instance plugin must be registered before every other plugin.
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            desktop_lifecycle::show_main_window(app);
+        }));
+    #[cfg(not(windows))]
+    if !desktop_settings::isolated() {
+        builder = builder.plugin(tauri_plugin_autostart::Builder::new()
+            .arg(desktop_lifecycle::LOGIN_ARGUMENT).build());
+    }
+    builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -50,48 +73,21 @@ fn main() {
             backup::create_backup,
             backup::inspect_backup,
             backup::restore_backup,
+            diagnostics::run_diagnostics,
+            desktop_settings::get_desktop_preferences,
+            desktop_settings::save_desktop_preferences,
+            desktop_settings::set_desktop_language,
+            desktop_lifecycle::quit_desktop,
         ])
         .setup(|app| {
-            // Initialize system tray
+            if let Err(error) = desktop_settings::initialize(app.handle()) {
+                desktop_lifecycle::show_error(app.handle(), error);
+            }
             tray::setup_tray(app)?;
+            desktop_lifecycle::on_launch(app.handle());
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building AIMEAT Desktop")
-        .run(|app_handle, event| {
-            // Keep the window available if shutdown fails, including when the title-bar X is used.
-            if let tauri::RunEvent::WindowEvent { event: tauri::WindowEvent::CloseRequested { ref api, .. }, .. } = event {
-                api.prevent_close();
-                app_handle.exit(0);
-            }
-            // Keep the event loop responsive while the child flushes its existing SIGTERM handlers.
-            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
-                // Tauri cannot prevent a restart. restart_desktop has already drained the child.
-                if code == Some(tauri::RESTART_EXIT_CODE) { return; }
-                static QUITTING: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
-                if QUITTING.load(std::sync::atomic::Ordering::SeqCst) != 2 {
-                    api.prevent_exit();
-                }
-                if QUITTING.compare_exchange(0, 1, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst).is_ok() {
-                    let app = app_handle.clone();
-                    std::thread::spawn(move || {
-                        if let Err(error) = node_manager::shutdown_node(&app) {
-                            use tauri::{Emitter, Manager};
-                            use tauri_plugin_dialog::DialogExt;
-                            QUITTING.store(0, std::sync::atomic::Ordering::SeqCst);
-                            let _ = app.emit("node-error", &error);
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                            app.dialog().message(error).title("AIMEAT Desktop")
-                                .kind(tauri_plugin_dialog::MessageDialogKind::Error).show(|_| {});
-                            return;
-                        }
-                        QUITTING.store(2, std::sync::atomic::Ordering::SeqCst);
-                        app.exit(code.unwrap_or(0));
-                    });
-                }
-            }
-        });
+        .run(desktop_lifecycle::handle_event);
 }

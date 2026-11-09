@@ -13,15 +13,16 @@
  *   copies WebView2Loader.dll out of the webview2-com-sys crate, and that DLL is Microsoft's
  *   redistributable under Microsoft's own terms rather than the crate's MIT.
  *
- *   So this stages four things: AIMEAT's own licence, the generated third-party notices for the
- *   server bundle, Node's LICENSE taken from the very runtime being shipped, and a notice naming
+ *   This stages AIMEAT's own licence, the generated third-party notices for the server bundle,
+ *   the locked Rust dependency notices, Node's LICENSE taken from the runtime being shipped, and a notice naming
  *   the WebView2 component with a pointer to the terms it ships under. Microsoft's terms are not
  *   reproduced here because we do not have a copy we may redistribute; naming the component,
  *   version and the canonical URL is what an installer can honestly do.
  * @structure nodeLicenseFile() → find LICENSE beside the runtime being staged; main() → copy the
- *   four documents, failing loudly if the Node licence cannot be found
+ *   documents, failing loudly if required licence text cannot be found
  * @usage  node scripts/stage-licenses.mjs   (run via `pnpm stage`)
  * @version-history
+ *   v1.2.0 - 2026-11-09 - Include the locked Rust dependency licences and source notices.
  *   v1.1.0 — 2026-09-29 — The WebView2 notice is written on Windows only; the macOS and Linux
  *     installers ship no WebView2 loader, so they carry three documents.
  *   v1.0.0 — 2026-08-31 — Initial: AIMEAT LICENSE, third-party notices, Node LICENSE, WebView2 notice.
@@ -29,6 +30,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stageRustNotices } from './rust-notices.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = join(__dirname, '..');
@@ -80,7 +82,7 @@ The full Microsoft terms are not reproduced in this file because they are Micros
 publish; the URL above is the canonical copy.
 `;
 
-function main() {
+async function main() {
   mkdirSync(outDir, { recursive: true });
 
   copyFileSync(join(repoRoot, 'LICENSE'), join(outDir, 'AIMEAT-LICENSE.txt'));
@@ -103,7 +105,8 @@ function main() {
   copyFileSync(nodeLicense, join(outDir, 'NODEJS-LICENSE.txt'));
 
   // The WebView2 loader ships only in the Windows installer, so only that installer names it.
-  let staged = 3;
+  await stageRustNotices(desktopRoot, outDir);
+  let staged = 4;
   if (process.platform === 'win32') {
     writeFileSync(join(outDir, 'WEBVIEW2-NOTICE.txt'), WEBVIEW2_NOTICE(webview2CrateVersion()), 'utf-8');
     staged += 1;
@@ -113,4 +116,4 @@ function main() {
   console.log(`[stage-licenses] Node LICENSE taken from ${nodeLicense}`);
 }
 
-main();
+await main();

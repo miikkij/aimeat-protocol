@@ -29,6 +29,7 @@
   <title>AIMEAT</title>
   <link rel="stylesheet" href="house.css" />
   <link rel="stylesheet" href="server.css" />
+  <link rel="stylesheet" href="desktop-tools.css" />
 </head>
 <body>
   <div class="wrap">
@@ -48,6 +49,7 @@
       <h1 class="poster-page-title" id="t-title"></h1>
       <p class="lead" id="t-lead"></p>
       <div id="update" aria-live="polite"></div>
+      <p class="below"><a class="poster-action" href="#desktopTools" data-tools-text="toolsLink"></a></p>
 
       <!-- ── Running it ─────────────────────────────────────────────────── -->
       <section class="poster-section">
@@ -71,11 +73,12 @@
         </dl>
       </section>
 
-      <section class="poster-section">
+      <section class="poster-section" id="backupSection">
         <h2 class="poster-section-title" id="t-backupTitle"></h2>
         <p class="lead" id="t-backupLead"></p>
         <p class="hint" id="t-backupPrivacy"></p>
         <p id="lastBackup" aria-live="polite"></p>
+        <p class="poster-aside" id="backupReminder" aria-live="polite" hidden></p>
         <p class="hint" id="backupStopHint"></p>
         <div class="acts below">
           <button class="poster-action" id="createBackup"></button>
@@ -85,7 +88,7 @@
       </section>
 
       <!-- ── The AI on this computer ────────────────────────────────────── -->
-      <section class="poster-section">
+      <section class="poster-section" id="aiSection">
         <h2 class="poster-section-title" id="t-aiTitle"></h2>
         <p class="lead" id="t-aiLead"></p>
 
@@ -142,7 +145,7 @@
       </section>
 
       <!-- ── Settings ───────────────────────────────────────────────────── -->
-      <section class="poster-section">
+      <section class="poster-section" id="settingsSection">
         <h2 class="poster-section-title" id="t-setTitle"></h2>
         <div class="field">
           <label class="poster-label" for="setId" id="t-setId"></label>
@@ -188,7 +191,7 @@
       </section>
 
       <!-- ── Log ────────────────────────────────────────────────────────── -->
-      <section class="poster-section">
+      <section class="poster-section" id="logSection">
         <h2 class="poster-section-title" id="t-logTitle"></h2>
         <div class="acts">
           <div class="checks">
@@ -202,6 +205,7 @@
         <div class="log" id="log"></div>
       </section>
 
+      <div id="desktopTools"></div>
       <div class="foot">
         <a class="poster-action" href="index.html" id="t-footBack"></a>
       </div>
@@ -209,9 +213,30 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="backupPasswordDialog" aria-labelledby="backupPasswordTitle">
+    <h2 class="poster-section-title" id="backupPasswordTitle"></h2>
+    <p id="backupPasswordHint"></p>
+    <p class="hint" id="backupPasswordFile"></p>
+    <form id="backupPasswordForm">
+      <div class="field">
+        <label class="poster-label" for="backupPassword" id="t-backupPassword"></label>
+        <input id="backupPassword" type="password" autocomplete="new-password" maxlength="1024" required />
+      </div>
+      <div class="field" id="backupPasswordRepeatField">
+        <label class="poster-label" for="backupPasswordRepeat" id="t-backupPasswordRepeat"></label>
+        <input id="backupPasswordRepeat" type="password" autocomplete="new-password" maxlength="1024" />
+      </div>
+      <p class="poster-aside danger" id="backupPasswordError" role="alert" hidden></p>
+      <div class="acts below">
+        <button class="poster-action" id="submitBackupPassword" type="submit"></button>
+        <button class="poster-action" id="cancelBackupPassword" type="button"></button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="restoreDialog" aria-labelledby="t-restoreTitle">
     <h2 class="poster-section-title" id="t-restoreTitle"></h2>
     <p id="restoreSummary"></p>
+    <p class="hint" id="restoreEncryption"></p>
     <p class="poster-aside" id="t-restoreReplaces"></p>
     <p class="hint" id="t-restoreRecovery"></p>
     <div class="acts below">
@@ -222,6 +247,8 @@
 
   <script src="server-strings.js"></script>
   <script src="server.js"></script>
+  <script src="desktop-tools-strings.js"></script>
+  <script src="desktop-tools.js"></script>
   <script src="updates.js"></script>
 </body>
 </html>
