@@ -85,6 +85,11 @@ aimeat/test/admin-setup-secret
 # source. The database itself is already covered by *.db above.
 aimeat/.sandbox.json
 aimeat/.sandbox.log
+# The same on PostgreSQL (AIMEAT_SANDBOX_DB_URL), and the per-request query trace (scripts/perf/).
+aimeat/.sandbox-pg.json
+aimeat/.sandbox-pg.log
+aimeat/.perf-trace*.jsonl
+aimeat/.perf/
 # `pnpm sandbox:machines` — the stand-in machine's own key and its output, the same kind of file.
 aimeat/.sandbox-machines.json
 aimeat/.sandbox-machines.log
