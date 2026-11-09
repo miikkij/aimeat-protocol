@@ -20,6 +20,8 @@
  *   schema check. The living document's gear link carries the value's sample, bounded.
  * @usage cd aimeat && pnpm exec vitest run test/unit/receivers-ready-commands.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-09 — The real-PowerShell test has a 60 s limit, as its spawned process has: a cold
+ *     start on a CI runner passed vitest's default 5 s and turned main's unit job red.
  *   v1.0.0 — 2026-11-09 — Initial (secaudit2026nov08b round 15d).
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -141,7 +143,9 @@ describe('the PowerShell command', () => {
     const run = spawnSync(psExe!, ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 60_000 });
     expect(run.status).toBe(0);
     expect(JSON.parse(run.stdout)).toEqual({ method: 'Post', uri: URL_, auth: `Bearer ${KEY}`, ct: 'application/json; charset=utf-8', body: BODY });
-  });
+    // The test's own limit matches the process's: a cold PowerShell start on a CI runner took more
+    // than vitest's default 5 s on 2026-11-09.
+  }, 60_000);
 });
 
 describe('the address', () => {
