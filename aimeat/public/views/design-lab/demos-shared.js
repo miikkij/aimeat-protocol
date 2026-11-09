@@ -9,7 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
- *   v1.18.0 — 2026-11-09 — Fingerprint's demo (draft): panel and row on a small invented profile.
+ *   v1.18.0 — 2026-11-09 — Fingerprint's demo: panel and row on a small invented profile.
  *   v1.17.0 — 2026-10-18 — ClassificationBadge's demo: the four default classifications, one from a
  *     workspace, a conflict and an exception beside the AudienceBadge.
  *   v1.16.0 — 2026-10-18 — AudienceBadge's demo: every level in a row, an organism not named yet, the button.

@@ -22,7 +22,7 @@
  * @structure ContextsTab() — state + handlers → renderContextsView(ctx)
  * @usage registered in profile.js TABS as id 'contexts'.
  * @version-history
- *   v1.1.0 — 2026-11-09 — DRAFT: the chosen context's fingerprint is read (api.fingerprint) when the
+ *   v1.1.0 — 2026-11-09 — The chosen context's fingerprint is read (api.fingerprint) when the
  *     choice or its version changes, for the view's fingerprint part.
  *   v1.0.0 — 2026-11-08 — Initial.
  */
@@ -94,7 +94,7 @@ export default function ContextsTab({ session, showToast }) {
     return () => { live = false; };
   }, [needsOrgs]);
 
-  // The chosen context's fingerprint, read when the choice or its version changes (draft, 2026-11-09).
+  // The chosen context's fingerprint, read when the choice or its version changes.
   const [fingerprint, setFingerprint] = useState(null);
   const fpKey = current ? `${current.key}@${current.version}` : '';
   useEffect(() => {

@@ -15,14 +15,14 @@
  *   it back (the developer's call, 2026-11-09: "kompakti riittää ... jos sitä klikkaa se voisi avata
  *   sen isomman näkymän").
  *
- *   DRAFT (2026-11-09): first used by the Contexts page, waiting for the developer's look before it
- *   goes to main.
+ *   First used by the Contexts page; the developer approved its look on 2026-11-09.
  *
  *   IT RENDERS; IT DOES NOT FETCH the profile. When the drawing cannot load, the component says so in
  *   one quiet line.
  * @structure Fingerprint({ profile, sections, title, view, expandable }) · loadDrawing()
  * @usage html`<${Fingerprint} profile=${facts.profile} sections=${profileSections} title=${name} expandable />`
  * @version-history
+ *   v1.0.0 — 2026-11-09 — The developer approved the look; no longer a draft.
  *   v0.2.0 — 2026-11-09 — `expandable`: the compact row opens the whole fingerprint in place.
  *   v0.1.0 — 2026-11-09 — Draft (the Contexts page).
  */

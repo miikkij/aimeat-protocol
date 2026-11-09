@@ -18,7 +18,7 @@
  *   fingerprintPart · corePart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
  * @usage import { renderContextsView } from './contexts/view.js';
  * @version-history
- *   v1.4.0 — 2026-11-09 — DRAFT for the developer's look: the fingerprint as the first numbered part
+ *   v1.4.0 — 2026-11-09 — The fingerprint as the first numbered part (approved by the developer)
  *     (components/Fingerprint.js, the drawing Pages shows), or the sentence that asks the AI for one.
  *     Compact by default; pressing it opens the whole fingerprint (the developer's call, same day).
  *   v1.3.0 — 2026-11-08 — The guidance follows the page-guidance rule: the page's own introduction is

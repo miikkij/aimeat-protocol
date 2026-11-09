@@ -294,9 +294,9 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
                 expandable: 'the compact row, which opens the whole fingerprint in place when pressed; "Show less" folds it back',
             },
         },
-        useFor: ['What a context or a document is made of, on the page that shows it (first: the Contexts page, a draft waiting for the developer\'s look).'],
+        useFor: ['What a context or a document is made of, on the page that shows it (first: the Contexts page).'],
         variants: [],
         example: { title: 'Cabin repair' },
-        note: 'Added 2026-11-09 as a draft. It loads /v1/libs/aimeat-atelier.js and the kit\'s fingerprint.css once, on first use; fingerprint.css here maps the kit\'s --ak-* tokens to the node\'s theme tokens, and the six genre colours stay the kit\'s validated defaults.',
+        note: 'Added 2026-11-09; the developer approved its look the same day. It loads /v1/libs/aimeat-atelier.js and the kit\'s fingerprint.css once, on first use; fingerprint.css here maps the kit\'s --ak-* tokens to the node\'s theme tokens, and the six genre colours stay the kit\'s validated defaults.',
     },
 ];
