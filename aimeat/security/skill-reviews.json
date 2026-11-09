@@ -491,11 +491,11 @@
       "digest": "sha256:4f7c25debca9946022d51d8c"
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-10-29",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:90fbf1167df33d165929efe5",
+      "digest": "sha256:ce301ca714c8186e6a9238e1",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -699,7 +699,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "5b1c4dde6b61c603"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "e0908125aa35620b"
+      "aimeat/scripts/sandbox.ts": "b53089e582ec571a"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"
