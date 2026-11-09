@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared context type + small pure helpers for the memory route group modules. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-09 — visibilityToZone and isAnonymousGaii moved unchanged to utils/visibility-words.ts and
+ *     re-exported, so services/memory-patch reads them without importing a route.
  *   2026-10-17 — visibilityToZone: 'organism:<id>' is dmz (node-local), as members and workspace are.
  *   2026-10-05 — MEMORY_LIST_MAX_LIMIT moved unchanged to models/tool-input-vocabulary.ts and is
  *     re-exported: the tool catalog states it (secaudit 2026-10, M3).
@@ -17,7 +19,6 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { StatsCollector } from '../../services/stats.js';
 import type { MemoryDbService } from '../../services/db/memory-db-service.js';
-import { isOrganismVisibilityWord } from '../../utils/visibility-words.js';
 
 /**
  * The most entries one listing will hand back, and the ceiling `?limit` is clamped to.
@@ -49,9 +50,7 @@ export interface MemoryRouteCtx {
 }
 
 /** Anonymous agents (shared#anonymous@...) may only write to keys prefixed with "anonymous." */
-export function isAnonymousGaii(gaii: string): boolean {
-  return gaii.includes('#anonymous@');
-}
+export { isAnonymousGaii, visibilityToZone } from '../../utils/visibility-words.js';
 
 /**
  * The exact bytes a provenance record is a statement ABOUT, for a memory value (TARGET-058).
@@ -62,17 +61,3 @@ export function isAnonymousGaii(gaii: string): boolean {
  * only stable rendering of a structured value we have.
  */
 export { memoryContentBytes } from '../../utils/memory-content.js';
-
-/** Map memory visibility to DMZ zone (Phase 0.6) */
-export function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
-  switch (visibility) {
-    case 'private': return 'private';
-    case 'owner': return 'dmz';
-    case 'group': return 'dmz';
-    case 'workspace': return 'dmz'; // node-local: readable by workspace members, never federated
-    case 'members': return 'dmz'; // node-local: never replicated to federation
-    case 'public': return 'federation';
-    // 'organism:<id>': node-local like members and workspace, never replicated to federation.
-    default: return isOrganismVisibilityWord(visibility) ? 'dmz' : 'private';
-  }
-}

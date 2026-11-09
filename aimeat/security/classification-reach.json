@@ -540,12 +540,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader (the bin list included); the other reads here serve a write or the node's own bookkeeping. 2026-10-15 (feature-list audit #42): the seventh is GET /:key reading the caller's own record when a hidden owner copy shadowed it, and it passes presentMemory like the read it replaces."
     },
-    "src/routes/memory/patch.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the second reads the record's visibility now, for the audience cap before the write."
-    },
     "src/routes/memory/public-read.ts": {
       "reads": {
         "getMemory": 2
@@ -1367,6 +1361,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the machine check of one context reads each record it names (references, module parts, source records) under the caller's own principal or, through the same-owner view (ownerScopeView with readsAsOwner), under the caller's person; the organism read rule applies, and every record goes through presentMemory with the caller's classification reader before a single string of it is compared. A record the reader may not see is reported as 'not found or not open to you', the same finding as a missing one."
+    },
+    "src/services/memory-patch/patch.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Moved unchanged from routes/memory/patch.ts on 2026-11-09 with its review: Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader (the echoed value goes through presentMemory with the caller's reader); the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the first reads the record's visibility, for the audience cap before the write; the second is the merge loop's re-read."
     },
     "src/services/memory-versions/history.ts": {
       "reads": {

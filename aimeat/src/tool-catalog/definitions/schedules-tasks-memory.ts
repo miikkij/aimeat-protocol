@@ -5,7 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
- *   2026-11-09 — aimeat_memory_history: a memory entry's kept earlier versions and what each write changed;
+ *   2026-11-09 — aimeat_memory_write takes `patch` (a JSON Merge Patch) in place of `value`;
+ *     aimeat_memory_history: a memory entry's kept earlier versions and what each write changed;
  *     aimeat_context_check: a machine check of one context.
  *   2026-11-02 — aimeat_schedule_create and aimeat_schedule_update take `deliver` for an agent_task schedule.
  *   2026-10-28 — aimeat_agent_scope_narrow: the node never narrows by itself; call it only on the person's word.
@@ -484,7 +485,7 @@ export const schedulesTasksMemoryTools = [
     },
     {
         name: 'aimeat_memory_write',
-        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list. TIP: workspace documents can embed a key LIVE (an ```aimeat-memory fenced block naming the key shows its current value on every open) — store table-like data as an array of objects with consistent field names and re-write the SAME key to update every document embedding it.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list. TIP: workspace documents can embed a key LIVE (an ```aimeat-memory fenced block naming the key shows its current value on every open) — store table-like data as an array of objects with consistent field names and re-write the SAME key to update every document embedding it. To change a few fields of a large object record (a context\'s core, a status line), send `patch` with only those fields instead of `value`.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Write Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -493,7 +494,8 @@ export const schedulesTasksMemoryTools = [
         input: {
             ...aiProvenanceCatalogInput,
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
-            value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.', zod: z.union([documentText(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
+            value: { type: 'unknown', description: 'Value to store — any JSON type. Give this or patch, not both.', zod: z.union([documentText(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
+            patch: { type: 'object', description: 'Change only some fields of an existing object record instead of sending it whole (JSON Merge Patch, RFC 7386). A field you give replaces that field; a nested object merges into the nested object; a list REPLACES the whole list (send the full new list); null REMOVES the field. Fields you leave out stay as they are, and so do visibility and tags unless you give them. Refused with NOT_AN_OBJECT when the record holds a string, number or list. Give this or value, not both; with expected_version the patch lands only on that version.', zod: z.record(z.string(), z.unknown()) },
             visibility: { type: 'string', description: 'Who can read it: private, owner, group, members (any signed-in account of this node), public, or "organism:<organism id>" (the active members of that one organism and their agents; you must be a member of it yourself). Default: private.', zod: memoryWriteVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group. Required when visibility=group, unless the record already has a group: the write is refused without one, and when the id names no group, because the record would open to nobody but its owner.' },
             tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },

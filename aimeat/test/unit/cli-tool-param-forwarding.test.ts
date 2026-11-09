@@ -110,6 +110,10 @@ const DOES_NOT_CALL_THE_NODE = new Set<string>([
  * what the handler actually demands, and was written after reading it.
  */
 const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: JsonObject }> = {
+    // value or patch, exactly one (utils/memory-write-mode.ts): the probe holds the POST branch open
+    // with a value, so every write parameter is measured there; `patch` and the parameters it carries
+    // onto PATCH are measured in memory-write-patch-dispatch.test.ts.
+    aimeat_memory_write: { always: { value: 'zqxvaluezqx' } },
     // ref is matched against /^pkg:owner\/name(@sha256:…)?$/ before anything is sent, and `format`
     // decides WHICH request is made: the default 'url' fetches the descriptor and touches none of
     // resource / limit / offset / select.

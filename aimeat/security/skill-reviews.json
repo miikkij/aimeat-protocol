@@ -32,7 +32,7 @@
       "digest": "sha256:255a43a31ee4bd4a603a5475"
     },
     "node:aimeat-content-classes": {
-      "reviewedOn": "2026-11-06",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/content/pipeline.ts",
         "aimeat/src/services/content/ai-stages.ts",
@@ -42,7 +42,7 @@
         "aimeat/src/services/content/shared-profile.ts",
         "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:2aeacaab9c4df95839a5f0e4"
+      "digest": "sha256:2fc63565b7ef2c9142939000"
     },
     "node:aimeat-context": {
       "reviewedOn": "2026-11-09",
@@ -278,14 +278,14 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:a3e7648c1d19f6789731869c"
+      "digest": "sha256:ac0248d64e8bd5a3ad7b78cb"
     },
     "node:manage-my-profile-data": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/routes/memory/shared.ts"
       ],
-      "digest": "sha256:d78eaf80767d1827ba9352b7"
+      "digest": "sha256:4c41735e286441cee00507fc"
     },
     "node:add-a-crew-agent": {
       "reviewedOn": "2026-11-05",
@@ -662,11 +662,11 @@
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "ee57da5710e8eb6b",
+      "aimeat/src/mcp/core.ts": "0a39f07278347815",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "66f1803515078196"
     },
     "node:manage-my-profile-data": {
-      "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
+      "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "59195162d900eb5f",
@@ -838,7 +838,7 @@
       "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
     },
     "node:aimeat-content-classes": {
-      "aimeat/src/services/content/pipeline.ts": "c0e79c05c342d571",
+      "aimeat/src/services/content/pipeline.ts": "40cc0216503b00e7",
       "aimeat/src/services/content/ai-stages.ts": "96d3366e8f153380",
       "aimeat/src/services/content/service.ts": "fa9119a4bc3a9a63",
       "aimeat/src/services/content/settings.ts": "75ca4524dd531ba0",

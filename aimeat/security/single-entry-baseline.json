@@ -363,10 +363,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/routes/memory/patch.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/routes/skills.ts": {
         "count": 1,
         "why": "UNREVIEWED"

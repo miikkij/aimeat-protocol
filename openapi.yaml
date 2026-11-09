@@ -19885,7 +19885,11 @@ paths:
         or array REPLACES wholesale (arrays are never merged element-wise — that would make two
         concurrent appends reorder each other). A non-object `patch` is rejected with 400 rather than
         replacing the whole record, which RFC 7386 would otherwise allow: on a shared record one
-        malformed body would wipe every other writer's subtree. Use PUT or POST to replace.
+        malformed body would wipe every other writer's subtree. Use PUT or POST to replace. For the
+        same reason a record whose value is not an object (a string, a number, a list) is not merged
+        into: 409 NOT_AN_OBJECT, and the record is unchanged. A writer that loses the swap waits a
+        short random moment before it reads again, and after six attempts answers 409 VERSION_CONFLICT.
+        The same code runs aimeat_memory_write with `patch`.
 
 
         `visibility`, `tags` and `ttl_hours` are optional and the record keeps its existing values

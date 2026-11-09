@@ -990,6 +990,8 @@ const ALL_SUITES = [
     'test/e2e-context-index.ts',
     // A context's earlier versions are kept and restorable, and a machine check says what no longer stands.
     'test/e2e-context-trust.ts',
+    // A partial write from an AI changes only what it names, on every data shape, and breaks nothing.
+    'test/e2e-memory-patch-mcp.ts',
     'test/e2e-agent-health.ts',
     'test/e2e-open-items.ts',
     'test/e2e-app-access-code.ts',

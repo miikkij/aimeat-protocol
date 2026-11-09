@@ -12,6 +12,8 @@
  *   visibility: memoryWriteVisibilitySchema.optional()
  *   if (!storedVisibilitySchema.safeParse(v).success) → 400
  * @version-history
+ *   v1.2.0 — 2026-11-09 — visibilityToZone and isAnonymousGaii moved here unchanged from
+ *     routes/memory/shared.ts, so services/memory-patch reads them without importing a route.
  *   v1.1.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.2 + V3.3).
  */
@@ -45,3 +47,22 @@ export const memoryWriteVisibilitySchema = z.union([z.enum(MEMORY_WRITE_VISIBILI
 
 /** A stored file's visibility: one of STORED_VISIBILITY_WORDS or `organism:<id>`. */
 export const storedVisibilitySchema = z.union([z.enum(STORED_VISIBILITY_WORDS), organismWord]);
+
+/** Map memory visibility to DMZ zone (Phase 0.6). Moved from routes/memory/shared.ts, which re-exports it. */
+export function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
+  switch (visibility) {
+    case 'private': return 'private';
+    case 'owner': return 'dmz';
+    case 'group': return 'dmz';
+    case 'workspace': return 'dmz'; // node-local: readable by workspace members, never federated
+    case 'members': return 'dmz'; // node-local: never replicated to federation
+    case 'public': return 'federation';
+    // 'organism:<id>': node-local like members and workspace, never replicated to federation.
+    default: return isOrganismVisibilityWord(visibility) ? 'dmz' : 'private';
+  }
+}
+
+/** Anonymous agents (shared#anonymous@...) may only write to keys prefixed with "anonymous." Moved from routes/memory/shared.ts. */
+export function isAnonymousGaii(gaii: string): boolean {
+  return gaii.includes('#anonymous@');
+}

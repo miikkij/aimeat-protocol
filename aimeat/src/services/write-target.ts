@@ -29,6 +29,8 @@
  *   const t = resolveWriteTarget(req, config, body.owner_scope === true);
  *   if ('deny' in t) { res.status(403).json(error(...t.deny)); return; }
  * @version-history
+ *   v1.2.0 — 2026-11-09 — resolveWriteTarget takes the fields it reads (WriteTargetAuth), so an MCP
+ *     session's caller auth reaches the same decision as a verified token (services/memory-patch).
  *   v1.1.0 — 2026-11-04 — Moved unchanged from routes/memory/owner-target.ts, so the MCP tools and the
  *     routes import the decision from a service. resolveWriteTarget takes anything that carries the
  *     verified token as `auth` (an Express request does), instead of the Express Request type
@@ -57,6 +59,9 @@ import { appMayWriteKey } from '../utils/reserved-keys.js';
  */
 export { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
 import { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
+
+/** What resolveWriteTarget reads of a credential: a verified token has it, and so has a session caller's `auth`. */
+export type WriteTargetAuth = Pick<VerifiedToken, 'sub' | 'owner' | 'roles' | 'scopes'> & { federated?: boolean; homeNode?: string };
 
 export interface WriteTarget {
     /** The namespace the record will be written under. */
@@ -98,7 +103,7 @@ export function hasWriteReserved(scopes: string[] | undefined): boolean {
  * error — asking for what you are is not a mistake worth a 403.
  */
 export function resolveWriteTarget(
-    req: { auth?: VerifiedToken }, config: AimeatConfig, ownerScopeRequested: boolean,
+    req: { auth?: WriteTargetAuth }, config: AimeatConfig, ownerScopeRequested: boolean,
 ): WriteTarget | WriteTargetDenied {
     const own = resolveIdentity(req.auth!, config.nodeId);
     const roles = req.auth!.roles ?? [];

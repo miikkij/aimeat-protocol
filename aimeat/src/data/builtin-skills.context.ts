@@ -18,6 +18,7 @@
  * @usage
  *   import { CONTEXT_SKILL_ENTRY } from './builtin-skills.context.js';
  * @version-history
+ *   v1.3.1 — 2026-11-09 — A change of some fields goes as `patch` on aimeat_memory_write.
  *   v1.3.0 — 2026-11-09 — When a context goes wrong: earlier versions and how to restore one
  *     (aimeat_memory_history), the machine check (aimeat_context_check); splitting a part off a large
  *     context into one the original includes; `module` names the ontology module.
@@ -118,7 +119,11 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
   each time.
 - **When something new is settled**, write it into the context before the conversation ends.
   Read the whole record first and write it back whole, with \`expected_version\`, so nothing
-  that was there is lost and nothing appears twice. Move what was open to what was decided.
+  that was there is lost and nothing appears twice. To change only some fields (the core, a
+  status, \`lifecycle.shapedAt\`), send \`aimeat_memory_write\` with \`patch\` holding just those
+  fields and \`expected_version\`: the rest stays as it is. A list in a patch (\`concepts\`,
+  \`references\`) replaces the whole list, so send the full new list; \`null\` removes a field.
+  Move what was open to what was decided.
   Mark a replaced fact with \`replacedBy\` instead of deleting it.
 - **Keep the core small:** what someone needs in their first minute. When it grows past about
   a page, move detail into \`material\` or a reference.

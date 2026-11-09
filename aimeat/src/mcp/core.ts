@@ -11,7 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
- *   2026-11-09 — aimeat_memory_history is registered from core-memory-history.ts.
+ *   2026-11-09 — aimeat_memory_history is registered from core-memory-history.ts; aimeat_memory_write
+ *     with `patch` runs services/memory-patch through core-memory-patch.ts.
  *   2026-11-01 — aimeat_discover takes type `dataset` (DISCOVERY_TYPES, the list the REST route reads) and
  *     hands the session's caller to the data package audience rule (plan doc-mvwxcas3dom3, D1.1).
  *   2026-10-25 — aimeat_discover with scope 'shared' needs organism:read, as aimeat_workspace_read
@@ -161,6 +162,9 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { registerMemoryBinTools } from './core-memory-bin.js';
 import { registerMemoryHistoryTool } from './core-memory-history.js';
+import { patchFromWriteTool } from './core-memory-patch.js';
+import { memoryWriteMode } from '../utils/memory-write-mode.js';
+import { toolError } from './tool-error.js';
 import { registerCoreBoardTools } from './core-boards.js';
 import { registerCoreWorkTools } from './core-work.js';
 import type { AimeatConfig } from '../config.js';
@@ -527,7 +531,17 @@ export function registerCoreTools(
             inputSchema: zodShapeFor('aimeat_memory_write'),
             annotations: annotationsFor('aimeat_memory_write'),
         },
-        async ({ key, value, visibility: givenVisibility, group_id, tags: givenTags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
+        async ({ key, value, patch, visibility: givenVisibility, group_id, tags: givenTags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
+            // A whole value or a partial patch: one decision for both MCP doors (utils/memory-write-mode.ts).
+            const mode = memoryWriteMode({ value, patch, group_id, ai_provenance, ai_provenance_id });
+            if ('error' in mode) return { ...toolError(mode.error.code, mode.error.message) };
+            if (mode.mode === 'patch') {
+                return patchFromWriteTool({ storage, config, peers }, caller(), agentGaii, {
+                    key, patch, ...(givenVisibility !== undefined ? { visibility: givenVisibility } : {}),
+                    ...(givenTags !== undefined ? { tags: givenTags } : {}), ...(ttl_hours !== undefined ? { ttl_hours } : {}),
+                    owner_scope: owner_scope === true, ...(expected_version !== undefined ? { expected_version } : {}),
+                });
+            }
             // No visibility named: the node's starting level (plan V5.1), as POST /v1/memory.
             const visibility = givenVisibility ?? memoryVisibilityDefault(config);
             const tags = givenTags ?? [];
