@@ -12,7 +12,8 @@
  *   - POST /v1/wallet/request      — request daily allowance morsels
  * @version-history
  *   2026-11-09 — GET /v1/wallet computes `lifetime` from per-type totals the database sums
- *     (lifetimeFromTypeSums) instead of reading up to 100 000 rows; the answer is the same.
+ *     (lifetimeFromTypeSums) instead of reading up to 100 000 rows; the answer is the same. The escrow
+ *     is one read of the person's and their agents' work (calculateEscrowMany), not one per identity.
  *   2026-10-15 — POST /v1/wallet/request grants the day's morsels once a day (grantDailyAllowance;
  *     409 ALREADY_GRANTED_TODAY), the grant the daily job makes (feature-list audit 135).
  *   v1.1.0 — 2026-07-27 — Transactions carry `initiator_gaii`: who made the call, beside whose balance
@@ -43,7 +44,7 @@ import type { Storage, WalletTransaction } from '../storage/interface.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
-import { calculateEscrow } from '../services/morsel.js';
+import { calculateEscrowMany } from '../services/morsel.js';
 import { grantDailyAllowance } from '../services/daily-allowance.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
@@ -92,9 +93,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       `escrow:${ownerName}`, TTL.dashboard,
       async () => {
         const agents = await storage.getAgentsByOwner(ownerName);
-        let total = 0;
-        for (const id of [identity, ...agents.map(a => a.gaii)]) total += await calculateEscrow(storage, id);
-        return total;
+        return calculateEscrowMany(storage, [identity, ...agents.map(a => a.gaii)]);
       },
       ['domain:work', 'domain:wallet'],
     );

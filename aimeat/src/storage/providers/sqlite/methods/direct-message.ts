@@ -8,6 +8,7 @@
  * @structure directMessageMethods
  * @usage Object.assign(SqliteStorage.prototype, directMessageMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-09 — listConversationsForParticipants: the per-identity lookup for many identities.
  *   v1.0.0 — 2026-10-05 — 30 methods (createDirectMessage, getDirectMessage, getDirectMessagesByIds, …) moved
  *     here from messaging.ts so the file mirrors postgres-kysely/methods/direct-message.ts (secaudit 2026-10,
  *     M8).
@@ -149,6 +150,14 @@ export const directMessageMethods = {
 
   async listConversationsForParticipant(this: SqliteStorage, identity: string): Promise<ConversationRecord[]> {
     return directMessageRepo.listConversationsForParticipant(this.db, identity);
+  },
+
+  async listConversationsForParticipants(this: SqliteStorage, identities: readonly string[]): Promise<Record<string, ConversationRecord[]>> {
+    // In-process and synchronous here, so one lookup per identity costs microseconds (81 took 1.5 ms
+    // in all at 79 agents); the batch exists for PostgreSQL, where each one is a round trip.
+    const out: Record<string, ConversationRecord[]> = {};
+    for (const identity of identities) out[identity] = directMessageRepo.listConversationsForParticipant(this.db, identity);
+    return out;
   },
 
   async listConversationsInvitingMailbox(this: SqliteStorage, mailboxGhii: string, opts?: { limit?: number }): Promise<ConversationRecord[]> {

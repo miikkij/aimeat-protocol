@@ -11,6 +11,8 @@
  *   mergePortfolioConfig · portfolioSwitchState · switchPortfolioOnUnlessTurnedOff
  * @usage await mergePortfolioConfig(storage, await portfolioWriteGaii(storage, owner, nodeId), { enabled: true });
  * @version-history
+ *   v1.3.0 — 2026-11-09 — portfolioReadGaiis reads the agents through the request's read scope
+ *     (loadOwnerAgents), so the home state reads the list once.
  *   v1.2.0 — 2026-10-18 — mergePortfolioConfig and switchPortfolioOnUnlessTurnedOff write the config
  *     on its version (record-cas.ts updateRecord); the switch decides again on the stored record, so
  *     an owner's switch-off at the same moment stays off (atomic-write round).
@@ -22,6 +24,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
+import { loadOwnerAgents } from './db/owner-identity.js';
 
 /** Where this owner's portfolio file and config live. */
 export const PORTFOLIO_HTML_KEY = 'portfolio/index.html';
@@ -54,7 +57,8 @@ export async function portfolioWriteGaii(
 export async function portfolioReadGaiis(
   storage: Storage, ownerName: string, nodeId: string,
 ): Promise<string[]> {
-  const agents = await storage.getAgentsByOwner(ownerName);
+  // Through the request's read scope: the home state reads the same list for its own use.
+  const agents = await loadOwnerAgents(storage, ownerName);
   return [...agents.map(a => a.gaii), `${ownerName}@${nodeId}`];
 }
 

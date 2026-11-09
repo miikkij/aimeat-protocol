@@ -13,6 +13,7 @@
  * @structure
  *   - loadOwnerAgents(storage, owner) — the owner's agents, read-once per operation
  *   - loadOwnerEcoApps(storage, owner) — the owner's ecosystem apps, read-once per operation
+ *   - loadOwnerOnboardings(storage, owner, agents) — their onboarding records, one query, read-once
  *   - resolveOwnerIdentities(storage, nodeId, owner) — GHII first, then agent GAIIs, then eco GEAIs
  *     (the priority order the owner-scope GHII-first dedup relies on)
  *   - identitiesActingFor(storage, owner, self) — the same order after the identity the session
@@ -20,6 +21,8 @@
  *   - accountPrincipals(storage, owner) — every principal one account holds, its bare name included
  * @usage const agents = await loadOwnerAgents(storage, owner);   // 0 extra reads inside a read scope
  * @version-history
+ *   v1.3.0 — 2026-11-09 — loadOwnerOnboardings: every agent's onboarding record in one query, shared by
+ *     the home state and the journey (they read one per agent: 80 + up to 79 reads at 79 agents).
  *   v1.2.0 — 2026-09-26 — identitiesActingFor: the person's own identity, then their agents' GAIIs and
  *     their ecosystem apps' GEAIs. resolveOwnerIdentities is it with the GHII first. The work inbox,
  *     the sent list and the Work tab read it, so work on an action an ecosystem app of the person
@@ -29,8 +32,9 @@
  *     each of them (routes/cortex/activation.ts).
  *   v1.0.0 — 2026-07-15 — Phase 3: canonical IdentityMap-aware owner-identity loaders (dedup).
  */
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, AgentOnboardingRecord } from '../../storage/interface.js';
 import { getCurrentReadScope } from '../../storage/read-scope/read-scope.js';
+import { logger } from '../../utils/logger.js';
 
 type Agents = Awaited<ReturnType<Storage['getAgentsByOwner']>>;
 type EcoApps = Awaited<ReturnType<Storage['getEcosystemAppsByOwner']>>;
@@ -50,6 +54,29 @@ export function loadOwnerEcoApps(storage: Storage, owner: string): Promise<EcoAp
   return scope
     ? scope.identity.getOrLoad('owner-eco', owner, () => storage.getEcosystemAppsByOwner(owner))
     : storage.getEcosystemAppsByOwner(owner);
+}
+
+/**
+ * The onboarding record of each of the owner's agents, keyed by GAII (null for an agent without one),
+ * read in ONE query and memoised in the active read scope (`owner-onboardings/<owner>`), so the home
+ * state and the journey's worker count share it. A failed read is logged and counts as no records,
+ * which every caller already reads as "cannot judge onboarding" (the verdict degrades to 'new').
+ */
+export function loadOwnerOnboardings(
+  storage: Storage, owner: string, agents: Agents,
+): Promise<Record<string, AgentOnboardingRecord | null>> {
+  const load = async () => {
+    const out: Record<string, AgentOnboardingRecord | null> = {};
+    for (const a of agents) out[a.gaii] = null;
+    try {
+      for (const r of await storage.getOnboardingMany(agents.map(a => a.gaii))) out[r.agentGaii] = r;
+    } catch (err) {
+      logger.warn('owner-identity: continuing after a suppressed onboarding read', { owner, error: String(err) });
+    }
+    return out;
+  };
+  const scope = getCurrentReadScope();
+  return scope ? scope.identity.getOrLoad('owner-onboardings', owner, load) : load();
 }
 
 /**

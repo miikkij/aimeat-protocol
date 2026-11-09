@@ -11,6 +11,8 @@
  *   - chunked-upload methods: create/get/addChunk/delete for resumable uploads
  *
  * @version-history
+ *   2026-11-09 — storageFileHolders: which identities hold a key, in one query (the home state's
+ *     per-agent welcome-page check, 81 reads at 79 agents).
  *   2026-11-08 — moveStorageFileBytes: the write that moves a file's bytes is conditional on the row's
  *     version (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
  *   2026-10-30 — listStorageFilesInDatabase is listStorageFilesIn: the files of any one place, so a
@@ -49,6 +51,9 @@ export interface FileRepository {
    *  keyed by ownerGaii (every input gaii present, empty array if none). Collapses the per-agent
    *  listStorageFiles fan-out in the portfolio catalog builder. */
   listStorageFilesForOwners(ownerGaiis: string[]): Promise<Record<string, StorageFileRecord[]>>;
+  /** Which of these identities hold a file under `key`, in ONE query (no metadata, no bytes). The
+   *  home state asked each of an owner's identities in turn whether the welcome page exists. */
+  storageFileHolders(ownerGaiis: readonly string[], key: string): Promise<string[]>;
   /** Total storage bytes + file count across MANY owner identities in ONE DB-side aggregate (the
    *  owner-scope footprint for the usage summary; replaces listStorageFiles-then-sum per identity). */
   sumStorageBytesForOwners(ownerGaiis: string[]): Promise<{ bytes: number; count: number }>;

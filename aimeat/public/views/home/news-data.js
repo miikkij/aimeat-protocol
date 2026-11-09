@@ -13,6 +13,8 @@
  * @structure useNews(session) · re-exports AUDIENCES, WINDOW_DAYS, OTHERS_SHOWN, entryAddress, audienceOf
  * @usage const { highlights, others, mode, count, confirm } = useNews(session);
  * @version-history
+ *   v1.1.1 — 2026-11-09 — The customer-node check reads /v1/home/state under the home's own cache key
+ *     ('home-state'), so the Home sends that request once instead of twice.
  *   v1.1.0 — 2026-10-29 — On a customer's node only the news for people who use AIMEAT, and none
  *     before their AI is connected (UX review 2026-10-29, C; Jouni's choice).
  *   v1.0.0 — 2026-10-18 — Initial (wish-uutta-aimeatissa-mit-on-tullut-sitten-viime-katselun-kenelle).
@@ -66,7 +68,9 @@ export function useNews(session) {
   // (Jouni, 2026-10-29: "Vain käyttäjän uutiset"). The buyer is their node's operator and owns apps,
   // but the band is for what they came to do, and the count on the header's Home link follows it.
   const customer = customerNode();
-  const homeRead = useShared('news-home-initialized', customer && signedIn ? '/v1/home/state' : '',
+  // The same cache key the home's own state read uses (surface/home-state.js), so the Home asks
+  // /v1/home/state once: under a key of its own this read was a second request on every Home load.
+  const homeRead = useShared('home-state', customer && signedIn ? '/v1/home/state' : '',
     ['home', 'agents', 'agent-onboarding'], (d) => d?.state?.initialized === true);
   const operator = !customer && Array.isArray(session?.roles) && session.roles.includes('operator');
   const ready = signedIn && entries !== null && seenRead.ready && appsRead.ready && (!customer || homeRead.ready);

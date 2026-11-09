@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.3 -- 2026-11-09 -- GET /v1/memory/files lists the owner's and every agent's files in one IN
+ *     query (listStorageFilesForOwners), in the same order: 81 queries at 79 agents before.
  *   v1.15.2 -- 2026-11-08 -- GET /v1/memory/files/:key asks the labels a data package version keeps, as
  *     GET /v1/pub does (datapackage/source-labels.ts storedFileShownTo; secaudit2026nov08b round 15b).
  *   v1.15.1 -- 2026-11-05 -- POST refuses a group_id naming no group, inline and presigned (storage-file-write.ts).
@@ -350,12 +352,11 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const callerOwner = req.auth!.owner as string;
       const ownerGhii = `${callerOwner}@${config.nodeId}`;
       const agents = await storage.getAgentsByOwner(callerOwner);
-      files = [];
-      // Include GHII's own files first
-      files.push(...await storage.listStorageFiles(ownerGhii));
-      for (const agent of agents) {
-        files.push(...await storage.listStorageFiles(agent.gaii));
-      }
+      // GHII's own files first, then each agent's, in ONE IN query: one query per agent, in turn,
+      // was 81 at 79 agents.
+      const holders = [ownerGhii, ...agents.map(a => a.gaii)];
+      const byOwner = await storage.listStorageFilesForOwners(holders);
+      files = holders.flatMap(g => byOwner[g] ?? []);
     } else {
       files = await storage.listStorageFiles(req.auth!.sub);
     }
