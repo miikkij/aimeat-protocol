@@ -185,8 +185,10 @@ export interface DirectMessageRepository {
   /** Every group thread `identity` is a participant of, newest first. */
   listConversationsForParticipant(identity: string): Promise<ConversationRecord[]>;
   /** listConversationsForParticipant for many identities: keyed by identity (every input present,
-   *  empty when none), each list newest first. The owner's mailbox asked once per agent. */
-  listConversationsForParticipants(identities: readonly string[]): Promise<Record<string, ConversationRecord[]>>;
+   *  empty when none), each list newest first. The owner's mailbox asked once per agent. `limit`
+   *  reads at most that many threads in all, newest first; without it every thread is read, as the
+   *  single lookup does. */
+  listConversationsForParticipants(identities: readonly string[], opts?: { limit?: number }): Promise<Record<string, ConversationRecord[]>>;
   /** The group threads with an open invitation for `mailboxGhii` or one of its agents, newest first,
    *  at most `limit` (default 100). */
   listConversationsInvitingMailbox(mailboxGhii: string, opts?: { limit?: number }): Promise<ConversationRecord[]>;

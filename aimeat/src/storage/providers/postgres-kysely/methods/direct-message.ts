@@ -540,15 +540,17 @@ export const directMessageMethods = {
     return rows.map(toConversationRecord);
   },
 
-  async listConversationsForParticipants(this: PostgresKyselyStorage, identities: readonly string[]): Promise<Record<string, ConversationRecord[]>> {
+  async listConversationsForParticipants(this: PostgresKyselyStorage, identities: readonly string[], opts?: { limit?: number }): Promise<Record<string, ConversationRecord[]>> {
     const out: Record<string, ConversationRecord[]> = {};
     for (const identity of identities) out[identity] = [];
     if (identities.length === 0) return out;
     // One query: a row matches when its membership array contains any of the identities, each
     // tested by containment as the single lookup does, so `alice@node` never matches `alice@node-2`.
-    const rows = await this.db.selectFrom('Conversation').selectAll()
+    let q = this.db.selectFrom('Conversation').selectAll()
       .where(eb => eb.or(identities.map(id => sql<boolean>`"participants" @> ${jsonb([id])}`)))
-      .orderBy('updatedAt', 'desc').execute();
+      .orderBy('updatedAt', 'desc');
+    if (opts?.limit !== undefined) q = q.limit(Math.max(1, Math.floor(opts.limit)));
+    const rows = await q.execute();
     for (const row of rows) {
       const record = toConversationRecord(row);
       for (const id of identities) if (record.participants.includes(id)) out[id].push(record);

@@ -110,6 +110,10 @@ describe.each([0, 1])('batch reads, provider %i', (i) => {
     expect(byId[me].length).toBe(2);
     expect(byId[near].length).toBe(1);
     expect(await storage.listConversationsForParticipants([])).toEqual({});
+    // `limit` reads at most that many threads in all, newest first: here the agent's thread (minute 2).
+    const one = await storage.listConversationsForParticipants([me, agent], { limit: 1 });
+    expect(one[me].map(c => c.id)).toEqual([byId[agent][0].id]);
+    expect(one[agent].map(c => c.id)).toEqual([byId[agent][0].id]);
   });
 
   it('organismNames gives each existing organism its name and leaves out an unknown id', async () => {

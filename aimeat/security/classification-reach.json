@@ -521,10 +521,11 @@
     },
     "src/routes/memory/files.ts": {
       "reads": {
-        "listStorageFiles": 3,
-        "getStorageFile": 1
+        "listStorageFiles": 1,
+        "getStorageFile": 1,
+        "listStorageFilesForOwners": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file. 2026-11-09 (performance round 2): GET /v1/memory/files lists the owner's and their agents' file metadata, to the owner in person, in one IN query (listStorageFilesForOwners) where it read listStorageFiles once per identity; the same rows, the same metadata, no bytes."
     },
     "src/routes/memory/key.ts": {
       "reads": {
@@ -2108,10 +2109,9 @@
     },
     "src/services/home-state.ts": {
       "reads": {
-        "listMemoryForOwners": 1,
-        "getStorageFile": 1
+        "listMemoryForOwners": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts. 2026-11-09: the welcome page's existence check asks storageFileHolders, which returns identities and no content."
     },
     "src/services/hook-log.ts": {
       "reads": {

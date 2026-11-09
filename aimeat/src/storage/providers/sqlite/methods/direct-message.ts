@@ -152,11 +152,17 @@ export const directMessageMethods = {
     return directMessageRepo.listConversationsForParticipant(this.db, identity);
   },
 
-  async listConversationsForParticipants(this: SqliteStorage, identities: readonly string[]): Promise<Record<string, ConversationRecord[]>> {
+  async listConversationsForParticipants(this: SqliteStorage, identities: readonly string[], opts?: { limit?: number }): Promise<Record<string, ConversationRecord[]>> {
     // In-process and synchronous here, so one lookup per identity costs microseconds (81 took 1.5 ms
     // in all at 79 agents); the batch exists for PostgreSQL, where each one is a round trip.
     const out: Record<string, ConversationRecord[]> = {};
     for (const identity of identities) out[identity] = directMessageRepo.listConversationsForParticipant(this.db, identity);
+    if (opts?.limit === undefined) return out;
+    // At most `limit` threads in all, newest first, as the PostgreSQL query reads them.
+    const keep = new Set([...new Map(Object.values(out).flat().map(c => [c.id, c] as const)).values()]
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0))
+      .slice(0, Math.max(1, Math.floor(opts.limit))).map(c => c.id));
+    for (const identity of identities) out[identity] = out[identity].filter(c => keep.has(c.id));
     return out;
   },
 
