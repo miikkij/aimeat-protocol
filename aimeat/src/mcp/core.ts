@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-09 — aimeat_memory_read and aimeat_memory_list with owner_scope show an agent its owner's
+ *     record kept at organism:<id> when that organism admits the agent (ownerScopeViewAdmitting).
  *   2026-11-09 — aimeat_memory_write without `tags` keeps the record's tags; `[]` clears them.
  *   2026-11-09 — aimeat_memory_history is registered from core-memory-history.ts; aimeat_memory_write
  *     with `patch` runs services/memory-patch through core-memory-patch.ts.
@@ -180,7 +182,7 @@ import { buildDiscoveryRegistry, runDiscovery, computeFacets, DISCOVERY_TYPES, t
 import { getAgentSkillLinks } from '../services/skill-agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
-import { readsAsOwner, ownerScopeView } from '../services/owner-scope-read.js';
+import { readsAsOwner, ownerScopeViewAdmitting } from '../services/owner-scope-read.js';
 import { organismReadableRecords } from '../services/organism-namespace-access.js';
 import { listMemoryMetaFor } from '../services/memory-query.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -469,7 +471,8 @@ export function registerCoreTools(
             if (!stored && owner_scope && parsedRead) {
                 stored = await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key);
                 // Without memory:read-as-owner only what visibility admits a same-owner reader (audit #42).
-                if (stored && !ownerScopeView([stored], agentGaii, readsAsOwner(caller())).length) stored = null;
+                // A record kept at organism:<id> passes when that organism admits this agent.
+                if (stored && !(await ownerScopeViewAdmitting(storage, [stored], agentGaii, readsAsOwner(caller()), caller().visitor)).length) stored = null;
             }
             // The organism rule GET /v1/memory/:key applies, on both branches (secaudit 2026-10, v57).
             if (stored && !(await organismReadableRecords({ storage, config }, caller(), [stored])).length) stored = null;
@@ -487,7 +490,7 @@ export function registerCoreTools(
                 const found = parsed
                     ? await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key)
                     : null;
-                const elsewhere = found && ownerScopeView([found], agentGaii, readsAsOwner(caller())).length
+                const elsewhere = found && (await ownerScopeViewAdmitting(storage, [found], agentGaii, readsAsOwner(caller()), caller().visitor)).length
                     && (await organismReadableRecords({ storage, config }, caller(), [found])).length ? await presentMemory(reader, found) : null;
                 if (elsewhere) {
                     return {
@@ -649,9 +652,9 @@ export function registerCoreTools(
                 // The owner-scope listing GET /v1/memory?owner_scope=true reads (services/memory-query.ts):
                 // the owner's GHII, every agent and every ecosystem app in one query, one row per key.
                 // The organism rule too, as GET /v1/memory?owner_scope=true (secaudit 2026-10, v57).
-                entries = await organismReadableRecords({ storage, config }, caller(), ownerScopeView(
+                entries = await organismReadableRecords({ storage, config }, caller(), await ownerScopeViewAdmitting(storage,
                     await listMemoryMetaFor({ storage, config }, { ownerScopeOf: localAccountName(agentGaii), gaii: agentGaii, prefix, visibility, tags }),
-                    agentGaii, readsAsOwner(caller())));
+                    agentGaii, readsAsOwner(caller()), caller().visitor));
             } else {
                 entries = await listMemoryMetaFor({ storage, config }, { ownerScopeOf: null, gaii: agentGaii, prefix, visibility, tags });
             }

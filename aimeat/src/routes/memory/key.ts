@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-09 — GET /v1/memory/:key with owner_scope or ?agent= shows a caller a same-owner record kept
+ *     at organism:<id> when that organism admits it (ownerScopeViewAdmitting).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — PUT /:key with owner_scope: a caller that reads a sibling's record as absent does not
@@ -101,7 +103,7 @@ import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared
 import { logger } from '../../utils/logger.js';
 import { rolesWithOperator } from '../../services/operator-override.js';
 import { recordOperatorAccess } from '../../services/operator-access-audit.js';
-import { readsAsOwner, ownerScopeView, hiddenRecordRelabel, READ_AS_OWNER_SCOPE } from '../../services/owner-scope-read.js';
+import { readsAsOwner, ownerScopeViewAdmitting, hiddenRecordRelabel, READ_AS_OWNER_SCOPE } from '../../services/owner-scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
 import { denyScope403 } from '../../auth/deny.js';
 
@@ -194,8 +196,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Another same-owner identity's record (owner_scope, or ?agent= naming a sibling): a caller that
     // does not read as the owner sees it only when its visibility admits a same-owner reader, and a
     // hidden one answers as an absent one (memory:read-as-owner, feature-list audit #42).
+    // A record kept at organism:<id> passes when that organism admits this caller.
     if (record && (ownerScopeRead || agentParam)
-      && !ownerScopeView([record], resolve(req), readsAsOwner(callerOf(req, config.nodeId, storage))).length) {
+      && !(await ownerScopeViewAdmitting(storage, [record], resolve(req), readsAsOwner(callerOf(req, config.nodeId, storage)), isForeignPrincipal(req.auth))).length) {
       // A hidden owner copy shadowed the caller's own record of the same key: the caller still reads its own.
       record = ownerScopeRead ? await storage.getMemory(resolve(req), key) : null;
     }
