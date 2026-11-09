@@ -22,6 +22,8 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-11-09 — PROBE_SETUP for aimeat_memory_write (a value), whose value is optional now that the
+ *     tool also takes a patch.
  *   2026-11-01 — PROBE_SETUP for aimeat_datapackage_sell (a package ref; plan D5.1).
  *   2026-11-01 — PROBE_SETUP for aimeat_dataproduct (an action and a product name).
  *   2026-11-01 — PROBE_SETUP for aimeat_datapackage_withdraw (a package ref, as for the export tool).
@@ -77,6 +79,8 @@ const NEVER_CALLS_THE_NODE = new Map<string, string>([
  * REFUSES_A_GENERIC_PROBE untested; with them the node-refusal path is actually measured.
  */
 const PROBE_SETUP: Record<string, Record<string, unknown>> = {
+  // `value` is optional now that `patch` is the other way to write; exactly one of them is needed.
+  aimeat_memory_write: { value: { probe: true } },
   aimeat_datapackage_export: { ref: 'pkg:someone/thing' },
   // The ref is parsed before the call (owner/name, or pkg:owner/name), as for the export tool.
   aimeat_datapackage_withdraw: { ref: 'pkg:someone/thing' },
