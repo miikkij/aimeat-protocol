@@ -12,6 +12,7 @@
  *     (services/settlement-ceiling.ts; secaudit2026oct31w2 round 10).
  *   2026-10-16 — getTransactions returns newest first, as PostgreSQL does; it reversed its newest-first
  *     window, so page 1 of the wallet history was the oldest rows here (QA audit D4-04).
+ *   2026-11-09 — sumTransactionsByType(since, gaii): one principal's ledger, resolved as getTransactions resolves it.
  *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
@@ -114,12 +115,16 @@ export const walletMethods = {
     return rows.map(r => this.deserializeTransaction(r));
   },
 
-  async sumTransactionsByType(this: SqliteStorage, since?: string): Promise<TransactionTypeSum[]> {
+  async sumTransactionsByType(this: SqliteStorage, since?: string, gaii?: string): Promise<TransactionTypeSum[]> {
     // The timestamps are ISO strings in UTC, so a string comparison orders them.
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (since) { where.push('timestamp >= ?'); params.push(since); }
+    if (gaii) { where.push('gaii = ?'); params.push(this.resolveGhii(gaii) ?? gaii); }
     const rows = this.db.prepare(
       `SELECT type, COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total, COALESCE(SUM(ABS(amount)), 0) AS absTotal
-       FROM wallet_transactions ${since ? 'WHERE timestamp >= ?' : ''} GROUP BY type`,
-    ).all(...(since ? [since] : [])) as { type: string; count: number; total: number; absTotal: number }[];
+       FROM wallet_transactions ${where.length ? `WHERE ${where.join(' AND ')}` : ''} GROUP BY type`,
+    ).all(...params) as { type: string; count: number; total: number; absTotal: number }[];
     return rows.map(r => ({ type: r.type, count: Number(r.count), total: Number(r.total), absTotal: Number(r.absTotal) }));
   },
 
