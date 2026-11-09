@@ -24,23 +24,39 @@
  *     it does not know yet (folded until it knows), false or absent: open. The person's own choice
  *     wins over it.
  *
+ *   "Explain this page to me" stands under the purpose: a prompt for the person's own AI that carries
+ *   the page's own explanation (the purpose, what follows, the page's concept and its examples) and
+ *   who the person is (js/ask-ai-prompt.js buildPagePrompt, their memory record profile.explain), so
+ *   any AI chat explains the page at their role and level, connected to AIMEAT or not. The page's
+ *   title, description and concept come from PageInfo, which SettingsPage and the admin frame fill;
+ *   props of the same names win.
+ *
  *   Built from the library's parts (Label, Note, Action, PromptCard); its sheet,
  *   css/components/page-start.css, only lays the parts out. The catalogue entry is `page-start`.
- * @structure PageStart({ id, vars, purpose, prompt, next, action, link, done })
+ * @structure PageStart({ id, vars, purpose, prompt, next, action, link, done, title, concept }) ·
+ *   PageInfo (context: { title, desc, help })
  * @usage html`<${PageStart} id="memory" done=${hasEntries} action=${{ onClick: openForm }} />`
  *        In a Settings page: SettingsPage's `start` slot draws it under the head.
  * @version-history
+ *   v1.1.0 — 2026-11-09 — "Explain this page to me": a prompt with the page's explanation and the
+ *     person's role from profile.explain; PageInfo carries the page's title, description and concept
+ *     (guidance audit 2026-11-09).
  *   v1.0.0 — 2026-10-03 — Initial (guidance for normal people, part B): what a page is for, what to do
  *     first and what happens next, on the ten main Settings pages.
  */
-import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { h, createContext } from 'preact';
+import { useState, useEffect, useContext } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { Action, Actions } from '/components/Action.js';
 import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { PromptCard } from '/components/PromptCard.js';
+import { explainOf } from '/components/ExplainDialog.js';
+import { buildPagePrompt, EXPLAIN_PROFILE_KEY } from '/js/ask-ai-prompt.js';
+import { getMemory } from '/js/services/memory.js';
+import { hasSession } from '/js/services/auth.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -61,12 +77,61 @@ function writeChoice(id, folded) {
   try { localStorage.setItem(STORE + id, folded ? '1' : '0'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- no storage: the fold holds for this visit only
 }
 
+/** What the page tells its start about itself: { title, desc, help } (SettingsPage, the admin frame). */
+export const PageInfo = createContext(null);
+
+/** The person's own profile.explain record ({ role, level }), read once per page load; null without one. */
+let aboutRead = null;
+function readAbout() {
+  if (!hasSession()) return Promise.resolve(null);
+  if (!aboutRead) {
+    aboutRead = getMemory(EXPLAIN_PROFILE_KEY, { soft: true })
+      .then((r) => { const v = r?.data?.value; return v && typeof v === 'object' ? v : null; })
+      .catch((err) => { swallowed('page-start: profile.explain', err); aboutRead = null; return null; });
+  }
+  return aboutRead;
+}
+
+/** A page's own words as plain text for the prompt; a node (a link, a mark) gives nothing. */
+const plain = (v) => (typeof v === 'string' ? v : '');
+
+/**
+ * "Explain this page to me": the page's own explanation and who the person is, as one prompt.
+ * @param {{ id: string, title: string, desc: string, concept: string, forWords: string, nextWords: string }} p
+ */
+function ExplainPrompt({ id, title, desc, concept, forWords, nextWords }) {
+  const [about, setAbout] = useState(null);
+  useEffect(() => { let live = true; readAbout().then((a) => { if (live) setAbout(a); }); return () => { live = false; }; }, []);
+  const term = concept && concept.startsWith('concept.') ? concept : '';
+  const part = (p) => (term ? explainOf(term, p) : '');
+  const prompt = buildPagePrompt({
+    title: title || id,
+    explanation: [
+      forWords && `What the page is for: ${forWords}`,
+      desc && desc !== forWords && `What the page says about itself: ${desc}`,
+      part('what') && `What it is: ${part('what')}`,
+      ...[1, 2, 3].map((n) => part('ex' + n)).filter(Boolean).map((e) => `Example: ${e}`),
+      part('tip') && `${part('tipLabel') || 'When to use something else'}: ${part('tip')}`,
+      nextWords && `What follows the first step: ${nextWords}`,
+    ],
+    about, concept: term || undefined, locale: getLocale(), base: location.origin,
+  });
+  return html`
+    <div class="page-start-explain">
+      <${PromptCard} quiet showPrompt=${false} label=${t('pageStart.explainLabel')} prompt=${prompt}
+        copyLabel=${t('pageStart.copy')} copiedLabel=${t('common.copied')} />
+      <${Note} kind="hint">${about ? t('pageStart.explainWhyRole') : t('pageStart.explainWhy')}<//>
+    </div>`;
+}
+
 /**
  * @param {{ id: string, vars?: Record<string, any>, purpose?: any, prompt?: string, next?: any,
  *   action?: { onClick?: () => void, href?: string, copy?: string, label?: any } | null,
- *   link?: { onClick?: () => void, href?: string, label?: any } | null, done?: boolean | null }} props
+ *   link?: { onClick?: () => void, href?: string, label?: any } | null, done?: boolean | null,
+ *   title?: string, concept?: string }} props
  */
-export function PageStart({ id, vars, purpose, prompt, next, action, link, done }) {
+export function PageStart({ id, vars, purpose, prompt, next, action, link, done, title, concept }) {
+  const info = useContext(PageInfo) || {};
   const [choice, setChoice] = useState(() => readChoice(id));
   const part = (name) => words(`pageStart.${id}.${name}`, vars);
   const folded = choice === '1' || choice === '0' ? choice === '1' : (done === true || done === null);
@@ -89,6 +154,8 @@ export function PageStart({ id, vars, purpose, prompt, next, action, link, done 
           <div class="page-start-part">
             <${Label} block>${t('pageStart.for')}<//>
             <${Note} kind="lead">${forWords}${link && linkLabel ? html` <${Action} tone="link" href=${link.href} onClick=${link.onClick}>${linkLabel}<//>` : null}<//>
+            <${ExplainPrompt} id=${id} title=${plain(title) || plain(info.title)} desc=${plain(info.desc)}
+              concept=${concept || plain(info.help)} forWords=${plain(forWords)} nextWords=${plain(nextWords)} />
           </div>
           <div class="page-start-part">
             <${Label} block>${t('pageStart.first')}<//>

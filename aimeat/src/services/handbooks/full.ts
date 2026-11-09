@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   (2026-11-09) "Who you explain to": read the person's profile.explain record (role and level)
+ *     before explaining a page, a setting or a word (guidance audit 2026-11-09). Additive.
  *   (2026-11-08) The Apps line says the model rule by quality (MODEL_QUALITY_ADVICE), never by name (Jouni).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.19.0 — 2026-11-01 — The data table paragraph names a run on a source change, a share to someone on
@@ -181,5 +183,11 @@ sections inside it and a link to each, and \`"places/admin"\` the admin pages. G
 \`aimeat_handbook_get { tier: "settings" }\` lists the settings the pages explain behind a question
 mark, and \`"settings/<term>"\` is one of them in English, Finnish and Spanish. Answer in the
 person's language with the matching section.
+
+**Who you explain to**: before you explain a page, a setting or a word, read the person's own
+record \`profile.explain\` with \`aimeat_memory_read { key: "profile.explain", owner_scope: true }\`.
+It holds their role in their own words and how technical they are (\`new\`, \`daily\` or
+\`technical\`); fit the explanation to it. When there is none, ask them both, and offer to keep the
+answer there with \`aimeat_memory_write\` (visibility \`owner\`); write it only when they say yes.
 
 ${SCREEN_ONLY_MD}`;
