@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description A whole Settings & Controls page (component plan C9, page parts): the crumb, the head
  *   (PageHead), the figure strip, and under them the page's sections beside the contents rail
- *   (Rail), which on a phone stands under the page. Every Settings tab wrote this frame by hand
+ *   (Rail), which on a narrow screen is one closed row over the sections. Every Settings tab wrote this frame by hand
  *   (<div class="og og-<page>">, a crumb() and a pageLinks() helper per page, og-mast, og-grid,
  *   og-main, og-rail); a page now passes data and its sections, and never a class. The look is the
  *   library's page kit: css/components/tab-page.css, page-head.css, crumb-trail.css (the og-*
@@ -47,6 +47,9 @@
  *          strip=${strip} railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pages}
  *          after=${html`<${ctx.ConfirmUI} />`}>…the sections…<//>`
  * @version-history
+ *   v1.5.0 — 2026-11-09 — On a narrow screen the rails are one closed row after the strip and before
+ *     the sections (railFold), not the last thing on the page; Jouni's choice "Suljettuna". A wide
+ *     screen is unchanged, and a page with `side` (an organism workspace's tree) keeps its place.
  *   v1.4.0 — 2026-11-09 — The `start` slot gets PageInfo ({ title, desc, help }), so PageStart's
  *     "Explain this page to me" carries the page's own title, description and concept.
  *   v1.3.0 — 2026-10-03 — `help` passed to PageHead (the title's question mark) and the `start` slot
@@ -80,6 +83,27 @@ export function settingsRail({ railTitle, sections, back, pages, pagesLabel, rai
   return groups.length ? { title: railTitle, groups } : null;
 }
 
+/**
+ * The rails as one closed row over the sections, for a narrow screen (css/components/tab-page.css
+ * shows it under 1100px and hides the rails in the side column there). On a phone the side column
+ * stands under the whole page, so its contents were the last thing on it (Jouni, 2026-11-09:
+ * "eikö tuon menun pitäisi näkyä aika ylhäällä"). A link in it closes it.
+ */
+function railFold(rails) {
+  const first = rails[0];
+  const count = (first.groups?.[0]?.items || []).filter((it) => it && !it.back).length;
+  // Closed in the capture phase, before the link's own handler scrolls: closed after it, the fold's
+  // height left the page and the section stood that much above the screen.
+  const close = (e) => { if (e.target.closest('button, a')) e.currentTarget.open = false; };
+  // The row already says the first group's name; inside, that group starts without it.
+  const shown = rails.map((r, i) => (i === 0 && r.groups?.[0]?.label === r.title ? { ...r, groups: [{ ...r.groups[0], label: '' }, ...r.groups.slice(1)] } : r));
+  return html`
+    <details class="og-rail-fold" onClickCapture=${close}>
+      <summary class="og-rail-fold-head"><span class="og-rail-label">${first.title}</span>${count ? html`<em>${count}</em>` : null}</summary>
+      ${shown.map((r, i) => html`<${Rail} key=${i} ...${r} />`)}
+    </details>`;
+}
+
 export function SettingsPage(props) {
   const { name, page, crumb, label, title, sub, marks, desc, actions, strip, rail, side, aside, after, asKey, help, start, children } = props;
   const rails = (Array.isArray(rail) ? rail : [rail || settingsRail(props)]).filter(Boolean);
@@ -94,6 +118,7 @@ export function SettingsPage(props) {
       ${column ? head : html`<div class="settings-page-head">${head}</div>`}
       ${start ? html`<${PageInfo.Provider} value=${{ title, desc, help }}>${start}<//>` : null}
       ${strip}
+      ${!side && rails.length ? railFold(rails) : null}
       ${column ? html`
         <div class="og-grid">
           <div class=${cx('og-main', page && 'poster-row--thing')}>${children}</div>
