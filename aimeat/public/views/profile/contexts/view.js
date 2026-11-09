@@ -14,12 +14,15 @@
  *   (pageStart.contexts.*) and the list's own empty line; nothing else on the page explains.
  *   Pure render over the ctx bag of contexts-tab.js; every part is a library component, and the
  *   file writes no class.
- * @structure renderContextsView · listPart · contextRow · deletedNote · detailPart · headPart ·
+ * @structure renderContextsView · listPart · tagPick · markWords · contextRow · deletedNote · detailPart · headPart ·
  *   fingerprintPart · corePart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
  * @usage import { renderContextsView } from './contexts/view.js';
  * @version-history
+ *   v1.5.0 — 2026-11-09 — Tags: a drop-down over the list shows the contexts of one tag (only when some
+ *     context has a tag), a row names up to three of its tags, and the chosen context's facts name all
+ *     of them with the line that the person's AI sets them.
  *   v1.4.0 — 2026-11-09 — The fingerprint as the first numbered part (approved by the developer)
- *     (components/Fingerprint.js, the drawing Pages shows), or the sentence that asks the AI for one.
+ *     (components/TextPrint.js, the drawing Pages shows), or the sentence that asks the AI for one.
  *     Compact by default; pressing it opens the whole fingerprint (the developer's call, same day).
  *   v1.3.0 — 2026-11-08 — The guidance follows the page-guidance rule: the page's own introduction is
  *     gone, and the head's paragraph, the title's question mark (concept.context), the standard
@@ -53,12 +56,14 @@ import { Box } from '/components/Box.js';
 import { Markdown } from '/components/Markdown.js';
 import { Peek, nextPeek } from '/components/Peek.js';
 import { Beside, Stack, Touch } from '/components/Layout.js';
-import { Fingerprint } from '/components/Fingerprint.js';
+import { Fingerprint } from '/components/TextPrint.js';
 import { x, xn, marksOf, readersWords, OWN_READERS, chatSentence, crumb, CONTEXT_PREFIX } from './frame.js';
 
 const html = htm.bind(h);
 /** A core longer than this shows its top under a fade until the person asks for all of it. */
 const CORE_FOLD = 1600;
+/** A row names this many of its tags; the chosen context names all of them. */
+const ROW_TAGS = 3;
 
 export function renderContextsView(ctx) {
   const all = ctx.items || [];
@@ -88,6 +93,7 @@ export function renderContextsView(ctx) {
 function listPart(ctx) {
   return html`
     <${Stack} gap="medium">
+      ${tagPick(ctx)}
       ${deletedNote(ctx)}
       <${ConversationList} empty=${ctx.items && !ctx.items.length ? x('empty') : undefined}>
         <${ConversationRows}>${ctx.active.map((c) => contextRow(ctx, c))}<//>
@@ -98,6 +104,18 @@ function listPart(ctx) {
           <//>` : null}
       <//>
     <//>`;
+}
+
+/**
+ * The list by one tag: a drop-down of every tag the contexts carry, with how many carry it. Shown only
+ * when some context has a tag. Touch: the drop-down is a 44px target (layout.css .layout-touch).
+ */
+function tagPick(ctx) {
+  if (!ctx.tags?.length) return null;
+  const options = [{ value: '', label: x('tagAll') },
+    ...ctx.tags.map(({ tag, count }) => ({ value: tag, label: x('tagOption', { tag, n: num(count) }) }))];
+  return html`<${Touch}><${Select} value=${ctx.tag} options=${options} ariaLabel=${x('tagPickLabel')} fit
+    onChange=${(v) => ctx.pickTag(v)} /><//>`;
 }
 
 /** The marks a person reads on a row and over the chosen context, in words. */
@@ -112,7 +130,7 @@ function contextRow(ctx, c) {
   const m = marksOf(c);
   const note = m.archived ? x('archivedOn', { date: date(c.archivedAt) }) : markWords(m);
   const line = `${x('shaped', { when: ago(c.shapedAt) })} · ${readersWords(c.visibility, ctx.orgNames)}`;
-  return html`<${ConversationRow} key=${c.key} title=${c.name} preview=${line} why=${note || undefined}
+  return html`<${ConversationRow} key=${c.key} title=${c.name} chips=${c.tags.slice(0, ROW_TAGS)} preview=${line} why=${note || undefined}
     active=${ctx.current?.key === c.key} onOpen=${() => ctx.select(c.key)} />`;
 }
 
@@ -170,6 +188,9 @@ function headPart(ctx, c) {
         c.readAt ? { key: 'read', k: x('readK'), v: ago(c.readAt) } : null,
         { key: 'readers', k: html`<${HelpLabel} term="context.readers" label=${x('readersLabel')}>${x('readersLabel')}<//>`,
           v: readers, controls: true, sub: own ? undefined : x('readersWider') },
+        { key: 'tags', k: x('tagsK'),
+          v: c.tags.length ? html`<${Marks}>${c.tags.map((tag) => html`<${Mark} key=${tag}>${tag}<//>`)}<//>` : x('noTags'),
+          sub: x('tagsSub') },
         { key: 'key', k: x('keyK'), v: c.key, mono: true, sub: x('keySub') },
       ]} />
       <${Actions}>

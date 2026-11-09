@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-10: check:blocked-names, no served file's address is blocked by EasyList, EasyPrivacy or uBlock Origin's Privacy list (EasyPrivacy's `/fingerprint.js^` took the admin page down on 2026-11-09).
  *  - 2026-11-05: check:services-flat, the number of flat files in src/services/ may only fall (codebase analysis 2026-11-03, item D-h).
  *  - 2026-11-04: check:pooler-safe, no session advisory lock and no LISTEN outside the event bus's own connection (codebase analysis 2026-11-03, item HA stage 3).
  *  - 2026-11-04: check:family-index, the classification index exports no file that reaches a module importing the family back (codebase analysis 2026-11-03, item D-g).
@@ -46,6 +47,7 @@ export const FAST_CHECKS = [
     { script: 'typecheck:audit-tests', label: 'Architecture regression tests use the current typed contracts' },
     { script: 'check:docs', label: 'Documentation catalog, links, data syntax and help copies agree' },
     { script: 'check:importmap', label: 'Importmap ↔ imports in sync' },
+    { script: 'check:blocked-names', label: 'No served file name is one a content blocker blocks' },
     { script: 'check:prompt-groups', label: 'Every prompt group has a translated heading on the admin page' },
     { script: 'check:profile-tabs', label: 'Every profile tab reachable from the menu' },
     { script: 'check:crew-defs', label: 'Shipped crew definitions match the runtime\'s rules' },

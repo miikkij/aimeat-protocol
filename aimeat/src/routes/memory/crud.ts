@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-09 — GET /v1/memory with owner_scope or ?agent= lists a same-owner record kept at
+ *     organism:<id> when that organism admits the caller (ownerScopeViewAdmitting).
+ *   2026-11-09 — POST /v1/memory without `tags` keeps an existing record's tags; `tags: []` clears them.
  *   2026-11-04 — GET /v1/memory?limit=N with values reads the values of its page only; the listing,
  *     `total` and the quota come from the meta rows, with the same answer (services/memory-list-page.ts;
  *     codebase analysis 2026-11-03, item C1).
@@ -96,7 +99,7 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { warningField } from '../../services/classification-exits.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
-import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
+import { readsAsOwner, ownerScopeView, ownerScopeViewAdmitting } from '../../services/owner-scope-read.js';
 import { organismReadableRecords } from '../../services/organism-namespace-access.js';
 import { callerOf } from '../../middleware/caller.js';
 import { listMemoryMetaFor, searchMemoryRecords } from '../../services/memory-query.js';
@@ -240,7 +243,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       key,
       value,
       visibility: vis as MemoryRecord['visibility'],
-      tags: Array.isArray(tags) ? tags : [],
+      // Left out: the record keeps its tags (services/memory-write.ts); `[]` clears them.
+      ...(Array.isArray(tags) ? { tags } : {}),
       ttlHours: ttl_hours ?? null,
       ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
       ...(vis === 'workspace' ? { workspaceRef: normalizeWorkspaceRefs(workspace_refs, workspace_ref) } : {}),
@@ -417,12 +421,12 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const reader = readerFor({ storage, config }, req.auth);
     if (metaOnly) {
       // The listing aimeat_memory_list reads too (services/memory-query.ts).
-      const allMeta = await organismView(ownerScopeView(await reader.show(
+      const allMeta = await organismView(await ownerScopeViewAdmitting(storage, await reader.show(
         await listMemoryMetaFor({ storage, config }, {
           ownerScopeOf: (ownerScope && !agentParam) ? req.auth!.owner : null, gaii,
           prefix, visibility, tags, maxFlags, archived,
         }),
-        r => memoryTarget(r.ownerGaii, r.key)), self, !restricted));
+        r => memoryTarget(r.ownerGaii, r.key)), self, !restricted, isForeignPrincipal(req.auth)));
       // A count is a count of what MATCHES, never of what was returned — so it is answered before
       // the limit is applied, or `?count=true&limit=10` would report ten for a keyspace of a thousand.
       if (req.query.count === 'true') {
@@ -494,7 +498,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         ownerScopeOf: (ownerScope && !agentParam) ? req.auth!.owner : null, gaii,
         prefix, visibility, tags, maxFlags, archived,
       });
-      const matched = await reader.show(await organismView(ownerScopeView(meta, self, !restricted)), r => memoryTarget(r.ownerGaii, r.key));
+      const matched = await reader.show(await organismView(await ownerScopeViewAdmitting(storage, meta, self, !restricted, isForeignPrincipal(req.auth))), r => memoryTarget(r.ownerGaii, r.key));
       // ?count=true with tag/maxFlags filters: before the limit, like the meta path.
       if (req.query.count === 'true') {
         res.json(success(config.nodeId, { count: matched.length }));
@@ -514,7 +518,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         loaded = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
       }
       // The one presentation of memory values: the classification reader plus the credential mask.
-      records = await presentMemories(reader, await organismView(ownerScopeView(loaded, self, !restricted)));
+      records = await presentMemories(reader, await organismView(await ownerScopeViewAdmitting(storage, loaded, self, !restricted, isForeignPrincipal(req.auth))));
 
       // ?count=true with tag/maxFlags filters — count from the materialized list (rare path). Before
       // the limit, like the meta path: a count answers "how many are there", not "how many did I ask for".

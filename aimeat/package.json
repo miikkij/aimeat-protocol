@@ -166,6 +166,7 @@
     "sandbox:reset": "tsx scripts/sandbox.ts --reset",
     "sandbox:status": "tsx scripts/sandbox.ts --status",
     "check:importmap": "tsx scripts/check-importmap.ts",
+    "check:blocked-names": "tsx scripts/check-blocked-names.ts",
     "check:prompt-groups": "tsx scripts/check-prompt-groups.ts",
     "check:profile-tabs": "tsx scripts/check-profile-tabs.ts",
     "check:crew-defs": "tsx scripts/check-crew-defs.ts",

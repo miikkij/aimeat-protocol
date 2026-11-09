@@ -226,6 +226,20 @@ pub fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("Failed to resolve app data dir: {}", e))
 }
 
+/// Desktop-only preferences share the data lease without creating or migrating the node .env.
+pub(crate) fn with_desktop_data<T>(app: &AppHandle, operation: impl FnOnce(&Path) -> Result<T, String>) -> Result<T, String> {
+    let _guard = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;
+    let root = data_dir(app)?;
+    let _data_lock = process::config_lock(&root)?;
+    operation(&root)
+}
+
+/// Diagnostics inspects these paths without initializing configuration or starting the node.
+pub(crate) fn diagnostic_runtime(app: &AppHandle) -> Result<(PathBuf, PathBuf, PathBuf), String> {
+    let runtime = resolve_runtime(app)?;
+    Ok((runtime.node_bin, runtime.server_entry, runtime.env_file))
+}
+
 /// Hold the same lock as start/stop throughout an offline backup or restore.
 pub fn with_stopped_node<T>(app: &AppHandle, operation: impl FnOnce(&Path) -> Result<T, String>) -> Result<T, String> {
     let _guard = process::LIFECYCLE.lock().map_err(|e| e.to_string())?;

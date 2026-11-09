@@ -23,11 +23,15 @@
  *   agent is not consulted on this code path, because doing so costs storage reads per record on
  *   listings of thousands; the owner who wants the agent to read those grants the word.
  * @structure readsAsOwner(caller) · visibleToSameOwnerReader(record, principal) · ownerScopeView(records, principal, all) ·
- *   hiddenRecordRelabel(record, principal, all, visibility)
+ *   ownerScopeViewAdmitting(storage, records, principal, all, visitor) · hiddenRecordRelabel(record, principal, all, visibility)
  * @usage
  *   const all = readsAsOwner(callerOf(req, config.nodeId, storage));
  *   const shown = ownerScopeView(records, caller.principal, all);
  * @version-history
+ *   2026-11-09 — ownerScopeViewAdmitting: an agent reading its owner's memory also sees a record kept at
+ *     organism:<id> when that organism admits it (the owner an active member, the agent not barred).
+ *     The organism level came after this file and was left out, so the owner's own agent read a record
+ *     its family organism's members read as absent.
  *   2026-10-27 — hiddenRecordRelabel: a caller that reads a same-owner record as absent does not
  *     change that record's visibility. PUT with owner_scope relabelled a sibling's private record to
  *     'owner' and PATCH with owner_scope relabelled the owner's, and the next read showed it
@@ -36,7 +40,10 @@
  *   2026-10-15 — Initial: memory:read-as-owner (feature-list audit #42).
  */
 import type { CallerContext } from './caller-context.js';
+import type { Storage } from '../storage/interface.js';
 import { READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
+import { organismVisibilityAdmits } from './organism-visibility.js';
+import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
 
 export { READ_AS_OWNER_SCOPE };
 
@@ -58,6 +65,34 @@ export function ownerScopeView<T extends { ownerGaii: string; visibility: string
   records: readonly T[], principal: string, readsAll: boolean,
 ): T[] {
   return readsAll ? [...records] : records.filter((r) => visibleToSameOwnerReader(r, principal));
+}
+
+/**
+ * ownerScopeView, and also a same-owner record kept at `organism:<id>` when that organism admits this
+ * reader: its account an active member and the agent not barred (services/organism-visibility.ts,
+ * the rule a read of the record by its owner's address applies). Without it the owner's own agent read
+ * a record the owner made visible to their family organism as absent, while a member of that organism
+ * read it. Each organism is asked once per call. Used where an agent reads and lists its owner's memory
+ * (aimeat_memory_read and aimeat_memory_list, GET /v1/memory and GET /v1/memory/:key with owner_scope);
+ * the other owner-scope readers keep the plainer ownerScopeView. Order is kept.
+ */
+export async function ownerScopeViewAdmitting<T extends { ownerGaii: string; visibility: string }>(
+  storage: Storage, records: readonly T[], principal: string, readsAll: boolean, visitor = false,
+): Promise<T[]> {
+  if (readsAll) return [...records];
+  const admits = new Map<string, boolean>();
+  const out: T[] = [];
+  for (const r of records) {
+    if (visibleToSameOwnerReader(r, principal)) { out.push(r); continue; }
+    if (!isOrganismVisibilityWord(r.visibility)) continue;
+    let ok = admits.get(r.visibility);
+    if (ok === undefined) {
+      ok = await organismVisibilityAdmits(storage, r.visibility, { identity: principal, federated: visitor });
+      admits.set(r.visibility, ok);
+    }
+    if (ok) out.push(r);
+  }
+  return out;
 }
 
 /**

@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-09 — An update that names no tags keeps the record's tags (`tags: []` clears them), as
+ *     PUT /v1/memory/:key and PATCH already did; POST /v1/memory and aimeat_memory_write had wiped them.
  *   2026-11-09 — A write to a context or ontology key (`context.`, `vocab.ctx.`) is trackable, so the
  *     version it replaces is kept, and the key's history is pruned to its newest HISTORY_KEEP versions
  *     (services/context/history-keys.ts).
@@ -505,7 +507,10 @@ export async function writeMemoryRecord(
         visibility: input.visibility,
         ...(input.visibility === 'group' && isNamedGroup(input.groupId) ? { groupId: input.groupId } : {}),
         ...(input.visibility === 'workspace' && input.workspaceRef !== undefined ? { workspaceRef: input.workspaceRef } : {}),
-        tags: Array.isArray(input.tags) ? input.tags : [],
+        // Tags left out keep the record's tags, as PUT and PATCH have; `[]` clears them. Before
+        // 2026-11-09 a whole rewrite without tags wiped them, so an AI that rewrote a context lost
+        // the tags the person groups it by.
+        tags: Array.isArray(input.tags) ? input.tags : (existing?.tags ?? []),
         ttlHours: input.ttlHours ?? null,
         version: existing ? existing.version + 1 : 1,
         createdAt: existing?.createdAt ?? now,

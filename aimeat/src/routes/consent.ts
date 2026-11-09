@@ -13,6 +13,9 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   2026-11-09 — Additive query parameters for the Data Wallet trail read by day: GET /v1/data-wallet
+ *     takes group_limit, today_from and yesterday_from; GET /v1/consent/audit takes from, to and
+ *     grouped=true (the groups of the window, paged by limit and offset).
  *   2026-11-08 — POST /v1/consent passes `role` (read | write) to the service, which refuses write
  *     where no write check reads it; the purpose text no longer decides write access.
  *   2026-10-15 — POST /v1/consent stamps how the consent was given (web form for the person, API call
@@ -40,6 +43,14 @@ import { createDataWalletService } from '../services/db/data-wallet-db-service.j
 import { operatorOverride } from '../services/operator-override.js';
 import { callerOf } from '../middleware/caller.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';
+import { auditWithin, groupConsentAudit } from '../services/consent-audit-groups.js';
+
+/** A query value that parses as a time, as ISO; anything else is absent. */
+function isoParam(v: unknown): string | undefined {
+    if (typeof v !== 'string' || !v) return undefined;
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
+}
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
@@ -111,7 +122,12 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     router.get('/v1/data-wallet', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
         const entryLimit = req.query.entry_limit ? Math.max(0, Math.min(1000, parseInt(req.query.entry_limit as string, 10) || 0)) : 20;
-        const data = await dataWalletDb.overview(resolve(req), days, entryLimit);
+        // Additive: group_limit caps audit.groups; today_from + yesterday_from (the reader's own
+        // midnights) add audit.buckets. Without them the answer is what it always was.
+        const groupLimit = req.query.group_limit !== undefined ? Math.max(0, Math.min(1000, parseInt(req.query.group_limit as string, 10) || 0)) : undefined;
+        const todayFrom = isoParam(req.query.today_from);
+        const yesterdayFrom = isoParam(req.query.yesterday_from);
+        const data = await dataWalletDb.overview(resolve(req), days, entryLimit, { groupLimit, todayFrom, yesterdayFrom });
         res.json(success(config.nodeId, data));
     });
 
@@ -170,9 +186,25 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         // the key's prefix, and a page of them. The composite (GET /v1/data-wallet) serves the groups.
         const keyPrefix = typeof req.query.key_prefix === 'string' ? req.query.key_prefix : '';
         if (keyPrefix) entries = entries.filter(e => e.memoryKey.startsWith(keyPrefix));
+        // One day bucket of the page: the rows in [from, to).
+        entries = auditWithin(entries, isoParam(req.query.from), isoParam(req.query.to));
         const total = entries.length;
         const limit = req.query.limit ? Math.max(0, Math.min(1000, parseInt(req.query.limit as string, 10) || 0)) : 0;
         const offset = req.query.offset ? Math.max(0, parseInt(req.query.offset as string, 10) || 0) : 0;
+
+        // grouped=true: the groups of these rows instead of the rows, and limit/offset page the groups.
+        if (req.query.grouped === 'true') {
+            const groups = groupConsentAudit(entries.filter(e => e.action !== 'grant' && e.action !== 'revoke'));
+            res.json(success(config.nodeId, {
+                entries: [],
+                total,
+                period_days: days,
+                groups: limit || offset ? groups.slice(offset, limit ? offset + limit : undefined) : groups,
+                group_total: groups.length,
+                ...(limit || offset ? { limit, offset } : {}),
+            }));
+            return;
+        }
         if (limit || offset) entries = entries.slice(offset, limit ? offset + limit : undefined);
 
         res.json(success(config.nodeId, {

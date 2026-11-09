@@ -50,7 +50,7 @@ import { ContactPicker } from '/components/ContactPicker.js';
 import { TagList } from '/components/TagList.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { HtmlPageFrame } from '/components/HtmlPageFrame.js';
-import { Fingerprint } from '/components/Fingerprint.js';
+import { Fingerprint } from '/components/TextPrint.js';
 
 const html = htm.bind(h);
 const noop = () => {};

@@ -7,9 +7,10 @@
  *   what one's own AI may do) and opens the grant form; the page's start (PageStart: what the page is
  *   for, the prompt that has one's own AI say who reaches the data, and what happens next); the
  *   strip says what you own, how many permissions stand, what was refused this window and what you
- *   revoked; 01 who reaches what (one row per target, turnable by people, the revoked ones); 02 the
- *   outside parties (parties.js); 03 what happened (the trail grouped: who tried what, how many
- *   times, with the grants and revocations read off the permissions' own timestamps); 04 the grant
+ *   revoked; 01 who reaches what (one row per person or agent, turnable by place, the revoked ones);
+ *   02 the outside parties (parties.js); 03 what happened (today, yesterday and earlier, each opening
+ *   the trail grouped: who tried what, how many times, with the grants and revocations read off the
+ *   permissions' own timestamps); 04 the grant
  *   form as a fold; 05 everything you own as one file, with what is inside; 06 classification
  *   (classification.js); 07 what is known about your content (content-classes.js). A wallet that
  *   lives on another server shows one box. Pure render over the ctx bag; the rows are rows.js. How
@@ -17,6 +18,9 @@
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.29.0 — 2026-11-09 — Grouped by who (Jouni's choice "Group by who"): 01 opens on the people
+ *     (By who, By place, Shared places, Key areas, Withdrawn), with the agents that reach one place
+ *     each folded into one row; 03 lists today, yesterday and earlier, each opening its groups.
  *   v1.28.0 — 2026-11-08 — May do offers Read and write for one person on one workspace (canWriteFor in
  *     frame.js), the shape the server gives write in, and explains itself (question mark
  *     dataWallet.may). An organism's members are never offered with a key area, which had no recipient
@@ -96,7 +100,7 @@ import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { x, n, crumb, pageLinks, whoOf, canWriteFor } from './frame.js';
-import { targetRow, personRow, revokedRow, groupRow, eventRow, groupId } from './rows.js';
+import { targetRow, personRow, foldedRow, revokedRow, bucketRow, eventRow, groupId } from './rows.js';
 import { secClassification, classificationCount } from './classification.js';
 import { secContentClasses, contentCount } from './content-classes.js';
 import { secParties, partyCount } from './parties.js';
@@ -178,24 +182,28 @@ function strip(ctx) {
 
 function secTargets(ctx) {
   const f = ctx.filter;
-  const filters = [['all', ctx.targets.length], ['orgs', ctx.targets.filter((r) => r.kind === 'org').length], ['keys', ctx.targets.filter((r) => r.kind === 'key').length], ['revoked', ctx.revokedList.length]];
+  // Who first (Jouni's choice "Group by who", 2026-11-09): the question the page answers first is who
+  // reaches my data. The places stay one tab away.
+  const filters = [['people', 'byWho', ctx.people.length], ['all', 'byPlace', ctx.targets.length], ['orgs', 'orgs', ctx.targets.filter((r) => r.kind === 'org').length], ['keys', 'keys', ctx.targets.filter((r) => r.kind === 'key').length], ['revoked', 'revoked', ctx.revokedList.length]];
   const list = f === 'orgs' ? ctx.targets.filter((r) => r.kind === 'org') : f === 'keys' ? ctx.targets.filter((r) => r.kind === 'key') : ctx.targets;
-  const shown = ctx.personFocus && f === 'people' ? ctx.people.filter((p) => p.name === ctx.personFocus).concat(ctx.people.filter((p) => p.name !== ctx.personFocus)) : ctx.people;
+  const foldedIds = new Set(ctx.personFocus ? [] : ctx.folded.map((p) => p.id));
+  const people = ctx.people.filter((p) => !foldedIds.has(p.id));
+  const shown = ctx.personFocus && f === 'people' ? people.filter((p) => p.name === ctx.personFocus).concat(people.filter((p) => p.name !== ctx.personFocus)) : people;
   return html`
     <${Section} id="dw-targets" num="01" title=${x('secTargets')} count=${x('secTargetsSub', { n: ctx.active.length, targets: ctx.targets.length })} first=${true}>
       <${Note} kind="lead">${x('targetsIntro')}<//>
       ${ctx.active.length || ctx.revokedList.length ? html`
         <${Tabs} tone="filter" value=${f} onSelect=${(v) => ctx.setFilter(v)}
-          items=${filters.map(([id, k]) => ({ value: id, label: x('filter.' + id), count: k }))}>
-          <${Filter} end on=${f === 'people'} count=${ctx.people.length} onClick=${() => ctx.setFilter('people')}>${x('filter.people')}<//>
-        <//>` : null}
+          items=${filters.map(([id, word, k]) => ({ value: id, label: x('filter.' + word), count: k }))} />` : null}
       ${f === 'revoked' ? html`
         <${List} cols="name-desc-span-doors" keepCols head=${[x('col.target'), x('col.whoWhat'), x('col.span'), '']} empty=${x('noRevoked')}>
           ${ctx.revokedList.map((c) => revokedRow(ctx, c))}
         <//>`
       : f === 'people' ? html`
-        <${List} cols="name-desc-since-doors" keepCols head=${[x('col.who'), x('col.reaches'), x('col.since'), '']} empty=${x('noGrants')}>
+        <${List} cols="name-desc-since-doors" keepCols head=${[x('col.who'), x('col.reaches'), x('col.since'), '']}
+          empty=${html`<${Note} kind="quiet"><b>${x('noGrantsTitle')}</b> ${x('noGrantsBody')}<//>`}>
           ${shown.map((p) => personRow(ctx, p))}
+          ${foldedIds.size ? foldedRow(ctx, ctx.folded) : null}
         <//>`
       : html`
         <${List} cols="name-desc-since-doors" keepCols head=${[x('col.target'), x('col.whoWhat'), x('col.since'), '']}
@@ -219,9 +227,9 @@ function secTrail(ctx) {
         items=${[7, 30, 90].map((d) => ({ value: d, label: x('daysN', { n: d }), count: ctx.days === d ? n(ov.audit.total) : undefined }))}>
         <${Filter} end on=${events} count=${ctx.events.length} onClick=${() => ctx.setTrailFilter(events ? 'all' : 'events')}>${x('filter.eventsOnly')}<//>
       <//>
-      <${List} cols="name-desc-count-when-doors" keepCols head=${[x('col.who'), x('col.what'), { label: x('col.times'), num: true }, x('col.when'), '']}
+      <${List} cols="name-desc-count-when-doors" keepCols head=${[events ? x('col.who') : x('col.day'), events ? x('col.what') : x('col.whoTried'), { label: x('col.times'), num: true }, x('col.when'), '']}
         empty=${html`<${Note} kind="quiet"><b>${x('trailEmptyTitle')}</b> ${x('trailEmptyBody')}<//>`}>
-        ${shown.map((it) => (it.kind === 'group' ? groupRow(ctx, it.group) : eventRow(ctx, it.event)))}
+        ${shown.map((it) => (it.kind === 'bucket' ? bucketRow(ctx, it.bucket, it.events) : eventRow(ctx, it.event)))}
       <//>
       ${items.length > shown.length ? html`<${More} label=${x('moreRows', { n: items.length - shown.length })} onMore=${() => ctx.showMoreTrail()} />` : null}
       ${ctx.manifestShare >= 0.5 && ctx.deniedCount >= 20 ? html`<${Box}><b>${x('meaningTitle')}</b> ${x('meaningManifest', { n: n(ctx.manifestDenied), total: n(ctx.deniedCount) })}<//>` : null}

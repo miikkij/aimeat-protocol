@@ -167,8 +167,10 @@ fn backup_runtime_smoke_restores_a_real_identity_and_memory_after_restart() {
     process.stop();
     new_directory(&root.join("data/storage"), false).unwrap();
     fs::write(root.join("data/storage/retained.txt"), b"original stored bytes").unwrap();
-    let archive = fixture.0.join("backup.zip");
-    let backup = create(&root, &archive, env!("CARGO_PKG_VERSION")).unwrap();
+    let archive = fixture.0.join("backup.zip.age");
+    let backup_password = SecretString::from("isolated runtime backup password".to_owned());
+    let backup = create_encrypted(&root, &archive, env!("CARGO_PKG_VERSION"), &backup_password).unwrap();
+    assert!(is_encrypted(&archive).unwrap());
     assert!(backup.files.iter().any(|file| file.path == "data/aimeat.db"));
     let mut process = NodeProcess::start(&node, &server, &root, &log, port);
     let token = login(port, &username, &password);
@@ -177,7 +179,11 @@ fn backup_runtime_smoke_restores_a_real_identity_and_memory_after_restart() {
     let current_database = archive_digest(&root.join("data/aimeat.db")).unwrap();
     fs::write(root.join("data/storage/retained.txt"), b"newer stored bytes").unwrap();
     fs::write(root.join("newer-only.txt"), b"keep this in recovery").unwrap();
-    let (_, recovery) = restore(&root, &archive).unwrap();
+    let digest = archive_digest(&archive).unwrap();
+    let wrong_password = SecretString::from("a different runtime backup password".to_owned());
+    assert!(restore_encrypted(&root, &archive, &digest, Some(&wrong_password)).is_err());
+    assert_eq!(archive_digest(&root.join("data/aimeat.db")).unwrap(), current_database);
+    let (_, recovery) = restore_encrypted(&root, &archive, &digest, Some(&backup_password)).unwrap();
     assert_eq!(archive_digest(&recovery.join("data/aimeat.db")).unwrap(), current_database);
     assert_eq!(fs::read(recovery.join("newer-only.txt")).unwrap(), b"keep this in recovery");
     assert_eq!(fs::read_to_string(root.join(".env")).unwrap(), env);
@@ -187,5 +193,5 @@ fn backup_runtime_smoke_restores_a_real_identity_and_memory_after_restart() {
     let restored = request(port, reqwest::Method::GET, memory_path, None, Some(&token));
     assert_eq!(restored.get("value"), Some(&before));
     process.stop();
-    println!("Staged runtime passed: identity login, SQLite memory, private keys, stored file, graceful stop, recovery retention and restart after restore.");
+    println!("Staged runtime passed: identity login, SQLite memory, private keys, stored file, graceful stop, encrypted backup, wrong-password refusal, recovery retention and restart after restore.");
 }

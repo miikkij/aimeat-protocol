@@ -22,6 +22,9 @@ let lastState = { state: 'stopped', running: false, ready: false, port: 41050, c
 let backupBusy = false;
 let backupReport = null;
 let restoreChoice = null;
+let restorePassword = '';
+let backupPasswordMode = null;
+let backupPasswordErrorKey = null;
 const busy = { signIn: false, settings: false, ai: false, scan: false };
 let currentToast = null;
 let resultMessage = null;
@@ -94,6 +97,7 @@ function applyLanguage() {
   renderServices(true);
   showBackupStatus();
   showRestoreSummary();
+  showPasswordLabels();
   if (currentToast && !$('toast').hidden) $('toast').textContent = t(currentToast.key, currentToast.vars);
   if (resultMessage) showResultMessage();
   document.dispatchEvent(new CustomEvent('desktop-language-change', { detail: { lang } }));
@@ -426,8 +430,9 @@ function pollLog() {
 function backupButtons() {
   for (const id of ['createBackup', 'inspectBackup']) $(id).disabled = running || backupBusy;
   $('backupStopHint').textContent = t(running ? 'backupStop' : 'backupReady');
-  $('confirmRestore').disabled = running || backupBusy || !restoreChoice;
+  $('confirmRestore').disabled = running || backupBusy || !restoreChoice || !!restoreChoice.password_required;
   $('cancelRestore').disabled = backupBusy;
+  for (const id of ['backupPassword', 'backupPasswordRepeat', 'submitBackupPassword', 'cancelBackupPassword']) $(id).disabled = backupBusy;
   $('toggle').disabled = lastState.state === 'stopping' || backupBusy;
   syncControls();
 }
@@ -457,7 +462,18 @@ function showBackupStatus() {
   $('lastBackup').textContent = backupReport
     ? t('lastBackup', { date: reportDate(backupReport.created_at), path: backupReport.path })
     : t('noBackup');
+  const days = window.DesktopTools?.preferences()?.backup_reminder_days ?? 7;
+  const reminder = backupReminderKey(backupReport, days);
+  $('backupReminder').hidden = !reminder;
+  $('backupReminder').textContent = reminder ? t(reminder, { days }) : '';
   backupButtons();
+}
+
+function backupReminderKey(report, days, now = Date.now()) {
+  if (!days) return null;
+  if (!report) return 'backupReminderFirst';
+  const age = now - Date.parse(report.created_at);
+  return !Number.isFinite(age) || age >= days * 86400000 ? 'backupReminderDue' : null;
 }
 
 async function refreshBackupStatus() {
@@ -478,15 +494,90 @@ function showResultMessage() {
 
 async function createBackup() {
   if (running || backupBusy) return;
+  openPasswordDialog('create');
+}
+
+function openPasswordDialog(mode) {
+  backupPasswordMode = mode;
+  backupPasswordErrorKey = null;
+  $('backupPassword').value = '';
+  $('backupPasswordRepeat').value = '';
+  $('backupPassword').autocomplete = mode === 'create' ? 'new-password' : 'current-password';
+  showPasswordLabels();
+  $('backupPasswordDialog').showModal();
+  $('backupPassword').focus();
+}
+
+function showPasswordLabels() {
+  const create = backupPasswordMode === 'create';
+  $('backupPasswordTitle').textContent = t(create ? 'backupPasswordTitle' : 'backupUnlockTitle');
+  $('backupPasswordHint').textContent = t(create ? 'backupPasswordHint' : 'backupUnlockHint');
+  $('backupPasswordFile').textContent = create ? '' : restoreChoice?.path || '';
+  $('backupPasswordRepeatField').hidden = !create;
+  $('submitBackupPassword').textContent = t(backupBusy ? 'backupWorking' : create ? 'backupPasswordSave' : 'backupUnlock');
+  $('cancelBackupPassword').textContent = t('backupPasswordCancel');
+  $('backupPasswordError').hidden = !backupPasswordErrorKey;
+  $('backupPasswordError').textContent = backupPasswordErrorKey ? t(backupPasswordErrorKey) : '';
+}
+
+function cancelBackupPassword() {
+  if (backupBusy) return;
+  $('backupPassword').value = '';
+  $('backupPasswordRepeat').value = '';
+  backupPasswordMode = null;
+  restorePassword = '';
+  restoreChoice = null;
+  $('backupPasswordDialog').close();
+}
+
+async function submitBackupPassword(event) {
+  event?.preventDefault();
+  if (running || backupBusy || !backupPasswordMode) return;
+  let password = $('backupPassword').value;
+  const create = backupPasswordMode === 'create';
+  if (new TextEncoder().encode(password).length > 1024) {
+    backupPasswordErrorKey = 'backupPasswordTooLong'; showPasswordLabels(); $('backupPassword').focus(); return;
+  }
+  if (!password.trim() || (create && [...password].length < 12)) {
+    backupPasswordErrorKey = 'backupPasswordLength'; showPasswordLabels(); $('backupPassword').focus(); return;
+  }
+  if (create && password !== $('backupPasswordRepeat').value) {
+    backupPasswordErrorKey = 'backupPasswordMismatch'; showPasswordLabels(); $('backupPasswordRepeat').focus(); return;
+  }
+  $('backupPassword').value = '';
+  $('backupPasswordRepeat').value = '';
+  backupPasswordErrorKey = null;
   backupBusy = true; backupButtons();
+  showPasswordLabels();
   try {
-    const report = await invoke('create_backup', { lang });
-    if (!report) return;
-    backupReport = report;
-    backupResult('backupSaved', { path: report.path, files: report.files, size: (report.total_bytes / 1048576).toFixed(1) }, report.warning);
-    showBackupStatus();
-  } catch (e) { toastKey('failed', { why: String(e) }, 'error'); }
-  finally { backupBusy = false; showState(lastState); }
+    if (create) {
+      $('backupPasswordDialog').close();
+      const report = await invoke('create_backup', { lang, password });
+      if (report) {
+        backupReport = report;
+        backupResult('backupSaved', { path: report.path, files: report.files, size: (report.total_bytes / 1048576).toFixed(1) }, report.warning);
+        showBackupStatus();
+      }
+      backupPasswordMode = null;
+    } else {
+      const choice = await invoke('inspect_backup', { lang, ticket: restoreChoice.ticket, password });
+      if (!choice || choice.password_required) throw new Error('Backup is still locked');
+      restoreChoice = choice;
+      restorePassword = password;
+      backupPasswordMode = null;
+      $('backupPasswordDialog').close();
+      showRestoreSummary();
+      $('restoreDialog').showModal();
+      $('cancelRestore').focus();
+    }
+  } catch (e) {
+    if (create) { backupPasswordMode = null; toastKey('failed', { why: String(e) }, 'error'); }
+    else { restorePassword = ''; backupPasswordErrorKey = 'backupUnlockFailed'; }
+  } finally {
+    password = ''; backupBusy = false; showPasswordLabels(); showState(lastState);
+    if (backupPasswordErrorKey) $('backupPassword').focus();
+    else if (restoreChoice && !restoreChoice.password_required) $('cancelRestore').focus();
+  }
 }
 
 function showRestoreSummary() {
@@ -496,39 +587,47 @@ function showRestoreSummary() {
     path: r.path, date: reportDate(r.created_at), version: r.desktop_version,
     files: r.files, size: (r.total_bytes / 1048576).toFixed(1),
   });
+  $('restoreEncryption').textContent = t(r.encrypted ? 'backupEncrypted' : 'backupUnencrypted');
 }
 
 async function inspectBackup() {
   if (running || backupBusy) return;
+  restoreChoice = null; restorePassword = '';
   backupBusy = true; backupButtons();
   try {
     const choice = await invoke('inspect_backup', { lang });
     if (!choice) return;
     restoreChoice = choice;
+    if (choice.password_required) { openPasswordDialog('unlock'); return; }
     showRestoreSummary();
     $('restoreDialog').showModal();
     $('cancelRestore').focus();
   } catch (e) { toastKey('failed', { why: String(e) }, 'error'); }
-  finally { backupBusy = false; backupButtons(); }
+  finally {
+    backupBusy = false; backupButtons();
+    if (restoreChoice?.password_required) $('backupPassword').focus();
+    else if (restoreChoice) $('cancelRestore').focus();
+  }
 }
 
 function cancelRestore() {
   if (backupBusy) return;
   restoreChoice = null;
+  restorePassword = '';
   $('restoreDialog').close();
 }
 
 async function confirmRestore() {
-  if (!restoreChoice || running || backupBusy) return;
+  if (!restoreChoice || restoreChoice.password_required || running || backupBusy) return;
   backupBusy = true; backupButtons();
   try {
-    const report = await invoke('restore_backup', { ticket: restoreChoice.ticket, confirmed: true });
-    $('restoreDialog').close(); restoreChoice = null;
+    const report = await invoke('restore_backup', { ticket: restoreChoice.ticket, confirmed: true, password: restorePassword || null });
+    $('restoreDialog').close(); restoreChoice = null; restorePassword = '';
     backupResult('restored', { path: report.recovery_path || '' }, report.warning);
     signOut();
     await loadConfig(); await checkStatus(); await refreshBackupStatus();
-  } catch (e) { toastKey('failed', { why: String(e) }, 'error'); }
-  finally { backupBusy = false; showState(lastState); }
+  } catch (e) { $('restoreDialog').close(); restoreChoice = null; toastKey('failed', { why: String(e) }, 'error'); }
+  finally { restorePassword = ''; backupBusy = false; showState(lastState); }
 }
 
 // ── Version ───────────────────────────────────────────────────────
@@ -564,11 +663,21 @@ $('createBackup').addEventListener('click', createBackup);
 $('inspectBackup').addEventListener('click', inspectBackup);
 $('confirmRestore').addEventListener('click', confirmRestore);
 $('cancelRestore').addEventListener('click', cancelRestore);
+$('backupPasswordForm').addEventListener('submit', submitBackupPassword);
+$('cancelBackupPassword').addEventListener('click', cancelBackupPassword);
+$('backupPasswordDialog').addEventListener('cancel', (event) => {
+  event.preventDefault(); cancelBackupPassword();
+});
 $('restoreDialog').addEventListener('cancel', (event) => {
   if (backupBusy) { event.preventDefault(); return; }
-  restoreChoice = null;
+  restoreChoice = null; restorePassword = '';
 });
-document.addEventListener('visibilitychange', () => { pollLog(); if (!document.hidden) refreshLog(); });
+document.addEventListener('desktop-preferences-change', showBackupStatus);
+document.addEventListener('visibilitychange', () => { pollLog(); if (!document.hidden) { refreshLog(); showBackupStatus(); } });
+window.addEventListener('pagehide', () => {
+  restorePassword = ''; restoreChoice = null;
+  $('backupPassword').value = ''; $('backupPasswordRepeat').value = '';
+});
 
 applyLanguage();
 if (!invoke) {

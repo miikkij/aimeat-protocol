@@ -42,7 +42,7 @@ function screen(overrides = {}, options = {}) {
     querySelectorAll: selector => selector === '[id^="t-"]' ? [...elements.values()].filter(e => e.id.startsWith('t-')) : selector === 'main button, main input, main select' ? ['toggle', 'saveSettings', 'signIn', 'createBackup', 'inspectBackup'].map(id => elements.get(id)) : [],
     addEventListener(name, fn) { listeners[name] = fn; }, dispatchEvent() {},
   };
-  const context = vm.createContext({ document, navigator: { language: 'en' }, console, URL,
+  const context = vm.createContext({ document, navigator: { language: 'en' }, console, URL, TextEncoder,
     localStorage: { getItem: () => null, setItem() {} },
     window: { __TAURI__: options.noBackend ? null : { core: { invoke }, event: { listen: async (name, fn) => { listeners[name] = fn; return () => {}; } } }, addEventListener() {} },
     CustomEvent: class { constructor(name, props) { this.type = name; this.detail = props?.detail; } },
@@ -146,6 +146,72 @@ test('inspecting a backup never restores it until the separate confirmation', as
   await s.run('confirmRestore()');
   assert.equal(s.calls.filter(c => c.name === 'restore_backup').length, 1);
   assert.equal(s.elements.get('restoreDialog').open, false);
+});
+
+test('creating a backup first asks for its password without opening a save dialog', async () => {
+  const s = screen(); await settle(); s.calls.length = 0;
+  await s.run('createBackup()');
+  assert.equal(s.calls.some(c => c.name === 'create_backup'), false);
+  assert.equal(s.elements.get('backupPasswordDialog').open, true);
+});
+
+test('backup passwords must match and are cleared even when saving fails', async () => {
+  const s = screen({ create_backup: () => { throw new Error('Disk full'); } }); await settle(); s.calls.length = 0;
+  await s.run('createBackup()');
+  s.elements.get('backupPassword').value = 'long test passphrase';
+  s.elements.get('backupPasswordRepeat').value = 'different passphrase';
+  await s.run('submitBackupPassword()');
+  assert.equal(s.calls.some(c => c.name === 'create_backup'), false);
+  assert.match(s.elements.get('backupPasswordError').textContent, /do not match/);
+  s.elements.get('backupPasswordRepeat').value = 'long test passphrase';
+  await s.run('submitBackupPassword()');
+  assert.equal(s.calls.filter(c => c.name === 'create_backup').length, 1);
+  assert.equal(s.elements.get('backupPassword').value, '');
+  assert.equal(s.elements.get('backupPasswordRepeat').value, '');
+  assert.equal(s.run('restorePassword'), '');
+  assert.match(s.elements.get('toast').textContent, /Disk full/);
+});
+
+test('an encrypted restore needs a password check and then a separate confirmation', async () => {
+  const selected = { ticket: 'selected', encrypted: true, password_required: true, path: 'copy.zip.age' };
+  const opened = { ...selected, password_required: false, files: 2, total_bytes: 1024, created_at: '2026-11-09', desktop_version: '0.9.0' };
+  const s = screen({ inspect_backup: args => args.ticket ? opened : selected }); await settle(); s.calls.length = 0;
+  await s.run('inspectBackup()');
+  assert.equal(s.elements.get('backupPasswordDialog').open, true);
+  assert.notEqual(s.elements.get('restoreDialog').open, true);
+  s.elements.get('backupPassword').value = 'restoring passphrase';
+  await s.run('submitBackupPassword()');
+  assert.equal(s.calls.some(c => c.name === 'restore_backup'), false);
+  assert.equal(s.elements.get('restoreDialog').open, true);
+  assert.equal(s.elements.get('backupPassword').value, '');
+  assert.equal(s.run('restorePassword'), 'restoring passphrase');
+  s.run('cancelRestore()');
+  assert.equal(s.run('restorePassword'), '');
+  assert.equal(s.run('restoreChoice'), null);
+});
+
+test('a wrong restore password keeps the unlock dialog and never enables restore', async () => {
+  const s = screen({ inspect_backup: args => {
+    if (args.ticket) throw new Error('BACKUP_PASSWORD_INVALID');
+    return { ticket: 'selected', encrypted: true, password_required: true, path: 'copy.zip.age' };
+  } }); await settle(); s.calls.length = 0;
+  await s.run('inspectBackup()'); s.elements.get('backupPassword').value = 'wrong password';
+  await s.run('submitBackupPassword()');
+  assert.equal(s.elements.get('backupPasswordDialog').open, true);
+  assert.notEqual(s.elements.get('restoreDialog').open, true);
+  assert.equal(s.elements.get('backupPassword').value, '');
+  assert.equal(s.run('restorePassword'), '');
+  assert.equal(s.calls.some(c => c.name === 'restore_backup'), false);
+  assert.equal(s.elements.get('backupPasswordError').hidden, false);
+});
+
+test('backup reminders respect off, the selected age and future timestamps', async () => {
+  const s = screen(); await settle();
+  assert.equal(s.run('backupReminderKey(null, 0)'), null);
+  assert.equal(s.run('backupReminderKey(null, 7)'), 'backupReminderFirst');
+  assert.equal(s.run("backupReminderKey({created_at:'2026-11-01'},7,Date.parse('2026-11-09'))"), 'backupReminderDue');
+  assert.equal(s.run("backupReminderKey({created_at:'2026-11-01'},30,Date.parse('2026-11-09'))"), null);
+  assert.equal(s.run("backupReminderKey({created_at:'2026-11-10'},7,Date.parse('2026-11-09'))"), null);
 });
 
 test('visible results and all labels have both language versions', async () => {

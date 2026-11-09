@@ -32,6 +32,38 @@ the node: wish `wish-ty-p-yt-sovellus-uusiksi-liitin-etuovena-kaikki-k-ytt-j-rje
 
 ## How it works
 
+### Desktop controls
+
+**Desktop settings and troubleshooting**, available from either page, contains the local check,
+report preview and startup preferences. The check reads local runtime and connection status and
+checks the loopback model-list endpoints of LM Studio and Ollama. It changes no configuration and
+does not send a report. The support report contains only versions, status codes and counts; inspect
+it before copying it. Logs, credentials, account names, file paths and server addresses are excluded.
+
+Closing the window still quits Desktop by default. **Keep Desktop running when I close the window**
+leaves the running local AIMEAT available; reopen the window from the tray icon. **Quit Desktop**,
+in the page or tray menu, drains the local server and exits. Starting Desktop at login and starting
+the local AIMEAT when Desktop opens are separate, opt-in settings. On Windows login startup belongs
+to the current Windows account. Isolated review profiles cannot change the computer's login startup.
+Launching Desktop twice opens its existing window. Different isolated profiles remain separate.
+
+### Backups
+
+New backups are password-encrypted `.zip.age` files. Choose a password of at least 12 characters;
+Desktop does not save it and cannot recover it. Encryption streams directly into the chosen file
+without a temporary plaintext ZIP. Keep the password separately from the backup. A new backup
+requires the local server to be stopped so that SQLite and stored files form one consistent copy.
+
+Restore also accepts earlier unencrypted `.zip` backups. An encrypted backup must first be unlocked
+for inspection; replacing local data still requires a separate confirmation. Desktop authenticates
+the encrypted contents before replacement, preserves this computer's Desktop startup preferences,
+and retains the previous data in a local, unencrypted recovery folder. That recovery folder is
+restricted to the current OS account where the platform supports it.
+
+Backup reminders appear on the local AIMEAT page after 7 days by default, with 30-day and off options.
+They do not stop the server or create backups automatically. Before the first successful backup,
+the page reminds you to make one.
+
 The packaged app is fully self-contained — the end user installs **one** installer with **no prerequisites**
 (no Node.js, no build tools). Three things are bundled together:
 
@@ -155,7 +187,10 @@ a dmg, Linux a deb and an AppImage. CI builds all three on their own runners
   install lifecycle scripts removed, so the native SQLite binary is present.
 - [scripts/stage-licenses.mjs](scripts/stage-licenses.mjs) — copies the licence texts the installer must
   carry (AIMEAT's licence, the server's third-party notices, the licence of the Node runtime being
-  shipped, and on Windows a WebView2 notice) into `src-tauri/resources/licenses/`.
+  shipped, and on Windows a WebView2 notice) into `src-tauri/resources/licenses/`. It also generates
+  Rust dependency notices from `cargo metadata --locked`, retaining the packages' original notices
+  and explicitly selecting licence alternatives. Missing upstream terms are retrieved from pinned
+  revisions and cached under `src-tauri/target/rust-license-cache`.
 
 After `tauri build`, [scripts/report-bundles.mjs](scripts/report-bundles.mjs) lists what was built. On
 Windows the installers land in:

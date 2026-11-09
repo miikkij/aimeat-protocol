@@ -8,6 +8,10 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use zip::write::SimpleFileOptions;
 
+#[path = "backup_encryption.rs"]
+mod encryption;
+pub use encryption::SecretString;
+
 const FORMAT: &str = "aimeat.desktop-backup";
 const MANIFEST: &str = "aimeat-backup.json";
 const MAX_ENTRIES: usize = 100_000;
@@ -17,6 +21,23 @@ const MAX_TOTAL: u64 = 100 * 1024 * 1024 * 1024;
 const MAX_ARCHIVE: u64 = MAX_TOTAL + 1024 * 1024 * 1024;
 const MAX_ENV: u64 = 1024 * 1024;
 const MAX_CENTRAL_DIRECTORY: u64 = 128 * 1024 * 1024;
+const MACHINE_PREFERENCES: &str = "desktop-preferences.json";
+
+pub fn validate_backup_password(password: &SecretString) -> Result<(), String> {
+    encryption::validate_password(password, true)
+}
+
+pub fn is_encrypted(path: &Path) -> Result<bool, String> { encryption::encrypted(path) }
+
+pub fn create_encrypted(root: &Path, destination: &Path, version: &str, password: &SecretString) -> Result<BackupManifest, String> {
+    validate_backup_password(password)?;
+    create_impl(root, destination, version, Some(password))
+}
+
+#[cfg(test)]
+pub fn create(root: &Path, destination: &Path, version: &str) -> Result<BackupManifest, String> {
+    create_impl(root, destination, version, None)
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -111,6 +132,20 @@ fn new_file(path: &Path, restrict_acl: bool) -> Result<File, String> {
     let file = options.open(path).map_err(|e| io_error("Cannot create backup file (existing files are never overwritten)", e))?;
     if restrict_acl {
         if let Err(error) = make_private(path, false) {
+            drop(file);
+            let _ = fs::remove_file(path);
+            return Err(error);
+        }
+    }
+    Ok(file)
+}
+
+fn backup_destination(path: &Path, encrypted: bool, protect: impl FnOnce(&Path) -> Result<(), String>) -> Result<File, String> {
+    let file = new_file(path, false)?;
+    if let Err(error) = protect(path) {
+        // Portable ciphertext is safe on filesystems without ACLs, such as USB exFAT.
+        // This exception never applies to the plaintext restore staging directory or its files.
+        if !encrypted {
             drop(file);
             let _ = fs::remove_file(path);
             return Err(error);
@@ -230,6 +265,8 @@ fn inventory(root: &Path, current: &Path, files: &mut Vec<(String, u64)>, direct
         let path = entry.path();
         let relative = path.strip_prefix(root).map_err(|e| e.to_string())?
             .to_str().ok_or("A filename is not valid UTF-8.")?.replace('\\', "/");
+        // Login, tray and language choices belong to the destination computer, not its node.
+        if relative.eq_ignore_ascii_case(MACHINE_PREFERENCES) { continue; }
         valid_relative(&relative)?;
         let metadata = regular_metadata(&path)?;
         if metadata.is_dir() {
@@ -243,7 +280,7 @@ fn inventory(root: &Path, current: &Path, files: &mut Vec<(String, u64)>, direct
     Ok(())
 }
 
-pub fn create(root: &Path, destination: &Path, version: &str) -> Result<BackupManifest, String> {
+fn create_impl(root: &Path, destination: &Path, version: &str, password: Option<&SecretString>) -> Result<BackupManifest, String> {
     let root = managed_root(root)?;
     local_database(&root)?;
     let parent = destination.parent().ok_or("Choose a backup destination folder.")?;
@@ -255,9 +292,15 @@ pub fn create(root: &Path, destination: &Path, version: &str) -> Result<BackupMa
     inventory(&root, &root, &mut source_files, &mut directories)?;
     let total_bytes = source_files.iter().try_fold(0_u64, |sum, (_, len)| sum.checked_add(*len))
         .filter(|total| *total <= MAX_TOTAL).ok_or("Desktop data exceeds the 100 GiB backup limit.")?;
-    let destination_file = new_file(&destination, true)?;
+    let destination_file = backup_destination(&destination, password.is_some(), |path| make_private(path, false))?;
     let result = (|| {
-        let mut writer = zip::ZipWriter::new(destination_file);
+        let output = match password {
+            Some(password) => encryption::ArchiveOutput::Encrypted(Box::new(encryption::writer(destination_file, password)?)),
+            None => encryption::ArchiveOutput::Plain(destination_file),
+        };
+        // ZIP data descriptors allow a streaming writer. Plaintext ZIP bytes go directly into
+        // age's authenticated stream and never into a temporary file or a whole-archive buffer.
+        let mut writer = zip::ZipWriter::new_stream(output);
         let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated)
             .unix_permissions(0o600).large_file(true);
         for directory in &directories {
@@ -282,11 +325,10 @@ pub fn create(root: &Path, destination: &Path, version: &str) -> Result<BackupMa
         if bytes.len() as u64 > MAX_MANIFEST { return Err("The backup file list is too large.".into()); }
         writer.start_file(MANIFEST, options).map_err(|e| io_error("Cannot write backup manifest", e))?;
         writer.write_all(&bytes).map_err(|e| io_error("Cannot write backup manifest", e))?;
-        let file = writer.finish().map_err(|e| io_error("Cannot finish backup", e))?;
-        file.sync_all().map_err(|e| io_error("Cannot save backup to disk", e))?;
-        drop(file);
+        let output = writer.finish().map_err(|e| io_error("Cannot finish backup", e))?.into_inner();
+        output.finish().map_err(|e| io_error("Cannot save backup to disk", e))?;
         // A completed backup has been read back and its file checksums verified.
-        inspect(&destination)?;
+        inspect_with_password(&destination, password)?;
         Ok(manifest)
     })();
     if result.is_err() { let _ = fs::remove_file(&destination); }
@@ -336,8 +378,9 @@ fn validate_manifest(manifest: &BackupManifest) -> Result<HashMap<String, bool>,
 /// Bound ZIP metadata before the ZIP library allocates its central-directory index. Payload
 /// limits alone do not stop an archive that advertises millions of empty files. The count also
 /// detects duplicate names that an archive library's map could otherwise silently collapse.
-fn directory_entry_count(file: &mut File) -> Result<usize, String> {
-    let length = file.metadata().map_err(|e| e.to_string())?.len();
+fn directory_entry_count(file: &mut (impl Read + Seek)) -> Result<usize, String> {
+    let length = file.seek(SeekFrom::End(0)).map_err(|e| e.to_string())?;
+    if length > MAX_ARCHIVE { return Err("BACKUP_TOO_LARGE".into()); }
     let tail_len = length.min(65_557) as usize;
     file.seek(SeekFrom::End(-(tail_len as i64))).map_err(|e| e.to_string())?;
     let mut tail = vec![0; tail_len];
@@ -382,10 +425,10 @@ fn directory_entry_count(file: &mut File) -> Result<usize, String> {
     Ok(count as usize)
 }
 
-fn open_archive(path: &Path) -> Result<(zip::ZipArchive<File>, BackupManifest), String> {
+fn open_archive(path: &Path, password: Option<&SecretString>) -> Result<(zip::ZipArchive<encryption::ArchiveReader>, BackupManifest), String> {
     let metadata = regular_metadata(path)?;
     if !metadata.is_file() || metadata.len() > MAX_ARCHIVE { return Err("The backup archive exceeds the supported size.".into()); }
-    let mut file = File::open(path).map_err(|e| io_error("Cannot open backup", e))?;
+    let mut file = encryption::reader(path, password)?;
     let entry_count = directory_entry_count(&mut file)?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| io_error("Cannot read backup archive", e))?;
     if archive.len() != entry_count { return Err("The backup contains duplicate or inconsistent entries.".into()); }
@@ -422,7 +465,7 @@ fn open_archive(path: &Path) -> Result<(zip::ZipArchive<File>, BackupManifest), 
     Ok((archive, manifest))
 }
 
-fn read_payload(archive: &mut zip::ZipArchive<File>, manifest: &BackupManifest, destination: Option<&Path>) -> Result<(), String> {
+fn read_payload(archive: &mut zip::ZipArchive<encryption::ArchiveReader>, manifest: &BackupManifest, destination: Option<&Path>) -> Result<(), String> {
     if let Some(root) = destination {
         let mut directories = manifest.directories.clone();
         directories.sort();
@@ -444,11 +487,14 @@ fn read_payload(archive: &mut zip::ZipArchive<File>, manifest: &BackupManifest, 
     Ok(())
 }
 
-pub fn inspect(archive: &Path) -> Result<BackupManifest, String> {
-    let (mut archive, manifest) = open_archive(archive)?;
+pub fn inspect_with_password(archive: &Path, password: Option<&SecretString>) -> Result<BackupManifest, String> {
+    let (mut archive, manifest) = open_archive(archive, password)?;
     read_payload(&mut archive, &manifest, None)?;
     Ok(manifest)
 }
+
+#[cfg(test)]
+pub fn inspect(archive: &Path) -> Result<BackupManifest, String> { inspect_with_password(archive, None) }
 
 /// Removes only a private staging folder created by this operation; never follows a link.
 struct Stage(PathBuf);
@@ -462,13 +508,13 @@ impl Drop for Stage {
     }
 }
 
-pub fn restore_verified(root: &Path, archive: &Path, expected_digest: &str) -> Result<(BackupManifest, PathBuf), String> {
+pub fn restore_encrypted(root: &Path, archive: &Path, expected_digest: &str, password: Option<&SecretString>) -> Result<(BackupManifest, PathBuf), String> {
     let root = managed_root(root)?;
     // A restore must work when the old database is damaged or missing. The managed root's
     // Desktop configuration identifies the target; only the replacement needs a valid DB.
     configured_database(&root)?;
     // Check the archive structure before creating any staging files.
-    open_archive(archive)?;
+    open_archive(archive, password)?;
     let parent = root.parent().ok_or("The Desktop data folder has no parent.")?;
     let id = random_id()?;
     let stage_path = parent.join(format!(".aimeat-restore-{id}"));
@@ -483,10 +529,11 @@ pub fn restore_verified(root: &Path, archive: &Path, expected_digest: &str) -> R
     drop(snapshot_file);
     let restored = stage.0.join("data");
     new_directory(&restored, true)?;
-    let (mut reader, manifest) = open_archive(&snapshot)?;
+    let (mut reader, manifest) = open_archive(&snapshot, password)?;
     read_payload(&mut reader, &manifest, Some(&restored))?;
     drop(reader);
     local_database(&restored)?;
+    preserve_machine_preferences(&root, &restored)?;
     let recovery = parent.join(format!("{}-recovery-{}-{id}", root.file_name().unwrap().to_string_lossy(), chrono::Utc::now().format("%Y%m%d-%H%M%S")));
     if recovery.exists() { return Err("The recovery folder already exists. Try restoring again.".into()); }
     fs::rename(&root, &recovery).map_err(|e| io_error("Cannot preserve current Desktop data. Close apps using its files and try again", e))?;
@@ -500,6 +547,38 @@ pub fn restore_verified(root: &Path, archive: &Path, expected_digest: &str) -> R
         return Err(io_error("Restore could not switch data; the original Desktop folder has been restored", error));
     }
     Ok((manifest, recovery))
+}
+
+/// A portable node backup must not enable autostart or replace this computer's tray policy.
+/// New archives exclude the file; legacy archives may contain it, so preserve the target here.
+fn preserve_machine_preferences(current: &Path, restored: &Path) -> Result<(), String> {
+    let destination = restored.join(MACHINE_PREFERENCES);
+    match fs::symlink_metadata(&destination) {
+        Ok(_) => {
+            if !regular_metadata(&destination)?.is_file() { return Err("Invalid machine preferences in backup.".into()); }
+            fs::remove_file(&destination).map_err(|e| io_error("Cannot preserve machine preferences", e))?;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(io_error("Cannot inspect restored preferences", error)),
+    }
+    let source = current.join(MACHINE_PREFERENCES);
+    match fs::symlink_metadata(&source) {
+        Ok(_) => {
+            let metadata = regular_metadata(&source)?;
+            if !metadata.is_file() || metadata.len() > 16 * 1024 { return Err("Machine preferences are invalid or too large.".into()); }
+            let mut target = new_file(&destination, false)?;
+            stream_hash(File::open(source).map_err(|e| e.to_string())?, &mut target, 16 * 1024)?;
+            target.sync_all().map_err(|e| e.to_string())?;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+        Err(error) => return Err(io_error("Cannot read machine preferences", error)),
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+pub fn restore_verified(root: &Path, archive: &Path, expected_digest: &str) -> Result<(BackupManifest, PathBuf), String> {
+    restore_encrypted(root, archive, expected_digest, None)
 }
 
 #[cfg(test)]

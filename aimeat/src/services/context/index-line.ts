@@ -23,6 +23,8 @@
  * @usage
  *   const line = await contextIndexLine(storage, config, ownerName);
  * @version-history
+ *   v1.4.0 — 2026-11-09 — Each line names the context's tags after its key (at most six, each cut
+ *     short), so the AI can group and find the person's contexts without a call.
  *   v1.3.0 — 2026-11-08 — Opt-in: with no context yet, the line tells the AI to start one only when
  *     the person asks for it, and never to offer one on its own (the developer's call for a careful
  *     roll-out).
@@ -85,6 +87,17 @@ function oneLine(s: string, max: number): string {
     return flat.length > max ? flat.slice(0, max - 1) + '…' : flat;
 }
 
+/** At most this many tags are named per context, each cut short: they are the person's data too. */
+const TAGS_MAX = 6;
+const TAG_MAX = 30;
+
+/** "; tags: a, b" after the key, so the AI can group the person's contexts without a call. */
+function tagsOf(tags: unknown[]): string {
+    const words = tags.filter((t): t is string => typeof t === 'string' && t.trim() !== '')
+        .slice(0, TAGS_MAX).map(t => oneLine(t, TAG_MAX));
+    return words.length ? `; tags: ${words.join(', ')}` : '';
+}
+
 /**
  * The lines for one person, or null when their store cannot be read. `agentSession`: the reader is
  * one of the person's agents, which reads a context only when its visibility lets every agent of
@@ -100,7 +113,7 @@ export async function contextIndexLine(storage: Storage, config: AimeatConfig, o
         const rows = reader ? await presentMemories(reader, listed) : listed;
         const contexts = rows
             .filter(r => !agentSession || r.visibility !== 'private')
-            .map(r => ({ key: r.key, value: (r.value ?? {}) as ContextValue }))
+            .map(r => ({ key: r.key, value: (r.value ?? {}) as ContextValue, tags: Array.isArray(r.tags) ? r.tags : [] }))
             .filter(r => r.value && typeof r.value === 'object' && r.value.type === CONTEXT_TYPE)
             // Archived by the person (skill aimeat-context, Ageing): readable by key, not listed.
             .filter(r => !r.value.lifecycle?.archivedAt)
@@ -109,7 +122,7 @@ export async function contextIndexLine(storage: Storage, config: AimeatConfig, o
         const lines = contexts.slice(0, CONTEXT_INDEX_MAX).map((c) => {
             const name = typeof c.value.name === 'string' && c.value.name.trim() ? oneLine(c.value.name, 60) : c.key.slice(CONTEXT_PREFIX.length);
             const summary = typeof c.value.summary === 'string' ? oneLine(c.value.summary, SUMMARY_MAX) : '';
-            return `- ${name} (${c.key})${summary ? ': ' + summary : ''}${marksOf(c.value, now)}`;
+            return `- ${name} (${c.key}${tagsOf(c.tags)})${summary ? ': ' + summary : ''}${marksOf(c.value, now)}`;
         });
         const more = contexts.length > CONTEXT_INDEX_MAX ? `\n…and ${contexts.length - CONTEXT_INDEX_MAX} more: aimeat_memory_list with prefix context. and owner_scope true.` : '';
         return `${HEAD}\n${lines.join('\n')}${more}`;

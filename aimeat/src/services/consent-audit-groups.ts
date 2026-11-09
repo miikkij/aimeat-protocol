@@ -10,9 +10,14 @@
  *   A group is one accessor × one target family × one outcome, where the family of an organism key
  *   is the organism plus the tail after the workspace id (so the manifests of three workspaces are
  *   one group with three keys), and any other key is its own family. Pure functions, no I/O.
- * @structure targetOf(key) · groupConsentAudit(entries) · organismIdsIn(consents, entries)
+ *   The page reads the trail by day (today, yesterday, earlier) and opens one day's groups on demand,
+ *   so the buckets carry the counts per accessor and the groups stay on the server until asked.
+ * @structure targetOf(key) · groupConsentAudit(entries) · auditWithin(entries, from, to) ·
+ *   bucketConsentAudit(entries, todayFrom, yesterdayFrom) · organismIdsIn(consents, entries)
  * @usage const groups = groupConsentAudit(entries);
  * @version-history
+ *   v1.1.0 — 2026-11-09 — The day buckets (bucketConsentAudit) and the time window (auditWithin), for
+ *     the Data Wallet trail read by day.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Tietolompakko-sivu", direction A).
  */
 
@@ -97,6 +102,69 @@ export function groupConsentAudit(entries: AuditRowLike[]): AuditGroup[] {
       return { ...g, keys: keys.slice(0, KEYS_PER_GROUP), key_count: keys.length };
     })
     .sort((a, b) => b.count - a.count || (a.last < b.last ? 1 : a.last > b.last ? -1 : 0));
+}
+
+/** One day bucket of the trail: today, yesterday or earlier, in the reader's own day boundaries. */
+export interface AuditBucket {
+  id: 'today' | 'yesterday' | 'earlier';
+  /** The bucket's bounds, ISO; `from` null on earlier (the window's start), `to` null on today. */
+  from: string | null;
+  to: string | null;
+  count: number;
+  denied: number;
+  first: string | null;
+  last: string | null;
+  /** The distinct UTC dates the bucket's rows fall on. */
+  day_count: number;
+  group_count: number;
+  /** The accessors with the most rows, at most WHO_PER_BUCKET; `accessor_total` says how many there are. */
+  who: Array<{ accessor_gaii: string; count: number; denied: number }>;
+  accessor_total: number;
+}
+
+const WHO_PER_BUCKET = 5;
+/** Grants and revocations are read off the permissions' own timestamps on the page, never off the trail. */
+const isMutation = (action: string) => action === 'grant' || action === 'revoke';
+
+/** The rows whose timestamp lies in [from, to); either bound may be empty. */
+export function auditWithin<T extends AuditRowLike>(entries: T[], from?: string | null, to?: string | null): T[] {
+  if (!from && !to) return entries;
+  return entries.filter(e => (!from || e.timestamp >= from) && (!to || e.timestamp < to));
+}
+
+/**
+ * The trail in three day buckets, split at the reader's own midnights (`todayFrom`, `yesterdayFrom`,
+ * ISO), with the rows and the refusals per accessor. Grant and revoke rows are left out, as on the page.
+ */
+export function bucketConsentAudit(entries: AuditRowLike[], todayFrom: string, yesterdayFrom: string): AuditBucket[] {
+  const shapes: Array<{ id: AuditBucket['id']; from: string | null; to: string | null }> = [
+    { id: 'today', from: todayFrom, to: null },
+    { id: 'yesterday', from: yesterdayFrom, to: todayFrom },
+    { id: 'earlier', from: null, to: yesterdayFrom },
+  ];
+  return shapes.map(({ id, from, to }) => {
+    const rows = auditWithin(entries, from, to).filter(e => !isMutation(e.action));
+    const by = new Map<string, { accessor_gaii: string; count: number; denied: number }>();
+    const days = new Set<string>();
+    let denied = 0;
+    let first: string | null = null;
+    let last: string | null = null;
+    for (const e of rows) {
+      const w = by.get(e.accessorGaii) ?? { accessor_gaii: e.accessorGaii, count: 0, denied: 0 };
+      w.count += 1;
+      if (!e.allowed) { w.denied += 1; denied += 1; }
+      by.set(e.accessorGaii, w);
+      days.add(e.timestamp.slice(0, 10));
+      if (!first || e.timestamp < first) first = e.timestamp;
+      if (!last || e.timestamp > last) last = e.timestamp;
+    }
+    const who = [...by.values()].sort((a, b) => b.count - a.count || a.accessor_gaii.localeCompare(b.accessor_gaii));
+    return {
+      id, from, to, count: rows.length, denied, first, last, day_count: days.size,
+      group_count: groupConsentAudit(rows).length,
+      who: who.slice(0, WHO_PER_BUCKET), accessor_total: who.length,
+    };
+  });
 }
 
 /** Every organism id a consent pattern, a consent recipient or an audit key points at. */

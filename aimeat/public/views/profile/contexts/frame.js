@@ -14,10 +14,13 @@
  *   shaping, large when the core passes CONTEXT_CORE_LARGE characters, archived when
  *   lifecycle.archivedAt is set.
  * @structure x · xn · CONTEXT_PREFIX · CONTEXT_TYPE · CONTEXT_STALE_DAYS · CONTEXT_CORE_LARGE · api (list,
- *   write, remove, restore) · slugOf · contextOf · marksOf · readersWords · OWN_READERS ·
- *   chatSentence · crumb
+ *   write, remove, restore, fingerprint) · slugOf · contextOf · tagCounts · marksOf · readersWords ·
+ *   OWN_READERS · chatSentence · crumb
  * @usage import { x, api, contextOf, marksOf } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-11-09 — A context carries the record's tags; tagCounts lists every tag with how many
+ *     contexts carry it, for the page's tag list. PUT /v1/memory/:key keeps the tags the page does not
+ *     send, so archive and the readers' choice leave them as they are.
  *   v1.0.0 — 2026-11-08 — Initial (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  */
 import { t, tn } from '/js/i18n.js';
@@ -90,7 +93,17 @@ export function contextOf(item) {
     shapedAt: text(lifecycle.shapedAt) || item.updated_at || '',
     readAt: text(lifecycle.readAt),
     archivedAt: text(lifecycle.archivedAt),
+    // The record's own tags (not a field of the value), set by the person's AI (skill aimeat-context, Tags).
+    tags: list(item.tags).filter((s) => typeof s === 'string' && s.trim()),
   };
+}
+
+/** Every tag the contexts carry, with how many carry it: the most used first, then by name. */
+export function tagCounts(contexts) {
+  const n = new Map();
+  for (const c of contexts || []) for (const tag of c.tags) n.set(tag, (n.get(tag) || 0) + 1);
+  return [...n].map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }
 
 /** The marks of one context: archived, months without shaping (past CONTEXT_STALE_DAYS), large. */

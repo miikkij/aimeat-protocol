@@ -16,6 +16,11 @@
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.5.0 — 2026-11-09 — Grouped by who (look round of the performance work, Jouni's choice "Group by
+ *     who"): 01 opens on the people, with how many places each reaches, and agents that reach one
+ *     place each fold into one row; 03 reads the trail as today, yesterday and earlier with the totals
+ *     per accessor from the server, and a day's groups are read when it opens. The mount sends no
+ *     groups (group_limit=0), and the refusal totals come from the server.
  *   v2.4.0 — 2026-11-08 — A grant is always POST /v1/consent with the purpose sentence and an explicit
  *     role (read, or write for a person on a workspace, canWriteFor in data-wallet/frame.js). Read and
  *     write was kept only for a person on a workspace with no end date on this server, and that path
@@ -57,6 +62,16 @@ const ENTRY_LIMIT = 20;
 const ROWS_PAGE = 50;
 const FIRST_TRAIL = 12;
 const EMPTY_FORM = { open: false, whoKind: 'contact', who: '', what: 'ws', orgId: '', wsId: '', key: '', may: 'read', why: '', scope: 'private', untilKind: 'never', until: '' };
+const BUCKET_PAGE = 20;
+const FOLD_AT = 3;
+/** The reader's own midnights, ISO: the start of today and of yesterday. */
+function dayBounds() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  return { todayFrom: today.toISOString(), yesterdayFrom: yesterday.toISOString() };
+}
 const flashFor = (setter) => (text, error = false) => { setter({ text, error }); setTimeout(() => setter(null), 7000); };
 const errText = (e, fallback) => e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error');
 
@@ -67,12 +82,14 @@ export default function DataWalletTab({ session, showToast }) {
   const [days, setDaysState] = useState(30);
   const [reloading, setReloading] = useState(false);
   const [nodeId, setNodeId] = useState('');
-  const [filter, setFilterState] = useState('all');
+  const [filter, setFilterState] = useState('people');
   const [trailFilter, setTrailFilter] = useState('all');
   const [personFocus, setPersonFocus] = useState('');
   const [openTarget, setOpenTarget] = useState(null);
   const [openGroup, setOpenGroup] = useState(null);
   const [groupRows, setGroupRows] = useState({});
+  const [openBucket, setOpenBucket] = useState(null);
+  const [bucketGroups, setBucketGroups] = useState({});
   const [shownTrail, setShownTrail] = useState(FIRST_TRAIL);
   const [form, setFormState] = useState(EMPTY_FORM);
   const [orgs, setOrgs] = useState([]);
@@ -92,11 +109,15 @@ export default function DataWalletTab({ session, showToast }) {
   const load = useCallback(async (d = days) => {
     if (federated) return;
     setReloading(true);
-    const o = await consentService.getDataWalletOverview(d, ENTRY_LIMIT);
+    // The trail comes as three day buckets in the reader's own days; a bucket's groups are read when
+    // it opens (bucketGroups), so the mount sends none of them.
+    const o = await consentService.getDataWalletOverview(d, ENTRY_LIMIT, { groupLimit: 0, ...dayBounds() });
     setReloading(false);
     if (!o) { setFailed(true); return; }
     setFailed(false);
     setOv(o);
+    setBucketGroups({});
+    setGroupRows({});
   }, [federated, days]);
 
   useEffect(() => { load(); }, [load]);
@@ -150,22 +171,34 @@ export default function DataWalletTab({ session, showToast }) {
       const tw = p.grants.map((c) => targetWords(c.data_pattern, names));
       const seen = [];
       for (const w of tw) { const s = `${w.title} · ${w.sub}`; if (!seen.includes(s)) seen.push(s); }
-      return { ...p, words: seen.slice(0, 3).join('; ') + (seen.length > 3 ? ` +${seen.length - 3}` : '') };
-    }).sort((a, b) => b.grants.length - a.grants.length);
+      const roles = [...new Set(p.grants.map(roleOf))];
+      return { ...p, places: seen.length, roles, words: seen.slice(0, 3).join('; ') + (seen.length > 3 ? ` +${seen.length - 3}` : '') };
+    }).sort((a, b) => b.places - a.places || b.grants.length - a.grants.length);
   }, [active, names]);
+  /** Agents that reach one place each fold into one row when there are FOLD_AT or more of them. */
+  const folded = useMemo(() => {
+    const ones = people.filter((p) => p.kind === 'agent' && p.places === 1);
+    return ones.length >= FOLD_AT ? ones : [];
+  }, [people]);
   const kinds = useMemo(() => { const k = {}; for (const c of active) { const w = whoOf(c.recipient, names).kind; k[w] = (k[w] || 0) + 1; } return k; }, [active, names]);
-  const groups = useMemo(() => ov?.audit?.groups || [], [ov]);
-  const deniedGroupsList = useMemo(() => groups.filter((g) => !g.allowed), [groups]);
-  const deniedCount = useMemo(() => deniedGroupsList.reduce((s, g) => s + g.count, 0), [deniedGroupsList]);
-  const manifestDenied = useMemo(() => deniedGroupsList.filter((g) => g.target?.rest === 'meta.manifest').reduce((s, g) => s + g.count, 0), [deniedGroupsList]);
+  // The refusal totals are the server's: the mount no longer carries every group to sum.
+  const deniedCount = ov?.audit?.denied_total || 0;
+  const deniedGroups = ov?.audit?.denied_groups || 0;
+  const manifestDenied = ov?.audit?.manifest_denied || 0;
   const events = useMemo(() => consentEvents(consents, days, names), [consents, days, names]);
-  /** Groups and events in one list, newest first by their last moment; the mutation rows the server keeps (grant/revoke) are dropped, the events say the same from the permissions. */
+  /**
+   * The trail by day: today, yesterday, earlier, each with the events that fall in it (the grants and
+   * revocations read off the permissions). A bucket with no row and no event is left out. Under the
+   * events filter it is the events alone, newest first, as before.
+   */
   const trail = useMemo(() => {
-    const items = groups.filter((g) => g.action !== 'grant' && g.action !== 'revoke').map((g) => ({ kind: 'group', at: g.last, group: g }));
     const evs = events.map((e) => ({ kind: 'event', at: e.at, event: e }));
-    const all = trailFilter === 'events' ? evs : [...items, ...evs];
-    return all.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
-  }, [groups, events, trailFilter]);
+    if (trailFilter === 'events') return evs;
+    const inside = (b, at) => (!b.from || at >= b.from) && (!b.to || at < b.to);
+    return (ov?.audit?.buckets || [])
+      .map((b) => ({ kind: 'bucket', bucket: b, events: events.filter((e) => inside(b, new Date(e.at).toISOString())) }))
+      .filter((it) => it.bucket.count || it.events.length);
+  }, [ov, events, trailFilter]);
   const swapped = useMemo(() => {
     // A revoke followed within a minute by a grant to the same recipient on the same target is a role swap.
     let k = 0;
@@ -182,7 +215,21 @@ export default function DataWalletTab({ session, showToast }) {
 
   /* ── Handlers ──────────────────────────────────────────────────────────────────────────────── */
 
-  const setDays = (d) => { setDaysState(d); setOpenGroup(null); setGroupRows({}); setShownTrail(FIRST_TRAIL); };
+  const setDays = (d) => { setDaysState(d); setOpenGroup(null); setOpenBucket(null); setGroupRows({}); setBucketGroups({}); setShownTrail(FIRST_TRAIL); };
+  /** The groups of one day bucket, a page at a time, read when the bucket opens. */
+  const loadBucketGroups = async (b, more) => {
+    const cur = bucketGroups[b.id] || { groups: [], total: 0 };
+    setBucketGroups((s) => ({ ...s, [b.id]: { ...cur, loading: true } }));
+    try {
+      const r = await consentService.listAuditGroups({ days, from: b.from, to: b.to, limit: BUCKET_PAGE, offset: more ? cur.groups.length : 0 });
+      setBucketGroups((s) => ({ ...s, [b.id]: { groups: more ? [...cur.groups, ...r.groups] : r.groups, total: r.total, loading: false } }));
+    } catch (e) { swallowed('data-wallet: bucket groups', e); setBucketGroups((s) => ({ ...s, [b.id]: { ...cur, loading: false, failed: true } })); }
+  };
+  const toggleBucket = (b) => {
+    const opening = openBucket !== b.id;
+    setOpenBucket(opening ? b.id : null);
+    if (opening && !bucketGroups[b.id]) loadBucketGroups(b, false);
+  };
   const setFilter = (f) => { setFilterState(f); setOpenTarget(null); if (f !== 'people') setPersonFocus(''); };
   const toggleTarget = (id) => setOpenTarget((cur) => (cur === id ? null : id));
   const toggleGroup = (id) => setOpenGroup((cur) => (cur === id ? null : id));
@@ -190,13 +237,13 @@ export default function DataWalletTab({ session, showToast }) {
   const showPerson = (name) => { setFilterState('people'); setPersonFocus(name); const p = people.find((q) => q.name === name); setOpenTarget(p ? p.id : null); window.setTimeout(() => document.getElementById('dw-targets')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); };
 
   /** The rows of one group, a page at a time: the accessor and the key prefix the family shares. */
-  const loadGroupRows = async (g, id, more) => {
+  const loadGroupRows = async (g, id, more, bucket) => {
     const tg = g.target || {};
     const keyPrefix = tg.kind === 'key' ? tg.key : tg.kind === 'ws' ? `organism.${tg.organism_id}.w.` : `organism.${tg.organism_id}.${tg.rest || ''}`;
     const cur = groupRows[id] || { entries: [], total: 0, offset: 0 };
     setGroupRows((s) => ({ ...s, [id]: { ...cur, loading: true } }));
     try {
-      const r = await consentService.listAuditRows({ days, accessor: g.accessor_gaii, keyPrefix, limit: ROWS_PAGE, offset: more ? cur.offset : 0 });
+      const r = await consentService.listAuditRows({ days, accessor: g.accessor_gaii, keyPrefix, from: bucket?.from || '', to: bucket?.to || '', limit: ROWS_PAGE, offset: more ? cur.offset : 0 });
       const fits = (e) => tg.kind !== 'ws' || targetOf(e.memory_key).rest === tg.rest;
       const rows = r.entries.filter((e) => fits(e) && e.allowed === g.allowed && e.action === g.action);
       setGroupRows((s) => ({ ...s, [id]: { entries: more ? [...cur.entries, ...rows] : rows, total: tg.kind === 'ws' ? g.count : r.total, offset: (more ? cur.offset : 0) + r.entries.length, loading: false } }));
@@ -285,10 +332,10 @@ export default function DataWalletTab({ session, showToast }) {
   };
 
   const ctx = {
-    session, federated, ov, failed, names, consents, active, revokedList, targets, people, kinds, groups, events, trail, shownTrail,
-    days, reloading, deniedCount, deniedGroups: deniedGroupsList.length, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
-    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls, content, parties,
-    setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke, exportAll,
+    session, federated, ov, failed, names, consents, active, revokedList, targets, people, folded, kinds, events, trail, shownTrail,
+    days, reloading, deniedCount, deniedGroups, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
+    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, openBucket, bucketGroups, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls, content, parties,
+    setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, toggleBucket, loadBucketGroups, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke, exportAll,
     openOrganisms: () => openTab('organisms'),
     openAgents: () => openTab('agents'),
     groupId,
