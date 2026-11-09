@@ -16,9 +16,12 @@
  *   two server additions the Tietolompakko design canvas asked for: aimeat.io served 2 856 audit rows on
  *   a 30-day mount and 1.4 MB on 90 days, and the page had no name for any of its 13 organisms.
  *
- * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?) → { consents, audit, permSummary, names }
+ * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?, opts?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-09 — Additive: `group_limit` sends only the biggest groups (the page sends 0 and reads the
+ *     day buckets instead, 1.23 MB of 1.27 MB at a heavy account's size), `today_from` and
+ *     `yesterday_from` add the buckets, and the refusal totals the page summed come from here.
  *   2026-11-09 — The key and file totals are counted (countMemory with excludeExpired,
  *     sumStorageBytesForOwners) instead of listed and measured; the same numbers.
  *   2026-11-09 — The organism names come from one query (storage.organismNames), not one whole record
@@ -33,7 +36,7 @@ import { countConsentRecipients } from '../../storage/consent-recipient.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { getPendingConsentAudit } from '../consent-audit-buffer.js';
-import { groupConsentAudit, organismIdsIn, type AuditGroup } from '../consent-audit-groups.js';
+import { groupConsentAudit, bucketConsentAudit, organismIdsIn, type AuditGroup, type AuditBucket } from '../consent-audit-groups.js';
 import { CONSENT_QUOTA } from '../consent-write.js';
 
 export interface DataWalletOverview {
@@ -43,7 +46,15 @@ export interface DataWalletOverview {
     total: number;
     period_days: number;
     entry_limit: number;
+    /** Every group, biggest first; only the first `group_limit` when the caller asked for a limit. */
     groups: AuditGroup[];
+    group_total: number;
+    /** Refused rows in the window, the groups they fall in, and those that were a workspace manifest. */
+    denied_total: number;
+    denied_groups: number;
+    manifest_denied: number;
+    /** Today, yesterday and earlier, when the caller gave its own day boundaries. */
+    buckets?: AuditBucket[];
   };
   permSummary: {
     total_memory_keys: number;
@@ -59,6 +70,13 @@ export interface DataWalletOverview {
   };
 }
 
+/** What the page asks beyond the window: how many groups to send, and the reader's own midnights. */
+export interface OverviewOptions {
+  groupLimit?: number;
+  todayFrom?: string;
+  yesterdayFrom?: string;
+}
+
 const DEFAULT_ENTRY_LIMIT = 20;
 const wsRegistryKey = (orgId: string) => `organism.${orgId}.meta.workspaces`;
 
@@ -72,7 +90,7 @@ export class DataWalletService {
    * `entryLimit` verbatim (the rows of one group are read on demand through GET /v1/consent/audit with
    * `key_prefix`). The names cover every organism the consents or the audit keys point at.
    */
-  overview(ownerGaii: string, auditDays = 30, entryLimit = DEFAULT_ENTRY_LIMIT): Promise<DataWalletOverview> {
+  overview(ownerGaii: string, auditDays = 30, entryLimit = DEFAULT_ENTRY_LIMIT, opts: OverviewOptions = {}): Promise<DataWalletOverview> {
     return runInReadScope(async () => {
       // The two totals are counted, not listed: listing 17 782 keys and 1 275 files to take their
       // length cost about 75 ms on PostgreSQL at a heavy account's size (2026-11-09). The same rows:
@@ -91,6 +109,9 @@ export class DataWalletService {
       // Permission summary — derived from the active subset of the SAME consent list (no re-read).
       const active = consents.filter(c => c.status === 'active');
       const byType = countConsentRecipients(active);
+
+      const groups = groupConsentAudit(auditEntries);
+      const deniedGroups = groups.filter(g => !g.allowed);
 
       const names = await this.namesFor(organismIdsIn(
         consents.flatMap(c => [c.dataPattern, c.recipient]),
@@ -114,7 +135,12 @@ export class DataWalletService {
           total: auditEntries.length,
           period_days: auditDays,
           entry_limit: Math.max(0, entryLimit),
-          groups: groupConsentAudit(auditEntries),
+          groups: opts.groupLimit === undefined ? groups : groups.slice(0, opts.groupLimit),
+          group_total: groups.length,
+          denied_total: deniedGroups.reduce((s, g) => s + g.count, 0),
+          denied_groups: deniedGroups.length,
+          manifest_denied: deniedGroups.filter(g => g.target.rest === 'meta.manifest').reduce((s, g) => s + g.count, 0),
+          ...(opts.todayFrom && opts.yesterdayFrom ? { buckets: bucketConsentAudit(auditEntries, opts.todayFrom, opts.yesterdayFrom) } : {}),
         },
         permSummary: {
           total_memory_keys: memoryKeys,

@@ -7,10 +7,12 @@
  *   visitor probing one hidden key, and a grant row; the groups must say who × what × how many, list
  *   the distinct keys newest first, and never merge an allowed row with a denied one.
  * @version-history
+ *   v1.1.0 — 2026-11-09 — The day buckets: the split at the reader's midnights, the grant rows left
+ *     out, at most five accessors named, an empty bucket.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { groupConsentAudit, targetOf, organismIdsIn } from '../../src/services/consent-audit-groups.js';
+import { groupConsentAudit, targetOf, organismIdsIn, bucketConsentAudit, auditWithin } from '../../src/services/consent-audit-groups.js';
 
 const ORG = 'd0d999ef-712b-408b-91e9-e074cfac3bae';
 const row = (accessorGaii: string, memoryKey: string, timestamp: string, allowed = false, action = 'read') => ({ accessorGaii, memoryKey, timestamp, allowed, action });
@@ -56,6 +58,49 @@ describe('groupConsentAudit', () => {
 
   it('an empty trail is an empty list', () => {
     expect(groupConsentAudit([])).toEqual([]);
+  });
+});
+
+describe('bucketConsentAudit', () => {
+  const TODAY = '2026-11-08T22:00:00.000Z';
+  const YESTERDAY = '2026-11-07T22:00:00.000Z';
+  const trail = [
+    row('a@node', 'k.1', TODAY),
+    row('a@node', 'k.1', '2026-11-09T08:00:00.000Z', true),
+    row('b@node', 'k.2', '2026-11-08T21:59:59.999Z'),
+    row('b@node', 'k.2', YESTERDAY),
+    row('c@node', 'k.3', '2026-11-07T21:59:59.999Z'),
+    row('c@node', 'k.3', '2026-11-01T10:00:00.000Z'),
+    row('owner@node', 'k.4', '2026-11-09T09:00:00.000Z', true, 'grant'),
+  ];
+
+  it('splits at the given midnights: a row on a boundary belongs to the later day', () => {
+    const [today, yesterday, earlier] = bucketConsentAudit(trail, TODAY, YESTERDAY);
+    expect([today.id, yesterday.id, earlier.id]).toEqual(['today', 'yesterday', 'earlier']);
+    expect([today.count, yesterday.count, earlier.count]).toEqual([2, 2, 2]);
+    expect(today.who).toEqual([{ accessor_gaii: 'a@node', count: 2, denied: 1 }]);
+    expect(yesterday.who).toEqual([{ accessor_gaii: 'b@node', count: 2, denied: 2 }]);
+    expect(earlier.day_count).toBe(2);
+    expect([today.from, today.to, earlier.from, earlier.to]).toEqual([TODAY, null, null, YESTERDAY]);
+  });
+
+  it('leaves the grant and revoke rows out, as the page does', () => {
+    const [today] = bucketConsentAudit(trail, TODAY, YESTERDAY);
+    expect(today.who.some((w) => w.accessor_gaii === 'owner@node')).toBe(false);
+    expect(today.group_count).toBe(groupConsentAudit(auditWithin(trail, TODAY, null).filter((e) => e.action !== 'grant')).length);
+  });
+
+  it('names at most five accessors and counts all of them', () => {
+    const many = Array.from({ length: 8 }, (_, i) => row(`p${i}@node`, 'k', '2026-11-09T01:00:00.000Z'));
+    const [today] = bucketConsentAudit(many, TODAY, YESTERDAY);
+    expect(today.who).toHaveLength(5);
+    expect(today.accessor_total).toBe(8);
+    expect(today.denied).toBe(8);
+  });
+
+  it('an empty bucket has no first, no last and nobody', () => {
+    const [, , earlier] = bucketConsentAudit([row('a@node', 'k', '2026-11-09T01:00:00.000Z')], TODAY, YESTERDAY);
+    expect(earlier).toMatchObject({ count: 0, denied: 0, first: null, last: null, day_count: 0, group_count: 0, who: [], accessor_total: 0 });
   });
 });
 

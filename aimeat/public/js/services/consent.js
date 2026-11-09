@@ -12,6 +12,9 @@
  *   - exportGdpr: full owner data export
  *
  * @version-history
+ *   2026-11-09 — getDataWalletOverview passes group_limit and the reader's midnights and returns the
+ *     day buckets and the refusal totals; listAuditGroups reads one window's groups; listAuditRows
+ *     takes from and to.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
@@ -50,8 +53,8 @@ export async function listAuditEntries(days) {
 }
 
 /**
- * The rows of one group of the trail: the window, the accessor, the key prefix and a page.
- * @param {{ days?: number, accessor?: string, keyPrefix?: string, limit?: number, offset?: number }} [opts]
+ * The rows of one group of the trail: the window, the accessor, the key prefix, the day and a page.
+ * @param {{ days?: number, accessor?: string, keyPrefix?: string, from?: string, to?: string, limit?: number, offset?: number }} [opts]
  * @returns {Promise<{ entries: Array, total: number }>}
  */
 export async function listAuditRows(opts) {
@@ -62,8 +65,22 @@ export async function listAuditRows(opts) {
   if (o.keyPrefix) q.set('key_prefix', o.keyPrefix);
   if (o.limit) q.set('limit', String(o.limit));
   if (o.offset) q.set('offset', String(o.offset));
+  if (o.from) q.set('from', o.from);
+  if (o.to) q.set('to', o.to);
   const data = await apiGet('/v1/consent/audit?' + q.toString());
   return { entries: data?.data?.entries || [], total: data?.data?.total ?? 0 };
+}
+
+/** The trail's groups in one time window ({ days, from, to, limit, offset }), biggest first. */
+export async function listAuditGroups(opts) {
+  const o = opts || {};
+  const q = new URLSearchParams({ days: String(o.days || 30), grouped: 'true' });
+  if (o.from) q.set('from', o.from);
+  if (o.to) q.set('to', o.to);
+  if (o.limit) q.set('limit', String(o.limit));
+  if (o.offset) q.set('offset', String(o.offset));
+  const data = await apiGet('/v1/consent/audit?' + q.toString());
+  return { groups: data?.data?.groups || [], total: data?.data?.group_total ?? 0 };
 }
 
 /** Load permissions summary. */
@@ -76,18 +93,25 @@ export async function getPermissionSummary() {
  * Composite mount for the Data Wallet tab: consents + audit + permission summary in ONE call. Returns
  * { consents, audit, permSummary } or null on error so the caller can fall back to the individual reads.
  */
-export async function getDataWalletOverview(days, entryLimit) {
+export async function getDataWalletOverview(days, entryLimit, opts) {
   try {
+    const o = opts || {};
     const q = new URLSearchParams();
     if (days) q.set('days', String(days));
     if (entryLimit !== undefined) q.set('entry_limit', String(entryLimit));
+    if (o.groupLimit !== undefined) q.set('group_limit', String(o.groupLimit));
+    if (o.todayFrom && o.yesterdayFrom) { q.set('today_from', o.todayFrom); q.set('yesterday_from', o.yesterdayFrom); }
     const qs = q.toString();
     const data = await apiGet('/v1/data-wallet' + (qs ? '?' + qs : ''));
     const d = data?.data;
     if (!d) return null;
+    const a = d.audit || {};
     return {
       consents: { consents: d.consents?.consents || [], total: d.consents?.total ?? (d.consents?.consents || []).length },
-      audit: { entries: d.audit?.entries || [], total: d.audit?.total ?? 0, period_days: d.audit?.period_days ?? days ?? 30, entry_limit: d.audit?.entry_limit ?? 0, groups: d.audit?.groups || [] },
+      audit: {
+        entries: a.entries || [], total: a.total ?? 0, period_days: a.period_days ?? days ?? 30, entry_limit: a.entry_limit ?? 0, groups: a.groups || [],
+        group_total: a.group_total ?? (a.groups || []).length, denied_total: a.denied_total ?? 0, denied_groups: a.denied_groups ?? 0, manifest_denied: a.manifest_denied ?? 0, buckets: a.buckets || null,
+      },
       permSummary: d.permSummary || null,
       names: { organisms: d.names?.organisms || {}, workspaces: d.names?.workspaces || {} },
     };
