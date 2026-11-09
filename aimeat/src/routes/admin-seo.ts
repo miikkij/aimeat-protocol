@@ -27,6 +27,8 @@
  *                                       POST /v1/admin/apps/:owner/:filename/seo-approve
  * @usage registerAdminSeoRoutes(router, config, storage, canonicalOwner);
  * @version-history
+ *   v1.6.0 — 2026-11-09 — sitemap.page_count counts the pages this node lists (less the ones handed to
+ *     the main node), and sitemap.primary_node names that node (seo.primary_node_url, TARGET-094).
  *   v1.5.1 — 2026-11-07 — apps.without_description asks for the description itself again: since the
  *     150-word rule it also caught thin apps that have one.
  *   v1.5.0 — 2026-11-06 — apps.thin_text: the search-visible apps whose page carries fewer than 150
@@ -50,7 +52,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { sitemapPages } from '../data/public-pages.js';
+import { indexedPages, primaryNodeOf } from '../data/public-pages.js';
 import { appSeoIndexable, appSeoListable, appSeoState, appOwnDescription, appOwnWords, APP_OWN_WORDS_MIN, type AppSeoState } from '../services/app-seo.js';
 import { readIndexNowRuns } from '../services/indexnow-log.js';
 import { planAnnouncement, announceEverything, type AnnounceScope } from '../services/indexnow-site.js';
@@ -147,7 +149,9 @@ export async function buildSeoStatus(config: AimeatConfig, storage: Storage) {
     sitemap: {
       url: `${b}/sitemap.xml`,
       index_url: `${b}/sitemap-index.xml`,
-      page_count: sitemapPages().length,
+      page_count: indexedPages(config).length,
+      // The main node this node hands its general pages to, or null (seo.primary_node_url).
+      primary_node: primaryNodeOf(config),
       // How many app hosts the index will actually list. The same decision the index itself makes,
       // including the operator's seo.announce_apps switch and the description rule.
       app_host_count: config.seoAnnounceApps ? listable : 0,

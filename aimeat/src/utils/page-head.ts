@@ -26,6 +26,8 @@
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
  *   html = injectStaticPageHead(html, '/', findPublicPage('/'), config, nonceAttr);
  * @version-history
+ *   2026-11-09 - The canonical link, og:url and the WebPage url come from canonicalPageUrl: the main
+ *     node's address for a page this node repeats, the original's for a copied data package (TARGET-094).
  *   2026-11-01 - A page's own `jsonLd` (the public dataset page's schema.org Dataset) is written beside
  *     the WebPage block (WP9b).
  *   2026-10-27 - injectStaticPageHead: the static front pages (AIMEAT_FRONT_PAGE) are stamped like
@@ -58,7 +60,7 @@
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phases 07 + 08)
  */
 import type { AimeatConfig } from '../config.js';
-import type { PublicPage } from '../data/public-pages.js';
+import { canonicalPageUrl, type PublicPage } from '../data/public-pages.js';
 import { escapeHtml as esc } from './html-escape.js';
 
 /**
@@ -201,7 +203,9 @@ export function injectPageHead(
 ): string {
   if (!/<\/head\s*>/i.test(html)) return html;
   const b = config.baseUrl.replace(/\/$/, '');
-  const url = `${b}${page.path}`;
+  // The canonical address, which og:url and the WebPage block repeat: the main node's for a page this
+  // node repeats (seo.primary_node_url), the original's for a copy, this node's own otherwise.
+  const url = canonicalPageUrl(page, config);
   const mirror = page.path === '/' ? `${b}/index.md` : `${b}${page.path}.md`;
   const title = esc(page.title);
   const desc = esc(page.description);

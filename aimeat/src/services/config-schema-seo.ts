@@ -7,6 +7,7 @@
  *   Config tab lists them in the same order.
  * @structure SEO_CONFIG_FIELDS
  * @version-history
+ *   v1.3.0 — 2026-11-09 — seo.primary_node_url: the main node whose general pages this node repeats (TARGET-094).
  *   v1.2.0 — 2026-10-01 — seo.announce_apps: whether the sitemap index and IndexNow name the apps.
  *   v1.1.0 — 2026-09-29 — seo.indexing and apps.seo_mode take oneOf(): their values are the Config tab's pick.
  *   v1.0.0 — 2026-09-28 — Moved from config-schema.ts, unchanged.
@@ -37,5 +38,6 @@ export const SEO_CONFIG_FIELDS: ConfigFieldShape<keyof SitePresenceConfig>[] = [
   { key: 'seoVerificationExtra', dotPath: 'seo.verification_extra', envVar: 'AIMEAT_SEO_VERIFICATION_EXTRA', type: 'object', validate: v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v as Record<string, unknown>).every(c => typeof c === 'string'), immutable: false, description: 'Any other verification meta tag as {name: content} — Yandex, Pinterest, Facebook' },
   { key: 'seoIndexnowAuto', dotPath: 'seo.indexnow_auto', envVar: 'AIMEAT_SEO_INDEXNOW_AUTO', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Notify IndexNow when indexable content changes (no-op without an IndexNow key)' },
   { key: 'seoAnnounceApps', dotPath: 'seo.announce_apps', envVar: 'AIMEAT_SEO_ANNOUNCE_APPS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Point search engines at published apps: their sitemaps in the sitemap index, and IndexNow notices when one is published. Off leaves both out; the apps stay reachable' },
+  { key: 'seoPrimaryNodeUrl', dotPath: 'seo.primary_node_url', envVar: 'AIMEAT_SEO_PRIMARY_NODE_URL', type: 'string', validate: v => typeof v === 'string' && ((v as string).trim() === '' || /^https?:\/\/[^\s/?#]+\/?$/i.test((v as string).trim())), immutable: false, description: 'The address of the main node whose general pages this node repeats (how it works, docs, help, glossary, change log, privacy, terms). Set, those pages here name the main node\'s address as their canonical one and leave this node\'s sitemap and IndexNow notices; people still read them here. This node\'s front page, applications and members stay its own. Empty: every page is this node\'s own', range: 'https://host or empty' },
   { key: 'appsSeoMode', dotPath: 'apps.seo_mode', envVar: 'AIMEAT_APPS_SEO_MODE', type: 'string', ...oneOf('owner', 'review'), immutable: false, description: 'Who decides an app is search-visible: "owner" (their own switch is the decision) or "review" (they request, the operator approves). The operator\'s per-app block works in both', range: 'owner|review' },
 ];
