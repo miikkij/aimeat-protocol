@@ -534,12 +534,12 @@
       "note": "Its tools are gitignored and live on the developer's main machine only."
     },
     "project:aimeat-writing": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/i18n.ts",
         "aimeat/scripts/locale-merge.ts"
       ],
-      "digest": "sha256:9517650418fe567984e1bbc8"
+      "digest": "sha256:b58257ea38fb11f712d2967f"
     },
     "project:security-audit": {
       "reviewedOn": "2026-10-20",
@@ -715,7 +715,7 @@
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
-      "aimeat/src/i18n.ts": "38a4e28cf64af14c",
+      "aimeat/src/i18n.ts": "d2d70c782a9c5e45",
       "aimeat/scripts/locale-merge.ts": "e1c28235732aafa5"
     },
     "node:aimeat-recurring-work": {

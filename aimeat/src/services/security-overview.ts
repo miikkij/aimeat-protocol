@@ -332,7 +332,8 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
       totp: { enabled: config.totpEnabled, issuer: config.totpIssuer, backup_codes: config.totpBackupCodeCount, max_failed: config.totpMaxFailedAttempts, lockout_seconds: config.totpLockoutSeconds },
       passkeys_enabled: config.passkeyEnabled,
       cors_origins: (config.corsAllowedOrigins ?? []).length,
-      cors_wildcard: (config.corsAllowedOrigins ?? []).includes('*'),
+      // An origin list, not a scope: `*` here is the CORS default "every origin" (middleware/cors.ts).
+      cors_wildcard: (config.corsAllowedOrigins ?? []).some(origin => origin === '*'),
       federation_auth_policy: config.federationAuthPolicy,
       body_limit_mb: config.jsonBodyLimitMb,
       body_limit_large_mb: config.jsonBodyLimitLargeMb,
