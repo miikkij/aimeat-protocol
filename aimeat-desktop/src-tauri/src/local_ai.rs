@@ -18,7 +18,7 @@
 //
 // 2026-10-27: initial (secaudit2026oct26, local-profile-from-default-baseurl-on-network-reachable-listener).
 
-use crate::node_manager::{make_private, parse_env, resolve_env_file};
+use crate::node_manager::{make_private, parse_env, with_config_file};
 use tauri::AppHandle;
 
 /// The id of the node provider the desktop writes. Nothing else with this id is the desktop's.
@@ -221,7 +221,7 @@ pub fn remember_env(existing: &str, base_url: &str, model: &str) -> Result<Strin
 /// effect the next time the node starts.
 #[tauri::command]
 pub fn remember_local_ai(app: AppHandle, base_url: String, model: String) -> Result<bool, String> {
-    let env_file = resolve_env_file(&app)?;
+    with_config_file(&app, |env_file| {
     let existing = std::fs::read_to_string(&env_file).map_err(|e| format!("Failed to read config: {}", e))?;
     let updated = remember_env(&existing, &base_url, &model)?;
     let carried = parse_env(&updated)
@@ -231,6 +231,7 @@ pub fn remember_local_ai(app: AppHandle, base_url: String, model: String) -> Res
     std::fs::write(&env_file, updated).map_err(|e| format!("Failed to write config: {}", e))?;
     make_private(&env_file, 0o600)?;
     Ok(carried)
+    })
 }
 
 #[cfg(test)]

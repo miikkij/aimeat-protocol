@@ -1,6 +1,6 @@
 {
   "productName": "AIMEAT Personal Node",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "identifier": "com.overscale.aimeat-desktop",
   "build": {
     "frontendDist": "../src"
@@ -18,8 +18,8 @@
         "title": "AIMEAT Personal Node",
         "width": 1024,
         "height": 768,
-        "minWidth": 800,
-        "minHeight": 600
+        "minWidth": 390,
+        "minHeight": 460
       }
     ]
   },

@@ -1,0 +1,21 @@
+/* Front-door layout. house.css owns the existing type, colours and shapes. */
+.update { margin-bottom: 2rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+.environment { margin-top: 2.5rem; }
+.environment .field { margin-top: 1.2rem; }
+.tool { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+.tool .name { font-weight: var(--font-poster-strong-weight); font-size: 1.05rem; flex: 0 0 9.5rem; }
+.tool .state { flex: 1; min-width: 0; }
+.path { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); overflow-wrap: anywhere; margin-top: .35rem; }
+.why, .hint { color: var(--text-dim); font-size: .9rem; margin-top: .6rem; max-width: 65ch; }
+.snippet { border: 2px solid var(--text); background: var(--card-bg); padding: .8rem 1rem; margin-block: .8rem; font-family: var(--font-mono); font-size: .8rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.connection { margin-top: .8rem; }
+.connection .acts { margin-top: .5rem; }
+.connection-name { font-family: var(--font-mono); font-size: .85rem; overflow-wrap: anywhere; }
+.acts { gap: 1.2rem; }
+.notice-error { border-style: solid; }
+.poster-action { white-space: normal; text-align: left; }
+.environment .hint { margin-top: .8rem; }
+.tool .poster-chip { white-space: normal; }
+#notice:empty { display: none; }
+.technical { margin-top: .6rem; font-size: .85rem; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .tool .name { flex-basis: 100%; } .acts { gap: .8rem 1.2rem; } }

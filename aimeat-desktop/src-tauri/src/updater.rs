@@ -13,8 +13,41 @@
 // verifies the comment together with the download, because minisign signs the two together, so
 // the name read here is the name the key signed.
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_updater::UpdaterExt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{LazyLock, Mutex};
+
+#[derive(Clone, serde::Serialize)]
+pub struct UpdateStatus {
+    phase: String,
+    downloaded: u64,
+    total: Option<u64>,
+    version: Option<String>,
+    error: Option<String>,
+}
+static STATUS: LazyLock<Mutex<UpdateStatus>> = LazyLock::new(|| Mutex::new(UpdateStatus {
+    phase: "idle".into(), downloaded: 0, total: None, version: None, error: None,
+}));
+
+#[tauri::command]
+pub fn get_update_status() -> Result<UpdateStatus, String> {
+    STATUS.lock().map(|s| s.clone()).map_err(|e| e.to_string())
+}
+
+static INSTALLING: AtomicBool = AtomicBool::new(false);
+struct InstallGuard;
+impl Drop for InstallGuard {
+    fn drop(&mut self) { INSTALLING.store(false, Ordering::SeqCst); }
+}
+
+fn progress(app: &AppHandle, phase: &str, downloaded: u64, total: Option<u64>) {
+    if let Ok(mut status) = STATUS.lock() {
+        status.phase = phase.into(); status.downloaded = downloaded; status.total = total;
+        if phase != "failed" { status.error = None; }
+        let _ = app.emit("update-progress", status.clone());
+    }
+}
 
 /// Returns Some(version) if a newer release is available, else None.
 #[tauri::command]
@@ -30,17 +63,64 @@ pub async fn check_update(app: AppHandle) -> Result<Option<String>, String> {
 /// relaunches into the new version. Returns false if there was nothing to install.
 #[tauri::command]
 pub async fn install_update(app: AppHandle) -> Result<bool, String> {
+    if INSTALLING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+        return Err("An update is already being installed.".into());
+    }
+    let _guard = InstallGuard;
+    let result = install_available(&app).await;
+    if let Err(ref error) = result {
+        if let Ok(mut status) = STATUS.lock() { status.error = Some(error.clone()); }
+        progress(&app, "failed", 0, None);
+    }
+    result
+}
+
+async fn install_available(app: &AppHandle) -> Result<bool, String> {
+    progress(app, "checking", 0, None);
     let updater = app.updater().map_err(|e| e.to_string())?;
     if let Some(update) = updater.check().await.map_err(|e| e.to_string())? {
         offered_version(&update.version, &update.signature)?;
-        update
-            .download_and_install(|_chunk, _total| {}, || {})
+        if let Ok(mut status) = STATUS.lock() { status.version = Some(update.version.clone()); }
+        let mut downloaded = 0u64;
+        let mut last_progress = std::time::Instant::now() - std::time::Duration::from_secs(1);
+        let bytes = update
+            .download(|chunk, total| {
+                downloaded = downloaded.saturating_add(chunk as u64);
+                if last_progress.elapsed() >= std::time::Duration::from_millis(100) {
+                    progress(app, "downloading", downloaded, total);
+                    last_progress = std::time::Instant::now();
+                }
+            }, || progress(app, "verifying", 0, None))
             .await
             .map_err(|e| e.to_string())?;
+        // download verifies the signature before the user's node is interrupted.
+        progress(app, "stopping", 0, None);
+        let handle = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::node_manager::shutdown_node(&handle)?;
+            crate::node_manager::with_stopped_node(&handle, |_| {
+                progress(&handle, "installing", 0, None);
+                update.install(bytes).map_err(|e| e.to_string())
+            })
+        }).await.map_err(|e| e.to_string())??;
+        progress(app, "installed", 0, None);
         Ok(true)
     } else {
+        if let Ok(mut status) = STATUS.lock() { status.version = None; }
+        progress(app, "none", 0, None);
         Ok(false)
     }
+}
+
+/// macOS and Linux keep running the old executable after installation; the UI offers a restart.
+#[tauri::command]
+pub async fn restart_desktop(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::node_manager::shutdown_node(&app)?;
+        app.restart();
+        #[allow(unreachable_code)]
+        Ok::<(), String>(())
+    }).await.map_err(|e| e.to_string())?
 }
 
 /// The version to offer for an update the manifest announces, or why it is not offered: the

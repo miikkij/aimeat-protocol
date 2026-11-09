@@ -6,8 +6,7 @@
 // tauri.conf.json is intentionally absent so Tauri does not auto-create a second,
 // menu-less tray — this module builds the single tray (with icon + menu) here.
 //
-// refresh_tray() takes the running state explicitly so node_manager can call it
-// while holding the NODE_PROCESS lock without deadlocking (it must NOT re-lock).
+// The lifecycle monitor supplies a snapshot; drawing the tray never locks child state.
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -116,20 +115,23 @@ fn show_main_window(handle: &AppHandle) {
 /// Toggle the node process: start if stopped, stop if running.
 /// start_node / stop_node refresh the tray themselves, so no extra refresh here.
 fn toggle_node(handle: &AppHandle) {
-    if node_manager::is_node_running() {
-        if let Some(pid) = node_manager::get_node_pid() {
-            if let Err(e) = node_manager::stop_node(handle.clone(), pid) {
-                eprintln!("Failed to stop node: {}", e);
-            }
+    let handle = handle.clone();
+    std::thread::spawn(move || {
+        let result = if node_manager::is_node_running() {
+            node_manager::shutdown_node(&handle)
+        } else {
+            node_manager::start_node(handle.clone()).map(|_| ())
+        };
+        if let Err(message) = result {
+            use tauri::Emitter;
+            let _ = handle.emit("node-error", message);
+            show_main_window(&handle);
         }
-    } else if let Err(e) = node_manager::start_node(handle.clone()) {
-        eprintln!("Failed to start node: {}", e);
-    }
+    });
 }
 
 /// Rebuild the tray menu + tooltip for the given state.
-/// IMPORTANT: must not lock NODE_PROCESS — callers may hold that lock. The state
-/// is passed in explicitly for exactly this reason.
+/// The state is passed explicitly, so drawing never takes the child-state lock.
 pub fn refresh_tray(handle: &AppHandle, running: bool) {
     if let Ok(menu) = build_tray_menu(handle, running) {
         if let Some(tray) = handle.tray_by_id(TRAY_ID) {
@@ -139,10 +141,23 @@ pub fn refresh_tray(handle: &AppHandle, running: bool) {
     }
 }
 
+/// The monitor calls this even while the server page is closed, including after a crash.
+pub fn refresh_tray_state(handle: &AppHandle, status: &node_manager::NodeStatus) {
+    refresh_tray(handle, status.running);
+    let label = match status.state {
+        node_manager::Phase::Stopped => "Stopped",
+        node_manager::Phase::Starting => "Starting",
+        node_manager::Phase::Ready => "Ready",
+        node_manager::Phase::Stopping => "Stopping",
+        node_manager::Phase::Failed => "Failed: open the window for details",
+    };
+    if let Some(tray) = handle.tray_by_id(TRAY_ID) {
+        let _ = tray.set_tooltip(Some(format!("AIMEAT: {}", label)));
+    }
+}
+
 /// Cleanly quit the application. Stops the node if running, then exits.
 fn quit_app(handle: &AppHandle) {
-    if let Some(pid) = node_manager::get_node_pid() {
-        let _ = node_manager::stop_node(handle.clone(), pid);
-    }
+    // The application's exit handler owns the asynchronous drain for every way of quitting.
     handle.exit(0);
 }

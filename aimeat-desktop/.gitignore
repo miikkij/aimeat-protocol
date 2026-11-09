@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# These are authored webview sources, not TypeScript compiler output.
+!src/*.js
+
 # Tauri / Rust build output
 src-tauri/target/
 # Tauri-generated schemas/capabilities (regenerated at build)

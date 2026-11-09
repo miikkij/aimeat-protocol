@@ -1,822 +1,283 @@
-// AIMEAT Desktop — MCP connectors: which AIs on this machine are attached to the node.
-//
-// This is the app's front door. A person installs one program and their own AI is attached to
-// their node, without a terminal and without walking a settings menu. The web cannot do this:
-// only a program on the machine can see which tools are installed and edit their config files.
-//
-// NOTHING HERE HOLDS A SECRET. The node speaks OAuth 2.1 with dynamic client registration
-// (aimeat/src/mcp/oauth.ts), so a client needs the endpoint URL and nothing else: it registers
-// itself, opens a browser, and the person signs in as themselves. That is why connecting is a
-// four-line edit rather than a token dance, and why the same edit is safe for every client.
-//
-// THE SHAPES COME FROM THE NODE, NOT FROM GUESSWORK. aimeat/src/services/mcp-install.ts is the
-// one place that says what each client accepts: Claude Code and Cursor key on `mcpServers`,
-// VS Code on `servers`; VS Code needs `type`, Cursor rejects it. Those three are written here.
-// A client whose file shape this project has not verified is reported as `manual` with a snippet
-// to paste, because a file a client loads and silently ignores is the failure this path exists
-// to remove.
-//
-// EVERY WRITE KEEPS A COPY. Before the first change to a config file the original is copied to
-// `<file>.aimeat-backup`, and the new content is written to a temporary file in the same folder
-// and renamed over the original, so a crash mid-write cannot leave a half-file behind.
-
+// AIMEAT Desktop: detect and edit the local clients' own MCP settings. An added URL does not
+// prove authentication. No credentials are read from a client or sent during an address check.
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::fs;
-use std::path::{Path, PathBuf};
+use serde_json::Value;
+use std::net::IpAddr;
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::Duration;
 
-/// One AI tool on this machine, as the front screen shows it.
+#[path = "connector_config.rs"]
+mod config;
+#[cfg(test)]
+#[path = "connector_tests.rs"]
+mod tests;
+
+static CONFIG_WRITE: Mutex<()> = Mutex::new(());
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Connector {
-    /// Stable id used by the frontend and by connect/disconnect.
-    pub id: String,
-    /// What the tool calls itself.
+pub struct ConnectorEntry {
     pub name: String,
-    /// Whether this machine has the tool at all.
-    pub installed: bool,
-    /// Whether its config file names the node that was asked about. Not whether the person has
-    /// signed in: that lives in the tool, and the screen says "added", never "connected".
-    pub connected: bool,
-    /// The AIMEAT endpoint it is attached to, when that is a different node.
-    pub connected_url: Option<String>,
-    /// "file" — this app writes the tool's own config · "manual" — the person pastes the lines
-    /// into a file on this machine · "cloud" — the tool is attached in its own settings and
-    /// reaches the address from somewhere else, so there is nothing on this machine to read.
-    pub method: String,
-    /// The config file, whether or not it exists yet. None for a cloud tool.
-    pub config_path: Option<String>,
-    /// True when the address the person gave answers only on this machine. It is what decides
-    /// whether a cloud tool can reach their AIMEAT at all.
-    pub address_is_local: bool,
+    pub url: String,
+    pub matches_selected: bool,
 }
 
-/// What a client accepts, and where it keeps it.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Connector {
+    pub id: String,
+    pub name: String,
+    pub installed: bool,
+    pub connected: bool,
+    pub connected_url: Option<String>,
+    pub method: String,
+    pub config_path: Option<String>,
+    pub config_error: Option<String>,
+    pub address_is_local: bool,
+    pub entries: Vec<ConnectorEntry>,
+}
+
 struct ClientSpec {
     id: &'static str,
     name: &'static str,
-    /// The object the servers live under: `mcpServers` or `servers`.
     key: &'static str,
-    /// Whether the entry carries `"type": "http"`. VS Code requires it, Cursor rejects it.
     with_type: bool,
-    /// How this tool is attached: see Connector::method.
     method: &'static str,
-    /// Why this one is not written here. It reaches a person only through the refusal below, as
-    /// a safety net; the words the screen shows are the frontend's, in the person's language.
-    note: Option<&'static str>,
 }
 
 const SPECS: &[ClientSpec] = &[
-    ClientSpec {
-        id: "claude-code",
-        name: "Claude Code",
-        key: "mcpServers",
-        with_type: true,
-        method: "file",
-        note: None,
-    },
-    // Claude Desktop takes a remote MCP server as a CUSTOM CONNECTOR, added in its own settings,
-    // on every plan including the free one. There is no file here to write and no bridge to build:
-    // "When you add a custom connector, Claude connects to your remote MCP server from Anthropic's
-    // cloud infrastructure, rather than from your local device", and "Servers hosted on a private
-    // corporate network, behind a VPN, or blocked by a firewall won't connect, even if you can
-    // reach them from your own machine" (support.claude.com article 11175166, read 2026-09-18).
-    // So this row's real question is not which file to edit; it is whether the person's AIMEAT
-    // answers from the internet at all, which is what `address_is_local` tells the screen.
-    ClientSpec {
-        id: "claude-desktop",
-        name: "Claude Desktop",
-        key: "mcpServers",
-        with_type: true,
-        method: "cloud",
-        note: Some("Claude Desktop is attached in its own connector settings, and it reaches the address from Anthropic's cloud rather than from this machine."),
-    },
-    ClientSpec {
-        id: "cursor",
-        name: "Cursor",
-        key: "mcpServers",
-        with_type: false,
-        method: "file",
-        note: None,
-    },
-    ClientSpec {
-        id: "vscode",
-        name: "VS Code",
-        key: "servers",
-        with_type: true,
-        method: "file",
-        note: None,
-    },
-    ClientSpec {
-        id: "codex",
-        name: "Codex",
-        key: "mcp_servers",
-        with_type: false,
-        method: "manual",
-        note: Some("Codex keeps its servers in a TOML file, and a URL server also needs its client feature switched on. Paste the lines below into it; this app does not edit TOML yet."),
-    },
+    ClientSpec { id: "claude-code", name: "Claude Code", key: "mcpServers", with_type: true, method: "file" },
+    ClientSpec { id: "claude-desktop", name: "Claude Desktop", key: "mcpServers", with_type: true, method: "cloud" },
+    ClientSpec { id: "cursor", name: "Cursor", key: "mcpServers", with_type: false, method: "file" },
+    ClientSpec { id: "vscode", name: "VS Code", key: "servers", with_type: true, method: "file" },
+    ClientSpec { id: "codex", name: "Codex", key: "mcp_servers", with_type: false, method: "file" },
 ];
 
-fn spec(id: &str) -> Option<&'static ClientSpec> {
-    SPECS.iter().find(|s| s.id == id)
+fn spec(id: &str) -> Result<&'static ClientSpec, String> {
+    SPECS.iter().find(|s| s.id == id).ok_or_else(|| "TOOL_UNSUPPORTED".into())
 }
-
-// ── Where each client keeps its file ────────────────────────────────────────
 
 fn home_dir() -> Option<PathBuf> {
-    let key = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-    std::env::var_os(key).map(PathBuf::from)
+    env_dir(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
 }
 
-/// The per-user application-data folder, per platform.
+fn env_dir(key: &str) -> Option<PathBuf> {
+    std::env::var_os(key).filter(|value| !value.is_empty()).map(PathBuf::from)
+}
+
 fn app_data_dir() -> Option<PathBuf> {
-    if cfg!(windows) {
-        return std::env::var_os("APPDATA").map(PathBuf::from);
-    }
+    if cfg!(windows) { return env_dir("APPDATA"); }
     let home = home_dir()?;
-    if cfg!(target_os = "macos") {
-        Some(home.join("Library").join("Application Support"))
-    } else {
-        std::env::var_os("XDG_CONFIG_HOME")
-            .map(PathBuf::from)
-            .or_else(|| Some(home.join(".config")))
-    }
+    if cfg!(target_os = "macos") { Some(home.join("Library").join("Application Support")) }
+    else { env_dir("XDG_CONFIG_HOME").or_else(|| Some(home.join(".config"))) }
 }
 
-/// Claude Code keeps its user-scope servers in `~/.claude.json`, under the top-level `mcpServers`
-/// key, and reads that file at session start; the `claude mcp add` command writes the same place,
-/// and a hand-written entry needs no index anywhere else. CLAUDE_CONFIG_DIR moves the file, and a
-/// person who has set it would otherwise get an edit to a file nothing reads.
 fn claude_code_config_in(config_dir: Option<PathBuf>, home: Option<PathBuf>) -> Option<PathBuf> {
     config_dir.or(home).map(|d| d.join(".claude.json"))
 }
 
-fn claude_code_config() -> Option<PathBuf> {
-    claude_code_config_in(
-        std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from),
-        home_dir(),
-    )
-}
-
-/// The config file for a client, whether or not it exists yet.
 fn config_path(id: &str) -> Option<PathBuf> {
-    let home = home_dir();
-    let data = app_data_dir();
     match id {
-        "claude-code" => claude_code_config(),
-        "claude-desktop" => data.map(|d| d.join("Claude").join("claude_desktop_config.json")),
-        "cursor" => home.map(|h| h.join(".cursor").join("mcp.json")),
-        "vscode" => data.map(|d| d.join("Code").join("User").join("mcp.json")),
-        "codex" => home.map(|h| h.join(".codex").join("config.toml")),
+        "claude-code" => claude_code_config_in(env_dir("CLAUDE_CONFIG_DIR"), home_dir()),
+        "cursor" => home_dir().map(|h| h.join(".cursor").join("mcp.json")),
+        "vscode" => app_data_dir().map(|d| d.join("Code").join("User").join("mcp.json")),
+        "codex" => env_dir("CODEX_HOME").or_else(|| home_dir().map(|h| h.join(".codex"))).map(|h| h.join("config.toml")),
         _ => None,
     }
 }
 
-/// Whether the tool is on this machine at all. A tool that has never been configured has no
-/// config file, so the folder it makes on first run is what answers this, not the file.
 fn is_installed(id: &str) -> bool {
-    let home = home_dir();
-    let data = app_data_dir();
-    let marks: Vec<PathBuf> = match id {
-        "claude-code" => {
-            let mut marks = Vec::new();
-            if let Some(h) = home {
-                marks.push(h.join(".claude"));
-            }
-            if let Some(file) = claude_code_config() {
-                marks.push(file);
-            }
-            marks
-        }
-        "claude-desktop" => data.map(|d| vec![d.join("Claude")]).unwrap_or_default(),
-        "cursor" => home.map(|h| vec![h.join(".cursor")]).unwrap_or_default(),
-        "vscode" => data
-            .map(|d| vec![d.join("Code").join("User")])
-            .unwrap_or_default(),
-        "codex" => home.map(|h| vec![h.join(".codex")]).unwrap_or_default(),
-        _ => vec![],
+    let marker = match id {
+        "claude-desktop" => app_data_dir().map(|h| h.join("Claude")),
+        "claude-code" => home_dir().map(|h| h.join(".claude")),
+        _ => config_path(id).and_then(|p| p.parent().map(|d| d.to_path_buf())),
     };
-    marks.iter().any(|p| p.exists())
+    marker.is_some_and(|p| p.exists()) || config_path(id).is_some_and(|p| p.exists())
 }
 
-// ── The node's endpoint, and what counts as the same node ───────────────────
-
-/// The MCP endpoint of a node, from the base URL a person typed.
-pub fn mcp_url(node_url: &str) -> String {
-    format!("{}/v1/mcp", node_url.trim().trim_end_matches('/'))
+#[derive(Debug, Clone, Serialize)]
+pub struct ConnectorAddress {
+    pub base_url: String,
+    pub mcp_url: String,
 }
 
-/// Whether an address answers only on this machine or on a private network. A tool that reaches
-/// the address from somebody else's cloud cannot use one, however well it works in a browser here.
-/// A bare hostname with no dot counts: it resolves on a local network and nowhere else.
-pub fn is_local_address(node_url: &str) -> bool {
-    let rest = node_url
-        .trim()
-        .trim_start_matches("https://")
-        .trim_start_matches("http://");
-    let host = rest
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or("")
-        .rsplit('@')
-        .next()
-        .unwrap_or("")
-        .to_lowercase();
-    // Strip the port, but leave an IPv6 literal's colons alone.
-    let host = if host.starts_with('[') {
-        host.split(']').next().unwrap_or("").trim_start_matches('[').to_string()
-    } else {
-        host.split(':').next().unwrap_or("").to_string()
-    };
-    if host.is_empty() || host == "localhost" || host == "::1" || host.ends_with(".localhost") {
-        return true;
-    }
-    if host.ends_with(".local") || host.ends_with(".internal") || host.ends_with(".home") {
-        return true;
-    }
-    if !host.contains('.') {
-        return true;
-    }
-    let octets: Vec<&str> = host.split('.').collect();
-    if octets.len() == 4 && octets.iter().all(|o| o.parse::<u8>().is_ok()) {
-        let n: Vec<u8> = octets.iter().map(|o| o.parse::<u8>().unwrap()).collect();
-        return match (n[0], n[1]) {
-            (127, _) | (10, _) | (0, _) => true,
-            (192, 168) => true,
-            (169, 254) => true,
-            (172, b) if (16..=31).contains(&b) => true,
-            _ => false,
+fn local_host(host: &str) -> bool {
+    let host = host.trim_matches(['[', ']']).to_lowercase();
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return match ip {
+            IpAddr::V4(ip) => ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified(),
+            IpAddr::V6(ip) => ip.is_loopback() || ip.is_unique_local() || ip.is_unicast_link_local() || ip.is_unspecified(),
         };
     }
-    false
+    host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local")
+        || host.ends_with(".internal") || host.ends_with(".home") || !host.contains('.')
 }
 
-/// Whether a configured URL points at this node. Compared whole and case-insensitively, so
-/// `https://AIMEAT.io/v1/mcp/` and `https://aimeat.io/v1/mcp` are one node, and a different
-/// host or a different path is a different node.
+/// A person may paste either the base address or /v1/mcp. The scheme and host are normalized by
+/// the URL parser; a path remains case sensitive. Credentials, queries and fragments are refused.
+fn parse_address(raw: &str) -> Result<ConnectorAddress, String> {
+    let raw = raw.trim();
+    if raw.is_empty() || raw.len() > 2048 || raw.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("ADDRESS_INVALID".into());
+    }
+    let bare = !raw.contains("://");
+    let candidate = if bare { format!("https://{}", raw) } else { raw.into() };
+    let mut url = Url::parse(&candidate).map_err(|_| "ADDRESS_INVALID".to_string())?;
+    if !matches!(url.scheme(), "https" | "http") || url.host_str().is_none()
+        || !url.username().is_empty() || url.password().is_some() || url.query().is_some() || url.fragment().is_some() {
+        return Err("ADDRESS_INVALID".into());
+    }
+    let local = local_host(url.host_str().unwrap());
+    if bare && local { let _ = url.set_scheme("http"); }
+    if url.scheme() == "http" && !local { return Err("ADDRESS_INSECURE".into()); }
+    let path = url.path().trim_end_matches('/');
+    let base_path = path.strip_suffix("/v1/mcp").unwrap_or(path).to_string();
+    url.set_path(&base_path);
+    let base_url = url.as_str().trim_end_matches('/').to_string();
+    Ok(ConnectorAddress { mcp_url: format!("{}/v1/mcp", base_url), base_url })
+}
+
+pub fn is_local_address(raw: &str) -> bool {
+    parse_address(raw).ok().and_then(|a| Url::parse(&a.base_url).ok())
+        .and_then(|u| u.host_str().map(local_host)).unwrap_or(true)
+}
+
 fn is_same_node(configured: &str, node_url: &str) -> bool {
-    let a = configured.trim().trim_end_matches('/').to_lowercase();
-    let b = mcp_url(node_url).to_lowercase();
-    a == b
+    match (parse_address(configured), parse_address(node_url)) {
+        (Ok(a), Ok(b)) => a.mcp_url == b.mcp_url,
+        _ => false,
+    }
 }
 
-/// The server name the node appears under in the client's own list.
+/// The probe is read-only, bounded, and cannot follow a redirect to a different machine. It
+/// checks discovery rather than calling any model or authenticated MCP tool.
+async fn check_address(raw: &str) -> Result<ConnectorAddress, String> {
+    let address = parse_address(raw)?;
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(8))
+        .connect_timeout(Duration::from_secs(4)).redirect(reqwest::redirect::Policy::none())
+        .build().map_err(|_| "ADDRESS_UNREACHABLE".to_string())?;
+    let mut response = client.get(format!("{}/.well-known/aimeat", address.base_url))
+        .header("Accept", "application/json").send().await.map_err(|_| "ADDRESS_UNREACHABLE".to_string())?;
+    if !response.status().is_success() { return Err(format!("ADDRESS_NOT_AIMEAT: HTTP {}", response.status().as_u16())); }
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| "ADDRESS_UNREACHABLE".to_string())? {
+        if body.len() + chunk.len() > 65536 { return Err("ADDRESS_NOT_AIMEAT: response too large".into()); }
+        body.extend_from_slice(&chunk);
+    }
+    let value: Value = serde_json::from_slice(&body).map_err(|_| "ADDRESS_NOT_AIMEAT".to_string())?;
+    let descriptor = value.get("data").unwrap_or(&value);
+    if descriptor.get("protocol").and_then(Value::as_str) != Some("aimeat")
+        || descriptor.get("node_id").and_then(Value::as_str).is_none_or(str::is_empty)
+        || descriptor.pointer("/endpoints/mcp").and_then(Value::as_str) != Some("/v1/mcp") {
+        return Err("ADDRESS_NOT_AIMEAT".into());
+    }
+    Ok(address)
+}
+
+#[tauri::command]
+pub async fn check_connector_address(node_url: String) -> Result<ConnectorAddress, String> {
+    check_address(&node_url).await
+}
+
 fn server_name(raw: Option<String>) -> String {
-    let cleaned: String = raw
-        .unwrap_or_default()
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' })
-        .collect();
-    let trimmed = cleaned.trim_matches('-').to_string();
-    if trimmed.is_empty() {
-        "aimeat".to_string()
-    } else {
-        trimmed.chars().take(32).collect()
-    }
+    let clean: String = raw.unwrap_or_default().to_lowercase().chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' }).collect();
+    let name = clean.trim_matches('-');
+    if name.is_empty() { "aimeat".into() } else { name.chars().take(48).collect() }
 }
 
-/// A TOML basic string: `text` in double quotes, with the quote, the backslash and every control
-/// character escaped, so nothing in `text` can end the string or start a line of its own.
-fn toml_string(text: &str) -> String {
-    let mut out = String::with_capacity(text.len() + 2);
-    out.push('"');
-    for c in text.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => out.push_str(&format!("\\u{:04X}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
-/// A TOML key: bare when TOML allows it bare, a basic string otherwise.
-fn toml_key(name: &str) -> String {
-    let bare = !name.is_empty()
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
-    if bare {
-        name.to_string()
-    } else {
-        toml_string(name)
-    }
-}
-
-// ── Reading and editing a client's JSON, as pure functions ──────────────────
-
-/// Every `url` under the client's servers object, in file order.
-fn configured_urls(text: &str, key: &str) -> Vec<String> {
-    let root: Value = match serde_json::from_str(text) {
-        Ok(v) => v,
-        Err(_) => return vec![],
-    };
-    let servers = match root.get(key).and_then(|v| v.as_object()) {
-        Some(m) => m,
-        None => return vec![],
-    };
-    servers
-        .values()
-        .filter_map(|entry| entry.get("url").and_then(|u| u.as_str()))
-        .map(|s| s.to_string())
-        .collect()
-}
-
-/// The entry a client accepts for this node.
-fn server_entry(with_type: bool, url: &str) -> Value {
-    if with_type {
-        json!({ "type": "http", "url": url })
-    } else {
-        json!({ "url": url })
-    }
-}
-
-/// The client's file with this node added under `name`, everything else left as it was.
-/// An empty file becomes a new one. A file that is not a JSON object is refused rather than
-/// replaced, because the person's own settings live in it.
-fn merge_entry(text: &str, key: &str, name: &str, entry: Value) -> Result<String, String> {
-    let mut root: Value = if text.trim().is_empty() {
-        json!({})
-    } else {
-        serde_json::from_str(text)
-            .map_err(|e| format!("This file is not valid JSON, so it was left alone: {}", e))?
-    };
-    let obj = root
-        .as_object_mut()
-        .ok_or_else(|| "This file does not hold a JSON object, so it was left alone.".to_string())?;
-    let servers = obj.entry(key).or_insert_with(|| json!({}));
-    let servers = servers.as_object_mut().ok_or_else(|| {
-        format!("`{}` in this file is not a JSON object, so it was left alone.", key)
-    })?;
-    servers.insert(name.to_string(), entry);
-    serde_json::to_string_pretty(&root).map_err(|e| format!("Could not write the JSON: {}", e))
-}
-
-/// The client's file with this node removed. Absent is not an error.
-fn remove_entry(text: &str, key: &str, name: &str) -> Result<String, String> {
-    let mut root: Value = if text.trim().is_empty() {
-        json!({})
-    } else {
-        serde_json::from_str(text)
-            .map_err(|e| format!("This file is not valid JSON, so it was left alone: {}", e))?
-    };
-    if let Some(obj) = root.as_object_mut() {
-        if let Some(servers) = obj.get_mut(key).and_then(|v| v.as_object_mut()) {
-            servers.remove(name);
-        }
-    }
-    serde_json::to_string_pretty(&root).map_err(|e| format!("Could not write the JSON: {}", e))
-}
-
-// ── Writing the file safely ─────────────────────────────────────────────────
-
-/// Replace a file's content, keeping one copy of the original and never leaving a half-file.
-///
-/// The replacement keeps the permissions of the file it replaces. A client's config can hold the
-/// person's other secrets, and on macOS and Linux a new file gets the default mode, 0644, which
-/// anyone on the machine can read. So the temporary file is readable by its owner alone from the
-/// moment it exists, and takes the old file's mode before it replaces it. Windows keeps who may
-/// read a file in an access list that the new file takes from the folder the old one is in.
-fn write_config(path: &Path, content: &str) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Could not make the folder {}: {}", parent.display(), e))?;
-    }
-    if path.exists() {
-        let backup = path.with_extension(format!(
-            "{}.aimeat-backup",
-            path.extension().and_then(|e| e.to_str()).unwrap_or("bak")
-        ));
-        fs::copy(path, &backup)
-            .map_err(|e| format!("Could not keep a copy of {}: {}", path.display(), e))?;
-    }
-    let temp = path.with_extension("aimeat-tmp");
-    write_private(&temp, content)
-        .map_err(|e| format!("Could not write {}: {}", temp.display(), e))?;
-    #[cfg(unix)]
-    keep_mode(path, &temp).map_err(|e| {
-        let _ = fs::remove_file(&temp);
-        format!("Could not keep the permissions of {}: {}", path.display(), e)
-    })?;
-    fs::rename(&temp, path).map_err(|e| {
-        let _ = fs::remove_file(&temp);
-        format!("Could not replace {}: {}", path.display(), e)
-    })
-}
-
-/// Write `content` to a new file that, on macOS and Linux, only its owner can read.
-fn write_private(temp: &Path, content: &str) -> std::io::Result<()> {
-    use std::io::Write;
-    // A temporary file that a crash left behind keeps the mode it had, so it goes first.
-    let _ = fs::remove_file(temp);
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    options.open(temp)?.write_all(content.as_bytes())
-}
-
-/// Give the temporary file the mode of the file it replaces. A file that did not exist yet stays
-/// at 0600.
-#[cfg(unix)]
-fn keep_mode(path: &Path, temp: &Path) -> std::io::Result<()> {
-    match fs::metadata(path) {
-        Ok(meta) => fs::set_permissions(temp, meta.permissions()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
-    }
-}
-
-// ── What the frontend calls ─────────────────────────────────────────────────
-
-/// Build one connector's current state.
-///
-/// A cloud tool keeps nothing on this machine, so there is no file to read and no honest way to
-/// say whether it is attached: that answer lives in the person's Claude account. It is reported
-/// as not connected and the screen says where to look, rather than inventing a state.
 fn read_connector(s: &ClientSpec, node_url: &str) -> Connector {
-    let cloud = s.method == "cloud";
-    let path = if cloud { None } else { config_path(s.id) };
-    let text = path
-        .as_ref()
-        .and_then(|p| fs::read_to_string(p).ok())
-        .unwrap_or_default();
-    let urls = configured_urls(&text, s.key);
-    let connected = urls.iter().any(|u| is_same_node(u, node_url));
-    let other = urls
-        .iter()
-        .find(|u| u.to_lowercase().ends_with("/v1/mcp"))
-        .cloned();
-
+    let path = config_path(s.id);
+    let mut config_error = None;
+    let mut entries = Vec::new();
+    if let Some(path) = &path {
+        match config::read(path).and_then(|text| config::Config::parse(text.as_deref().unwrap_or(""), s.key)) {
+            Ok(config) => for (name, url) in config.entries(s.key) {
+                // Only AIMEAT-shaped endpoints appear in this app's list. Other MCP settings
+                // still reserve their names and survive every edit.
+                if Url::parse(&url).ok().is_some_and(|u| u.path().trim_end_matches('/').ends_with("/v1/mcp")) {
+                    // A manually configured URL can contain a secret. Such entries remain in
+                    // the client's file, but never cross into this app's UI or diagnostics.
+                    if let Ok(address) = parse_address(&url) {
+                        entries.push(ConnectorEntry { matches_selected: is_same_node(&url, node_url), name, url: address.mcp_url });
+                    }
+                }
+            },
+            Err(e) => config_error = Some(e),
+        }
+    }
+    let connected = entries.iter().any(|e| e.matches_selected);
     Connector {
-        id: s.id.to_string(),
-        name: s.name.to_string(),
-        installed: is_installed(s.id),
-        connected,
-        connected_url: if connected { None } else { other },
-        method: s.method.to_string(),
-        config_path: path.map(|p| p.display().to_string()),
-        address_is_local: is_local_address(node_url),
+        id: s.id.into(), name: s.name.into(), installed: is_installed(s.id), connected,
+        connected_url: entries.iter().find(|e| !e.matches_selected).map(|e| e.url.clone()),
+        method: s.method.into(), config_path: path.map(|p| p.display().to_string()), config_error,
+        address_is_local: is_local_address(node_url), entries,
     }
 }
 
-/// Every AI tool this app knows, with its current state against the given node.
 #[tauri::command]
 pub fn detect_connectors(node_url: String) -> Result<Vec<Connector>, String> {
-    Ok(SPECS.iter().map(|s| read_connector(s, &node_url)).collect())
+    let address = parse_address(&node_url)?;
+    Ok(SPECS.iter().map(|s| read_connector(s, &address.base_url)).collect())
 }
 
-/// Attach one tool to the node by editing its own config file.
+/// Adding picks a free name. Replacement requires both the old name and old URL from the screen;
+/// it starts a fresh URL-only entry so credentials for the former server cannot reach the new one.
+fn add_to_config(text: &str, s: &ClientSpec, url: &str, name: &str, replace: Option<(&str, &str)>) -> Result<String, String> {
+    let mut doc = config::Config::parse(text, s.key)?;
+    if let Some((old_name, old_url)) = replace {
+        doc.remove_exact(s.key, old_name, old_url)?;
+        doc.put(s.key, old_name, url, s.with_type);
+    } else {
+        if doc.entries(s.key).iter().any(|(_, configured)| is_same_node(configured, url)) { return Ok(text.into()); }
+        let name = doc.unique_name(s.key, name);
+        doc.put(s.key, &name, url, s.with_type);
+    }
+    Ok(doc.text())
+}
+
 #[tauri::command]
-pub fn connect_connector(
-    id: String,
-    node_url: String,
-    name: Option<String>,
-) -> Result<Connector, String> {
-    let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
-    if s.method != "file" {
-        return Err(s
-            .note
-            .unwrap_or("This tool is attached by hand.")
-            .to_string());
-    }
-    let path = config_path(&id).ok_or_else(|| {
-        format!("Could not work out where {} keeps its settings.", s.name)
-    })?;
-    let text = fs::read_to_string(&path).unwrap_or_default();
-    let merged = merge_entry(
-        &text,
-        s.key,
-        &server_name(name),
-        server_entry(s.with_type, &mcp_url(&node_url)),
-    )?;
-    write_config(&path, &merged)?;
-    Ok(read_connector(s, &node_url))
+pub async fn connect_connector(id: String, node_url: String, name: Option<String>, replace_name: Option<String>, replace_url: Option<String>) -> Result<Connector, String> {
+    let s = spec(&id)?;
+    if s.method != "file" { return Err("TOOL_UNSUPPORTED".into()); }
+    let address = check_address(&node_url).await?;
+    let _guard = CONFIG_WRITE.lock().map_err(|_| "CONFIG_WRITE".to_string())?;
+    let path = config_path(&id).ok_or_else(|| "CONFIG_READ".to_string())?;
+    let before = config::read(&path)?;
+    let replace = match (replace_name.as_deref(), replace_url.as_deref()) {
+        (Some(name), Some(url)) => Some((name, url)),
+        (None, None) => None,
+        _ => return Err("CONNECTION_CHANGED".into()),
+    };
+    let merged = add_to_config(before.as_deref().unwrap_or(""), s, &address.mcp_url, &server_name(name), replace)?;
+    if before.as_deref() != Some(&merged) { config::write(&path, before.as_deref(), &merged)?; }
+    let result = read_connector(s, &address.base_url);
+    if !result.connected { return Err("CONFIG_CHANGED".into()); }
+    Ok(result)
 }
 
-/// Detach one tool from the node.
 #[tauri::command]
-pub fn disconnect_connector(
-    id: String,
-    node_url: String,
-    name: Option<String>,
-) -> Result<Connector, String> {
-    let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
-    if s.method != "file" {
-        return Err(s
-            .note
-            .unwrap_or("This tool is attached by hand.")
-            .to_string());
-    }
-    let path = config_path(&id).ok_or_else(|| {
-        format!("Could not work out where {} keeps its settings.", s.name)
-    })?;
-    if !path.exists() {
-        return Ok(read_connector(s, &node_url));
-    }
-    let text = fs::read_to_string(&path)
-        .map_err(|e| format!("Could not read {}: {}", path.display(), e))?;
-    let stripped = remove_entry(&text, s.key, &server_name(name))?;
-    write_config(&path, &stripped)?;
-    Ok(read_connector(s, &node_url))
+pub fn disconnect_connector(id: String, node_url: String, name: String) -> Result<Connector, String> {
+    let s = spec(&id)?;
+    if s.method != "file" { return Err("TOOL_UNSUPPORTED".into()); }
+    let address = parse_address(&node_url)?;
+    let _guard = CONFIG_WRITE.lock().map_err(|_| "CONFIG_WRITE".to_string())?;
+    let path = config_path(&id).ok_or_else(|| "CONFIG_READ".to_string())?;
+    let before = config::read(&path)?.ok_or_else(|| "CONNECTION_MISSING".to_string())?;
+    let mut doc = config::Config::parse(&before, s.key)?;
+    doc.remove_exact(s.key, &name, &address.mcp_url)?;
+    config::write(&path, Some(&before), &doc.text())?;
+    let result = read_connector(s, &address.base_url);
+    if result.entries.iter().any(|e| e.name == name) { return Err("CONFIG_CHANGED".into()); }
+    Ok(result)
 }
 
-/// What a person copies for a tool this app does not write: the address itself for a cloud tool,
-/// and the lines to paste for the others.
 #[tauri::command]
-pub fn connector_snippet(
-    id: String,
-    node_url: String,
-    name: Option<String>,
-) -> Result<String, String> {
-    let s = spec(&id).ok_or_else(|| format!("Unknown tool: {}", id))?;
-    let name = server_name(name);
-    let url = mcp_url(&node_url);
-    // A custom connector asks for one address in a form. Anything else copied into that field is
-    // a mistake the person then has to find.
-    if s.method == "cloud" {
-        return Ok(url);
-    }
-    if s.id == "codex" {
-        // The URL entry does nothing on its own: Codex reaches an HTTP server through its RMCP
-        // client, which is behind a feature switch. Newer builds spell it `[features] rmcp_client`
-        // and older ones `experimental_use_rmcp_client`, so both lines are given and the extra one
-        // is ignored by whichever build reads it. The name and the address are written as TOML
-        // values, never pasted in as they are: the address is what the person typed.
-        return Ok(format!(
-            "experimental_use_rmcp_client = true\n\n[features]\nrmcp_client = true\n\n[mcp_servers.{}]\nurl = {}\n",
-            toml_key(&name),
-            toml_string(&url)
-        ));
-    }
-    let mut servers = serde_json::Map::new();
-    servers.insert(name, server_entry(s.with_type, &url));
-    let mut root = serde_json::Map::new();
-    root.insert(s.key.to_string(), Value::Object(servers));
-    serde_json::to_string_pretty(&Value::Object(root))
-        .map_err(|e| format!("Could not write the JSON: {}", e))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mcp_url_is_the_base_plus_the_endpoint() {
-        assert_eq!(mcp_url("https://aimeat.io"), "https://aimeat.io/v1/mcp");
-        assert_eq!(mcp_url("https://aimeat.io/"), "https://aimeat.io/v1/mcp");
-        assert_eq!(mcp_url(" http://localhost:41050 "), "http://localhost:41050/v1/mcp");
-    }
-
-    #[test]
-    fn the_same_node_survives_a_slash_and_a_capital() {
-        assert!(is_same_node("https://AIMEAT.io/v1/mcp/", "https://aimeat.io"));
-        assert!(!is_same_node("https://other.example/v1/mcp", "https://aimeat.io"));
-        assert!(!is_same_node("https://aimeat.io/v1/other", "https://aimeat.io"));
-    }
-
-    // The expected paths are joined, not written out: Windows joins with "\" and Linux with "/", and
-    // this test runs on both (desktop-check.yml has a Linux job since 2026-09-26).
-    #[test]
-    fn claude_code_follows_its_config_dir_when_one_is_set() {
-        let home = Some(PathBuf::from("C:\\Users\\someone"));
-        let moved = Some(PathBuf::from("D:\\claude"));
-        assert_eq!(
-            claude_code_config_in(None, home.clone()).unwrap(),
-            PathBuf::from("C:\\Users\\someone").join(".claude.json")
-        );
-        assert_eq!(
-            claude_code_config_in(moved, home).unwrap(),
-            PathBuf::from("D:\\claude").join(".claude.json")
-        );
-        assert!(claude_code_config_in(None, None).is_none());
-    }
-
-    #[test]
-    fn a_name_is_reduced_to_something_a_client_accepts() {
-        assert_eq!(server_name(None), "aimeat");
-        assert_eq!(server_name(Some("".to_string())), "aimeat");
-        assert_eq!(server_name(Some("---".to_string())), "aimeat");
-        assert_eq!(server_name(Some("My Node!".to_string())), "my-node");
-    }
-
-    #[test]
-    fn merging_keeps_every_other_setting() {
-        let before = r#"{"theme":"dark","mcpServers":{"other":{"url":"https://x/v1/mcp"}}}"#;
-        let after = merge_entry(
-            before,
-            "mcpServers",
-            "aimeat",
-            server_entry(true, "https://aimeat.io/v1/mcp"),
-        )
-        .unwrap();
-        let v: Value = serde_json::from_str(&after).unwrap();
-        assert_eq!(v["theme"], "dark");
-        assert_eq!(v["mcpServers"]["other"]["url"], "https://x/v1/mcp");
-        assert_eq!(v["mcpServers"]["aimeat"]["url"], "https://aimeat.io/v1/mcp");
-        assert_eq!(v["mcpServers"]["aimeat"]["type"], "http");
-    }
-
-    #[test]
-    fn merging_into_an_empty_file_makes_a_whole_one() {
-        let after = merge_entry("", "servers", "aimeat", server_entry(true, "https://aimeat.io/v1/mcp"))
-            .unwrap();
-        let v: Value = serde_json::from_str(&after).unwrap();
-        assert_eq!(v["servers"]["aimeat"]["type"], "http");
-    }
-
-    #[test]
-    fn cursor_gets_no_type_field() {
-        let after = merge_entry("", "mcpServers", "aimeat", server_entry(false, "https://aimeat.io/v1/mcp"))
-            .unwrap();
-        let v: Value = serde_json::from_str(&after).unwrap();
-        assert!(v["mcpServers"]["aimeat"].get("type").is_none());
-    }
-
-    #[test]
-    fn a_file_that_is_not_json_is_refused_rather_than_replaced() {
-        let err = merge_entry("// comments\n{\"a\":1}", "mcpServers", "aimeat", json!({})).unwrap_err();
-        assert!(err.contains("not valid JSON"));
-    }
-
-    #[test]
-    fn removing_leaves_the_rest_alone_and_absent_is_fine() {
-        let before = r#"{"theme":"dark","mcpServers":{"aimeat":{"url":"u"},"other":{"url":"v"}}}"#;
-        let after = remove_entry(before, "mcpServers", "aimeat").unwrap();
-        let v: Value = serde_json::from_str(&after).unwrap();
-        assert!(v["mcpServers"].get("aimeat").is_none());
-        assert_eq!(v["mcpServers"]["other"]["url"], "v");
-        assert_eq!(v["theme"], "dark");
-
-        let again = remove_entry(&after, "mcpServers", "aimeat").unwrap();
-        let v2: Value = serde_json::from_str(&again).unwrap();
-        assert!(v2["mcpServers"].get("aimeat").is_none());
-    }
-
-    #[test]
-    fn urls_are_read_from_the_clients_own_key() {
-        let text = r#"{"servers":{"a":{"url":"https://aimeat.io/v1/mcp"}},"mcpServers":{"b":{"url":"https://x/v1/mcp"}}}"#;
-        assert_eq!(configured_urls(text, "servers"), vec!["https://aimeat.io/v1/mcp"]);
-        assert_eq!(configured_urls(text, "mcpServers"), vec!["https://x/v1/mcp"]);
-        assert!(configured_urls("not json", "servers").is_empty());
-    }
-
-    #[test]
-    fn the_snippet_matches_what_the_client_accepts() {
-        let vscode = connector_snippet("vscode".into(), "https://aimeat.io".into(), None).unwrap();
-        assert!(vscode.contains("\"servers\""));
-        assert!(vscode.contains("\"type\": \"http\""));
-
-        let cursor = connector_snippet("cursor".into(), "https://aimeat.io".into(), None).unwrap();
-        assert!(cursor.contains("\"mcpServers\""));
-        assert!(!cursor.contains("\"type\""));
-
-        // Codex needs its RMCP client switched on, under either spelling, or the url is ignored.
-        let codex = connector_snippet("codex".into(), "https://aimeat.io".into(), None).unwrap();
-        assert!(codex.contains("experimental_use_rmcp_client = true"));
-        assert!(codex.contains("rmcp_client = true"));
-        assert!(codex.contains("[mcp_servers.aimeat]"));
-        assert!(codex.contains("url = \"https://aimeat.io/v1/mcp\""));
-    }
-
-    #[test]
-    fn the_codex_lines_keep_a_typed_address_inside_its_string() {
-        // A quote and a line break typed into the address stay part of the url's value.
-        let typed = "https://a.example\"\n[other]\nx = \"1";
-        let codex = connector_snippet("codex".into(), typed.into(), None).unwrap();
-        assert!(
-            codex.contains(r#"url = "https://a.example\"\n[other]\nx = \"1/v1/mcp""#),
-            "{}",
-            codex
-        );
-        assert!(!codex.lines().any(|l| l.trim_start().starts_with("[other]")), "{}", codex);
-    }
-
-    #[test]
-    fn a_toml_value_escapes_what_toml_reads_as_syntax() {
-        assert_eq!(toml_string("https://aimeat.io/v1/mcp"), r#""https://aimeat.io/v1/mcp""#);
-        assert_eq!(toml_string("a\"b\\c"), r#""a\"b\\c""#);
-        assert_eq!(toml_string("a\nb\rc\td"), r#""a\nb\rc\td""#);
-        assert_eq!(toml_string("\u{0}\u{1b}\u{7f}"), r#""\u0000\u001B\u007F""#);
-        assert_eq!(toml_string("äö"), "\"äö\"");
-        assert_eq!(toml_key("aimeat"), "aimeat");
-        assert_eq!(toml_key("my_node-2"), "my_node-2");
-        assert_eq!(toml_key(""), r#""""#);
-        assert_eq!(toml_key("a.b]\n[c"), r#""a.b]\n[c""#);
-    }
-
-    #[test]
-    fn a_cloud_tool_copies_the_address_and_nothing_else() {
-        // Its settings ask for one address in a form; a JSON block pasted there is a mistake the
-        // person then has to find.
-        let desktop =
-            connector_snippet("claude-desktop".into(), "https://aimeat.io".into(), None).unwrap();
-        assert_eq!(desktop, "https://aimeat.io/v1/mcp");
-    }
-
-    #[test]
-    fn a_tool_this_app_does_not_edit_is_refused_with_its_reason() {
-        let err = connect_connector("claude-desktop".into(), "https://aimeat.io".into(), None)
-            .unwrap_err();
-        assert!(err.contains("own connector settings"));
-        let err = disconnect_connector("codex".into(), "https://aimeat.io".into(), None)
-            .unwrap_err();
-        assert!(err.contains("TOML"));
-    }
-
-    #[test]
-    fn a_cloud_tool_has_no_file_on_this_machine() {
-        let list = detect_connectors("https://aimeat.io".to_string()).unwrap();
-        let desktop = list.iter().find(|c| c.id == "claude-desktop").unwrap();
-        assert_eq!(desktop.method, "cloud");
-        assert!(desktop.config_path.is_none());
-        assert!(!desktop.connected);
-        let code = list.iter().find(|c| c.id == "claude-code").unwrap();
-        assert_eq!(code.method, "file");
-        assert!(code.config_path.is_some());
-    }
-
-    #[test]
-    fn an_address_only_this_machine_answers_is_named_as_one() {
-        for local in [
-            "http://localhost:41050",
-            "http://127.0.0.1:41050",
-            "https://LOCALHOST",
-            "http://192.168.1.20:41050",
-            "http://10.0.0.5",
-            "http://172.16.4.4",
-            "http://172.31.0.1",
-            "http://169.254.1.1",
-            "https://desktop.local",
-            "https://aimeat",
-            "http://[::1]:41050",
-        ] {
-            assert!(is_local_address(local), "{} should read as local", local);
-        }
-        for public in [
-            "https://aimeat.io",
-            "https://node.example.com/",
-            "https://172.32.0.1",
-            "https://8.8.8.8",
-        ] {
-            assert!(!is_local_address(public), "{} should read as public", public);
-        }
-    }
-
-    #[test]
-    fn the_local_address_travels_with_every_tool() {
-        let list = detect_connectors("http://localhost:41050".to_string()).unwrap();
-        assert!(list.iter().all(|c| c.address_is_local));
-        let list = detect_connectors("https://aimeat.io".to_string()).unwrap();
-        assert!(list.iter().all(|c| !c.address_is_local));
-    }
-
-    #[test]
-    fn writing_keeps_a_copy_and_lands_whole() {
-        let dir = std::env::temp_dir().join(format!("aimeat-connectors-{}", std::process::id()));
-        let _ = fs::create_dir_all(&dir);
-        let file = dir.join("mcp.json");
-        fs::write(&file, r#"{"a":1}"#).unwrap();
-
-        write_config(&file, r#"{"a":2}"#).unwrap();
-        assert_eq!(fs::read_to_string(&file).unwrap(), r#"{"a":2}"#);
-        let backup = file.with_extension("json.aimeat-backup");
-        assert_eq!(fs::read_to_string(&backup).unwrap(), r#"{"a":1}"#);
-        assert!(!file.with_extension("aimeat-tmp").exists());
-
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn a_rewrite_keeps_the_mode_the_file_had_and_a_new_file_starts_private() {
-        // A client's config can hold the person's other secrets: a file kept at 0600 stays at 0600
-        // after the app edits it, a file left at 0644 is not narrowed, and a new one starts at 0600.
-        use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("aimeat-connectors-mode-{}", std::process::id()));
-        let _ = fs::create_dir_all(&dir);
-        let private = dir.join("mcp.json");
-        let readable = dir.join("settings.json");
-        let fresh = dir.join("new.json");
-        for (file, mode) in [(&private, 0o600), (&readable, 0o644)] {
-            fs::write(file, r#"{"a":1}"#).unwrap();
-            fs::set_permissions(file, fs::Permissions::from_mode(mode)).unwrap();
-        }
-
-        for file in [&private, &readable, &fresh] {
-            write_config(file, r#"{"a":2}"#).unwrap();
-        }
-        let mode = |file: &PathBuf| fs::metadata(file).unwrap().permissions().mode() & 0o777;
-        let modes = format!("{:o} {:o} {:o}", mode(&private), mode(&readable), mode(&fresh));
-        let content = fs::read_to_string(&private).unwrap();
-        let _ = fs::remove_dir_all(&dir);
-
-        assert_eq!(content, r#"{"a":2}"#);
-        assert_eq!(modes, "600 644 600");
-    }
+pub fn connector_snippet(id: String, node_url: String, name: Option<String>) -> Result<String, String> {
+    let s = spec(&id)?;
+    let address = parse_address(&node_url)?;
+    if s.method == "cloud" { return Ok(address.mcp_url); }
+    let mut doc = config::Config::parse("", s.key)?;
+    doc.put(s.key, &server_name(name), &address.mcp_url, s.with_type);
+    Ok(doc.text())
 }

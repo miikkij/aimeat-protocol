@@ -4,7 +4,9 @@ A [Tauri](https://tauri.app) desktop application that does what only a program o
 can do. Two things, in this order:
 
 1. **The front door ([src/index.html](src/index.html)).** Which AI tools on this computer are attached to the
-   person's AIMEAT, and one click to attach or detach each one. Today that job means installing Node.js and
+   person's AIMEAT. Named personal, work and local environments keep addresses separate. The app checks
+   the selected address before adding it, preserves other connections, and removes only the selected
+   name and address. A guided first read follows the tool's own sign-in. Without Desktop this means installing Node.js and
    running `npx aimeat connect` in a terminal, which is where a non-technical person stops. This screen works
    whether their AIMEAT is aimeat.io or a server of their own, so the app is useful before anyone decides to
    run anything. The work is in [src-tauri/src/connectors.rs](src-tauri/src/connectors.rs), which reads and
@@ -12,8 +14,9 @@ can do. Two things, in this order:
    over OAuth 2.1 with dynamic client registration.
 2. **The machine room ([src/server.html](src/server.html)).** Run an AIMEAT of their own on this computer
    without a terminal: start and stop it, choose the AI that runs on this computer (LM Studio, Ollama or an
-   address of their own), change its settings and read its log. Data is stored in **persistent SQLite** and
-   survives restarts.
+   address of their own), change its settings and read its log. Starting, ready, stopping and failed are
+   separate states. A saved port stays pending until restart. Data is stored in **persistent SQLite**;
+   the backup and restore controls include its configuration, private keys and stored files.
 
 > Everything else a person does with their AIMEAT happens in its own web pages, which the machine room opens
 > in the browser (`http://localhost:41050/v1/portal`). The app does not copy them. Until 2026-09-29 it did:
@@ -45,7 +48,7 @@ When you click **Start Node**, the Rust layer ([src-tauri/src/node_manager.rs](s
 spawns:
 
 ```
-node.exe --env-file <appdata>\.env  resources\server\dist\src\index.js  start
+node.exe --env-file <appdata>\.env --import <file-url-of-desktop-parent.mjs> resources\server\dist\src\index.js start
 ```
 
 with the working directory set to a **writable app-data folder**. All user state lives there, never in
@@ -58,11 +61,31 @@ with the working directory set to a **writable app-data folder**. All user state
 | `%APPDATA%\com.overscale.aimeat-desktop\aimeat-node.log` | Server stdout/stderr |
 
 Storage is fixed to `AIMEAT_STORAGE=sqlite` — see [config.ts](../aimeat/src/config.ts) for the underlying env
-contract. To **back up** your node, stop it and copy the whole app-data folder.
+contract. To **back up** your node, stop it and choose **Create backup**. The ZIP includes private keys
+and is not encrypted; keep it private. Desktop checks every archived file against its manifest before
+restoring. Restore requires a separate confirmation and retains the previous complete data directory
+at the recovery path shown afterwards. External database paths and linked files are refused because a
+copy of this folder would not contain all of their data.
+
+Desktop's parent adapter asks the existing core shutdown handler to drain before exit. The app waits
+for its own child's listening proof and readiness endpoint before enabling local sign-in and browser
+actions. The updater verifies the download, stops the node, installs, then offers a restart on platforms
+that need one. These behaviors are implemented in Desktop; the bundled core source is unchanged.
 
 ---
 
 ## Building / packaging (developers)
+
+Run `pnpm test` here for the Desktop UI and child-process behavior, then `cargo test` in `src-tauri`.
+After staging, set `AIMEAT_DESKTOP_SMOKE_PORT` to the session's claimed port and run `pnpm test:runtime`.
+This opt-in test starts the actual staged server, creates an isolated account and memory, backs them up,
+changes them, restores them and signs in after restart to read the original memory. It never uses the
+person's app-data folder. Desktop Check runs this on Windows; release builds run it on each target OS.
+
+For a Windows review build, use a separate Tauri identifier ending in `.review` with
+`pnpm tauri build --debug --no-bundle --config <review-config.json>`, then run
+`scripts/review-desktop.ps1 -Port <claimed-port>`. The launcher uses separate node data and AI-tool
+settings under `src-tauri/target/desktop-review`; the review identifier also separates webview storage.
 
 ### Prerequisites (build machine only — not the end user)
 

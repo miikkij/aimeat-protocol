@@ -156,6 +156,16 @@ jobs:
         run: pnpm stage
         working-directory: aimeat-desktop
 
+      - name: Desktop behavior tests
+        run: pnpm test
+        working-directory: aimeat-desktop
+
+      - name: Prove the staged runtime and complete backup recovery
+        env:
+          AIMEAT_DESKTOP_SMOKE_PORT: '40497'
+        run: pnpm test:runtime
+        working-directory: aimeat-desktop
+
       # No updater artifacts in this build, so it needs no signing key: the sign job signs the
       # files the updater installs. With Tauri v2 and createUpdaterArtifacts false the installers
       # come out the same (tauri-cli 2.11.2: sign_updaters in bundle.rs returns at once when the
