@@ -9,6 +9,7 @@
  *   the prompt card keep their own looks. Reads the theme's tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-11-09 — .page-start-explain: "Explain this page to me" under the purpose.
  *   v1.0.0 — 2026-10-03 — Initial (guidance for normal people, part B).
  */
 
@@ -44,6 +45,15 @@
 .page-start-part > .og-lead,
 .page-start-part > .poster-hint,
 .page-start-part > .poster-prompt { margin: 0; }
+
+/* "Explain this page to me" under the purpose: the card and its one line, as close as the part's own parts. */
+.page-start-explain {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.page-start-explain > .poster-prompt,
+.page-start-explain > .poster-hint { margin: 0; }
 
 @media (max-width: 900px) {
   .page-start-parts { grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }

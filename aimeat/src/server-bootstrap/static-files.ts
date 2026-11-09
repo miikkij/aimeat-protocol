@@ -11,6 +11,10 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.17.0 -- 2026-11-09 -- A .js, .mjs or .css file asked for under its current content tag
+ *     (`?v=`, portal-spa.ts isCurrentAssetTag) is `public, max-age=31536000, immutable`: a returning
+ *     visitor's browser no longer asks again about every module before drawing (about 2 s per page
+ *     view on aimeat.io). Any other address of the same file stays no-cache with its ETag.
  *   v1.16.0 -- 2026-11-04 -- The node's own pages allow scripts from the node only: cdnjs.cloudflare.com
  *     and cdn.jsdelivr.net leave script-src, since no node page loads from them (codebase analysis
  *     2026-11-03, item A13). The App Catalog's own policy is unchanged.
@@ -86,6 +90,7 @@ import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import { serveSpa } from '../routes/portal.js';
+import { isCurrentAssetTag } from '../routes/portal-spa.js';
 import { buildAuthMd } from '../services/auth-md.js';
 import { resolveAssetDir } from './asset-dirs.js';
 import { appOriginServiceWorker } from '../utils/app-sw-source.js';
@@ -112,6 +117,19 @@ function resolveServerDir(): string {
  * turns that into a live ESM cycle: `does not provide an export named CONTENT_SIGNAL_DEFAULT`, at
  * boot, on one entry point and not the other.
  */
+/** How a module or stylesheet under its current content tag is cached: for a year, never asked again. */
+const KEPT_ASSET = 'public, max-age=31536000, immutable';
+
+/** The request asked for a .js, .mjs or .css file under the content tag it has now (`?v=<tag>`). */
+function isKeptAsset(res: { req?: { url?: string } }): boolean {
+  const url = res.req?.url;
+  if (!url) return false;
+  const u = new URL(url, 'http://local');
+  // The shell tags plain paths only, so an escaped one is never an address it handed out.
+  if (!/\.(m?js|css)$/.test(u.pathname) || u.pathname.includes('%')) return false;
+  return isCurrentAssetTag(u.pathname, u.searchParams.get('v') ?? '');
+}
+
 const CONTENT_SIGNAL_DEFAULT = 'search=yes, ai-input=yes, ai-train=no';
 const CONTENT_SIGNAL_TRAINING_ALLOWED = 'search=yes, ai-input=yes, ai-train=yes';
 
@@ -391,8 +409,13 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       setHeaders: (res, filePath) => {
         // Markdown too: the help page's text (public/help/help.<lang>.md) is fetched without the
         // build id, so a 7-day cache kept the old text in a browser for a week after an update.
+        // A module or stylesheet asked for under its current content tag (`?v=`, stamped by the shell)
+        // is kept by the browser for good: the address changes whenever the bytes do. Before
+        // 2026-11-09 every one was no-cache, and a returning visitor's browser asked again about each
+        // of the 376 files of aimeat.io's front page (454 on the Home, 859 on a Settings page) before
+        // it drew anything: about 2 s per page view. Anything else stays no-cache with its ETag.
         if (/\.(js|css|html|md)$/.test(filePath)) {
-          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Cache-Control', isKeptAsset(res) ? KEPT_ASSET : 'no-cache');
         }
         // A /lib/ asset whose directory pins a FULL version (ffmpeg-core@0.12.6/) can never change
         // under that path — the vendoring policy ships even a patch bump as a new directory — so it

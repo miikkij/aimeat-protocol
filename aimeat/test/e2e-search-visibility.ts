@@ -20,7 +20,11 @@
  *       an app with no description is unit-tested (test/unit/app-seo-listable.test.ts), because the
  *       API no longer lets anyone make one.
  *   TARGET-091: /index.html on the apex answers 301 to `/`.
+ *   TARGET-094: with seo.primary_node_url set, the general pages name the main node's address as
+ *     canonical (head and Link header) and leave the sitemap, the node's own pages keep theirs; a
+ *     bad address and a second owner are refused.
  * @version-history
+ *   v1.4.0 — 2026-11-09 — TARGET-094: the main node's address (seo.primary_node_url).
  *   v1.3.1 — 2026-11-07 — A thin app that has a description is not in the status's without_description.
  *   v1.3.0 — 2026-11-06 — Jouni's rule of 2026-11-06: switching search on below 150 words of the app's
  *     own text is refused before anything is written (REST and MCP), the seo answer says the count,
@@ -390,6 +394,64 @@ async function main() {
         await test('/index.html on an app host is not sent to the apex front page', async () => {
             const r = await on('app', '/index.html', FINDABLE.sub);
             assert(!(r.status === 301 && r.header('location') === '/'), `status ${r.status}, Location ${r.header('location')}`);
+        });
+
+        console.log('\nTARGET-094: a node beside a main node hands it the general pages');
+
+        const PRIMARY = 'https://main.aimeat.test';
+        const canonicalOf = (html: string) => /<link rel="canonical" href="([^"]+)">/.exec(html)?.[1] ?? '';
+        const setPrimary = (value: string, as = token) => json('/v1/admin/config', as, 'PUT', { changes: [{ path: 'seo.primary_node_url', value }] });
+
+        await test('a value that is not a node address is refused, and nothing changes', async () => {
+            const r = await setPrimary('not a url');
+            const applied = (r.body.data?.applied ?? []) as unknown[];
+            assert(r.status >= 400 || applied.length === 0, `a bad address was applied: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+            const page = await on('apex', '/v1/glossary');
+            assert(canonicalOf(page.body) === `${BASE}/v1/glossary`, `canonical ${canonicalOf(page.body)}`);
+        });
+
+        await test('a second owner cannot name the main node', async () => {
+            const other = (await registerOwner(BASE, `${owner}c`)).token;
+            const r = await setPrimary(PRIMARY, other);
+            assert(r.status === 403, `a second owner got ${r.status}`);
+            const sm = await on('apex', '/sitemap.xml');
+            assert(sm.body.includes(`${BASE}/v1/glossary<`), 'the glossary left the sitemap');
+        });
+
+        await test('with the main node named, a general page names its address as canonical, and people still read it here', async () => {
+            const r = await setPrimary(PRIMARY);
+            assert(r.status === 200 && (r.body.data?.applied ?? []).length === 1, `set: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+            for (const path of ['/v1/glossary', '/v1/how-an-app-builds', '/v1/help', '/v1/privacy', '/v1/portal']) {
+                const page = await on('apex', path);
+                assert(page.status === 200, `${path} answered ${page.status}`);
+                assert(canonicalOf(page.body) === `${PRIMARY}${path}`, `${path} canonical ${canonicalOf(page.body)}`);
+            }
+            const md = await on('apex', '/v1/glossary.md');
+            assert((md.header('link') ?? '').includes(`<${PRIMARY}/v1/glossary>; rel="canonical"`), `glossary.md Link ${md.header('link')}`);
+        });
+
+        await test('the node\'s own pages keep their own address: the front page, the applications, the members', async () => {
+            for (const path of ['/v1/app-store', '/v1/members']) {
+                const page = await on('apex', path);
+                assert(canonicalOf(page.body) === `${BASE}${path}`, `${path} canonical ${canonicalOf(page.body)}`);
+            }
+        });
+
+        await test('the sitemap lists only the node\'s own pages, and the SEO status names the main node', async () => {
+            const sm = (await on('apex', '/sitemap.xml')).body;
+            const locs = [...sm.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+            assert(locs.length === 3 && [`${BASE}/`, `${BASE}/v1/app-store`, `${BASE}/v1/members`].every((u) => locs.includes(u)), `sitemap ${locs.join(' ')}`);
+            const st = await json('/v1/admin/seo/status', token);
+            const data = st.body.data ?? st.body;
+            assert(data.sitemap.primary_node === PRIMARY && data.sitemap.page_count === 3, `status ${JSON.stringify(data.sitemap)}`);
+        });
+
+        await test('emptied, every page is the node\'s own again', async () => {
+            const r = await setPrimary('');
+            assert(r.status === 200, `reset ${r.status}`);
+            const page = await on('apex', '/v1/glossary');
+            assert(canonicalOf(page.body) === `${BASE}/v1/glossary`, `canonical ${canonicalOf(page.body)}`);
+            assert((await on('apex', '/sitemap.xml')).body.includes(`${BASE}/v1/glossary<`), 'the glossary is not back in the sitemap');
         });
     } finally {
         server.kill('SIGTERM');

@@ -14,6 +14,7 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-09 — The Link header of /v1/portal and of a page's markdown: the canonical address comes from canonicalPageUrl (data/public-pages.ts): the main node's for a page this node repeats (seo.primary_node_url, TARGET-094).
  *   2026-11-04 — GET /v1/build answers the process stamp (PROCESS_BUILD_ID) as before; the pages' stamp names the code (codebase analysis 2026-11-03, item A7).
  *   2026-11-01 — /v1/dataset/:owner/:name answers 404 (same page body) when no public package is
  *     there, not 200 with noindex (WP10e C1).
@@ -121,7 +122,7 @@ import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { runningBuild } from '../utils/build-stamp.js';
 import { injectAgentFooter } from '../utils/agent-footer.js';
-import { findPublicPage } from '../data/public-pages.js';
+import { canonicalPageUrl, findPublicPage } from '../data/public-pages.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { mcpInstallLink } from '../services/mcp-install.js';
@@ -412,7 +413,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     res.vary('Accept');
     const page = findPublicPage('/v1/portal');
     if (prefersMarkdown(_req) || _req.query.format === 'md') {
-      res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}/v1/portal>; rel="canonical"`);
+      res.set('Link', `<${canonicalPageUrl({ path: '/v1/portal', ...page }, config)}>; rel="canonical"`);
       sendMarkdown(res, page?.markdown ? renderPageMarkdown(page, config) : buildLandingMarkdown(config));
       return;
     }
@@ -630,7 +631,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
         const page = findPublicPage(path);
         if (page?.markdown) {
           res.vary('Accept');
-          res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}${page.path}>; rel="canonical"`);
+          res.set('Link', `<${canonicalPageUrl(page, config)}>; rel="canonical"`);
           sendMarkdown(res, renderPageMarkdown(page, config));
           return;
         }

@@ -18,6 +18,7 @@
  *   - renderPageMarkdown(page, config) — frontmatter + body + the site-map section
  * @usage app.use(markdownMirrorsRouter(config));  // before the SPA catch-all
  * @version-history
+ *   v1.2.0 — 2026-11-09 — The mirror's Link header: the canonical address comes from canonicalPageUrl (data/public-pages.ts): the main node's for a page this node repeats (seo.primary_node_url, TARGET-094).
  *   v1.1.0 — 2026-08-01 — Every mirror points at the node's AI transparency statement. These pages
  *     are hand-authored marketing copy and deliberately carry NO provenance record of their own:
  *     stamping them `original` would be an attestation about authorship nobody made, and absent
@@ -27,7 +28,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { PublicPage } from '../data/public-pages.js';
-import { mirroredPages, sitemapPages } from '../data/public-pages.js';
+import { canonicalPageUrl, mirroredPages, sitemapPages } from '../data/public-pages.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
 import { apexOnly } from './agent-docs.js';
 
@@ -79,7 +80,7 @@ export function markdownMirrorsRouter(config: AimeatConfig): Router {
     router.get(paths, apexOnly, (_req, res) => {
       // rel="canonical" back to the HTML page: the mirror is a rendering of that page, not a
       // second page with the same content competing with it in an index.
-      res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}${page.path}>; rel="canonical"`);
+      res.set('Link', `<${canonicalPageUrl(page, config)}>; rel="canonical"`);
       res.set('Access-Control-Allow-Origin', '*');
       sendMarkdown(res, renderPageMarkdown(page, config));
     });

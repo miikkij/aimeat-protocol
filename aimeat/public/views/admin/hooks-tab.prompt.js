@@ -9,6 +9,7 @@
  *   here, while the page around it follows the reader's language.
  * @structure buildHooksPrompt({ url })
  * @version-history
+ *   v1.0.1 — 2026-11-09 — Five gates, as services/hooks.ts has them (it said four).
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
 
@@ -21,7 +22,7 @@ export function buildHooksPrompt({ url = '' } = {}) {
   return `I run an AIMEAT node${where} and I am its operator. Read its hooks and tell me which moments call out to my own code, which of them can refuse a thing outright, and whether anything bound to them has been failing.
 
 == 1. Read ==
-  aimeat_admin_hooks {}   the eleven moments, which four are gates, what is bound to each and whether it still exists and still carries an address, what could be bound, and every call the node has made
+  aimeat_admin_hooks {}   the eleven moments, which five are gates, what is bound to each and whether it still exists and still carries an address, what could be bound, and every call the node has made
 
 == 2. Judge ==
 A gate is any hook whose name starts with pre_: it runs before the thing happens and its answer decides. It refuses when the address says no, returns a non-2xx, or does not answer within ten seconds, so a bound gate whose address is down stops everything it guards. \`failing\` names any gate in that state. A bound action that is no longer published, or one with no address, is a binding that does nothing while looking exactly like one that works. Say which of these applies here.

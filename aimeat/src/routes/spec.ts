@@ -11,6 +11,7 @@
  *   - GET /v1/specs/:name: a public record contract as text/markdown; GET /docs/specs/:name redirects there
  *
  * @version-history
+ *   v1.6.0 — 2026-11-09 — /v1/docs and its markdown: the canonical address comes from canonicalPageUrl (data/public-pages.ts): the main node's for a page this node repeats (seo.primary_node_url, TARGET-094).
  *   v1.5.0 — 2026-11-01 — /v1/docs loads Swagger UI 5.34.1 from the node's own /lib/ instead of
  *     unpkg.com by the range @5 with no integrity, and its CSP names no outside host
  *     (secaudit2026oct31w2 round 10b, W2-5).
@@ -30,7 +31,7 @@
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
 import type { AimeatConfig } from '../config.js';
-import { findPublicPage } from '../data/public-pages.js';
+import { canonicalPageUrl, findPublicPage } from '../data/public-pages.js';
 import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
 import { apiIndexHtml } from '../services/api-index.js';
@@ -89,7 +90,7 @@ export function specRouter(config: AimeatConfig): Router {
     res.vary('Accept');
     const docsPage = findPublicPage('/v1/docs');
     if (docsPage?.markdown && (prefersMarkdown(_req) || _req.query.format === 'md')) {
-      res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}/v1/docs>; rel="canonical"`);
+      res.set('Link', `<${canonicalPageUrl(docsPage, config)}>; rel="canonical"`);
       sendMarkdown(res, renderPageMarkdown(docsPage, config));
       return;
     }
@@ -111,6 +112,8 @@ export function specRouter(config: AimeatConfig): Router {
     const b = config.baseUrl;
     const title = page?.title ?? 'AIMEAT API documentation';
     const desc = page?.description ?? 'Browsable reference for every AIMEAT endpoint.';
+    // The main node's address when this node repeats its pages (seo.primary_node_url, TARGET-094).
+    const canonical = canonicalPageUrl(page ?? { path: '/v1/docs' }, config);
     res.type('text/html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,8 +124,8 @@ export function specRouter(config: AimeatConfig): Router {
   <meta property="og:title" content="${title}"/>
   <meta property="og:description" content="${desc}"/>
   <meta property="og:type" content="website"/>
-  <meta property="og:url" content="${b}/v1/docs"/>
-  <link rel="canonical" href="${b}/v1/docs">
+  <meta property="og:url" content="${canonical}"/>
+  <link rel="canonical" href="${canonical}">
   <link rel="alternate" type="text/markdown" href="${b}/v1/docs.md">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/theme.css">

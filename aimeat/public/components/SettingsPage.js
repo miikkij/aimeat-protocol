@@ -47,6 +47,8 @@
  *          strip=${strip} railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pages}
  *          after=${html`<${ctx.ConfirmUI} />`}>…the sections…<//>`
  * @version-history
+ *   v1.4.0 — 2026-11-09 — The `start` slot gets PageInfo ({ title, desc, help }), so PageStart's
+ *     "Explain this page to me" carries the page's own title, description and concept.
  *   v1.3.0 — 2026-10-03 — `help` passed to PageHead (the title's question mark) and the `start` slot
  *     under the head (PageStart; guidance for normal people, part B); additive.
  *   v1.2.0 — 2026-09-26 — `edit` passed to PageHead: the rename field in the title's place (a
@@ -60,6 +62,7 @@ import htm from 'htm';
 import { Crumb } from '/components/Crumb.js';
 import { PageHead } from '/components/PageHead.js';
 import { Rail, railSection } from '/components/Rail.js';
+import { PageInfo } from '/components/PageStart.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -89,7 +92,7 @@ export function SettingsPage(props) {
   return html`
     <div class=${cx('og', name && `og-${name}`, page && 'og-page')}>
       ${column ? head : html`<div class="settings-page-head">${head}</div>`}
-      ${start}
+      ${start ? html`<${PageInfo.Provider} value=${{ title, desc, help }}>${start}<//>` : null}
       ${strip}
       ${column ? html`
         <div class="og-grid">

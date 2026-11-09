@@ -16,6 +16,7 @@
  * @structure GoalsTab (default) · GoalRules({ goal, agents, onSaved, confirm, showToast })
  * @usage Registered in profile.js TABS as { id: 'goals', component: GoalsTab }.
  * @version-history
+ *   v1.4.0 — 2026-11-09 — PageStart gets the page's title and concept, for "Explain this page to me".
  *   v1.3.0 — 2026-11-08 — The Rounds save sends the cron (and the condition) even when emptied, so the
  *     server refuses an empty cron on a clock round instead of keeping the old one; the server now keeps
  *     the time zone and the works per round this page does not show (group k3-goalrounds).
@@ -264,7 +265,7 @@ export default function GoalsTab({ showToast }) {
       desc=${g('desc', 'Every goal you or your AI gave your agents. Here are the rules the work moves by: who takes part, what the coordinator may do, the reactions, the rounds, the limits and the whole chain.')} />
     ${/* The start (page-guidance.md) stands under the head; a goal is given on the home or by one's own
           AI, so it has no button here. It folds once the list has a goal. */''}
-    <${PageStart} id="goals" done=${goals === null ? null : goals.length > 0} />
+    <${PageStart} id="goals" done=${goals === null ? null : goals.length > 0} title=${g('title', 'Goals')} concept="concept.goal" />
     <${Choice} tone="filter" ariaLabel=${g('show', 'Show')} value=${filter} onChange=${setFilter} options=${[
       ['running', g('fRunning', 'Running')], ['done', g('fDone', 'Done')], ['stopped', g('fStopped', 'Stopped')], ['expired', g('fExpired', 'Ended')], ['all', g('fAll', 'All')]]} />
     ${err && html`<${ErrorNote} text=${err} />`}

@@ -14,9 +14,15 @@
  *   (no reader), so a private, members or organism package, a withdrawn one and one that does not
  *   exist answer null, and the shell serves the generic head with noindex: the page then shows the
  *   404 the API answers. A node that shows its content to signed-in accounts only gives no head at all.
- * @structure schemaOrgOfOpened · datasetPageOf
+ * @structure schemaOrgOfOpened · datasetPageOf · factsOf
  * @usage const page = await datasetPageOf({ storage, config }, owner, name);
  * @version-history
+ *   v1.2.0 — 2026-11-09 — The page says what tells it from another with the same title: the publisher
+ *     in the title, and who published it, when, the tables, rows, columns and licence in the
+ *     description and in a crawler body (factsOf). A copy of another public package names the
+ *     original's page as canonical (./copy-origin.ts). On aimeat.io two accounts' `agentscan-corpus`
+ *     pages, 5 and 24 sites, sent a crawler the same title, description and no body, and Google
+ *     reported them as duplicates (TARGET-094).
  *   v1.1.0 — 2026-11-01 — The meta description is the first paragraph of the Markdown description as
  *     plain text (plainLead; WP10e A1).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b). schemaOrgOfOpened moved here unchanged from
@@ -31,7 +37,9 @@ import { versionAudienceOf } from './odps-read.js';
 import { readPointer } from './version-audience.js';
 import { schemaOrgDataset } from './schema-org.js';
 import { datasetLandingUrl } from './catalogue-facts.js';
-import { PACKAGE_NAME_RE } from './contract.js';
+import { PACKAGE_NAME_RE, type Descriptor } from './contract.js';
+import { copyOriginOf } from './copy-origin.js';
+import { logger } from '../../utils/logger.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type Opened = NonNullable<Awaited<ReturnType<typeof openPackage>>>;
@@ -78,11 +86,44 @@ export async function datasetPageOf(deps: Deps, owner: string, name: string): Pr
     const d = opened.descriptor;
     const title = d.title || d.name;
     const lead = plainLead(d.description ?? '');
-    const description = (lead.length >= 50 ? lead
-        : `${title}: a data table by ${owner}, to open in Excel, Power BI, DuckDB, Python or your own AI. ${lead}`).trim().slice(0, 300);
+    const facts = factsOf(d, owner, opened.latest?.updatedAt ?? d.created);
+    const description = `${lead.length >= 50 ? lead
+        : `${title}: a data table by ${owner}, to open in Excel, Power BI, DuckDB, Python or your own AI. ${lead}`} ${facts.sentence}`
+        .replace(/\s+/g, ' ').trim().slice(0, 300);
+    // A copy of another public package names the original's page as its canonical address
+    // (./copy-origin.ts): the search engine sees the content once, where it was first published.
+    // A failed read of the original leaves the page its own address, and says so in the log.
+    const origin = await copyOriginOf(deps, d).catch((err: unknown) => {
+        logger.warn('dataset page: could not tell whether the package is a copy; the page keeps its own address', { owner, name, error: String(err) });
+        return null;
+    });
     return {
         path: `/v1/dataset/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
-        title: `${title} · ${deps.config.seoSiteName || 'AIMEAT'}`,
+        // The publisher is in the title: one app publishes under one fixed title from every account
+        // that runs it, and two accounts' tables then had the same title, description and empty body.
+        title: `${title} · ${owner} · ${deps.config.seoSiteName || 'AIMEAT'}`,
         description, changefreq: 'weekly', priority: '0.5', jsonLd,
+        ...(origin ? { canonical: datasetLandingUrl(deps.config.baseUrl, origin.owner, origin.name) } : {}),
+        crawlerBody: [lead, facts.sentence, facts.tables, facts.licence].filter(Boolean).join('\n\n'),
     };
+}
+
+/**
+ * What tells this package from another with the same title, in words the page sends a crawler:
+ * who published it, when, how many tables and rows, which columns, and under which licence. The
+ * view draws the same facts from the API; these are the ones the document as sent has to carry.
+ */
+export function factsOf(d: Pick<Descriptor, 'resources' | 'licenses'>, owner: string, updatedAt: string): { sentence: string; tables: string; licence: string } {
+    const rows = d.resources.reduce((n, r) => n + (r.rowCount ?? 0), 0);
+    const day = /^\d{4}-\d{2}-\d{2}/.exec(updatedAt)?.[0];
+    const tableWord = d.resources.length === 1 ? 'table' : 'tables';
+    const sentence = `Published by ${owner}${day ? `, last updated on ${day}` : ''}: ${d.resources.length} ${tableWord}, ${rows} ${rows === 1 ? 'row' : 'rows'}.`;
+    const tables = d.resources.map(r => {
+        const columns = (r.schema?.fields ?? []).map(f => f.name).filter(Boolean);
+        const shown = columns.slice(0, 12).join(', ') + (columns.length > 12 ? `, and ${columns.length - 12} more` : '');
+        return `- ${r.title || r.name}: ${r.rowCount ?? 0} rows${shown ? `, columns ${shown}` : ''}.`;
+    }).join('\n');
+    const lic = d.licenses?.[0];
+    const licence = lic ? `Licence: ${lic.title || lic.name}.` : '';
+    return { sentence, tables, licence };
 }

@@ -21,19 +21,21 @@
  *   v1.2.0 — 2026-11-01 — /sitemap-datasets.xml lists the public data packages at their public page,
  *     and the sitemap index names it (plan doc-mvwxcas3dom3, D1.4).
  *   v1.2.1 — 2026-11-02 — A dataset's lastmod is escaped like its loc (secaudit2026nov02d round 13).
+ *   v1.4.0 — 2026-11-09 — sitemap.xml leaves out the pages handed to the main node (seo.primary_node_url),
+ *     and sitemap-datasets.xml leaves out a copy of another public data package (TARGET-094).
  *   v1.3.0 — 2026-11-06 — The sitemap index lists an app only when it also has a description of its
  *     own (appSeoListable, TARGET-089 Y2).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { sitemapPages } from '../data/public-pages.js';
+import { indexedPages } from '../data/public-pages.js';
 import { apexOnly } from './agent-docs.js';
 import { appSeoListable } from '../services/app-seo.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { localAccountName } from '../utils/gaii.js';
-import { publicDatasetPages } from '../services/datapackage/catalogue-facts.js';
+import { indexedDatasetPages } from '../services/datapackage/copy-origin.js';
 import { escapeHtml } from '../utils/html-escape.js';
 
 /** Register `/sitemap.xml` and `/sitemap-index.xml` on the given router. */
@@ -55,7 +57,8 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
     const xml = [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...sitemapPages().map(p =>
+      // The pages handed to the main node (seo.primary_node_url) are its to list, not this node's.
+      ...indexedPages(config).map(p =>
         `  <url><loc>${b}${p.path === '/' ? '/' : p.path}</loc><lastmod>${now}</lastmod><changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`
       ),
       '</urlset>',
@@ -159,7 +162,8 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
    * when node-wide discovery is off or the node shows its content to signed-in accounts only.
    */
   router.get('/sitemap-datasets.xml', apexOnly, async (_req, res) => {
-    const urls = await publicDatasetPages(config, storage);
+    // A copy of another public package is left out: its page names the original (TARGET-094).
+    const urls = await indexedDatasetPages(config, storage);
     res.type('application/xml').send([
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',

@@ -9,6 +9,8 @@
  *   concept.node_stats after its heading's words, and the page's start (PageStart id "nodeStats")
  *   under the heading.
  * @version-history
+ *   v1.12.0 -- 2026-11-09 -- PageStart gets the page's title and concept, for "Explain this page to
+ *     me".
  *   v1.11.0 -- 2026-11-08 -- Owners, Agents and P95 Latency open their explanation
  *     (nodeStats.owners, nodeStats.agents, nodeStats.latencyP95): what each figure counts.
  *   v1.10.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
@@ -101,7 +103,7 @@ export default function NodeStatsTab() {
   const title = t('profile.nodeStats.title');
   const head = html`
     <${SubHeading} level=${2} desc=${error ? null : t('profile.nodeStats.desc')}>${title} <${HelpTip} term="concept.node_stats" label=${title} /><//>
-    <${PageStart} id="nodeStats" />`;
+    <${PageStart} id="nodeStats" title=${title} concept="concept.node_stats" />`;
   if (error) return html`${head}<${Note} kind="meta">${t('profile.nodeStats.error')}<//>`;
   if (!data) return html`<${LoadingLine} text=${t('profile.nodeStats.loading')} />`;
   const s = data;

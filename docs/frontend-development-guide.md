@@ -1025,8 +1025,18 @@ The stamp is added by the regular expression; no code change is needed.
 **Key files:** `public/spa.html` (the importmap, the stylesheet links and `ROUTES`),
 `src/routes/portal-spa.ts` (`BUILD_ID`, `serveSpa()`, `stampAssets()`), `src/utils/asset-version.ts`.
 
-Files under `public/` are also served `no-cache` with an ETag, so during development a reload
-fetches an edited file without a restart.
+A `.js`, `.mjs` or `.css` file asked for under its CURRENT content tag (the `?v=` the shell stamped)
+is served `public, max-age=31536000, immutable`: those bytes never change under that address, so a
+returning visitor's browser uses its own copy and asks nothing. Until 2026-11-09 every file was
+`no-cache`, and a returning visitor's browser asked again about each of the 376 files of aimeat.io's
+front page (454 on the Home, 859 on a Settings page) before it drew anything: about 2 s per page
+view. The test is `isCurrentAssetTag()` in `src/routes/portal-spa.ts`, called from
+`src/server-bootstrap/static-files.ts`; a tag that is not the file's current one (a page from before
+a deploy) gets `no-cache`, so new bytes are never kept under an old address.
+
+Every other file under `public/` (an untagged module, HTML, Markdown) is served `no-cache` with an
+ETag, so during development a reload fetches an edited file without a restart; an edited tagged
+file gets a new tag on the next page load, because the shell hashes it again.
 
 ---
 

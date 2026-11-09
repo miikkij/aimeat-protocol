@@ -21,6 +21,8 @@
  * @usage
  *   const out = await announceEverything(config, storage, { scope: 'all', by: operatorName });
  * @version-history
+ *   v1.4.0 — 2026-11-09 — The pages handed to the main node (seo.primary_node_url) and the copies of
+ *     another public data package are left out, as in the sitemaps (TARGET-094).
  *   v1.3.0 — 2026-11-06 — "all" names an app only when it has a description of its own
  *     (appSeoListable, TARGET-089 Y2).
  *   v1.2.0 — 2026-11-01 — "all" carries the public data packages' pages too, the list of
@@ -31,11 +33,11 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppSummaryRecord } from '../storage/types/apps.js';
-import { sitemapPages } from '../data/public-pages.js';
+import { indexedPages } from '../data/public-pages.js';
 import { appSeoListable } from './app-seo.js';
 import { submitToIndexNow, appSubmitUrls, groupByHost, stampAnnounced } from './indexnow.js';
 import type { IndexNowRun } from './indexnow-log.js';
-import { publicDatasetPages } from './datapackage/catalogue-facts.js';
+import { indexedDatasetPages } from './datapackage/copy-origin.js';
 
 /** What "everything" means: the pages, or the pages and every findable application. */
 export type AnnounceScope = 'pages' | 'all';
@@ -64,7 +66,8 @@ export async function planAnnouncement(
   listed?: AppSummaryRecord[],
 ): Promise<AnnouncementPlan> {
   const b = config.baseUrl.replace(/\/$/, '');
-  const urls = sitemapPages().map((p) => `${b}${p.path === '/' ? '/' : p.path}`);
+  // The pages handed to the main node (seo.primary_node_url) are its to announce, as in sitemap.xml.
+  const urls = indexedPages(config).map((p) => `${b}${p.path === '/' ? '/' : p.path}`);
   const apps: AnnouncementPlan['apps'] = [];
 
   // seo.announce_apps off: the operator has asked that no notice name an app, so "everything" is
@@ -88,7 +91,7 @@ export async function planAnnouncement(
   }
 
   // The public data packages, at their public page: the same list /sitemap-datasets.xml carries.
-  if (scope === 'all') urls.push(...(await publicDatasetPages(config, storage)).map(p => p.loc));
+  if (scope === 'all') urls.push(...(await indexedDatasetPages(config, storage)).map(p => p.loc));
 
   const unique = [...new Set(urls)];
   const hosts = [...groupByHost(unique).entries()].map(([host, list]) => ({ host, url_count: list.length }));

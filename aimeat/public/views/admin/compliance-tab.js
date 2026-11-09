@@ -31,6 +31,9 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.8.0 — 2026-11-09 — Section 01's verdict counts what the records of processing leave open and
+ *     the register drafts waiting for a review, with a row that leads to section 08 or 09; it said
+ *     CLEAR and "Nothing is waiting" above both (guidance audit 2026-11-09).
  *   v3.7.0 — 2026-11-01 — Section 12, data intermediation (compliance-tab.intermediation.js; board
  *     Admin-Compliance, plan doc-mvwxcas3dom3 D7, WP9b), after the agreements.
  *   v3.6.0 — 2026-10-28 — "Fill these in for me" also brings the app makers' answers into entries
@@ -144,6 +147,8 @@ export function gapsLine(g, registerEmpty) {
   if (g.unlabelled > 0) parts.push(g.unlabelled === 1 ? C('line.unlabelledOne') : C('line.unlabelled', { n: num(g.unlabelled) }));
   const fonts = g.fonts || [];
   if (fonts.length > 0) parts.push(fonts.length === 1 ? C('line.fontsOne') : C('line.fonts', { n: num(fonts.length) }));
+  if (g.records > 0) parts.push(g.records === 1 ? C('line.recordsOne') : C('line.records', { n: num(g.records) }));
+  if (g.drafts > 0) parts.push(g.drafts === 1 ? C('line.draftsOne') : C('line.drafts', { n: num(g.drafts) }));
   if (parts.length === 0) return C('gapsNone');
   const joined = parts.length === 1 ? parts[0]
     : parts.slice(0, -1).join(C('line.sep')) + C('line.last') + parts[parts.length - 1];
@@ -200,7 +205,12 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
           { key: 'unclassified', name: C('gapUnclassified'), why: ucWhy,
             end: g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id)) },
           { key: 'unlabelled', name: C('gapUnlabelled'), why: unlWhy, end: g.unlabelled === 0 ? clear : door(C('toApps'), toApps) },
-          { key: 'fonts', name: C('gapFonts'), why: fontsWhy, end: fonts.length === 0 ? clear : door(C('toFonts'), toFonts), last: true },
+          { key: 'fonts', name: C('gapFonts'), why: fontsWhy, end: fonts.length === 0 ? clear : door(C('toFonts'), toFonts) },
+          // What the records of processing leave open (section 08) and the drafts nobody reviewed
+          // (section 09): the verdict said "Nothing is waiting" above both until 2026-11-09.
+          { key: 'records', name: C('gapRecords'), last: true,
+            why: g.records + g.drafts === 0 ? C('gap.recordsClear') : C('gap.recordsWhy', { n: num(g.records), drafts: num(g.drafts) }),
+            end: g.records + g.drafts === 0 ? clear : door(C('toRecords'), () => go(g.records > 0 ? 'adm-cmp-08' : 'adm-cmp-09')) },
         ]} />
       <//>
     <//>`;
@@ -473,7 +483,12 @@ export default function ComplianceTab(props) {
   const period0 = scope.period || {};
   const questions = questionnaire?.questions || [];
   const usecases = report.register.usecases;
-  const g = groupGaps(report.gaps);
+  // The verdict counts every open item on the page: the AI-use gaps, what the records of processing
+  // leave open (report.processing.gaps, section 08) and the register drafts waiting for a review.
+  const ai = groupGaps(report.gaps);
+  const records = (report.processing?.gaps || []).length;
+  const drafts = report.processing?.registers?.drafts?.total ?? 0;
+  const g = { ...ai, records, drafts, total: ai.total + records + drafts };
   const stats = answerStats(usecases, questions);
   const classes = classCounts(usecases);
 

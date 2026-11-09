@@ -35,6 +35,9 @@
  * @usage
  *   html = injectPageBody(html, page, config, isShell);
  * @version-history
+ *   v1.3.0 - 2026-11-09 - A built page's `crawlerBody` is its body when it has no authored markdown,
+ *     and such a page gets no "This page as markdown" link, because no `.md` address serves it (the
+ *     public dataset page, TARGET-094).
  *   v1.2.1 - 2026-10-05 - HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *     A link's URL is decoded from all five entities before it is escaped again, so `'` and `"` in
  *     a URL are not escaped twice.
@@ -216,8 +219,10 @@ export function injectPageBody(
     markdown?: string;
   },
 ): string {
-  const source = opts.markdown ?? page?.markdown;
+  const source = opts.markdown ?? page?.markdown ?? page?.crawlerBody;
   if (!opts.isShell || !page || !source) return html;
+  // A built page with a crawler body and no authored markdown has no `.md` address to link to.
+  const mirrored = opts.markdown !== undefined || !!page.markdown;
   const marker = '<div id="app"></div>';
   if (!html.includes(marker)) return html;
 
@@ -229,8 +234,10 @@ export function injectPageBody(
   const block = `<div id="crawler-body" class="md-body">`
     + `<h1>${esc(page.title)}</h1>`
     + (opts.markdown === undefined && page.generatedHtml ? page.generatedHtml : renderMarkdownBody(markdown))
-    + `<p><a href="${esc(baseUrl + (page.path === '/' ? '/index.md' : `${page.path}.md`))}">`
-    + `This page as markdown</a></p>`
+    + (mirrored
+      ? `<p><a href="${esc(baseUrl + (page.path === '/' ? '/index.md' : `${page.path}.md`))}">`
+        + `This page as markdown</a></p>`
+      : '')
     + `</div>`;
 
   return html.replace(marker, `${marker}\n  ${block}`);

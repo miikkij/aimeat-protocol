@@ -38487,6 +38487,7 @@ paths:
                               index_url: { type: string }
                               page_count: { type: integer }
                               app_host_count: { type: integer, description: App hosts the sitemap index will list (search-visible apps with a description of their own). 0 while announce_apps is off }
+                              primary_node: { type: string, nullable: true, description: 'The main node this node hands its general pages to (seo.primary_node_url): their canonical address is that node''s, and they leave this node''s sitemap. Null when every page is this node''s own.' }
                               announce_apps:
                                 type: boolean
                                 description: The seo.announce_apps setting. False leaves every app out of the sitemap index and out of IndexNow notices; the apps stay reachable.

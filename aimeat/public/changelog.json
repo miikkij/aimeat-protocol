@@ -4,6 +4,49 @@
     {
       "date": "2026-11-09",
       "kind": "feature",
+      "id": "2026-11-09-explain-this-page-to-me",
+      "highlight": true,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Explain this page to me",
+        "fi": "Selitä tämä sivu minulle"
+      },
+      "summary": {
+        "en": "Copy one prompt into any AI chat, and it explains the page for your role and at your level.",
+        "fi": "Kopioi yksi kehote mihin tahansa tekoälykeskusteluun, ja se selittää sivun roolisi ja osaamisesi mukaan."
+      },
+      "body": {
+        "en": "Every page of Settings & Controls and the admin has a prompt that you copy into any AI chat. It carries what the page is and who you are, so your AI explains the page for your role and at your level. The admin pages now also open with what the page is for and what to do first.",
+        "fi": "Jokaisella Asetukset ja hallinta -sivulla ja ylläpidon sivulla on nyt kehote, jonka kopioit mihin tahansa tekoälykeskusteluun. Siinä on sivun selitys ja tieto siitä, kuka olet, joten tekoälysi selittää sivun roolisi ja osaamisesi mukaan. Ylläpidon sivut kertovat nyt myös ensimmäiseksi, mihin sivu on ja mitä teet ensin."
+      }
+    },
+    {
+      "date": "2026-11-09",
+      "kind": "feature",
+      "id": "2026-11-09-a-store-or-customer-site-no-longer-competes-with-aimeat-io-in-search",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
+      "title": {
+        "en": "A store or customer site no longer competes with aimeat.io in search",
+        "fi": "Kauppa tai asiakasinstanssi ei enää kilpaile aimeat.io:n kanssa hakukoneissa"
+      },
+      "summary": {
+        "en": "A site beside aimeat.io names it, and its pages about the software point search engines there.",
+        "fi": "Rinnalla toimiva instanssi nimeää aimeat.io:n, ja sen ohjelmistosivut ohjaavat hakukoneet sinne."
+      },
+      "body": {
+        "en": "A store or customer site no longer competes with aimeat.io in search. It can name the main site, and its pages about the software point search engines there. A data package's page says who published it and how many rows it has.",
+        "fi": "Kauppa ja asiakasinstanssit eivät kilpaile aimeat.io:n kanssa hakukoneissa. Instanssi voi nimetä pääinstanssin, ja silloin ohjelmistoa kuvaavat sivut osoittavat hakukoneille sinne. Datapaketin sivu kertoo, kuka sen julkaisi ja montako riviä siinä on."
+      }
+    },
+    {
+      "date": "2026-11-09",
+      "kind": "feature",
       "id": "2026-11-09-your-contexts",
       "highlight": true,
       "audience": [

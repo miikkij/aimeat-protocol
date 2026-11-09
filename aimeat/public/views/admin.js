@@ -6,6 +6,10 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.17.0 — 2026-11-09 — Every admin page starts with PageStart (`pageStart.admin.<id>.*`: what the
+ *     page is for, a prompt for the operator's own AI, what follows, and "Explain this page to me"),
+ *     and a head paragraph (`admin.pageHead.<id>`) where the page had no sentence of its own
+ *     (guidance audit 2026-11-09).
  *   v1.16.0 — 2026-11-07 — The page "Receivers" (receivers) after Open to the internet: every address an
  *     outside program writes into an owner's data with, the setting that decides who may make one, and
  *     the operator's stop, start and decision (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -53,6 +57,7 @@ import { MenuFind } from '/components/MenuFind.js';
 import { loadPlaces, placeWords, indexGroups } from '/js/services/places.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { Note } from '/components/Note.js';
+import { PageStart, PageInfo } from '/components/PageStart.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
@@ -188,6 +193,21 @@ const NAV_GROUPS = [
     { id: 'themes', key: 'dashboard.themes', component: ThemesTab },
   ]},
 ];
+
+/**
+ * The start of every admin page (page-guidance.md): the head paragraph where the page has no
+ * sentence of its own (`admin.pageHead.<id>`), and PageStart under `pageStart.admin.<id>.*`.
+ */
+function AdminStart({ id, title }) {
+  const headKey = `admin.pageHead.${id}`;
+  const head = t(headKey);
+  const desc = head && head !== headKey ? head : '';
+  return html`
+    <${PageInfo.Provider} value=${{ title, desc, help: '' }}>
+      ${desc ? html`<${Note} kind="lead">${desc}<//>` : null}
+      <${PageStart} id=${`admin.${id}`} />
+    <//>`;
+}
 
 // Page title lookup
 const PAGE_TITLES = {};
@@ -509,6 +529,7 @@ export default function Admin({ navigate, locale }) {
       time=${lastUpdate}>
       ${error && html`<${ErrorNote} text=${t('dashboard.failedToLoad')} hint=${error} />`}
       ${!data && !error && html`<${Note} kind="loading">${t('dashboard.loading')}<//>`}
+      ${data && html`<${AdminStart} key=${activeItem.id} id=${activeItem.id} title=${t(pageInfo.key)} />`}
       ${data && html`<${ActiveComponent} ...${tabProps} />`}
     <//>
   `;

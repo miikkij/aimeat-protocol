@@ -2,8 +2,9 @@
  * @file public/views/admin/directory-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin dashboard "Directory" tab (Preact + HTM) — shows directory index stats (entries,
- *   cities, categories) and an operator control to rebuild the directory index. The tab draws library
+ * @description Admin dashboard "Directory" tab (Preact + HTM) — shows directory index stats (people and
+ *   shared places listed, the most common cities and interests) and an operator control to rebuild the
+ *   directory index. The tab draws library
  *   components and passes them data; it writes no class and no style.
  *
  * @structure
@@ -11,6 +12,9 @@
  *   - doRebuild(): calls rebuildDirectory() and surfaces success/error feedback
  *
  * @version-history
+ *   v2.1.0 — 2026-11-09 — The figures read data.directoryStats (totalPeople, totalOrganisms, topCities,
+ *     topInterests), what the admin frame keeps; the page read data.directory, which nothing set, so
+ *     every figure showed 0. "Categories" went: the directory has none (guidance audit 2026-11-09).
  *   v2.0.0 — 2026-09-27 — Library components, no class or inline style: the explanation is a hint,
  *     the maintenance card is the Object box under its sub-heading, Rebuild is the loud action, the
  *     result is the form's message (fine or refused).
@@ -31,7 +35,9 @@ import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
 
 export default function DirectoryTab({ data }) {
-  const dir = data.directory;
+  // GET /v1/admin/directory/stats (services/directory.ts getStats), kept by the admin frame as directoryStats.
+  const dir = data.directoryStats;
+  const named = (rows) => (rows || []).slice(0, 5).map((r) => `${r.name} (${r.count})`).join(', ');
   const [rebuilding, setRebuilding] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -52,10 +58,11 @@ export default function DirectoryTab({ data }) {
     <${ExpandableHelp} title=${t('dashboard.directoryHelpTitle')}>${t('dashboard.directoryHelpDetail')}<//>
 
     <${StatsGrid} items=${[
-      { label: t('dashboard.totalEntries'), value: dir?.total || 0, tone: 'cyan' },
-      { label: t('dashboard.cities'), value: dir?.cities || 0, tone: 'green' },
-      { label: t('dashboard.categories'), value: dir?.categories || 0, tone: 'amber' },
+      { label: t('dashboard.directoryPeople'), value: dir?.totalPeople || 0, tone: 'cyan' },
+      { label: t('dashboard.directoryPlaces'), value: dir?.totalOrganisms || 0, tone: 'green' },
     ]} />
+    ${named(dir?.topCities) ? html`<${Note} kind="meta">${t('dashboard.directoryTopCities', { list: named(dir.topCities) })}<//>` : null}
+    ${named(dir?.topInterests) ? html`<${Note} kind="meta">${t('dashboard.directoryTopInterests', { list: named(dir.topInterests) })}<//>` : null}
 
     <${Space} above="medium">
       <${Box}>

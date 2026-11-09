@@ -1,6 +1,6 @@
 # 00 Go-live checklist
 
-> Checked against AIMEAT node 4.2.0 (commit f36018fcd) on 2026-11-05. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 5171a1fdc) on 2026-11-09. Maintained with the code: see the README for how.
 
 Everything to do when an AIMEAT node goes online, in the order it must be done. It is for the person who runs the installation and for the people who supply what the installation needs: the DNS admin, the identity provider (IdP) admin, the mail admin and the data protection officer (DPO). Each item says what to do, why, which setting or tool does it, what goes wrong if it is skipped, and who provides it. The detail lives in the linked guides; this page is the order.
 
@@ -132,6 +132,7 @@ Detail on [06 AI and models](06-ai-and-models.md).
 | 8.3 | Public node only: name the site and the operator | Site name, description, social image and the Organization structured data that says who runs the node | `AIMEAT_SEO_SITE_NAME`, `AIMEAT_SEO_SITE_DESCRIPTION`, `AIMEAT_SEO_ORGANIZATION_NAME`, `AIMEAT_SEO_ORGANIZATION_URL`, `AIMEAT_SEO_SAME_AS` | The node presents itself with the software's defaults | IT |
 | 8.4 | Public node only: verify ownership with the search engines | A DNS TXT record covers the app subdomains too, which a meta tag on the apex does not (`aimeat/.env.example`, SEO block). [Google Search Console](https://support.google.com/webmasters/answer/9008080), [Bing Webmaster Tools](https://www.bing.com/webmasters/help/add-and-verify-site-12184f8b) | `AIMEAT_SEO_VERIFICATION_GOOGLE`, `AIMEAT_SEO_VERIFICATION_BING`, or DNS TXT | No search console data | DNS admin, IT |
 | 8.5 | Public node only: sitemaps and IndexNow | `/sitemap.xml` and `/sitemap-index.xml` list indexable pages and published apps (`aimeat/src/routes/sitemaps.ts`). IndexNow notifies engines when content changes ([IndexNow](https://www.indexnow.org/documentation)) | `AIMEAT_INDEXNOW_KEY`, `AIMEAT_SEO_INDEXNOW_AUTO`, `AIMEAT_SEO_ANNOUNCE_APPS`; `aimeat_seo_status`, `aimeat_seo_announce` | Slower discovery | IT |
+| 8.6 | Public node beside a main node only: name the main node | Every node serves the same pages about the software (docs, help, glossary, change log, privacy, terms). A node that runs beside another, such as a store or a customer node, names that node; those pages then give its address as canonical and leave this node's sitemap and IndexNow notices, and people still read them here. The front page, the applications and the members stay this node's own (`aimeat/src/data/public-pages.ts`) | `AIMEAT_SEO_PRIMARY_NODE_URL` (`seo.primary_node_url`) | Search engines report this node's copies as duplicates of the main node's pages | IT |
 
 ## Phase 9: Compliance settings
 

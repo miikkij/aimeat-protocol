@@ -7,6 +7,7 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.25.0 -- 2026-11-09 -- PageStart gets the page's title and concept, for "Explain this page to me".
  *   v4.24.0 -- 2026-10-31 -- While a proposal waits, its panel (with Approve and Decline) comes first on the page, not third (v31 K49).
  *   v4.23.1 -- 2026-10-28 -- The list no longer names the agents holding all permissions: the node no longer narrows them, so the owner is not asked to; each agent's card offers the narrowing.
  *   v4.23.0 -- 2026-10-25 -- An approval of a new device taking over an existing agent sends the owner's
@@ -620,7 +621,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
               shows the same panel for the person's FIRST agent, and a copy here would drift from it.
               Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
         <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} busyCode=${consentBusy} />
-        <${PageStart} id="agents" done=${agents.length > 0} action=${{ onClick: openNew }} />
+        <${PageStart} id="agents" done=${agents.length > 0} action=${{ onClick: openNew }}
+          title=${t('profile.agents.title')} concept="concept.agent" />
         <${FigureStrip} items=${strip} />`}
       railTitle=${p('railTitle')}
       sections=${sections}

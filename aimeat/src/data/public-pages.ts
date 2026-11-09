@@ -34,6 +34,12 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-11-09 - TARGET-094: `ownContent` marks the three pages that show this node's own content (/,
+ *     /v1/app-store, /v1/members). With `seo.primary_node_url` set, every other page names the main
+ *     node's address as canonical (canonicalPageUrl) and leaves this node's sitemap and IndexNow
+ *     notices (indexedPages). store.aimeat.io had listed the 16 pages of aimeat.io under its own
+ *     address, and Google reported "Duplicate, Google chose different canonical than user".
+ *     `canonical` and `crawlerBody` serve a built page (the public dataset page).
  *   2026-11-07 - The front page's title, description and first line follow the story (docs/AIMEAT-Story.md), not "AI Memory Exchange and Action Transfer"; /v1/portal's title and description follow it too, approved by Jouni on 2026-11-07 in place of the 2026-11-06 wording (TARGET-091).
  *   2026-11-06 - /v1/portal, /v1/business and /v1/how-it-works: new titles and descriptions, approved by
  *     Jouni on 2026-11-06. The three ranked at 3.8 to 4.3 in Google with a click rate of 0.8 to 1.4 %
@@ -69,6 +75,7 @@
  *     sitemap (docs/internal/agentscanner/02-vaihe-sitemap-xml.md)
  */
 
+import type { AimeatConfig } from '../config.js';
 import { everythingMarkdown, everythingHtml } from '../utils/everything-page.js';
 
 /** How often a crawler should expect the page to change (sitemaps.org changefreq). */
@@ -121,6 +128,55 @@ export interface PublicPage {
    * ld+json block: the public dataset page's schema.org Dataset (services/datapackage/landing-page.ts).
    */
   jsonLd?: Record<string, unknown>;
+  /**
+   * The page shows this node's own content: its front page, its applications, its members. Every
+   * other registry page shows the software's own text, the same on every node, and is handed to the
+   * main node when `seo.primary_node_url` names one (canonicalPageUrl, indexedPages).
+   */
+  ownContent?: boolean;
+  /**
+   * The address that holds this content, when it is not the page's own: a built page whose content
+   * is a copy of another page (a data package copied from another one, TARGET-094). The head names
+   * it as the canonical address.
+   */
+  canonical?: string;
+  /**
+   * Body text for a built page that has no `.md` mirror: what the shell sends a crawler under the
+   * title. Never a mirror and never an alternate link, because no address serves it on its own.
+   */
+  crawlerBody?: string;
+}
+
+/** The main node's address from `seo.primary_node_url`, or null when it is empty or this node itself. */
+export function primaryNodeOf(config: Pick<AimeatConfig, 'seoPrimaryNodeUrl' | 'baseUrl'>): string | null {
+  const primary = (config.seoPrimaryNodeUrl ?? '').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[^\s/?#]+$/i.test(primary)) return null;
+  return primary.toLowerCase() === config.baseUrl.replace(/\/+$/, '').toLowerCase() ? null : primary;
+}
+
+/** True when this node hands the page to the main node: a software page on a node that names one. */
+export function handedToPrimary(page: Pick<PublicPage, 'ownContent'>, config: Pick<AimeatConfig, 'seoPrimaryNodeUrl' | 'baseUrl'>): boolean {
+  return !page.ownContent && primaryNodeOf(config) !== null;
+}
+
+/**
+ * The canonical address of a page: the page's own `canonical` when it has one, the same path on the
+ * main node for a page handed to it, and this node's own address otherwise. The head, the Link
+ * header of the page and of its `.md` mirror all read it, so the three never disagree.
+ */
+export function canonicalPageUrl(page: Pick<PublicPage, 'path' | 'ownContent' | 'canonical'>, config: Pick<AimeatConfig, 'seoPrimaryNodeUrl' | 'baseUrl'>): string {
+  if (page.canonical) return page.canonical;
+  const primary = handedToPrimary(page, config) ? primaryNodeOf(config) : null;
+  return `${primary ?? config.baseUrl.replace(/\/+$/, '')}${page.path}`;
+}
+
+/**
+ * The pages this node names to search engines: its sitemap.xml and its IndexNow notices. The live
+ * pages, less the ones handed to the main node, so a node beside aimeat.io no longer lists the same
+ * sixteen pages under its own address.
+ */
+export function indexedPages(config: Pick<AimeatConfig, 'seoPrimaryNodeUrl' | 'baseUrl'>): PublicPage[] {
+  return sitemapPages().filter((p) => !handedToPrimary(p, config));
 }
 
 /**
@@ -130,6 +186,8 @@ export interface PublicPage {
 export const PUBLIC_PAGES: PublicPage[] = [
   {
     path: '/',
+    // A node's front page is the node itself, even where it repeats the software's landing text.
+    ownContent: true,
     title: 'AIMEAT: multiply what your AI can do',
     description: 'AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.',
     changefreq: 'weekly',
@@ -321,6 +379,7 @@ same story with the real pieces, and ends with the generator itself, open.
   },
   {
     path: '/v1/app-store',
+    ownContent: true,
     title: 'Applications published here, openable without an account',
     description: 'The applications people have published on this node: what each one does, who made it, and the address to open it. Anything listed can be opened without an account.',
     changefreq: 'weekly',
@@ -339,6 +398,7 @@ address to open, what it stores, and what it declares about the AI inside it.
   },
   {
     path: '/v1/members',
+    ownContent: true,
     title: 'Members — the people who publish on this AIMEAT node',
     description: 'Everyone on this node who has published a portfolio: their name, the identifier other people and their agents address them by, and a link to their own page.',
     changefreq: 'weekly',
