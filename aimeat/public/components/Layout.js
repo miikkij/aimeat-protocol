@@ -35,6 +35,9 @@
  * @structure Row · Stack · Split · Space · Beside · Columns · Touch
  * @usage html`<${Row} wrap>…<//>` · html`<${Stack} gap="large">…<//>` · html`<${Split}><${Actions}>…<//><//>`
  * @version-history
+ *   v1.12.0 — 2026-11-08 — Beside `start` renders the side part before the main part in the DOM, so the
+ *     reading order matches what is seen (the Contexts page's list); the CSS order is unchanged, so no
+ *     page using `start` looks different.
  *   v1.11.0 — 2026-09-27 — The step 'part' (1.875rem) for `above` and `below`: the air between the
  *     parts of a readout (the old app catalogue's .vis-block); additive, appcat parity (sections-b).
  *   v1.10.0 — 2026-09-27 — Space `inset`: the same step at both sides (the old app catalogue's Active
@@ -114,10 +117,14 @@ export function Beside({ side, narrow, wide, start, stick, align, rule, above, p
   // it stands over the main part.
   // stick (added by admin page group G2): the side part stays in sight while the main part scrolls
   // (the Portal page's preview beside its parts); when one column, the side part stands first.
+  // With `start` the side part is also first in the DOM, so the keyboard and a screen reader meet the
+  // parts in the order they are seen; layout.css still gives it order -1, so nothing moves on screen.
+  const main = html`<div class="layout-beside-main">${children}</div>`;
+  const aside = html`<div class="layout-beside-side">${side}</div>`;
   return html`<div id=${id} class=${cx('layout-beside', narrow && 'layout-beside--narrow', wide && 'layout-beside--wide',
     start && 'layout-beside--start', stick && 'layout-beside--stick', align === 'end' && 'layout-beside--end', rule && 'poster-row--thing', step('above', above), step('pad', pad), step('below', below))}>
-    <div class="layout-beside-main">${children}</div>
-    <div class="layout-beside-side">${side}</div>
+    ${start ? aside : main}
+    ${start ? main : aside}
   </div>`;
 }
 

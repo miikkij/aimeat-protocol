@@ -32,7 +32,7 @@
       "digest": "sha256:3e8f6205908b1583c01411b2"
     },
     "node:aimeat-content-classes": {
-      "reviewedOn": "2026-11-06",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/content/pipeline.ts",
         "aimeat/src/services/content/ai-stages.ts",
@@ -42,7 +42,18 @@
         "aimeat/src/services/content/shared-profile.ts",
         "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:2aeacaab9c4df95839a5f0e4"
+      "digest": "sha256:2fc63565b7ef2c9142939000"
+    },
+    "node:aimeat-context": {
+      "reviewedOn": "2026-11-09",
+      "watches": [
+        "aimeat/src/services/context/index-line.ts",
+        "aimeat/src/services/mcp-build-inputs.ts",
+        "aimeat/src/services/context/history-keys.ts",
+        "aimeat/src/services/context/check.ts",
+        "aimeat/src/services/memory-versions/history.ts"
+      ],
+      "digest": "sha256:4852520c5ee55d8417fad430"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -70,13 +81,13 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:0fcb452f71876e5d6e93fe97",
+      "digest": "sha256:425d6db75d64499fad41609f",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -262,19 +273,19 @@
       "digest": "sha256:9bfa24f196e06f9aaa163a0b"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:9a2453c210bd162d663bf27b"
+      "digest": "sha256:ac0248d64e8bd5a3ad7b78cb"
     },
     "node:manage-my-profile-data": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/routes/memory/shared.ts"
       ],
-      "digest": "sha256:d78eaf80767d1827ba9352b7"
+      "digest": "sha256:4c41735e286441cee00507fc"
     },
     "node:add-a-crew-agent": {
       "reviewedOn": "2026-11-05",
@@ -495,7 +506,7 @@
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:ce301ca714c8186e6a9238e1",
+      "digest": "sha256:400cb6fd749d43606daa56c1",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -651,11 +662,11 @@
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "9f179454eabf4bbe",
+      "aimeat/src/mcp/core.ts": "0a39f07278347815",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "66f1803515078196"
     },
     "node:manage-my-profile-data": {
-      "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
+      "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "59195162d900eb5f",
@@ -699,7 +710,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "5b1c4dde6b61c603"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "b53089e582ec571a"
+      "aimeat/scripts/sandbox.ts": "06a900eaea28b058"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"
@@ -750,7 +761,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "f7e77e3ec980d153",
+      "aimeat/src/services/journey-state.ts": "c386fed71e81bdf0",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "24765a8656779b80"
     },
@@ -827,7 +838,7 @@
       "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
     },
     "node:aimeat-content-classes": {
-      "aimeat/src/services/content/pipeline.ts": "c0e79c05c342d571",
+      "aimeat/src/services/content/pipeline.ts": "40cc0216503b00e7",
       "aimeat/src/services/content/ai-stages.ts": "96d3366e8f153380",
       "aimeat/src/services/content/service.ts": "fa9119a4bc3a9a63",
       "aimeat/src/services/content/settings.ts": "75ca4524dd531ba0",

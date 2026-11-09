@@ -230,6 +230,16 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         example: { title: 'Your things', children: '…' },
     },
     {
+        id: 'surface-slot', name: 'Block slot', kind: 'component', status: 'active',
+        summary: 'A home block\'s place while its code or data is on its way: the block\'s heading in a Band and the loading line, at the height the block had on the last visit in this browser, so nothing below it jumps. The two wrappers draw no box, so a block that has arrived lays out as it did without them.',
+        module: '/views/surface/renderer.js', sheet: '/css/components/surface-slot.css',
+        classes: ['surface-slot', 'surface-slot-content', 'surface-slot-wait'],
+        data: { shape: 'SurfaceRenderer({ layout, ctx, placeholders: true })', fields: { placeholders: 'draw each block in a slot that waits with its heading and the loading line (the home); without it the blocks draw as before' } },
+        useFor: ['The home, where blocks fetch their own data and the frame draws before it arrives (Jouni, 2026-11-09: "Heading + loading line").'],
+        variants: [{ name: 'waiting', class: 'surface-slot-wait', prop: 'placeholders', when: 'the block\'s code or data is still on its way' }],
+        example: { placeholders: true },
+    },
+    {
         id: 'line-list', name: 'LineList', kind: 'component', status: 'active',
         summary: 'A list of one-line pointers: who, then what they said, cut to one line.',
         module: '/components/LineList.js', sheet: '/css/components/line-list.css',

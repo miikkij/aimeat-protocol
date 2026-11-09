@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-08 — The handbook carries the person's context index (services/context/index-line.ts)
+ *     for a session that holds memory:read, the same lines the handshake carries.
  *   2026-11-05 — aimeat_handbook_get's input schema is one module constant, so every server registers
  *     the same object and tools/list builds its JSON Schema once (codebase analysis 2026-11-03,
  *     decision 11b of 2026-11-05). The schema itself is unchanged.
@@ -67,6 +69,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { handbookForRole } from '../services/handbooks/index.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
+import { contextIndexLine } from '../services/context/index-line.js';
 import { skillsBySituation } from '../services/skills-by-situation.js';
 import { journeyHandbookFor } from '../services/journey-state.js';
 import { substituteVariables } from '../services/prompt-variables.js';
@@ -138,7 +141,14 @@ export function registerPromptsTools(
                 // Where the person stands on their path, while it is not walked: it names the
                 // guided-journey skill, so an AI that read only this page still finds it.
                 const journey = await journeyHandbookFor(storage, config, ownerName);
-                const text = [handbookForRole(which), skills, journey, guidance].filter(Boolean).join('\n\n');
+                // The person's contexts, the same lines the handshake carried, for a client that
+                // cut the instructions before them. Only to a session that can open them.
+                const session = caller?.();
+                const contexts = session && session.has('memory:read')
+                    ? await contextIndexLine(storage, config, ownerName, parseGaiiLoose(getAgentGaii()).agent !== '', Date.now(),
+                        readerForAgent({ storage, config }, getAgentGaii(), session.scopes))
+                    : null;
+                const text = [handbookForRole(which), skills, journey, contexts, guidance].filter(Boolean).join('\n\n');
                 return { content: [{ type: 'text' as const, text }] };
             }
             const tierKey = tier;

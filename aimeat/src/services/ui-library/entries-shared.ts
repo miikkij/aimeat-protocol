@@ -280,4 +280,23 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         example: { class: 'ld-sh-door showroom-door', label: 'Get your own →' },
         note: 'Added 2026-10-06 for aimeat.io, whose store showed its prices while its payments ran in test mode. .store-soon takes the pointer away and drops a door\'s link underline; nothing carries it while the store is open.',
     },
+    {
+        id: 'fingerprint', name: 'Fingerprint', kind: 'component', status: 'active',
+        summary: 'The fingerprint of a text on the node\'s own screens: what kind of material it is (fact, analysis, opinion, instruction, decision, narrative) and what each part rests on, drawn by the same atelier drawing Pages and the apps use (seal, barcode, trust bar, quadrants, the lines a chat shows), in the node\'s ink, lines and fonts.',
+        module: '/components/Fingerprint.js', sheet: '/css/components/fingerprint.css', classes: ['node-fp'],
+        data: {
+            shape: 'Fingerprint({ profile, sections?, title?, view?, expandable? })',
+            fields: {
+                profile: 'the item\'s profile, facts.profile from GET /v1/content/facts?with_profile=true',
+                sections: 'profile_sections from the same answer (headings and claims), or null',
+                title: 'the item\'s name over the drawing',
+                view: 'panel (everything, the default) | row | seal | barcode',
+                expandable: 'the compact row, which opens the whole fingerprint in place when pressed; "Show less" folds it back',
+            },
+        },
+        useFor: ['What a context or a document is made of, on the page that shows it (first: the Contexts page).'],
+        variants: [],
+        example: { title: 'Cabin repair' },
+        note: 'Added 2026-11-09; the developer approved its look the same day. It loads /v1/libs/aimeat-atelier.js and the kit\'s fingerprint.css once, on first use; fingerprint.css here maps the kit\'s --ak-* tokens to the node\'s theme tokens, and the six genre colours stay the kit\'s validated defaults.',
+    },
 ];

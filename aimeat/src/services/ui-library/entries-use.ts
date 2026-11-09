@@ -10,6 +10,7 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.80.0 — 2026-11-09 — The block slot (surface-slot): wait, layout.
  *   v1.79.0 — 2026-10-29 — LayoutSketch and LookSample: view, pick.
  *   v1.78.0 — 2026-10-19 — AgentAvatar: view, list.
  *   v1.77.0 — 2026-10-18 — ClassificationBadge: status, explain.
@@ -129,6 +130,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'instruction-block': ['explain', 'copy'], 'contact-picker': ['pick', 'search'], tags: ['pick', 'list'], 'app-sandbox': ['view', 'open'], 'html-page-frame': ['view', 'open'],
     'own-aimeat': ['explain', 'navigate'],
     'store-door': ['navigate', 'status'],
+    fingerprint: ['view', 'explain'],
     // The shell and the parts catalogued on 2026-09-24
     'page-base': ['layout'], 'top-bar': ['navigate', 'notify'], button: ['act'], 'copy-button': ['copy'], card: ['layout', 'view'],
     badge: ['status'], pill: ['status'], seg: ['pick'], 'start-page': ['pick', 'edit'], 'status-dot': ['status'],
@@ -146,7 +148,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'page-section': ['layout'], 'fold-row': ['open', 'layout'], 'setting-box': ['edit', 'confirm'], 'form-fields': ['edit'],
     'space-table': ['list', 'open'], facts: ['view'], listing: ['list', 'open', 'act'], 'search-line': ['search'],
     'code-block': ['view', 'copy'], 'form-message': ['status', 'notify'], switch: ['edit', 'status'], 'select-field': ['pick', 'edit'],
-    'proof-ledger': ['list', 'status'], changelog: ['list'], 'address-preview': ['status', 'explain'], 'loading-mark': ['wait'], 'more-line': ['navigate', 'count'],
+    'proof-ledger': ['list', 'status'], changelog: ['list'], 'address-preview': ['status', 'explain'], 'loading-mark': ['wait'], 'surface-slot': ['wait', 'layout'], 'more-line': ['navigate', 'count'],
     'colour-tag': ['pick', 'status'], 'doc-tree': ['navigate', 'list'], 'file-preview': ['view', 'open'], 'file-drop': ['pick', 'edit'], 'tag-input': ['edit'],
     'gaii-chip': ['copy', 'view'],
     'model-picker': ['pick', 'search'],

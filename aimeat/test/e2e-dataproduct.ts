@@ -20,6 +20,9 @@
  *   file, and cannot read, run or delete A's definition; an agent without memory:write is refused; an
  *   agent with the words defines and previews over MCP.
  * @version-history
+ *   v1.4.0 — 2026-11-09 — W7/W8 (TARGET-094): a public package built unchanged from another names the
+ *     original's page as canonical and leaves the dataset sitemap; one that is not a copy keeps its own
+ *     address, and its page names the publisher in the title and says the rows in a crawler body.
  *   v1.3.0 — 2026-11-03 — W6: a direct POST /v1/datapackages refuses a malformed i18n or attribution and
  *     stores the words normalised (before, that route passed both through unchecked).
  *   v1.2.0 — 2026-11-01 — WP10e: the words per language, the licence and the attribution reach the
@@ -496,6 +499,28 @@ await test('W3 the public dataset page answers 200 for a public package and 404,
     assert(miss.status === 404 && body.includes('<html') && miss.headers.get('x-robots-tag')?.includes('noindex'), `a missing package: ${miss.status} ${miss.headers.get('x-robots-tag')}`);
     const priv = await fetch(`${BASE}/v1/dataset/${A.name}/${N('mem')}`);
     assert(priv.status === 404, `a private package's page: ${priv.status}`);
+});
+
+await test('W7 a package built unchanged from another public package names the original as canonical and leaves the dataset sitemap', async () => {
+    // N('pkg') (D9.1f) is a public product of SRC with no transformation: the same bytes.
+    const canonicalOf = (html: string) => /<link rel="canonical" href="([^"]+)">/.exec(html)?.[1] ?? '';
+    const original = `${BASE}/v1/dataset/${A.name}/${SRC}`;
+    const copy = await (await fetch(`${BASE}/v1/dataset/${A.name}/${N('pkg')}`)).text();
+    assert(canonicalOf(copy) === original, `the copy's canonical: ${canonicalOf(copy)}`);
+    const own = await (await fetch(original)).text();
+    assert(canonicalOf(own) === original, `the original's canonical: ${canonicalOf(own)}`);
+    const sm = await (await fetch(`${BASE}/sitemap-datasets.xml`)).text();
+    assert(sm.includes(`${original}<`) && !sm.includes(`/v1/dataset/${A.name}/${N('pkg')}<`), `dataset sitemap: ${sm.slice(0, 800)}`);
+});
+
+await test('W8 a package that is not a copy keeps its own address, and its page says who published how many rows', async () => {
+    // N('words') (W1) is public and built from a memory record: not a copy of any package.
+    const canonicalOf = (html: string) => /<link rel="canonical" href="([^"]+)">/.exec(html)?.[1] ?? '';
+    const page = await (await fetch(`${BASE}/v1/dataset/${A.name}/${N('words')}`)).text();
+    assert(canonicalOf(page) === `${BASE}/v1/dataset/${A.name}/${N('words')}`, `canonical ${canonicalOf(page)}`);
+    assert(new RegExp(`<title>[^<]*· ${A.name} ·`).test(page), `the title names no publisher: ${/<title>[^<]*/.exec(page)?.[0]}`);
+    assert(page.includes('id="crawler-body"') && page.includes(`Published by ${A.name}`) && /2 rows/.test(page), 'the crawler body says nothing of who published how many rows');
+    assert(!page.includes(`/v1/dataset/${A.name}/${N('words')}.md`), 'the body links to a markdown address that does not exist');
 });
 
 await test('W4 the history sums the rows and bytes of every table, and a return to earlier bytes is the newest row and the current one', async () => {

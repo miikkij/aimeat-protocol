@@ -13,6 +13,8 @@
  * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName, { agentThreads }) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   2026-11-09 — groupsOf asks for the reader's and every agent's group threads in one read
+ *     (listConversationsForParticipants); the reader's own membership still wins.
  *   2026-11-04 — No per-owner loop for a storage without listConversationsForOwners: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.7.0 — 2026-10-21 — Group chat. The group memberships are read once (groupsOf) for the whole list.
@@ -255,7 +257,7 @@ export class MessagingDbService {
   }
 
   /**
-   * Every group thread the reader or one of their agents is in, by id. ONE query per identity.
+   * Every group thread the reader or one of their agents is in, by id, in ONE read for all of them.
    *
    * The membership lookup is an exact match on the participant string, and a thread an AGENT opened
    * lists the agent, not the person. So the owner's own row in their agent's support thread matched
@@ -265,12 +267,15 @@ export class MessagingDbService {
    * agent.
    */
   private async groupsOf(readerGhii: string, agentGaiis: string[]): Promise<Map<string, ConversationRecord>> {
-    const lookup = async (identity: string) => this.storage.listConversationsForParticipant(identity)
-      .catch(err => { logger.warn('groupsOf: continuing without group identity', { error: String(err) }); return [] as ConversationRecord[]; });
-    const [own, viaAgents] = await Promise.all([lookup(readerGhii), Promise.all(agentGaiis.map(lookup))]);
-    const byId = new Map(own.map(g => [g.id, g] as const));
-    for (const groups of viaAgents) {
-      for (const g of groups) if (!byId.has(g.id)) byId.set(g.id, g);
+    // Every identity in one read (one per agent was 81 round trips at 79 agents on PostgreSQL).
+    const byIdentity = await this.storage.listConversationsForParticipants([readerGhii, ...agentGaiis])
+      .catch(err => {
+        logger.warn('groupsOf: continuing without group identity', { error: String(err) });
+        return {} as Record<string, ConversationRecord[]>;
+      });
+    const byId = new Map((byIdentity[readerGhii] ?? []).map(g => [g.id, g] as const));
+    for (const gaii of agentGaiis) {
+      for (const g of byIdentity[gaii] ?? []) if (!byId.has(g.id)) byId.set(g.id, g);
     }
     return byId;
   }

@@ -5,6 +5,9 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-09 — aimeat_memory_write takes `patch` (a JSON Merge Patch) in place of `value`;
+ *     aimeat_memory_history: a memory entry's kept earlier versions and what each write changed;
+ *     aimeat_context_check: a machine check of one context.
  *   2026-11-02 — aimeat_schedule_create and aimeat_schedule_update take `deliver` for an agent_task schedule.
  *   2026-10-28 — aimeat_agent_scope_narrow: the node never narrows by itself; call it only on the person's word.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -482,7 +485,7 @@ export const schedulesTasksMemoryTools = [
     },
     {
         name: 'aimeat_memory_write',
-        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list. TIP: workspace documents can embed a key LIVE (an ```aimeat-memory fenced block naming the key shows its current value on every open) — store table-like data as an array of objects with consistent field names and re-write the SAME key to update every document embedding it.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list. TIP: workspace documents can embed a key LIVE (an ```aimeat-memory fenced block naming the key shows its current value on every open) — store table-like data as an array of objects with consistent field names and re-write the SAME key to update every document embedding it. To change a few fields of a large object record (a context\'s core, a status line), send `patch` with only those fields instead of `value`.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Write Memory Entry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -491,7 +494,8 @@ export const schedulesTasksMemoryTools = [
         input: {
             ...aiProvenanceCatalogInput,
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
-            value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.', zod: z.union([documentText(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
+            value: { type: 'unknown', description: 'Value to store — any JSON type. Give this or patch, not both.', zod: z.union([documentText(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
+            patch: { type: 'object', description: 'Change only some fields of an existing object record instead of sending it whole (JSON Merge Patch, RFC 7386). A field you give replaces that field; a nested object merges into the nested object; a list REPLACES the whole list (send the full new list); null REMOVES the field. Fields you leave out stay as they are, and so do visibility and tags unless you give them. Refused with NOT_AN_OBJECT when the record holds a string, number or list. Give this or value, not both; with expected_version the patch lands only on that version.', zod: z.record(z.string(), z.unknown()) },
             visibility: { type: 'string', description: 'Who can read it: private, owner, group, members (any signed-in account of this node), public, or "organism:<organism id>" (the active members of that one organism and their agents; you must be a member of it yourself). Default: private.', zod: memoryWriteVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group. Required when visibility=group, unless the record already has a group: the write is refused without one, and when the id names no group, because the record would open to nobody but its owner.' },
             tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
@@ -531,6 +535,31 @@ export const schedulesTasksMemoryTools = [
         input: {
             key: { type: 'string', required: true, description: 'Exact memory entry key to put back.' },
             owner_scope: { type: 'boolean', description: "Also reach your sibling agents' namespaces, and the OWNER's own when you hold the memory:write-as-owner scope.", zod: flexibleBoolean },
+        },
+    },
+    {
+        name: 'aimeat_memory_history',
+        description: "The earlier versions of one memory entry, newest first, each with what that write changed (path, added, removed or changed). With `version`, that one version's whole value. A person's contexts (`context.`) and ontology modules (`vocab.ctx.`) keep their newest 50 versions; most other keys keep none. To restore, write the old value back with aimeat_memory_write and expected_version set to the current version: the version it replaces is kept too, so a restore can be undone. Read by the entry's owner, or with owner_scope by an agent holding memory:read-as-owner.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Read Memory Entry History', readOnlyHint: true },
+        scope: 'memory:read',
+        input: {
+            key: { type: 'string', required: true, description: 'Exact memory entry key.' },
+            owner_scope: { type: 'boolean', description: "Look under the OWNER as well as under you. Reading the owner's earlier versions needs the memory:read-as-owner scope.", zod: flexibleBoolean },
+            version: { type: 'number', description: "Return this version's whole value instead of the list.", zod: z.number().int().nonnegative() },
+            limit: { type: 'number', description: 'How many versions the list shows, newest first (default 20, at most 50).', zod: z.number().int().min(1).max(50) },
+        },
+    },
+    {
+        name: 'aimeat_context_check',
+        description: "Check one of the person's contexts by machine: references that no longer open, included or composed contexts that are gone, and, when the context has an ontology module, source quotes no longer found in the records they name, ids that name nothing, replacement chains that loop, statements with no source; plus the marks for a context untouched for 90 days or with a core grown large. Reads only, changes nothing. Run it when the person asks how solid a context is, before you lean on it for something that matters, or after a large rewrite. A target you may not open is reported as not found or not open to you.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Check a Context', readOnlyHint: true },
+        scope: 'memory:read',
+        input: {
+            context: { type: 'string', required: true, description: 'The context: its slug ("lisbon-trip") or its key ("context.lisbon-trip").' },
         },
     },
     {

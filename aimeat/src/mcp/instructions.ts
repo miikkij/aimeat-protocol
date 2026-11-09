@@ -15,6 +15,9 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.9.0 — 2026-11-08 — The person's context index (services/context/index-line.ts), after the
+ *     permission line and before DETAIL, for a session that reads memory. CORE is unchanged, so no
+ *     measured cut moves (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  *   v1.8.1 — 2026-11-07 — CORE's first sentence follows the story (docs/AIMEAT-Story.md): the node
  *     multiplies what AI can do for its person, where it said "the personal knowledge and action
  *     store". Seven characters shorter, so the cut budget is unchanged.
@@ -178,6 +181,12 @@ export interface InstructionsOptions {
      * went. Absent leaves the instructions byte for byte as they were.
      */
     supportAnsweredBy?: string | null;
+    /**
+     * The person's context index (services/context/index-line.ts): their contexts by name, key and
+     * when to open each, or the sentence that tells the AI to offer one. Null or absent for a
+     * session that cannot read memory, and the instructions stay as they were.
+     */
+    contexts?: string | null;
 }
 
 /**
@@ -209,6 +218,10 @@ export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOpt
     if (role !== 'all') parts.push(SURFACE_INTROS[role]);
     if (PROPOSING_ROLES.has(role)) parts.push(AGENT_PARAGRAPH);
     if (opts.permissionAsk) parts.push(PERMISSION_ASK);
+    // The person's contexts after everything an agent acts on and before the long form: a client
+    // that cuts at about 2 kB loses it, and aimeat_handbook_get carries the same lines for that one.
+    const contexts = opts.contexts?.trim();
+    if (contexts) parts.push(contexts);
     parts.push(DETAIL);
 
     const guidance = opts.proactiveGuidance?.trim();

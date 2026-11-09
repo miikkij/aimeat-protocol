@@ -1,0 +1,38 @@
+/*
+ * @file public/css/components/fingerprint.css
+ * @description The fingerprint drawing on the node's own screens (components/Fingerprint.js): the
+ *   atelier kit's tokens the drawing reads, mapped to the node's theme tokens, so the seal, the
+ *   barcode and the hover card take the node's ink, lines, surfaces and fonts in both themes. The
+ *   six genre colours stay the kit's validated defaults (aimeat-atelier/fingerprint.css).
+ * @version-history
+ *   v1.0.1 — 2026-11-09 — The focus ring reads var(--shape-frame) (check:shape-tokens), the same
+ *     2px as before.
+ *   v1.0.0 — 2026-11-09 — The developer approved the look; no longer a draft.
+ *   v0.2.0 — 2026-11-09 — .node-fp--opens: the compact row that opens the whole fingerprint.
+ *   v0.1.0 — 2026-11-09 — Draft (the Contexts page).
+ */
+.node-fp {
+  --ak-ink: var(--text);
+  --ak-ink-dim: var(--text-dim);
+  --ak-surface: var(--bg-card);
+  --ak-surface-2: var(--bg-surface);
+  --ak-line: var(--border);
+  --ak-line-w: 1px;
+  --ak-radius: var(--radius-sm);
+  --ak-font: var(--font-body);
+  --ak-font-mono: var(--font-mono);
+  --ak-gap: 12px;
+  --ak-shadow: var(--shadow-sm);
+  --ak-err: var(--danger);
+}
+
+/* The compact row that opens the whole fingerprint (Fingerprint expandable). */
+.node-fp--opens {
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+}
+.node-fp--opens:hover,
+.node-fp--opens:focus-visible {
+  outline: var(--shape-frame) solid var(--border-focus);
+  outline-offset: 4px;
+}

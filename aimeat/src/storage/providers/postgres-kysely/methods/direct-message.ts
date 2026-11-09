@@ -9,6 +9,7 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.10.0 — 2026-11-09 — listConversationsForParticipants: many identities' group threads in one query.
  *   v1.9.0 — 2026-10-26 — Reactions on a single message ("DirectMessageReaction", migration 0118) and
  *     listDirectMessageCopies (every copy by "mid"). Parity with the SQLite repo.
  *   v1.8.0 — 2026-10-21 — Group chat: a conversation's open invitations (`invited`, migration 0111),
@@ -537,6 +538,24 @@ export const directMessageMethods = {
       .where(sql<boolean>`"participants" @> ${jsonb([identity])}`)
       .orderBy('updatedAt', 'desc').execute();
     return rows.map(toConversationRecord);
+  },
+
+  async listConversationsForParticipants(this: PostgresKyselyStorage, identities: readonly string[], opts?: { limit?: number }): Promise<Record<string, ConversationRecord[]>> {
+    const out: Record<string, ConversationRecord[]> = {};
+    for (const identity of identities) out[identity] = [];
+    if (identities.length === 0) return out;
+    // One query: a row matches when its membership array contains any of the identities, each
+    // tested by containment as the single lookup does, so `alice@node` never matches `alice@node-2`.
+    let q = this.db.selectFrom('Conversation').selectAll()
+      .where(eb => eb.or(identities.map(id => sql<boolean>`"participants" @> ${jsonb([id])}`)))
+      .orderBy('updatedAt', 'desc');
+    if (opts?.limit !== undefined) q = q.limit(Math.max(1, Math.floor(opts.limit)));
+    const rows = await q.execute();
+    for (const row of rows) {
+      const record = toConversationRecord(row);
+      for (const id of identities) if (record.participants.includes(id)) out[id].push(record);
+    }
+    return out;
   },
 
   async listConversationsInvitingMailbox(this: PostgresKyselyStorage, mailboxGhii: string, opts: { limit?: number } = {}): Promise<ConversationRecord[]> {

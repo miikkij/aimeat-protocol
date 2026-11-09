@@ -10,6 +10,9 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-09 -- aimeat_memory_write with `patch` proxies PATCH /v1/memory/:key (utils/memory-write-mode.ts
+ *     decides value or patch); aimeat_memory_history, a proxy over GET /v1/memory/history/:key; aimeat_context_check,
+ *     over GET /v1/memory/context-check/:slug.
  *   2026-11-08 -- aimeat_consent_grant sends `role` (read | write) in the POST /v1/consent body.
  *   2026-11-01 -- aimeat_consent_grant sends pinned_version, allow_url_key and terms_required as the
  *     consent's metadata, for a party recipient (plan doc-mvwxcas3dom3, D3.4).
@@ -62,6 +65,7 @@
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord } from './tool-call-helpers.js';
 import { dataMapCliTools } from './tool-call-defs-data-map.js';
+import { memoryWriteMode } from '../utils/memory-write-mode.js';
 import type { ApiResponse } from './api-client.js';
 import { complianceCliTools } from './tool-call-defs-compliance.js';
 
@@ -119,6 +123,19 @@ export const coreTools: ConnectCliToolDefinition[] = [
         })}`),
     },
     {
+        name: 'aimeat_memory_history',
+        // A thin proxy: who may read earlier versions is decided in services/memory-history.ts.
+        handler: ({ client }, input) => client.get(`/v1/memory/history/${encodeURIComponent(requiredString(input, 'key'))}${query({
+            owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
+            version: optionalNumber(input, 'version'),
+            limit: optionalNumber(input, 'limit'),
+        })}`),
+    },
+    {
+        name: 'aimeat_context_check',
+        handler: ({ client }, input) => client.get(`/v1/memory/context-check/${encodeURIComponent(requiredString(input, 'context'))}`),
+    },
+    {
         name: 'aimeat_memory_delete',
         // A THIN PROXY, deliberately. Who may remove what is decided once, in
         // services/memory-bin.ts behind DELETE /v1/memory/:key, and this door brings parameters
@@ -139,6 +156,23 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_memory_write',
         handler: ({ client }, input) => {
+            const mode = memoryWriteMode(input);
+            if ('error' in mode) throw new Error(`${mode.error.code}: ${mode.error.message}`);
+            if (mode.mode === 'patch') {
+                // A thin proxy over PATCH /v1/memory/:key: the route (services/memory-patch) decides,
+                // including a patch that is not an object and a record that is not one.
+                const pbody: JsonObject = { patch: input.patch as JsonObject };
+                const v = optionalString(input, 'visibility');
+                if (v) pbody.visibility = v;
+                const t = optionalArray(input, 'tags');
+                if (t) pbody.tags = t;
+                const ttl = optionalNumber(input, 'ttl_hours');
+                if (ttl !== undefined) pbody.ttl_hours = ttl;
+                if (optionalBoolean(input, 'owner_scope')) pbody.owner_scope = true;
+                const ev = optionalNumber(input, 'expected_version');
+                if (ev !== undefined) pbody.if_version = ev;
+                return client.patch(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}`, pbody);
+            }
             const body: JsonObject = { key: requiredString(input, 'key'), value: requiredValue(input, 'value') };
             const visibility = optionalString(input, 'visibility');
             const ttlHours = optionalNumber(input, 'ttl_hours');

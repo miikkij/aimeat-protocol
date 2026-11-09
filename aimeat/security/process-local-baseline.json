@@ -1049,6 +1049,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/mcp-build-inputs.ts :: map :: contextsByReader": {
+      "count": 1,
+      "reason": "A short cache (BUILD_INPUTS_TTL_MS) of the context index per connecting principal on the 2026-07-28 MCP path. A second process builds its own from the same storage; a changed context reaches a session through either process within the TTL, and nothing is lost."
+    },
     "src/services/mcp-client/pool.ts :: interval :: startSweeper": {
       "count": 1,
       "reason": "DEBT"

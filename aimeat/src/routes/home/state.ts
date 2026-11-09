@@ -12,6 +12,8 @@
  * @structure registerHomeStateRoutes(router, ctx): GET /v1/home/state
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.4.1 — 2026-11-09 — The state, the rooms, the playbooks and the journey are read in one read
+ *     scope, so the agent list and the onboarding records are read once for the whole answer.
  *   v1.4.0 — 2026-10-01 — The response carries `journey`: the seven stages of the path and what the
  *     person said they want (services/journey-state.ts), for every account, initialized or not.
  *   v1.3.0 — 2026-09-18 — `client_options` carries the two apps behind a shared name when the
@@ -32,6 +34,7 @@ import { openPlaybooks } from '../../services/home-playbooks.js';
 import { readJourney } from '../../services/journey-state.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void {
     const { config, storage } = ctx;
@@ -45,7 +48,27 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
     router.get('/v1/home/state', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
         const owner = req.auth!.owner;
         const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
-        const state = await readHomeState(storage, config, owner);
+        // One read scope for the whole answer: the state, the rooms and the journey read the same
+        // agent list and onboarding records, once (the journey read them again outside it).
+        const { state, rooms, playbooks, journey } = await runInReadScope(async () => {
+            const state = await readHomeState(storage, config, owner);
+
+            // Only the rooms that are really there. The view renders what it is given and never
+            // decides for itself which doors exist (E11).
+            // The mailbox room asks about THIS account, so the resolved GHII goes in — never
+            // req.auth!.sub, which is a bare owner name on an owner session (Rule 10).
+            const rooms = state.initialized
+                ? await openRooms(storage, config, resolveIdentity(req.auth!, config.nodeId))
+                : [];
+
+            // The playbooks this node can actually deliver, once the AI connection is verified.
+            const playbooks = state.initialized ? await openPlaybooks(storage, config) : [];
+
+            // The seven stages and the person's own words, so the page draws the same path their AI
+            // reads in its handbook (services/journey-state.ts).
+            const journey = await readJourney(storage, config, owner, state);
+            return { state, rooms, playbooks, journey };
+        });
 
         // Re-derive the pending question from what is known, rather than storing it: the answer
         // to "what should I ask next" is a function of the state, and a stored copy would survive
@@ -55,21 +78,6 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
                 state.branch ? { clientAnswer: state.ai?.client ?? undefined } : {})
             : null;
         const question = state.branch ? null : decision?.branch === 'ask' ? decision.question : null;
-
-        // Only the rooms that are really there. The view renders what it is given and never
-        // decides for itself which doors exist (E11).
-        // The mailbox room asks about THIS account, so the resolved GHII goes in — never
-        // req.auth!.sub, which is a bare owner name on an owner session (Rule 10).
-        const rooms = state.initialized
-            ? await openRooms(storage, config, resolveIdentity(req.auth!, config.nodeId))
-            : [];
-
-        // The playbooks this node can actually deliver, once the AI connection is verified.
-        const playbooks = state.initialized ? await openPlaybooks(storage, config) : [];
-
-        // The seven stages and the person's own words, so the page draws the same path their AI
-        // reads in its handbook (services/journey-state.ts).
-        const journey = await readJourney(storage, config, owner, state);
 
         res.json(success(config.nodeId, {
             state,

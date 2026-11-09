@@ -184,6 +184,7 @@ import { stableToolSchemas } from './tool-schema-cache.js';
 import { shortenChatTools } from './chat-tool-text.js';
 import { instructionsFor } from './instructions.js';
 import { readBuildInputs } from '../services/mcp-build-inputs.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 import { mcpAudienceRefusal } from './oauth-binding.js';
@@ -279,10 +280,19 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // support here. Read when the server is built, because that is the one moment every client
         // passes through, and never allowed to fail a connection (services/mcp-build-inputs.ts). A 2026-07-28
         // request builds a server per request and reads both through a short cache.
-        const { guidance, supportAnsweredBy } = await readBuildInputs(storage, config, owner, stateless);
+        // The person's contexts are named only to a session that can open them: one whose scopes
+        // reach aimeat_memory_read (services/context/index-line.ts).
+        const isAgent = parseGaiiLoose(agentGaii).agent !== '';
+        const reader = {
+            readsMemory: !config.mcpEnforceScopes || scopeAllowsTool(scopes, 'aimeat_memory_read'),
+            agentSession: isAgent,
+            identity: agentGaii,
+            content: readerForAgent({ storage, config }, agentGaii, scopes),
+        };
+        const { guidance, supportAnsweredBy, contexts } = await readBuildInputs(storage, config, owner, stateless, Date.now(), reader);
         // An agent's person can allow a missing permission with one press; an owner, an app and an
         // ecosystem app have no such page (services/permission-ask.ts).
-        const mayAsk = config.mcpEnforceScopes && !agentGaii.startsWith('eco:') && parseGaiiLoose(agentGaii).agent !== '';
+        const mayAsk = config.mcpEnforceScopes && !agentGaii.startsWith('eco:') && isAgent;
         const mcp = new McpServer(
             // serverInfo.version is the node's software version (Core 2026-11 ruling Q2), not a number of its own.
             { name: `AIMEAT Node ${config.nodeId}`, version: getSoftwareVersion() },
@@ -296,7 +306,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 // The orientation an agent reads before it has called anything. Without it a client
                 // meets a few hundred tool descriptions and no indication of where to start, so the
                 // handbook this text points at was reachable only by guessing it existed.
-                instructions: instructionsFor(role, { proactiveGuidance: guidance, supportAnsweredBy, permissionAsk: mayAsk }),
+                instructions: instructionsFor(role, { proactiveGuidance: guidance, supportAnsweredBy, permissionAsk: mayAsk, contexts }),
             },
         );
         // A client that sends null for an optional field it left out is read as leaving it out

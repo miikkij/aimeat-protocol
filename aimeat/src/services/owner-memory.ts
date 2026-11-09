@@ -16,6 +16,9 @@
  *       owner+agents (GHII-first); a non-public record never shadows a public one (anonymous serve paths)
  * @usage import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
  * @version-history
+ *   v1.6.0 — 2026-11-09 — getOwnerScopeMemory reads the agents and ecosystem apps through the request's
+ *     read scope (loadOwnerAgents, loadOwnerEcoApps): the home state asked for three keys and read the
+ *     agent list for each.
  *   v1.5.0 — 2026-11-01 — getOwnerScopeMemory takes `skipAgent`, so the connect-your-AI proof key can
  *     leave out a copy the node's own chat or basic agents wrote (mcp-agent-admission.ts).
  *   v1.0.0 — 2026-06-13 — Extracted from routes/memory.ts owner-scope branch; reused by the workflow
@@ -35,6 +38,7 @@
 import type { Storage, MemoryRecord, AgentRecord } from '../storage/interface.js';
 import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
 import { MemoryRepository } from '../storage/repositories-impl/memory-repository.js';
+import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
 
 /**
  * A record from an owner-scope listing. `alsoUnder` names every OTHER same-owner identity holding
@@ -113,8 +117,10 @@ export async function getOwnerScopeMemory(
   // was one getMemory PER identity (an owner with ~60 agents = ~60 serial round-trips just to read one
   // key that isn't there). `prefix: key` + an exact-key filter finds the key wherever it lives; GHII was
   // already checked, so agents/eco keep their listing-order precedence.
-  const agents = (await storage.getAgentsByOwner(ownerName)).filter(a => !opts?.skipAgent?.(a));
-  const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
+  // Both lists through the request's read scope, so a composite (the home state, the journey) that
+  // asks for several keys reads them once.
+  const [allAgents, ecoApps] = await Promise.all([loadOwnerAgents(storage, ownerName), loadOwnerEcoApps(storage, ownerName)]);
+  const agents = allAgents.filter(a => !opts?.skipAgent?.(a));
   const others = [...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
   if (!others.length) return null;
   const rows = (await storage.listMemoryForOwners(others, { prefix: key })).filter(r => r.key === key);

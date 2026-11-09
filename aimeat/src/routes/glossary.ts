@@ -20,6 +20,7 @@
  *   technical definition stays as it is, for builders.
  * @usage app.use(glossaryRouter(config));
  * @version-history
+ *   v1.2.0 — 2026-11-09 — The Link header of /v1/glossary.md: the canonical address comes from canonicalPageUrl (data/public-pages.ts): the main node's for a page this node repeats (seo.primary_node_url, TARGET-094).
  *   v1.1.1 — 2026-10-03 — The translator is found by comparing the locale, not by using the request's
  *     value as a key (CodeQL alert 1698).
  *   v1.1.0 — 2026-10-03 —?lang= and `plain` on every term a person meets, `label` on every area,
@@ -29,7 +30,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { GLOSSARY, GLOSSARY_AREAS, findTerm, glossaryByArea, glossaryTermId, type GlossaryTerm } from '../data/glossary.js';
-import { sitemapPages } from '../data/public-pages.js';
+import { canonicalPageUrl, sitemapPages } from '../data/public-pages.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
 import { success, error } from '../middleware/envelope.js';
 import { LOCALES, createT, toLocale, type Locale, type TFunction } from '../i18n.js';
@@ -168,7 +169,7 @@ export function glossaryRouter(config: AimeatConfig): Router {
   router.get('/v1/glossary.md', (req, res) => {
     res.set('Access-Control-Allow-Origin', '*');
     // Canonical back to the HTML page: this is a rendering of that page, not a rival for it.
-    res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}/v1/glossary>; rel="canonical"`);
+    res.set('Link', `<${canonicalPageUrl({ path: '/v1/glossary' }, config)}>; rel="canonical"`);
     sendMarkdown(res, buildGlossaryMarkdown(config, toLocale(req.query.lang)));
   });
 

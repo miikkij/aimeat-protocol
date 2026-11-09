@@ -7,6 +7,9 @@
  *   under src/routes/memory/ (crud, bulk, federation, files, key); this file wires
  *   them onto one router in registration order (Express matches top-to-bottom).
  * @version-history
+ *   v1.14.0 -- 2026-11-09 -- GET /v1/memory/history/:key (routes/memory/history.ts): a record's kept
+ *     earlier versions and what each write changed; GET /v1/memory/context-check/:slug
+ *     (routes/memory/context-check.ts): a machine check of one context.
  *   v1.13.0 -- 2026-10-18 -- /v1/publish-requests (routes/publish-requests.ts): the requests to make
  *     something public that wait for the owner (plan doc-mvcn6c7e4e5q, V4.3).
  *   v (2026-07-04) — /v1/memory/files upload + download accept external principals (agent/ecosystem/app)
@@ -57,6 +60,8 @@ import { registerFederationRoutes } from './memory/federation.js';
 import { registerFilesRoutes } from './memory/files.js';
 import { registerPatchRoutes } from './memory/patch.js';
 import { registerKeyRoutes } from './memory/key.js';
+import { registerHistoryRoutes } from './memory/history.js';
+import { registerContextCheckRoutes } from './memory/context-check.js';
 import { registerPublishRequestRoutes } from './publish-requests.js';
 
 export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void, peers?: Map<string, import('../services/federation.js').PeerInfo>): Router {
@@ -105,6 +110,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   registerFilesRoutes(router, ctx);       // /v1/memory/files (upload, visibility, tags, list, get, delete)
   // AFTER files (which owns PATCH /v1/memory/files/:key) and before the /:gaii/:key capture.
   registerPatchRoutes(router, ctx);       // PATCH /v1/memory/:key (RFC 7386 merge patch)
+  registerHistoryRoutes(router, ctx);     // GET /v1/memory/history/:key, before the /:gaii/:key capture
+  registerContextCheckRoutes(router, ctx); // GET /v1/memory/context-check/:slug, likewise
   registerKeyRoutes(router, ctx);         // /v1/memory/:key (get/delete/put), cors, /v1/memory/:gaii/:key
   // Requests to make a record (or other content) public that wait for the owner (plan V4.3).
   registerPublishRequestRoutes(router, config, storage);   // /v1/publish-requests

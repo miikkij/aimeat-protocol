@@ -34,6 +34,9 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.5.2 — 2026-11-09 — countWorkersRun counts a worker with two or more finished tasks without
+ *     reading them (one of two is always not the test task), and reads the onboarding records once
+ *     (loadOwnerOnboardings): two reads per worker, 158 at 79 workers, before. Same count.
  *   v1.5.1 — 2026-11-02 — isOutsideMcpAgent asks node-resident-agent.ts isNodeResidentAgent, the rule the
  *     first-MCP-call marker uses, instead of a second copy of its two conditions (agreed with bb).
  *   v1.5.0 — 2026-11-01 — "Connect your AI" is ticked by an agent of the person's own that used MCP
@@ -54,14 +57,14 @@
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AgentRecord } from '../storage/interface.js';
 import { getOwnerScopeMemory } from './owner-memory.js';
 import { readHomeState, type HomeState } from './home-state.js';
 import { FIRST_MCP_CALL_KEY } from './onboarding-funnel.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { isNodeResidentAgent } from './node-resident-agent.js';
 import { getOwnerUsageSummary } from './usage-summary.js';
-import { loadOwnerAgents } from './db/owner-identity.js';
+import { loadOwnerAgents, loadOwnerOnboardings } from './db/owner-identity.js';
 import { writeMemoryRecord } from './memory-write.js';
 import { logger } from '../utils/logger.js';
 
@@ -280,7 +283,7 @@ export async function readJourneySignals(
         sharedWithSomeone,
         apps,
         workers: own.length,
-        workersRun: await countWorkersRun(storage, ghii, own),
+        workersRun: await countWorkersRun(storage, owner, ghii, own),
     };
 }
 
@@ -289,17 +292,19 @@ export async function readJourneySignals(
  * grouped count for the owner first, so an agent with nothing done costs no further read; for the
  * rest, at most three done tasks each are looked at, and the first real one answers.
  */
-async function countWorkersRun(storage: Storage, ownerGhii: string, workers: Array<{ gaii: string }>): Promise<number> {
+async function countWorkersRun(storage: Storage, owner: string, ownerGhii: string, workers: AgentRecord[]): Promise<number> {
     if (!workers.length) return 0;
     const counts = await storage.countTasksByOwner(ownerGhii);
-    let ran = 0;
-    for (const w of workers) {
-        if (!(counts[w.gaii]?.done > 0)) continue;
-        const [onboarding, done] = await Promise.all([
-            storage.getOnboarding(w.gaii),
-            storage.listAgentTasks(w.gaii, { status: 'done', perPage: 3 }),
-        ]);
-        const testId = (onboarding?.steps.find(s => s.id === 'accept_test_task')?.details as Record<string, unknown> | undefined)?.testTaskId;
+    // Two finished tasks always include one that is not the onboarding's test task (a worker has
+    // one test task), so only a worker with exactly one is looked at. Reading every worker's tasks in
+    // turn was two reads per worker: 158 at 79 workers.
+    let ran = workers.filter(w => (counts[w.gaii]?.done ?? 0) >= 2).length;
+    const single = workers.filter(w => counts[w.gaii]?.done === 1);
+    if (!single.length) return ran;
+    const onboardings = await loadOwnerOnboardings(storage, owner, await loadOwnerAgents(storage, owner));
+    for (const w of single) {
+        const done = await storage.listAgentTasks(w.gaii, { status: 'done', perPage: 3 });
+        const testId = (onboardings[w.gaii]?.steps.find(s => s.id === 'accept_test_task')?.details as Record<string, unknown> | undefined)?.testTaskId;
         if (done.tasks.some(t => t.id !== testId)) ran++;
     }
     return ran;

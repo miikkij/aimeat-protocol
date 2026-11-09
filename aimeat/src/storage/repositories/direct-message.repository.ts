@@ -7,6 +7,8 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   2026-11-09 -- listConversationsForParticipants: the mailbox's group lookup for the owner and every
+ *     agent in one read (81 round trips at 79 agents on PostgreSQL).
  *   2026-11-04 -- getDirectMessagesByIds and listConversationsForOwners are required: both providers
  *     implement them (codebase analysis 2026-11-03, item D-e).
  *   v1.7.0 -- 2026-10-26 -- Reactions on a single message (addMessageReaction, removeMessageReaction,
@@ -182,6 +184,11 @@ export interface DirectMessageRepository {
   updateConversation(id: string, updates: ConversationUpdate): Promise<ConversationRecord | null>;
   /** Every group thread `identity` is a participant of, newest first. */
   listConversationsForParticipant(identity: string): Promise<ConversationRecord[]>;
+  /** listConversationsForParticipant for many identities: keyed by identity (every input present,
+   *  empty when none), each list newest first. The owner's mailbox asked once per agent. `limit`
+   *  reads at most that many threads in all, newest first; without it every thread is read, as the
+   *  single lookup does. */
+  listConversationsForParticipants(identities: readonly string[], opts?: { limit?: number }): Promise<Record<string, ConversationRecord[]>>;
   /** The group threads with an open invitation for `mailboxGhii` or one of its agents, newest first,
    *  at most `limit` (default 100). */
   listConversationsInvitingMailbox(mailboxGhii: string, opts?: { limit?: number }): Promise<ConversationRecord[]>;

@@ -15,6 +15,7 @@
  * @usage interface AimeatConfig extends SitePresenceConfig { … }
  *   return { ...seoDefaults(), … };
  * @version-history
+ *   2026-11-09 — seoPrimaryNodeUrl (AIMEAT_SEO_PRIMARY_NODE_URL): the node whose general pages this node repeats (TARGET-094).
  *   2026-10-01 — seoAnnounceApps (AIMEAT_SEO_ANNOUNCE_APPS): whether the node points search engines at its apps.
  *   2026-09-29 — appBadge (AIMEAT_APP_BADGE): the served apps' aimeat.io badge, on or off node-wide.
  *   2026-09-17 - TARGET-078: ownership and useful work lead the default description.
@@ -111,6 +112,18 @@ export interface SeoConfig {
    */
   seoAnnounceApps: boolean;
   /**
+   * The address of the node whose general pages this node repeats: the pages about the software
+   * (how it works, the docs, the help, the glossary, the change log and the like), which every node
+   * serves with the same text. Set, those pages here name that node's address as their canonical
+   * one and leave this node's sitemap and IndexNow notices; people still read them here. Empty, or
+   * this node's own address: the pages are this node's own. The pages that show this node's own
+   * content (its front page, its applications, its members) are never handed over
+   * (data/public-pages.ts `ownContent`). A store or customer node running beside a main node sets
+   * it; store.aimeat.io served the 16 general pages of aimeat.io as its own until 2026-11-09, and
+   * Google reported them as duplicates (TARGET-094).
+   */
+  seoPrimaryNodeUrl: string;
+  /**
    * Who decides whether a published app is search-visible. 'owner' means the app owner's own
    * switch is the whole decision; 'review' means the owner requests it and the operator approves.
    * The operator's per-app block works in both modes.
@@ -190,6 +203,7 @@ export function seoDefaults(): SeoConfig {
     seoVerificationExtra: parseVerificationExtra(process.env.AIMEAT_SEO_VERIFICATION_EXTRA),
     seoIndexnowAuto: process.env.AIMEAT_SEO_INDEXNOW_AUTO !== 'false',
     seoAnnounceApps: process.env.AIMEAT_SEO_ANNOUNCE_APPS !== 'false',
+    seoPrimaryNodeUrl: (process.env.AIMEAT_SEO_PRIMARY_NODE_URL ?? '').trim(),
     appsSeoMode: process.env.AIMEAT_APPS_SEO_MODE?.trim().toLowerCase() === 'review' ? 'review' : 'owner',
   };
 }

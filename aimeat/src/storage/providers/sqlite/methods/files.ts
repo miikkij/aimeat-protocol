@@ -8,6 +8,7 @@
  * @structure fileMethods
  * @usage Object.assign(SqliteStorage.prototype, fileMethods) in ../index.ts
  * @version-history
+ *   2026-11-09 — storageFileHolders: which identities hold a key, in one query.
  *   2026-11-08 — `rowVersion` (Postgres 0128): every write of a row gives it a new random token, and
  *     moveStorageFileBytes writes only where the bytes live, and only while the row still has the token
  *     the move read (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
@@ -176,6 +177,14 @@ export const fileMethods = {
       (out[record.ownerGaii] ??= []).push(record);
     }
     return out;
+  },
+
+  async storageFileHolders(this: SqliteStorage, ownerGaiis: readonly string[], key: string): Promise<string[]> {
+    if (ownerGaiis.length === 0) return [];
+    const rows = this.db.prepare(
+      `SELECT ownerGaii FROM storage_files WHERE key = ? AND ownerGaii IN (${ownerGaiis.map(() => '?').join(',')})`,
+    ).all(key, ...ownerGaiis) as { ownerGaii: string }[];
+    return rows.map(r => r.ownerGaii);
   },
 
   async listFontFilesAcrossOwners(this: SqliteStorage, opts: { limit: number; excludeOwner?: string }): Promise<{ total: number; items: StorageFileRecord[] }> {

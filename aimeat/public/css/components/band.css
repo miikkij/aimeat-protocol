@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-11-09 — The row spacing reaches through a home block's slot (surface-slot.css), so a
+ *     band of blocks lays out as it did before the slots.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -30,3 +32,11 @@
    one, so the categories read apart instead of as one lump. */
 .poster-band--tight > * + * { margin-top: 1.3rem; }
 .poster-band--tight > .poster-section-title--large + * { margin-top: 0; }
+/* A home block's slot (surface-slot.css) draws no box, so the space a row gets from the row before
+   it goes to what the slot holds: the block, or its waiting line. The same three rules as above. */
+.poster-band > * + .surface-slot > .surface-slot-content > :first-child,
+.poster-band > * + .surface-slot > .surface-slot-wait { margin-top: 1.5rem; }
+.poster-band--tight > * + .surface-slot > .surface-slot-content > :first-child,
+.poster-band--tight > * + .surface-slot > .surface-slot-wait { margin-top: 1.3rem; }
+.poster-band > .poster-section-title--large + .surface-slot > .surface-slot-content > :first-child,
+.poster-band > .poster-section-title--large + .surface-slot > .surface-slot-wait { margin-top: 0; }

@@ -25,6 +25,8 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.6.0 — 2026-11-09 — memoryValueText reads a person's context (aimeat.context/v1) as its name,
+ *     summary, core and material, so its fingerprint sees the text's own parts instead of JSON.
  *   v1.5.0 — 2026-11-06 — The profile stage runs only when the caller names it (stagesToRun). With
  *     stages.profile on, every text an owner's agents wrote was fingerprinted on arrival, on the
  *     owner's key, when the owner had meant to try it on two records.
@@ -131,12 +133,21 @@ function mayAsk(caller: CallerContext, owner: string): boolean {
   return caller.inPerson && ownerGhiiOf(owner) === caller.ownerGhii;
 }
 
-/** A memory value as the words it holds: a string; a document's title and markdown; else JSON. */
+/**
+ * A memory value as the words it holds: a string; a document's title and markdown; a person's context
+ * (aimeat.context/v1) as its name, summary, core and material; else JSON. A context read as JSON was
+ * profiled as one section of "fact" resting on nothing (measured 2026-11-09 on a context holding facts,
+ * a decision, an opinion and a story), because the model saw field names, not the text's own parts.
+ */
 export function memoryValueText(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object') {
     const v = value as Record<string, unknown>;
     if (typeof v.markdown === 'string') return [typeof v.title === 'string' ? v.title : '', v.markdown].filter(Boolean).join('\n\n');
+    if (v.type === 'aimeat.context/v1' && typeof v.core === 'string') {
+      const s = (k: string) => (typeof v[k] === 'string' ? (v[k] as string).trim() : '');
+      return [s('name') ? `# ${s('name')}` : '', s('summary'), s('core'), s('material')].filter(Boolean).join('\n\n');
+    }
   }
   try {
     return JSON.stringify(value) ?? '';

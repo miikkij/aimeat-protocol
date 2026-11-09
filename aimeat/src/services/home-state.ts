@@ -19,6 +19,9 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   2026-11-09 — The welcome page is looked for under every identity in one query
+ *     (storage.storageFileHolders), and the agents' onboarding records are one shared query
+ *     (loadOwnerOnboardings): 161 single reads at 79 agents, one round trip each on PostgreSQL.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.4.5 — 2026-11-01 — helloMcp leaves out a proof key the node's own chat or basic agents wrote.
@@ -54,8 +57,7 @@ import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
 import { nodeContext } from './node-context.js';
-import type { AgentOnboardingRecord } from '../storage/types/agents-messaging.js';
-import { loadOwnerAgents } from './db/owner-identity.js';
+import { loadOwnerAgents, loadOwnerOnboardings } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
 import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
 
@@ -168,10 +170,9 @@ async function readHomeStateInScope(
 
     // The mat is a FILE, not a marker: the marker says a paste happened, the file says a page
     // exists. A deleted portfolio must stop being offered as a link.
-    let matHtmlExists = false;
-    for (const gaii of await portfolioReadGaiis(storage, owner, config.nodeId)) {
-        if (await storage.getStorageFile(gaii, PORTFOLIO_HTML_KEY)) { matHtmlExists = true; break; }
-    }
+    // Asked of every identity at once: one round trip per agent, in turn, was 81 reads at 79 agents.
+    const matHtmlExists = (await storage.storageFileHolders(
+        await portfolioReadGaiis(storage, owner, config.nodeId), PORTFOLIO_HTML_KEY)).length > 0;
 
     // The proof key is written by the AGENT under its own GAII, so this must read owner-scope, and
     // a copy the node's own chat or basic agents wrote is not a connection the person made.
@@ -185,18 +186,7 @@ async function readHomeStateInScope(
     // healthy while another is broken is the same lie in a different place. `problems` carries the
     // count so the card never implies the fleet is one agent.
     const nowMs = Date.now();
-    const onboardings = await Promise.all(agents.map(a =>
-        storage.getOnboarding(a.gaii).catch(err => {
-            // A missing onboarding record and a failed read both mean "cannot judge onboarding",
-            // and the verdict degrades to 'new' either way — but a read that FAILED is worth
-            // knowing about, so it is logged rather than swallowed.
-            logger.warn('home-state: continuing after a suppressed onboarding read', {
-                gaii: a.gaii, error: String(err),
-            });
-            return null;
-        })));
-    const onboardingByGaii: Record<string, AgentOnboardingRecord | null> = {};
-    agents.forEach((a, i) => { onboardingByGaii[a.gaii] = onboardings[i] ?? null; });
+    const onboardingByGaii = await loadOwnerOnboardings(storage, owner, agents);
     // A daemon holding an agent's socket is that agent being available right now, which the home
     // has to know before it calls anybody stale: a spawn agent's runtime lives only while a worker
     // runs, so its lastSeen is old whenever it is between jobs.

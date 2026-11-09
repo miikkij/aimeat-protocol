@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.33.0 -- 2026-11-08 -- "Contexts" under Information, after Memory: the things a person keeps working on with their AI, each one record their AI shapes in chat (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  *   v1.32.0 -- 2026-11-07 -- "Receivers" under Automation, after Workflows: the addresses and keys outside programs write into one place of the person's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.31.0 -- 2026-11-02 -- "Data you share" under Account, before the Data Wallet, and in the basic menu (WP11).
  *   v1.30.0 -- 2026-10-31 -- On a node the store sold, the usage card's AI line is the AI credit left in euros with no bar (js/ai-credit.js), the number the Home, the chat and the AI page show (v28 finding 9).
@@ -630,6 +631,9 @@ export const SIDEBAR_GROUPS = [
     { id: 'discover', labelKey: 'discover.tabLabel' },
     { id: 'organisms', labelKey: 'profile.tabs.organisms' },
     { id: 'memory', labelKey: 'profile.tabs.memory' },
+    /* A person's contexts: one memory record each, kept and shaped by their AI in chat; the page
+     * shows them and holds who can read each one, archive and delete. */
+    { id: 'contexts', labelKey: 'profile.tabs.contexts' },
     { id: 'notebook', labelKey: 'profile.tabs.notebook' },
     { id: 'living', labelKey: 'profile.tabs.living' },
     { id: 'knowledge', labelKey: 'knowledge.tabLabel' },

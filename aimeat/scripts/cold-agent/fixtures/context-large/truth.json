@@ -1,0 +1,3768 @@
+{
+  "$comment": "Ground truth for the large context eval (scripts/cold-agent/context-large.ts). Invented people, places and companies only. The session notes in sessions/ are written FROM this file by generate.ts; answer keys are taken from this file, never from the prose.",
+  "main": {
+    "slug": "larder",
+    "name": "Larder",
+    "kind": "factual",
+    "summary": "Larder, the lobby-locker vegetable box service Rasmus and Ilona have built since January 2026. Open this for anything about Larder, its pods, growers, members, prices or decisions.",
+    "setting": "Lakeport, an invented mid-sized coastal city. All people, farms, buildings and companies are invented.",
+    "core": "Larder is the project Rasmus (the owner of this context) and Ilona have run together since January 2026: lockers, which they call pods, in the lobbies of apartment buildings in Lakeport, where members pick up weekly vegetable boxes from small local growers at any hour of the day.\n\nWho does what. Rasmus builds the software: Picker, the app members use; Backroom, the admin back end behind it; and Field, the growers' app. Ilona runs operations and the relationship with the growers, out of her garage on Pier Road. Maija joined as a part-time coordinator in June. Hanna has advised them since March. The pods are leased from Kestrel Lockworks (contact: Oskar). Orphaned food goes to the Harbour Pantry (contact: Hilda).\n\nWhere it stands (mid-October 2026). The pilot ran from the first drop on 10 March to 30 September. At its end Larder had 9 pods (Linden Yard, Quarry Street 12, Harbour Row, Mill Gate, Ferry Close, Weaver's Yard, Kiln Lane, Saltworks and Ropewalk 3), 8 growers (Ridgeback Farm, Saltmeadow Gardens, Three Oaks Market Garden, Fernbrook, Mossy Gate Farm, Kettle Hill, Sorrel Acres, Birch Hollow) and 214 members. The best week saw 152 boxes picked up. Season 2 starts on 2 November with the same nine pods, and an angel investment was agreed at the end of September. A few questions are still open; they are in the latest session notes.\n\nStanding rules. There are rules about what Kestrel may be told and about what may appear in anything that leaves Larder; the latest version of each is in the session notes. Personal matters come up in the sessions now and then and stay between Rasmus and Ilona.\n\nHow to read this context. The working notes of all 40 Tuesday sessions, 13 January to 13 October 2026, are in the references, one record per session, each with what it covered. Over nine months many things were decided, changed and sometimes changed back, so a later session overrides an earlier one: for anything that changed, the latest session that touched it holds the current answer. The notes use the pair's own words and abbreviations freely and seldom explain a word again after the session that coined it.",
+    "people": [
+      {
+        "name": "Rasmus",
+        "role": "co-founder; builds the software (Picker, the Ledger, Field)",
+        "from": 1
+      },
+      {
+        "name": "Ilona",
+        "role": "co-founder; operations, growers and the Garage",
+        "from": 1
+      },
+      {
+        "name": "Aino",
+        "role": "grower, Ridgeback Farm (the first grower)",
+        "from": 3
+      },
+      {
+        "name": "Raimo",
+        "role": "caretaker at Alder Court",
+        "from": 4
+      },
+      {
+        "name": "Oskar",
+        "role": "contact at Kestrel Lockworks, the pod supplier",
+        "from": 6
+      },
+      {
+        "name": "Oskar",
+        "role": "a resident of Harbour Row and its building champion; a different person from Oskar at Kestrel",
+        "from": 11
+      },
+      {
+        "name": "Pekka",
+        "role": "grower, Saltmeadow Gardens",
+        "from": 8
+      },
+      {
+        "name": "Liisa",
+        "role": "grower, Three Oaks Market Garden",
+        "from": 8
+      },
+      {
+        "name": "Hanna",
+        "role": "advisor to Rasmus and Ilona; runs an angel group of private investors",
+        "from": 10
+      },
+      {
+        "name": "Sirpa",
+        "role": "chair of the Alder Court HA",
+        "from": 11
+      },
+      {
+        "name": "Hilda",
+        "role": "contact at the Harbour Pantry food bank",
+        "from": 15
+      },
+      {
+        "name": "Juho",
+        "role": "grower, Fernbrook",
+        "from": 17
+      },
+      {
+        "name": "Kaisa",
+        "role": "grower, Mossy Gate Farm",
+        "from": 17
+      },
+      {
+        "name": "Maija",
+        "role": "part-time coordinator; the grower desk",
+        "from": 24
+      },
+      {
+        "name": "Ville",
+        "role": "grower, Kettle Hill",
+        "from": 26
+      },
+      {
+        "name": "Helmi",
+        "role": "grower, Sorrel Acres",
+        "from": 26
+      },
+      {
+        "name": "Onni",
+        "role": "grower, Birch Hollow",
+        "from": 37
+      }
+    ],
+    "sessions": [
+      {
+        "n": 1,
+        "date": "2026-01-13",
+        "title": "Kick-off: the locker idea",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "the idea",
+          "pods in lobbies",
+          "members",
+          "the bet"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 2,
+        "date": "2026-01-20",
+        "title": "Naming and the first grower search",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "product name",
+          "first grower",
+          "lobby walks",
+          "working rhythm"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 3,
+        "date": "2026-01-27",
+        "title": "The first grower signs",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Aino"
+        ],
+        "topics": [
+          "first grower",
+          "GSA",
+          "box price",
+          "grower onboarding"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 4,
+        "date": "2026-02-03",
+        "title": "Boxes nobody collects",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "orphan boxes",
+          "member app",
+          "caretakers",
+          "chill cells"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 5,
+        "date": "2026-02-10",
+        "title": "How long a box waits",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "pickup window",
+          "web app",
+          "drops",
+          "food registration"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 6,
+        "date": "2026-02-17",
+        "title": "Hardware and the first pod",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Oskar"
+        ],
+        "topics": [
+          "pod supplier",
+          "pod model",
+          "number of pods",
+          "first pod location",
+          "north number",
+          "lobby power"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 7,
+        "date": "2026-02-24",
+        "title": "Logistics: the first loop",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "delivery day",
+          "dawn run",
+          "van",
+          "packing"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 8,
+        "date": "2026-03-03",
+        "title": "Money and codes",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "house cut",
+          "opening compartments",
+          "caretakers",
+          "growers"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 9,
+        "date": "2026-03-10",
+        "title": "Payments and the honesty shelf",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "payment",
+          "card at the pod",
+          "honesty shelf",
+          "investors",
+          "food premises",
+          "first drop"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 10,
+        "date": "2026-03-17",
+        "title": "Passes, short boxes and when to stop",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Hanna"
+        ],
+        "topics": [
+          "season pass",
+          "short boxes",
+          "kill criteria",
+          "pilot length"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 11,
+        "date": "2026-03-24",
+        "title": "Housing associations and champions",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Sirpa"
+        ],
+        "topics": [
+          "lobby fee",
+          "building champions",
+          "champion perk",
+          "insurance"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 12,
+        "date": "2026-03-31",
+        "title": "Prices and box sizes",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "box price",
+          "small box",
+          "grant",
+          "lease or buy",
+          "members"
+        ],
+        "mustUse": [
+          "orphan box",
+          "wake code"
+        ]
+      },
+      {
+        "n": 13,
+        "date": "2026-04-07",
+        "title": "Weather, leases and data",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "rainy-day rule",
+          "pod lease",
+          "member data"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 14,
+        "date": "2026-04-14",
+        "title": "A new name and wave 1",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "product name",
+          "shroud",
+          "wave 1",
+          "trademark"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 15,
+        "date": "2026-04-21",
+        "title": "Where orphan boxes go",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Hilda"
+        ],
+        "topics": [
+          "orphan boxes",
+          "food bank",
+          "neighbour credit",
+          "orphan rate"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 16,
+        "date": "2026-04-28",
+        "title": "A longer window and the Field app",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "pickup window",
+          "crates",
+          "drop scan",
+          "food bank weekends",
+          "floor price",
+          "the Harbour Pantry in public",
+          "the Larder layer"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 17,
+        "date": "2026-05-05",
+        "title": "The growers' circle",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Aino",
+          "Pekka",
+          "Liisa",
+          "Juho",
+          "Kaisa"
+        ],
+        "topics": [
+          "house cut",
+          "floor price",
+          "insurance",
+          "the sweep",
+          "new growers"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 18,
+        "date": "2026-05-12",
+        "title": "Six pods and the Garage pack line",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "number of pods",
+          "packing",
+          "wave 2"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 19,
+        "date": "2026-05-19",
+        "title": "The honesty shelf ends",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "honesty shelf",
+          "opening compartments",
+          "theft"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 20,
+        "date": "2026-05-26",
+        "title": "Bigger pods and the cold chain",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Oskar"
+        ],
+        "topics": [
+          "pod model",
+          "chill cell temperature",
+          "pod size",
+          "pickup rate"
+        ],
+        "mustUse": [
+          "orphan box",
+          "GSA",
+          "the window"
+        ]
+      },
+      {
+        "n": 21,
+        "date": "2026-06-02",
+        "title": "Prices up, a family box",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "box price",
+          "family box",
+          "box tier names",
+          "add-ons"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 22,
+        "date": "2026-06-09",
+        "title": "Moving the drop day",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "delivery day",
+          "dawn run timing",
+          "grant",
+          "admin back end name"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 23,
+        "date": "2026-06-16",
+        "title": "Sales share and the cargo bike",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Sirpa"
+        ],
+        "topics": [
+          "lobby fee",
+          "cargo bike",
+          "dawn run timing"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 24,
+        "date": "2026-06-23",
+        "title": "Maija joins",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "grower onboarding",
+          "short boxes",
+          "coordinator pay"
+        ],
+        "mustUse": [
+          "GSA",
+          "cabinet",
+          "rainy-day rule"
+        ]
+      },
+      {
+        "n": 25,
+        "date": "2026-06-30",
+        "title": "Midsummer review",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Hanna"
+        ],
+        "topics": [
+          "season pass",
+          "pilot length",
+          "north number",
+          "weekly boxes",
+          "a second pod supplier"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 26,
+        "date": "2026-07-07",
+        "title": "Nine pods",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "number of pods",
+          "wave 2",
+          "third wave",
+          "new growers",
+          "swap market"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 27,
+        "date": "2026-07-14",
+        "title": "Back to Larder",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "product name",
+          "shroud",
+          "trademark"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 28,
+        "date": "2026-07-21",
+        "title": "Champions and credits",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "champion perk",
+          "champion name",
+          "neighbour credit",
+          "abuse"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 29,
+        "date": "2026-07-28",
+        "title": "The window again",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "pickup window",
+          "chill locks",
+          "orphan rate"
+        ],
+        "mustUse": [
+          "orphan box",
+          "OB",
+          "the window"
+        ]
+      },
+      {
+        "n": 30,
+        "date": "2026-08-04",
+        "title": "Caretakers, the house cut, photos",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Raimo"
+        ],
+        "topics": [
+          "caretakers",
+          "house cut",
+          "photo proofs",
+          "weekly boxes",
+          "what Kestrel may be told"
+        ],
+        "mustUse": [
+          "orphan box",
+          "GSA",
+          "Backroom"
+        ]
+      },
+      {
+        "n": 31,
+        "date": "2026-08-11",
+        "title": "An Android app after all",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "member app",
+          "Android or iOS",
+          "pod health page"
+        ],
+        "mustUse": [
+          "wake code",
+          "QR stub"
+        ]
+      },
+      {
+        "n": 32,
+        "date": "2026-08-18",
+        "title": "Growers pack again",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "packing",
+          "the Garage"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 33,
+        "date": "2026-08-25",
+        "title": "The price cut",
+        "attendees": [
+          "Rasmus",
+          "Ilona"
+        ],
+        "topics": [
+          "box price",
+          "small box",
+          "churn"
+        ],
+        "mustUse": [
+          "rainy-day rule",
+          "cabinet",
+          "make-good",
+          "Sprout"
+        ]
+      },
+      {
+        "n": 34,
+        "date": "2026-09-01",
+        "title": "Two dawn runs a week",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "delivery day"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 35,
+        "date": "2026-09-08",
+        "title": "Alder Court votes",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Sirpa"
+        ],
+        "topics": [
+          "first pod location",
+          "housing association vote",
+          "the move"
+        ],
+        "mustUse": [
+          "pod zero",
+          "orphan box",
+          "lobby slot",
+          "HA",
+          "lobby host"
+        ]
+      },
+      {
+        "n": 36,
+        "date": "2026-09-15",
+        "title": "Colder chill cells",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Oskar"
+        ],
+        "topics": [
+          "chill cell temperature",
+          "summer setpoint"
+        ],
+        "mustUse": [
+          "chill cell",
+          "cold chain log",
+          "cabinet",
+          "the Pulse"
+        ]
+      },
+      {
+        "n": 37,
+        "date": "2026-09-22",
+        "title": "The season pass returns",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "season pass",
+          "new growers"
+        ],
+        "mustUse": [
+          "GSA",
+          "drip plan",
+          "skip week"
+        ]
+      },
+      {
+        "n": 38,
+        "date": "2026-09-29",
+        "title": "Hanna's angel group",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Hanna"
+        ],
+        "topics": [
+          "investors",
+          "churn",
+          "use of the investment",
+          "what Kestrel may be told"
+        ],
+        "mustUse": [
+          "north number",
+          "NN",
+          "rainy-day rule"
+        ]
+      },
+      {
+        "n": 39,
+        "date": "2026-10-06",
+        "title": "Pilot retro",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "pilot end",
+          "Season 2",
+          "third wave",
+          "weekly boxes",
+          "members"
+        ],
+        "mustUse": [
+          "orphan box",
+          "OB",
+          "GSA",
+          "the bet",
+          "pod zero",
+          "weather skip"
+        ]
+      },
+      {
+        "n": 40,
+        "date": "2026-10-13",
+        "title": "Planning Season 2",
+        "attendees": [
+          "Rasmus",
+          "Ilona",
+          "Maija"
+        ],
+        "topics": [
+          "Season 2",
+          "delivery day",
+          "waitlist"
+        ],
+        "mustUse": [
+          "the window",
+          "twin run",
+          "cabinet",
+          "grower desk",
+          "card on file"
+        ]
+      }
+    ],
+    "terms": [
+      {
+        "id": "t001",
+        "term": "pod",
+        "kind": "coined",
+        "means": "a locker unit standing in the lobby of an apartment building; members collect their boxes from it",
+        "session": 1
+      },
+      {
+        "id": "t002",
+        "term": "compartment",
+        "kind": "jargon",
+        "means": "one lockable door of a pod; it holds one member's box for one drop",
+        "session": 1,
+        "broader": "pod"
+      },
+      {
+        "id": "t003",
+        "term": "grower",
+        "kind": "jargon",
+        "means": "a small local farm that supplies Larder's boxes",
+        "session": 1
+      },
+      {
+        "id": "t004",
+        "term": "member",
+        "kind": "coined",
+        "means": "a resident who subscribes to Larder boxes",
+        "session": 1
+      },
+      {
+        "id": "t005",
+        "term": "customer",
+        "kind": "synonym",
+        "means": "the same as a member; Ilona's word in the first weeks",
+        "session": 1,
+        "synonymOf": "member"
+      },
+      {
+        "id": "t006",
+        "term": "the bet",
+        "kind": "coined",
+        "means": "the main hypothesis: residents will pick up vegetable boxes in their own lobby if pickup is open around the clock",
+        "session": 1
+      },
+      {
+        "id": "t007",
+        "term": "lobby slot",
+        "kind": "coined",
+        "means": "the floor space a housing association lets a pod stand on",
+        "session": 1
+      },
+      {
+        "id": "t008",
+        "term": "HA",
+        "kind": "abbreviation",
+        "means": "housing association: the residents' association that runs a building's common spaces",
+        "session": 1
+      },
+      {
+        "id": "t009",
+        "term": "box",
+        "kind": "jargon",
+        "means": "one member's weekly delivery of vegetables from one grower",
+        "session": 1
+      },
+      {
+        "id": "t010",
+        "term": "last metre",
+        "kind": "coined",
+        "means": "the step from the delivery vehicle to the compartment",
+        "session": 1
+      },
+      {
+        "id": "t011",
+        "term": "Larder",
+        "kind": "name",
+        "means": "the product's name",
+        "session": 2,
+        "sense": "product"
+      },
+      {
+        "id": "t012",
+        "term": "the parking lot",
+        "kind": "coined",
+        "means": "the list of ideas put aside for later",
+        "session": 2
+      },
+      {
+        "id": "t013",
+        "term": "red list",
+        "kind": "coined",
+        "means": "the list of things blocking work this week",
+        "session": 2
+      },
+      {
+        "id": "t014",
+        "term": "box week",
+        "kind": "coined",
+        "means": "the Monday-to-Sunday week a box belongs to",
+        "session": 2
+      },
+      {
+        "id": "t015",
+        "term": "the Tuesday sit-down",
+        "kind": "coined",
+        "means": "the weekly working session of Rasmus and Ilona; these notes are from it",
+        "session": 2
+      },
+      {
+        "id": "t016",
+        "term": "lobby walk",
+        "kind": "coined",
+        "means": "a visit to a building to meet its HA and look for a lobby slot",
+        "session": 2
+      },
+      {
+        "id": "t017",
+        "term": "GSA",
+        "kind": "abbreviation",
+        "means": "grower share agreement: the contract between Larder and one grower, signed by the grower and by Ilona for Larder, that sets the grower share and the grower's duties",
+        "session": 3
+      },
+      {
+        "id": "t018",
+        "term": "grower share",
+        "kind": "coined",
+        "means": "the part of the box price that goes to the grower",
+        "session": 3,
+        "broader": "GSA"
+      },
+      {
+        "id": "t019",
+        "term": "house cut",
+        "kind": "coined",
+        "means": "the part of the box price Larder keeps",
+        "session": 3
+      },
+      {
+        "id": "t020",
+        "term": "standard box",
+        "kind": "jargon",
+        "means": "the main box size, about 6 kg of vegetables for two to three people",
+        "session": 3,
+        "broader": "box"
+      },
+      {
+        "id": "t021",
+        "term": "box sheet",
+        "kind": "coined",
+        "means": "the list a grower sends each week of what goes into that week's boxes",
+        "session": 3
+      },
+      {
+        "id": "t022",
+        "term": "onboarding pack",
+        "kind": "coined",
+        "means": "the documents and instructions a new grower receives",
+        "session": 3
+      },
+      {
+        "id": "t023",
+        "term": "orphan box",
+        "kind": "coined",
+        "means": "a box still in its compartment when the pickup window closes",
+        "session": 4,
+        "broader": "box"
+      },
+      {
+        "id": "t024",
+        "term": "OB",
+        "kind": "abbreviation",
+        "means": "orphan box",
+        "session": 4,
+        "synonymOf": "orphan box"
+      },
+      {
+        "id": "t025",
+        "term": "caretaker",
+        "kind": "jargon",
+        "means": "the person who looks after a building and holds its lobby keys",
+        "session": 4
+      },
+      {
+        "id": "t026",
+        "term": "Picker",
+        "kind": "name",
+        "means": "the member app: members see their box, pay and open their compartment with it",
+        "session": 4
+      },
+      {
+        "id": "t027",
+        "term": "the Ledger",
+        "kind": "name",
+        "means": "the admin back end Rasmus built: members, boxes, drops and payments",
+        "session": 4,
+        "replacedBy": "Backroom",
+        "renamedIn": 22
+      },
+      {
+        "id": "t028",
+        "term": "cell",
+        "kind": "synonym",
+        "means": "the same as a compartment; Rasmus's word, taken from the supplier's manuals",
+        "session": 4,
+        "synonymOf": "compartment"
+      },
+      {
+        "id": "t029",
+        "term": "chill cell",
+        "kind": "coined",
+        "means": "a refrigerated compartment",
+        "session": 4,
+        "broader": "compartment"
+      },
+      {
+        "id": "t030",
+        "term": "pickup window",
+        "kind": "coined",
+        "means": "the time a member has to collect a box after its drop",
+        "session": 5
+      },
+      {
+        "id": "t031",
+        "term": "the window",
+        "kind": "synonym",
+        "means": "the pickup window",
+        "session": 5,
+        "synonymOf": "pickup window"
+      },
+      {
+        "id": "t032",
+        "term": "PW",
+        "kind": "abbreviation",
+        "means": "pickup window",
+        "session": 5,
+        "synonymOf": "pickup window"
+      },
+      {
+        "id": "t033",
+        "term": "dry cell",
+        "kind": "coined",
+        "means": "an unrefrigerated compartment",
+        "session": 5,
+        "broader": "compartment"
+      },
+      {
+        "id": "t034",
+        "term": "drop",
+        "kind": "jargon",
+        "means": "one delivery of boxes into a pod's compartments; also the moment a box is put in",
+        "session": 5
+      },
+      {
+        "id": "t035",
+        "term": "drop day",
+        "kind": "coined",
+        "means": "the day of the week drops are made",
+        "session": 5
+      },
+      {
+        "id": "t036",
+        "term": "Kestrel",
+        "kind": "name",
+        "means": "Kestrel Lockworks, the company that leases the pods to Larder; their contact is Oskar",
+        "session": 6
+      },
+      {
+        "id": "t037",
+        "term": "K-12",
+        "kind": "name",
+        "means": "Kestrel's pod model with 12 compartments, 3 of them chill cells",
+        "session": 6,
+        "broader": "pod",
+        "replacedBy": "K-16",
+        "renamedIn": 20
+      },
+      {
+        "id": "t038",
+        "term": "the spine",
+        "kind": "coined",
+        "means": "the control column of a pod, with its screen, modem and lock controller",
+        "session": 6,
+        "broader": "pod"
+      },
+      {
+        "id": "t039",
+        "term": "north number",
+        "kind": "coined",
+        "means": "the one number the pilot is steered by: boxes picked up per week",
+        "session": 6
+      },
+      {
+        "id": "t040",
+        "term": "NN",
+        "kind": "abbreviation",
+        "means": "north number",
+        "session": 6,
+        "synonymOf": "north number"
+      },
+      {
+        "id": "t041",
+        "term": "pod zero",
+        "kind": "coined",
+        "means": "the first pod Larder installed",
+        "session": 6,
+        "broader": "pod"
+      },
+      {
+        "id": "t042",
+        "term": "heartbeat",
+        "kind": "jargon",
+        "means": "the status message a pod's spine sends to the Ledger every 5 minutes",
+        "session": 6
+      },
+      {
+        "id": "t043",
+        "term": "plinth",
+        "kind": "jargon",
+        "means": "the base frame a pod stands on, which spreads its weight over the lobby floor",
+        "session": 6
+      },
+      {
+        "id": "t044",
+        "term": "dawn run",
+        "kind": "coined",
+        "means": "the morning delivery round that fills the pods with that day's drops",
+        "session": 7
+      },
+      {
+        "id": "t045",
+        "term": "DR",
+        "kind": "abbreviation",
+        "means": "dawn run",
+        "session": 7,
+        "synonymOf": "dawn run"
+      },
+      {
+        "id": "t046",
+        "term": "morning loop",
+        "kind": "synonym",
+        "means": "the same as the dawn run; Ilona's first name for it",
+        "session": 7,
+        "synonymOf": "dawn run"
+      },
+      {
+        "id": "t047",
+        "term": "loop",
+        "kind": "coined",
+        "means": "a fixed route that visits a set of pods in a set order",
+        "session": 7
+      },
+      {
+        "id": "t048",
+        "term": "loop sheet",
+        "kind": "coined",
+        "means": "the printed list of a loop's stops, with the compartment of each box",
+        "session": 7
+      },
+      {
+        "id": "t049",
+        "term": "stop",
+        "kind": "jargon",
+        "means": "one pod visited on a loop",
+        "session": 7,
+        "broader": "loop"
+      },
+      {
+        "id": "t050",
+        "term": "van day",
+        "kind": "coined",
+        "means": "the day a van is hired for the dawn run",
+        "session": 7
+      },
+      {
+        "id": "t051",
+        "term": "hatch",
+        "kind": "jargon",
+        "means": "the rear loading door of a pod",
+        "session": 7,
+        "broader": "pod"
+      },
+      {
+        "id": "t052",
+        "term": "back-load",
+        "kind": "coined",
+        "means": "filling compartments from the hatch side, without opening the members' doors",
+        "session": 7
+      },
+      {
+        "id": "t053",
+        "term": "front-pick",
+        "kind": "coined",
+        "means": "a member opening their compartment from the front",
+        "session": 7
+      },
+      {
+        "id": "t054",
+        "term": "wake code",
+        "kind": "coined",
+        "means": "the 6-digit code a member gets by SMS that opens their compartment",
+        "session": 8
+      },
+      {
+        "id": "t055",
+        "term": "door pulse",
+        "kind": "coined",
+        "means": "the unlock signal the Ledger sends to the spine of a pod",
+        "session": 8
+      },
+      {
+        "id": "t056",
+        "term": "commission",
+        "kind": "synonym",
+        "means": "the same as the house cut; the growers' word for it",
+        "session": 8,
+        "synonymOf": "house cut"
+      },
+      {
+        "id": "t057",
+        "term": "pickup rate",
+        "kind": "jargon",
+        "means": "the share of boxes collected before the pickup window closes",
+        "session": 8
+      },
+      {
+        "id": "t058",
+        "term": "PUR",
+        "kind": "abbreviation",
+        "means": "pickup rate",
+        "session": 8,
+        "synonymOf": "pickup rate"
+      },
+      {
+        "id": "t059",
+        "term": "fob",
+        "kind": "jargon",
+        "means": "the key tag that opens a building's front door",
+        "session": 8
+      },
+      {
+        "id": "t060",
+        "term": "honesty shelf",
+        "kind": "coined",
+        "means": "an unlocked shelf on top of a pod with surplus produce that people pay for by phone",
+        "session": 9
+      },
+      {
+        "id": "t061",
+        "term": "surplus",
+        "kind": "jargon",
+        "means": "produce a grower has beyond what the box sheets need",
+        "session": 9
+      },
+      {
+        "id": "t062",
+        "term": "card on file",
+        "kind": "jargon",
+        "means": "a payment card stored in Picker and charged on the drop day",
+        "session": 9
+      },
+      {
+        "id": "t063",
+        "term": "the Garage",
+        "kind": "name",
+        "means": "Ilona's garage on Pier Road, Larder's store and later its packing room",
+        "session": 9
+      },
+      {
+        "id": "t064",
+        "term": "first drop",
+        "kind": "coined",
+        "means": "the first real drop of the pilot, on 10 March 2026",
+        "session": 9
+      },
+      {
+        "id": "t065",
+        "term": "food premises",
+        "kind": "jargon",
+        "means": "a place registered with the city's food authority for handling food",
+        "session": 9
+      },
+      {
+        "id": "t066",
+        "term": "season pass",
+        "kind": "coined",
+        "means": "a run of weekly boxes paid in advance",
+        "session": 10,
+        "replacedBy": "short pass",
+        "renamedIn": 37
+      },
+      {
+        "id": "t067",
+        "term": "SP",
+        "kind": "abbreviation",
+        "means": "season pass",
+        "session": 10,
+        "synonymOf": "season pass"
+      },
+      {
+        "id": "t068",
+        "term": "short box",
+        "kind": "coined",
+        "means": "a box missing items because the grower came up short",
+        "session": 10,
+        "broader": "box"
+      },
+      {
+        "id": "t069",
+        "term": "swap card",
+        "kind": "coined",
+        "means": "a printed card in a box that says what was swapped or is missing",
+        "session": 10
+      },
+      {
+        "id": "t070",
+        "term": "make-good",
+        "kind": "coined",
+        "means": "a credit given to a member when something went wrong with a box",
+        "session": 10
+      },
+      {
+        "id": "t071",
+        "term": "kill criteria",
+        "kind": "coined",
+        "means": "the conditions under which the two would stop the pilot",
+        "session": 10
+      },
+      {
+        "id": "t072",
+        "term": "pilot",
+        "kind": "jargon",
+        "means": "Larder's first phase in its first buildings, before Season 2",
+        "session": 10
+      },
+      {
+        "id": "t073",
+        "term": "building champion",
+        "kind": "coined",
+        "means": "a resident volunteer who speaks for Larder in one pod building",
+        "session": 11,
+        "replacedBy": "lobby host",
+        "renamedIn": 28
+      },
+      {
+        "id": "t074",
+        "term": "BC",
+        "kind": "abbreviation",
+        "means": "building champion",
+        "session": 11,
+        "synonymOf": "building champion",
+        "replacedBy": "lobby host",
+        "renamedIn": 28
+      },
+      {
+        "id": "t075",
+        "term": "member FAQ",
+        "kind": "coined",
+        "means": "the page of questions and answers every new member receives",
+        "session": 11
+      },
+      {
+        "id": "t076",
+        "term": "champion perk",
+        "kind": "coined",
+        "means": "what a building champion gets in return",
+        "session": 11,
+        "broader": "building champion"
+      },
+      {
+        "id": "t077",
+        "term": "lobby fee",
+        "kind": "coined",
+        "means": "what Larder pays an HA for a lobby slot",
+        "session": 11
+      },
+      {
+        "id": "t078",
+        "term": "member note",
+        "kind": "coined",
+        "means": "a short message pushed to all members of one building",
+        "session": 11
+      },
+      {
+        "id": "t079",
+        "term": "small box",
+        "kind": "jargon",
+        "means": "the smaller box size, for one or two people",
+        "session": 12,
+        "broader": "box"
+      },
+      {
+        "id": "t080",
+        "term": "the half",
+        "kind": "synonym",
+        "means": "the same as the small box",
+        "session": 12,
+        "synonymOf": "small box"
+      },
+      {
+        "id": "t081",
+        "term": "box tiers",
+        "kind": "coined",
+        "means": "the set of box sizes on offer",
+        "session": 12
+      },
+      {
+        "id": "t082",
+        "term": "drip plan",
+        "kind": "coined",
+        "means": "paying for boxes week by week, with no advance payment",
+        "session": 12
+      },
+      {
+        "id": "t083",
+        "term": "skip week",
+        "kind": "coined",
+        "means": "a week a member pauses their box",
+        "session": 12
+      },
+      {
+        "id": "t084",
+        "term": "cabinet",
+        "kind": "synonym",
+        "means": "the same as a pod; the word the growers use",
+        "session": 12,
+        "synonymOf": "pod"
+      },
+      {
+        "id": "t085",
+        "term": "rainy-day rule",
+        "kind": "coined",
+        "means": "the rule for a drop that a grower cancels because of weather",
+        "session": 13
+      },
+      {
+        "id": "t086",
+        "term": "weather skip",
+        "kind": "synonym",
+        "means": "the same as the rainy-day rule; how Picker names it to members",
+        "session": 13,
+        "synonymOf": "rainy-day rule"
+      },
+      {
+        "id": "t087",
+        "term": "cold chain log",
+        "kind": "jargon",
+        "means": "the record of chill cell temperatures that the spine keeps",
+        "session": 13
+      },
+      {
+        "id": "t088",
+        "term": "lease",
+        "kind": "jargon",
+        "means": "renting the pods from Kestrel by the month instead of buying them",
+        "session": 13
+      },
+      {
+        "id": "t089",
+        "term": "EU host",
+        "kind": "jargon",
+        "means": "a hosting provider whose servers are in the EU",
+        "session": 13
+      },
+      {
+        "id": "t090",
+        "term": "Cropbox",
+        "kind": "name",
+        "means": "the product's name for a time in the spring and early summer",
+        "session": 14,
+        "replacedBy": "Larder",
+        "renamedIn": 27
+      },
+      {
+        "id": "t091",
+        "term": "shroud",
+        "kind": "coined",
+        "means": "the branded cover panel on the front of a pod",
+        "session": 14,
+        "broader": "pod"
+      },
+      {
+        "id": "t092",
+        "term": "wave",
+        "kind": "coined",
+        "means": "a group of buildings brought into Larder together",
+        "session": 14
+      },
+      {
+        "id": "t093",
+        "term": "wave 1",
+        "kind": "coined",
+        "means": "the first four pod buildings: Alder Court, Quarry Street 12, Harbour Row and Mill Gate",
+        "session": 14,
+        "broader": "wave"
+      },
+      {
+        "id": "t094",
+        "term": "waitlist",
+        "kind": "jargon",
+        "means": "households that asked for Larder in a building without a pod",
+        "session": 14
+      },
+      {
+        "id": "t095",
+        "term": "orphan run",
+        "kind": "coined",
+        "means": "the weekday round that takes orphan boxes to the food bank",
+        "session": 15
+      },
+      {
+        "id": "t096",
+        "term": "Harbour Pantry",
+        "kind": "name",
+        "means": "the food bank in Lakeport that takes orphan boxes; their contact is Hilda",
+        "session": 15
+      },
+      {
+        "id": "t097",
+        "term": "neighbour credit",
+        "kind": "coined",
+        "means": "a credit for a member who brings in a neighbour, and for the neighbour",
+        "session": 15
+      },
+      {
+        "id": "t098",
+        "term": "orphan rate",
+        "kind": "jargon",
+        "means": "the share of boxes that become orphan boxes",
+        "session": 15
+      },
+      {
+        "id": "t099",
+        "term": "OBR",
+        "kind": "abbreviation",
+        "means": "orphan box rate, the same as the orphan rate",
+        "session": 15,
+        "synonymOf": "orphan rate"
+      },
+      {
+        "id": "t100",
+        "term": "crate",
+        "kind": "jargon",
+        "means": "the reusable crate a box is packed in",
+        "session": 16
+      },
+      {
+        "id": "t101",
+        "term": "crate deposit",
+        "kind": "coined",
+        "means": "money held for a crate until it comes back",
+        "session": 16,
+        "broader": "crate"
+      },
+      {
+        "id": "t102",
+        "term": "drop scan",
+        "kind": "coined",
+        "means": "scanning a box into its compartment in the Field app",
+        "session": 16
+      },
+      {
+        "id": "t103",
+        "term": "Field",
+        "kind": "name",
+        "means": "the grower app: box sheets, drops and drop scans",
+        "session": 16
+      },
+      {
+        "id": "t104",
+        "term": "fill rate",
+        "kind": "jargon",
+        "means": "the share of a pod's compartments that hold a box after a drop",
+        "session": 16
+      },
+      {
+        "id": "t105",
+        "term": "ghost drop",
+        "kind": "coined",
+        "means": "a box that was scanned in but is not in its compartment",
+        "session": 16
+      },
+      {
+        "id": "t106",
+        "term": "Larder",
+        "kind": "name",
+        "means": "Rasmus's name for the software layer that turns the back end's orders into door pulses for the spines (\"the Larder layer\"); the code kept the old product name",
+        "session": 16,
+        "sense": "software layer",
+        "spelled": "Larder layer"
+      },
+      {
+        "id": "t107",
+        "term": "floor price",
+        "kind": "coined",
+        "means": "the least a grower is paid for one standard box",
+        "session": 17,
+        "broader": "GSA"
+      },
+      {
+        "id": "t108",
+        "term": "the sweep",
+        "kind": "coined",
+        "means": "the weekly cleaning and check of every pod",
+        "session": 17
+      },
+      {
+        "id": "t109",
+        "term": "growers' circle",
+        "kind": "coined",
+        "means": "the meeting of all Larder growers",
+        "session": 17
+      },
+      {
+        "id": "t110",
+        "term": "CPD",
+        "kind": "abbreviation",
+        "means": "cost per drop: what one drop costs Larder in driving, fuel and time",
+        "session": 17
+      },
+      {
+        "id": "t111",
+        "term": "lobby insurance",
+        "kind": "jargon",
+        "means": "insurance for a pod standing in a lobby, against damage and theft",
+        "session": 17
+      },
+      {
+        "id": "t112",
+        "term": "hub",
+        "kind": "synonym",
+        "means": "the same as the Garage, in its role as the packing room",
+        "session": 18,
+        "synonymOf": "the Garage"
+      },
+      {
+        "id": "t113",
+        "term": "pack line",
+        "kind": "coined",
+        "means": "the tables in the Garage where boxes are packed in loop order",
+        "session": 18
+      },
+      {
+        "id": "t114",
+        "term": "pack sheet",
+        "kind": "coined",
+        "means": "the list of boxes to pack on one pack line evening",
+        "session": 18
+      },
+      {
+        "id": "t115",
+        "term": "wave 2",
+        "kind": "coined",
+        "means": "the five buildings added over the summer: Ferry Close, Weaver's Yard, Kiln Lane, Saltworks and Ropewalk 3",
+        "session": 18,
+        "broader": "wave"
+      },
+      {
+        "id": "t116",
+        "term": "double drop",
+        "kind": "coined",
+        "means": "two boxes put into one compartment by mistake",
+        "session": 18
+      },
+      {
+        "id": "t117",
+        "term": "QR stub",
+        "kind": "coined",
+        "means": "a QR code shown in Picker that opens the member's compartment",
+        "session": 19
+      },
+      {
+        "id": "t118",
+        "term": "shrink",
+        "kind": "jargon",
+        "means": "goods lost to theft or spoilage",
+        "session": 19
+      },
+      {
+        "id": "t119",
+        "term": "sticky door",
+        "kind": "coined",
+        "means": "a compartment door that does not open on the first door pulse",
+        "session": 19
+      },
+      {
+        "id": "t120",
+        "term": "K-16",
+        "kind": "name",
+        "means": "Kestrel's pod model with 16 compartments, 4 of them chill cells",
+        "session": 20,
+        "broader": "pod"
+      },
+      {
+        "id": "t121",
+        "term": "ice brick",
+        "kind": "coined",
+        "means": "a frozen pack put into a dry cell on hot days",
+        "session": 20
+      },
+      {
+        "id": "t122",
+        "term": "frost guard",
+        "kind": "coined",
+        "means": "the pod's heater mode for cold lobbies",
+        "session": 20
+      },
+      {
+        "id": "t123",
+        "term": "pod health",
+        "kind": "coined",
+        "means": "the page in the Ledger that shows every pod's heartbeat, temperature and faults",
+        "session": 20,
+        "replacedBy": "the Pulse",
+        "renamedIn": 31
+      },
+      {
+        "id": "t124",
+        "term": "family box",
+        "kind": "jargon",
+        "means": "the largest box size, about twice a standard box",
+        "session": 21,
+        "broader": "box"
+      },
+      {
+        "id": "t125",
+        "term": "add-on",
+        "kind": "coined",
+        "means": "an extra item a member buys with a box, such as eggs or bread",
+        "session": 21
+      },
+      {
+        "id": "t126",
+        "term": "Larder",
+        "kind": "name",
+        "means": "the name of the standard box's price tier; the tiers are Sprout, Larder and Harvest",
+        "session": 21,
+        "sense": "box tier",
+        "broader": "box tiers",
+        "spelled": "Larder tier"
+      },
+      {
+        "id": "t127",
+        "term": "Sprout",
+        "kind": "name",
+        "means": "the name of the small box's price tier",
+        "session": 21,
+        "broader": "box tiers"
+      },
+      {
+        "id": "t128",
+        "term": "Harvest",
+        "kind": "name",
+        "means": "the name of the family box's price tier",
+        "session": 21,
+        "broader": "box tiers"
+      },
+      {
+        "id": "t129",
+        "term": "add-on shelf",
+        "kind": "coined",
+        "means": "the space in the Garage where add-ons wait for packing",
+        "session": 21
+      },
+      {
+        "id": "t130",
+        "term": "dusk run",
+        "kind": "coined",
+        "means": "an evening delivery round, tried as an alternative to the dawn run",
+        "session": 22
+      },
+      {
+        "id": "t131",
+        "term": "Backroom",
+        "kind": "name",
+        "means": "the admin back end: members, boxes, drops and payments; the new name of the Ledger",
+        "session": 22
+      },
+      {
+        "id": "t132",
+        "term": "seven o'clock line",
+        "kind": "coined",
+        "means": "the rule that every pod is filled before 7:00 on a drop day",
+        "session": 22
+      },
+      {
+        "id": "t133",
+        "term": "cargo bike leg",
+        "kind": "coined",
+        "means": "the part of a loop in the city centre done by cargo bike",
+        "session": 23,
+        "broader": "loop"
+      },
+      {
+        "id": "t134",
+        "term": "sales share",
+        "kind": "coined",
+        "means": "a lobby fee paid as a percentage of a pod's box sales",
+        "session": 23,
+        "broader": "lobby fee"
+      },
+      {
+        "id": "t135",
+        "term": "outer loop",
+        "kind": "coined",
+        "means": "the van part of the dawn run that serves the pods outside the centre",
+        "session": 23,
+        "broader": "loop"
+      },
+      {
+        "id": "t136",
+        "term": "coordinator",
+        "kind": "jargon",
+        "means": "Maija's role: part-time operations work for Larder",
+        "session": 24
+      },
+      {
+        "id": "t137",
+        "term": "grower desk",
+        "kind": "coined",
+        "means": "grower onboarding and support, as one area of work",
+        "session": 24
+      },
+      {
+        "id": "t138",
+        "term": "midsummer review",
+        "kind": "coined",
+        "means": "the half-year review of the pilot on 30 June",
+        "session": 25
+      },
+      {
+        "id": "t139",
+        "term": "the extension",
+        "kind": "coined",
+        "means": "the pilot's extra three months beyond June",
+        "session": 25
+      },
+      {
+        "id": "t140",
+        "term": "Brightlatch",
+        "kind": "name",
+        "means": "another locker maker, which Rasmus asked for a quote",
+        "session": 25
+      },
+      {
+        "id": "t141",
+        "term": "pod cluster",
+        "kind": "coined",
+        "means": "pods in neighbouring buildings that one stop on a loop can serve",
+        "session": 26
+      },
+      {
+        "id": "t142",
+        "term": "the swap market",
+        "kind": "coined",
+        "means": "a page where growers offer their surplus to each other; Ilona calls it Larder's next product, Rasmus calls it just a feature of Backroom",
+        "session": 26
+      },
+      {
+        "id": "t143",
+        "term": "the U-turn",
+        "kind": "coined",
+        "means": "the return from the name Cropbox to Larder",
+        "session": 27
+      },
+      {
+        "id": "t144",
+        "term": "champion box",
+        "kind": "coined",
+        "means": "the free small box a building champion gets each month",
+        "session": 28,
+        "broader": "champion perk"
+      },
+      {
+        "id": "t145",
+        "term": "lobby host",
+        "kind": "coined",
+        "means": "a resident volunteer who speaks for Larder in one pod building; the new name of the building champion",
+        "session": 28
+      },
+      {
+        "id": "t146",
+        "term": "chill lock",
+        "kind": "coined",
+        "means": "a chill cell held by an uncollected box, so the next drop cannot use it",
+        "session": 29
+      },
+      {
+        "id": "t147",
+        "term": "blocked cell",
+        "kind": "synonym",
+        "means": "the same as a chill lock",
+        "session": 29,
+        "synonymOf": "chill lock"
+      },
+      {
+        "id": "t148",
+        "term": "caretaker box",
+        "kind": "coined",
+        "means": "the free standard box a caretaker of a pod building gets each month",
+        "session": 30
+      },
+      {
+        "id": "t149",
+        "term": "photo proof",
+        "kind": "coined",
+        "means": "a photo the drop scan takes of a box in its compartment",
+        "session": 30
+      },
+      {
+        "id": "t150",
+        "term": "the do-not-tell list",
+        "kind": "coined",
+        "means": "the list of things Kestrel must never be told",
+        "session": 30
+      },
+      {
+        "id": "t151",
+        "term": "the Android build",
+        "kind": "coined",
+        "means": "the native Android version of Picker",
+        "session": 31
+      },
+      {
+        "id": "t152",
+        "term": "the Pulse",
+        "kind": "name",
+        "means": "the page in Backroom that shows every pod's heartbeat, temperature and faults; the new name of pod health",
+        "session": 31
+      },
+      {
+        "id": "t153",
+        "term": "grower-packed",
+        "kind": "coined",
+        "means": "packed at the farm by the grower",
+        "session": 32
+      },
+      {
+        "id": "t154",
+        "term": "hub-packed",
+        "kind": "coined",
+        "means": "packed on the pack line in the Garage",
+        "session": 32
+      },
+      {
+        "id": "t155",
+        "term": "churn",
+        "kind": "jargon",
+        "means": "the share of members who leave in a month",
+        "session": 33
+      },
+      {
+        "id": "t156",
+        "term": "the cut",
+        "kind": "coined",
+        "means": "the price cut of the standard box made in late August after churn rose",
+        "session": 33
+      },
+      {
+        "id": "t157",
+        "term": "twin run",
+        "kind": "coined",
+        "means": "two dawn runs in one week",
+        "session": 34
+      },
+      {
+        "id": "t158",
+        "term": "the move",
+        "kind": "coined",
+        "means": "moving the Alder Court pod to another building",
+        "session": 35
+      },
+      {
+        "id": "t159",
+        "term": "relocation kit",
+        "kind": "jargon",
+        "means": "Kestrel's set of parts and its crew for moving a pod",
+        "session": 35
+      },
+      {
+        "id": "t160",
+        "term": "summer setpoint",
+        "kind": "coined",
+        "means": "the chill cell temperature target used in hot weeks",
+        "session": 36
+      },
+      {
+        "id": "t161",
+        "term": "short pass",
+        "kind": "coined",
+        "means": "the eight-week form of the season pass",
+        "session": 37,
+        "broader": "season pass"
+      },
+      {
+        "id": "t162",
+        "term": "angel round",
+        "kind": "jargon",
+        "means": "money from private investors in return for a share of the company",
+        "session": 38
+      },
+      {
+        "id": "t163",
+        "term": "runway",
+        "kind": "jargon",
+        "means": "how many months the money lasts at the current spending",
+        "session": 38
+      },
+      {
+        "id": "t164",
+        "term": "retro",
+        "kind": "jargon",
+        "means": "a meeting that looks back at what worked and what did not",
+        "session": 39
+      },
+      {
+        "id": "t165",
+        "term": "Season 2",
+        "kind": "coined",
+        "means": "Larder's phase after the pilot",
+        "session": 39
+      },
+      {
+        "id": "t166",
+        "term": "cold start",
+        "kind": "coined",
+        "means": "the first week of Season 2, when every member starts at once",
+        "session": 40
+      },
+      {
+        "id": "t167",
+        "term": "pod passport",
+        "kind": "coined",
+        "means": "a one-page sheet kept in each pod's hatch with its building contacts, fob location and faults",
+        "session": 40
+      }
+    ],
+    "decisions": [
+      {
+        "id": "d01",
+        "session": 2,
+        "date": "2026-01-20",
+        "topic": "product name",
+        "text": "The product is called Larder.",
+        "value": "Larder",
+        "replacedBy": "d02"
+      },
+      {
+        "id": "d02",
+        "session": 14,
+        "date": "2026-04-14",
+        "topic": "product name",
+        "text": "The product is renamed Cropbox, because people met on lobby walks took \"Larder\" for a pantry-storage app.",
+        "value": "Cropbox",
+        "replaces": "d01",
+        "replacedBy": "d03"
+      },
+      {
+        "id": "d03",
+        "session": 27,
+        "date": "2026-07-14",
+        "topic": "product name",
+        "text": "The product goes back to the name Larder (the U-turn): the cropbox web address could not be bought, and growers and members kept saying Larder anyway.",
+        "value": "Larder",
+        "replaces": "d02"
+      },
+      {
+        "id": "d04",
+        "session": 5,
+        "date": "2026-02-10",
+        "topic": "pickup window",
+        "text": "The pickup window is 24 hours from the drop.",
+        "value": "24 hours",
+        "replacedBy": "d05"
+      },
+      {
+        "id": "d05",
+        "session": 16,
+        "date": "2026-04-28",
+        "topic": "pickup window",
+        "text": "The pickup window is extended to 48 hours, because members on shift work kept missing their boxes.",
+        "value": "48 hours",
+        "replaces": "d04",
+        "replacedBy": "d06"
+      },
+      {
+        "id": "d06",
+        "session": 29,
+        "date": "2026-07-28",
+        "topic": "pickup window",
+        "text": "The pickup window is shortened to 36 hours: chill locks kept the next drop out of chill cells, and the orphan rate had fallen to 3 %.",
+        "value": "36 hours",
+        "replaces": "d05"
+      },
+      {
+        "id": "d07",
+        "session": 3,
+        "date": "2026-01-27",
+        "topic": "standard box price",
+        "text": "A standard box costs a member 24 €.",
+        "value": "24 €",
+        "replacedBy": "d08"
+      },
+      {
+        "id": "d08",
+        "session": 12,
+        "date": "2026-03-31",
+        "topic": "standard box price",
+        "text": "The standard box goes up to 27 €, to cover the growers' costs and the lobby fee.",
+        "value": "27 €",
+        "replaces": "d07",
+        "replacedBy": "d09"
+      },
+      {
+        "id": "d09",
+        "session": 21,
+        "date": "2026-06-02",
+        "topic": "standard box price",
+        "text": "The standard box goes up to 29 €, to pay for packing in the Garage.",
+        "value": "29 €",
+        "replaces": "d08",
+        "replacedBy": "d10"
+      },
+      {
+        "id": "d10",
+        "session": 33,
+        "date": "2026-08-25",
+        "topic": "standard box price",
+        "text": "The standard box is cut to 26 € (the cut), because churn had risen to 9 % after the rise to 29 €.",
+        "value": "26 €",
+        "replaces": "d09"
+      },
+      {
+        "id": "d11",
+        "session": 12,
+        "date": "2026-03-31",
+        "topic": "small box price",
+        "text": "A small box (the half) is added at 17 €.",
+        "value": "17 €",
+        "replacedBy": "d12"
+      },
+      {
+        "id": "d12",
+        "session": 33,
+        "date": "2026-08-25",
+        "topic": "small box price",
+        "text": "The small box goes down to 16 €.",
+        "value": "16 €",
+        "replaces": "d11"
+      },
+      {
+        "id": "d13a",
+        "session": 21,
+        "date": "2026-06-02",
+        "topic": "family box",
+        "text": "A family box, about twice the standard box, is added at 42 €.",
+        "value": "42 €",
+        "replacedBy": "d13"
+      },
+      {
+        "id": "d13",
+        "session": 21,
+        "date": "2026-06-02",
+        "topic": "family box",
+        "text": "Minutes later the family box price is changed to 39 €, because 42 € was too close to a standard box and a small box bought together (46 €), and Ilona wants the family box to be a clear saving.",
+        "value": "39 €",
+        "replaces": "d13a"
+      },
+      {
+        "id": "d14a",
+        "session": 8,
+        "date": "2026-03-03",
+        "topic": "house cut",
+        "text": "Larder's house cut is 20 % of the box price.",
+        "value": "20 %",
+        "replacedBy": "d14"
+      },
+      {
+        "id": "d14",
+        "session": 8,
+        "date": "2026-03-03",
+        "topic": "house cut",
+        "text": "Minutes later the house cut is changed to 15 % of the box price, because at 20 % the grower share at 24 € left Aino less than her market stall pays.",
+        "value": "15 %",
+        "replaces": "d14a",
+        "replacedBy": "d15"
+      },
+      {
+        "id": "d15",
+        "session": 17,
+        "date": "2026-05-05",
+        "topic": "house cut",
+        "text": "The house cut goes down to 12 %, after the growers' circle asked for a bigger grower share.",
+        "value": "12 %",
+        "replaces": "d14",
+        "replacedBy": "d16"
+      },
+      {
+        "id": "d16",
+        "session": 30,
+        "date": "2026-08-04",
+        "topic": "house cut",
+        "text": "The house cut goes up to 14 %, because the sales share to the housing associations and the cargo bike leg cost more than planned.",
+        "value": "14 %",
+        "replaces": "d15"
+      },
+      {
+        "id": "d17",
+        "session": 17,
+        "date": "2026-05-05",
+        "topic": "floor price",
+        "text": "Every GSA gets a floor price: a grower is paid at least 18 € for each standard box, whatever the house cut.",
+        "value": "18 €"
+      },
+      {
+        "id": "d18",
+        "session": 7,
+        "date": "2026-02-24",
+        "topic": "delivery day",
+        "text": "The dawn run is on Tuesdays.",
+        "value": "Tuesday",
+        "replacedBy": "d19"
+      },
+      {
+        "id": "d19",
+        "session": 22,
+        "date": "2026-06-09",
+        "topic": "delivery day",
+        "text": "The dawn run moves to Thursdays, so growers harvest on Wednesday instead of at the weekend.",
+        "value": "Thursday",
+        "replaces": "d18",
+        "replacedBy": "d20a"
+      },
+      {
+        "id": "d20a",
+        "session": 34,
+        "date": "2026-09-01",
+        "topic": "delivery day",
+        "text": "There are two dawn runs a week, on Mondays and Thursdays (the twin run), so a family box no longer has to last a full week and the chill cells empty twice.",
+        "value": "Monday and Thursday",
+        "replaces": "d19",
+        "replacedBy": "d20"
+      },
+      {
+        "id": "d20",
+        "session": 34,
+        "date": "2026-09-01",
+        "topic": "delivery day",
+        "text": "Minutes later the twin run days are changed to Tuesdays and Fridays, because Monday is the day of the sweep.",
+        "value": "Tuesday and Friday",
+        "replaces": "d20a"
+      },
+      {
+        "id": "d21",
+        "session": 6,
+        "date": "2026-02-17",
+        "topic": "pod model",
+        "text": "The pods are Kestrel K-12 units with 12 compartments, 3 of them chill cells.",
+        "value": "K-12",
+        "replacedBy": "d22"
+      },
+      {
+        "id": "d22",
+        "session": 20,
+        "date": "2026-05-26",
+        "topic": "pod model",
+        "text": "New and existing pods move to the Kestrel K-16 with 16 compartments, 4 of them chill cells.",
+        "value": "K-16",
+        "replaces": "d21"
+      },
+      {
+        "id": "d23",
+        "session": 6,
+        "date": "2026-02-17",
+        "topic": "number of pods",
+        "text": "The pilot starts with 4 pods.",
+        "value": "4",
+        "replacedBy": "d24"
+      },
+      {
+        "id": "d24",
+        "session": 18,
+        "date": "2026-05-12",
+        "topic": "number of pods",
+        "text": "The pilot grows to 6 pods: Ferry Close and Weaver's Yard join.",
+        "value": "6",
+        "replaces": "d23",
+        "replacedBy": "d25"
+      },
+      {
+        "id": "d25",
+        "session": 26,
+        "date": "2026-07-07",
+        "topic": "number of pods",
+        "text": "The pilot grows to 9 pods: Kiln Lane, Saltworks and Ropewalk 3 join, which completes wave 2.",
+        "value": "9",
+        "replaces": "d24"
+      },
+      {
+        "id": "d26",
+        "session": 6,
+        "date": "2026-02-17",
+        "topic": "first pod location",
+        "text": "The first pod (pod zero) goes into the lobby of Alder Court.",
+        "value": "Alder Court",
+        "replacedBy": "d27"
+      },
+      {
+        "id": "d27",
+        "session": 35,
+        "date": "2026-09-08",
+        "topic": "first pod location",
+        "text": "The Alder Court pod moves to the lobby of Linden Yard (the move), after the Alder Court HA voted to end its lobby slot on 30 September. Larder still has 9 pods.",
+        "value": "Linden Yard",
+        "replaces": "d26"
+      },
+      {
+        "id": "d28",
+        "session": 9,
+        "date": "2026-03-10",
+        "topic": "payment",
+        "text": "Members pay in Picker with a card on file, charged on the drop day."
+      },
+      {
+        "id": "d29",
+        "session": 10,
+        "date": "2026-03-17",
+        "topic": "season pass",
+        "text": "Members can buy a season pass: 10 weekly boxes paid in advance for the price of 9.",
+        "value": "10 boxes for the price of 9",
+        "replacedBy": "d30"
+      },
+      {
+        "id": "d30",
+        "session": 25,
+        "date": "2026-06-30",
+        "topic": "season pass",
+        "text": "The season pass is dropped: refunds for skip weeks were too complicated, and all members are on the drip plan.",
+        "value": "none",
+        "replaces": "d29",
+        "replacedBy": "d31"
+      },
+      {
+        "id": "d31",
+        "session": 37,
+        "date": "2026-09-22",
+        "topic": "season pass",
+        "text": "The season pass comes back as the short pass: 8 weekly boxes paid in advance, no free box, and a skip week moves the end date.",
+        "value": "8 boxes",
+        "replaces": "d30"
+      },
+      {
+        "id": "d32",
+        "session": 9,
+        "date": "2026-03-10",
+        "topic": "honesty shelf",
+        "text": "An honesty shelf is tried on the Alder Court pod.",
+        "replacedBy": "d33"
+      },
+      {
+        "id": "d33",
+        "session": 19,
+        "date": "2026-05-19",
+        "topic": "honesty shelf",
+        "text": "The honesty shelf is dropped: about 40 % of the surplus on it was never paid for.",
+        "value": "none",
+        "replaces": "d32"
+      },
+      {
+        "id": "d34",
+        "session": 4,
+        "date": "2026-02-03",
+        "topic": "orphan boxes",
+        "text": "An orphan box is left with the building's caretaker.",
+        "value": "caretaker",
+        "replacedBy": "d35"
+      },
+      {
+        "id": "d35",
+        "session": 15,
+        "date": "2026-04-21",
+        "topic": "orphan boxes",
+        "text": "Orphan boxes go to the Harbour Pantry food bank on the orphan run, because caretakers did not want to store them.",
+        "value": "Harbour Pantry",
+        "replaces": "d34"
+      },
+      {
+        "id": "d36",
+        "session": 30,
+        "date": "2026-08-04",
+        "topic": "caretakers",
+        "text": "Each caretaker of a pod building gets a caretaker box: one free standard box a month.",
+        "value": "one free standard box a month"
+      },
+      {
+        "id": "d37",
+        "session": 11,
+        "date": "2026-03-24",
+        "topic": "lobby fee",
+        "text": "Larder pays each HA a lobby fee of 40 € a month per pod.",
+        "value": "40 € a month",
+        "replacedBy": "d38"
+      },
+      {
+        "id": "d38",
+        "session": 23,
+        "date": "2026-06-16",
+        "topic": "lobby fee",
+        "text": "The lobby fee becomes a sales share: 2 % of the box sales of that pod.",
+        "value": "2 % of sales",
+        "replaces": "d37"
+      },
+      {
+        "id": "d39",
+        "session": 13,
+        "date": "2026-04-07",
+        "topic": "rainy-day rule",
+        "text": "Rainy-day rule: when a grower cancels a drop because of weather, the box is skipped, not delayed, and each member gets a make-good of half the box price."
+      },
+      {
+        "id": "d40",
+        "session": 10,
+        "date": "2026-03-17",
+        "topic": "short box",
+        "text": "A short box gets a swap card and a make-good of 3 €.",
+        "value": "3 €",
+        "replacedBy": "d41"
+      },
+      {
+        "id": "d41",
+        "session": 24,
+        "date": "2026-06-23",
+        "topic": "short box",
+        "text": "The make-good for a short box goes up to 5 €.",
+        "value": "5 €",
+        "replaces": "d40"
+      },
+      {
+        "id": "d42",
+        "session": 3,
+        "date": "2026-01-27",
+        "topic": "grower onboarding",
+        "text": "Ilona onboards new growers.",
+        "value": "Ilona",
+        "replacedBy": "d43"
+      },
+      {
+        "id": "d43",
+        "session": 24,
+        "date": "2026-06-23",
+        "topic": "grower onboarding",
+        "text": "Maija, the new part-time coordinator, takes over grower onboarding (the grower desk) from Ilona.",
+        "value": "Maija",
+        "replaces": "d42"
+      },
+      {
+        "id": "d44",
+        "session": 7,
+        "date": "2026-02-24",
+        "topic": "packing",
+        "text": "Growers pack their own boxes at the farm.",
+        "value": "growers",
+        "replacedBy": "d45"
+      },
+      {
+        "id": "d45",
+        "session": 18,
+        "date": "2026-05-12",
+        "topic": "packing",
+        "text": "All packing moves to the Garage: Ilona runs a pack line there on the evening before the dawn run.",
+        "value": "the Garage",
+        "replaces": "d44",
+        "replacedBy": "d46"
+      },
+      {
+        "id": "d46",
+        "session": 32,
+        "date": "2026-08-18",
+        "topic": "packing",
+        "text": "Growers pack the standard and small boxes at the farm again (grower-packed); the Garage packs only the family boxes (hub-packed).",
+        "value": "growers, family boxes in the Garage",
+        "replaces": "d45"
+      },
+      {
+        "id": "d47",
+        "session": 11,
+        "date": "2026-03-24",
+        "topic": "building champion",
+        "text": "Each pod building has one building champion."
+      },
+      {
+        "id": "d48",
+        "session": 11,
+        "date": "2026-03-24",
+        "topic": "champion perk",
+        "text": "A building champion gets 10 % off their boxes.",
+        "value": "10 % off",
+        "replacedBy": "d49"
+      },
+      {
+        "id": "d49",
+        "session": 28,
+        "date": "2026-07-21",
+        "topic": "champion perk",
+        "text": "The champion perk becomes the champion box: one free small box a month instead of the 10 % off.",
+        "value": "one free small box a month",
+        "replaces": "d48"
+      },
+      {
+        "id": "d50",
+        "session": 4,
+        "date": "2026-02-03",
+        "topic": "member app",
+        "text": "The member app is called Picker."
+      },
+      {
+        "id": "d51",
+        "session": 5,
+        "date": "2026-02-10",
+        "topic": "native app",
+        "text": "Picker is a web app first; no native app during the pilot.",
+        "value": "web only",
+        "replacedBy": "d52"
+      },
+      {
+        "id": "d52",
+        "session": 31,
+        "date": "2026-08-11",
+        "topic": "native app",
+        "text": "Picker gets a native Android app (the Android build), because wake code text messages cost too much and Android members asked for it.",
+        "value": "Android app",
+        "replaces": "d51"
+      },
+      {
+        "id": "d53",
+        "session": 8,
+        "date": "2026-03-03",
+        "topic": "opening compartments",
+        "text": "A member opens their compartment with a 6-digit wake code sent by SMS.",
+        "value": "wake code",
+        "replacedBy": "d54"
+      },
+      {
+        "id": "d54",
+        "session": 19,
+        "date": "2026-05-19",
+        "topic": "opening compartments",
+        "text": "The QR stub in Picker becomes the main way to open a compartment; the wake code stays as a fallback.",
+        "value": "QR stub",
+        "replaces": "d53"
+      },
+      {
+        "id": "d55",
+        "session": 20,
+        "date": "2026-05-26",
+        "topic": "chill cell temperature",
+        "text": "Chill cells are held at 4 °C, and the cold chain log records every 10 minutes.",
+        "value": "4 °C",
+        "replacedBy": "d56"
+      },
+      {
+        "id": "d56",
+        "session": 36,
+        "date": "2026-09-15",
+        "topic": "chill cell temperature",
+        "text": "The chill cell target goes down to 3 °C.",
+        "value": "3 °C",
+        "replaces": "d55"
+      },
+      {
+        "id": "d57",
+        "session": 14,
+        "date": "2026-04-14",
+        "topic": "wave 1",
+        "text": "Wave 1 is the four buildings of the first pods: Alder Court, Quarry Street 12, Harbour Row and Mill Gate."
+      },
+      {
+        "id": "d58",
+        "session": 18,
+        "date": "2026-05-12",
+        "topic": "wave 2",
+        "text": "Wave 2 is five more buildings over the summer: Ferry Close and Weaver's Yard now, Kiln Lane, Saltworks and Ropewalk 3 later."
+      },
+      {
+        "id": "d59",
+        "session": 12,
+        "date": "2026-03-31",
+        "topic": "grant",
+        "text": "Larder applies for the Lakeport food-innovation grant."
+      },
+      {
+        "id": "d60",
+        "session": 9,
+        "date": "2026-03-10",
+        "topic": "investors",
+        "text": "No outside investors during the pilot.",
+        "value": "none",
+        "replacedBy": "d61"
+      },
+      {
+        "id": "d61",
+        "session": 38,
+        "date": "2026-09-29",
+        "topic": "investors",
+        "text": "Larder takes 40 000 € from Hanna's angel group for Season 2.",
+        "value": "40 000 €",
+        "replaces": "d60"
+      },
+      {
+        "id": "d62",
+        "session": 6,
+        "date": "2026-02-17",
+        "topic": "north number",
+        "text": "The north number is boxes picked up per week; the pilot's target is 100.",
+        "value": "100",
+        "replacedBy": "d63"
+      },
+      {
+        "id": "d63",
+        "session": 25,
+        "date": "2026-06-30",
+        "topic": "north number",
+        "text": "The north number target is raised to 160 for the end of the extended pilot.",
+        "value": "160",
+        "replaces": "d62"
+      },
+      {
+        "id": "d64",
+        "session": 7,
+        "date": "2026-02-24",
+        "topic": "vehicle",
+        "text": "The dawn run uses a hired van on van day.",
+        "value": "van"
+      },
+      {
+        "id": "d65",
+        "session": 23,
+        "date": "2026-06-16",
+        "topic": "cargo bike",
+        "text": "The city-centre part of the loop moves to a cargo bike leg; the van keeps the outer loop."
+      },
+      {
+        "id": "d66",
+        "session": 10,
+        "date": "2026-03-17",
+        "topic": "kill criteria",
+        "text": "Kill criteria: stop the pilot if the pickup rate stays under 85 % for four weeks in a row.",
+        "value": "85 %"
+      },
+      {
+        "id": "d67",
+        "session": 17,
+        "date": "2026-05-05",
+        "topic": "the sweep",
+        "text": "Every pod gets the sweep on Mondays, by whoever drives the loop that week."
+      },
+      {
+        "id": "d68",
+        "session": 14,
+        "date": "2026-04-14",
+        "topic": "shroud",
+        "text": "The shroud is green with the Cropbox mark.",
+        "value": "green",
+        "replacedBy": "d69"
+      },
+      {
+        "id": "d69",
+        "session": 27,
+        "date": "2026-07-14",
+        "topic": "shroud",
+        "text": "The shroud becomes ochre with the Larder mark.",
+        "value": "ochre",
+        "replaces": "d68"
+      },
+      {
+        "id": "d70",
+        "session": 10,
+        "date": "2026-03-17",
+        "topic": "pilot length",
+        "text": "The pilot runs until the end of June.",
+        "value": "end of June",
+        "replacedBy": "d71"
+      },
+      {
+        "id": "d71",
+        "session": 25,
+        "date": "2026-06-30",
+        "topic": "pilot length",
+        "text": "The pilot is extended to 30 September (the extension).",
+        "value": "30 September",
+        "replaces": "d70"
+      },
+      {
+        "id": "d72",
+        "session": 39,
+        "date": "2026-10-06",
+        "topic": "Season 2",
+        "text": "Season 2 starts on 2 November with the same 9 pods.",
+        "value": "2 November"
+      },
+      {
+        "id": "d73",
+        "session": 13,
+        "date": "2026-04-07",
+        "topic": "member data",
+        "text": "Member data stays on an EU host."
+      },
+      {
+        "id": "d74",
+        "session": 30,
+        "date": "2026-08-04",
+        "topic": "photo proofs",
+        "text": "Photo proofs are deleted after 30 days.",
+        "value": "30 days"
+      },
+      {
+        "id": "d75",
+        "session": 16,
+        "date": "2026-04-28",
+        "topic": "drop scan",
+        "text": "Growers record each drop with a drop scan in the Field app."
+      },
+      {
+        "id": "d76",
+        "session": 15,
+        "date": "2026-04-21",
+        "topic": "neighbour credit",
+        "text": "A member who brings in a neighbour gets a 5 € neighbour credit, and so does the neighbour.",
+        "value": "5 €",
+        "replacedBy": "d77"
+      },
+      {
+        "id": "d77",
+        "session": 28,
+        "date": "2026-07-21",
+        "topic": "neighbour credit",
+        "text": "The neighbour credit is dropped: members were signing up their own second phone numbers.",
+        "value": "none",
+        "replaces": "d76"
+      },
+      {
+        "id": "d78",
+        "session": 16,
+        "date": "2026-04-28",
+        "topic": "crate deposit",
+        "text": "Each crate carries a 3 € crate deposit, refunded when the crate comes back to the pod.",
+        "value": "3 €"
+      },
+      {
+        "id": "d79",
+        "session": 13,
+        "date": "2026-04-07",
+        "topic": "pod lease",
+        "text": "Pods are leased from Kestrel, not bought, at 85 € a month per pod.",
+        "value": "85 € a month"
+      },
+      {
+        "id": "d80",
+        "session": 17,
+        "date": "2026-05-05",
+        "topic": "insurance",
+        "text": "Larder takes Kestrel's lobby insurance for 6 € a month per pod.",
+        "value": "6 € a month"
+      },
+      {
+        "id": "d81",
+        "session": 9,
+        "date": "2026-03-10",
+        "topic": "food premises",
+        "text": "Ilona registers the Garage as a food premises."
+      },
+      {
+        "id": "d82",
+        "session": 3,
+        "date": "2026-01-27",
+        "topic": "first grower",
+        "text": "Aino's Ridgeback Farm is the first grower and signs the first GSA."
+      },
+      {
+        "id": "d83",
+        "session": 6,
+        "date": "2026-02-17",
+        "topic": "lobby power",
+        "text": "Chill cells run on the lobby's ordinary socket; no separate power line is needed."
+      },
+      {
+        "id": "d84",
+        "session": 16,
+        "date": "2026-04-28",
+        "topic": "food bank weekends",
+        "text": "The orphan run is on weekdays only; the Harbour Pantry takes no boxes at weekends."
+      },
+      {
+        "id": "d85",
+        "session": 24,
+        "date": "2026-06-23",
+        "topic": "coordinator pay",
+        "text": "Maija is paid by the hour, 22 € an hour.",
+        "value": "22 € an hour"
+      },
+      {
+        "id": "d86",
+        "session": 31,
+        "date": "2026-08-11",
+        "topic": "Android or iOS",
+        "text": "The native app is Android first; iOS waits."
+      },
+      {
+        "id": "d87",
+        "session": 39,
+        "date": "2026-10-06",
+        "topic": "third wave",
+        "text": "No third wave this year: Season 2 keeps the 9 pods."
+      },
+      {
+        "id": "d88",
+        "session": 22,
+        "date": "2026-06-09",
+        "topic": "admin back end name",
+        "text": "The Ledger is renamed Backroom, because Maija will use it and \"ledger\" sounded like accounting.",
+        "value": "Backroom"
+      },
+      {
+        "id": "d89",
+        "session": 28,
+        "date": "2026-07-21",
+        "topic": "building champion name",
+        "text": "Building champions are called lobby hosts from now on; the champion box keeps its name.",
+        "value": "lobby host"
+      },
+      {
+        "id": "d90",
+        "session": 31,
+        "date": "2026-08-11",
+        "topic": "pod health page name",
+        "text": "The pod health page in Backroom is renamed the Pulse.",
+        "value": "the Pulse"
+      },
+      {
+        "id": "d91",
+        "session": 21,
+        "date": "2026-06-02",
+        "topic": "box tier names",
+        "text": "The box tiers get names: Sprout (small box), Larder (standard box) and Harvest (family box). The standard tier keeps the old product name on purpose, for the members who still say Larder."
+      },
+      {
+        "id": "d92",
+        "session": 26,
+        "date": "2026-07-07",
+        "topic": "swap market",
+        "text": "The swap market is built as a page in Backroom for growers, with no fee for now."
+      },
+      {
+        "id": "d93",
+        "session": 16,
+        "date": "2026-04-28",
+        "topic": "Harbour Pantry in public",
+        "text": "The Harbour Pantry is never named in Larder's marketing or in any material that leaves Larder, at Hilda's request."
+      },
+      {
+        "id": "d94",
+        "session": 25,
+        "date": "2026-06-30",
+        "topic": "second supplier",
+        "text": "Rasmus asks Brightlatch, another locker maker, for a quote, without telling Kestrel."
+      },
+      {
+        "id": "d95",
+        "session": 30,
+        "date": "2026-08-04",
+        "topic": "do not tell Kestrel",
+        "text": "The do-not-tell list: Kestrel must never be told about the Brightlatch quote, about Larder's churn figures, or that Larder would buy pods if the lease price rises.",
+        "replacedBy": "d96"
+      },
+      {
+        "id": "d96",
+        "session": 38,
+        "date": "2026-09-29",
+        "topic": "do not tell Kestrel",
+        "text": "The do-not-tell list grows: Kestrel must never be told about the Brightlatch quote, Larder's churn figures, that Larder would buy pods if the lease price rises, or the angel investment and its amount.",
+        "replaces": "d95"
+      }
+    ],
+    "questions": [
+      {
+        "id": "q01",
+        "opened": 2,
+        "question": "Who will be the first grower?",
+        "closedIn": 3,
+        "closedBy": "d82"
+      },
+      {
+        "id": "q02",
+        "opened": 4,
+        "question": "Can chill cells run in a lobby without a separate power line?",
+        "closedIn": 6,
+        "closedBy": "d83"
+      },
+      {
+        "id": "q03",
+        "opened": 5,
+        "question": "Does Larder need a food-premises registration?",
+        "closedIn": 9,
+        "closedBy": "d81",
+        "answer": "Yes; Ilona registered the Garage."
+      },
+      {
+        "id": "q04",
+        "opened": 8,
+        "question": "Should caretakers get something for helping with the pods (lobby keys, keeping an eye on the pod)?",
+        "closedIn": 30,
+        "closedBy": "d36"
+      },
+      {
+        "id": "q05",
+        "opened": 9,
+        "question": "Should members be able to pay by card at the pod itself?"
+      },
+      {
+        "id": "q06",
+        "opened": 11,
+        "question": "Who insures a pod standing in a lobby?",
+        "closedIn": 17,
+        "closedBy": "d80"
+      },
+      {
+        "id": "q07",
+        "opened": 12,
+        "question": "Lease the pods or buy them?",
+        "closedIn": 13,
+        "closedBy": "d79"
+      },
+      {
+        "id": "q08",
+        "opened": 14,
+        "question": "Does the name Cropbox clash with an existing trademark?",
+        "closedIn": 27,
+        "closedBy": "d03",
+        "answer": "It no longer mattered: the name went back to Larder."
+      },
+      {
+        "id": "q09",
+        "opened": 15,
+        "question": "Can the food bank take orphan boxes at weekends?",
+        "closedIn": 16,
+        "closedBy": "d84",
+        "answer": "No."
+      },
+      {
+        "id": "q10",
+        "opened": 16,
+        "question": "Would a guaranteed minimum per box keep growers in?",
+        "closedIn": 17,
+        "closedBy": "d17",
+        "answer": "Yes; the growers' circle agreed to the floor price."
+      },
+      {
+        "id": "q11",
+        "opened": 19,
+        "question": "Can the honesty shelf be protected from unpaid takings?",
+        "closedIn": 19,
+        "closedBy": "d33",
+        "answer": "No; it was dropped."
+      },
+      {
+        "id": "q12",
+        "opened": 20,
+        "question": "Is a 16-compartment pod too big for the smaller buildings?"
+      },
+      {
+        "id": "q13",
+        "opened": 22,
+        "question": "Can the dawn run finish before 7:00 with six pods?",
+        "closedIn": 23,
+        "closedBy": "d65",
+        "answer": "Yes, with the cargo bike leg in the centre."
+      },
+      {
+        "id": "q14",
+        "opened": 24,
+        "question": "Should Maija be paid by the hour or a monthly fee?",
+        "closedIn": 24,
+        "closedBy": "d85"
+      },
+      {
+        "id": "q15",
+        "opened": 26,
+        "question": "A third wave of buildings this year?",
+        "closedIn": 39,
+        "closedBy": "d87",
+        "answer": "No."
+      },
+      {
+        "id": "q16",
+        "opened": 28,
+        "question": "How to catch abuse of the neighbour credit?",
+        "closedIn": 28,
+        "closedBy": "d77",
+        "answer": "It was not caught; the credit was dropped."
+      },
+      {
+        "id": "q17",
+        "opened": 31,
+        "question": "Android or iOS first for the native app?",
+        "closedIn": 31,
+        "closedBy": "d86"
+      },
+      {
+        "id": "q18",
+        "opened": 33,
+        "question": "Will the cut to 26 € bring churn back down?",
+        "closedIn": 38,
+        "answer": "Yes: churn fell from 9 % to 5 %."
+      },
+      {
+        "id": "q19",
+        "opened": 36,
+        "question": "Should the chill cells go to 3 °C in summer only?"
+      },
+      {
+        "id": "q20",
+        "opened": 38,
+        "question": "What is Hanna's investment spent on first?"
+      },
+      {
+        "id": "q21",
+        "opened": 40,
+        "question": "Does Season 2 keep two dawn runs a week?"
+      },
+      {
+        "id": "q22",
+        "opened": 26,
+        "question": "Should the swap market become a product of its own?"
+      }
+    ],
+    "facts": [
+      {
+        "id": "f01",
+        "session": 1,
+        "text": "Lakeport has about 40 apartment buildings within 3 km of Ilona's garage."
+      },
+      {
+        "id": "f02",
+        "session": 3,
+        "text": "Growers signed: 1 (Ridgeback Farm)."
+      },
+      {
+        "id": "f03",
+        "session": 8,
+        "text": "Growers signed: 3 (Ridgeback Farm, Saltmeadow Gardens, Three Oaks Market Garden)."
+      },
+      {
+        "id": "f04",
+        "session": 9,
+        "text": "The first drop, on 10 March, put 11 boxes into the Alder Court pod."
+      },
+      {
+        "id": "f05",
+        "session": 12,
+        "text": "Members: 38."
+      },
+      {
+        "id": "f06",
+        "session": 14,
+        "text": "Boxes picked up last week: 41."
+      },
+      {
+        "id": "f07",
+        "session": 15,
+        "text": "Orphan rate so far: 6 %."
+      },
+      {
+        "id": "f08",
+        "session": 17,
+        "text": "Growers: 5, after Fernbrook and Mossy Gate Farm signed."
+      },
+      {
+        "id": "f09",
+        "session": 19,
+        "text": "About 40 % of the honesty shelf's produce was never paid for."
+      },
+      {
+        "id": "f10",
+        "session": 20,
+        "text": "Boxes picked up last week: 88. Pickup rate: 91 %."
+      },
+      {
+        "id": "f11",
+        "session": 22,
+        "text": "The Lakeport food-innovation grant was awarded: 12 000 €."
+      },
+      {
+        "id": "f12",
+        "session": 25,
+        "text": "Boxes picked up last week: 104, so the first target of 100 was met."
+      },
+      {
+        "id": "f13",
+        "session": 26,
+        "text": "Growers: 7, after Kettle Hill and Sorrel Acres signed."
+      },
+      {
+        "id": "f14",
+        "session": 28,
+        "text": "Oskar, the building champion at Harbour Row (not Oskar from Kestrel), noticed that members were signing up their own second phone numbers for the neighbour credit."
+      },
+      {
+        "id": "f15",
+        "session": 29,
+        "text": "Orphan rate: 3 %."
+      },
+      {
+        "id": "f16",
+        "session": 30,
+        "text": "Boxes picked up last week: 131."
+      },
+      {
+        "id": "f17",
+        "session": 33,
+        "text": "Monthly churn: 9 %."
+      },
+      {
+        "id": "f18",
+        "session": 35,
+        "text": "The Alder Court HA voted 14 to 9 to end the lobby slot."
+      },
+      {
+        "id": "f19",
+        "session": 37,
+        "text": "Growers: 8, after Birch Hollow signed."
+      },
+      {
+        "id": "f20",
+        "session": 38,
+        "text": "Monthly churn: 5 %."
+      },
+      {
+        "id": "f21",
+        "session": 39,
+        "text": "Best week of the pilot: 152 boxes picked up (the target of 160 was missed). Pickup rate in September: 96 %. Members at the end of the pilot: 214."
+      },
+      {
+        "id": "f22",
+        "session": 40,
+        "text": "Waitlist for Season 2: 63 households."
+      }
+    ],
+    "stories": [
+      {
+        "id": "s1",
+        "topic": "the Mill Gate double drop",
+        "tellings": [
+          {
+            "session": 18,
+            "teller": "Ilona",
+            "text": "On last Tuesday's dawn run two boxes went into compartment 7 of the Mill Gate pod. The member took both, so Larder wrote one box off.",
+            "mustSay": [
+              "compartment 7",
+              "Mill Gate"
+            ]
+          },
+          {
+            "session": 24,
+            "teller": "Ilona, telling Maija",
+            "text": "The Mill Gate double drop was in compartment 9, not 7, and the member brought the second box back the next day. Nobody knew yet how it happened.",
+            "mustSay": [
+              "compartment 9",
+              "Mill Gate"
+            ]
+          },
+          {
+            "session": 39,
+            "teller": "Rasmus, after reading the drop scan log",
+            "text": "The Mill Gate double drop was in compartment 9. The member brought the second box back the next day, so nothing was written off. The cause: the grower made the drop scan for that box on the Harbour Row pod in Field, so the back end thought compartment 9 at Mill Gate was still empty.",
+            "mustSay": [
+              "compartment 9",
+              "Harbour Row",
+              "Mill Gate"
+            ]
+          }
+        ]
+      }
+    ],
+    "documents": [
+      {
+        "id": "doc1",
+        "title": "Larder member FAQ",
+        "text": "Larder member FAQ\n\nHow does Larder work? Every week a grower near Lakeport packs your box, and on drop day we put it into your compartment in the pod in your lobby. You open the compartment with the wake code we send you by text message.\n\nHow long can my box wait? You have 24 hours from the drop to collect it.\n\nWhat if I cannot collect it in time? An uncollected box is left with your building's caretaker, who keeps it for you.\n\nHow do I pay? With a card on file in Picker. We charge it on the drop day.\n\nWhat does a box cost? A standard box is 24 €.\n\nWhat is the shelf on top of the Alder Court pod? Our honesty shelf: take surplus vegetables and pay by phone.\n\nWho can I talk to? Your building champion, or Larder by email.",
+        "pastes": [
+          {
+            "session": 11,
+            "by": "Ilona",
+            "how": "Ilona wrote it today and pastes it in full for Rasmus to read; both agree it goes to every new member."
+          },
+          {
+            "session": 36,
+            "by": "Maija",
+            "how": "Maija pastes the member FAQ in full, unchanged, saying \"this is what every new member gets from us, for reference\". Nobody comments on its content in this session."
+          }
+        ]
+      }
+    ],
+    "personal": [
+      {
+        "session": 19,
+        "text": "Ilona's father had a fall and is in hospital in the next town; she will miss the next two dawn runs, and Rasmus covers them.",
+        "mustSay": [
+          "hospital"
+        ]
+      },
+      {
+        "session": 22,
+        "text": "Ilona's father is home again and recovering.",
+        "mustSay": [
+          "father"
+        ]
+      },
+      {
+        "session": 33,
+        "text": "Rasmus hurt his back lifting crates and is seeing a physio; he drives no loops for two weeks.",
+        "mustSay": [
+          "physio"
+        ]
+      },
+      {
+        "session": 36,
+        "text": "Rasmus is moving flats in October and will be slow on messages for a week.",
+        "mustSay": [
+          "moving"
+        ]
+      }
+    ],
+    "analyses": [
+      {
+        "session": 10,
+        "by": "Rasmus's assistant",
+        "about": "whether to offer a season pass and how to price it",
+        "recommends": "a 12-week pass with 2 free boxes"
+      },
+      {
+        "session": 16,
+        "by": "Ilona's assistant",
+        "about": "how long the pickup window should be, from the first weeks of pickup data",
+        "recommends": "keeping 24 hours and sending a reminder text after 18 hours"
+      },
+      {
+        "session": 21,
+        "by": "Ilona's assistant",
+        "about": "box prices after the costs of the Garage pack line",
+        "recommends": "a standard box at 28 €"
+      },
+      {
+        "session": 25,
+        "by": "Rasmus's assistant",
+        "about": "the midsummer review of the pilot numbers",
+        "recommends": "ending the pilot on schedule at the end of June and starting the next phase in August"
+      },
+      {
+        "session": 29,
+        "by": "Rasmus's assistant",
+        "about": "chill locks and the length of the pickup window",
+        "recommends": "a 30-hour window"
+      },
+      {
+        "session": 30,
+        "by": "Ilona's assistant",
+        "about": "the house cut against Larder's costs",
+        "recommends": "a house cut of 16 %"
+      },
+      {
+        "session": 33,
+        "by": "Ilona's assistant",
+        "about": "churn after the price rise",
+        "recommends": "a standard box at 27 € with a loyalty discount"
+      },
+      {
+        "session": 35,
+        "by": "Ilona's assistant",
+        "about": "revenue for the autumn if the Alder Court pod moves",
+        "recommends": "keeping the Alder Court pod in storage for a month before choosing a new building",
+        "stale": "Its revenue model still prices the standard box at 29 €, the price before the cut of 25 August; nobody in the thread corrects this.",
+        "mustSay": [
+          "29 €"
+        ]
+      },
+      {
+        "session": 37,
+        "by": "Rasmus's assistant",
+        "about": "bringing back an advance payment option",
+        "recommends": "a 6-week pass with one free box"
+      },
+      {
+        "session": 38,
+        "by": "Rasmus's assistant",
+        "about": "how to spend the angel investment",
+        "recommends": "a list of options with no single recommendation"
+      },
+      {
+        "session": 39,
+        "by": "Ilona's assistant",
+        "about": "the pilot retro",
+        "recommends": "a third wave of three buildings in January"
+      }
+    ],
+    "boundaries": {
+      "doNotTell": [
+        {
+          "party": "Kestrel Lockworks (Oskar)",
+          "decision": "d96",
+          "items": [
+            "the Brightlatch quote",
+            "Larder's churn figures",
+            "that Larder would buy pods if the lease price rises",
+            "the angel investment and its amount"
+          ]
+        }
+      ],
+      "neverExternal": [
+        {
+          "party": "Harbour Pantry",
+          "decision": "d93"
+        }
+      ],
+      "personalStaysOut": true
+    }
+  },
+  "second": {
+    "slug": "tidewater",
+    "name": "Tidewater (board game)",
+    "kind": "mixed",
+    "summary": "Tidewater, the board game Rasmus designs in his free time, and its playtests. Open this for anything about the game, its rules or its playtests.",
+    "setting": "A board game in design; Pauli and Venla are invented friends of Rasmus.",
+    "core": "Tidewater is Rasmus's board game, which he has worked on in his free time since early 2026: traders sail cargo between harbours in a foggy archipelago before the tide turns. Pauli and Venla, two friends, playtest it with him. Six playtests were held between March and October 2026, and a small print run is planned for the Lakeport game fair in November.\n\nThe notes of every playtest are in the references, one record each. Rules changed between playtests, so the latest playtest that touched a rule holds the rule as it stands. The notes use the game's own words for its pieces and phases.",
+    "people": [
+      {
+        "name": "Rasmus",
+        "role": "designer",
+        "from": 1
+      },
+      {
+        "name": "Pauli",
+        "role": "playtester",
+        "from": 1
+      },
+      {
+        "name": "Venla",
+        "role": "playtester; draws",
+        "from": 1
+      }
+    ],
+    "sessions": [
+      {
+        "n": 1,
+        "date": "2026-03-08",
+        "title": "First playtest",
+        "attendees": [
+          "Rasmus",
+          "Pauli",
+          "Venla"
+        ],
+        "topics": [
+          "rules draft",
+          "dawn run",
+          "player count",
+          "game length"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 2,
+        "date": "2026-04-19",
+        "title": "Waves and pilots",
+        "attendees": [
+          "Rasmus",
+          "Pauli",
+          "Venla"
+        ],
+        "topics": [
+          "event cards",
+          "pilot",
+          "the reef",
+          "tide track"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 3,
+        "date": "2026-05-31",
+        "title": "Trading and scoring",
+        "attendees": [
+          "Rasmus",
+          "Pauli",
+          "Venla"
+        ],
+        "topics": [
+          "trading phase",
+          "champion",
+          "orphans",
+          "game length"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 4,
+        "date": "2026-07-12",
+        "title": "Five players",
+        "attendees": [
+          "Rasmus",
+          "Pauli",
+          "Venla",
+          "two guests"
+        ],
+        "topics": [
+          "player count",
+          "ledger",
+          "swap cards",
+          "dawn run"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 5,
+        "date": "2026-08-23",
+        "title": "One pilot",
+        "attendees": [
+          "Rasmus",
+          "Pauli",
+          "Venla"
+        ],
+        "topics": [
+          "pilot",
+          "the reef"
+        ],
+        "mustUse": []
+      },
+      {
+        "n": 6,
+        "date": "2026-10-04",
+        "title": "Towards a print run",
+        "attendees": [
+          "Rasmus",
+          "Pauli",
+          "Venla"
+        ],
+        "topics": [
+          "print run",
+          "box art",
+          "game fair"
+        ],
+        "mustUse": []
+      }
+    ],
+    "terms": [
+      {
+        "id": "g01",
+        "term": "pod",
+        "kind": "homonym",
+        "means": "a group of three whale tokens that moves as one piece and blocks a sea lane",
+        "session": 1,
+        "homonymOf": "pod"
+      },
+      {
+        "id": "g02",
+        "term": "dawn run",
+        "kind": "homonym",
+        "means": "the first turn of the game, in which every player moves their ship twice",
+        "session": 1,
+        "homonymOf": "dawn run"
+      },
+      {
+        "id": "g03",
+        "term": "drop",
+        "kind": "homonym",
+        "means": "playing a cargo card face down onto a harbour tile",
+        "session": 1,
+        "homonymOf": "drop"
+      },
+      {
+        "id": "g04",
+        "term": "loop",
+        "kind": "homonym",
+        "means": "one full round in which every player has had a turn",
+        "session": 1,
+        "homonymOf": "loop"
+      },
+      {
+        "id": "g05",
+        "term": "hub",
+        "kind": "homonym",
+        "means": "the central harbour tile where all sea lanes meet",
+        "session": 1,
+        "homonymOf": "hub"
+      },
+      {
+        "id": "g06",
+        "term": "cargo card",
+        "kind": "coined",
+        "means": "a card for one load of goods a ship carries between harbours",
+        "session": 1
+      },
+      {
+        "id": "g07",
+        "term": "harbour tile",
+        "kind": "coined",
+        "means": "a board tile for one harbour where cargo is dropped and picked up",
+        "session": 1
+      },
+      {
+        "id": "g08",
+        "term": "fog bank",
+        "kind": "coined",
+        "means": "a board tile that ordinary ships cannot enter",
+        "session": 1
+      },
+      {
+        "id": "g09",
+        "term": "captain sheet",
+        "kind": "coined",
+        "means": "each player's card with their ship's hold and abilities",
+        "session": 1
+      },
+      {
+        "id": "g10",
+        "term": "heartbeat",
+        "kind": "homonym",
+        "means": "the tide timer track; it advances one step at the end of every loop, and the game ends when it is full",
+        "session": 2,
+        "homonymOf": "heartbeat"
+      },
+      {
+        "id": "g11",
+        "term": "tide track",
+        "kind": "synonym",
+        "means": "the same as the heartbeat",
+        "session": 2,
+        "synonymOf": "heartbeat"
+      },
+      {
+        "id": "g12",
+        "term": "wave",
+        "kind": "homonym",
+        "means": "a set of three event cards revealed together",
+        "session": 2,
+        "homonymOf": "wave"
+      },
+      {
+        "id": "g13",
+        "term": "storm deck",
+        "kind": "coined",
+        "means": "the deck the event cards are drawn from",
+        "session": 2
+      },
+      {
+        "id": "g14",
+        "term": "pilot",
+        "kind": "homonym",
+        "means": "a special ship piece that can move through a fog bank",
+        "session": 2,
+        "homonymOf": "pilot"
+      },
+      {
+        "id": "g15",
+        "term": "the reef",
+        "kind": "coined",
+        "means": "the tile ring around the hub that damages ships passing it",
+        "session": 2
+      },
+      {
+        "id": "g16",
+        "term": "gull token",
+        "kind": "coined",
+        "means": "a marker that shows where an event card struck",
+        "session": 2
+      },
+      {
+        "id": "g17",
+        "term": "window",
+        "kind": "homonym",
+        "means": "the trading phase between two loops, when players may trade cargo",
+        "session": 3,
+        "homonymOf": "the window"
+      },
+      {
+        "id": "g18",
+        "term": "champion",
+        "kind": "homonym",
+        "means": "the token held by the player with the most points",
+        "session": 3,
+        "homonymOf": "building champion"
+      },
+      {
+        "id": "g19",
+        "term": "orphan",
+        "kind": "homonym",
+        "means": "a cargo card left on a harbour tile with no ship to carry it",
+        "session": 3,
+        "homonymOf": "orphan box"
+      },
+      {
+        "id": "g20",
+        "term": "beacon",
+        "kind": "coined",
+        "means": "a light a player builds on a harbour tile for points",
+        "session": 3
+      },
+      {
+        "id": "g21",
+        "term": "ledger",
+        "kind": "homonym",
+        "means": "the score sheet",
+        "session": 4,
+        "homonymOf": "the Ledger"
+      },
+      {
+        "id": "g22",
+        "term": "swap card",
+        "kind": "homonym",
+        "means": "a card that lets a player trade one cargo card with another player outside the window",
+        "session": 4,
+        "homonymOf": "swap card"
+      },
+      {
+        "id": "g23",
+        "term": "salvage",
+        "kind": "coined",
+        "means": "taking an orphan into your hold for one point",
+        "session": 5
+      }
+    ],
+    "decisions": [
+      {
+        "id": "t01",
+        "session": 1,
+        "date": "2026-03-08",
+        "topic": "player count",
+        "text": "Tidewater is for 2 to 4 players.",
+        "value": "2 to 4",
+        "replacedBy": "t02"
+      },
+      {
+        "id": "t02",
+        "session": 4,
+        "date": "2026-07-12",
+        "topic": "player count",
+        "text": "Tidewater is for 2 to 5 players.",
+        "value": "2 to 5",
+        "replaces": "t01"
+      },
+      {
+        "id": "t03",
+        "session": 1,
+        "date": "2026-03-08",
+        "topic": "game length",
+        "text": "A game should take about 45 minutes.",
+        "value": "45 minutes",
+        "replacedBy": "t04"
+      },
+      {
+        "id": "t04",
+        "session": 3,
+        "date": "2026-05-31",
+        "topic": "game length",
+        "text": "A game may take about 60 minutes.",
+        "value": "60 minutes",
+        "replaces": "t03"
+      },
+      {
+        "id": "t05",
+        "session": 2,
+        "date": "2026-04-19",
+        "topic": "waves",
+        "text": "A wave is three event cards from the storm deck."
+      },
+      {
+        "id": "t06",
+        "session": 2,
+        "date": "2026-04-19",
+        "topic": "pilot",
+        "text": "Each player has one pilot.",
+        "value": "one per player",
+        "replacedBy": "t07"
+      },
+      {
+        "id": "t12",
+        "session": 2,
+        "date": "2026-04-19",
+        "topic": "the reef",
+        "text": "Passing the reef costs two cargo cards.",
+        "value": "two cargo cards",
+        "replacedBy": "t10"
+      },
+      {
+        "id": "t07",
+        "session": 5,
+        "date": "2026-08-23",
+        "topic": "pilot",
+        "text": "There is only one pilot on the board, and it goes to whoever holds the champion token.",
+        "value": "one, to the champion",
+        "replaces": "t06"
+      },
+      {
+        "id": "t08",
+        "session": 3,
+        "date": "2026-05-31",
+        "topic": "orphans",
+        "text": "Every orphan left at the end costs the player who dropped it one point."
+      },
+      {
+        "id": "t09",
+        "session": 4,
+        "date": "2026-07-12",
+        "topic": "dawn run",
+        "text": "The dawn run stays: a version without it made the opening too slow."
+      },
+      {
+        "id": "t10",
+        "session": 5,
+        "date": "2026-08-23",
+        "topic": "the reef",
+        "text": "Passing the reef costs one cargo card instead of two.",
+        "value": "one cargo card",
+        "replaces": "t12"
+      },
+      {
+        "id": "t11",
+        "session": 6,
+        "date": "2026-10-04",
+        "topic": "print run",
+        "text": "A print run of 50 copies for the Lakeport game fair on 21 November.",
+        "value": "50 copies"
+      }
+    ],
+    "questions": [
+      {
+        "id": "tq1",
+        "opened": 2,
+        "question": "Is the reef too punishing?",
+        "closedIn": 5,
+        "closedBy": "t10"
+      },
+      {
+        "id": "tq2",
+        "opened": 6,
+        "question": "Will Venla draw the box art, or do we hire someone?"
+      }
+    ],
+    "facts": [],
+    "stories": [],
+    "documents": [],
+    "personal": [],
+    "analyses": []
+  }
+}

@@ -10,6 +10,9 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-11-08 — The "Contexts" tab (views/profile/contexts-tab.js, id 'contexts'): the person's
+ *     contexts, which their AI keeps and shapes in chat, with who can read each one, archive and
+ *     delete (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  *   2026-11-07 — The "Receivers" tab (views/profile/receivers-tab.js, id 'receivers'): the addresses and
  *     keys through which an outside program writes into one place of the person's data
  *     (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -86,6 +89,7 @@ import VisibilityTab from './profile/visibility-tab.js';
 import { PnlTab } from './profile/pnl-tab.js';
 import { CompaniesTab } from './profile/companies-tab.js';
 import MemoryTab from './profile/memory-tab.js';
+import ContextsTab from './profile/contexts-tab.js';
 import WorkTab from './profile/work-tab.js';
 import ServicesTab from './profile/services-tab.js';
 import BoardsTab from './profile/boards-tab.js';
@@ -172,6 +176,7 @@ const TABS = [
   { id: 'skills',        key: 'skills.tabLabel',             component: SkillsTab,         minTier: 'active' },
   { id: 'organisms',     key: 'profile.tabs.organisms',      component: OrganismsTab,      minTier: 'active' },
   { id: 'memory',        key: 'profile.tabs.memory',         component: MemoryTab,         minTier: 'new' },
+  { id: 'contexts',      key: 'profile.tabs.contexts',       component: ContextsTab,       minTier: 'new' },
   { id: 'notebook',      key: 'profile.tabs.notebook',       component: NotebookTab,       minTier: 'new' },
   { id: 'living',        key: 'profile.tabs.living',         component: LivingTab,         minTier: 'new' },
   { id: 'work',          key: 'profile.tabs.work',           component: WorkTab,           minTier: 'active' },

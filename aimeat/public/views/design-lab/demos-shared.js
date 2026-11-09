@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.18.0 — 2026-11-09 — Fingerprint's demo: panel and row on a small invented profile.
  *   v1.17.0 — 2026-10-18 — ClassificationBadge's demo: the four default classifications, one from a
  *     workspace, a conflict and an exception beside the AudienceBadge.
  *   v1.16.0 — 2026-10-18 — AudienceBadge's demo: every level in a row, an organism not named yet, the button.
@@ -49,6 +50,7 @@ import { ContactPicker } from '/components/ContactPicker.js';
 import { TagList } from '/components/TagList.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { HtmlPageFrame } from '/components/HtmlPageFrame.js';
+import { Fingerprint } from '/components/Fingerprint.js';
 
 const html = htm.bind(h);
 const noop = () => {};
@@ -69,7 +71,22 @@ function SandboxOpen() {
   return html`<p>The overlay covers this frame.</p>`;
 }
 
+/** A small profile in the shape GET /v1/content/facts gives (atelier fingerprint.js FINGERPRINT_SAMPLE has the full one). */
+const FP_PROFILE = {
+  v: 1, prompt: 'profile-4', model: 'demo', at: '2026-11-09T08:00:00.000Z', kind: 'repair notes',
+  topics: [
+    { name: 'Roof and quote', share: 0.5, genre: 'F', mark: '~', axes: { fakta: 0.8, konkr: 0.8, aika: -0.4, toim: -0.3, yks: 0.7, varm: 0.8 } },
+    { name: 'Why repair', share: 0.25, genre: 'M', mark: '?', axes: { fakta: -0.6, konkr: 0.2, aika: 0.3, toim: 0.2, yks: -0.2, varm: 0.7 } },
+    { name: 'The sauna', share: 0.25, genre: 'K', mark: '~', axes: { fakta: 0.2, konkr: 0.9, aika: -0.9, toim: -0.8, yks: 0.6, varm: 0.6 } },
+  ],
+  sections: [['F', 120, 0.9, '~', 0], ['F', 90, 0.8, '+', 0], ['P', 70, 0.9, '~', 0], ['M', 80, 0.7, '?', 1], ['K', 90, 0.6, '~', 2]], axes: { fakta: 0.3, konkr: 0.6, aika: -0.3, toim: -0.3, yks: 0.4, varm: 0.75 },
+};
+
 export const SHARED_DEMOS = {
+  fingerprint: { height: 900, variants: [
+    { name: 'panel', render: () => html`<${Fingerprint} profile=${FP_PROFILE} title="Cabin repair" />` },
+    { name: 'row', render: () => html`<${Fingerprint} profile=${FP_PROFILE} title="Cabin repair" view="row" />` },
+  ] },
   'card-menu': { height: 260, variants: [
     { name: 'off', render: (ex) => html`<${CardMenu} state="off" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'open', render: (ex) => html`<${CardMenu} state="open" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },

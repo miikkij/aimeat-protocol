@@ -24,6 +24,49 @@
       }
     },
     {
+      "date": "2026-11-09",
+      "kind": "feature",
+      "id": "2026-11-09-a-store-or-customer-site-no-longer-competes-with-aimeat-io-in-search",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
+      "title": {
+        "en": "A store or customer site no longer competes with aimeat.io in search",
+        "fi": "Kauppa tai asiakasinstanssi ei enää kilpaile aimeat.io:n kanssa hakukoneissa"
+      },
+      "summary": {
+        "en": "A site beside aimeat.io names it, and its pages about the software point search engines there.",
+        "fi": "Rinnalla toimiva instanssi nimeää aimeat.io:n, ja sen ohjelmistosivut ohjaavat hakukoneet sinne."
+      },
+      "body": {
+        "en": "A store or customer site no longer competes with aimeat.io in search. It can name the main site, and its pages about the software point search engines there. A data package's page says who published it and how many rows it has.",
+        "fi": "Kauppa ja asiakasinstanssit eivät kilpaile aimeat.io:n kanssa hakukoneissa. Instanssi voi nimetä pääinstanssin, ja silloin ohjelmistoa kuvaavat sivut osoittavat hakukoneille sinne. Datapaketin sivu kertoo, kuka sen julkaisi ja montako riviä siinä on."
+      }
+    },
+    {
+      "date": "2026-11-09",
+      "kind": "feature",
+      "id": "2026-11-09-your-contexts",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your contexts",
+        "fi": "Kontekstit"
+      },
+      "summary": {
+        "en": "Larger work you do with your AI is kept as a context that any AI you connect can carry on.",
+        "fi": "Isompi asia, jota teet tekoälysi kanssa, säilyy kontekstina, jota jokainen tekoälysi voi jatkaa."
+      },
+      "body": {
+        "en": "Something larger you work on with your AI is kept as a context that every AI you connect can carry on from. You choose when one starts. Earlier versions are kept and can be put back, a check says what no longer stands, and the fingerprint shows what it is made of.",
+        "fi": "Isompi asia, jota teet tekoälysi kanssa, säilyy kontekstina, jota jokainen yhdistämäsi tekoäly voi jatkaa. Sinä päätät, milloin konteksti aloitetaan. Aiemmat versiot säilyvät, ja voit palauttaa niistä minkä tahansa. Tarkistus kertoo, mikä ei enää pidä, ja sormenjälki näyttää, mistä konteksti koostuu."
+      }
+    },
+    {
       "date": "2026-11-08",
       "kind": "fix",
       "id": "2026-11-08-an-extensions-refusal-says-why",

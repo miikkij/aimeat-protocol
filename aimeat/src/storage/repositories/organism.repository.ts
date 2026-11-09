@@ -11,6 +11,8 @@
  *   - PendingApproval methods: create/get/list/update plus listOverduePendingApprovals
  *
  * @version-history
+ *   2026-11-09 — organismNames: many organisms' names in one query (the Data Wallet read 51 whole
+ *     records one at a time for their names).
  *   2026-11-04 — listPendingApprovalsForOrgs is required: both providers implement it (codebase
  *     analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-09-09 — getOrganismReputation deleted: no caller (services/organism-reputation.ts
@@ -23,6 +25,8 @@ import type { ArchiveFilter, OrganismRecord, OrganismMembershipRecord, JoinReque
 export interface OrganismRepository {
   createOrganism(record: OrganismRecord): Promise<OrganismRecord>;
   getOrganism(id: string): Promise<OrganismRecord | null>;
+  /** The names of these organisms, by id, in ONE query; an id with no organism is absent. */
+  organismNames(ids: readonly string[]): Promise<Record<string, string>>;
   listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: ArchiveFilter }): Promise<OrganismRecord[]>;
   updateOrganism(id: string, updates: Partial<OrganismRecord>): Promise<OrganismRecord | null>;
   deleteOrganism(id: string): Promise<boolean>;

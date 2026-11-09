@@ -1,0 +1,20 @@
+/**
+ * @file surface-slot.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A surface block's place while its code or its data is on its way
+ *   (views/surface/renderer.js, Block). The two wrappers draw no box (display: contents), so a block
+ *   that has arrived lays out exactly as it did without them. While it waits, the slot shows the
+ *   block's heading and the loading line (the Band and Note kind="loading" the Settings pages use),
+ *   at the height the block had on the last visit in this browser, so nothing below it jumps when
+ *   the data arrives (Jouni, 2026-11-09: "Heading + loading line").
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-11-09 — Initial.
+ */
+
+.surface-slot,
+.surface-slot-content { display: contents; }
+/* The waiting place is the one that draws a box: it holds the heading and the line, and the
+   renderer sets its min-height to the block's remembered height. Its row spacing is in band.css. */
+.surface-slot-wait { display: block; }

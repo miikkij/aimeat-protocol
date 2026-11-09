@@ -9,6 +9,7 @@
  * @structure agentOnboardingMethods
  * @usage Object.assign(SqliteStorage.prototype, agentOnboardingMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-09 — getOnboardingMany: many agents' records in one IN query.
  *   v1.0.0 — 2026-10-05 — deserializeOnboarding, createOnboarding, getOnboarding, updateOnboarding,
  *     deleteOnboarding, listOnboardingByStatus moved here from messaging.ts so the file mirrors
  *     postgres-kysely/methods/agent-onboarding.ts (secaudit 2026-10, M8).
@@ -88,6 +89,14 @@ export const agentOnboardingMethods = {
       'SELECT * FROM agent_onboarding WHERE agentGaii = ?'
     ).get(agentGaii) as Record<string, unknown> | undefined;
     return row ? this.deserializeOnboarding(row) : null;
+  },
+
+  async getOnboardingMany(this: SqliteStorage, agentGaiis: readonly string[]): Promise<AgentOnboardingRecord[]> {
+    if (agentGaiis.length === 0) return [];
+    const rows = this.db.prepare(
+      `SELECT * FROM agent_onboarding WHERE agentGaii IN (${agentGaiis.map(() => '?').join(',')})`,
+    ).all(...agentGaiis) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeOnboarding(r));
   },
 
   async updateOnboarding(this: SqliteStorage, agentGaii: string, updates: Partial<AgentOnboardingRecord>): Promise<AgentOnboardingRecord | null> {

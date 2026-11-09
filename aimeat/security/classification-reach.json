@@ -521,10 +521,11 @@
     },
     "src/routes/memory/files.ts": {
       "reads": {
-        "listStorageFiles": 3,
-        "getStorageFile": 1
+        "listStorageFiles": 1,
+        "getStorageFile": 1,
+        "listStorageFilesForOwners": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file. 2026-11-09 (performance round 2): GET /v1/memory/files lists the owner's and their agents' file metadata, to the owner in person, in one IN query (listStorageFilesForOwners) where it read listStorageFiles once per identity; the same rows, the same metadata, no bytes."
     },
     "src/routes/memory/key.ts": {
       "reads": {
@@ -533,12 +534,6 @@
         "getMemory": 7
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader (the bin list included); the other reads here serve a write or the node's own bookkeeping. 2026-10-15 (feature-list audit #42): the seventh is GET /:key reading the caller's own record when a hidden owner copy shadowed it, and it passes presentMemory like the read it replaces."
-    },
-    "src/routes/memory/patch.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the second reads the record's visibility now, for the audience cap before the write."
     },
     "src/routes/memory/public-read.ts": {
       "reads": {
@@ -1351,6 +1346,31 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, each entry gated by canReadWorkspace."
     },
+    "src/services/context/index-line.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-08 (wish-oma-konteksti): the person's own context records (context.*), listed to write their names and summaries into the MCP instructions and the handbook of that person's own connecting AI. Both callers pass the connecting principal's classification reader (readerForAgent), and the rows go through presentMemories before a line is written, so a context classified away from AI is not named; private contexts are left out for an agent, and a session without memory:read gets no index."
+    },
+    "src/services/context/check.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the machine check of one context reads each record it names (references, module parts, source records) under the caller's own principal or, through the same-owner view (ownerScopeView with readsAsOwner), under the caller's person; the organism read rule applies, and every record goes through presentMemory with the caller's classification reader before a single string of it is compared. A record the reader may not see is reported as 'not found or not open to you', the same finding as a missing one."
+    },
+    "src/services/memory-patch/patch.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Moved unchanged from routes/memory/patch.ts on 2026-11-09 with its review: Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader (the echoed value goes through presentMemory with the caller's reader); the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the first reads the record's visibility, for the audience cap before the write; the second is the merge loop's re-read."
+    },
+    "src/services/memory-versions/history.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemoryHistory": 1
+      },
+      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the earlier versions of one record, read only by the record's own principal or the same person in person or through memory:read-as-owner; the organism read rule applies, and the current value and every archived version go through presentMemories with the caller's classification reader (and the credential mask) under the record's own target before anything is shown or compared."
+    },
     "src/services/content/classes.ts": {
       "reads": {
         "getMemory": 2
@@ -2108,10 +2128,9 @@
     },
     "src/services/home-state.ts": {
       "reads": {
-        "listMemoryForOwners": 1,
-        "getStorageFile": 1
+        "listMemoryForOwners": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts. 2026-11-09: the welcome page's existence check asks storageFileHolders, which returns identities and no content."
     },
     "src/services/hook-log.ts": {
       "reads": {
