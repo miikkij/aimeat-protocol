@@ -22,7 +22,7 @@
  *     context has a tag), a row names up to three of its tags, and the chosen context's facts name all
  *     of them with the line that the person's AI sets them.
  *   v1.4.0 — 2026-11-09 — The fingerprint as the first numbered part (approved by the developer)
- *     (components/Fingerprint.js, the drawing Pages shows), or the sentence that asks the AI for one.
+ *     (components/TextPrint.js, the drawing Pages shows), or the sentence that asks the AI for one.
  *     Compact by default; pressing it opens the whole fingerprint (the developer's call, same day).
  *   v1.3.0 — 2026-11-08 — The guidance follows the page-guidance rule: the page's own introduction is
  *     gone, and the head's paragraph, the title's question mark (concept.context), the standard
@@ -56,7 +56,7 @@ import { Box } from '/components/Box.js';
 import { Markdown } from '/components/Markdown.js';
 import { Peek, nextPeek } from '/components/Peek.js';
 import { Beside, Stack, Touch } from '/components/Layout.js';
-import { Fingerprint } from '/components/Fingerprint.js';
+import { Fingerprint } from '/components/TextPrint.js';
 import { x, xn, marksOf, readersWords, OWN_READERS, chatSentence, crumb, CONTEXT_PREFIX } from './frame.js';
 
 const html = htm.bind(h);

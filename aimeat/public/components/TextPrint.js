@@ -1,5 +1,5 @@
 /**
- * @file public/components/Fingerprint.js
+ * @file public/components/TextPrint.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The fingerprint of a text on the node's own screens: the same drawing every app and
@@ -19,9 +19,15 @@
  *
  *   IT RENDERS; IT DOES NOT FETCH the profile. When the drawing cannot load, the component says so in
  *   one quiet line.
+ *
+ *   THE FILE NAME MUST NOT BE fingerprint.js. EasyPrivacy, the privacy list most content blockers
+ *   load, has the rule `/fingerprint.js^`, which matches `/components/Fingerprint.js?v=…` in any
+ *   letter case. A blocked static import fails every module that imports it, so the admin page and
+ *   the Contexts page showed "Failed to load page" in a browser with a content blocker (2026-11-09).
  * @structure Fingerprint({ profile, sections, title, view, expandable }) · loadDrawing()
  * @usage html`<${Fingerprint} profile=${facts.profile} sections=${profileSections} title=${name} expandable />`
  * @version-history
+ *   v1.0.1 — 2026-11-09 — Renamed from Fingerprint.js: content blockers block that file name.
  *   v1.0.0 — 2026-11-09 — The developer approved the look; no longer a draft.
  *   v0.2.0 — 2026-11-09 — `expandable`: the compact row opens the whole fingerprint in place.
  *   v0.1.0 — 2026-11-09 — Draft (the Contexts page).
