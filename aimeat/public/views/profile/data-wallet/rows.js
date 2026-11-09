@@ -8,9 +8,14 @@
  *   reach; one revoked permission; one group of the trail (who tried what, how many times, when) and
  *   what opens under it (the keys with their names, the rows page by page, a door to grant, a door
  *   to the person's permissions); one grant or revoke event read off a permission's timestamps.
- * @structure targetRow · targetOpen · personRow · revokedRow · groupRow · groupOpen · eventRow
- * @usage import { targetRow, groupRow, eventRow } from './rows.js';
+ * @structure targetRow · targetOpen · personRow · foldedRow · revokedRow · bucketRow · bucketOpen ·
+ *   groupRow · groupOpen · eventRow
+ * @usage import { targetRow, bucketRow, eventRow } from './rows.js';
  * @version-history
+ *   v1.13.0 — 2026-11-09 — Grouped by who: a person's row says how many places and in which role;
+ *     the agents that reach one place each are one row (foldedRow); the trail is one row per day
+ *     (bucketRow: today, yesterday, earlier) whose groups load when it opens, and a group's id and
+ *     rows stay inside its day.
  *   v1.12.0 — 2026-09-26 — On the component kit (page group G7): every row, cell, opened panel, the
  *     grants and keys inside it and the access log are the List (components/List.js: Row, Name, Desc,
  *     Who, Num, When, Cell, Doors, Panel, More; the marked person is the selected Row); the counts
@@ -42,7 +47,8 @@ import { Action } from '/components/Action.js';
 import { Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Figure } from '/components/Figure.js';
-import { x, n, whoOf, roleOf, roleWord, grantWords, grantsWord, groupWords, targetWords, targetOf, wsName, dateWord, timeWord, spanWord, restWords } from './frame.js';
+import { LoadingLine } from '../shared.js';
+import { x, n, whoOf, roleOf, roleWord, grantWords, grantsWord, groupWords, targetWords, targetOf, wsName, dateWord, timeWord, spanWord, restWords, accessorWords } from './frame.js';
 
 const doorWord = (open) => (open ? x('close') : x('open'));
 /** Lines under one another in a cell's small line. */
@@ -128,13 +134,36 @@ export function personRow(ctx, p) {
   return html`
     <${Row} key=${p.id} open=${open} selected=${ctx.personFocus === p.name}>
       <${Name} onOpen=${toggle} meta=${x('whoKind.' + p.kind)}>${p.name}<//>
-      <${Desc}>${p.words}<//>
+      <${Desc} sub=${p.words}>${`${p.places === 1 ? x('placeOne') : x('placesN', { n: p.places })} · ${p.roles.map(roleWord).join(' / ')}`}<//>
       <${When}>${sinceWords(p.since, p.grants.length)}<//>
       ${toggleDoor(open, toggle)}
       ${open ? html`
         <${Panel}>
           <${List} cols="name-who-when-by-doors" dense apart head=${[x('col.target'), x('col.whoWhat'), x('col.since'), x('col.gaveBy'), '']}>
             ${p.grants.map((c) => grantLine(ctx, c, targetCell(ctx, c)))}
+          <//>
+        <//>` : null}
+    <//>`;
+}
+
+/** The agents that reach one place each, as one row; opened, each agent's place with its revoke. */
+export function foldedRow(ctx, list) {
+  const id = 'p|folded';
+  const open = ctx.openTarget === id;
+  const toggle = () => ctx.toggleTarget(id);
+  const grants = list.flatMap((p) => p.grants);
+  const since = grants.reduce((m, c) => (!m || c.granted_at < m ? c.granted_at : m), null);
+  const names = list.slice(0, 3).map((p) => whoShort(ctx, p.grants[0]?.recipient)).join(', ') + (list.length > 3 ? ` +${list.length - 3}` : '');
+  return html`
+    <${Row} key=${id} open=${open}>
+      <${Name} onOpen=${toggle} meta=${x('whoKind.agent')}>${x('folded.title', { n: list.length })}<//>
+      <${Desc} sub=${names}>${x('folded.sub')}<//>
+      <${When}>${sinceWords(since, grants.length)}<//>
+      ${toggleDoor(open, toggle)}
+      ${open ? html`
+        <${Panel}>
+          <${List} cols="name-who-when-by-doors" dense apart head=${[x('col.target'), x('col.whoWhat'), x('col.since'), x('col.gaveBy'), '']}>
+            ${grants.map((c) => grantLine(ctx, c, targetCell(ctx, c)))}
           <//>
         <//>` : null}
     <//>`;
@@ -153,12 +182,69 @@ export function revokedRow(ctx, c) {
     <//>`;
 }
 
-/* ── 02: one group of the trail ──────────────────────────────────────────────────────────────── */
+/* ── 03: one day of the trail ────────────────────────────────────────────────────────────────── */
+
+/**
+ * An accessor in one short phrase: the person; an agent of the reader's own by its name alone, and
+ * another person's agent with its owner.
+ */
+const whoShort = (ctx, gaii) => {
+  const s = String(gaii || '').replace(/^ghii:/, '');
+  const hash = s.indexOf('#');
+  if (hash <= 0) return accessorWords(gaii).name;
+  const agent = s.slice(0, hash);
+  const owner = s.slice(hash + 1).split('@')[0];
+  return owner === ctx.session?.owner ? agent : x('who.agentOf', { name: agent, owner });
+};
+const WHO_SHOWN = 3;
+
+/** Today, yesterday or earlier: who tried how often, the refusals, and the owner's own changes in it. */
+export function bucketRow(ctx, b, events) {
+  const open = ctx.openBucket === b.id;
+  const toggle = () => ctx.toggleBucket(b);
+  const top = b.who.slice(0, WHO_SHOWN);
+  const words = top.map((w) => `${whoShort(ctx, w.accessor_gaii)} ${n(w.count)}`);
+  const otherWho = b.accessor_total - top.length;
+  if (otherWho > 0) words.push(x('bucket.others', { who: otherWho, n: n(b.count - top.reduce((s, w) => s + w.count, 0)) }));
+  const times = [b.first, b.last, ...events.map((e) => e.at)].filter(Boolean).map((t) => new Date(t).toISOString()).sort();
+  const figure = b.count
+    ? { n: n(b.count), tone: b.denied ? 'notice' : 'fine', sub: b.denied ? x('bucket.refused', { n: n(b.denied) }) : x('outcome.allowed') }
+    : { n: String(events.length), tone: 'fine', sub: x('bucket.changes') };
+  return html`
+    <${Row} key=${b.id} open=${open}>
+      <${Name} onOpen=${toggle} meta=${b.id !== 'earlier' ? dateWord(b.from) : b.day_count === 1 ? x('bucket.dayOne') : x('bucket.days', { n: b.day_count })}>${x('bucket.' + b.id)}<//>
+      <${Desc} sub=${events.length ? x('bucket.events', { n: events.length }) : undefined}>${words.join(' · ') || x('bucket.onlyChanges')}<//>
+      <${Num}><${Figure} small end tone=${figure.tone} n=${figure.n} sub=${figure.sub} /><//>
+      <${When}>${times.length ? spanWord(times[0], times[times.length - 1]) : ''}<//>
+      ${toggleDoor(open, toggle)}
+      ${open ? bucketOpen(ctx, b, events) : null}
+    <//>`;
+}
+
+/** An opened day: the owner's own changes first, then the groups biggest first, a page at a time. */
+function bucketOpen(ctx, b, events) {
+  const st = ctx.bucketGroups[b.id];
+  const groups = st?.groups || [];
+  return html`
+    <${Panel}>
+      ${!st || (st.loading && !groups.length) ? html`<${LoadingLine} />` : st.failed ? html`<${Note} kind="quiet">${x('loadFailed')}<//>` : null}
+      ${events.length || groups.length ? html`
+        <${List} cols="name-desc-count-when-doors" dense apart head=${[x('col.who'), x('col.what'), { label: x('col.times'), num: true }, x('col.when'), '']}>
+          ${events.map((e) => eventRow(ctx, e))}
+          ${groups.map((g) => groupRow(ctx, g, b))}
+        <//>` : null}
+      ${st && groups.length < st.total ? html`<${More} disabled=${st.loading} label=${st.loading ? x('loading') : x('moreRows', { n: st.total - groups.length })}
+        onMore=${() => ctx.loadBucketGroups(b, true)} />` : null}
+    <//>`;
+}
+
+/* ── 03: one group of the trail ──────────────────────────────────────────────────────────────── */
 
 export const groupId = (g) => `${g.accessor_gaii}|${g.target?.kind}|${g.target?.organism_id || g.target?.key || ''}|${g.target?.rest || ''}|${g.action}|${g.allowed ? 1 : 0}`;
 
-export function groupRow(ctx, g) {
-  const id = groupId(g);
+/** One group; `bucket` is the day it was read in, so its id and its rows stay inside that day. */
+export function groupRow(ctx, g, bucket) {
+  const id = `${bucket?.id || ''}|${groupId(g)}`;
   const open = ctx.openGroup === id;
   const w = groupWords(g, ctx.names);
   const denied = w.outcome === 'denied';
@@ -170,11 +256,11 @@ export function groupRow(ctx, g) {
       <${Num}><${Figure} small end tone=${denied ? 'notice' : 'fine'} n=${n(g.count)} sub=${x('outcome.' + w.outcome)} /><//>
       <${When}>${spanWord(g.first, g.last)}<//>
       ${toggleDoor(open, toggle)}
-      ${open ? groupOpen(ctx, g, id, w) : null}
+      ${open ? groupOpen(ctx, g, id, w, bucket) : null}
     <//>`;
 }
 
-function groupOpen(ctx, g, id, w) {
+function groupOpen(ctx, g, id, w, bucket) {
   const tg = g.target || {};
   const rows = ctx.groupRows[id];
   const person = w.who.name && !['anonymous', 'shared#'].some((p) => String(g.accessor_gaii).startsWith(p));
@@ -189,7 +275,7 @@ function groupOpen(ctx, g, id, w) {
   const doors = html`
     ${person && w.outcome === 'denied' ? html`<${Action} small onClick=${() => ctx.prefillGrant({ who: g.accessor_gaii, orgId: tg.organism_id || '', wsId: tg.kind === 'ws' ? targetOf(g.keys?.[0] || '').workspace_id || '' : '', key: tg.kind === 'key' ? tg.key : '' })}>${x('group.grantTo', { who: w.who.name })}<//>` : null}
     ${person ? html`<${Action} small soft onClick=${() => ctx.showPerson(w.who.name)}>${x('group.seePermissions', { who: w.who.name })}<//>` : null}
-    ${!rows ? html`<${Action} small soft onClick=${() => ctx.loadGroupRows(g, id, false)}>${x('group.showRows')}<//>` : null}`;
+    ${!rows ? html`<${Action} small soft onClick=${() => ctx.loadGroupRows(g, id, false, bucket)}>${x('group.showRows')}<//>` : null}`;
   return html`
     <${Panel} doors=${doors}>
       <${Note} kind="lead">${lead}<//>
@@ -204,11 +290,11 @@ function groupOpen(ctx, g, id, w) {
           ${rows.entries.map((e) => html`<${Row} key=${e.id}><${When}>${dateWord(e.timestamp)} ${timeWord(e.timestamp)}<//><${Cell}><${Code}>${e.memory_key}<//><//><${Cell}>${x(e.allowed ? 'outcome.allowed' : 'outcome.denied')}<//><//>`)}
         <//>
         ${rows.entries.length < rows.total ? html`<${More} disabled=${rows.loading} label=${rows.loading ? x('loading') : x('group.moreRows', { n: n(rows.total - rows.entries.length) })}
-          onMore=${() => ctx.loadGroupRows(g, id, true)} />` : null}` : null}
+          onMore=${() => ctx.loadGroupRows(g, id, true, bucket)} />` : null}` : null}
     <//>`;
 }
 
-/* ── 02: one grant or revoke event ───────────────────────────────────────────────────────────── */
+/* ── 03: one grant or revoke event ───────────────────────────────────────────────────────────── */
 
 export function eventRow(ctx, ev) {
   const byYou = !ev.by || ev.by === ctx.session?.owner;

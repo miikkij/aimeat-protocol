@@ -10,6 +10,9 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.8.0 — 2026-11-09 — Under 1100px the rails are one closed row after the strip (.og-rail-fold,
+ *     SettingsPage railFold), and the rails in the side column are hidden there; Jouni's choice
+ *     "Suljettuna". Wider screens are unchanged.
  *   v1.7.0 — 2026-10-05 — The ink tone stands on the ink ground in both themes, as every contents rail
  *     does since theme.css v1.46.0: in the dark theme it had turned light, and its sun group labels and
  *     numbers measured 1.5:1 and its coral notices 2.35:1 on it (Jouni: "näkyy paskasti"). A notice
@@ -77,8 +80,22 @@
 .og-tree .og-rail-toggle i { color: var(--accent); }
 .og-page .og-main { padding-top: .9rem; }
 
+/* The rails folded into one row over the sections (SettingsPage railFold): only on a narrow screen,
+   where the side column stands under the page. The fold wears the rail's ink ground and frame, and
+   the rails inside it lose their own. */
+.og-rail-fold { display: none; margin-top: .5rem; background: var(--ink-ground); color: var(--on-ink-ground); border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow-raised); }
+.og-rail-fold-head { display: flex; align-items: center; gap: .6rem; padding: .75rem 1.1rem; cursor: pointer; list-style: none; }
+.og-rail-fold-head::-webkit-details-marker { display: none; }
+.og-rail-fold-head .og-rail-label { margin: 0; }
+.og-rail-fold-head em { font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
+.og-rail-fold-head::after { content: ''; margin-left: auto; width: .45rem; height: .45rem; border-right: var(--shape-frame) solid var(--sun); border-bottom: var(--shape-frame) solid var(--sun); transform: rotate(45deg); transition: transform .15s; }
+.og-rail-fold[open] > .og-rail-fold-head::after { transform: rotate(-135deg); }
+.og-rail-fold .og-rail { position: static; max-height: none; padding-top: 0; border: 0; box-shadow: none; background: none; }
+
 @media (max-width: 1100px) {
   .og-grid { grid-template-columns: 1fr; }
   .og-rail { position: static; }
   .og-tree { position: static; }
+  .og-rail-fold { display: block; }
+  .og-grid > .og-rail, .og-grid > .settings-page-side > .og-rail { display: none; }
 }

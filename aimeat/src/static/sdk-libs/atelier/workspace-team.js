@@ -41,6 +41,8 @@
  *   AIMEAT.atelier.workspaceTeam({ target, org, ws, variant: 'table', actions: [{ label: 'Message', run: (m) => open(m.account) }] });
  *   AIMEAT.atelier.workspaceTeam({ target, org, ws: b12, inviteInto: [{ ws: b12, label: 'B1–B2' }, { ws: b34, label: 'B3–B4', checked: false }] });
  * @version-history
+ *   v0.64.0 — 2026-11-09 — An account name that is not yet a member of the organism: the node's
+ *     grant now invites it, and the notice says so (outsideNotice) where it said "is now a viewer".
  *   v0.63.0 — 2026-10-02 — inviteInto: one invitation into several workspaces; the Invitations tab
  *     with Cancel (AIMEAT.organism.invitations, cancelInvitation).
  *   v0.62.0 — 2026-10-01 — `app` without org and ws follows the app's chosen workspace.
@@ -169,6 +171,20 @@ export function workspaceTeam(spec) {
       failure = refusal(e) || String(e);
     }
     await render();
+  }
+
+  /**
+   * What to say when the node answered that the granted account is not a member of the organism
+   * (`organism_member: false` with `invitation`), or '' when the role works now. A node that does
+   * not say answers '' as well, and the caller keeps its own sentence.
+   * @param {any} r @param {string} who
+   */
+  function outsideNotice(r, who) {
+    if (!r || r.organism_member !== false) return '';
+    if (r.invitation === 'sent') return tw('team.grantedInvited', { who: who });
+    if (r.invitation === 'pending') return tw('team.grantedPending', { who: who });
+    if (r.invitation === 'needs_admin') return tw('team.grantedNeedsAdmin', { who: who });
+    return tw('team.grantedRefused', { who: who, why: String(r.invitation_refusal || '') });
   }
 
   function button(label, tone, run, disabled) {
@@ -356,9 +372,9 @@ export function workspaceTeam(spec) {
               : tw('team.inviteSent', { email: value });
           });
         } else {
-          act(function () { return lib.grant(spec.org, spec.ws, value, role); }, function () {
+          act(function () { return lib.grant(spec.org, spec.ws, value, role); }, function (r) {
             typed = '';
-            return tw('team.granted', { who: value, role: tw('role.' + role) });
+            return outsideNotice(r, value) || tw('team.granted', { who: value, role: tw('role.' + role) });
           });
         }
       }, sample);
@@ -413,9 +429,14 @@ export function workspaceTeam(spec) {
         } else {
           act(async function () {
             // One grant per workspace, in order; a refusal stops there and says which sentence.
-            for (const g of into) await lib.grant(spec.org, g.ws, value, g.role);
-          }, function () {
+            // The last answer says where the account stands in the organism; it is the same for each.
+            let last = null;
+            for (const g of into) last = await lib.grant(spec.org, g.ws, value, g.role);
+            return last;
+          }, function (r) {
             typed = '';
+            const outside = outsideNotice(r, value);
+            if (outside) return outside;
             return into.length === 1
               ? tw('team.granted', { who: value, role: tw('role.' + into[0].role) })
               : tw('team.grantedMany', { who: value, n: into.length });

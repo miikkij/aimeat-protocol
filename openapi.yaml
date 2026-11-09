@@ -44772,7 +44772,25 @@ paths:
           schema:
             type: integer
             minimum: 0
-          description: Entries to skip before the page (newest first)
+          description: Entries to skip before the page (newest first); with `grouped=true`, groups to skip
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Only entries at or after this time (one day bucket of the Data Wallet trail)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Only entries before this time
+        - name: grouped
+          in: query
+          schema:
+            type: string
+            enum: ['true']
+          description: Return the matching entries grouped (as GET /v1/data-wallet groups them, grant and revoke rows left out) in `groups`, with `entries` empty; limit and offset then page the groups
       responses:
         '200':
           description: Consent audit log
@@ -44818,6 +44836,13 @@ paths:
                           offset:
                             type: integer
                             description: Present when a page was asked for
+                          groups:
+                            type: array
+                            description: With grouped=true, the groups (shape as in GET /v1/data-wallet audit.groups), biggest first
+                            items: { type: object }
+                          group_total:
+                            type: integer
+                            description: With grouped=true, every group before paging
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -49784,13 +49809,21 @@ paths:
   /v1/organisms/{id}/workspace-access/grant:
     post:
       operationId: grantWorkspaceRole
-      summary: Directly grant an existing member a workspace role (no prior request)
+      summary: Directly grant a workspace role (no prior request)
       description: |
         The workspace creator (or an org admin) adds an existing organism member to a workspace with a
         role — `viewer` (read) or `contributor` (read+write) — without a prior access request. `grantee`
         may be an owner name, GHII, or GAII; the grant applies to the OWNER, so all their agents inherit
         it. Modelled as a consent the workspace creator owns on `organism.{id}.w.{ws}.**` (the audit
         record), stamped with its source. Re-granting a different role replaces the prior one.
+
+        A role is read only by an active member of the organism. The answer says where the grantee
+        stands: `organism_member` true, or false with `invitation`. For an account outside the
+        organism the call also sends the organism's name invitation, carrying this role, when the
+        caller is an organism owner or admin (`sent`); `pending` means an invitation already waits,
+        `needs_admin` that the caller manages the workspace and may not invite, and `refused` that
+        the invitation could not be made (`invitation_refusal` carries the code). The role works
+        once the person accepts.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -49807,7 +49840,7 @@ paths:
                 grantee: { type: string, description: Owner name, GHII, or GAII to grant (applies to the owner) }
                 role: { type: string, enum: [viewer, contributor], description: viewer = read; contributor = read+write }
       responses:
-        '200': { description: 'Granted: { ws, grantee, role }' }
+        '200': { description: 'Granted: { ws, grantee, role, organism_member, invitation, invitation_refusal? }' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -80524,6 +80557,21 @@ paths:
           required: false
           schema: { type: integer, default: 20, minimum: 0, maximum: 1000 }
           description: How many of the newest audit rows to return verbatim beside the groups.
+        - name: group_limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, maximum: 1000 }
+          description: How many of the biggest groups to return; omitted means every group. `group_total` counts them all, and GET /v1/consent/audit with `grouped=true` pages through them.
+        - name: today_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: The reader's own start of today. With `yesterday_from` it adds `audit.buckets`.
+        - name: yesterday_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: The reader's own start of yesterday.
       responses:
         '200':
           description: Data Wallet overview
@@ -80570,6 +80618,35 @@ paths:
                                     last: { type: string, format: date-time }
                                     keys: { type: array, items: { type: string }, description: Distinct keys, newest first, at most 20 }
                                     key_count: { type: integer }
+                              group_total: { type: integer, description: Every group in the window, whatever group_limit returned }
+                              denied_total: { type: integer, description: Refused rows in the window }
+                              denied_groups: { type: integer, description: Groups of refused rows }
+                              manifest_denied: { type: integer, description: Refused rows that asked for a workspace manifest }
+                              buckets:
+                                type: array
+                                description: Present when today_from and yesterday_from were given. Today, yesterday and earlier; grant and revoke rows are left out.
+                                items:
+                                  type: object
+                                  properties:
+                                    id: { type: string, enum: [today, yesterday, earlier] }
+                                    from: { type: string, format: date-time, nullable: true }
+                                    to: { type: string, format: date-time, nullable: true }
+                                    count: { type: integer }
+                                    denied: { type: integer }
+                                    first: { type: string, format: date-time, nullable: true }
+                                    last: { type: string, format: date-time, nullable: true }
+                                    day_count: { type: integer, description: Distinct UTC dates the rows fall on }
+                                    group_count: { type: integer }
+                                    who:
+                                      type: array
+                                      description: The accessors with the most rows, at most 5
+                                      items:
+                                        type: object
+                                        properties:
+                                          accessor_gaii: { type: string }
+                                          count: { type: integer }
+                                          denied: { type: integer }
+                                    accessor_total: { type: integer }
                           permSummary:
                             type: object
                             properties:

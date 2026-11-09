@@ -12,11 +12,14 @@
  * @structure Setup · 1-6 memory · 7-12 files · 13-15 PATCH a file · 16 leaving · Cleanup
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-audience-memory-files
  * @version-history
+ *   v1.1.0 — 2026-11-09 — 2b: A's own agent reads and lists the organism record with owner_scope, on
+ *     REST and over MCP; 16b: after B leaves, B's agent no longer does.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.2 + V3.3).
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 let passed = 0, failed = 0;
@@ -97,6 +100,29 @@ await test('2. B (a member) and B\'s agent read it; A\'s own agent reads it', as
     assert(ba.status === 200, `B's agent ${ba.status} ${JSON.stringify(ba.body)}`);
     const aa = await readRec(aAgent.token);
     assert(aa.status === 200, `A's agent ${aa.status} ${JSON.stringify(aa.body)}`);
+});
+
+// The owner's own agent reads its owner's memory with owner_scope (no memory:read-as-owner): a record
+// kept at organism:<id> is shown when the organism admits the agent, on REST and on the MCP tools, as a
+// read by the owner's address already did. Before 2026-11-09 the owner-scope view knew only owner,
+// members and public, so the agent read its own owner's family record as absent.
+const bKey = `aud.b.${stamp}`;
+await test('2b. A\'s own agent reads and lists the organism record with owner_scope, on REST and over MCP', async () => {
+    const r = await json(`/v1/memory/${encodeURIComponent(recKey)}?owner_scope=true`, { headers: auth(aAgent.token) });
+    assert(r.status === 200 && r.body.data?.value?.note === 'for the organism', `REST read ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+    const l = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(`aud.rec.${stamp}`)}`, { headers: auth(aAgent.token) });
+    assert(l.status === 200 && (l.body.data?.items ?? []).some((i: any) => i.key === recKey), `REST list ${l.status} ${JSON.stringify(l.body).slice(0, 300)}`);
+    const mcpAgent = await makeAgent(BASE, A, ['memory:read', 'memory:write'], `aud-mcp-${stamp % 100000}`);
+    const session = await openSession(BASE, mcpAgent.token, 'e2e-audience-owner-scope');
+    const read = await callTool(session, 'aimeat_memory_read', { key: recKey, owner_scope: true });
+    assert(!read.isError && read.text.includes('for the organism'), `MCP read: ${read.text.slice(0, 300)}`);
+    const list = await callTool(session, 'aimeat_memory_list', { prefix: `aud.rec.${stamp}`, owner_scope: true });
+    assert(!list.isError && list.text.includes(recKey), `MCP list: ${list.text.slice(0, 300)}`);
+    // B (a member) keeps a record for the organism too; 16b reads it after B leaves.
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key: bKey, value: { note: 'b for the organism' }, visibility: `organism:${orgId}` }) });
+    assert(w.status === 201, `B write ${w.status} ${JSON.stringify(w.body)}`);
+    const br = await json(`/v1/memory/${encodeURIComponent(bKey)}?owner_scope=true`, { headers: auth(bAgent.token) });
+    assert(br.status === 200, `B's agent read ${br.status} ${JSON.stringify(br.body).slice(0, 300)}`);
 });
 
 await test('3. C (not a member) and C\'s agent are refused with 403 NOT_ORGANISM_MEMBER', async () => {
@@ -237,8 +263,17 @@ await test('16. B leaves the organism and loses the read of the record and the f
     assert(f.status === 403, `B file after leaving ${f.status}`);
 });
 
+await test('16b. After B leaves, B\'s own agent no longer reads or lists B\'s organism record with owner_scope', async () => {
+    const r = await json(`/v1/memory/${encodeURIComponent(bKey)}?owner_scope=true`, { headers: auth(bAgent.token) });
+    // A hidden same-owner record answers as an absent one.
+    assert(r.status === 404, `B's agent still reads it: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+    const l = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(`aud.b.${stamp}`)}`, { headers: auth(bAgent.token) });
+    assert(l.status === 200 && !(l.body.data?.items ?? []).some((i: any) => i.key === bKey), `B's agent still lists it: ${JSON.stringify(l.body).slice(0, 300)}`);
+});
+
 await test('Cleanup', async () => {
     await json(`/v1/memory/${encodeURIComponent(recKey)}`, { method: 'DELETE', headers: auth(A.token) });
+    await json(`/v1/memory/${encodeURIComponent(bKey)}`, { method: 'DELETE', headers: auth(B.token) });
     for (const k of [fileKey, patchFileKey, `aud-pre-ok-${stamp}.txt`]) await json(`/v1/storage/${k}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/organisms/${otherOrgId}`, { method: 'DELETE', headers: auth(C.token) });

@@ -11,6 +11,9 @@
  *   opens no write, an explicit write grant with an end date writes, a read grant does not, and write
  *   where no check reads it is refused before anything is stored.
  * @version-history
+ *   v1.2.0 — 2026-11-09 — The trail by day: group_limit=0 sends no groups and the same totals, the day
+ *     buckets put today's refusals in today, grouped=true with from and to gives one day's groups, and
+ *     paging them reaches every group the old answer had; an unreadable time filters nothing.
  *   v1.1.0 — 2026-11-08 — May do is a field the server reads, never the purpose text: the attack (a
  *     purpose word wrote), the use (Read and write with an end date was filed read-only), read gives
  *     no write, and the refusals.
@@ -131,6 +134,62 @@ await test('GET /v1/consent/audit: the rows of one group by key prefix, paged', 
   assert(body.data.entries.every((e: any) => e.memory_key.startsWith('probe.dw') && e.allowed === false && e.accessor_gaii === bGhii()), 'every row matches the filters');
   const none = await json('/v1/consent/audit?days=7&key_prefix=nothing.here', { headers: auth(A.token) });
   assert(none.body.data.total === 0 && none.body.data.entries.length === 0, 'an unmatched prefix is empty');
+});
+
+// The page reads the trail by day: the mount asks for no groups (group_limit=0) and the reader's
+// midnights, and a day's groups come from GET /v1/consent/audit?grouped=true with from and to.
+const todayFrom = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+const yesterdayFrom = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+
+await test('GET /v1/data-wallet with group_limit=0 and the day bounds: no groups, the totals, and the guest in today', async () => {
+  const full = await json('/v1/data-wallet?days=7', { headers: auth(A.token) });
+  const { status, body } = await json(`/v1/data-wallet?days=7&group_limit=0&today_from=${encodeURIComponent(todayFrom)}&yesterday_from=${encodeURIComponent(yesterdayFrom)}`, { headers: auth(A.token) });
+  assert(status === 200, `data-wallet ${status}: ${JSON.stringify(body.error)}`);
+  const a = body.data.audit;
+  const groups = full.body.data.audit.groups;
+  assert(Array.isArray(a.groups) && a.groups.length === 0, `no groups sent, got ${a.groups.length}`);
+  assert(a.group_total === groups.length, `group_total ${a.group_total} is every group (${groups.length})`);
+  const denied = groups.filter((g: any) => !g.allowed);
+  assert(a.denied_total === denied.reduce((s: number, g: any) => s + g.count, 0) && a.denied_total >= 3, `denied_total ${a.denied_total} is the sum of the refused groups`);
+  assert(a.denied_groups === denied.length, `denied_groups ${a.denied_groups}`);
+  assert(Array.isArray(a.buckets) && a.buckets.map((b: any) => b.id).join() === 'today,yesterday,earlier', `buckets ${JSON.stringify(a.buckets)}`);
+  const today = a.buckets[0];
+  const guest = today.who.find((w: any) => w.accessor_gaii === bGhii());
+  assert(!!guest && guest.count === 3 && guest.denied === 3, `the guest's three refusals are today: ${JSON.stringify(today.who)}`);
+  assert(today.from === todayFrom && today.to === null, 'today runs from the given midnight');
+  assert(a.buckets[1].count === 0 && a.buckets[2].count === 0, 'nothing yesterday or earlier on a fresh account');
+  assert(!full.body.data.audit.buckets, 'without the day bounds there are no buckets (the old answer)');
+});
+
+await test('GET /v1/consent/audit?grouped=true: one day\'s groups, paged, and together every group', async () => {
+  const day = await json(`/v1/consent/audit?days=7&grouped=true&from=${encodeURIComponent(todayFrom)}`, { headers: auth(A.token) });
+  assert(day.status === 200, `grouped ${day.status}: ${JSON.stringify(day.body.error)}`);
+  const g = day.body.data.groups.find((x: any) => x.accessor_gaii === bGhii() && x.target?.key === 'probe.dw.secret');
+  assert(!!g && g.count === 3 && g.allowed === false, `the guest's group today: ${JSON.stringify(day.body.data.groups).slice(0, 300)}`);
+  assert(day.body.data.entries.length === 0, 'grouped sends no rows');
+  const past = await json(`/v1/consent/audit?days=7&grouped=true&to=${encodeURIComponent(yesterdayFrom)}`, { headers: auth(A.token) });
+  assert(past.body.data.group_total === 0 && past.body.data.total === 0, `nothing before yesterday: ${JSON.stringify(past.body.data)}`);
+  const all = await json('/v1/consent/audit?days=7&grouped=true', { headers: auth(A.token) });
+  const walked: any[] = [];
+  for (let offset = 0; offset < all.body.data.group_total; offset++) {
+    const page = await json(`/v1/consent/audit?days=7&grouped=true&limit=1&offset=${offset}`, { headers: auth(A.token) });
+    assert(page.body.data.groups.length === 1 && page.body.data.limit === 1, `page ${offset}`);
+    walked.push(page.body.data.groups[0]);
+  }
+  const full = await json('/v1/data-wallet?days=7', { headers: auth(A.token) });
+  const want = full.body.data.audit.groups.filter((x: any) => x.action !== 'grant' && x.action !== 'revoke');
+  const id = (x: any) => `${x.accessor_gaii}|${JSON.stringify(x.target)}|${x.action}|${x.allowed}|${x.count}`;
+  assert(walked.map(id).sort().join() === want.map(id).sort().join(), `paging reaches every group the mount had: ${walked.length} vs ${want.length}`);
+});
+
+await test('A from that is not a time is ignored, and the guest\'s grouped trail holds none of the owner\'s refusals', async () => {
+  const bad = await json(`/v1/consent/audit?days=7&from=yesterday&key_prefix=probe.dw&accessor_gaii=${encodeURIComponent(bGhii())}`, { headers: auth(A.token) });
+  assert(bad.status === 200 && bad.body.data.total === 3, `an unreadable from filters nothing: ${bad.status} ${bad.body.data?.total}`);
+  const guest = await json('/v1/consent/audit?days=7&grouped=true', { headers: auth(B.token) });
+  assert(guest.status === 200, `guest grouped ${guest.status}`);
+  assert(!guest.body.data.groups.some((x: any) => x.target?.key === 'probe.dw.secret'), "the owner's refusals are not in the guest's groups");
+  const anon = await json('/v1/consent/audit?days=7&grouped=true');
+  assert(anon.status === 401, `grouped without a token: ${anon.status}`);
 });
 
 await test('Without a token both doors refuse (401)', async () => {

@@ -15459,6 +15459,10 @@ Known schemas:
       "team.add": "Add",
       "team.invite": "Invite",
       "team.granted": "{who} is now a {role}.",
+      "team.grantedInvited": "{who} is not yet a member of this organism, so they got an invitation. The role works when they accept it.",
+      "team.grantedPending": "{who} has an invitation to this organism that waits for their answer. The role works when they accept it.",
+      "team.grantedNeedsAdmin": "{who} is not a member of this organism. Ask an owner or admin of the organism to invite them. The role works after that.",
+      "team.grantedRefused": "{who} is not a member of this organism, and the invitation could not be sent ({why}). The role works only for a member.",
       "team.declined": "You declined the request from {who}.",
       "team.removed": "{who} no longer has access.",
       "team.inviteSent": "Invitation sent to {email}.",
@@ -15544,6 +15548,10 @@ Known schemas:
       "team.add": "Lisää",
       "team.invite": "Kutsu",
       "team.granted": "{who} on nyt {role}.",
+      "team.grantedInvited": "{who} ei ole vielä tämän organismin jäsen, joten hän sai kutsun. Rooli tulee voimaan, kun hän hyväksyy kutsun.",
+      "team.grantedPending": "{who} on jo saanut kutsun tähän organismiin, ja kutsu odottaa hänen vastaustaan. Rooli tulee voimaan, kun hän hyväksyy kutsun.",
+      "team.grantedNeedsAdmin": "{who} ei ole tämän organismin jäsen. Pyydä organismin omistajaa tai ylläpitäjää kutsumaan hänet. Rooli tulee voimaan sen jälkeen.",
+      "team.grantedRefused": "{who} ei ole tämän organismin jäsen, eikä kutsua voitu lähettää ({why}). Rooli toimii vain jäsenellä.",
       "team.declined": "Hylkäsit pyynnön: {who}.",
       "team.removed": "Käyttäjällä {who} ei enää ole pääsyä.",
       "team.inviteSent": "Kutsu lähti osoitteeseen {email}.",
@@ -15629,6 +15637,10 @@ Known schemas:
       "team.add": "Agregar",
       "team.invite": "Invitar",
       "team.granted": "{who} ahora es {role}.",
+      "team.grantedInvited": "{who} todavía no es miembro de este organismo, así que ha recibido una invitación. El rol funciona cuando la acepte.",
+      "team.grantedPending": "{who} ya tiene una invitación a este organismo que espera su respuesta. El rol funciona cuando la acepte.",
+      "team.grantedNeedsAdmin": "{who} no es miembro de este organismo. Pide a un propietario o administrador del organismo que le invite. El rol funciona después.",
+      "team.grantedRefused": "{who} no es miembro de este organismo y no se pudo enviar la invitación ({why}). El rol solo funciona para un miembro.",
       "team.declined": "Rechazaste la solicitud de {who}.",
       "team.removed": "{who} ya no tiene acceso.",
       "team.inviteSent": "La invitación se envió a {email}.",
@@ -15947,6 +15959,13 @@ Known schemas:
       }
       await render();
     }
+    function outsideNotice(r, who) {
+      if (!r || r.organism_member !== false) return "";
+      if (r.invitation === "sent") return tw("team.grantedInvited", { who });
+      if (r.invitation === "pending") return tw("team.grantedPending", { who });
+      if (r.invitation === "needs_admin") return tw("team.grantedNeedsAdmin", { who });
+      return tw("team.grantedRefused", { who, why: String(r.invitation_refusal || "") });
+    }
     function button2(label, tone, run2, disabled) {
       return el("button", { type: "button", class: "ak-btn ak-btn--" + tone, disabled: disabled ? true : null, on: { click: run2 } }, label);
     }
@@ -16185,9 +16204,9 @@ Known schemas:
           } else {
             act(function() {
               return lib.grant(spec.org, spec.ws, value, role);
-            }, function() {
+            }, function(r) {
               typed = "";
-              return tw("team.granted", { who: value, role: tw("role." + role) });
+              return outsideNotice(r, value) || tw("team.granted", { who: value, role: tw("role." + role) });
             });
           }
         }, sample);
@@ -16250,9 +16269,13 @@ Known schemas:
             });
           } else {
             act(async function() {
-              for (const g of into) await lib.grant(spec.org, g.ws, value, g.role);
-            }, function() {
+              let last = null;
+              for (const g of into) last = await lib.grant(spec.org, g.ws, value, g.role);
+              return last;
+            }, function(r) {
               typed = "";
+              const outside2 = outsideNotice(r, value);
+              if (outside2) return outside2;
               return into.length === 1 ? tw("team.granted", { who: value, role: tw("role." + into[0].role) }) : tw("team.grantedMany", { who: value, n: into.length });
             });
           }

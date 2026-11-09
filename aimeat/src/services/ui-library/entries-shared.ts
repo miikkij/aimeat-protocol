@@ -283,7 +283,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     {
         id: 'fingerprint', name: 'Fingerprint', kind: 'component', status: 'active',
         summary: 'The fingerprint of a text on the node\'s own screens: what kind of material it is (fact, analysis, opinion, instruction, decision, narrative) and what each part rests on, drawn by the same atelier drawing Pages and the apps use (seal, barcode, trust bar, quadrants, the lines a chat shows), in the node\'s ink, lines and fonts.',
-        module: '/components/Fingerprint.js', sheet: '/css/components/fingerprint.css', classes: ['node-fp'],
+        module: '/components/TextPrint.js', sheet: '/css/components/fingerprint.css', classes: ['node-fp'],
         data: {
             shape: 'Fingerprint({ profile, sections?, title?, view?, expandable? })',
             fields: {

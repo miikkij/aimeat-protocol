@@ -1298,6 +1298,7 @@ const ALL_SUITES = [
     'test/e2e-access-page.ts',
     'test/e2e-invitations.ts',
     'test/e2e-invite-grants.ts',
+    'test/e2e-workspace-grant-invite.ts',     // a workspace role granted to an account outside the organism invites it
     'test/e2e-contact-picker.ts',
     'test/e2e-contacts.ts',
     'test/e2e-colleagues.ts',               // a company server: everyone on it sees each other (members see each other)

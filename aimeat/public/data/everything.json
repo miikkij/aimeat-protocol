@@ -1171,10 +1171,10 @@
      "slug": "g-6-workspace-access-requests",
      "cells": [
       "<strong>Workspace access requests</strong>",
-      "A member who can see a workspace but not read it asks its creator for access. The creator or an admin sees the requests and the members, then approves (contributor by default, or viewer) or declines. An app's own token can decide; an agent needs the permission to invite.",
+      "A member who can see a workspace but not read it asks its creator for access. The creator or an admin sees the requests and the members, then approves (contributor by default, or viewer) or declines. An app's own token can decide; an agent needs the permission to invite. A role given directly to an account that is not yet a member of the organism also sends that account the organism's invitation when the giver is an organism owner or admin, and the role works once the person accepts; the answer says where the person stands.",
       "<code>/v1/organisms/:id/workspace-access</code> (<code>/decision</code>, <code>/grant</code>, <code>/revoke</code>), <code>aimeat_workspace_access</code>, <code>aimeat_workspace_member_grant</code>"
      ],
-     "plain": "Workspace access requests A member who can see a workspace but not read it asks its creator for access. The creator or an admin sees the requests and the members, then approves (contributor by default, or viewer) or declines. An app's own token can decide; an agent needs the permission to invite. /v1/organisms/:id/workspace-access (/decision, /grant, /revoke), aimeat_workspace_access, aimeat_workspace_member_grant"
+     "plain": "Workspace access requests A member who can see a workspace but not read it asks its creator for access. The creator or an admin sees the requests and the members, then approves (contributor by default, or viewer) or declines. An app's own token can decide; an agent needs the permission to invite. A role given directly to an account that is not yet a member of the organism also sends that account the organism's invitation when the giver is an organism owner or admin, and the role works once the person accepts; the answer says where the person stands. /v1/organisms/:id/workspace-access (/decision, /grant, /revoke), aimeat_workspace_access, aimeat_workspace_member_grant"
     },
     {
      "slug": "g-6-html-pages-a-presentation-without-an-app",

@@ -11,6 +11,8 @@
  *   Access and grant live together because they are the two halves of ONE membership decision —
  *   someone asks, someone decides — and both were already reaching for the same role helpers.
  * @version-history
+ *   2026-11-09 — member_grant answers `organism_member` and `invitation`, and invites a grantee who
+ *     is outside the organism when the caller's owner may (services/invitations.ts membershipAfterGrant).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-06 — member_grant and member_revoke answer as a refusal when every workspace refused, as
@@ -31,6 +33,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { granteeOwner, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
 import { decideAccessRequest, requestStatus } from '../services/workspace-access-decision.js';
+import { membershipAfterGrant } from '../services/invitations.js';
 import type { Storage } from '../storage/interface.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
@@ -151,7 +154,15 @@ export function registerWorkspaceMemberTools(
             // Refused on every workspace is a refusal, not a grant of nothing: answered as ok it reads as
             // "there was nothing to do". The connector has said so since TARGET-028; this tool had not.
             const refusedEverywhere = results.every(r => r.status === 'forbidden_or_not_found');
-            return refusedOr(ok({ grantee: owner, role, granted, total: targets.length, results }), refusedEverywhere);
+            // A role is read only by an active member of the organism: say where the grantee stands,
+            // and invite an account outside it when the caller's owner may (the REST grant's function).
+            const standing = granted > 0
+                ? await membershipAfterGrant(storage, config, {
+                    orgId: organism_id, grantee, granter: ownerName,
+                    grants: results.filter(r => r.status === 'granted').map(r => ({ ws: r.ws, role })),
+                })
+                : {};
+            return refusedOr(ok({ grantee: owner, role, granted, total: targets.length, results, ...standing }), refusedEverywhere);
         });
 
     // ── aimeat_workspace_member_revoke ── (remove a member's role on one or many workspaces)
