@@ -33,6 +33,7 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.7.4 — 2026-11-09 — The ctx.changed row.
  *   v1.7.3 — 2026-11-01 — A listed tool's `deliversData`, and the node's proposal from its output (plan D5.5).
  *   v1.7.2 — 2026-10-25 — The newsletter row: ctx.email takes one recipient per call within the hourly allowance (secaudit2026oct22, lead 325).
  *   v1.7.1 — 2026-10-18 — The ctx.ai row says the extension reads the answer back, privately.
@@ -179,6 +180,7 @@ This is what an agent reaches through an app tool. The extension's manifest decl
 | \`ctx.files\` | Reads and writes files in the node's storage. |
 | \`ctx.ai\` | Starts a model call that runs in the background: text, a picture, or the transcription of a stored audio file. The extension's owner pays for it, and the extension reads the answer back while it stays private to the owner. |
 | \`ctx.email\`, \`ctx.notify\` | Sends an email through the node's mail service, or a notice to the owner. |
+| \`ctx.changed\` | Tells the open pages of named owners that the extension's data changed for them, so an app showing it reads again without a timer. It carries no data. |
 | \`ctx.buy\` | Buys one call of another app's tool, under a contract the extension's owner holds. |
 | \`ctx.calendar\` | Calendar arithmetic on the node, with the library the browser uses (\`aimeat-calendar\`): the occurrences of repeating events in a range, free time, a time zone's local time to an instant and back, ICS text to events and back. An extension has no time-zone data of its own, so a calendar tool ("what is booked this week", "when is free") is built on these calls and stores events in the library's event shape. |
 | A schedule | Runs an action on a clock, for example to fetch from an outside system and write rows. |

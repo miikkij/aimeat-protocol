@@ -58,6 +58,8 @@
  *     open MCP sessions on every process (secaudit2026nov08b round 15).
  *   2026-11-08 — The `mcpSessionsClose` channel: an agent deleted, rekeyed or approved again closes its
  *     open MCP sessions on the node's other processes too (secaudit2026nov08b round 15b).
+ *   2026-11-09 — extensionDomain: an installed extension's own live domain, `ext:<installer>/<name>`,
+ *     which its ctx.changed() sends to named owners (services/extension-live/changed.ts).
  */
 import { EventEmitter } from 'node:events';
 
@@ -149,6 +151,17 @@ export const WORKSPACE_DOMAIN_PREFIX = 'workspace:';
 /** The live domain of one organism workspace: what a page subscribes to with AIMEAT.live. */
 export function workspaceDomain(organismId: string, ws: string): string {
   return `${WORKSPACE_DOMAIN_PREFIX}${organismId}/${ws}`;
+}
+
+/** Every extension's own live domain starts with this; the rest is `<installer>/<extension name>`. */
+export const EXTENSION_DOMAIN_PREFIX = 'ext:';
+
+/**
+ * The live domain of one installed extension's data: what a page subscribes to with AIMEAT.live, and
+ * what the extension's `ctx.changed()` sends to named owners (services/extension-live/changed.ts).
+ */
+export function extensionDomain(installer: string, name: string): string {
+  return `${EXTENSION_DOMAIN_PREFIX}${installer}/${name}`;
 }
 
 const WORKSPACE_KEY = /^organism\.([^.]+)\.w\.([^.]+)\./;

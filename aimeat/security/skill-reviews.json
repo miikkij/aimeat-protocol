@@ -335,7 +335,7 @@
       "digest": "sha256:842ca193052075de81e6ba67"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
@@ -345,7 +345,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:26ddcb3bfb8805e4ae87cf42"
+      "digest": "sha256:b4cc80c9b398658e9fa46c9e"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-08",
@@ -382,7 +382,7 @@
       "digest": "sha256:9db5b30b9b19e5f5cf51eff7"
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -392,7 +392,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:7accaba694111d909b78caa1"
+      "digest": "sha256:e116c2f3ac31e8992fc252c0"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-08",
@@ -517,13 +517,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-09",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:a4bddca2d6b6b3f3c01a74ae"
+      "digest": "sha256:aaaa2c59728d287a07d79650"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -718,7 +718,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "9f7c9e6018b803da",
       ".githooks/pre-commit": "ba558088830eb13c",
-      "aimeat/src/services/build-extension-prompt.ts": "e709256d39ca4e7a"
+      "aimeat/src/services/build-extension-prompt.ts": "b57f2f004de1f861"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
@@ -779,8 +779,8 @@
       "aimeat/src/services/agent-task-rules.ts": "207afa09788c8a11"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/build-extension-prompt.ts": "e709256d39ca4e7a",
-      "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
+      "aimeat/src/services/build-extension-prompt.ts": "b57f2f004de1f861",
+      "aimeat/src/services/extension-ctx-contract.ts": "e1fcae27d371795a",
       "aimeat/src/services/extension-manifest.ts": "fd3d70de8b81e457",
       "aimeat/src/services/extension-access/paywall.ts": "ae42068a8b036d98",
       "aimeat/src/routes/extensions/crud.ts": "723ee89afa7b5c7f",
@@ -819,7 +819,7 @@
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "f3ec18941ecc650d",
       "aimeat/src/commerce/app-tool-catalog.ts": "c2ddc40235643464",
-      "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
+      "aimeat/src/services/extension-ctx-contract.ts": "e1fcae27d371795a",
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/services/workspace-rows/row-service.ts": "78c57e3d5f2025be",
       "aimeat/src/services/refinery/pipeline.ts": "fc234b1ffcf6442b",

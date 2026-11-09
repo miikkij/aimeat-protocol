@@ -11,6 +11,8 @@
  *     3. An app-grant stream does NOT mark the owner present. Only a real owner session may.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sse.ts
  * @version-history
+ *   v1.5.0 — 2026-11-09 — Phase 8: an extension's ctx.changed sends its own domain to named owners,
+ *     to principals holding ext:invoke, and to nobody else.
  *   v1.4.0 — 2026-10-25 — Phase 1: the 15 s keepalive is `event: alive`, which the shared-stream
  *     failover in public/lib/live-updates.js listens for.
  *   v1.3.0 — 2026-10-18 — Phase 7: a change in one workspace is that workspace's own domain, told to
@@ -455,6 +457,60 @@ async function main() {
             await writeInWs('n2');
             await joined.waitFor(t => domainsSeen(t).includes(wsDomain()), 6_000, 'the workspace domain on B\'s stream after joining');
             joined.close();
+        });
+
+        console.log('\nPhase 8: An extension tells named owners that its data changed (ctx.changed)');
+        // An extension whose data lives in an outside service had no way to tell a page that the
+        // data changed: its own memory events reach the installer alone. ctx.changed({ owners }) sends
+        // the extension's own domain, `ext:<installer>/<name>`, to the named owners' streams, to
+        // principals holding ext:invoke, and to nobody else (services/extension-live/changed.ts).
+        const EXT = `ssechg${Date.now() % 100000}`;
+        const extDomain = `ext:${user}/${EXT}`;
+        const tell = async (input: unknown) => {
+            const r = await json(`/v1/ext/${EXT}/tell`, { method: 'POST', headers: authA, body: JSON.stringify(input) });
+            assert(r.status === 200, `tell: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+            return (r.body.data?.result ?? r.body.data) as { told: number; has: boolean };
+        };
+        await test('the installer installs an extension whose action calls ctx.changed', async () => {
+            const manifest = `metadata:\n  name: ${EXT}\n  version: 1.0.0\n  description: SSE E2E, ctx.changed\n  author: e2e-test\n`
+                + 'actions:\n  - id: tell\n    method: POST\n    path: /tell\n    script: tell_script\n    input:\n      type: object\n    output:\n      type: object\n';
+            const scripts = { tell_script: 'export default async function (ctx, input) { return { has: typeof ctx.changed === "function", told: ctx.changed ? await ctx.changed(input && input.owners ? { owners: input.owners } : undefined) : -1 }; }' };
+            const ins = await json('/v1/extensions', { method: 'POST', headers: authA, body: JSON.stringify({ manifest, scripts }) });
+            assert(ins.status === 201, `install: ${ins.status} ${JSON.stringify(ins.body).slice(0, 300)}`);
+            const act = await json(`/v1/extensions/${EXT}/activate`, { method: 'POST', headers: authA });
+            assert(act.status === 200, `activate: ${act.status} ${JSON.stringify(act.body).slice(0, 300)}`);
+        });
+
+        await test('a named owner hears the extension\'s domain, and an owner nobody named does not', async () => {
+            const aStream = await openStream(A.token);
+            const bStream = await openStream(B.token);
+            await bStream.waitFor(t => t.includes(':open'), 3_000, 'the :open comment on B\'s stream');
+            // An owner of another node and a name that is no string are left out of the count.
+            const r = await tell({ owners: [`${user}b@${NODE_ID}`, 'someone@another-node', 42] });
+            assert(r.has === true && r.told === 1, `one owner of this node was named: ${JSON.stringify(r)}`);
+            // HOLE: before this change no call of an extension reached another owner's stream at all.
+            await bStream.waitFor(t => domainsSeen(t).includes(extDomain), 6_000, 'the extension domain on B\'s stream');
+            await settle();
+            assert(!domainsSeen(aStream.text()).includes(extDomain), 'A was not named and heard the domain');
+            aStream.close();
+            bStream.close();
+        });
+
+        await test('without owners it tells the caller\'s owner; an app hears it only with ext:invoke', async () => {
+            const aStream = await openStream(A.token);
+            const without = await openStream(await appToken(ORIGIN, 'memory:read', A.rt));
+            const withWord = await openStream(await appToken(ORIGIN, 'memory:read ext:invoke', A.rt));
+            await withWord.waitFor(t => t.includes(':open'), 3_000, 'the :open comment on the app stream');
+            const r = await tell({});
+            assert(r.told === 1, `the caller's owner was told: ${JSON.stringify(r)}`);
+            await aStream.waitFor(t => domainsSeen(t).includes(extDomain), 6_000, 'the extension domain on A\'s own stream');
+            await withWord.waitFor(t => domainsSeen(t).includes(extDomain), 6_000, 'the extension domain on the app stream holding ext:invoke');
+            await settle();
+            assert(!domainsSeen(without.text()).some(d => d.startsWith('ext:')),
+                `an app without ext:invoke heard: ${JSON.stringify(domainsSeen(without.text()))}`);
+            aStream.close();
+            without.close();
+            withWord.close();
         });
 
         other?.close();

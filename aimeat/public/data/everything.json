@@ -1330,6 +1330,15 @@
      "plain": "Extensions in a workspace An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. An extension can also archive up to 500 records in one step, so a space that only grows, such as closed tickets, stays fast to read: archived records leave every read and can be restored. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removed records (up to 2000 in one step) go to the bin, where each can be restored for the node's grace period, and removing asks an agent or app for the permission to delete (memory:delete); only the organism's creator or an admin may archive. extension manifest, ctx.workspace.publishRecords, ctx.workspace.deleteRecords, ctx.workspace.archiveRecords, POST /v1/organisms/:id/workspace/records/publish (dry_run, create_only)"
     },
     {
+     "slug": "g-6-an-extension-tells-open-pages-that-its-data-changed",
+     "cells": [
+      "<strong>An extension tells open pages that its data changed</strong>",
+      "An extension whose data lives in an outside service, such as a bookkeeping or booking system, tells the node which people a change concerns. Their open pages read again at once, so a screen shows what an AI agent or a colleague just did without a reload and without asking again on a timer. The event carries no data, reaches only the named people of this node, and an app hears it only when it may call extensions.",
+      "In an extension: <code>ctx.changed({ owners })</code>; in a page: <code>AIMEAT.live.subscribe(['ext:&lt;installer&gt;/&lt;name&gt;'], reload)</code>"
+     ],
+     "plain": "An extension tells open pages that its data changed An extension whose data lives in an outside service, such as a bookkeeping or booking system, tells the node which people a change concerns. Their open pages read again at once, so a screen shows what an AI agent or a colleague just did without a reload and without asking again on a timer. The event carries no data, reaches only the named people of this node, and an app hears it only when it may call extensions. In an extension: ctx.changed({ owners }); in a page: AIMEAT.live.subscribe(['ext:<installer>/<name>'], reload)"
+    },
+    {
      "slug": "g-6-rows-from-an-extension-on-a-schedule",
      "cells": [
       "<strong>Rows from an extension on a schedule</strong>",
@@ -4964,6 +4973,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 508
+  "rows": 509
  }
 }

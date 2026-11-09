@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   2026-11-09 — ADDITIVE: the `ctx.changed({owners})` row.
  *   2026-11-08 — ADDITIVE: ctx.workspace.archiveRecords names the archived memory key limit and its
  *     QUOTA_EXCEEDED (secaudit2026nov08b round 15b).
  *   v1.7.8 — 2026-11-01 — ADDITIVE: ctx.email's body is text, and a `[Label](https://…)` line or a bare
@@ -195,6 +196,7 @@ function sandboxSection(): string {
     '| `ctx.now()` | The run\'s ISO timestamp, FIXED for the whole run |',
     '| `ctx.hash(s)` | FNV-1a 64-bit, 16 hex chars |',
     '| `ctx.notify(message, {title, link, to})` | Notify the caller\'s owner (on an unattended run, the installer). With `to`, another owner, delivered only when they consented. Returns whether it was delivered |',
+    '| `ctx.changed({owners})` | Tell the open pages of the named owners (GHIIs of this node; without `owners`, the owner of the caller) that the data this extension serves changed for them. The node sends the live domain `ext:<installer>/<extension name>` to their event streams, with no payload; a page subscribes with `AIMEAT.live.subscribe(["ext:<installer>/<name>"], reload)` and reads again. Call it after a write, so no page polls. Returns how many owners were told; at most 100 a call |',
     '| `ctx.email(to, subject, body)` | Send mail. Allowed to the owner\'s own verified address, or to anyone once that owner has granted this extension an `extension_email` consent. Returns false when it is not allowed or the node has no mail. `to` is one address: for several recipients, call it once per recipient. `body` is plain text and is shown as text; a line that is only `[Label](https://…)` shows as a button, and a line that is only an https address as a link. Past the operator\'s hourly allowance per account (`extensions.email_per_hour`, 200 by default) it throws a message naming that setting |',
     '',
     'Every argument a call needs has to be there. An `undefined` or `null` one makes the call throw',

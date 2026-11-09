@@ -13,6 +13,7 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   2026-11-09 — ctx.changed({ owners }): the extension's live domain to named owners' open pages.
  *   2026-11-01 — ctx.caller.party: a person registered to the gated app, with no account (WP9d).
  *   2026-10-30 — ctx.files.read answers `visibility` and `workspaceRef`.
  *   2026-10-25 — ctx.email's comment: one recipient per message and the hourly allowance (secaudit2026oct22, lead 325).
@@ -364,6 +365,10 @@ export interface ExtensionCtx {
     /** Notify the caller's owner; with `to`, ANOTHER owner — delivered only when the target holds
      *  an active `extension_notify` consent for `ext:{name}` (see services/extension-notify.ts). */
     notify?(message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }): Promise<boolean>;
+    /** Tell the open pages of `owners` (default: the caller's owner) that the data this extension
+     *  serves changed for them: the live domain `ext:<installer>/<name>` reaches their event streams,
+     *  with no payload. Answers how many owners were told (services/extension-live/changed.ts). */
+    changed?(opts?: { owners?: string[] }): Promise<number>;
     /** Send one message to ONE recipient (services/extension-email.ts): a `to` naming several is
      *  refused with a thrown sentence, and a send past the account's hourly allowance
      *  (extensions.email_per_hour) throws naming that setting. False when no tier allows it. */

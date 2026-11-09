@@ -52,6 +52,7 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.12.0 -- 2026-11-09 -- ctx.changed on an unattended run: without owners it tells the installer.
  *   v1.11.0 -- 2026-11-08 -- One label trail per run, shared by the row calls, ctx.files and
  *     ctx.datapackage: a package the run publishes keeps the labels of what it read, and the result
  *     names them (labelSources) for a data product's extension source (secaudit2026nov08b round 15).
@@ -107,6 +108,7 @@ import { executeExtensionAction } from './extension-runtime.js';
 import { trackMemoryAccess } from './extension-runtime-tracking.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from './extension-ctx.js';
+import { buildExtensionChanged } from './extension-live/changed.js';
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 import type { ExtensionCtxDeps } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
@@ -393,6 +395,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
             storage, config, extName: ext.name,
             recipientGaii: ownerName, recipientOwner: ownerName,
         }),
+        changed: buildExtensionChanged({ config, extName: ext.name, extOwner: ext.installedBy, callerOwner: ownerName }),
         email: buildExtensionEmail({
             storage, config, extName: ext.name, extConfig: ext.config,
             ownerName, emailService,

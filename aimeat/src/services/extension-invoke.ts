@@ -27,6 +27,7 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-09 — ctx.changed for the caller's run (services/extension-live/changed.ts).
  *   2026-11-08 — One label trail per run, shared by ctx.workspace, ctx.files and ctx.datapackage, so a
  *     package the run publishes keeps the labels of what it read (secaudit2026nov08b round 15).
  *   2026-11-08 — A named refusal answers EXTENSION_REFUSED with the script's code as `reason`, never
@@ -84,6 +85,7 @@ import { getMember, accountOf } from './app-members.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { resolveGatedApp } from './members-only.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, unavailableEmail, sandboxLimits } from './extension-ctx.js';
+import { buildExtensionChanged } from './extension-live/changed.js';
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 import { attachExtensionWorkspace, workspaceRefusalFor, type ExtensionWorkspaceCapability } from './extension-workspace.js';
 import { maybeExtensionAi } from './ai-jobs/index.js';
@@ -410,6 +412,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
         storage, config, extName: ext.name,
         recipientGaii: caller.gaii, recipientOwner: caller.owner,
       }),
+      changed: buildExtensionChanged({ config, extName: ext.name, extOwner: ext.installedBy, callerOwner: caller.owner }),
       email: args.emailService
         ? buildExtensionEmail({ storage, config, extName: ext.name, extConfig: ext.config, ownerName: caller.owner, emailService: args.emailService })
         // No mail service on this call path. Refusing with a logged false is the behaviour every

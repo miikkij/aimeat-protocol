@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.14.0 — 2026-11-09 — An extension's own domain (`ext:<installer>/<name>`, sent by its ctx.changed())
+ *     passes for a principal holding ext:invoke, the word a page needs to call the extension at all.
  *   v1.13.0 — 2026-11-07 — `ai-usage` passes for a principal holding ai:use: today's AI spend changed,
  *     so the sign-in pill's bolt reads it again.
  *   v1.12.0 — 2026-11-07 — `receivers` passes for a principal holding receivers:read (or receivers:manage).
@@ -62,7 +64,7 @@
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../utils/gaii.js';
-import { WORKSPACE_DOMAIN_PREFIX } from '../services/event-bus.js';
+import { EXTENSION_DOMAIN_PREFIX, WORKSPACE_DOMAIN_PREFIX } from '../services/event-bus.js';
 
 export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // Owner data the app already reads
@@ -158,6 +160,10 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // The name alone is still timing metadata about this account's integrations, which is why it is
   // gated at all rather than left to deny-by-default.
   'mcp-servers': 'mcp:read',
+  // The data an installed extension serves changed for this owner (services/extension-live/changed.ts).
+  // This row stands for every `ext:<installer>/<name>` domain (filterDomains): the word is the one
+  // a page needs to call an extension, so a page that cannot call it is not told about it either.
+  'extension-data': 'ext:invoke',
 });
 
 /**
@@ -198,5 +204,7 @@ export function allowedDomains(scopes: string[] | undefined): Set<string> | null
  */
 export function filterDomains(domains: string[], allow: Set<string> | null): string[] {
   if (!allow) return domains;
-  return domains.filter(d => allow.has(d) || (d.startsWith(WORKSPACE_DOMAIN_PREFIX) && allow.has('organisms')));
+  return domains.filter(d => allow.has(d)
+    || (d.startsWith(WORKSPACE_DOMAIN_PREFIX) && allow.has('organisms'))
+    || (d.startsWith(EXTENSION_DOMAIN_PREFIX) && allow.has('extension-data')));
 }

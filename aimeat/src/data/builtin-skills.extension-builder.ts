@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-09 — Section 5: an extension signals a change to named owners' pages with ctx.changed;
+ *     the line said an extension had no way to reach an app.
  *   2026-11-08 — "Name a refusal" says EXTENSION_REFUSED with the script's code as `reason`
  *     (instruction audit re-check, round 2).
  *   2026-11-08 — "Name a refusal": a script's `CODE: …` error reaches the caller with its code and a
@@ -234,8 +236,12 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
   \`ctx.fetch\` carries no session. An agent's task is created by the cortex in the person's session
   (\`POST /v1/agents/{name}/tasks\`); work the extension leaves for an agent goes into a workspace
   record with \`ctx.workspace\` (skill \`aimeat-workspace-contracts\`).
-- **Push live updates to an app.** \`ctx.notify(message, opts)\` sends a notification to a person; it
-  is not an app channel. An app re-reads when the node's event stream names a domain it shows.
+- **Push data to an app.** An extension sends a signal, never the data: \`ctx.changed({ owners })\`
+  tells the open pages of the named owners (GHIIs of this node; without \`owners\`, the owner of the
+  caller) that the extension's data changed for them. The node sends the live domain
+  \`ext:<installer>/<extension name>\` to their event streams, the app subscribes to it with
+  \`AIMEAT.live.subscribe\` and reads again through an action. Call it after a write, so no page
+  polls. \`ctx.notify(message, opts)\` sends a notification to a person; it is not an app channel.
 - **Take a payment in morsels.** \`ctx.wallet.consume\` burns the caller's morsels and credits nobody.
   A morsel paces use and is never a price, a fee or a currency, so a script never charges a price
   with it. Pacing and money are declared on the action (section 8), and the node charges them.

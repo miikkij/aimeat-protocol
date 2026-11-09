@@ -28,6 +28,7 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   2026-11-09 — deps.changed becomes ctx.changed (services/extension-live/changed.ts).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.20.4 — 2026-10-31 — ctx.fetch refuses an unknown responseType before resolveOutboundSecrets,
@@ -199,6 +200,7 @@ export interface ExtensionCtxDeps {
      *  the INSTALLER and a road that cannot name the record cannot say who pays. */
     ai?: ExtensionCtx['ai'];
     notify?: ExtensionCtx['notify'];
+    changed?: ExtensionCtx['changed'];
     email?: ExtensionCtx['email'];
     /** The caller's organism workspace (services/extension-workspace.ts). Only a road with a real
      *  caller and a manifest that declares it can offer this. */
@@ -739,6 +741,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     // one that guesses.
     if (deps.ai && deps.extension && caps.ai) ctx.ai = deps.ai;
     if (deps.notify) ctx.notify = deps.notify;
+    if (deps.changed) ctx.changed = deps.changed;
     if (deps.email && caps.email) ctx.email = deps.email;
     // ctx.fetch has always existed, so a script without `network` meets a refusal that says why
     // rather than a missing function.

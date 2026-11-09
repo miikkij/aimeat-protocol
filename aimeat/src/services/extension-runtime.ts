@@ -8,6 +8,7 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   2026-11-09 — `ctx.changed(opts)` on the `__changed` host function.
  *   2026-10-18 — `ctx.ai.result(jobId)` on the `__ai_result` host function, beside `ctx.ai.start`.
  *   2026-10-16 — Every run has a wall-clock deadline (extensionWallClockMs: limits.wallClockMs, or
  *     twelve times the CPU limit, at least a minute). The run rejects with EXTENSION_RUN_TIMED_OUT and
@@ -143,7 +144,7 @@ const GUEST_CALL_NAMES: Record<string, string> = {
     __wallet_consume: 'ctx.wallet.consume', __wallet_balance: 'ctx.wallet.getBalance',
     __ext_buy: 'ctx.buy', __ai_start: 'ctx.ai.start', __ai_result: 'ctx.ai.result',
     __consent_check: 'ctx.consent.check', __consent_require: 'ctx.consent.require',
-    __trust_getScore: 'ctx.trust.getScore', __notify: 'ctx.notify', __email: 'ctx.email',
+    __trust_getScore: 'ctx.trust.getScore', __notify: 'ctx.notify', __changed: 'ctx.changed', __email: 'ctx.email',
 };
 
 function registerAsyncHostFn(
@@ -368,6 +369,7 @@ const __aimeatCtx = (() => {
             },
         ),
         notify: __notify ? (async (message, opts) => __call(__notify, [message, opts ? JSON.stringify(opts) : '{}'])) : undefined,
+        changed: __changed ? (async (opts) => __call(__changed, [opts ? JSON.stringify(opts) : '{}'])) : undefined,
         email:  __email  ? (async (to, subject, body) => __call(__email, [to, subject, body]))                        : undefined,
     };
     return ctx;
@@ -729,6 +731,12 @@ async function runInSandbox(
         registerAsyncHostFn(vm, '__notify',
             ctx.notify
                 ? async (message, optsJson) => ctx.notify!(message, optsJson ? JSON.parse(optsJson) as Record<string, string> : undefined)
+                : null,
+            counter, limits.maxApiCalls, inflight);
+
+        registerAsyncHostFn(vm, '__changed',
+            ctx.changed
+                ? async (optsJson) => ctx.changed!(optsJson ? JSON.parse(optsJson) as { owners?: string[] } : undefined)
                 : null,
             counter, limits.maxApiCalls, inflight);
 
