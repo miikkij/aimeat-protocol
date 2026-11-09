@@ -14,6 +14,7 @@
  * @structure LivingDocsService.overview(reader, ownerName) → { templates, instances, organisms }
  * @usage const ov = await createLivingDocsService(storage).overview(readerFor({ storage, config }, req.auth), ownerName);
  * @version-history
+ *   v1.1.1 — 2026-11-09 — CONFIG_KEY_RE takes dot-free organism and workspace ids (code scanning alert 1784).
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: takes the caller's ContentReader instead of the owner GHII; the
  *     template and instance records pass presentMemories before their values are returned.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Living Docs tab's 2 duplicate memory scans + organisms into one.
@@ -25,8 +26,9 @@ import { presentMemories } from '../classification/present-memory.js';
 
 const TEMPLATE_PREFIX = 'living.template.';
 // A deployed living instance's config key: organism.{org}.w.{ws}.living.{docId}.latest (mirrors the
-// client's parseConfigKey in public/js/services/living.js).
-const CONFIG_KEY_RE = /^organism\.(.+?)\.w\.(.+?)\.living\.([^.]+)\.latest$/;
+// client's parseConfigKey in public/js/services/living.js). Organism and workspace ids hold no dot
+// (services/write-guards.ts KEY_RE), and `[^.]+` keeps the match linear (code scanning 1784).
+const CONFIG_KEY_RE = /^organism\.([^.]+)\.w\.([^.]+)\.living\.([^.]+)\.latest$/;
 
 export interface LivingDocsOverview {
   templates: unknown[];
