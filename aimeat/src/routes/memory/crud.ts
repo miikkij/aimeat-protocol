@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-09 — POST /v1/memory without `tags` keeps an existing record's tags; `tags: []` clears them.
  *   2026-11-04 — GET /v1/memory?limit=N with values reads the values of its page only; the listing,
  *     `total` and the quota come from the meta rows, with the same answer (services/memory-list-page.ts;
  *     codebase analysis 2026-11-03, item C1).
@@ -240,7 +241,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       key,
       value,
       visibility: vis as MemoryRecord['visibility'],
-      tags: Array.isArray(tags) ? tags : [],
+      // Left out: the record keeps its tags (services/memory-write.ts); `[]` clears them.
+      ...(Array.isArray(tags) ? { tags } : {}),
       ttlHours: ttl_hours ?? null,
       ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
       ...(vis === 'workspace' ? { workspaceRef: normalizeWorkspaceRefs(workspace_refs, workspace_ref) } : {}),

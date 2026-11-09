@@ -2372,6 +2372,9 @@ components:
             which it then keeps. Refused with 400 INVALID_INPUT without one, and when the id names no group.
         tags:
           type: array
+          description: >-
+            Tags to filter and group by (GET /v1/memory?tags=a,b lists records carrying all of them). Left
+            out on an update, the record keeps its tags; an empty list clears them.
           items:
             type: string
           example: [research, climate]

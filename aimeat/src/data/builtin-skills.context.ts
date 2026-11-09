@@ -18,6 +18,10 @@
  * @usage
  *   import { CONTEXT_SKILL_ENTRY } from './builtin-skills.context.js';
  * @version-history
+ *   v1.4.0 — 2026-11-09 — Tags: one to five on a new context, reused from the person's other
+ *     contexts, kept by a write that leaves them out; finding contexts by tag; the key never changes
+ *     when a context is renamed (the developer's request, same day: "lähinnä tagit että voidaan
+ *     etsiä ja ryhmitellä niitä", no new identifier form).
  *   v1.3.1 — 2026-11-09 — A change of some fields goes as `patch` on aimeat_memory_write.
  *   v1.3.0 — 2026-11-09 — When a context goes wrong: earlier versions and how to restore one
  *     (aimeat_memory_history), the machine check (aimeat_context_check); splitting a part off a large
@@ -128,6 +132,24 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
 - **Keep the core small:** what someone needs in their first minute. When it grows past about
   a page, move detail into \`material\` or a reference.
 - Stamp \`lifecycle.shapedAt\` when you change it.
+- **The key never changes.** A renamed context keeps its key \`context.<slug>\`: change \`name\`
+  only. A new key is a new context, without the earlier versions of the old one.
+
+## Tags: finding and grouping
+
+- Tags are the record's own \`tags\`, given beside the value on \`aimeat_memory_write\`, not a
+  field inside the value. Leave \`tags\` out and the record keeps the tags it has; \`[]\` clears
+  them.
+- **When you create a context, give it one to five short tags** in the person's language, lower
+  case: what it is about and whom it belongs to ("travel", "family", "acme"). First look at the
+  tags their other contexts carry (the index you got on connecting names them after each key)
+  and reuse one that fits, so the contexts group together instead of drifting into near-twins
+  such as "trip" beside "travel".
+- Change a tag when the person asks, or when a context's subject has plainly moved, and say
+  what you changed.
+- **To find contexts by tag:** \`aimeat_memory_list\` with prefix \`context.\`, \`owner_scope: true\`
+  and \`tags\` (a context must carry every tag given). \`aimeat_memory_search\` also matches the
+  words of a tag.
 
 ## Concepts (the ontology)
 

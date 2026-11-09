@@ -6,6 +6,7 @@
  *   named, in which order, which stay hidden from an agent, and that the instructions carry the
  *   lines only when the session can open them.
  * @version-history
+ *   v1.1.0 — 2026-11-09 — A context's tags on its line.
  *   v1.0.0 — 2026-11-08 — Initial (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  */
 import { describe, expect, it } from 'vitest';
@@ -53,6 +54,14 @@ describe('contextIndexLine', () => {
         const line = await contextIndexLine(storageWith([ctx('trip', '2026-11-01'), ctx('band', '2026-11-07')]), config, 'alice');
         expect(line).toContain('- BAND (context.band): About band.');
         expect(line!.indexOf('context.band')).toBeLessThan(line!.indexOf('context.trip'));
+    });
+
+    it('names a context\'s tags after its key: at most six, each cut short, blanks dropped', async () => {
+        const long = 'x'.repeat(50);
+        const tagged = { ...ctx('trip', '2026-11-01'), tags: ['travel', ' ', long, 'a', 'b', 'c', 'd', 'e'] };
+        const line = await contextIndexLine(storageWith([tagged, ctx('band', '2026-10-01')]), config, 'alice');
+        expect(line).toContain(`- TRIP (context.trip; tags: travel, ${'x'.repeat(29)}…, a, b, c, d): About trip.`);
+        expect(line).toContain('- BAND (context.band): About band.');
     });
 
     it('leaves out a record under context. that is not a context', async () => {

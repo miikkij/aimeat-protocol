@@ -22,6 +22,8 @@
  * @structure ContextsTab() — state + handlers → renderContextsView(ctx)
  * @usage registered in profile.js TABS as id 'contexts'.
  * @version-history
+ *   v1.2.0 — 2026-11-09 — The list by one tag (ctx.tags, ctx.tag, ctx.pickTag); the chosen context
+ *     stays chosen when the list narrows.
  *   v1.1.0 — 2026-11-09 — The chosen context's fingerprint is read (api.fingerprint) when the
  *     choice or its version changes, for the view's fingerprint part.
  *   v1.0.0 — 2026-11-08 — Initial.
@@ -33,7 +35,7 @@ import { getOrganismsTab } from '/js/services/organisms.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { date } from '/js/format.js';
-import { x, api, contextOf } from './contexts/frame.js';
+import { x, api, contextOf, tagCounts } from './contexts/frame.js';
 import { renderContextsView } from './contexts/view.js';
 
 /** The slug this tab was opened on (`?context=<slug>`), taken off the address after reading. */
@@ -78,8 +80,14 @@ export default function ContextsTab({ session, showToast }) {
   liveRef.current = load;
   useEffect(() => onLiveUpdate(['memory'], () => liveRef.current()), []);
 
-  const active = useMemo(() => (items || []).filter((c) => !c.archivedAt).sort(byShaped), [items]);
-  const archived = useMemo(() => (items || []).filter((c) => c.archivedAt).sort(byShaped), [items]);
+  // The list by one tag. A tag no context carries any more (the AI changed it) shows them all again.
+  const [tagPicked, setTagPicked] = useState('');
+  const tags = useMemo(() => tagCounts(items), [items]);
+  const tag = tags.some((t) => t.tag === tagPicked) ? tagPicked : '';
+  const shown = useMemo(() => (items || []).filter((c) => !tag || c.tags.includes(tag)), [items, tag]);
+
+  const active = useMemo(() => shown.filter((c) => !c.archivedAt).sort(byShaped), [shown]);
+  const archived = useMemo(() => shown.filter((c) => c.archivedAt).sort(byShaped), [shown]);
   const current = useMemo(() => (items || []).find((c) => c.key === selected) || active[0] || archived[0] || null,
     [items, selected, active, archived]);
 
@@ -174,6 +182,7 @@ export default function ContextsTab({ session, showToast }) {
     viewsOpen, setViewOpen: (id, view) => setViewsOpen((m) => ({ ...m, [id]: view })),
     deleted, restore, dismissDeleted: () => setDeleted(null),
     archive, bringBack, setReaders, remove, fingerprint,
+    tags, tag, pickTag: (t) => setTagPicked(t || ''),
     copied: () => toast(x('copiedToast')),
   };
   return renderContextsView(ctx);

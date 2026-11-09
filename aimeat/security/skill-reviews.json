@@ -53,7 +53,7 @@
         "aimeat/src/services/context/check.ts",
         "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:4852520c5ee55d8417fad430"
+      "digest": "sha256:d85ee35b7d7fc5418576a80b"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -278,7 +278,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:ac0248d64e8bd5a3ad7b78cb"
+      "digest": "sha256:54194645cc19592c79f04400"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -662,7 +662,7 @@
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "0a39f07278347815",
+      "aimeat/src/mcp/core.ts": "38ddaf9f0e903e68",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "66f1803515078196"
     },
     "node:manage-my-profile-data": {
@@ -857,6 +857,13 @@
       "aimeat/src/services/receivers/receive.ts": "23774d484171476e",
       "aimeat/src/services/receivers/manage.ts": "1ea16e7f680c543e",
       "aimeat/src/tool-catalog/definitions/receivers.ts": "58f218873b049c7d"
+    },
+    "node:aimeat-context": {
+      "aimeat/src/services/context/index-line.ts": "635f3d9f01f7cc1d",
+      "aimeat/src/services/mcp-build-inputs.ts": "30340abebd1814dc",
+      "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
+      "aimeat/src/services/context/check.ts": "8eae091c8256a410",
+      "aimeat/src/services/memory-versions/history.ts": "1e7cb0431167c4d5"
     }
   }
 }

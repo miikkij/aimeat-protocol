@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-09 — aimeat_memory_write without `tags` keeps the record's tags; `[]` clears them.
  *   2026-11-09 — aimeat_memory_history is registered from core-memory-history.ts; aimeat_memory_write
  *     with `patch` runs services/memory-patch through core-memory-patch.ts.
  *   2026-11-01 — aimeat_discover takes type `dataset` (DISCOVERY_TYPES, the list the REST route reads) and
@@ -544,7 +545,8 @@ export function registerCoreTools(
             }
             // No visibility named: the node's starting level (plan V5.1), as POST /v1/memory.
             const visibility = givenVisibility ?? memoryVisibilityDefault(config);
-            const tags = givenTags ?? [];
+            // Left out: the record keeps its tags (services/memory-write.ts); `[]` clears them.
+            const tags = givenTags;
             // ONE implementation, and it is not this one. services/memory-write.ts owns the scope
             // gate, the schema lock, the version check, the shadowing warning, the provenance stamp,
             // the record shape and the change event — because every one of those had to be fixed

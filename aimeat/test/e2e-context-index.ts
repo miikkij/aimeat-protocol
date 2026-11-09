@@ -20,10 +20,14 @@
  *     7. The agent without memory:read is refused the context itself: 403 over REST, a refused call
  *        over MCP, and the content does not leak.
  *     8. The index says its names and summaries are data, never instructions.
+ *     9. Tags: a whole rewrite that names no tags keeps them, over MCP and over POST; `tags: []`
+ *        clears them; contexts are listed by tag over REST and MCP; the index names a context's tags
+ *        after its key, and a line without tags is unchanged.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=context-index
  * @version-history
+ *   v1.1.0 — 2026-11-09 — Phase 1b, tags (claim 9).
  *   v1.0.0 — 2026-11-08 — Initial (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  */
 import * as ed from '@noble/ed25519';
@@ -157,6 +161,56 @@ await test('The agent opens a named context with owner_scope, as the line says',
     const r = await mcp(reader, readerSession, 'tools/call', { name: 'aimeat_memory_read', arguments: { key: 'context.trip', owner_scope: true } });
     const text = JSON.stringify(r.msg?.result ?? {});
     assert(text.includes('Flights booked'), `could not open the context: ${text.slice(0, 300)}`);
+});
+
+console.log('\nPhase 1b: tags, to find and group contexts by');
+
+const GARDEN = { type: TYPE, name: 'Garden', summary: 'The vegetable beds.', core: 'Beds dug.', lifecycle: { createdAt: '2026-11-08T00:00:00Z', shapedAt: '2026-11-08T00:00:00Z' } };
+let writer = '';
+
+async function tagsOf(key: string): Promise<string[]> {
+    const r = await json(`/v1/memory/${key}`, auth(ownerToken));
+    assert(r.status === 200, `read ${key} ${r.status}`);
+    return r.body.data.tags;
+}
+const same = (a: string[], b: string[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+await test('A whole rewrite over MCP that names no tags keeps the context\'s tags', async () => {
+    writer = await agentOf(owner, ownerToken, 'ctx-writer', ['memory:read', 'memory:write', 'memory:read-as-owner', 'memory:write-as-owner']);
+    const w = await json('/v1/memory', auth(ownerToken, { method: 'POST', body: JSON.stringify({ key: 'context.garden', value: GARDEN, visibility: 'owner', tags: ['home', 'garden'] }) }));
+    assert(w.status < 300, `tagged write ${w.status}`);
+    const { session } = await initialize(writer);
+    const r = await mcp(writer, session, 'tools/call', { name: 'aimeat_memory_write', arguments: {
+        key: 'context.garden', value: { ...GARDEN, core: 'Beds dug. Seeds ordered.' }, owner_scope: true, visibility: 'owner' } });
+    assert(r.msg?.result && r.msg.result.isError !== true, `MCP rewrite refused: ${JSON.stringify(r.msg).slice(0, 300)}`);
+    const tags = await tagsOf('context.garden');
+    assert(same(tags, ['home', 'garden']), `the rewrite left tags ${JSON.stringify(tags)}`);
+    const v = await json('/v1/memory/context.garden', auth(ownerToken));
+    assert(v.body.data.value.core === 'Beds dug. Seeds ordered.', 'the rewrite itself did not land');
+});
+
+await test('POST without tags keeps them, and an empty list clears them', async () => {
+    const kept = await json('/v1/memory', auth(ownerToken, { method: 'POST', body: JSON.stringify({ key: 'context.garden', value: GARDEN, visibility: 'owner' }) }));
+    assert(kept.status < 300, `rewrite ${kept.status}`);
+    assert(same(await tagsOf('context.garden'), ['home', 'garden']), 'POST without tags wiped them');
+    const cleared = await json('/v1/memory', auth(ownerToken, { method: 'POST', body: JSON.stringify({ key: 'context.garden', value: GARDEN, visibility: 'owner', tags: [] }) }));
+    assert(cleared.status < 300, `clear ${cleared.status}`);
+    assert((await tagsOf('context.garden')).length === 0, 'tags: [] did not clear the tags');
+    const again = await json('/v1/memory', auth(ownerToken, { method: 'POST', body: JSON.stringify({ key: 'context.garden', value: GARDEN, visibility: 'owner', tags: ['home', 'garden'] }) }));
+    assert(again.status < 300 && same(await tagsOf('context.garden'), ['home', 'garden']), 'the tags could not be set again');
+});
+
+await test('Contexts are listed by tag, and the index names each context\'s tags', async () => {
+    const rest = await json('/v1/memory?prefix=context.&tags=garden', auth(ownerToken));
+    const keys = (rest.body.data.items as Array<{ key: string }>).map(i => i.key);
+    assert(keys.includes('context.garden') && !keys.includes('context.trip'), `REST by tag gave ${JSON.stringify(keys)}`);
+    const { session } = await initialize(writer);
+    const l = await mcp(writer, session, 'tools/call', { name: 'aimeat_memory_list', arguments: { prefix: 'context.', owner_scope: true, tags: ['garden'] } });
+    const text = String(l.msg?.result?.content?.[0]?.text ?? '');
+    assert(text.includes('context.garden') && !text.includes('context.trip'), `MCP list by tag: ${text.slice(0, 300)}`);
+    const r = await initialize(reader);
+    assert(r.instructions.includes('- Garden (context.garden; tags: home, garden): The vegetable beds.'), 'the index does not name the tags');
+    assert(r.instructions.includes('- Lisbon trip (context.trip): Family week'), 'a context without tags changed its line');
 });
 
 console.log('\nPhase 2: who gets nothing');

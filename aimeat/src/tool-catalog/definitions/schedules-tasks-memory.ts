@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-09 — aimeat_memory_write's `tags` says that leaving it out keeps the record's tags.
  *   2026-11-09 — aimeat_memory_write takes `patch` (a JSON Merge Patch) in place of `value`;
  *     aimeat_memory_history: a memory entry's kept earlier versions and what each write changed;
  *     aimeat_context_check: a machine check of one context.
@@ -498,7 +499,7 @@ export const schedulesTasksMemoryTools = [
             patch: { type: 'object', description: 'Change only some fields of an existing object record instead of sending it whole (JSON Merge Patch, RFC 7386). A field you give replaces that field; a nested object merges into the nested object; a list REPLACES the whole list (send the full new list); null REMOVES the field. Fields you leave out stay as they are, and so do visibility and tags unless you give them. Refused with NOT_AN_OBJECT when the record holds a string, number or list. Give this or value, not both; with expected_version the patch lands only on that version.', zod: z.record(z.string(), z.unknown()) },
             visibility: { type: 'string', description: 'Who can read it: private, owner, group, members (any signed-in account of this node), public, or "organism:<organism id>" (the active members of that one organism and their agents; you must be a member of it yourself). Default: private.', zod: memoryWriteVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group. Required when visibility=group, unless the record already has a group: the write is refused without one, and when the id names no group, because the record would open to nobody but its owner.' },
-            tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
+            tags: { type: 'array', description: 'Optional tags for later filtering (aimeat_memory_list tags) or shared memory areas. Leave out to keep the record\'s tags; [] clears them.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },
             owner_scope: { type: 'boolean', description: 'Write under the OWNER instead of yourself. Requires the memory:write-as-owner scope.', zod: flexibleBoolean },
             expected_version: { type: 'number', description: 'Optimistic lock: the version you read. Refused with VERSION_CONFLICT if the record changed since. Pass 0 to assert the key does not exist yet. Omit for last-write-wins.', zod: z.number().int().nonnegative() },
