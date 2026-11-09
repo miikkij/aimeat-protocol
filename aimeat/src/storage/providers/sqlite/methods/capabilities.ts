@@ -8,6 +8,8 @@
  * @structure capabilityMethods
  * @usage Object.assign(SqliteStorage.prototype, capabilityMethods) in ../index.ts
  * @version-history
+ *   2026-11-08 — publicOrOwner lists another owner's entry only when it is public AND active: a draft,
+ *     an entry waiting for review and a rejected one were listed to every signed-in account.
  *   2026-11-04 — getCapabilitiesBySourceRefs: many source refs in one read (codebase analysis
  *     2026-11-03, item C7).
  *   v1.0.0 — 2026-10-05 — 16 methods (deserializeCapability, createCapability, getCapability, …) moved here
@@ -149,7 +151,9 @@ export const capabilityMethods = {
 
     if (filters.ownerGhii) { query += ' AND ownerGhii = ?'; params.push(filters.ownerGhii); }
     if (filters.visibility) { query += ' AND visibility = ?'; params.push(filters.visibility); }
-    if (filters.publicOrOwner) { query += ' AND (visibility = ? OR ownerGhii = ?)'; params.push('public', filters.publicOrOwner); }
+    // Another owner's entry is listed only when it is public AND active, the same rule a single read and
+    // the MCP search apply (services/capability-reach.ts); the caller's own entries in any state.
+    if (filters.publicOrOwner) { query += ' AND ((visibility = ? AND status = ?) OR ownerGhii = ?)'; params.push('public', 'active', filters.publicOrOwner); }
     if (filters.status) { query += ' AND status = ?'; params.push(filters.status); }
     if (filters.sourceType) { query += ' AND sourceType = ?'; params.push(filters.sourceType); }
     if (filters.authRequired) { query += ' AND authRequired = ?'; params.push(filters.authRequired); }

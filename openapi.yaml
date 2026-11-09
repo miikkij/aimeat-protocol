@@ -253,7 +253,7 @@ tags:
   - name: Parties
     description: Outside parties (people and programs with no account here) and the named shares of data packages to them
   - name: Receivers
-    description: An address and a key an outside program writes into exactly one place of an owner's data with, over plain REST
+    description: Incoming webhooks, the tag's older name kept for the routes /v1/receivers and /v1/receive. An incoming webhook is an address and an API key an outside program writes into exactly one place of an owner's data with, over plain REST
   - name: Dataspace
     description: The Eclipse Dataspace Protocol 2025-1 provider (catalog, contract negotiation, pull transfer) and the owner's and operator's reads of it
   - name: Workflows
@@ -319,7 +319,9 @@ components:
         shared with it: user `<owner>/<party name>`, password the party key. What Excel, Power BI and
         Tableau send to an OData feed. Accepted only on the data package reads, the OData feed, the
         package files under /v1/pub and /v1/parties/me; a wrong key on the OData feed answers 401 with
-        `WWW-Authenticate: Basic realm="aimeat"`. Never a sign-in to this node.
+        `WWW-Authenticate: Basic realm="aimeat"`. Never a sign-in to this node. While the owner's
+        account is deactivated, every party key and token of it answers 403 ACCOUNT_DISABLED; they
+        work again when the operator reactivates the account.
     PartyTokenAuth:
       type: http
       scheme: bearer
@@ -334,9 +336,11 @@ components:
       scheme: bearer
       bearerFormat: aimeat_rcv_<key>
       description: >
-        A receiver's own key, made when the owner creates or approves the receiver and shown once.
+        An incoming webhook's own API key, made when the owner creates or approves the incoming webhook and shown once.
         Accepted only on /v1/receive/{owner}/{name}[/{sub}]; on every other endpoint it answers 401.
-        It is never accepted in the address. The node keeps only its SHA-256.
+        It is never accepted in the address. The node keeps only its SHA-256. While the owner's
+        account is deactivated, the key answers 403 ACCOUNT_DISABLED and nothing is written; it works
+        again when the operator reactivates the account.
     DataspaceAuth:
       type: http
       scheme: bearer
@@ -1347,7 +1351,7 @@ components:
             `assisted` = a person wrote it and a model edited or refined it. `synthesized` = a model
             combined real sources into new content at someone's direction. `ai-generated` = a model
             produced it. `machine` = a program produced it with no model and no person writing it
-            (a sensor reading, an export from another system); a write through a receiver is recorded
+            (a sensor reading, an export from another system); a write through an incoming webhook is recorded
             at this level.
         method:
           type: string
@@ -1853,6 +1857,22 @@ components:
         retry_after:
           type: integer
           description: Seconds to wait before retry (present on RATE_LIMITED)
+
+    FileStoreTakes:
+      type: object
+      additionalProperties: false
+      description: >-
+        Which files a store is for. A file at least `min_mb` megabytes long goes to the store; a smaller
+        one keeps its bytes in the node's database unless its kind is in `kinds`. A store that never set
+        this takes 1 MB and up, and every video and sound. A part left out keeps its value. A file the
+        store holds and no longer takes moves to the database by itself within a day.
+      properties:
+        min_mb: { type: number, minimum: 0, maximum: 10240, description: '0 sends every file to the store.' }
+        kinds:
+          type: array
+          maxItems: 4
+          items: { type: string, enum: [video, audio, image, pdf] }
+          description: Kinds that go to the store whatever their size.
 
     FieldError:
       type: object
@@ -3525,6 +3545,21 @@ components:
           nullable: true
         metadata:
           type: object
+          description: >-
+            Free-form. The node writes `collection_method` and `wsRole` itself and drops a request's
+            own values for them.
+        role:
+          type: string
+          enum: [read, write]
+          description: >-
+            Request only. What the recipient may do; absent means `read`. `write` is the contributor
+            role on one workspace: `data_pattern` `organism.<id>.w.<ws>.**`, `recipient`
+            `ghii:<name>@<this node>` (it covers that person's agents), granted by the workspace's
+            creator signed in as themselves. Any other `write` is refused: 400 WRITE_NOT_SUPPORTED for
+            another pattern or recipient, 403 WRITE_NOT_SUPPORTED when the caller is not the
+            workspace's creator (an organism admin uses /v1/organisms/{id}/workspace-access/grant).
+            The node stamps the role as `metadata.wsRole` (`contributor`, or `viewer` for `read` in
+            the same shape). `purpose` is free text and never decides what the recipient may do.
 
     # === Phase 0: TOTP ===
     TotpSetupResponse:
@@ -8343,7 +8378,9 @@ paths:
             another key than the pinned one); a key change also carries `pinned_key_fingerprint` and
             `key_fingerprint`, so the owner can see that approving replaces the key of a working
             connection. A reconnect with the pinned key also carries `key_proven`: true when the hello
-            signed its `proof` with that key, false when it only named the key.
+            signed its `proof` with that key, false when it only named the key. `own_tick_scopes`
+            lists the requested words outside every wildcard (receivers:manage, the read-as-owner
+            words and the rest): the owner grants each one by naming it in the approval's `scopes`.
         '403':
           description: Owner role required.
   /v1/ecosystem-apps/{userCode}/approve:
@@ -8355,7 +8392,10 @@ paths:
         the node's `maxEcoScopes` ceiling) and the data-area allowlist. On approve the GEAI principal
         is created (or re-approval rotates the pinned key) and the credential becomes issuable. A
         re-approval that changes the pinned key ends the sessions issued under the old key; one with
-        the same key keeps them.
+        the same key keeps them. Without `scopes` the approval grants what the app asked for except
+        the words outside every wildcard, which it grants only when the app already held them from an
+        earlier approval; the answer's `held_back_scopes` names the ones not granted, and naming them
+        in `scopes` grants them.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -8382,7 +8422,7 @@ paths:
                   items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
       responses:
         '200':
-          description: Approved (returns geai) or denied.
+          description: Approved (returns geai, existing_app and held_back_scopes) or denied.
         '400':
           description: Invalid action or scopes exceed the node ceiling.
         '403':
@@ -8910,7 +8950,10 @@ paths:
         automation recipe, its `eco-capability` schedules, and any pending (awaiting-approval) advisories.
         The owner's DEPOSITED refined data (the app's `eco:` writes into the owner's Memory, e.g.
         `feedback.stats.*`) is PRESERVED (peer sovereignty). Re-onboarding the app later starts over
-        from scratch (a brand-new record). Returns `{ deleted: true, app, geai }`.
+        from scratch (a brand-new record). The incoming webhooks the app made, and those whose API key it
+        changed and so holds, are the owner's and keep working; `receivers_kept` names them (`why`
+        is `made` or `key`) and the owner gets a notice when there are any.
+        Returns `{ deleted: true, app, geai, receivers_kept }`.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -8922,7 +8965,7 @@ paths:
           description: The app name of the GEAI to disconnect.
       responses:
         '200':
-          description: "Deleted. Response data is `{ deleted: true, app, geai }`."
+          description: "Deleted. Response data is `{ deleted: true, app, geai, receivers_kept: { count, receivers: [{ name, display_name, state, why }] } }`."
         '403':
           description: Owner role required.
         '404':
@@ -12433,6 +12476,10 @@ paths:
         The refusal codes outside A2A's own set are -32040 (nothing is published for hire here),
         -32041 (not what you named, or you named nothing and there are several), -32042 (for sale,
         but this node cannot take your money right now) and -32043 (principals of this account only).
+        While the seller's account is deactivated, a new message and the payment turn of quoted work
+        both answer -32042 with the day of the deactivation in the message: nothing is quoted or
+        charged, quoted work stays open and unpaid, and the same offering sells again after the
+        operator reactivates the account.
 
         THE SCOPE IS PER METHOD, not per door: one HTTP door with a dozen methods behind it cannot be
         gated by one middleware without being wrong for eleven of them. `SendMessage` needs
@@ -19626,6 +19673,15 @@ paths:
         the bin with 400 MORSEL_PRICE_REMOVED, as the same document is refused on
         POST, PUT and PATCH. A knowledge package manifest whose two pacing names
         disagree is refused the same way.
+
+
+        A restored key counts toward its principal's key limit again, so a restore
+        asks the limits a write asks: one that would take the principal past the
+        node's memory key limit (`memoryMaxKeysPerAgent`) or memory quota
+        (`memoryQuotaMb`) answers 413 QUOTA_EXCEEDED naming that setting, and the
+        record stays in the bin. A record that was archived when it was deleted comes
+        back archived, so it also asks the archived memory key limit
+        (`memoryMaxArchivedKeysPerAgent`), with the same answer.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19654,6 +19710,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          description: QUOTA_EXCEEDED. Putting the record back would pass the memory key limit or the memory quota; the message names the setting, and the record stays in the bin.
   /v1/memory/{key}:
     get:
       operationId: readMemory
@@ -21651,6 +21709,15 @@ paths:
         once at the next start and runs again; its record then carries `requeued_after_stop` (the
         number of times that happened). A job the node stops a second time, or one left running by a
         process that ended without stopping, is `failed` with error code `node_restarted`.
+
+
+        Before a job runs, its account and its starter are asked as they are at that moment. A queued
+        job of a deactivated account stays `queued` with `waiting` (a sentence that names the
+        deactivation); nothing is paid or written, and it runs after the account is reactivated. A job
+        whose starting agent was deleted ends `failed` with error code `AI_JOB_STARTER_GONE` before the
+        provider is called; a job whose starting agent's permissions were narrowed runs with the
+        narrower permissions, and ends `failed` with `SCOPE_DENIED` when its `on_done` needs
+        `ext:invoke` the agent no longer holds.
 
 
         Requires an owner session or a token carrying `ai:use`.
@@ -25155,7 +25222,9 @@ paths:
         The owner or the goal's coordinator changes it; the coordinator only within what the goal's
         permissions allow. With `preview: true` nothing changes and the answer names the taken works the
         change would end and what they cost so far. `this_round_only` makes a change for the current
-        round of a round goal. Taken works the change ends are told so in their tasks. `task:write`.
+        round of a round goal. Taken works the change ends are told so in their tasks. A change to
+        `rounds` keeps the fields it leaves out (an empty string or an empty list clears one); a field the
+        new trigger does not use is dropped, and a `clock` round without a cron is refused. `task:write`.
       security:
         - BearerAuth: []
       requestBody:
@@ -26577,7 +26646,7 @@ paths:
         '201': { description: '`{ purchase, pay }`: the open purchase and how to pay it (`complete_url`, and `card_page_url` for the card page).' }
         '400': { description: INVALID_INPUT }
         '401': { description: INVALID_PARTY_CREDENTIAL }
-        '403': { description: FORBIDDEN. The party credential belongs to another provider }
+        '403': { description: 'FORBIDDEN (the party credential belongs to another provider), or ACCOUNT_DISABLED (the provider''s account is deactivated: no purchase is kept and nothing is charged; the message names the day, and the offering sells again after the operator reactivates the account)' }
         '404': { description: No such listed offering }
         '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price), USE_YOUR_ACCOUNT, or PROVIDER_TAKES_NO_CARD (`com.stripe.checkout` asked and the provider has connected no Stripe account; nothing is kept, and the message names the other handlers this node offers, if any)' }
         '422': { description: 'UNKNOWN_PAYMENT_HANDLER, or Stripe refused to open the card page (its own code; the purchase is not kept)' }
@@ -26626,6 +26695,7 @@ paths:
       responses:
         '200': { description: '`{ purchase, party, share, contract, connection, key_note?, say }`' }
         '402': { description: 'The payment did not go through, or PAYMENT_REFUNDED (this payment was refunded after a failed delivery; start a new purchase)' }
+        '403': { description: 'ACCOUNT_DISABLED: the provider''s account is deactivated. With `test.money` nothing is collected and the purchase stays open, so it completes after the operator reactivates the account inside its hour; a card page already paid is refunded, and the message says whether the refund went through.' }
         '404': { description: 'No such purchase, NOT_FOUND or NOT_SOLD_TO_PARTIES (the offering is no longer for sale; a card payment made for it was refunded, and the message says whether it was), or PURCHASE_ENDED (the webhook completed the purchase and the seller then removed its party or share; the message names the purchase id to give the seller)' }
         '409': { description: 'ALREADY_COMPLETED or PURCHASE_BUSY' }
         '410': { description: 'PURCHASE_EXPIRED (the hour passed and no payment was made for the purchase)' }
@@ -30095,15 +30165,15 @@ paths:
         '404': { description: NOT_FOUND }
   /v1/receive/{owner}/{name}:
     parameters:
-      - { name: owner, in: path, required: true, schema: { type: string }, description: The account the receiver belongs to. }
+      - { name: owner, in: path, required: true, schema: { type: string }, description: The account the incoming webhook belongs to. }
       - { name: name, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,39}$' } }
     post:
       operationId: receiverWrite
-      summary: A program writes through a receiver
+      summary: A program writes through an incoming webhook
       description: |
-        The credential is the receiver's own key, `Authorization: Bearer aimeat_rcv_…`, never a session and never in the address (400 KEY_IN_ADDRESS).
-        A missing key, a wrong key and a receiver that does not exist all answer the same 401. A key target writes its one memory key; a row
-        space target appends one row, or `{ "rows": [...] }` (1 to 500). When the receiver has a CSM, the value (each row's body) is checked
+        The address of an incoming webhook (the routes keep the older name "receive"). The credential is the webhook's own API key, `Authorization: Bearer aimeat_rcv_…`, never a session and never in the address (400 KEY_IN_ADDRESS).
+        A missing API key, a wrong API key and an incoming webhook that does not exist all answer the same 401. A key target writes its one memory key; a row
+        space target appends one row, or `{ "rows": [...] }` (1 to 500). When the incoming webhook has a CSM, the value (each row's body) is checked
         against the compiled schema first and a mismatch is 422 SCHEMA_VALIDATION_FAILED with `details.fields` naming each path; without one any JSON is
         taken and the node's own write checks still apply. `?dry_run=true` checks and answers what would be written without storing anything.
         `Idempotency-Key` names the row a retry replaces. A memory record written here carries provenance level `machine`.
@@ -30118,7 +30188,7 @@ paths:
         '200': { description: 'Replaced an existing record, or a dry run: `{ key, version }` or `{ dry_run, would_write }`' }
         '201': { description: 'Written: `{ key, version }` for memory, `{ space, written, row_ids }` for a row space' }
         '400': { description: 'KEY_IN_ADDRESS, SUB_REQUIRED, INVALID_SUB, INVALID_INPUT' }
-        '401': { description: 'UNAUTHORIZED (no key, a wrong key, or no such receiver)' }
+        '401': { description: 'UNAUTHORIZED (no API key, a wrong API key, or no such incoming webhook)' }
         '403': { description: 'VERB_NOT_ALLOWED, PAUSED, STOPPED, EXPIRED, NOT_APPROVED, RESERVED_KEY' }
         '409': { description: 'VERSION_CONFLICT, PREFIX_FULL' }
         '413': { description: TOO_LARGE }
@@ -30128,7 +30198,7 @@ paths:
         '503': { description: RECEIVERS_OFF }
     put:
       operationId: receiverReplace
-      summary: Replace the record (or a named row) through a receiver
+      summary: Replace the record (or a named row) through an incoming webhook
       description: The same as POST. With If-Match the write is refused when the record moved on (409 VERSION_CONFLICT).
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
@@ -30139,8 +30209,8 @@ paths:
         '401': { description: UNAUTHORIZED }
     patch:
       operationId: receiverMerge
-      summary: Merge fields into the record through a receiver
-      description: JSON Merge Patch (RFC 7396) into the receiver's record, written on the version read; the whole result is checked against the CSM. Needs the verb `merge`; a row space answers 405.
+      summary: Merge fields into the record through an incoming webhook
+      description: JSON Merge Patch (RFC 7396) into the incoming webhook's record, written on the version read; the whole result is checked against the CSM. Needs the verb `merge`; a row space answers 405.
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       requestBody: { required: true, content: { application/json: { schema: {} } } }
@@ -30149,8 +30219,8 @@ paths:
         '403': { description: VERB_NOT_ALLOWED }
     get:
       operationId: receiverRead
-      summary: Read back the receiver's own target
-      description: Needs the verb `read`. A key target answers its value; a prefix target lists its keys; a row space answers only the rows this receiver wrote.
+      summary: Read back the incoming webhook's own target
+      description: Needs the verb `read`. A key target answers its value; a prefix target lists its keys; a row space answers only the rows this incoming webhook wrote.
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       responses:
@@ -30159,7 +30229,7 @@ paths:
         '404': { description: NOT_FOUND }
     delete:
       operationId: receiverDelete
-      summary: Delete the receiver's own key through a receiver
+      summary: Delete the incoming webhook's own memory key through the webhook
       description: Needs the verb `delete`. The record goes to the bin for the grace period, as the owner's own delete does.
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
@@ -30170,16 +30240,16 @@ paths:
     parameters:
       - { name: owner, in: path, required: true, schema: { type: string } }
       - { name: name, in: path, required: true, schema: { type: string } }
-      - { name: sub, in: path, required: true, schema: { type: string }, description: 'For a prefix target the key''s last part (`[a-z0-9][a-z0-9_-]{0,63}`, the key is `<prefix>.<sub>`); for a row space a row id; `_self` answers what the receiver takes (GET).' }
+      - { name: sub, in: path, required: true, schema: { type: string }, description: 'For a prefix target the key''s last part (`[a-z0-9][a-z0-9_-]{0,63}`, the key is `<prefix>.<sub>`); for a row space a row id; `_self` answers what the incoming webhook takes (GET).' }
     post:
       operationId: receiverWriteSub
-      summary: A program writes one key under the receiver's prefix, or one named row
+      summary: A program writes one key under the incoming webhook's prefix, or one named row
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       requestBody: { required: true, content: { application/json: { schema: {} } } }
       responses:
         '201': { description: '`{ key, version }` or `{ space, written, row_ids }`' }
-        '409': { description: 'PREFIX_FULL (the prefix holds the most keys this receiver may make)' }
+        '409': { description: 'PREFIX_FULL (the prefix holds the most keys this incoming webhook may make)' }
         '422': { description: SCHEMA_VALIDATION_FAILED }
     put:
       operationId: receiverReplaceSub
@@ -30199,15 +30269,15 @@ paths:
         '200': { description: '`{ key, version }`' }
     get:
       operationId: receiverReadSub
-      summary: Read one key under the prefix or one row this receiver wrote, or `_self`
-      description: '`/_self` answers the receiver''s target, verbs, limits and the JSON schema it checks against; it needs no verb.'
+      summary: Read one key under the prefix or one row this incoming webhook wrote, or `_self`
+      description: '`/_self` answers the incoming webhook''s target, verbs, limits and the JSON schema it checks against; it needs no verb.'
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       responses:
         '200': { description: '`{ key, value, version }`, `{ space, rows }` or the `_self` description' }
     delete:
       operationId: receiverDeleteSub
-      summary: Delete one key under the prefix, or one row this receiver wrote
+      summary: Delete one key under the prefix, or one row this incoming webhook wrote
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       responses:
@@ -30215,8 +30285,8 @@ paths:
   /v1/receivers:
     get:
       operationId: listReceivers
-      summary: The owner's receivers
-      description: The owner, or a principal holding receivers:read or receivers:manage. Each with its address, target, CSM, verbs, limits, state and today's counts; never a key.
+      summary: The owner's incoming webhooks
+      description: The owner's incoming webhooks (the routes keep the older name "receivers"). The owner, or a principal holding receivers:read or receivers:manage. Each with its address, target, CSM, verbs, limits, state and today's counts; never an API key. `created_by` is the principal that made or proposed it, and `key_holders` the principals that were answered an API key that still works (the current one, and the replaced one while its overlap lasts); an API key made before 2026-11-08 names no one in `key_holders`.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       responses:
@@ -30224,12 +30294,12 @@ paths:
         '403': { description: SCOPE_DENIED }
     post:
       operationId: createReceiver
-      summary: Make a receiver
+      summary: Make an incoming webhook
       description: |
         The owner, or a principal holding receivers:manage (outside every wildcard). Body `{ name, target, csm?, csm_version?, verbs?, limits?,
         visibility?, display_name?, description?, expires_days? }`; `target` is exactly one of `{ key }`, `{ prefix, max_keys? }` or
-        `{ organism_id, ws, space }`. The answer carries `key` ONCE (Cache-Control no-store). With visibility.receivers_mode `operator`
-        the receiver waits for an operator; with `off` it is refused (403 RECEIVERS_OFF).
+        `{ organism_id, ws, space }`. The answer carries the API key as `key` ONCE (Cache-Control no-store). With visibility.receivers_mode `operator`
+        the incoming webhook waits for an operator; with `off` it is refused (403 RECEIVERS_OFF).
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
@@ -30243,8 +30313,8 @@ paths:
   /v1/receivers/proposals:
     post:
       operationId: proposeReceiver
-      summary: Propose a receiver the owner approves
-      description: A principal holding receivers:read stores a receiver WITHOUT a key. The owner approves it in person (POST /v1/receivers/{name}/decide); the key is answered to the owner then.
+      summary: Propose an incoming webhook the owner approves
+      description: A principal holding receivers:read stores an incoming webhook WITHOUT an API key. The owner approves it in person (POST /v1/receivers/{name}/decide); the API key is answered to the owner then.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
@@ -30255,7 +30325,7 @@ paths:
       - { name: name, in: path, required: true, schema: { type: string } }
     get:
       operationId: getReceiver
-      summary: One receiver and its newest deliveries
+      summary: One incoming webhook and its newest deliveries
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       responses:
@@ -30263,7 +30333,7 @@ paths:
         '404': { description: NOT_FOUND }
     patch:
       operationId: updateReceiver
-      summary: Change a receiver's limits, verbs, end date, names, visibility or CSM version
+      summary: Change an incoming webhook's limits, verbs, end date, names, visibility or CSM version
       description: receivers:manage. The name, the target and the CSM never change (400); `csm_version` moves to another version of the same CSM.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
@@ -30272,8 +30342,8 @@ paths:
         '200': { description: '`{ receiver }`' }
     delete:
       operationId: deleteReceiver
-      summary: Delete a receiver
-      description: receivers:manage. The key stops at once; what it wrote stays the owner's.
+      summary: Delete an incoming webhook
+      description: receivers:manage. The API key stops at once; what it wrote stays the owner's.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       responses:
@@ -30282,7 +30352,7 @@ paths:
   /v1/receivers/{name}/deliveries:
     get:
       operationId: receiverDeliveries
-      summary: A receiver's deliveries
+      summary: An incoming webhook's deliveries
       description: The 200 newest, newest first; `?refused=true` for the refused ones. Time, verb, status, code and reason, size and the key or rows reached; never the content.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
@@ -30294,8 +30364,8 @@ paths:
   /v1/receivers/{name}/decide:
     post:
       operationId: decideReceiverProposal
-      summary: The owner approves or refuses a proposed receiver
-      description: 'The owner in person only (403 OWNER_ONLY). `{ decision: approve | refuse }`. Approving answers the key once.'
+      summary: The owner approves or refuses a proposed incoming webhook
+      description: 'The owner in person only (403 OWNER_ONLY). `{ decision: approve | refuse }`. Approving answers the API key once.'
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30307,7 +30377,7 @@ paths:
   /v1/receivers/{name}/pause:
     post:
       operationId: pauseReceiver
-      summary: Pause a receiver
+      summary: Pause an incoming webhook
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30318,7 +30388,7 @@ paths:
   /v1/receivers/{name}/resume:
     post:
       operationId: resumeReceiver
-      summary: Resume a paused receiver
+      summary: Resume a paused incoming webhook
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30329,8 +30399,8 @@ paths:
   /v1/receivers/{name}/rotate:
     post:
       operationId: rotateReceiverKey
-      summary: A new key for a receiver
-      description: '`{ overlap_minutes? }` (default 15, 0 ends the old key now). The answer carries the new key once.'
+      summary: A new API key for an incoming webhook
+      description: '`{ overlap_minutes? }` (default 15, 0 ends the old API key now). The answer carries the new API key once, and the caller is recorded as its holder (`key_holders`): when that agent or ecosystem app is removed, its delete answer names this incoming webhook in `receivers_kept` and the owner gets a notice.'
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30341,8 +30411,8 @@ paths:
   /v1/admin/receivers:
     get:
       operationId: adminListReceivers
-      summary: Every receiver on the node (operator)
-      description: The mode, the counts and every receiver with its owner; no key and no content. `?owner=` filters.
+      summary: Every incoming webhook on the node (operator)
+      description: The mode, the counts and every incoming webhook with its owner; no API key and no content. `?owner=` filters.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30353,7 +30423,7 @@ paths:
   /v1/admin/receivers/{owner}/{name}/stop:
     post:
       operationId: adminStopReceiver
-      summary: Stop any account's receiver (operator)
+      summary: Stop any account's incoming webhook (operator)
       description: '`{ reason }` (required), which the owner reads. Only the operator starts it again.'
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
@@ -30366,7 +30436,7 @@ paths:
   /v1/admin/receivers/{owner}/{name}/start:
     post:
       operationId: adminStartReceiver
-      summary: Start a receiver the operator stopped
+      summary: Start an incoming webhook the operator stopped
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30377,7 +30447,7 @@ paths:
   /v1/admin/receivers/{owner}/{name}/decide:
     post:
       operationId: adminDecideReceiver
-      summary: Approve or refuse a receiver waiting for the operator
+      summary: Approve or refuse an incoming webhook waiting for the operator
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -39108,10 +39178,11 @@ paths:
         The node tests the storage (write, read, read part, list, remove under the folder) before it
         saves anything. A person may keep several named stores; the first is the default, and
         `make_default` makes another one the default. A new file of the person and their agents goes to
-        the default unless its writer names a store. The node also checks whether a browser may send to
+        the default unless its writer names a store, when the store takes it: `takes` says which files
+        a store is for, and a smaller file of another kind keeps its bytes in the node's database. The node also checks whether a browser may send to
         the store directly (its CORS rule) and keeps the answer as the store's `browser_access`; a store
         without the rule is saved all the same and takes files through the node. Without `kind`, the
-        store `name` names is tested again with its kept key, and `make_default` applies. The keys are kept encrypted under the node key and never returned. On a node
+        store `name` names is tested again with its kept key, and `make_default` and `takes` apply. The keys are kept encrypted under the node key and never returned. On a node
         where operators approve, the answer is 202 with `outcome` waiting_for_operator and files keep
         going to the node until approved. Needs the person in person, or an agent with `secrets:manage`.
         400 INVALID_INPUT names what is missing (and asks for `name` when the person has several
@@ -39141,6 +39212,7 @@ paths:
                 container: { type: string }
                 credential: { type: string, description: 'Azure: account key, connection string or container SAS URL.' }
                 prefix: { type: string, description: 'The folder inside the bucket or container.' }
+                takes: { $ref: '#/components/schemas/FileStoreTakes' }
                 reason: { type: string, description: 'For the operators, on a node where they approve.' }
       responses:
         '200': { description: Connected }
@@ -39219,8 +39291,9 @@ paths:
         With `kind` the address and key are read, the store is tested (write, read, read part, list,
         remove under its folder) and kept, its key encrypted under the node key and never returned.
         The store's `browser_access` says whether a browser may send to it directly, with the CORS rule
-        to add when it may not. Without `kind` only `selectable` (every person may name it for a file) and `make_default` (new
-        files go there; false on the default lets the environment's setting decide again) change. 400
+        to add when it may not. `takes` says which files the store is for; a smaller file of another
+        kind keeps its bytes in the database. Without `kind` only `selectable` (every person may name it for a file), `make_default` (new
+        files go there; false on the default lets the environment's setting decide again) and `takes` change. 400
         INVALID_INPUT (a reserved name: s3, azure, database), 409 FILES_IN_STORE when a store holding
         files would point at a different bucket, 409 STORE_ALREADY_CONNECTED, 422 STORE_TEST_FAILED, 503
         NO_ENCRYPTION_KEY. Reserved to the node operator.
@@ -39249,6 +39322,7 @@ paths:
                 prefix: { type: string, description: 'The folder inside the bucket or container.' }
                 selectable: { type: boolean }
                 make_default: { type: boolean }
+                takes: { $ref: '#/components/schemas/FileStoreTakes' }
       responses:
         '200': { description: Changed }
         '201': { description: Added }
@@ -43777,6 +43851,10 @@ paths:
           - a pattern under `organism.<id>.` is set by the organism's admins, the
             workspace's creator, or the member whose namespace it is
             (403 SCHEMA_PATTERN_NOT_YOURS); a wildcard organism id is operator only;
+          - a pattern under `csm.` is set only by the account that registered every
+            CSM it reaches (not a later account of an erased author's name) and its
+            agents, or, for a name nobody registered, the account the name starts
+            with (403 SCHEMA_PATTERN_NOT_YOURS); a pattern over every CSM is operator only;
           - the same pattern locked by someone else, under either apply_to, or a key
             another account's lock already governs, is refused
             (403 SCHEMA_LOCKED_BY_OTHER) unless the operator overrides it.
@@ -43837,7 +43915,10 @@ paths:
     get:
       operationId: getMemorySchema
       summary: Get schema for a memory key
-      description: Retrieve the JSON Schema locked to a specific memory key or prefix. No authentication required.
+      description: |
+        Retrieve the JSON Schema locked to a specific memory key or prefix. No authentication
+        required. The lock a CSM owns (`csm.<name>`) follows that CSM's visibility: to a caller who
+        may not read the CSM, the answer is `has_schema: false`, as for a key with no lock.
       tags: [Schema]
       parameters:
         - name: key
@@ -43880,7 +43961,11 @@ paths:
         the one PUT admits: the account holder, an agent of theirs holding
         memory:write, or the operator. Only the principal that set the lock, the
         account holder for a lock one of their agents set, or the operator, may
-        remove it (403 NOT_SCHEMA_OWNER).
+        remove it (403 NOT_SCHEMA_OWNER). The prefix row at a registered CSM's own
+        key (`csm.<name>`) holds that CSM's schema: its holder removes it only as the
+        account that registered the CSM, or that account's agent; any other holder,
+        such as a later account of an erased author's name, gets 403
+        SCHEMA_PATTERN_NOT_YOURS, and the operator may still remove it.
         Without apply_to the exact lock is the row, else the prefix lock; the other
         row of the same pattern, which may be another principal's, is left in place.
       tags: [Schema]
@@ -43918,7 +44003,8 @@ paths:
         List all registered schema locks on this node, or those whose key pattern starts with
         `prefix`. No authentication required. The list is not paged: every matching lock is in one
         answer, with `total` its length. The schema body and its semantic context are read per lock
-        with GET /v1/memory/{key}/schema.
+        with GET /v1/memory/{key}/schema. The lock a CSM owns (`csm.<name>`) is listed only to a
+        caller who may read that CSM (its visibility: public, members, organism or private).
       tags: [Schema]
       parameters:
         - name: prefix
@@ -44303,8 +44389,15 @@ paths:
         Remove a Community Service Manifest, its schema lock and its kept
         versions. Requires the owner or a principal holding `csm:write`, on the
         CSMs of its own account; the node's operator may delete another
-        account's CSM, which writes the operator trail. While a module of the
-        node uses the CSM the answer is 409 IN_USE with `details.users`.
+        account's CSM, which writes the operator trail. While the registering
+        account itself uses the CSM (its own incoming webhooks) the answer is 409
+        IN_USE with `details.users`, which names only those uses. Another
+        account's incoming webhook does not block the delete: it keeps checking
+        messages against the copy of the schema it holds, its owner gets a
+        `csm_removed` notice, and `data.other_accounts_told` counts those
+        accounts. The registering account is the account that held the name
+        when the CSM was registered; a later account of a released name is
+        not it.
       tags: [CSM]
       security:
         - BearerAuth: []
@@ -44490,7 +44583,9 @@ paths:
           description: |
             Nothing was granted. Either the session does not carry
             `consent:manage` (SCOPE_DENIED), or the recipient is `*` and the
-            publish gate asked the owner first (PUBLISH_REQUESTED).
+            publish gate asked the owner first (PUBLISH_REQUESTED), or `role`
+            is `write` and the caller is not the workspace's creator
+            (WRITE_NOT_SUPPORTED).
           content:
             application/json:
               schema:
@@ -51005,7 +51100,7 @@ paths:
         `/v1/` once its dot segments resolve. Any other action, and one of an unknown kind, is left out
         of the answer and logged, whatever wrote the record.
 
-        Every row also carries `source` ({ kind: aimeat|app|extension|agent|owner, name, id? }, derived
+        Every row also carries `source` ({ kind: aimeat|app|extension|agent|owner|ecosystem, name, id? }, derived
         from the title prefix for rows written before it travelled with them), `group` (organisms,
         messages, workflows, apps, account, other) and, for the node's own kinds, `i18n` ({ key, vars })
         so a client can say the title and body in the reader's language. `total` is the whole inbox.
@@ -51034,6 +51129,10 @@ paths:
         App-grant sessions (role `app`) need `notifications:send` in their grant; an app
         notification gets the app's name prefixed to the title (provenance) and `link` defaults to
         the app's own open URL (`/v1/apps/{owner}/{file}?mode=inline`) so the click reopens the app.
+        An outside app (role `ecosystem`) needs `notifications:send` among its approved scopes; its
+        notification gets the app's name prefixed to the title, `source.kind` `ecosystem` with its
+        GEAI as `source.id`, and `link` defaults to the Outside apps page, so the owner can tell it
+        apart from their own notices and mute it on its own.
         `created` says whether the notification was STORED — that it is in the bell and will be
         there when the owner next looks. It is not a claim about the browser push, which is
         best-effort on top and can fail without changing `created`. A notification the owner has
@@ -51175,7 +51274,8 @@ paths:
       summary: Who may notify this owner, and what each did in 30 days
       description: >-
         The node's own six groups with counts, the apps whose grant carries notifications:send, the
-        owner's agents with the scope, and the extensions that have notified, each with the count in
+        owner's agents with the scope, the owner's outside apps (kind `ecosystem`) that hold the scope
+        or mail an automation report, and the extensions that have notified, each with the count in
         the last 30 days, the last time, and the owner's decision (push, muted). Owner only.
       tags: [Notifications]
       security: [{ BearerAuth: [] }]
@@ -51301,6 +51401,13 @@ paths:
         (structure overview, workspace read, organism search) — keeping the working set focused — yet
         stays findable via archive search (`?archived=only`) and `?includeArchived=true`, and resolvable
         by key. Archiving a container CASCADES to its contents. Creator/admin only.
+
+        Archived rows leave the memory key limit, so an archive frees room among live keys, and count
+        toward an archived memory key limit of their own (`memoryMaxArchivedKeysPerAgent`,
+        `AIMEAT_MEMORY_MAX_ARCHIVED_KEYS`, default 10000, 0 for no limit). An archive that would take
+        the archiving account, in person or through one of its agents, past it answers 413
+        QUOTA_EXCEEDED naming that setting, and nothing is archived. Rows of other members are archived
+        without asking their count. Unarchive and delete are never refused by this limit.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -51323,6 +51430,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 'QUOTA_EXCEEDED: the archive would pass the archived memory key limit (memoryMaxArchivedKeysPerAgent); nothing was archived' }
 
   /v1/organisms/{id}/unarchive:
     post:
@@ -51332,6 +51440,14 @@ paths:
         Reverse an archive. Uses SMART RESTORE: restores ONLY the content that THIS target's archival
         flagged (its `archivedRoot`), leaving any item that was archived separately still archived.
         Same body shape and creator/admin gate as POST /v1/organisms/{id}/archive.
+
+        Restored rows count toward their principals' memory limits again, so an unarchive asks the
+        limits a write asks of the account that unarchives: one that would take that account, in
+        person or through one of its agents, past the node's memory key limit
+        (`memoryMaxKeysPerAgent`) or memory quota (`memoryQuotaMb`) answers 413 QUOTA_EXCEEDED naming
+        that setting, and nothing is brought back. Rows of other members come back without asking
+        their limits, and those members are not charged overage for them: a member cannot unarchive,
+        and the account that does cannot change another member's count.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -51354,6 +51470,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 'QUOTA_EXCEEDED. Bringing the content back would pass the memory key limit or memory quota of the unarchiving account or one of its agents; the message names the setting, and nothing is brought back.' }
 
   /v1/organisms/{id}/revert:
     post:
@@ -52883,7 +53000,8 @@ paths:
       description: |
         Browse the merged catalogue of actions and agents across
         all genesis-peered federations. No authentication required (Tier 0).
-        Entries are aggregated from connected genesis peers.
+        Entries are aggregated from connected genesis peers. A local CSM is
+        listed when it is federable and public.
       tags: [Cross-Federation]
       parameters:
         - name: q
@@ -75467,14 +75585,17 @@ paths:
         addresses it could not tell apart as the operator's own site or a label a publish gave an app;
         the entry id is the label. The start step of type `platform_fee_records` names the money
         platform-fee records outside an operator's account whose writer it could not tell; the entry
-        id is `<owner>/<key>`. With
+        id is `<owner>/<key>`. The start step of type `erased_lock_holders` gives the schema locks of
+        accounts that no longer exist the erasure pseudonym, and names the locks set before the account
+        that holds their holder's name now was registered; the entry id is `<applyTo>:<keyPattern>`. With
         `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
         none), `delete` (the skill or the data package is deleted with its files, the schedule is
         removed from the scheduler and from storage), `app_only` (the address is served only at its
-        app address, origin `publisher`) or `uncount` (the fee record is marked `notCounted` and left
-        out of the dashboard's money fees; nothing is deleted), or `keep`
-        (nothing changes; an address stays served at both addresses, a fee record keeps counting). Deciding an entry again answers 409. The incident resolves itself with its
+        app address, origin `publisher`), `uncount` (the fee record is marked `notCounted` and left
+        out of the dashboard's money fees; nothing is deleted) or `pseudonymise` (the lock stays in
+        force and names the erasure pseudonym, so no account holds it), or `keep`
+        (nothing changes; an address stays served at both addresses, a fee record keeps counting, a lock stays the current account's). Deciding an entry again answers 409. The incident resolves itself with its
         last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
@@ -75492,7 +75613,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 'An account name from the incident''s `names`, a classification id from the incident''s `caps`, or an entry id from the incident''s `entries`.' }
-                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete, app_only or uncount, or keep.' }
+                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount, pseudonymise], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete, app_only, uncount or pseudonymise, or keep.' }
       responses:
         '200':
           description: Incident resolved, or one case of it decided
@@ -75510,7 +75631,7 @@ paths:
                           id: { type: string }
                           resolved_at: { type: string, format: date-time, description: Without a body. }
                           name: { type: string, description: With a name. }
-                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount], description: With a name. }
+                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount, pseudonymise], description: With a name. }
                           entry_done: { type: string, description: 'With an entry: what the decision did, in one line.' }
                           done:
                             type: object
@@ -77729,13 +77850,30 @@ paths:
                             description: How many live sessions this ended. Deleted and "can no longer act" are different claims.
                           mcp_sessions_closed:
                             type: integer
-                            description: How many open MCP sessions of this agent were closed. An MCP OAuth access token carries no session row, so it is not counted in sessions_revoked; it is refused from the next request on either way.
+                            description: How many open MCP sessions of this agent were closed by the node process that answered. On a node with several processes the other processes close the sessions they hold as well, and those are not counted here. An MCP OAuth access token carries no session row, so it is not counted in sessions_revoked; it is refused from the next request on either way.
                           standing_work:
                             type: object
                             description: The schedules and saved workflows this agent made. They stop with the agent and run again as a new agent approved under the same name; the owner gets a notice when there are any.
                             properties:
                               schedules: { type: integer }
                               workflows: { type: integer }
+                          receivers_kept:
+                            type: object
+                            description: The incoming webhooks this agent made, and those whose API key it changed and so holds. They are the owner's and keep working after the agent is gone, because a program may hold their API keys; the owner gets a notice when there are any, and pauses or deletes them on the Incoming webhooks page.
+                            properties:
+                              count: { type: integer }
+                              receivers:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    name: { type: string }
+                                    display_name: { type: string }
+                                    state: { type: string }
+                                    why:
+                                      type: string
+                                      enum: [made, key]
+                                      description: '`made` when the agent made it, `key` when it changed the key and was answered the new one.'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -79164,7 +79302,7 @@ paths:
       operationId: postAdminConsulImport
       tags: [Federation, Admin]
       summary: Pull config from Consul KV and apply
-      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported. A setting GET /v1/admin/config marks `appliesAt "restart"` is stored and takes effect at the next start; the answer names those in `at_restart`, and the running value stays until then.
+      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported. A setting GET /v1/admin/config marks `appliesAt "restart"` is stored and takes effect at the next start; the answer names those in `at_restart`, and the running value stays until then. For an AI credential (the operator's agent on operator:admin), a Consul value that would make a setting an AI may only make stricter looser than the node runs is not imported; `held_back` names each with the reason, and the operator imports it signed in in person. The operator in person imports every value.
       security:
         - BearerAuth: []
       responses:
@@ -79182,6 +79320,14 @@ paths:
                         properties:
                           imported: { type: integer }
                           total: { type: integer }
+                          held_back:
+                            type: array
+                            description: The values an AI caller did not import, because each would make a tighten-only setting looser.
+                            items:
+                              type: object
+                              properties:
+                                path: { type: string }
+                                reason: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -79488,17 +79634,21 @@ paths:
                             type: object
                             description: |
                               Present only on the first sign-in of an account a code key made: the key is
-                              replaced by a new password, shown here once. The same details are emailed to
-                              the account's address when the account has verified it. When it has not,
-                              nothing is mailed now, `email_held` is true and `email_note` says so, and the
-                              mail goes when the address is verified (unless the password has changed by
-                              then).
+                              replaced by a new password, shown here once. Nothing is mailed at this
+                              sign-in. When the account had verified its address before it, no mail
+                              follows. When it had not, `email_held` is true and `email_note` says so, and
+                              the mail goes when the address is verified (unless the password has changed by
+                              then), by a code asked for after this sign-in. A first sign-in by an emailed
+                              link or an identity provider replaces the key too; its details are given by
+                              `POST /v1/ghii/key-credentials`.
                             properties:
                               username: { type: string, description: The exact sign-in name }
                               password: { type: string, description: The new password that replaced the key }
                               email_sent: { type: boolean, description: Whether the email with these details left now }
                               email_held: { type: boolean, description: 'Present when the address is not verified: true when the email waits for the address to be verified, false when this node cannot keep it to send later (no data key)' }
                               email_note: { type: string, description: Present with email_held. A sentence for the person about the email. }
+                              agent_keys_ended: { type: integer, description: 'Present when agent keys that POST /v1/ghii/verify-email or GET /v1/ghii/magic-link/verify handed out before this first sign-in stopped working at it (the agent was rekeyed and its earlier tokens end; the agent and its permissions stay): how many.' }
+                              agent_keys_note: { type: string, description: Present with agent_keys_ended. A sentence for the person. }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -79764,6 +79914,48 @@ paths:
                           verification_id: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/ghii/key-credentials:
+    post:
+      operationId: takeGhiiKeyCredentials
+      tags: [GHII]
+      summary: The new sign-in details of a code key's first sign-in by a link or a provider
+      description: |
+        A code key's code is the account's password until the holder's first sign-in. When that
+        sign-in is an emailed sign-in link or an identity provider, the node replaces the code at
+        once and redirects the browser to `/?auth_step=key_credentials`; the page then asks here,
+        with the access token of the session that signed in, and gets a new password once. Another
+        session of the account, a second request, or a request after 24 hours gets 404. The details
+        are shown, not mailed. `continue_to` is where the sign-in was going.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The new sign-in details, once
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key_credentials:
+                            type: object
+                            properties:
+                              username: { type: string, description: The exact sign-in name }
+                              password: { type: string, description: The new password }
+                              email_sent: { type: boolean, description: Always false }
+                              agent_keys_ended: { type: integer, description: 'Present when agent keys handed out before this first sign-in stopped working at it: how many.' }
+                              agent_keys_note: { type: string, description: Present with agent_keys_ended. A sentence for the person. }
+                          continue_to: { type: string, nullable: true, description: Where the sign-in was going }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -81775,6 +81967,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 'QUOTA_EXCEEDED. Putting the record back would pass that principal''s memory key limit or memory quota; the message names the setting, and the record stays in the bin.' }
   /v1/admin/extensions/available:
     get:
       operationId: getAdminExtensionsAvailable

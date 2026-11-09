@@ -30,10 +30,17 @@
  *   RECEIVERS_MANAGE_SCOPE · RECEIVER_NAME_RE · RECEIVER_SUB_RE · MAX_RECEIVERS · RECEIVER_DEFAULTS ·
  *   RECEIVER_MAXIMA · RECEIVER_VERBS · ReceiverTarget · ReceiverSchema · ReceiverRecord · ReceiverState ·
  *   receiverPrincipalOf · parseReceiverPrincipal · isReceiverPrincipal · validateReceiverName ·
- *   validateReceiverSub · normalizeReceiverInput · effectiveState · receiverView · takesReceiverKey ·
- *   verbOfMethod · parseReceiver
+ *   validateReceiverSub · normalizeReceiverInput · effectiveState · keyHoldersOf · receiverView ·
+ *   takesReceiverKey · verbOfMethod · parseReceiver
  * @usage const ref = receiverPrincipalOf('alice', 'ruuvi', config.nodeId);   // receiver:alice/ruuvi@node
  * @version-history
+ *   v1.2.1 — 2026-11-08 — The validation messages say incoming webhook where they said receiver
+ *     (secaudit2026nov08b round 15b).
+ *   v1.2.0 — 2026-11-08 — ReceiverRecord.keyAnsweredTo and previousKey.answeredTo: who was answered a
+ *     key that still works; keyHoldersOf, and the view's `key_holders` (secaudit2026nov08b round 15,
+ *     rotated-key-holder-not-surfaced).
+ *   v1.1.0 — 2026-11-08 — ReceiverRecord.stoppedFrom: the state an operator's stop replaced
+ *     (secaudit2026nov08 round 14, start-drops-owner-pause).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 
@@ -152,17 +159,29 @@ export interface ReceiverRecord {
     /** SHA-256 of the key; null while proposed (no key exists before the owner approves). */
     keyHash: string | null;
     keyId: string | null;
-    /** The key a rotation replaced, accepted until `until`. */
-    previousKey?: { hash: string; id: string; until: string } | null;
+    /** The key a rotation replaced, accepted until `until`, and the principal it had been answered to. */
+    previousKey?: { hash: string; id: string; until: string; answeredTo?: string | null } | null;
     createdAt: string;
     /** The principal that made or proposed it. */
     createdBy: string;
+    /**
+     * The principal the current key was answered to in plain text: whoever made the receiver, the owner
+     * who approved a proposal, or whoever rotated the key. Absent on a key made before 2026-11-08
+     * (secaudit2026nov08b round 15, rotated-key-holder-not-surfaced).
+     */
+    keyAnsweredTo?: string | null;
     approvedAt?: string | null;
     expiresAt: string;
     keyRotatedAt?: string | null;
     pausedAt?: string | null;
     stoppedAt?: string | null;
     stopReason?: string | null;
+    /**
+     * The state the operator's stop replaced, so the operator's start returns to it: the owner's pause
+     * stays until the owner lifts it. Absent on a receiver stopped before 2026-11-08, which starts as
+     * it did then (active when it has a key).
+     */
+    stoppedFrom?: ReceiverState | null;
     /** The operator's decision when the node asks one (receivers.mode = operator). */
     operatorDecision?: { decision: 'approve' | 'refuse'; at: string; by: string; reason?: string } | null;
 }
@@ -199,16 +218,16 @@ export function isReceiverPrincipal(value: unknown): value is string {
 /** Null when `name` is a receiver name, else the reason it is not. */
 export function validateReceiverName(name: unknown): string | null {
     if (typeof name !== 'string' || !RECEIVER_NAME_RE.test(name)) {
-        return 'A receiver name is 1 to 40 characters: lowercase letters, digits and dashes, starting with a letter or a digit.';
+        return 'An incoming webhook\'s name is 1 to 40 characters: lowercase letters, digits and dashes, starting with a letter or a digit.';
     }
-    if (RESERVED_RECEIVER_NAMES.includes(name)) return `"${name}" is a word the receiver routes use. Choose another name.`;
+    if (RESERVED_RECEIVER_NAMES.includes(name)) return `"${name}" is a word the incoming webhook routes use. Choose another name.`;
     return null;
 }
 
 /** Null when `sub` may name a key under a prefix target, else the reason it may not. */
 export function validateReceiverSub(sub: unknown): string | null {
     if (typeof sub !== 'string' || !RECEIVER_SUB_RE.test(sub)) {
-        return 'The last part of the address is 1 to 64 characters: lowercase letters, digits, dashes and underscores, starting with a letter or a digit. It names one key under the receiver\'s prefix.';
+        return 'The last part of the address is 1 to 64 characters: lowercase letters, digits, dashes and underscores, starting with a letter or a digit. It names one memory key under the incoming webhook\'s prefix.';
     }
     return null;
 }
@@ -289,7 +308,7 @@ export function normalizeReceiverInput(body: Record<string, unknown>): ReceiverC
     if (typeof expiresDays === 'string') return expiresDays;
     const vis = body.visibility ?? 'private';
     if (vis !== 'private' && vis !== 'owner' && !(typeof vis === 'string' && ORGANISM_VIS_RE.test(vis))) {
-        return 'visibility is "private", "owner" or "organism:<id>". A receiver never writes public records: making data public is the owner\'s own act.';
+        return 'visibility is "private", "owner" or "organism:<id>". An incoming webhook never writes public records: making data public is the owner\'s own act.';
     }
     const displayName = typeof body.display_name === 'string' ? body.display_name : undefined;
     if (displayName !== undefined && displayName.length > 120) return 'display_name is at most 120 characters.';
@@ -326,6 +345,19 @@ export function receiverAddress(baseUrl: string, owner: string, name: string): s
     return `${baseUrl.replace(/\/$/, '')}/v1/receive/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 }
 
+/**
+ * The principals that were answered a key of this receiver that still works: the current key's, and
+ * the replaced key's while its overlap lasts. A key made before 2026-11-08 names no one here; its
+ * maker is `createdBy`.
+ */
+export function keyHoldersOf(r: Pick<ReceiverRecord, 'keyHash' | 'keyAnsweredTo' | 'previousKey'>, now = Date.now()): string[] {
+    const holders = new Set<string>();
+    if (r.keyHash && r.keyAnsweredTo) holders.add(r.keyAnsweredTo);
+    const prev = r.previousKey;
+    if (prev?.answeredTo && Date.parse(prev.until) > now) holders.add(prev.answeredTo);
+    return [...holders];
+}
+
 /** What a receiver looks like to its owner and the owner's agents: no key hash. */
 export function receiverView(r: ReceiverRecord, owner: string, nodeId: string, baseUrl: string, log?: {
     lastDeliveryAt: string | null; lastRefusalAt: string | null; failedAttempts: number; today: number; refusedToday: number;
@@ -351,6 +383,7 @@ export function receiverView(r: ReceiverRecord, owner: string, nodeId: string, b
         ...(r.previousKey ? { previous_key_until: r.previousKey.until } : {}),
         created_at: r.createdAt,
         created_by: r.createdBy,
+        key_holders: keyHoldersOf(r),
         approved_at: r.approvedAt ?? null,
         expires_at: r.expiresAt,
         key_rotated_at: r.keyRotatedAt ?? null,

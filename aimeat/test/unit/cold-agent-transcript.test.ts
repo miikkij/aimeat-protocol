@@ -9,6 +9,7 @@
  *   too, because the report's every number is one.
  * @structure parseTranscript: pairing, error detection, totals, noise · shortToolName · median
  * @version-history
+ *   v1.1.0 — 2026-11-08 — Duration and tokens are summed over the turns, as the cost is.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -46,6 +47,14 @@ describe('parseTranscript', () => {
             line({ type: 'result', subtype: 'success', num_turns: 7, duration_ms: 4200, total_cost_usd: 0.31, result: 'You have no apps yet.', usage: { input_tokens: 1200, output_tokens: 300, cache_read_input_tokens: 9000 } }),
         ].join('\n'));
         expect(m).toMatchObject({ turns: 7, durationMs: 4200, costUsd: 0.31, finalText: 'You have no apps yet.', inputTokens: 1200, outputTokens: 300, cacheReadTokens: 9000, finished: true });
+    });
+
+    it('sums duration, tokens and cost over the turns of a task of several turns', () => {
+        const m = parseTranscript([
+            line({ type: 'result', subtype: 'success', duration_ms: 60000, total_cost_usd: 0.5, result: 'Which level?', usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 1000 } }),
+            line({ type: 'result', subtype: 'success', duration_ms: 3000, total_cost_usd: 0.1, result: 'Published.', usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 100 } }),
+        ].join('\n'));
+        expect(m).toMatchObject({ durationMs: 63000, costUsd: 0.6, inputTokens: 110, outputTokens: 55, cacheReadTokens: 1100, turnTexts: ['Which level?', 'Published.'] });
     });
 
     it('falls back to the last thing the agent said when the run stopped on a limit', () => {

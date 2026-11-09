@@ -17,7 +17,13 @@
  *     U3  When A opens the workspace to every member of the organism, B's product at the organism's
  *         audience builds, and C reads its rows.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-dataproduct-records-audience
+ *     R2  With classification on, A labels one record for A alone and builds a product at the organism:
+ *         C reads no row of it (rows read and /v1/pub). Fails on the code before round 14.
+ *     U4  A reads every row; C still reads the product over unlabelled records; classification off
+ *         reads as before.
  * @version-history
+ *   v1.1.0 — 2026-11-08 — R2 and U4: a labelled record keeps its label in the product (secaudit2026nov08
+ *     round 14, dataproduct/sources-memory:records-source-drops-source-record-labels).
  *   v1.0.1 — 2026-11-03 — R1: the refusal says who can widen the workspace (secaudit2026nov02d round 13b).
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
@@ -144,6 +150,62 @@ await test('U3. A opens the workspace to every member: B\'s product at the organ
     assert(r.status === 201 && r.body.data.rows === 1, `run: ${show(r)}`);
     const rows = await rowsOf(C.token, B.name, N('open'));
     assert(rows.status === 200 && rows.text.includes(SECRET), `C's read: ${show(rows)}`);
+});
+
+// ── A labelled record keeps its label in the product (secaudit2026nov08 round 14,
+//    dataproduct/sources-memory:records-source-drops-source-record-labels) ──
+// With classification on for the organism, A labels one record "Board only" (people: A). A's product at
+// the organism's audience copied it into a package file with no label, so C read it there. The version
+// now carries the strictest label of its source records, and C, outside that label, reads no row of it.
+const LABELLED = `BOARD-ONLY-${stamp}`;
+const setMode = (mode: string) => call('PUT', '/v1/admin/config', A.token, { changes: [{ path: 'classification.mode', value: mode }] });
+
+await test('Setup L: classification on for the organism; A labels one published record for A alone', async () => {
+    const on = await setMode('owner');
+    assert(on.status === 200, `classification on: ${show(on)}`);
+    const policy = await call('PUT', '/v1/classification/policy', A.token, { level: 'organism', organism_id: orgId, policy: {
+        enabled: true,
+        labels: [{ id: 'board', rank: 25, name: { en: 'Board only', fi: 'Hallitus', es: 'Junta' }, audience: { people: [A.name] } }],
+    } });
+    assert(policy.status === 200 && policy.body.data.applied === true, `organism policy: ${show(policy)}`);
+    const d = await call('POST', `/v1/organisms/${orgId}/workspace/drafts`, A.token, { ws, space: 'signal', id: 's2', value: { note: LABELLED } });
+    assert(d.status === 200, `draft: ${show(d)}`);
+    const p = await call('POST', `/v1/organisms/${orgId}/publish`, A.token, { ws, namespace: 'shared.signals', id: 's2' });
+    assert(p.status === 200, `publish: ${show(p)}`);
+    const l = await call('PUT', '/v1/classification/label', A.token, { kind: 'memory', key: `organism.${orgId}.w.${ws}.shared.signals.s2`, label: 'board' });
+    assert(l.status === 200 && l.body.data.applied === true, `label: ${show(l)}`);
+    // The control: C reads the workspace (it is open to the organism since U3) without the labelled record.
+    const readC = await call('GET', `/v1/organisms/${orgId}/workspace?ws=${ws}`, C.token);
+    assert(readC.status === 200 && readC.text.includes(SECRET) && !readC.text.includes(LABELLED), `C's workspace read: ${show(readC)}`);
+});
+
+let labHash = '';
+let labCsv = '';
+await test('R2. A\'s product at the organism carries the label: C reads no row of it, on the rows read or on /v1/pub', async () => {
+    const d = await define(A.token, N('lab'), `organism:${orgId}`);
+    assert(d.status === 201, `define: ${show(d)}`);
+    const r = await run(A.token, N('lab'));
+    assert(r.status === 201 && r.body.data.rows === 2, `run: ${show(r)}`);
+    labHash = r.body.data.content_hash;
+    labCsv = String(r.body.data.resources?.[0]?.url ?? '');
+    const rows = await rowsOf(C.token, A.name, N('lab'));
+    assert(!rows.text.includes(LABELLED), `C reads the labelled record through the product: ${show(rows)}`);
+    assert(labCsv.includes('/v1/pub/'), `the resource address: ${labCsv}`);
+    const pub = await fetch(labCsv.replace(/^https?:\/\/[^/]+/, BASE), { headers: { Authorization: `Bearer ${C.token}` } });
+    const body = await pub.text();
+    assert(!body.includes(LABELLED), `C reads the labelled record through /v1/pub: ${pub.status} ${body.slice(0, 200)}`);
+});
+
+await test('U4. A, inside the label, reads every row of the product; a product over unlabelled records still reads for C', async () => {
+    const rows = await rowsOf(A.token, A.name, N('lab'));
+    assert(rows.status === 200 && rows.text.includes(LABELLED) && rows.text.includes(SECRET), `A's rows: ${show(rows)}`);
+    assert(!!labHash, 'the version hash');
+    const c = await rowsOf(C.token, A.name, N('org'));
+    assert(c.status === 200 && c.text.includes(SECRET), `C's read of the earlier product: ${show(c)}`);
+    const off = await setMode('off');
+    assert(off.status === 200, `classification off: ${show(off)}`);
+    const again = await rowsOf(C.token, A.name, N('lab'));
+    assert(again.status === 200 && again.text.includes(LABELLED), `with classification off the read is as before: ${show(again)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}\n`);

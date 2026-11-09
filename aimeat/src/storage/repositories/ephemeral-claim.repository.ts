@@ -23,6 +23,8 @@
  * @structure EphemeralClaimRow · EphemeralCount · EphemeralClaimRepository
  * @usage implemented by both storage providers; called through services/ephemeral-claims.ts only.
  * @version-history
+ *   v1.1.0 — 2026-11-08 — releaseEphemeralCounter, so a limit can reserve its count before the check it
+ *     guards (secaudit2026nov08 round 14, services/admin-password.ts).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, high-availability stage 2, item 2.3 and 2.4).
  */
 
@@ -73,6 +75,13 @@ export interface EphemeralClaimRepository {
   bumpEphemeralCounter(kind: string, id: string, opts: {
     now: number; windowMs: number; staleBefore: number; sliding: boolean;
   }): Promise<EphemeralCount>;
+
+  /**
+   * Take back one count from the counter (kind, id), in one statement: the count falls by one while
+   * it is above 0 and its window has not ended at `now`; otherwise nothing changes. For a count that
+   * was reserved before a check and turned out not to belong in it (a right admin password).
+   */
+  releaseEphemeralCounter(kind: string, id: string, now: number): Promise<void>;
 
   /** The counter (kind, id) as stored, its window ended or not, or null. */
   readEphemeralCounter(kind: string, id: string): Promise<EphemeralCount | null>;

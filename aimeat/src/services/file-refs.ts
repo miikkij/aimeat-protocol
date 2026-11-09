@@ -27,6 +27,8 @@
  *   const h = await fileHandleFor(storage, config, `${ownerGhii}/${key}`, { gaii: agentGaii });
  *   if (h.access !== 'granted') return refuse(h.reason);
  * @version-history
+ *   v1.4.0 — 2026-11-08 — A data package version's file resolves only for a reader the version's label
+ *     source admits, as GET /v1/pub decides (secaudit2026nov08b round 15).
  *   v1.3.0 — 2026-11-06 — The accessor may carry `mailbox`, the mailbox it reads in its owner's name: an
  *     attachment of a message in that mailbox resolves as granted (mailbox/attachment-read.ts). An agent
  *     holding messages:read-as-owner was handed the attachment's reference by the thread and refused
@@ -55,6 +57,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { generateDownloadToken } from './download-token.js';
 import { fileTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
+import { packageFileHiddenBySourceLabel } from './datapackage/source-labels.js';
 import { ownExtensionFileKey } from './component-address.js';
 import { localAccountName } from '../utils/gaii.js';
 import type { MailboxReader } from './owner-mailbox-reads.js';
@@ -199,8 +202,12 @@ export async function resolveFileRef(
         return { access: 'denied', ref: canonical, ownerGaii: gaii, key, reason: decision.reason ?? 'not_permitted' };
     }
     // The classification reader: a file this caller may not see answers as an absent one.
+    // A data package version's file is also asked about the labels the version keeps, as GET /v1/pub
+    // asks (datapackage/source-labels.ts).
     const [shown] = await accessor.reader.show([file], () => fileTarget(gaii, key, file.workspaceRef));
-    if (!shown) return { access: 'missing', ref: canonical, ownerGaii: gaii, key, reason: 'not_found' };
+    if (!shown || await packageFileHiddenBySourceLabel({ storage, config }, accessor.reader, gaii, key)) {
+        return { access: 'missing', ref: canonical, ownerGaii: gaii, key, reason: 'not_found' };
+    }
 
     return { access: 'granted', ref: canonical, ownerGaii: gaii, key, file: shown };
 }

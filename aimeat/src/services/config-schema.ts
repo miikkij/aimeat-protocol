@@ -12,6 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-11-08 — quota.memory_max_archived_keys_per_agent (AIMEAT_MEMORY_MAX_ARCHIVED_KEYS), mutable,
+ *     default 10000, 0 = no limit: archived memory keys get a ceiling of their own (secaudit2026nov08b
+ *     round 15b, storage/memory-totals:postgres-archived-rows-count-no-bytes).
  *   2026-11-07 — extensions.microservices_central_url (AIMEAT_MSC_CENTRAL_URL), mutable, empty by default:
  *     the Microservices Central aimeat_appdev_overview names (services/appdev/microservices.ts).
  *   2026-11-06 — extensions.zip_max_files (AIMEAT_EXT_ZIP_MAX_FILES, 1-10000), the ZIP file cap 5e367ec01
@@ -410,6 +413,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Quotas (mutable, additional) ──
   { key: 'memoryMaxValueSizeKb', dotPath: 'quota.memory_max_value_size_kb', envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory value size in KB', range: '1-10240' },
   { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'The most memory keys each owner and each agent may hold', range: '1-100000' },
+  // Archived rows are outside the key ceiling above, so an archive frees live room; without a ceiling
+  // of their own, write, archive, write stored past every limit (secaudit2026nov08b round 15b).
+  { key: 'memoryMaxArchivedKeysPerAgent', dotPath: 'quota.memory_max_archived_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_ARCHIVED_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000000, immutable: false, description: 'The most archived memory keys each owner and each agent may hold. Archiving takes keys out of the memory keys cap and into this one; an archive that would pass it is refused and nothing is archived. Delete archived content that is no longer needed, or raise this value. This limit never refuses bringing content back from the archive or deleting it. 0: no limit', range: '0-10000000' },
   // How long a deleted memory record can still be taken back. 0 makes a delete immediate and
   // final, which is a legitimate choice an operator should have to make rather than inherit.
   { key: 'memoryDeleteGraceDays', dotPath: 'quota.memory_delete_grace_days', envVar: 'AIMEAT_MEMORY_DELETE_GRACE_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Days a deleted memory record stays takeable back before it is removed for good', range: '0-365' },

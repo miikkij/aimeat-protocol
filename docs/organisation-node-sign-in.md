@@ -341,7 +341,9 @@ person's knowledge, memberships and history remain; every credential acting in t
 sessions, their agents' 90-day tokens, personal access tokens, app grants, live connect tunnels —
 ends within the request, and nothing new can be minted. The account's background work waits: its
 schedules, its workflow triggers and its extensions' unattended runs are skipped with a log line
-that names the deactivation, and none of them is deleted. Reactivation lets the person back in
+that names the deactivation, and none of them is deleted. The keys the person gave outside programs
+and parties wait the same way: an incoming webhook's API key, an outside party's key or token, a share link and an
+app party's sign-in answer 403 `ACCOUNT_DISABLED`, and no webhook goes to their agents. Reactivation lets the person back in
 without resurrecting the old credentials, and the waiting work runs again at its next time. The same state is behind the operator's manual
 Deactivate button on the Owners tab. A connection may only touch accounts it manages
 (`managedBy`), it can never deactivate an operator-role account, and it may ADOPT an existing

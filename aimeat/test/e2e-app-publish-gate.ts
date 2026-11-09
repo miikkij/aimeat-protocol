@@ -27,6 +27,7 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   (2026-11-08) The acceptance line names the one size matrix (390×844, 1280×900, 1280×460), not 390 and 1440.
  *   (2026-11-05) The Atelier specification has seven parts: `motion` was split from `look` in effc2bcaa.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.3.0 — 2026-09-05 — THE RECIPE AND THE ACCEPTANCE (wish-atelier-always-excellent, part 4):
@@ -593,7 +594,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
     // measured checks pass on pages the owner rejects — so the response says which picture to
     // take, and which page to put it beside.
 
-    await test('an Atelier publish is told to accept the app BESIDE the genre it forked, at 390 and 1440', async () => {
+    await test('an Atelier publish is told to accept the app BESIDE the genre it forked, at the one size matrix', async () => {
         const f = `gateaccept${Date.now()}.html`;
         const r = await publish(o.token, {
             filename: f, mime_type: 'text/html', content: b64(atelierApp(f, 'genre-departures')),
@@ -602,8 +603,10 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
         const line = r.body.data.next_steps?.acceptance as string | undefined;
         assert(!!line, `the Atelier publish must carry an acceptance line: ${JSON.stringify(r.body.data.next_steps)}`);
-        assert(line!.includes('390') && line!.includes('1440'),
-            `the acceptance must name both widths: ${line}`);
+        // 390×844, 1280×900 and 1280×460 since 2026-11-08, the matrix the skill and the spec name; the
+        // answer said 390 and 1440, and a real build met the two as a contradiction.
+        assert(line!.includes('390×844') && line!.includes('1280×900') && line!.includes('1280×460') && !line!.includes('1440'),
+            `the acceptance must name the size matrix: ${line}`);
         assert(/both themes/i.test(line!), `the acceptance must name both themes: ${line}`);
         // The exact genre, not a shelf to search: this app named one.
         assert(line!.includes('/v1/app-templates/genre-departures'),

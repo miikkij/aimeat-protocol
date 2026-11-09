@@ -34,6 +34,8 @@
  *   - POST /dsp/2025-1/transfers/:pid/{start,completion,suspension,termination}
  * @usage app.use(dspRouter(config, storage))
  * @version-history
+ *   2026-11-08 — Installs the step that ends a share-offer agreement when the share it stood on ends
+ *     (services/dataspace/source-share.ts; secaudit2026nov08 round 14b).
  *   2026-11-04 — The participant is verified by the declared credential strategy
  *     acceptCredential('dsp-participant') instead of participantOf() in each handler; same answers
  *     (codebase analysis 2026-11-03, item B8).
@@ -59,6 +61,7 @@ import { logger } from '../../utils/logger.js';
 import { exportJWK } from 'jose';
 import { getNodeCryptoKeys } from '../../auth/jwt.js';
 import { dataspaceDidDocument } from '../../services/dataspace/identity.js';
+import { installSourceShareEnd } from '../../services/dataspace/source-share.js';
 
 type Kind = 'catalog' | 'negotiation' | 'transfer';
 type Answer = { status: number; body: Record<string, unknown> };
@@ -67,6 +70,8 @@ const pidOf = (req: Request): string => String(req.params.pid ?? '');
 export function dspRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
     const deps = { storage, config };
+    // A share-offer agreement ends when the share it stood on ends; the step asks the running config.
+    installSourceShareEnd(deps);
     const off = (_req: Request, res: Response, next: NextFunction): void => {
         if (!config.dataspaceEnabled) { res.status(404).json({ error: 'Not found' }); return; }
         next();

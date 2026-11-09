@@ -5,14 +5,22 @@
  * @description The Receivers page's dialogs (design canvas "Vastaanottimet", artboards Create and
  *   Chat): the new-receiver form (name, where it writes as one of three, the shape it checks against,
  *   the verbs and the limits); the decision on a receiver an agent proposed (?approve=<name>); the
- *   key shown once after a create, an approval or a key change, with the curl example, the sentence
- *   for one's own AI and a test that stores nothing (?dry_run=true with the key just shown); and the
- *   new end date. Every part is a library component (Modal, the Field family, Box, Facts, Action);
- *   the file writes no class.
+ *   key shown once after a create, an approval or a key change, with two ready commands that carry
+ *   that key (POSIX and PowerShell, commands.js), the sentence for one's own AI and a test that
+ *   stores nothing (?dry_run=true with the key just shown); and the new end date. Every part is a
+ *   library component (Modal, the Field family, Box, Facts, Action); the file writes no class.
  * @structure renderDialogs · createDialog · targetFields · shapeFields · limitFields · decideDialog ·
- *   keyDialog · keyOnce · dryRunBlock · extendDialog
+ *   keyDialog · readyCommands · keyOnce · dryRunBlock · extendDialog
  * @usage ${renderDialogs(ctx)} after the page
  * @version-history
+ *   v1.2.0 — 2026-11-09 — The key-once view shows two ready commands under the API key, for macOS,
+ *     Linux and Git Bash and for Windows PowerShell, with the address, the API key and an example
+ *     message in them, each with its copy button; a switch adds ?dry_run=true to both. They replace
+ *     the curl that read the key from an environment variable (secaudit2026nov08b round 15d).
+ *   v1.1.1 — 2026-11-08 — The English sentence for one's AI says API key; it stays English, as the
+ *     key.aiHint line tells the reader (secaudit2026nov08b round 15b).
+ *   v1.1.0 — 2026-11-08 — The form's "What it takes" choice has the question mark that explains a
+ *     data description (concept.data_description).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { h } from 'preact';
@@ -32,8 +40,9 @@ import { Check } from '/components/Check.js';
 import { Select } from '/components/Select.js';
 import { Stack } from '/components/Layout.js';
 import {
-  x, LIMITS, validName, validKey, targetWords, shapeWords, limitsWords, verbsWords, byWords, curlFor,
+  x, LIMITS, validName, validKey, targetWords, shapeWords, limitsWords, verbsWords, byWords,
 } from './frame.js';
+import { bashCommand, powershellCommand, commandAddress } from './commands.js';
 
 const html = htm.bind(h);
 
@@ -150,7 +159,7 @@ function shapeFields(ctx, f, shown) {
   const csms = ctx.csms;
   return html`
     <${Stack}>
-      <${Choice} boxed dot cols=${2} name="rc-shape" label=${x('form.shapeLabel')} value=${f.shape}
+      <${Choice} boxed dot cols=${2} name="rc-shape" label=${x('form.shapeLabel')} help="concept.data_description" value=${f.shape}
         onChange=${(v) => ctx.setForm({ shape: v })}
         options=${[
           { value: 'csm', label: x('form.shapeCsm'), hint: x('form.shapeCsmHint') },
@@ -221,11 +230,41 @@ function keyDialog(ctx, d) {
     <//>`;
 }
 
-/** The key box, the curl, the sentence for an AI and the test, for the receiver in `d`. */
+/**
+ * The two ready commands, each with the API key just shown in it: one for macOS, Linux and Git Bash,
+ * one for Windows PowerShell. The switch adds ?dry_run=true to both. They live in this dialog only.
+ */
+export function readyCommands(ctx, d) {
+  const r = d.receiver;
+  if (d.example == null) {
+    return html`<${Stack}><${Label} block>${x('key.tryLabel')}<//><${Note} kind="loading" /><//>`;
+  }
+  const url = commandAddress(r, ctx.origin, !!d.commandsDry);
+  const parts = { url, key: d.key, body: d.example };
+  const bash = bashCommand(parts);
+  const ps = powershellCommand(parts);
+  const one = (label, cmd, copyLabel) => html`
+    <${Stack} gap="small">
+      <${Label} block>${label}<//>
+      <${Code} block>${cmd}<//>
+      <${Actions}><${Action} small copy=${cmd} copiedLabel=${x('copied')}>${copyLabel}<//><//>
+    <//>`;
+  return html`
+    <${Box} name=${x('key.tryLabel')}>
+      <${Stack} gap="medium">
+        <${Note} kind="hint">${d.commandsDry ? x('key.commandsDryBody') : x('key.commandsBody', { target: targetWords(r.target) })}<//>
+        <${Check} checked=${!!d.commandsDry} onChange=${(on) => ctx.setCommandsDry(on)}>${x('key.commandsDry')}<//>
+        ${one(x('key.bashLabel'), bash, x('key.copyBash'))}
+        ${one(x('key.psLabel'), ps, x('key.copyPs'))}
+        <${Note} kind="quiet">${x('key.commandsOnce')}<//>
+      <//>
+    <//>`;
+}
+
+/** The key box, the ready commands, the sentence for an AI and the test, for the receiver in `d`. */
 function keyOnce(ctx, d) {
   const r = d.receiver;
-  const curl = curlFor(r);
-  const forAi = `${d.say || ''} The key is in the secret AIMEAT_RECEIVER_KEY.`.trim();
+  const forAi = `${d.say || ''} The API key is in the secret AIMEAT_RECEIVER_KEY.`.trim();
   return html`
     <${Stack} gap="large">
       <${Box} tone="raised" name=${x('key.onceTitle')}>
@@ -236,11 +275,7 @@ function keyOnce(ctx, d) {
           ? x('key.overlap', { time: dateTime(r.previous_key_until) }) : x('key.noOverlap')}<//>` : null}
         ${r.state === 'awaiting_operator' ? html`<${Note} kind="aside" size="small" tone="waiting">${x('waitingOperator')}<//>` : null}
       <//>
-      <${Stack}>
-        <${Label} block>${x('key.tryLabel')}<//>
-        <${Code} block scroll>${curl}<//>
-        <${Actions}><${Action} small copy=${curl} copiedLabel=${x('copied')}>${x('copyCurl')}<//><//>
-      <//>
+      ${readyCommands(ctx, d)}
       <${Box} name=${x('key.aiLabel')}>
         <${Note} kind="hint">${x('key.aiHint')}<//>
         <${Code} block>${forAi}<//>

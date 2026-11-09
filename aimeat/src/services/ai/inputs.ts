@@ -19,10 +19,15 @@
  *   not invent it and the agent knows what to ask its owner for. A caller that passes no viewer reads
  *   as before (the node's own unattended work, the workflow ai step with its own save-time check, a
  *   decide run).
- * @structure AiInputRecord · readAiRecords() · readAiFile()
+ * @structure AiInputRecord · AiFileDeps · AiFileSource · aiFileDeps() · readAiRecords() · readAiFile()
  * @usage
  *   const recs = await readAiRecords(deps, reader, ownerGhii, [{ key }], { capability: 'text' }, viewer);
+ *   const file = await readAiFile({ storage, config }, reader, ownerGhii, key, { capability: 'text' });
  * @version-history
+ *   v1.3.0 -- 2026-11-08 -- readAiFile takes { storage, config } and asks the labels a data package version
+ *     keeps of a package file, as GET /v1/pub does: a reader outside one reads it as absent
+ *     (datapackage/source-labels.ts storedFileShownTo; secaudit2026nov08b round 15b). A bare storage, as the
+ *     callers' unit tests pass it, reads as before.
  *   v1.2.1 -- 2026-11-05 -- Moved unchanged from src/services/ai-inputs.ts to src/services/ai/inputs.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.2.0 -- 2026-10-22 -- An optional viewer: a record or a file the owner or a sibling agent keeps
  *     private is refused with READ_AS_OWNER_NOTE to a viewer that does not read as the owner, and a
@@ -41,6 +46,7 @@ import { memoryTarget, fileTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
 import { visibleToSameOwnerReader } from '../owner-scope-read.js';
 import { aiFileRefusal, hiddenRecordError, AiInputHiddenError, type AiReadViewer } from './read-viewer.js';
+import { storedFileShownTo } from '../datapackage/source-labels.js';
 
 /** One named input: its key, and the value a model may read, or undefined when there is none. */
 export interface AiInputRecord {
@@ -89,18 +95,39 @@ export async function readAiRecords(
   });
 }
 
+/** What readAiFile reads with: the storage, and the classification switch the version labels ask. */
+export interface AiFileDeps {
+  storage: Storage;
+  config: Pick<AimeatConfig, 'classificationMode' | 'nodeId'>;
+}
+
 /**
- * A file a model will read, from `ownerGaii`'s own storage. Null when it is not there. With a `fence`
- * whose viewer may not read the file (aiFileRefusal), AiInputHiddenError before the bytes are shown.
+ * What a reader of AI input files is given: `{ storage, config }`, which every caller in src/ passes, or a
+ * bare storage, which the unit tests of the callers pass and which asks no version labels (it has no
+ * classification switch to read them by).
+ */
+export type AiFileSource = AiFileDeps | Storage;
+
+/** The storage of an AiFileSource, and its config when it has one. */
+export function aiFileDeps(source: AiFileSource): { storage: Storage; config?: AiFileDeps['config'] } {
+  return 'getStorageFile' in source ? { storage: source } : source;
+}
+
+/**
+ * A file a model will read, from `ownerGaii`'s own storage. Null when it is not there, or when this
+ * reader may not see it: its own label, and for a data package version's file the labels the version
+ * keeps, as GET /v1/pub asks (datapackage/source-labels.ts). With a `fence` whose viewer may not read
+ * the file (aiFileRefusal), AiInputHiddenError before the bytes are shown.
  */
 export async function readAiFile(
-  storage: Storage,
+  source: AiFileSource,
   reader: ContentReader,
   ownerGaii: string,
   storageKey: string,
   use: { capability: string },
   fence?: { config: AimeatConfig; viewer?: AiReadViewer },
 ): Promise<StorageFileRecord | null> {
+  const { storage, config } = aiFileDeps(source);
   const file = await storage.getStorageFile(ownerGaii, storageKey);
   if (!file) return null;
   if (fence?.viewer) {
@@ -108,6 +135,9 @@ export async function readAiFile(
     if (refusal) throw new AiInputHiddenError(refusal);
   }
   await reader.useForAi([fileTarget(ownerGaii, storageKey, file.workspaceRef)], use);
-  const [shown] = await reader.show([file], () => fileTarget(ownerGaii, storageKey, file.workspaceRef));
-  return shown ?? null;
+  if (!config) {
+    const [shown] = await reader.show([file], () => fileTarget(ownerGaii, storageKey, file.workspaceRef));
+    return shown ?? null;
+  }
+  return (await storedFileShownTo({ storage, config }, reader, ownerGaii, storageKey, file)) ?? null;
 }

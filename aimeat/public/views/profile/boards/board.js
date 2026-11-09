@@ -11,6 +11,10 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v1.16.0 — 2026-11-08 — The rules fold's settings explain themselves: boards.whoSees,
+ *     boards.whoPublishes, boards.noticeLifetime and boards.partners on their Choices. The partner
+ *     hint is gone: it said the flag did nothing, and the explanation says what it does (the board's
+ *     name and description reach the partner servers' catalogue; the notices stay here).
  *   v1.15.0 — 2026-10-18 — The rules fold shows the board's classification, and its keeper changes it there,
  *     while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v1.14.1 — 2026-10-18 — The notices tag in the language's plural form ("1 notice").
@@ -158,18 +162,18 @@ function composer(ctx, b, cats) {
 function rulesFold(ctx, b, mine) {
   const r = ctx.rules;
   const set = (k, v) => ctx.setRules({ ...r, [k]: v });
-  const choice = (key, label, options, hint) => html`<${Choice} label=${label} hint=${hint} disabled=${!mine} value=${r[key]} onChange=${(v) => mine && set(key, v)} options=${options} />`;
+  const choice = (key, label, options, help) => html`<${Choice} label=${label} help=${help} disabled=${!mine} value=${r[key]} onChange=${(v) => mine && set(key, v)} options=${options} />`;
   const save = () => ctx.handleSaveRules(bid(b));
   const remove = () => ctx.handleDeleteBoard(bid(b));
   return html`
     <${Fields} cols=${2}>
-      ${choice('visibility', c('fSees'), [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}
-      ${choice('posting', c('fPosts'), [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}
+      ${choice('visibility', c('fSees'), [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]], 'boards.whoSees')}
+      ${choice('posting', c('fPosts'), [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]], 'boards.whoPublishes')}
       <${TextField} id="bp-r-cats" label=${c('fCategories')} value=${r.categories} disabled=${!mine} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
-      ${choice('ttl', c('fLifetime'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
+      ${choice('ttl', c('fLifetime'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]], 'boards.noticeLifetime')}
       ${r.visibility === 'public' ? html`
         <${TextField} id="bp-r-price" size="short" label=${c('fPrice')} help="commerce.morsels" hint=${c('priceHint')} type="number" min="0" step="1" value=${r.price} disabled=${!mine} onInput=${(v) => set('price', v)} />
-        ${choice('federate', c('federate'), [['no', c('federateNo')], ['yes', c('federateYes')]], c('federateHint'))}` : null}
+        ${choice('federate', c('federate'), [['no', c('federateNo')], ['yes', c('federateYes')]], 'boards.partners')}` : null}
     <//>
     ${mine ? html`<${Space} above="large"><${Actions}><${Loud} control disabled=${ctx.savingRules} onClick=${save}>${c('saveRules')}<//><//><//>` : null}
     ${mine && (b.visibility === 'shared' || r.visibility === 'shared') ? membersBlock(ctx, b) : null}

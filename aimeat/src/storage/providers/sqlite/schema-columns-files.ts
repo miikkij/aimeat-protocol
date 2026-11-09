@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description The storage_files columns added after the table, for existing SQLite databases: the
  *   UTF-8 verdict, the AI-provenance record and the object reference of a file whose bytes live in an
- *   S3 or Azure Blob store. Called by initializeSchema where the provenance column was always added.
+ *   S3 or Azure Blob store, and the row's version. Called by initializeSchema where the provenance column was always added.
  * @structure applyFileColumns
  * @usage applyFileColumns(safeAddColumn, sql => db.exec(sql));
  * @version-history
+ *   v1.1.0 — 2026-11-08 — storage_files.rowVersion (mirrors Postgres 0128; secaudit2026nov08b round 15b,
+ *     file-store/relocate-from-store-rewrites-stale-row).
  *   v1.0.0 — 2026-10-29 — utf8Verified and aiProvenanceId (with its index) moved out of schema.ts
  *     unchanged (max-file-lines), plus storage_files.blobRef and its index (mirrors Postgres 0121;
  *     wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -26,4 +28,7 @@ export function applyFileColumns(safeAddColumn: SafeAddColumn, exec: (sql: strin
   // whose bytes are in `data`. The index serves the orphan sweep. Mirrors Postgres 0121.
   safeAddColumn('storage_files', 'blobRef', 'TEXT');
   exec('CREATE INDEX IF NOT EXISTS idx_storage_files_blob_ref ON storage_files(blobRef) WHERE blobRef IS NOT NULL;');
+  // The row's version: a random token every write of the row replaces, NULL until the first write
+  // after this column was added. A move of the bytes writes only while it is unchanged. Mirrors Postgres 0128.
+  safeAddColumn('storage_files', 'rowVersion', 'TEXT');
 }

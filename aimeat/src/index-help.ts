@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — The serve help names --agent and --owner (secaudit2026nov08b round 15).
  *   2026-11-07 — The first line describes the node as the story does (docs/AIMEAT-Story.md).
  *   2026-10-16 — backup and restore say the export is partial and name the operator token they need
  *     (--token or AIMEAT_OP_TOKEN) and --url (QA audit P6-07, F19b-01).
@@ -163,6 +164,12 @@ USAGE
       --surface restricts the exposed tools to one purpose-scoped set (focuses
       the agent, fewer tools = less confusion). Omit for the full toolset.
       e.g. aimeat connect serve --surface agent
+
+      --agent <name or identity> [--owner <owner>] serves that one agent in
+      stdio mode: tool calls are made with its credential only. Without it,
+      every agent in the connector home is served and a call picks one by
+      agent_name.
+      e.g. aimeat connect serve --agent company-crew
 
       --http (a.k.a. --daemon) runs a long-lived loopback daemon on 127.0.0.1
       instead of the default stdio transport. It holds ONE persistent WebSocket

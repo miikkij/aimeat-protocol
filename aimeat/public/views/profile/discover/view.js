@@ -7,11 +7,16 @@
  *   (each kind with its count and where it lives), what changed last among the kinds a person
  *   reads, the places (organisms and their workspaces), and the machine's bookkeeping as a fold.
  *   RESULTS for a query come grouped by kind, best first, the words marked, the bookkeeping counted
- *   but folded. A kind and a place each open as a page of rows. Pure render functions over the ctx
- *   bag discover-tab.js assembles.
+ *   but folded. A kind and a place each open as a page of rows. The cover's start (PageStart: what
+ *   one search finds, the prompt that searches through the person's own AI) and the title's
+ *   question mark (concept.discover: the three views, what a search reads, the bookkeeping). Pure
+ *   render functions over the ctx bag discover-tab.js assembles. How the page explains itself:
+ *   .claude/rules/page-guidance.md.
  * @structure renderDiscoverView · renderCover · secKinds · secRecent · secPlaces · secBookkeeping · renderResults · renderKind · renderPlace
  * @usage import { renderDiscoverView } from './discover/view.js';
  * @version-history
+ *   v1.14.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart on the cover and the title's question mark concept.discover.
  *   v1.13.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its tags, doors, desk and rail as data; List with its Row, Num, Name, Desc and Doors; Group; More; Tabs; Filter; CardGrid of framed Cards with their lines for the places; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.12.0 -- 2026-09-26 -- The map of kinds, the rows of entries and the hits are the Listing (listing, listing-row and its head row, figure, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.11.0 -- 2026-09-26 -- The line under a kind's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
@@ -50,6 +55,7 @@ import { Note } from '/components/Note.js';
 import { Action, Actions } from '/components/Action.js';
 import { c, num, kindName, kindSub, HUMAN_TYPES, desk, entryRows, crumb, renderPage, rel } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { PageStart } from '/components/PageStart.js';
 
 const RECENT_ROWS = 8;
 const SCOPE_IDS = ['own', 'public', 'shared'];
@@ -84,6 +90,8 @@ function renderCover(ctx) {
     <${SettingsPage} name="dv"
       crumb=${crumb(ctx, [])}
       title=${t('discover.title')}
+      help="concept.discover"
+      start=${html`<${PageStart} id="discover" />`}
       marks=${[
         { label: c('chipItems', { n: num(total) }) },
         { label: c('chipKinds', { n: kinds.length }) },

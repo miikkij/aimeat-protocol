@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-11-08 — The input pictures are read with { storage, config }, so a package file asks the labels its version keeps (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  *   2026-11-04 — The asking agent is the session principal's caller facts (`principalCaller(gaii).payer`),
  *     the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-31 — The result names the generation rules in force (gen_rules), when any.
@@ -84,7 +85,7 @@ export function registerAiImageTool(
                 // The pictures the model works from: the agent's own files, or pictures it made with
                 // this tool before (which live in the owner's storage), under the agent's reader.
                 const inputs = reference_images !== undefined || mask !== undefined
-                    ? await readImageInputs(storage, readerForAgent({ storage, config }, getAgentGaii()), getAgentGaii(), { references: reference_images, mask }, gaii)
+                    ? await readImageInputs({ storage, config }, readerForAgent({ storage, config }, getAgentGaii()), getAgentGaii(), { references: reference_images, mask }, gaii)
                     : undefined;
                 const r = await generateForOwner(storage, config, gaii, {
                     prompt, size, storageKey: storage_key,

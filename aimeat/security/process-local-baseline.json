@@ -473,6 +473,10 @@
       "count": 1,
       "reason": "The relays this process started, so its stop closes their listening connections. Each process has its own connection by design; nothing is shared through it."
     },
+    "src/services/bus-relay.ts :: interval :: startBusRelay": {
+      "count": 1,
+      "reason": "Each process compares the stored registry marks with the ones it read and reads a registry again whose mark moved; the marks are in storage, so every process finds a change whose event it missed."
+    },
     "src/services/cache-cleanup.ts :: interval :: startCacheCleanupJob": {
       "count": 1,
       "reason": "DEBT"
@@ -630,8 +634,8 @@
       "reason": "DEBT"
     },
     "src/services/connect-tunnel.ts :: interval :: startHeartbeatMonitor": {
-      "count": 1,
-      "reason": "DEBT"
+      "count": 2,
+      "reason": "DEBT: the heartbeat monitor; and, with several processes, the re-check of the sockets this process holds, which reads each decision from storage (connect-tunnel/recheck.ts, secaudit2026nov08b round 15)"
     },
     "src/services/connections/media-handoff.ts :: map :: held": {
       "count": 1,
@@ -684,6 +688,14 @@
     "src/services/content/intake.ts :: let :: dropped": {
       "count": 1,
       "reason": "DEBT"
+    },
+    "src/services/dataspace/source-share.ts :: let :: installed": {
+      "count": 1,
+      "reason": "The function that removes this process's registration of the step after a share ended, so a second install in the same process replaces the first. Every process installs its own at boot (routes/dsp/index.ts); nothing breaks with a second process."
+    },
+    "src/services/parties/shares.ts :: set :: sharesEndedHooks": {
+      "count": 1,
+      "reason": "The steps that run after an owner's named share ended. Every process registers the same steps at its own boot, and a step runs in the process that ended the share, against the shared store; nothing breaks with a second process."
     },
     "src/services/content/intake.ts :: let :: installed": {
       "count": 1,

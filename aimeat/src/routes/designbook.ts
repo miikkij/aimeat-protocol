@@ -14,6 +14,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-11-08 — GET /v1/designbook/:id/preview shows the node's genre template when a part by that
+ *     id exists but the reader may not see it (unpublished, or a narrower kit), instead of 404: the
+ *     spec's "See it" link for genre-receipt answered 404 on production.
  *   2026-10-30 — The node's default kit: PUT /v1/designbook/kits/default takes `node: true` (the
  *     operator), and GET /v1/designbook/kits/defaults answers every default the caller sees or chooses.
  *     A preview built without the nonce still gives it to the node's own AI-label script.
@@ -289,13 +292,20 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // A part still in proposal is shown to signed-in readers only, as the list and the detail
       // read do. A frame carries no session, so it shows one with the token those reads hand out
       // in `preview_url`; without either it answers like a part that does not exist.
-      if (part && part.status !== 'published' && !isSignedIn(req) && !(await designBookPreviewTokenOpens(req.query.t, id))) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
-      }
+      // A part this reader may not see is set aside rather than answered 404 at once: when the node
+      // serves a genre by the same id, that template is what the reader gets, as for a genre the
+      // shelf does not hold. Production held genre-receipt as a part nobody had published, and the
+      // spec's "See it" link for it answered 404 to every owner it was sent to (2026-11-08).
+      let hidden = false;
+      if (part && part.status !== 'published' && !isSignedIn(req) && !(await designBookPreviewTokenOpens(req.query.t, id))) hidden = true;
       // A kit narrower than the node: a reader inside its reach, or the token the list handed to one.
-      if (part && kitReach(part) !== 'node' && !(await designBookPreviewTokenOpens(req.query.t, id))
-        && !(isSignedIn(req) && await kitReadable(storage, config.nodeId, part, callerOf(req, config.nodeId, storage).ownerGhii))) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
+      if (part && !hidden && kitReach(part) !== 'node' && !(await designBookPreviewTokenOpens(req.query.t, id))
+        && !(isSignedIn(req) && await kitReadable(storage, config.nodeId, part, callerOf(req, config.nodeId, storage).ownerGhii))) hidden = true;
+      if (hidden) {
+        part = null;
+        if (!getAppTemplates().some(t => t.kind === 'genre' && t.id === id)) {
+          return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
+        }
       }
       const served = part ? null : getAppTemplates().find(t => t.kind === 'genre' && t.id === id);
       if (!part && !served) {

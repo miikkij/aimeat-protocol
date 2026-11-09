@@ -1,4 +1,15 @@
-// Knowledge System E2E tests — Phase 1
+/**
+ * @file e2e-knowledge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Knowledge system E2E: package import and validation, the owner tab fold, sharing and
+ *   cloning, reviews, organism-member consent resolution, contributed packages, the pacing amount's
+ *   name, and the Federation switch of a package (a consent to everyone opens no private entry).
+ * @version-history
+ *   2026-11-08 — The Federation switch: with the page's own consent granted, an unrelated signed-in
+ *     account, its agent and the anonymous reader cannot read a private entry by its key; the public
+ *     entry stays readable and the consent stays an active federation-reach grant (k1-federation).
+ */
 // Run: cd aimeat && pnpm exec tsx test/e2e-knowledge.ts
 // Requires: server running on port 40251
 
@@ -744,6 +755,63 @@ await test('sharing.toll_morsels and sharing.morsel_price that disagree are 400 
     body: tollPackage('Toll mismatch', { catalog_listed: false, allow_clone: false, toll_morsels: 0, morsel_price: 5 }),
   });
   assert(res.status === 400 && res.body?.error?.code === 'TOLL_MORSELS_MISMATCH', `${res.status}: ${JSON.stringify(res.body).slice(0, 300)}`);
+});
+
+// ─── The Federation switch of a knowledge package (guide audit 2026-11-08, k1-federation) ───
+// The package page grants packages/<id>/* to '*' with the reach federation, to send the public
+// entries to peers and list the owner in the directory. That consent opened every private entry of
+// the package to every reader by its key; a private entry now answers to its own visibility.
+console.log('\nFederation switch of a knowledge package');
+
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+let fedPkgId = '';
+const fedRead = (entry: string, token?: string) =>
+  json(`/v1/memory/${encodeURIComponent(`${ownerName}@${NODE_ID}`)}/${encodeURIComponent(`packages/${fedPkgId}/${entry}`)}`,
+    token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+
+await test('Federation switch: the owner imports a package with a public and a private entry and switches it on', async () => {
+  const imp = await json('/v1/knowledge/import', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({
+      package: {
+        type: 'knowledge-package', name: 'Federated Pkg', version: '1.0.0', author: ownerName, content_type: 'research',
+        tags: ['fed'], language: 'en', maturity: 'published', synthesis: { level: 'original', description: 'federation switch' },
+        entries: [{ key: 'open', title: 'Open', visibility: 'public' }, { key: 'secret', title: 'Secret', visibility: 'private' }],
+        links: [], sharing: { catalog_listed: false, allow_clone: false, toll_morsels: 0 },
+      },
+      entry_data: { open: { body: 'fedopen-text' }, secret: { body: 'fedsecret-text' } },
+    }),
+  });
+  assert(imp.status === 201, `import ${imp.status}: ${JSON.stringify(imp.body).slice(0, 300)}`);
+  fedPkgId = imp.body.data.package_id;
+  // The exact request public/views/profile/knowledge-tab.js toggleFederation sends.
+  const grant = await json('/v1/consent', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ data_pattern: `packages/${fedPkgId}/*`, recipient: '*', scope: 'federation', purpose: 'knowledge_sharing' }),
+  });
+  assert(grant.status === 201, `grant ${grant.status}: ${JSON.stringify(grant.body).slice(0, 300)}`);
+});
+
+await test('Federation switch on: an unrelated signed-in account and an anonymous reader cannot read the private entry', async () => {
+  // The owner session holds memory:read and the anonymous reader needs none, so both reach the consent
+  // decision, which said allowed through the switch's consent before the fix.
+  for (const [who, token] of [['unrelated owner', nonMember.ownerToken], ['anonymous', undefined]] as const) {
+    const r = await fedRead('secret', token);
+    assert(r.status === 403 && r.body.error?.code === 'CONSENT_DENIED', `${who}: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+    assert(!JSON.stringify(r.body).includes('fedsecret-text'), `${who} got the private text`);
+  }
+});
+
+await test('Federation switch on: the public entry is still readable, and the consent stays an active federation-reach grant', async () => {
+  for (const token of [nonMember.ownerToken, undefined]) {
+    const r = await fedRead('open', token);
+    assert(r.status === 200 && JSON.stringify(r.body).includes('fedopen-text'), `public entry: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+  }
+  const own = await fedRead('secret', ownerToken);
+  assert(own.status === 200 && JSON.stringify(own.body).includes('fedsecret-text'), `the owner reads the private entry: ${own.status}`);
+  const list = await json('/v1/consent?status=active', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const fed = (list.body.data?.consents ?? []).find((c: any) => c.data_pattern === `packages/${fedPkgId}/*`);
+  assert(fed?.recipient === '*' && fed.scope === 'federation', `the switch's consent: ${JSON.stringify(fed)}`);
 });
 
 // ─── Cleanup ───

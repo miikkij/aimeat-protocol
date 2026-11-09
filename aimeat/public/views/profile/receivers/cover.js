@@ -3,15 +3,21 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Receivers page's cover (design canvas "Vastaanottimet", artboard Settings): the
- *   lede and the one loud action "New receiver"; the dashed aside with the sentence a person says to
- *   their own AI, which then proposes a receiver they approve here; 01 the list of receivers (name,
- *   what it writes, its CSM or "no shape", its state, today's counts and the last delivery); 02 how a
- *   new receiver is made on this node (the node setting receivers.mode in words); 03 the three
- *   explanations (what it may do, what it may not, how it goes stale). Pure render over the ctx bag;
- *   every part is a library component, and the file writes no class.
+ *   lede, the title's question mark (concept.receiver: what a receiver is, the use cases, when to use
+ *   something else) and the one loud action "New receiver"; the page's start (PageStart: what it is
+ *   for, the prompt for one's own AI, which then proposes a receiver they approve here, and what
+ *   happens next); 01 the list of receivers (name, what it writes, its data description (CSM) or
+ *   none, its state, today's counts and the last delivery); 02 how a new receiver is made on this
+ *   node (the node setting receivers.mode in words); 03 the limits and safety facts (what it may do,
+ *   what it may not, how it goes stale, its key). Pure render over the ctx bag; every part is a
+ *   library component, and the file writes no class. How the page explains itself:
+ *   .claude/rules/page-guidance.md.
  * @structure renderReceiversView · renderCover · secList · receiverRow · secNew · secHow
  * @usage import { renderReceiversView } from './receivers/cover.js';
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart in place of the dashed aside, and the title's question mark concept.receiver with
+ *     the use cases.
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { h } from 'preact';
@@ -21,13 +27,14 @@ import { ago, num } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageSection } from '/components/PageSection.js';
 import { List, Row, Name, Desc, Num, When, Doors } from '/components/List.js';
-import { Action, Loud, Actions } from '/components/Action.js';
+import { Action, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Facts } from '/components/Facts.js';
 import { Hint } from '/components/Hint.js';
+import { PageStart } from '/components/PageStart.js';
 import { openTab } from '/components/Rail.js';
-import { x, crumb, pageLinks, targetWords, shapeWords, stateWord, stateTone, sayToAi } from './frame.js';
+import { x, crumb, pageLinks, targetWords, shapeWords, stateWord, stateTone } from './frame.js';
 import { renderDetail } from './detail.js';
 import { renderDialogs } from './dialogs.js';
 
@@ -54,15 +61,14 @@ function renderCover(ctx) {
     { id: 'rc-new', num: '02', label: x('secNew') },
     { id: 'rc-how', num: '03', label: x('secHow') },
   ];
+  // The start: folded once the person has a receiver; its button is the page's own form.
+  const start = html`<${PageStart} id="receivers" done=${ctx.list ? list.length > 0 : null}
+    action=${off ? undefined : { onClick: () => ctx.openCreate() }} />`;
   return html`
-    <${SettingsPage} name="rc" crumb=${crumb(ctx)} title=${t('profile.tabs.receivers')} marks=${marks}
-      desc=${x('lede')} actions=${actions}
+    <${SettingsPage} name="rc" crumb=${crumb(ctx)} title=${t('profile.tabs.receivers')} help="concept.receiver" marks=${marks}
+      desc=${x('lede')} actions=${actions} start=${start}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
-      <${Note} kind="aside">
-        <b>${x('ai.title')}</b> ${x('ai.body', { sentence: sayToAi() })}
-        <${Actions}><${Action} small copy=${sayToAi()} copiedLabel=${x('copied')}>${x('ai.copy')}<//><//>
-      <//>
       ${secList(ctx, list)}
       ${secNew(ctx)}
       ${secHow()}
@@ -119,7 +125,6 @@ function secHow() {
         { key: 'not', k: x('how.notK'), v: x('how.notV') },
         { key: 'stale', k: x('how.staleK'), v: x('how.staleV') },
         // The Access page lists every credential that acts in the person's name, receiver keys included.
-        { key: 'key', k: x('how.keyK'), v: x('how.keyV'), action: html`<${Action} small soft onClick=${() => openTab('access')}>${t('profile.tabs.access')}<//>` },
-      ]} />
+        { key: 'key', k: x('how.keyK'), v: x('how.keyV'), action: html`<${Action} small soft onClick=${() => openTab('access')}>${t('profile.tabs.access')}<//>` },      ]} />
     <//>`;
 }

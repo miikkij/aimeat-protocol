@@ -5,10 +5,16 @@
  * @description Reading a workspace record's parts out of its memory key. Moved unchanged out of
  *   services/workspace-tool-ops.ts (max-file-lines), which re-exports it.
  * @structure instanceFromKey(root, namespaces, asked) · recordAt(rest) · recordRowAt(rest) ·
- *   spaceRowAt(key, nsPrefix, prefixes) · declaredNamespaceOf(parsed, declared) · spacePrefixesOf(root, objectTypes)
+ *   spaceRowAt(key, nsPrefix, prefixes) · declaredNamespaceOf(parsed, declared) · spacePrefixesOf(root, objectTypes) ·
+ *   NODE_META_PARTS · isNodeReservedPart(rel) · isNodeReservedWorkspaceKey(key)
  * @usage const named = instanceFromKey(`organism.${org}.w.${ws}`, ['shared.notes'], key);
  *   const row = spaceRowAt(r.key, `${root}.notes.`, spacePrefixesOf(root, manifest.objectTypes));
  * @version-history
+ *   2026-11-08 — isNodeReservedPart() and isNodeReservedWorkspaceKey(): the parts of a workspace the
+ *     node keeps for itself (share, access requests, intake forms, fingerprints, skills, the manifest
+ *     and its siblings). spaceRowAt reads no row there, so a manifest that declares a space over such a
+ *     part lists only that space's own records (secaudit2026nov08 round 14,
+ *     workspace-content:reserved-workspace-records-served-through-declared-namespace-unmasked).
  *   2026-11-01 — recordRowAt(), spaceRowAt() and spacePrefixesOf(): the record and copy of a row read
  *     from the end of its key with the space's longer namespaces left to them, for the readers outside
  *     the index; declaredNamespaceOf() for the write guard (secaudit2026oct31w2 round 10b, dotted
@@ -81,6 +87,8 @@ export function recordRowAt(rest: string): RecordRow | null {
  */
 export function spaceRowAt(key: string, nsPrefix: string, prefixes: readonly string[]): RecordRow | null {
     if (!key.startsWith(nsPrefix)) return null;
+    // A record the node keeps for itself is no row of any space, whatever a manifest declares.
+    if (isNodeReservedWorkspaceKey(key)) return null;
     if (prefixes.some(p => p.length > nsPrefix.length && p.startsWith(nsPrefix) && key.startsWith(p))) return null;
     return recordRowAt(key.slice(nsPrefix.length));
 }
@@ -93,6 +101,41 @@ export function spaceRowAt(key: string, nsPrefix: string, prefixes: readonly str
  */
 export function declaredNamespaceOf(parsed: string, declared: readonly string[]): string | null {
     return declared.filter(ns => parsed === ns || parsed.startsWith(`${ns}.`)).sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+/**
+ * The parts under `meta.` of a workspace (or of an organism's own root) that the node writes for
+ * itself: the manifest, readme, section index, share record, pinned apps, member-change rule, opened
+ * marks, sources and config, intake form configs, comments, the shared fingerprints and their setting,
+ * and on the organism root the workspace registry, its structure snapshot and its colours. Any other
+ * `meta.<x>` is free for a space: the project shape declares meta.goals, meta.plans and meta.decisions.
+ */
+export const NODE_META_PARTS: ReadonlySet<string> = new Set([
+    'manifest', 'readme', 'sections', 'share', 'apps', 'rules', 'opened', 'sources', 'config',
+    'intake', 'comments', 'fingerprint', 'contentclass', 'workspaces', 'structure', 'colors',
+]);
+
+/**
+ * Whether `rel`, a key or a namespace read from the workspace root, lies in a part the node keeps for
+ * itself: `access.*` (access requests), `skills.*` (the skills published into the workspace), `meta`
+ * itself, a NODE_META_PARTS entry under `meta.`, or a `meta._<x>` probe key. Such a part is never a
+ * space (a manifest write refuses it, services/workspace-meta.ts) and its records are never a row of
+ * one (spaceRowAt), so a space declared over it before this rule lists only its own records.
+ */
+export function isNodeReservedPart(rel: string): boolean {
+    const [head, second] = rel.split('.');
+    if (head === 'access' || head === 'skills') return true;
+    if (head !== 'meta') return false;
+    return second === undefined || second === '' || NODE_META_PARTS.has(second) || second.startsWith('_');
+}
+
+const WORKSPACE_KEY_RE = /^organism\.[^.]+\.w\.[^.]+\.(.+)$/;
+const ORGANISM_KEY_RE = /^organism\.[^.]+\.(.+)$/;
+
+/** Whether a full memory key is a record the node keeps under a workspace root (or an organism's own root). */
+export function isNodeReservedWorkspaceKey(key: string): boolean {
+    const rel = WORKSPACE_KEY_RE.exec(key)?.[1] ?? ORGANISM_KEY_RE.exec(key)?.[1];
+    return !!rel && isNodeReservedPart(rel);
 }
 
 /** The `<root>.<namespace>.` prefix of every space a manifest declares, for spaceRowAt. */

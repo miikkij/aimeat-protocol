@@ -24,6 +24,8 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.10.1 — 2026-11-08 — The sheet example drops `nav: 'stack'`, a mode the node does not have (the
+ *     publish refused the layout in silence); with no `nav` the blocks stack.
  *   v1.10.0 — 2026-11-03 — The variants line names fingerprint (`dense` and `plain`, kit 0.69.0),
  *     and the token count says seventy-five: fingerprint's nine colour and zone tokens.
  *   v1.9.0 — 2026-10-03 — The variants line names the board family (`fill` and `plain` on board,
@@ -285,7 +287,7 @@ export function renderPatterns(): string {
     + '```js\n'
     + 'var sheet = {\n'
     + "  v: 1, register: 'genre-living', look: 'vivid',\n"
-    + '  layout: { v: 1, nav: \'stack\', blocks: [\n'
+    + '  layout: { v: 1, blocks: [   // no `nav`: the blocks stack, which is the default\n'
     + "    { id: 'controls', component: 'section', span: 'full', props: { title: 'The wall' } },\n"
     + "    { id: 'tin',      component: 'figure',  span: 'half', props: { title: 'Litres of paint' } },\n"
     + "    { id: 'maths',    component: 'section', span: 'half', props: { title: 'How it is worked out' } },\n"

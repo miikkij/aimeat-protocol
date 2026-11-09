@@ -12,6 +12,7 @@
  *   function alone: the decision was never the hard part, the wiring was.
  * @usage cd aimeat && pnpm vitest run test/unit/skill-seeds.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-08 — A pre-fingerprint copy at 1.0.0 is updated; one published again stays.
  *   v1.1.0 — 2026-09-19 — A retired skill leaves an unedited node and stays on an edited one.
  *   v1.0.0 — 2026-08-25 — Initial, with the seeder that follows the repo on an unedited node.
  */
@@ -115,14 +116,31 @@ describe('a node seeded before any of this existed', () => {
     expect(next.updated).toBe(1);
   });
 
-  it('leaves a copy it cannot account for, rather than guessing', async () => {
+  it('leaves a copy somebody published again (an edit), rather than guessing', async () => {
+    // Seeded once, then edited on the node: the second publish makes it 1.0.1.
+    await publishSkill(storage, config, {
+      scope: 'node', publisher: SYSTEM,
+      files: new Map([['SKILL.md', REPO_V1]]), visibility: 'public',
+    });
     await publishSkill(storage, config, {
       scope: 'node', publisher: SYSTEM,
       files: new Map([['SKILL.md', EDITED_ON_NODE]]), visibility: 'public',
     });
-    const r = await seedWith(storage, REPO_V1);
+    const r = await seedWith(storage, REPO_V2);
     expect(r.diverged).toEqual(['probe-skill']);
     expect(await readNodeSkillBody(storage, config, 'probe-skill')).toBe(EDITED_ON_NODE);
+  });
+
+  // 2026-11-08: two copies on production sat at 1.0.0 with an old text for months.
+  it('updates a copy still at its first version: the seeder wrote it and nobody published it again', async () => {
+    await publishSkill(storage, config, {
+      scope: 'node', publisher: SYSTEM,
+      files: new Map([['SKILL.md', REPO_V1]]), visibility: 'public',
+    });
+    const r = await seedWith(storage, REPO_V2);
+    expect(r.updated).toBe(1);
+    expect(r.diverged).toEqual([]);
+    expect(await readNodeSkillBody(storage, config, 'probe-skill')).toBe(REPO_V2);
   });
 });
 
@@ -187,5 +205,13 @@ describe('the decision on its own', () => {
     expect(decideSeedAction(EDITED_ON_NODE, stampV1, REPO_V2)).toBe('keep-edited');
     expect(decideSeedAction(REPO_V1, null, REPO_V1)).toBe('adopt');
     expect(decideSeedAction(EDITED_ON_NODE, null, REPO_V1)).toBe('keep-unknown');
+  });
+
+  // 2026-11-08: production held two pre-fingerprint copies at 1.0.0 for months, one still sending a
+  // new app to the Classic track. An edit on a node is a publish, and a publish bumps the version.
+  it('updates a pre-fingerprint copy that was never published again, and keeps one that was', () => {
+    expect(decideSeedAction(REPO_V1, null, REPO_V2, true)).toBe('update');
+    expect(decideSeedAction(EDITED_ON_NODE, null, REPO_V1, false)).toBe('keep-unknown');
+    expect(decideSeedAction(REPO_V2, null, REPO_V2, true)).toBe('adopt');
   });
 });

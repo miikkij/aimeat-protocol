@@ -32,6 +32,11 @@
  *   2026-11-09 — A write to a context or ontology key (`context.`, `vocab.ctx.`) is trackable, so the
  *     version it replaces is kept, and the key's history is pruned to its newest HISTORY_KEEP versions
  *     (services/context/history-keys.ts).
+ *   2026-11-08 — The schema lock is asked with the writer, so the lock a CSM owns does not govern, name
+ *     or describe itself to a writer that CSM's visibility refuses (secaudit2026nov08b round 15).
+ *   2026-11-08 — A receiver's write at 'organism:<id>' is checked against the owner it writes for: the
+ *     membership check cut the receiver's own identity (receiver:<owner>/<name>@<node>) to an account
+ *     no organism has, so a member's receiver was refused with NOT_ORGANISM_MEMBER.
  *   2026-11-05 — A write at 'group' that names no group and finds none on the record is refused with 400
  *     INVALID_INPUT, nothing stored (storage/memory-sharing.ts). A row an older node stored that way
  *     stays writable and the write carries the warning GROUP_NOT_NAMED. A group id naming no group is
@@ -139,6 +144,7 @@
  */
 import type { MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { validateMemoryWrite } from './schema-validator.js';
+import { writerAudienceAuth } from './csm/readers.js';
 import { memoryCeilings } from './memory-ceilings.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 import { isKeyArchived } from './archive.js';
@@ -261,8 +267,12 @@ export async function writeMemoryRecord(
     }
     // 1b'. A record made visible to one organism names an organism the writer's account is an active
     //      member of, decided by services/audience.ts through services/organism-visibility.ts.
+    //      A receiver writes for its owner, and its identity (receiver:<owner>/<name>@<node>, built by the
+    //      server from the verified key) names no account, so the check reads the owner it writes for:
+    //      the namespace the record lands in, which services/organism-visibility.ts accepts as the writer.
+    const writesForOwner = caller.roles.includes('receiver') && caller.principal.startsWith('receiver:');
     const audienceRefusal = await organismVisibilityRefusal(storage, input.visibility, {
-        identity: caller.principal, federated: isForeignPrincipal(caller),
+        identity: writesForOwner ? caller.targetGaii : caller.principal, federated: isForeignPrincipal(caller),
     });
     if (audienceRefusal) return { ok: false, ...audienceRefusal };
 
@@ -304,7 +314,9 @@ export async function writeMemoryRecord(
     }
     // 2. Schema locks apply on EVERY write surface. MCP used to call setMemory directly, so a write
     //    that REST answered with 422 sailed through there.
-    const validation = await validateMemoryWrite(input.key, input.value, storage);
+    //    A CSM's own lock does not govern a writer that CSM's visibility refuses (round 15).
+    const validation = await validateMemoryWrite(input.key, input.value, storage, undefined,
+        writerAudienceAuth(caller.principal, caller.targetGaii, caller.federated));
     if (!validation.valid) {
         return {
             ok: false, status: 422, code: 'SCHEMA_VALIDATION_FAILED',

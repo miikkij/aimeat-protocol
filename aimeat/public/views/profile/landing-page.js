@@ -17,6 +17,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.24.0 — 2026-11-09 — The app strip asks for the owner's own apps (listApps({ own: true })) instead
+ *     of walking the node's whole catalogue on every Settings page; the same apps, 600 kB less at 288
+ *     apps on the node.
  *   v3.23.0 — 2026-11-02 — An old ?tab=offers&product=… address opens the product on "Data you share"
  *     (redirectMovedTab), on arrival and on Back (WP11).
  *   v3.22.0 — 2026-11-01 — On a customer's node a menu item reads its `Place` words when they exist:
@@ -277,7 +280,8 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   /* Fetch app list for app strip */
   const loadApps = useCallback(async () => {
     try {
-      const list = await listApps();
+      // The owner's own apps only (GET /v1/apps?own=true), not the whole catalogue of the node.
+      const list = await listApps({ own: true });
       setApps(Array.isArray(list) ? list.filter(a => a.owner === owner) : []);
     } catch (err) { swallowed('landing-page', err); setApps([]); }
   }, [owner]);

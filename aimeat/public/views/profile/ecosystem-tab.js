@@ -7,9 +7,15 @@
  *   "hello integration" requests (approve with a scope preset / deny), the connected-GEAI list, and
  *   per-app grants + outbound event subscriptions + the account-correspondence binding with a
  *   typed-name revoke. Listens for aimeat-live-update and polls pending requests, like the Agents tab.
+ *   How the page explains itself (.claude/rules/page-guidance.md): PageStart "ecosystem" under the
+ *   head and the title's question mark concept.outside_app.
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.27.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: a waiting request's access level (ecosystem.grantLevel), and on the app's card the publish cadence, the guidance delivery, the trigger key (ecosystem-tab.automation.js) and the event picker (ecosystem-tab.cards.js) (.claude/rules/page-guidance.md).
+ *   v3.26.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once an app is connected) and the title's question mark concept.outside_app, which now holds what the automation's "How this works" fold said.
+ *   v3.25.0 -- 2026-11-08 -- A waiting request lists the words no access level carries, unticked, and the approval adds only the ones the owner ticked to the access level's scopes (ecosystem-tab.pending.js; secaudit2026nov08 round 14, older item O5).
+ *   v3.24.0 -- 2026-11-08 -- The disconnect dialog says which receivers the app made, that they keep working, and offers one press that pauses them (receivers/maker-receivers.js; secaudit2026nov08 round 14, ruling 3).
  *   v3.23.0 -- 2026-10-25 -- A waiting request lists the data areas the app asked for, each with a tick, and the approval sends data_areas from the ticks; a reconnect and a key change are marked, with both key fingerprints (ecosystem-tab.pending.js; secaudit2026oct22, leads 2378 and 2415).
  *   v3.22.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage (the count the tally Mark), the waiting requests the small attention note with a List (the grant level a Select that keeps its choice), the apps the List whose row opens its panel (a revoked app faded, main's .pf-eco-card-revoked), each part of the panel the heavy-ruled Split under its Sub-heading, the written data the Folds, the revoke dialog the Action, Loud and TextField. The empty part the panel drew between "ask in Claude" and the data (a bare heavy rule) goes. It writes no class.
  *   v3.21.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
@@ -153,13 +159,15 @@ import { timeAgo } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
 import { LoadingLine } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
-import { ECO_PRESETS, initialTicks, chosenAreas } from './ecosystem-tab.helpers.js';
+import { ECO_PRESETS, initialTicks, chosenAreas, chosenScopes } from './ecosystem-tab.helpers.js';
 import { EcoPendingAccess } from './ecosystem-tab.pending.js';
 import { EcoAutomationSection, EcoSection } from './ecosystem-tab.automation.js';
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
 import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Folds } from '/components/Folds.js';
 import { Action, Loud, Icon, Actions } from '/components/Action.js';
@@ -169,6 +177,7 @@ import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { Row as LRow, Stack, Space } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { MakerReceivers } from './receivers/maker-receivers.js';
 
 /** An app's state as a Status tone: approved is fine, waiting needs a look, revoked is danger. */
 const appStatusTone = (s) => (['active', 'approved'].includes(s) ? 'fine' : ['pending', 'validating'].includes(s) ? 'attention' : s === 'revoked' ? 'danger' : 'off');
@@ -183,6 +192,7 @@ export default function EcosystemTab({ onStats, showToast }) {
   const [expanded, setExpanded] = useState(null);     // expanded geai
   const [presetByCode, setPresetByCode] = useState({}); // userCode → preset
   const [ticksByCode, setTicksByCode] = useState({});   // userCode → one tick per requested data area
+  const [wordsByCode, setWordsByCode] = useState({});   // userCode → { own-tick word: ticked }
   const [revokeApp, setRevokeApp] = useState(null);   // app pending typed-name revoke
   const [revokeInput, setRevokeInput] = useState('');
   const [subForm, setSubForm] = useState({});         // app → { event }
@@ -250,7 +260,8 @@ export default function EcosystemTab({ onStats, showToast }) {
     const request = pending.find(r => r.user_code === userCode);
     try {
       // data_areas from the owner's ticks, always as a list: a body without one grants the app's own.
-      await approve(userCode, { action: 'approve', scopes: ECO_PRESETS[preset], data_areas: chosenAreas(request, ticksByCode[userCode]) });
+      // scopes: the access level, plus each word outside every level only when the owner ticked it.
+      await approve(userCode, { action: 'approve', scopes: chosenScopes(ECO_PRESETS[preset], request, wordsByCode[userCode]), data_areas: chosenAreas(request, ticksByCode[userCode]) });
       showToast?.(t('profile.ecosystem.approved'), 'success');
       await loadData();
     } catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.approveError'), 'error'); }
@@ -277,9 +288,11 @@ export default function EcosystemTab({ onStats, showToast }) {
 
   if (loading) return html`<${LoadingLine} />`;
 
+  // The start folds once an app is connected; connecting happens in the app, so it has no button here.
   return html`<${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.ecosystem')]}
-    title=${t('profile.ecosystem.title')} sub=${html`<${Mark} kind="count" tone="tally">${apps.length}<//>`}
+    title=${t('profile.ecosystem.title')} help="concept.outside_app" sub=${html`<${Mark} kind="count" tone="tally">${apps.length}<//>`}
     desc=${t('profile.ecosystem.desc')}
+    start=${html`<${PageStart} id="ecosystem" done=${apps.length > 0} />`}
     after=${html`
       <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
         footer=${html`
@@ -288,6 +301,7 @@ export default function EcosystemTab({ onStats, showToast }) {
             ${t('profile.ecosystem.revoke')}
           <//>`}>
         <${Stack} gap="medium">
+          ${revokeApp && html`<${MakerReceivers} maker=${apps.find(a => a.app === revokeApp)?.geai} label=${revokeApp} />`}
           <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
           <${TextField} value=${revokeInput} ariaLabel=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
             placeholder=${revokeApp || ''} onInput=${v => setRevokeInput(v)} />
@@ -315,10 +329,12 @@ export default function EcosystemTab({ onStats, showToast }) {
                     <${Note} kind="meta" inline>${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}<//>
                   <//>
                   <${EcoPendingAccess} request=${r} ticks=${ticksByCode[r.user_code]}
-                    onTick=${(i, v) => setTicksByCode(m => { const next = [...(m[r.user_code] || initialTicks(r))]; next[i] = v; return { ...m, [r.user_code]: next }; })} />
+                    onTick=${(i, v) => setTicksByCode(m => { const next = [...(m[r.user_code] || initialTicks(r))]; next[i] = v; return { ...m, [r.user_code]: next }; })}
+                    wordTicks=${wordsByCode[r.user_code]}
+                    onWordTick=${(w, v) => setWordsByCode(m => ({ ...m, [r.user_code]: { ...(m[r.user_code] || {}), [w]: v } }))} />
                 <//>
                 <${Doors}>
-                  <${Label}>${t('profile.ecosystem.grantLevel')}<//>
+                  <${HelpLabel} term="ecosystem.grantLevel" label=${t('profile.ecosystem.grantLevel')}><${Label}>${t('profile.ecosystem.grantLevel')}<//><//>
                   <${Select} fit ariaLabel=${t('profile.ecosystem.grantLevel')} value=${presetByCode[r.user_code] || 'standard'}
                     onChange=${v => setPresetByCode(p => ({ ...p, [r.user_code]: v }))}
                     options=${[['standard', t('profile.ecosystem.presetStandard')], ['readonly', t('profile.ecosystem.presetReadonly')], ['full', t('profile.ecosystem.presetFull')]]} />

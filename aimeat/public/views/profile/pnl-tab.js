@@ -7,8 +7,13 @@
  *   the result before taxes, the period's VAT payable, internal transfers as an info
  *   line, and the LEDGER AI spend as its own USD line (never mixed into the EUR total).
  *   No forecasts: only the truth of the bookings. Live: re-fetches on the
- *   aimeat-live-update event when the finance domain ticks.
+ *   aimeat-live-update event when the finance domain ticks. The page explains itself the
+ *   designed way (.claude/rules/page-guidance.md): the page's start (PageStart "pnl") and the
+ *   title's question mark (concept.pnl).
  * @version-history
+ *   v1.18.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "pnl" in the start slot (folded once the period shown has a booking) and the title's
+ *     question mark concept.pnl.
  *   v1.17.0 — 2026-09-27 — As main: the result before taxes is centred with its words over it and the VAT
  *     line under it (Figure's Result in a section Card), and the section bands span their columns
  *     (Section `band`).
@@ -55,6 +60,7 @@ import { Note } from '/components/Note.js';
 import { Action, Loud } from '/components/Action.js';
 import { TextField } from '/components/TextField.js';
 import { Row as Line, Space } from '/components/Layout.js';
+import { PageStart } from '/components/PageStart.js';
 
 function euros(minor) {
   const sign = minor < 0 ? '\u2212' : '';
@@ -210,7 +216,9 @@ export function PnlTab({ showToast }) {
     <${SettingsPage} name="pnl"
       crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.pnl')]}
       title=${t('profile.pnl.title')}
-      desc=${t('profile.pnl.desc')}>
+      help="concept.pnl"
+      desc=${t('profile.pnl.desc')}
+      start=${html`<${PageStart} id="pnl" done=${report ? report.voucherCount > 0 : null} />`}>
 
       <${Line} gap="medium" align="end" wrap below="large">
         <${TextField} type="month" label=${t('profile.pnl.from')} value=${from} onChange=${setFrom} />

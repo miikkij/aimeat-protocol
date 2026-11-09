@@ -11,6 +11,7 @@
  * @structure skillRow · skillOpen · loadingRow
  * @usage import { skillRow } from './rows.js';
  * @version-history
+ *   v1.20.0 -- 2026-11-08 -- The visibility row's name and the "Lock to version" check open the setting's explanation (terms skills.visibility and skills.pinVersion; .claude/rules/page-guidance.md).
  *   v1.19.1 -- 2026-10-19 -- The agent picker takes the [name, shown name] pairs skills-tab.js builds.
  *   v1.19.0 -- 2026-10-18 -- Who can read a skill is the AudienceBadge beside its name (Private, Signed-in, "<organism> members", Public); the word left the line under the name (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.18.0 -- 2026-09-26 -- On the component kit (page group G7): the opened panel's facts are the Facts (the copies and the links inside a value are the Action's link tone, main's coral crumb link), the agent picker is the Select, the Check and the Action, who may see it the Tabs, the SKILL.md the Box's folded tone with its "show all", the loading lines the Note and the List. The file writes no class.
@@ -52,6 +53,7 @@ import { Facts } from '/components/Facts.js';
 import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
 import { Tabs } from '/components/Tabs.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { List, Row, Name, Desc, Who, Num, Cell, Doors, Panel } from '/components/List.js';
 import { x, splitSkillMd, isOwn, whoOf, visibilityWord, sizeWord, dateWord, installLine, openTab } from './frame.js';
 
@@ -109,7 +111,7 @@ function skillOpen(ctx, s, who) {
   const pickerDoors = picker ? html`
     <${Select} fit value=${picker.selected} onChange=${(v) => ctx.pickAgent(v)} ariaLabel=${x('pickAgent')}
       placeholder=${x('pickAgent')} options=${picker.agents} />
-    <${Check} inline checked=${picker.pin} onChange=${(on) => ctx.pickPin(on)}>${x('pinToVersion', { v: s.version })}<//>
+    <${Check} inline help="skills.pinVersion" checked=${picker.pin} onChange=${(on) => ctx.pickPin(on)}>${x('pinToVersion', { v: s.version })}<//>
     <${Action} small disabled=${!picker.selected || ctx.busy} onClick=${() => ctx.link(s)}>${x('attachDo')}<//>` : null;
   const visDoors = own ? html`
     <${Tabs} label=${x('vis.k')} value=${s.visibility} disabled=${ctx.busy} onSelect=${(v) => ctx.setVisibility(s, v)}
@@ -123,7 +125,7 @@ function skillOpen(ctx, s, who) {
         { k: x('version'), v: `${x('versionLine', { v: s.version, date: dateWord(s.updatedAt) })}${versions.length ? ` · ${x('versionsKept', { n: versions.length, from: versions[0].version, to: versions[versions.length - 1].version })}` : ''}`,
           sub: d?.metadata?.aimeat_ref ? x('installedFrom', { ref: d.metadata.aimeat_ref }) : x('versionSub') },
         { k: x('who.k'), v: whoValue, sub: html`${x('who.attachSub')} <${Action} tone="link" onClick=${() => ctx.openPicker(s)}>${picker ? x('close') : x('attach')}<//>`, actions: pickerDoors },
-        { k: x('vis.k'), v: `${visibilityWord(s.visibility)}${publicIndex ? ` · ${x('vis.inIndex')}` : ''}`, sub: x('vis.' + (s.visibility === 'workspace' ? 'workspaceSub' : s.visibility + 'Sub')), actions: visDoors },
+        { k: html`<${HelpLabel} term="skills.visibility" label=${x('vis.k')}>${x('vis.k')}<//>`, v: `${visibilityWord(s.visibility)}${publicIndex ? ` · ${x('vis.inIndex')}` : ''}`, sub: x('vis.' + (s.visibility === 'workspace' ? 'workspaceSub' : s.visibility + 'Sub')), actions: visDoors },
         { k: x('files'), v: html`<${List} cols="path-size" keepCols dense>${(s.files || []).map((f) => html`<${Row} key=${f.path}><${Cell}><${Code}>${f.path}<//><//><${Num} dim>${sizeWord([f])}<//><//>`)}<//>` },
         { k: x('install'), v: html`<${Code}>${installLine(pinned)}<//> · ${copyLink(installLine(pinned), x('copy'))}`, sub: html`${x('installSub')} <${Action} tone="link" onClick=${() => ctx.download(s)}>${x('downloadZip')}<//>` },
       ]} />

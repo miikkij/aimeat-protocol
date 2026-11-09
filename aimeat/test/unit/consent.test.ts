@@ -1,7 +1,18 @@
+/**
+ * @file consent.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Unit tests for the consent pattern matcher and the read decision (checkConsentForRead),
+ *   including the Federation switch of a knowledge package: a consent to everyone opens no entry
+ *   that is not public, and the public entries stay eligible to travel to peers.
+ * @version-history
+ *   2026-11-08 — The Federation switch of a knowledge package (guide audit 2026-11-08, k1-federation).
+ */
 import { describe, it, expect } from 'vitest';
 import { consentMatchPattern } from '../../src/storage/pattern-utils.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkConsentForRead } from '../../src/services/consent.js';
+import { isEligibleForReplication } from '../../src/services/memory-replication.js';
 
 describe('consentMatchPattern', () => {
   it('matches exact keys', () => {
@@ -121,5 +132,62 @@ describe('checkConsentForRead', () => {
     });
     const result = await checkConsentForRead(storage, 'profile.bio', 'agent1#alice@node', 'agent2#bob@node', 'owner');
     expect(result.allowed).toBe(false);
+  });
+});
+
+// The knowledge package page's Federation switch grants packages/<id>/* to '*' with the reach
+// federation (public/views/profile/knowledge-tab.js). Its job is to send the public entries to peers
+// and list the owner in the directory; it opened every private entry to every reader (k1-federation).
+describe('checkConsentForRead — the Federation switch of a knowledge package', () => {
+  const OWNER = 'alice@node';
+  const PKG = 'packages/pkg-1';
+  const now = new Date().toISOString();
+  async function switchedOn(): Promise<SqliteStorage> {
+    const storage = new SqliteStorage(':memory:');
+    await storage.createConsent({
+      id: 'fed1', ownerGaii: OWNER, dataPattern: `${PKG}/*`, recipient: '*', purpose: 'knowledge_sharing',
+      scope: 'federation', expires: null, status: 'active', grantedAt: now, revokedAt: null,
+    });
+    return storage;
+  }
+
+  it('an unrelated signed-in account, a visitor from another node and the anonymous reader cannot read a private entry', async () => {
+    const storage = await switchedOn();
+    for (const reader of ['bob@node', 'agent2#bob@node', 'carol@other-node', 'anonymous']) {
+      const r = await checkConsentForRead(storage, `${PKG}/private-notes`, OWNER, reader, 'private');
+      expect(r, reader).toEqual({ allowed: false, reason: 'no_matching_consent' });
+    }
+  });
+
+  it('nor an owner-only entry, an unlisted manifest, or a members entry for a visitor', async () => {
+    const storage = await switchedOn();
+    expect((await checkConsentForRead(storage, `${PKG}/draft`, OWNER, 'bob@node', 'owner')).allowed).toBe(false);
+    expect((await checkConsentForRead(storage, `${PKG}/manifest`, OWNER, 'bob@node', 'owner')).allowed).toBe(false);
+    expect((await checkConsentForRead(storage, `${PKG}/team`, OWNER, 'carol@other-node', 'members')).allowed).toBe(false);
+  });
+
+  it('a public entry stays readable, and stays eligible to travel to peers under the switch', async () => {
+    const storage = await switchedOn();
+    expect((await checkConsentForRead(storage, `${PKG}/findings`, OWNER, 'anonymous', 'public')).allowed).toBe(true);
+    for (const [key, visibility] of [['findings', 'public'], ['private-notes', 'private']] as const) {
+      await storage.setMemory({
+        key: `${PKG}/${key}`, ownerGaii: OWNER, value: { key }, visibility,
+        tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+      });
+    }
+    expect(await isEligibleForReplication(storage, OWNER, `${PKG}/findings`)).toEqual({ eligible: true, consentId: 'fed1' });
+    expect((await isEligibleForReplication(storage, OWNER, `${PKG}/private-notes`)).eligible).toBe(false);
+  });
+
+  it('a consent naming the reader still opens a private entry of the package', async () => {
+    const storage = await switchedOn();
+    await storage.createConsent({
+      id: 'named1', ownerGaii: OWNER, dataPattern: `${PKG}/*`, recipient: 'ghii:bob@node', purpose: 'test',
+      scope: 'local', expires: null, status: 'active', grantedAt: now, revokedAt: null,
+    });
+    const bob = await checkConsentForRead(storage, `${PKG}/private-notes`, OWNER, 'agent2#bob@node', 'private');
+    expect(bob).toEqual({ allowed: true, consentId: 'named1', reason: 'consent_granted' });
+    const carol = await checkConsentForRead(storage, `${PKG}/private-notes`, OWNER, 'carol@node', 'private');
+    expect(carol.allowed).toBe(false);
   });
 });

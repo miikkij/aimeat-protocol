@@ -274,8 +274,9 @@ export async function patchMemoryRecord(deps: MemoryPatchDeps, who: MemoryPatchW
         overageMorsels = quotaCheck.overageMorsels;
         bytesForAlarm = quotaCheck.currentBytes - existingSize + mergedSize;
 
-        // The MERGED value is what gets stored, so the merged value is what the schema must accept.
-        const validation = await validateMemoryWrite(key, merged, storage);
+        // The MERGED value is what gets stored, so the merged value is what the schema must accept. A
+        // CSM's own lock does not govern a caller that CSM's visibility refuses (secaudit2026nov08b round 15).
+        const validation = await validateMemoryWrite(key, merged, storage, undefined, who.auth ?? null);
         if (!validation.valid) {
             return fail(422, 'SCHEMA_VALIDATION_FAILED', 'Merged value does not match the schema for this key', {
                 key, violations: validation.errors, schema_url: `/v1/memory/${encodeURIComponent(validation.schemaKey!)}/schema`,

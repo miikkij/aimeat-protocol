@@ -25,6 +25,9 @@
  *     MCP: aimeat_receiver list and propose, aimeat_admin_receivers list.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=receivers
  * @version-history
+ *   v1.1.0 — 2026-11-08 — A receiver whose owner is a member writes at organism:<id> (the membership is
+ *     the owner's, not the receiver principal's); one writing for an organism its owner is not in is
+ *     still refused with NOT_ORGANISM_MEMBER and stores nothing.
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { request as httpRequest } from 'node:http';
@@ -207,6 +210,21 @@ await test('Designed: a prefix receiver writes <prefix>.<last part>; _self descr
     const dry = await send(A.name, 'rooms', key, { t: 99 }, { sub: 'keittio', query: '?dry_run=true' });
     assert(dry.status === 200 && dry.body.data.dry_run === true, `dry run: ${show(dry)}`);
     assert((await readMemory('ruuvit.keittio')) === null, 'the dry run wrote nothing');
+});
+
+await test('Designed: a receiver whose owner is a member writes a record visible to that organism (the membership is the owner\'s)', async () => {
+    const { key } = await make({ name: 'family', target: { prefix: 'perhe' }, visibility: `organism:${orgId}` });
+    const w = await send(A.name, 'family', key, { t: 19 }, { sub: 'olohuone' });
+    assert(w.status === 201 && w.body.data.key === 'perhe.olohuone', `write: ${show(w)}`);
+    const rec = await readMemory('perhe.olohuone');
+    assert(rec?.value?.t === 19 && rec.visibility === `organism:${orgId}`, `stored for the organism: ${JSON.stringify(rec)}`);
+});
+
+await test('Refusal: a receiver writing for an organism its owner is not a member of → 400 NOT_ORGANISM_MEMBER; nothing stored', async () => {
+    const { key } = await make({ name: 'notfamily', target: { prefix: 'vieras' }, visibility: `organism:${bOrgId}` });
+    const w = await send(A.name, 'notfamily', key, { t: 5 }, { sub: 'olohuone' });
+    assert(w.status === 400 && codeOf(w) === 'NOT_ORGANISM_MEMBER', `write: ${show(w)}`);
+    assert((await readMemory('vieras.olohuone')) === null, 'nothing stored');
 });
 
 let rowsKey = '';

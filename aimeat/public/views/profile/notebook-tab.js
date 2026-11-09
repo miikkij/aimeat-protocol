@@ -11,6 +11,10 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.20.0 -- 2026-11-09 -- The page's question mark explains the notebook (concept.notebook); it
+ *     opened the Knowledge explanation (guidance audit 2026-11-09).
+ *   v1.19.0 -- 2026-11-08 -- The three Automate switches each have their question mark (Check `help`:
+ *     notebook.autoDetect, notebook.autoRun, notebook.autoDistribute).
  *   v1.18.1 -- 2026-11-01 -- Open on a workspace hit hands the workspace the hit's whole key, which it
  *     resolves through its manifest: the hit's `space` is only the first part of the namespace
  *     (`shared` of `shared.notes`), so the page never opened, and an id with a dot lost its tail
@@ -296,13 +300,13 @@ export default function NotebookTab({ session, showToast, onStats }) {
     <//>
   `;
 
-  const setting = (key, words) => html`
-    <${Check} inline checked=${settings[key]} onChange=${() => toggleSetting(key)}>${words}<//>`;
+  const setting = (key, words, help) => html`
+    <${Check} inline help=${help} checked=${settings[key]} onChange=${() => toggleSetting(key)}>${words}<//>`;
 
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.notebook')]}
-      title=${t('profile.notebook.title')} help="concept.knowledge" desc=${t('profile.notebook.desc')}
+      title=${t('profile.notebook.title')} help="concept.notebook" desc=${t('profile.notebook.desc')}
       start=${html`<${PageStart} id="notebook" done=${inbox === null ? null : inbox.length > 0} />`}
       after=${html`<${ConfirmUI} />`}>
 
@@ -318,9 +322,9 @@ export default function NotebookTab({ session, showToast, onStats }) {
       <//>
       <${Row} wrap gap="medium">
         <${Note} kind="meta" inline>${t('profile.notebook.trustTitle')}<//>
-        ${setting('autoDetectIntent', t('profile.notebook.autoDetect'))}
-        ${setting('autoRunPlan', t('profile.notebook.autoRun'))}
-        ${setting('autoDistribute', t('profile.notebook.autoDistribute'))}
+        ${setting('autoDetectIntent', t('profile.notebook.autoDetect'), 'notebook.autoDetect')}
+        ${setting('autoRunPlan', t('profile.notebook.autoRun'), 'notebook.autoRun')}
+        ${setting('autoDistribute', t('profile.notebook.autoDistribute'), 'notebook.autoDistribute')}
       <//>
     <//>
 

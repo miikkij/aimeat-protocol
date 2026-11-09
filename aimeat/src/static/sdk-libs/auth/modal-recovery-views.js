@@ -4,15 +4,18 @@
  *   password (ask for a code, then set a new password), forgot username (the address gets the name
  *   sent to it), and complete-account (an account with no verified email, and a brand-new account
  *   created under the email gate). The markup of all three, and the wiring of the first two;
- *   modal.js wires complete-account, because that step shares its pendingEmailLogin state.
+ *   modal-email-step.js wires complete-account, which holds its pendingEmailLogin state.
  *
  *   PURE EXTRACTION from modal.js on 2026-09-04, moved because that file passed the 800-line
  *   ceiling when the second-factor step arrived. The strings are the same bytes, re-indented.
  *
  * @structure recoveryViewsHtml(i, field) -> the three hidden views as one markup string ·
- *   wireRecoveryViews({ i, api, showView }) -> the forgot-password and forgot-username handlers
+ *   wireRecoveryViews({ i, api, showView }) -> the forgot-password and forgot-username handlers,
+ *   and { forgotPw, forgotUser } each with keep() and resume(state)
  * @usage import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
  * @version-history
+ *   v1.3.0 -- 2026-11-08 -- wireRecoveryViews returns keep() and resume() for both views: the language
+ *     switch draws them again with what was typed (modal-view-keep.js; secaudit2026nov08b round 15b).
  *   v1.2.0 — 2026-11-01 — The address fields' example is in the page's language (modal.emailPlaceholder).
  *   v1.1.0 — 2026-10-05 — wireRecoveryViews: the forgot-password and forgot-username handlers,
  *     extracted verbatim from modal.js, which the sign-up fix took past the 800-line ceiling.
@@ -154,4 +157,35 @@ export function wireRecoveryViews(ctx) {
     msgEl.textContent = i.usernameSent || 'If an account with that email exists, your username was sent.';
     msgEl.style.display = 'block';
   });
+
+  // What each view holds, for the language switch (modal-view-keep.js). Resuming sends nothing.
+  var $ = function (id) { return /** @type {any} */ (document.getElementById(id)); };
+  return {
+    forgotPw: {
+      keep: function () {
+        return {
+          step2: $('aimeat-fpw-step2').style.display !== 'none',
+          username: $('aimeat-fpw-username').value, code: $('aimeat-fpw-code').value, newPass: $('aimeat-fpw-newpass').value,
+        };
+      },
+      resume: function (state) {
+        showView('forgot-pw');
+        $('aimeat-fpw-step1').style.display = state.step2 ? 'none' : '';
+        $('aimeat-fpw-step2').style.display = state.step2 ? '' : 'none';
+        $('aimeat-fpw-username').value = state.username || '';
+        $('aimeat-fpw-code').value = state.code || '';
+        $('aimeat-fpw-newpass').value = state.newPass || '';
+      },
+    },
+    forgotUser: {
+      keep: function () { return { email: $('aimeat-fu-email').value, sent: $('aimeat-fu-msg').style.display === 'block' }; },
+      resume: function (state) {
+        showView('forgot-user');
+        $('aimeat-fu-email').value = state.email || '';
+        if (!state.sent) return;
+        $('aimeat-fu-msg').textContent = i.usernameSent || 'If an account with that email exists, your username was sent.';
+        $('aimeat-fu-msg').style.display = 'block';
+      },
+    },
+  };
 }

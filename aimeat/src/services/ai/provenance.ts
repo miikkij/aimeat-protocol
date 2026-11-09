@@ -44,6 +44,7 @@
  *   import { mintProvenance, contentHashOf } from './provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.7.1 — 2026-11-08 — RECEIVER_WRITE_NOTE says incoming webhook (secaudit2026nov08b round 15b).
  *   v1.7.0 — 2026-11-07 — stampAgentWrite stamps a receiver's write (receiver:<owner>/<name>@<node>)
  *     at level `machine`, stamped by the node and not observed (RECEIVER_WRITE_NOTE).
  *   v1.6.0 — 2026-11-07 — Level `machine` names no model and carries no generation rules, as
@@ -744,8 +745,8 @@ export const INFERRED_FROM_PRINCIPAL_NOTE =
 
 /** The note on a record a receiver's write was stamped with. */
 export const RECEIVER_WRITE_NOTE =
-  'Written by an outside program through a receiver of the owner. The node recorded which receiver '
-  + 'wrote it and when; it cannot see how the program made the data.';
+  'Written by an outside program through an incoming webhook of the owner. The node recorded which '
+  + 'webhook wrote it and when; it cannot see how the program made the data.';
 
 /** A GAII (`agent#owner@node`) or a GEAI (`eco:app#owner@node`) — anything that is not a person. */
 export function isNonHumanPrincipal(principal: string): boolean {

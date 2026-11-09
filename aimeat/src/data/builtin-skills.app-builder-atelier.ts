@@ -13,6 +13,17 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-09 — Step 3: one top bar. On a genre fork the genre's masthead is the only top bar, with
+ *     the node's pill in it as it comes, restyled only when the owner asks (Jouni). A real build met
+ *     "the shell's bar is the only top bar" and "the genre is the frame, no app shell" side by side,
+ *     built a header of its own and restyled the pill.
+ *   2026-11-08 — Step 1 asks the level first and lets it decide the rest: a prototype skips drawn
+ *     layouts, the introduction, the data map unless shared, and the genre and Design Book parts; an
+ *     ordinary page skips the introduction and those two parts; the finest is unchanged. Two real
+ *     builds met four rounds of questions before the level was asked (B, measured before and after).
+ *   2026-11-08 — Step 3 says the shell shows a signed-out visitor only "Log in to continue" and names
+ *     `requireLogin: false`; step 9 names `legal_pages` as recommended, not owed (two real builds on
+ *     aimeat.io met both only after publishing).
  *   v1.41.0 — 2026-11-07 — The interview asks about an introduction (scope, diagrams or pictures,
  *     prompts for the person's AI), and the proposal offers three to five designs, one always the
  *     clean look (build-introduction-step.ts).
@@ -191,8 +202,8 @@ GET /v1/appdev/pitfalls             ← what bites app builders
 
 **Connected over MCP and cannot make HTTP calls?** Everything above comes through tools. The
 specification: \`aimeat_handbook_get { tier: "build-app-atelier" }\` returns its first part, which
-names the others (\`genre\`, \`libraries\`, \`book\`, \`patterns\`, \`look\`); read \`genre\`, \`libraries\`, \`book\` and \`patterns\` before you
-write code, each with \`aimeat_handbook_get { tier: "build-app-atelier/<id>" }\`. It comes in parts
+names the others (\`genre\`, \`libraries\`, \`book\`, \`patterns\`, \`look\`); read \`libraries\` and \`patterns\` before you
+write code, and on the finest level \`genre\` and \`book\` too, each with \`aimeat_handbook_get { tier: "build-app-atelier/<id>" }\`. It comes in parts
 because one tool result cannot carry all of it. The genres: \`aimeat_designbook_search { kind:
 "genre" }\` lists them with what each is for, and \`aimeat_app_template_get { id: "genre-<id>" }\`
 returns the page to fork; a genre is larger than one result, so it says how many parts it has and
@@ -230,12 +241,18 @@ moved under you says so.
 
 ## The shape of the work
 
-1. **Interview** — what the app does, who uses it, how it should FEEL (this picks the look
-   preset), which languages, what it must not do.
+1. **Interview** — FIRST THE LEVEL (a quick prototype, an ordinary page or the finest; when the
+   owner's first words already say it, "just quick", that is the answer), then what the app does,
+   who uses it, how it should FEEL (this picks the look preset), which languages, what it must not
+   do. **The level decides the rest of this step.** On \`proto\`: ask what it does, who uses it and
+   the languages, draw no layouts, no introduction, the data map only for shared data, and read the
+   specification's parts \`libraries\` and \`patterns\` only; then a one-line proposal and build. On
+   \`plain\`: no introduction unless they ask, and parts \`genre\` and \`book\` stay unread. On the
+   finest, or with no answer, all of it.
    **START THE STRUCTURE PAGE BEFORE THE FIRST QUESTION** on a new app: pick a filename, call
    \`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose, proposals }\` and put
-   \`page_url\` from the answer in your first message. \`proposals.layout\` is two or three layouts
-   you drew for THIS app, each with a sketch (the field's description has the shape); the page
+   \`page_url\` from the answer in your first message. Unless the level is \`proto\`,
+   \`proposals.layout\` is two or three layouts you drew for THIS app, each with a sketch (the field's description has the shape); the page
    shows them first and the node's presets after. There the person sees the steps and picks
    a layout and a look by seeing them (the looks, the layouts and the Design Book genres), so the
    look question points to the page; it is optional, and "you decide" is an answer. The page shows
@@ -257,7 +274,8 @@ moved under you says so.
    sells or announces, such as a landing page. The specification's part \`libraries\` says how it
    is built.
    **PROPOSE, THEN WAIT.** Before any code, show the owner what you are about to build and let
-   them choose. FIRST THE LEVEL, which is theirs to choose and never yours: **a quick prototype**
+   them choose. FIRST THE LEVEL they gave (ask it here if they did not), which is theirs to choose
+   and never yours: **a quick prototype**
    (a working draft to try one idea, the kit as it comes, no styling), **an ordinary page** (a
    ready layout and look from the Design Book, tidy and not distinctive), or **the finest** (a
    forked genre, the Book's proven parts, components of its own). All three are Atelier, in two
@@ -305,7 +323,8 @@ moved under you says so.
    difference (Postinjalostamo, 2026-09-28: three rounds of corrections).
 3. **Build** — on the level \`fine\` (and on a page that states no level), start from a GENRE, never
    from the bare shell; a \`proto\` or \`plain\` page starts from the shell \`shell-atelier\` and skips
-   the genre and the register. On \`fine\`: pick the register the page belongs
+   the genre and the register. The shell shows a signed-out visitor only "Log in to continue": an
+   app used without signing in passes \`requireLogin: false\` to \`app()\`. On \`fine\`: pick the register the page belongs
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
    and keep its \`<meta name="aimeat-register">\` line (or name your own register with
    \`custom:<name>\`); the publish refuses an Atelier app that names none. Then compose screens
@@ -333,6 +352,9 @@ moved under you says so.
    \`AIMEAT.atelier.fx(el, { id })\` in your code: still on the words, a moment on a cue with
    \`fxPlay\`, and living motion only as \`ambient.post\` behind the words (the spec lists the
    nine, where each lands, and the knobs).
+   **One top bar.** On a genre fork the genre's masthead is the only top bar, and the node's pill
+   always sits in it as it comes: its look and its functions stay, restyled only when the owner
+   asks. No header or sign-in control of your own; the work goes into the app, not the bar.
    **The working screen is a MOSAIC inside the genre.** The genre is the frame; the part of the
    page that is this app (the list, the numbers, the form, the history) is
    \`AIMEAT.atelier.mosaic({ target: '#work', sources, fallback })\` mounted into one element of
@@ -488,7 +510,8 @@ moved under you says so.
    for each family of keys or files, where it lives, who owns and reads it and one sentence on why
    there) and the **design spec** (\`design_spec_present\`: \`aimeat_app_manage\`
    \`{ action: "spec_set" }\`). Write the two documents after the first publish and again after
-   any publish that changed the screens, the decisions or where data lives.
+   any publish that changed the screens, the decisions or where data lives. The terms and privacy
+   pages are recommended, not owed: \`legal_pages\` names the missing ones and how to write them.
 10. **Write down why, and put nothing into the Design Book because the build is finished.** As
    you choose, the page carries your reasons, one true sentence each, in
    \`<script type="application/json" id="aimeat-build-notes">\`: \`took\` (a Book part in this

@@ -13,10 +13,15 @@
  *   (print, sign, send the scan back). When the operator announces a change of sub-processors, they
  *   see what changes and may object before the date. They never edit an agreement.
  *
- *   Live data by the `aimeat-live-update` event (the `compliance` domain), never on a timer.
+ *   Live data by the `aimeat-live-update` event (the `compliance` domain), never on a timer. The page
+ *   explains itself the designed way (.claude/rules/page-guidance.md): the page's start (PageStart
+ *   "agreements") and the title's question mark (concept.processing_agreement).
  * @structure SignWays · NoticeBox · AgreementView · AgreementsTab (default)
  * @usage Registered in views/profile.js as the `agreements` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "agreements" in the start slot (folded once an agreement has come) and the title's
+ *     question mark concept.processing_agreement.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D5).
  */
 import { h } from 'preact';
@@ -34,6 +39,7 @@ import { Box } from '/components/Box.js';
 import { Columns, Stack } from '/components/Layout.js';
 import { FileDrop } from '/components/FileDrop.js';
 import { TextArea } from '/components/TextField.js';
+import { PageStart } from '/components/PageStart.js';
 import { A, StatusMark, Steps, Annexes, Summary, newestOf, inForceOf, dateOf } from './agreements/parts.js';
 
 const html = htm.bind(h);
@@ -183,7 +189,9 @@ export default function AgreementsTab({ showToast }) {
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.agreements')]}
       title=${A('cp.title')}
-      desc=${A('cp.intro')}>
+      help="concept.processing_agreement"
+      desc=${A('cp.intro')}
+      start=${html`<${PageStart} id="agreements" done=${list ? items.length > 0 : null} />`}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${!list && !error ? html`<${Note} kind="loading">${A('loading')}<//>` : null}
       ${list ? html`

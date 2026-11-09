@@ -59,6 +59,8 @@
  *   See: docs/superpowers/specs/2026-05-23-agent-integration-architecture-design.md, Appendix A
  *
  * @version-history
+ *   v1.5.0 -- 2026-11-08 -- An agent of a deactivated account gets no webhook; reactivation resumes
+ *     delivery (secaudit2026nov08 round 14, older item O2).
  *   v1.4.0 -- 2026-11-04 -- The retries are kept in the stored outbox (services/outbox.ts), so a restart
  *     resumes them and a second process does not send them twice; schedule, log lines and delivery log
  *     unchanged (codebase analysis 2026-11-03, HA stage 1 item 1.5).
@@ -79,6 +81,7 @@ import { errorFields } from '../utils/error-fields.js';
 import { type WebhookEventType, buildWebhookEnvelope } from '../models/webhook-schemas.js';
 import { isStopped, isWakeWebhookEvent } from './agent-stop-rules.js';
 import { deliverWithRetries, registerOutboxHandler } from './outbox.js';
+import { deactivatedSince } from './account-deactivated.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -175,6 +178,17 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
     // Events about work it is already doing still go out.
     if (isStopped(agent) && isWakeWebhookEvent(event)) {
       logger.debug('Webhook dispatch: skipped (the agent is stopped)', { agentGaii, event });
+      return;
+    }
+
+    // A deactivated account's agents get no webhook, as its schedules do not run
+    // (services/account-deactivated.ts). Nothing is switched off or counted, so reactivation resumes
+    // delivery. A failed owner read is logged and does not stop the delivery: this path never rejects.
+    let deactivated: string | null = null;
+    try { deactivated = await deactivatedSince(storage, agentGaii); }
+    catch (err) { logger.warn('Webhook dispatch: the account could not be read', { agentGaii, event, ...errorFields(err) }); }
+    if (deactivated) {
+      logger.info('Webhook dispatch: skipped (the account is deactivated)', { agentGaii, event, since: deactivated });
       return;
     }
 

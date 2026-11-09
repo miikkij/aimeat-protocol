@@ -19,7 +19,8 @@
  *   (a token names its uid, so a party made again under the name is a different party), be active, and
  *   hold the key (a token names the key id, so deleting or rotating the key ends its tokens). A key is
  *   compared in constant time. A wrong key for a known party is counted (./activity.ts). The share is
- *   decided after this, per read (./read-gate.ts).
+ *   decided after this, per read (./read-gate.ts). While the owner's account is deactivated, a party
+ *   that matched answers 403 ACCOUNT_DISABLED, and reads again after reactivation (nothing is deleted).
  *
  *   PARTY_TOKEN_ROUTES (./contract.ts) names the endpoints that take a party, so the global auth
  *   middleware leaves a party token alone there (no req.auth, no anonymous identity) and answers 401
@@ -27,6 +28,8 @@
  * @structure PartyCredential · PartyContext · PartyVerdict · partyCredentialOf · verifyParty · RequestLike
  * @usage const cred = partyCredentialOf(req, { urlKeyOwner }); if (cred) { const v = await verifyParty(deps, cred); }
  * @version-history
+ *   v1.3.0 — 2026-11-08 — A party of a deactivated account answers 403 ACCOUNT_DISABLED until the account
+ *     is reactivated (secaudit2026nov08 round 14, older item O3).
  *   v1.2.0 — 2026-11-01 — A key a DSP transfer minted (`share` set) is admitted only where the caller
  *     takes it (`transferKeys`, the data reads), and its context names the one share it reads (plan D8.4).
  *   v1.1.0 — 2026-11-01 — The token of a party registered to an app is refused here: it opens that app's
@@ -40,6 +43,7 @@ import { partyKeyMatches } from './keys.js';
 import { readParties } from './store.js';
 import { verifyPartyToken } from './token.js';
 import { noteFailedAttempt, noteKeyUse } from './activity.js';
+import { deactivatedSince } from '../account-deactivated.js';
 
 /** The parts of a request this reads; an Express request fits. Not the Express type: a service takes none. */
 export interface RequestLike {
@@ -100,6 +104,10 @@ export function partyCredentialOf(req: RequestLike, opts: { urlKeyOwner?: string
 
 const UNKNOWN = 'The party key or token is not valid here. Ask the owner who shared the data for a new key.';
 
+/** The refusal while the account that shared the data is deactivated. */
+export const OWNER_DEACTIVATED = (since: string): string =>
+    `The account that shared this data was deactivated on ${since}, so nothing it shared can be read now. Your key stays valid and works again if the operator of this server reactivates the account.`;
+
 /** A key of the party that is not past its own expiry and matches `given`. Compares every key, so the time does not say which. */
 function matchingKey(party: PartyRecord, given: string, nowMs: number): PartyKey | undefined {
     let found: PartyKey | undefined;
@@ -154,6 +162,10 @@ export async function verifyParty(
     }
 
     const ownerGhii = `${owner}@${config.nodeId}`;
+    // A party reads its owner's data, so it waits while the owner's account is deactivated, as the
+    // owner's own credentials and background work do. Nothing is deleted: reactivation lets it read again.
+    const deactivated = await deactivatedSince(storage, ownerGhii);
+    if (deactivated) return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: OWNER_DEACTIVATED(deactivated) };
     if (party.status !== 'active') {
         return {
             ok: false, status: 403, code: 'PARTY_STOPPED',

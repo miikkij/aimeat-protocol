@@ -14,6 +14,9 @@
  *     crew-defs an app declares (manifest.cortex.agents) onto YOUR OWN fleet + read liveness
  *
  * @version-history
+ *   v1.3.0 — 2026-11-09 — listApps({ own: true }) asks the server for the caller's own apps
+ *     (GET /v1/apps?own=true), so a page that shows only them no longer walks the whole catalogue
+ *     of the node: 600 kB in two requests at 288 apps, on every Settings page and the Home.
  *   v1.2.0 — 2026-07-21 — listApps() paginates through ALL apps (was capped at the server
  *     default of 50, silently truncating the Apps tab / gallery).
  *   v1.1.0 — 2026-07-16 — Agent-Bundled Apps Slice 1: deploy/undeploy/status service calls
@@ -28,12 +31,12 @@ import { apiGet, apiDelete, apiPatch, api } from '/js/api.js';
  *  Paginates through EVERY app: a single /v1/apps request caps at the server default
  *  (50), so this loops by offset (200/page) until it has the server-reported `total`.
  *  Otherwise the Apps tab / gallery silently stopped at 50. A guard bounds the loop. */
-export async function listApps({ building = false } = {}) {
+export async function listApps({ building = false, own = false } = {}) {
   const LIMIT = 200;
   let all = [];
   let offset = 0;
   for (let page = 0; page < 100; page++) {   // guard: ≤ 100 pages (20k apps)
-    const data = await apiGet(`/v1/apps?limit=${LIMIT}&offset=${offset}${building ? '&building=true' : ''}`);
+    const data = await apiGet(`/v1/apps?limit=${LIMIT}&offset=${offset}${building ? '&building=true' : ''}${own ? '&own=true' : ''}`);
     const apps = data?.data?.apps || [];
     all = all.concat(apps);
     const total = typeof data?.data?.total === 'number' ? data.data.total : all.length;

@@ -10,6 +10,7 @@
  * @structure secModels · judgeRow · candidateRow · picker
  * @usage import { secModels } from './models.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-08 -- The judge's and each model under test's role name opens the setting's explanation (terms calibrator.judge and calibrator.underTest; .claude/rules/page-guidance.md); the section's hint left, because the two explanations carry its words.
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the rows are the List with its Panel, the picker the library's Model list (components/ModelPicker.js ModelList, a taken model dimmed with "already added"), the lines Note (component plan, page group G4).
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
  *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -41,6 +42,7 @@ import { Action } from '/components/Action.js';
 import { Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { ModelList } from '/components/ModelPicker.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Row as Line } from '/components/Layout.js';
 import { openTab } from '/components/Rail.js';
 import { rankModels, matchesQuery, modelPageUrl, answersInText } from '/views/profile/openrouter/pricing.js';
@@ -67,7 +69,6 @@ export function secModels(ctx) {
         <${Action} small disabled=${!ctx.keyed || !ctx.models.length} onClick=${() => ctx.setPick(ctx.pick === 'add' ? null : 'add')}>${ctx.pick === 'add' ? x('close') : x('addModel')}<//>
         ${!candidates.length ? html`<${Note} inline>${x('noCandidatesHint')}<//>` : null}
       <//>
-      <${Note}>${x('hintModels')}<//>
     <//>`;
 }
 
@@ -86,7 +87,7 @@ function judgeRow(ctx, judge) {
     <${Action} small soft onClick=${() => ctx.setPick(null)}>${x('close')}<//>`;
   return html`
     <${Row} key="judge" id="cal-judge" open=${open} panel=${panel} panelDoors=${doors}>
-      <${Name} meta=${x('judgeSub')}>${x('judge')}<//>
+      <${Name} meta=${x('judgeSub')}><${HelpLabel} term="calibrator.judge" label=${x('judge')}>${x('judge')}<//><//>
       <${Who} sub=${sub}><b>${name}</b>${judge.modelId ? html`<${Code}>${judge.modelId}<//>` : null}<//>
       <${Desc}>${facts}<//>
       <${Doors}><${Action} small row disabled=${!ctx.keyed} onClick=${() => ctx.setPick(open ? null : 'judge')}>${open ? x('close') : x('change')}<//><//>
@@ -98,7 +99,7 @@ function candidateRow(ctx, m, i) {
   const facts = model ? [priceWords(model, CHAT_ROLE), contextWords(model)].filter(Boolean).join(' · ') : (ctx.keyed && ctx.models.length ? x('modelNotInList') : '');
   return html`
     <${Row} key=${m.id}>
-      <${Name} meta=${x('candidateSub')}>${x('candidateN', { n: i + 1 })}<//>
+      <${Name} meta=${x('candidateSub')}><${HelpLabel} term="calibrator.underTest" label=${x('candidateN', { n: i + 1 })}>${x('candidateN', { n: i + 1 })}<//><//>
       <${Who}><b>${modelWords(model, m.modelId)}</b><${Code}>${m.modelId}<//><//>
       <${Desc}>${facts}<//>
       <${Doors}><${Action} small row soft tone="danger" disabled=${ctx.busy === 'models'} onClick=${() => ctx.removeCandidate(m.id)}>${x('remove')}<//><//>

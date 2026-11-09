@@ -7,6 +7,8 @@
  *   recommended-agent matching, organism-name resolution). Extracted from ecosystem-tab.js to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-11-08 — chosenScopes: the access level's words plus the own-tick words the owner
+ *     ticked, as the approve body's scopes (secaudit2026nov08 round 14, older item O5).
  *   v1.2.0 — 2026-10-25 — areaSentence, initialTicks, chosenAreas: a waiting request's data areas in
  *     plain words, ticked by default, and the ticked ones as the approve body's data_areas
  *     (secaudit2026oct22, lead 2378).
@@ -157,4 +159,16 @@ export function chosenAreas(request, ticks) {
   const areas = request?.requested_data_areas || [];
   const on = Array.isArray(ticks) ? ticks : initialTicks(request);
   return areas.filter((_, i) => on[i] !== false);
+}
+
+/**
+ * The approve body's `scopes`: the access level's words, and each word outside every access level
+ * (`own_tick_scopes`) only when the owner ticked it. Unticked is the default.
+ * @param {string[]} presetScopes
+ * @param {{ own_tick_scopes?: string[] }} request
+ * @param {Record<string, boolean>} [wordTicks]
+ */
+export function chosenScopes(presetScopes, request, wordTicks) {
+  const ticked = (request?.own_tick_scopes || []).filter(w => (wordTicks || {})[w] === true);
+  return [...new Set([...(presetScopes || []), ...ticked])];
 }

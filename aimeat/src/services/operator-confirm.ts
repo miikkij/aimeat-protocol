@@ -20,15 +20,20 @@
  *   v1.1.0 -- 2026-11-04 -- Signed with the confirm purpose's own key (auth/node-signer.ts); a token
  *     signed before, with the node key, verifies as before until it expires (codebase analysis
  *     2026-11-03, item B9).
+ *   v1.2.0 -- 2026-11-08 -- A confirm token is spent once under its id (jti) in the node's storage, not
+ *     under its text in one process's memory: a second process, or a second spelling of the signature,
+ *     no longer applies it again (secaudit2026nov08 round 14).
  */
 import { SignJWT } from 'jose';
 import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 import { createHash, randomUUID } from 'node:crypto';
+import { spendOnce } from './ephemeral-claims.js';
 
 let _privateKey: CryptoKey | null = null;
 let _publicKey: CryptoKey | null = null;
 
-/** token-hash -> expiry epoch-seconds; single-use guard, pruned lazily. */
+/** jti -> expiry epoch-seconds: this process's tokens already applied, pruned lazily. The spend that
+ *  decides is the storage row (spendOnce 'confirm-token'). */
 const usedTokens = new Map<string, number>();
 
 export function initConfirmTokenKeys(privateKey: CryptoKey, publicKey: CryptoKey): void {
@@ -66,12 +71,8 @@ export async function verifyConfirmToken(token: string, sub: string, action: str
     if (!_publicKey || !_privateKey) throw new Error('Confirm token keys not initialized');
 
     const now = Math.floor(Date.now() / 1000);
-    for (const [hash, exp] of usedTokens) {
-        if (exp < now) usedTokens.delete(hash);
-    }
-    const hash = createHash('sha256').update(token).digest('hex');
-    if (usedTokens.has(hash)) {
-        throw new ConfirmTokenError('TOKEN_USED', 'This confirm token was already used — propose again');
+    for (const [jti, exp] of usedTokens) {
+        if (exp < now) usedTokens.delete(jti);
     }
 
     let claims;
@@ -84,12 +85,21 @@ export async function verifyConfirmToken(token: string, sub: string, action: str
         if (msg.includes('exp')) throw new ConfirmTokenError('TOKEN_EXPIRED', 'Confirm token expired (10 min TTL) — propose again');
         throw new ConfirmTokenError('TOKEN_INVALID', `Invalid confirm token: ${msg}`);
     }
-    if (claims.typ !== 'confirm' || claims.sub !== sub || claims.action !== action) {
+    // A token is spent under its id (jti), which the signature covers. The whole token text was the key
+    // before, and one signature segment has several base64url spellings that verify alike.
+    const jti = typeof claims.jti === 'string' ? claims.jti : '';
+    const used = () => new ConfirmTokenError('TOKEN_USED', 'This confirm token was already used — propose again');
+    if (jti && usedTokens.has(jti)) throw used();
+    if (claims.typ !== 'confirm' || claims.sub !== sub || claims.action !== action || !jti) {
         throw new ConfirmTokenError('TOKEN_INVALID', 'Confirm token does not match this caller/action');
     }
     if (claims.phash !== payloadHash(payload)) {
         throw new ConfirmTokenError('PAYLOAD_MISMATCH',
             'The payload changed since it was proposed — the token binds to the exact approved change; propose again');
     }
-    usedTokens.set(hash, claims.exp as number);
+    // Spent in the node's storage (services/ephemeral-claims.ts), so another process of the node refuses
+    // it too; the Map above answers this process's repeat before the binding check, as it did.
+    const expMs = (claims.exp as number) * 1000;
+    if (!await spendOnce('confirm-token', jti, Math.max(expMs, Date.now() + 1000))) throw used();
+    usedTokens.set(jti, claims.exp as number);
 }

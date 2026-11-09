@@ -31,6 +31,9 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2-a2a
  * @version-history
+ *   2026-11-08 -- A seller whose account is deactivated is neither quoted nor paid over A2A, and the same
+ *     offering sells and delivers after reactivation (secaudit2026nov08b round 15,
+ *     a2a-foreign-handler/deactivated-provider-offering-quoted-and-charged).
  *   2026-10-15 — The card's for-hire skill carries the offering's input schema; the assertion that the
  *     card never names the GAII is replaced by one that the card's address names owner and agent,
  *     because the identifier is public (feature-list audit #83).
@@ -1165,6 +1168,93 @@ async function run(): Promise<void> {
         // A principal of ANOTHER account is still refused rather than quietly becoming a buyer.
         const other = await rpc(a.owner, worker.name, outsider.token, 'GetTask', { id: taskId });
         assert(other.status === 403, `expected 403, got ${other.status}`);
+    });
+
+    // ── 7b. A seller whose account is deactivated takes no new paid work ──────
+    //
+    // secaudit2026nov08b round 15 (a2a-foreign-handler/deactivated-provider-offering-quoted-and-charged).
+    // Deactivation ends every credential the seller's agent needs to deliver, and paid open work has no
+    // way back for the buyer, so the work is neither quoted nor paid while the account is deactivated.
+    // Nothing is deleted: after reactivation the same offering sells and delivers as before.
+    // `a` is the first account of the suite database, so it is the operator.
+    const seller = await setupOwner('dact');
+    const sellerWorker = await addAgent(seller.owner, seller.ownerToken, 'dact-worker');
+    let sellerOffering = '';
+    let quotedBefore = '';
+    let quotedBeforeReq: any = null;
+
+    await test('setup: a second seller lists agent work for money and is quoted once while active', async () => {
+        const listed = await json('/v1/exchange/offerings', {
+            method: 'POST', headers: { Authorization: `Bearer ${seller.ownerToken}` },
+            body: JSON.stringify({
+                kind: 'agent-work', agent_name: sellerWorker.name, task_type: 'summarize',
+                title: 'Summarise a note', description: 'Send text, get a summary back.',
+                price_money: { amount: PRICE_MICROS, currency: 'USD' },
+                usage_terms: { derivatives: true, resale: false, attribution: true },
+                input_schema: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } },
+                output_schema: { type: 'object', properties: { summary: { type: 'string' } } },
+            }),
+        });
+        assert(listed.status === 201, `list ${listed.status}: ${JSON.stringify(listed.body?.error)}`);
+        sellerOffering = listed.body.data.offering.offeringId;
+        const psp = await json('/v1/commerce/payout/x402', {
+            method: 'PUT', headers: { Authorization: `Bearer ${seller.ownerToken}` }, body: JSON.stringify({ address: SELLER_ADDR }),
+        });
+        assert(psp.status === 200, `psp ${psp.status}: ${JSON.stringify(psp.body?.error)}`);
+        const q = await foreignRpc(seller.owner, sellerWorker.name, stranger, 'SendMessage', {
+            message: { messageId: 'dact-0', role: 'ROLE_USER', metadata: { offeringId: sellerOffering }, parts: [{ text: 'Summarise: a heron.' }] },
+        });
+        assert(!q.error && q.result?.task?.status?.state === 'TASK_STATE_AUTH_REQUIRED', `quoted while active, got ${JSON.stringify(q.error ?? q.result).slice(0, 250)}`);
+        quotedBefore = q.result.task.id;
+        quotedBeforeReq = q.result.task.metadata?.accepts?.[0];
+        const off = await json(`/v1/admin/owners/${seller.owner}/disable`, { method: 'POST', headers: authA });
+        assert(off.status === 200, `the operator deactivates the seller: ${off.status} ${JSON.stringify(off.body?.error)}`);
+    });
+
+    await test('a stranger is not quoted for work of a deactivated seller, and the refusal says why', async () => {
+        const r = await foreignRpc(seller.owner, sellerWorker.name, stranger, 'SendMessage', {
+            message: { messageId: 'dact-1', role: 'ROLE_USER', metadata: { offeringId: sellerOffering }, parts: [{ text: 'Summarise: a crane.' }] },
+        });
+        assert(!!r.error && r.error.code === FOREIGN_CODE.PAYMENT_UNAVAILABLE,
+            `expected the payment-unavailable code, got ${JSON.stringify(r.error ?? r.result).slice(0, 250)}`);
+        assert(/deactivated/.test(String(r.error.message)) && /Nothing was charged/.test(String(r.error.message)),
+            `and the message names the deactivation, got ${r.error.message}`);
+    });
+
+    await test('a quote taken before the deactivation is not paid while it lasts: nothing is collected', async () => {
+        const r = await foreignRpc(seller.owner, sellerWorker.name, stranger, 'SendMessage', {
+            message: { messageId: 'dact-2', role: 'ROLE_USER', taskId: quotedBefore, parts: [{ text: 'paid' }] },
+        }, { payment: buildXPayment(quotedBeforeReq, BUYER_WALLET) });
+        assert(!!r.error && r.error.code === FOREIGN_CODE.PAYMENT_UNAVAILABLE,
+            `expected the payment-unavailable code, got ${JSON.stringify(r.error ?? r.result).slice(0, 250)}`);
+        const t = await foreignRpc(seller.owner, sellerWorker.name, stranger, 'GetTask', { id: quotedBefore });
+        assert(!t.error && t.result.status.state === 'TASK_STATE_WORKING' && /Accepted/.test(JSON.stringify(t.result.status.message)) === true,
+            `the work stays open and unpaid, got ${JSON.stringify(t.result?.status ?? t.error).slice(0, 250)}`);
+    });
+
+    await test('after reactivation the same offering is quoted, paid and delivered as before', async () => {
+        const on = await json(`/v1/admin/owners/${seller.owner}/enable`, { method: 'POST', headers: authA });
+        assert(on.status === 200, `enable ${on.status}`);
+        const tok = await ownerSignIn(BASE, seller.owner, 'AgentV6Pass12345');
+        const authS = { Authorization: `Bearer ${tok.body.data.token as string}` };
+        const before = await json('/v1/exchange/work?role=provider', { headers: authS });
+        const unpaid = (before.body.data.work as any[]).find(x => x.work_id === quotedBefore);
+        assert(!!unpaid && unpaid.charged_units === 0, `nothing was charged while deactivated, got ${JSON.stringify(unpaid)}`);
+        const q = await foreignRpc(seller.owner, sellerWorker.name, stranger, 'SendMessage', {
+            message: { messageId: 'dact-3', role: 'ROLE_USER', taskId: quotedBefore, parts: [{ text: 'quote again' }] },
+        });
+        const req = q.result?.task?.metadata?.accepts?.[0];
+        assert(!q.error && !!req, `quoted again, got ${JSON.stringify(q.error ?? q.result).slice(0, 250)}`);
+        const paid = await foreignRpc(seller.owner, sellerWorker.name, stranger, 'SendMessage', {
+            message: { messageId: 'dact-4', role: 'ROLE_USER', taskId: quotedBefore, parts: [{ text: 'paid' }] },
+        }, { payment: buildXPayment(req, BUYER_WALLET) });
+        assert(!paid.error && paid.result.task.status.state === 'TASK_STATE_WORKING', `paid, got ${JSON.stringify(paid.error ?? paid.result).slice(0, 250)}`);
+        const delivered = await json(`/v1/exchange/work/${quotedBefore}/deliver`, {
+            method: 'POST', headers: authS, body: JSON.stringify({ output: { summary: 'A heron, standing.' } }),
+        });
+        assert(delivered.status === 200, `deliver ${delivered.status}: ${JSON.stringify(delivered.body?.error)}`);
+        const done = await foreignRpc(seller.owner, sellerWorker.name, stranger, 'GetTask', { id: quotedBefore });
+        assert(done.result?.status?.state === 'TASK_STATE_COMPLETED', `completed, got ${done.result?.status?.state}`);
     });
 
     // ── 8. Nothing existing moved ─────────────────────────────────────────────

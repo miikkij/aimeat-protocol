@@ -28,6 +28,14 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-08 — A grant takes an explicit `role`, read (the default) or write, and the purpose text
+ *     decides nothing (services/workspace-roles.ts consentWsRole, before any write): write is the
+ *     contributor role on one workspace, for one person on this node, filed under the workspace's
+ *     creator, and any other write is refused with the reason. The role is stamped as metadata.wsRole,
+ *     which a caller cannot set. A purpose typed as `workspace-contributor` gave write access.
+ *   2026-11-08 — Revoking a named share runs the steps after a share ended (parties/shares.ts
+ *     sharesEnded): a Dataspace agreement made on a share offer that stood on it ends
+ *     (secaudit2026nov08 round 14b).
  *   2026-11-01 — A grant of `datapkg:<name>` to a GHII is a named share to a person on another AIMEAT
  *     node (services/parties/shares.ts normalizeVisitorShare): an account of this node is refused, and
  *     party:manage, the package, the pin and the end are checked as for a party share (WP9c).
@@ -76,7 +84,8 @@ import { COLLECTION_METHOD_KEY } from './mydata-receipt.js';
 import { notifyDirectoryChange } from './directory.js';
 import { callerFromAuth } from './caller-context.js';
 import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
-import { normalizePartyShare, normalizeVisitorShare, packageOfPattern } from './parties/shares.js';
+import { isNamedShare, normalizePartyShare, normalizeVisitorShare, packageOfPattern, sharesEnded } from './parties/shares.js';
+import { consentWsRole, WS_ROLE_KEY } from './workspace-roles.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -144,6 +153,12 @@ export interface ConsentGrantInput {
     /** Absolute ISO expiry, or null for indefinite. */
     expires?: string | null;
     metadata?: Record<string, unknown>;
+    /**
+     * What the recipient may do: `read` (absent) or `write`. Write is the contributor role on one
+     * workspace, for one person on this node, filed under the workspace's creator; any other `write`
+     * is refused (consentWsRole in services/workspace-roles.ts). The purpose never decides it.
+     */
+    role?: unknown;
 }
 
 export type ConsentResult<T> =
@@ -301,6 +316,11 @@ export async function grantConsent(
     }
     const reach = input.scope === undefined ? defaultConsentReach() : consentReachOf(input.scope);
 
+    // What the recipient may do, from the explicit `role` and never from the purpose text, decided
+    // before anything is stored: a `write` that no write check would read is refused with the reason.
+    const wsRole = await consentWsRole(storage, deps.config.nodeId, fileUnder, input);
+    if (!wsRole.ok) return wsRole;
+
     // Recipient `*` is the anonymous reader too, so it meets the publish gate before anything is
     // stored. Asked here and not at each door, because both doors reach this one function.
     const notOurs = await wildcardPublishRefusal(deps, caller, input, reach);
@@ -316,10 +336,16 @@ export async function grantConsent(
 
     const now = new Date().toISOString();
     // The node's stamp of how the consent was given wins over anything the caller sent under the
-    // same key: the receipt reads it as fact (feature-list audit #161).
-    const metadata = caller.collectionMethod
-        ? { ...(input.metadata ?? {}), [COLLECTION_METHOD_KEY]: caller.collectionMethod }
-        : input.metadata;
+    // same key: the receipt reads it as fact (feature-list audit #161). The workspace role is the
+    // node's stamp too: a caller's own `wsRole` is dropped, and the one decided above is written.
+    const { [WS_ROLE_KEY]: _callerRole, ...callerMeta } = input.metadata ?? {};
+    void _callerRole;
+    const stamped: Record<string, unknown> = {
+        ...callerMeta,
+        ...(caller.collectionMethod ? { [COLLECTION_METHOD_KEY]: caller.collectionMethod } : {}),
+        ...(wsRole.wsRole ? { [WS_ROLE_KEY]: wsRole.wsRole } : {}),
+    };
+    const metadata = input.metadata || Object.keys(stamped).length ? stamped : undefined;
     const consent = await storage.createConsent({
         id: randomUUID(),
         ownerGaii: fileUnder,
@@ -382,6 +408,8 @@ export async function revokeConsent(
     const now = new Date().toISOString();
     await storage.updateConsent(consentId, { status: 'revoked', revokedAt: now });
     await auditDataAccess(storage, consentId, consent.ownerGaii, consent.recipient, consent.dataPattern, 'revoke', true);
+    // A Dataspace agreement made on a share offer stood on this share: it ends with it.
+    if (isNamedShare(consent)) await sharesEnded(storage, ownerGhiiOf(consent.ownerGaii));
 
     // Withdrawing is the half that must not be missed: the person is in the directory with their
     // display name, bio, city and coordinates until the index hears about it.

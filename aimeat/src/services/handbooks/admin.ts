@@ -6,7 +6,14 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.35.1 -- 2026-11-08 -- A receiver is an incoming webhook and its key an API key in what the
+ *     operator reads; the tool and the setting keep their names (developer, 2026-11-08; secaudit2026nov08b
+ *     round 15b).
+ *   v1.35.0 -- 2026-11-08 -- The erased lock holders incident's locks are entries decided with "pseudonymise"
+ *     or "keep" (secaudit2026nov08 round 14b).
  *   v1.34.0 -- 2026-11-07 -- aimeat_admin_receivers and visibility.receivers_mode: every receiver, the stop and the decision.
+ *   v1.34.0 -- 2026-11-08 -- Which files a store is for: `takes`, file_store.min_mb and file_store.kinds
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.33.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt: replacing the data key (codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.32.0 -- 2026-11-02 -- consent.app_party_signups_per_hour and consent.app_party_pending_hours (secaudit2026nov02d round 13).
@@ -196,15 +203,17 @@ owner); \`aimeat_app_internet_close\` with \`owner\` closes any opening; \`aimea
 lets an owner open on their own or takes that back. Decide only as the operator says. How apps are
 opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
 
-Receivers are the addresses outside programs (a Lambda, a sensor, a CRM export) write into owners' data
-through, each with its own key and exactly one target. \`aimeat_admin_receivers\` \`list\` answers the
-setting, the counts (active, waiting, writes and refusals today, wrong keys) and every receiver with its
-owner; no key and no content. \`stop\` { owner, name, reason } stops one for everybody, and the owner reads
-the reason and cannot start it again; \`start\` lets it work; \`decide\` { owner, name, decision } answers
-one waiting for the operator. Who may make receivers is \`visibility.receivers_mode\`: auto (operator on
-a node with signed-in content access, self elsewhere), off, operator or self; change it with
-\`aimeat_admin_config_set\` only on the operator's word. Five wrong keys in an hour for one receiver open
-a security incident. The page is the admin Receivers page.
+Incoming webhooks (the tool and the setting keep the older name receiver) are the addresses outside
+programs (a Lambda, a sensor, a CRM export) write into owners' data through, each with its own API key
+and exactly one target. \`aimeat_admin_receivers\` \`list\` answers the setting, the counts (active,
+waiting, writes and refusals today, wrong API keys) and every incoming webhook with its owner; no API key
+and no content. \`stop\` { owner, name, reason } stops one for everybody, and the owner reads the reason
+and cannot start it again; \`start\` lets it work; \`decide\` { owner, name, decision } answers one waiting
+for the operator. Who may make incoming webhooks is \`visibility.receivers_mode\`: auto (operator on a
+node with signed-in content access, self elsewhere), off, operator or self; change it with
+\`aimeat_admin_config_set\` only on the operator's word. Five wrong API keys in an hour for one incoming
+webhook open a security incident. The page is the admin page Incoming webhooks. When you speak to the
+operator, call it an incoming webhook and its credential an API key.
 
 When \`consent.party_self_registration\` is apps-ask, an app's owner asks to let people register to it
 without an account here. \`aimeat_admin_app_party_registrations\` lists the apps that asked (state
@@ -239,6 +248,12 @@ from one node store to another, in batches (call it again while \`remaining\` is
 own as \`file_store.owner_stores\` allows (self, operator, off; auto is operator on a signed-in-only
 node); on an operator node \`aimeat_admin_file_store_decide\` approves, declines or revokes, as the
 operator says. A daily sweep removes, inside the store's folder only, objects no file names any more.
+Each store says which files it is for, so it holds large files and media and not small notes: a file
+from \`min_mb\` megabytes up, and files of the \`kinds\` it names (video, audio, image, pdf) whatever their
+size; by default 1 MB and up, and every video and sound. A smaller file of another kind stays in the
+database. \`takes: { min_mb, kinds }\` on \`aimeat_admin_file_store_set\` sets it for a named store, and
+\`file_store.min_mb\` and \`file_store.kinds\` for the environment's store. A file a store holds and no
+longer takes moves to the database by itself, once after start and then daily.
 
 **Security classes (operator).** \`aimeat_classification\` with \`action: "pack_list"\` shows the two
 label packs, the Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to
@@ -355,7 +370,7 @@ account is deactivated, its schedules, workflow triggers and unattended extensio
 with a log line that names the deactivation; nothing is deleted, and they run again after enable.
 
 **Security incidents that name records (operator).** Some incidents list \`entries\`, each with an
-\`id\`, an \`action\` ("clear", "delete", "app_only" or "uncount") and a status: the records the shared anonymous agent wrote
+\`id\`, an \`action\` ("clear", "delete", "app_only", "uncount" or "pseudonymise") and a status: the records the shared anonymous agent wrote
 before its token was refused there (type \`anonymous_principal_records\`: its webhook, tags and
 capabilities, and the skills and data packages it published), the schedules that account
 erasures before 2026-10-25 left (type \`erasure_leftover_schedules\`, the entry id is the schedule id:
@@ -364,7 +379,11 @@ subdomain addresses the start step could not tell apart as the operator's own si
 publish gave an app (type \`subdomain_site_origin\`, the entry id is the label: "app_only" serves it only
 at its app address, "keep" leaves it at both addresses), and the money platform-fee records outside an
 operator's account whose writer the start step could not tell (type \`platform_fee_records\`, the entry id
-is \`<owner>/<key>\`: "uncount" leaves it out of the dashboard's money fees, "keep" counts it). Read them with
+is \`<owner>/<key>\`: "uncount" leaves it out of the dashboard's money fees, "keep" counts it), and the schema
+locks set before the account that holds their holder's name was registered, which may be an account's erased
+before 2026-11-08 (type \`erased_lock_holders\`, the entry id is \`<applyTo>:<keyPattern>\`: "pseudonymise" keeps
+the lock in force under the erasure pseudonym so no account holds it, "keep" leaves it the current account's;
+the locks of accounts that no longer exist were moved to a pseudonym at start without a question). Read them with
 \`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
 \`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
 the operator says. The incident is resolved with the last entry.

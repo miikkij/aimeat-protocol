@@ -6,6 +6,7 @@
  *   reads as an array and `allowed.includes(origin)` became a substring test.
  * @usage pnpm test -- config-list-settings
  * @version-history
+ *   v1.1.3 — 2026-11-08 — file_store.kinds, a list row whose entries come from a fixed set.
  *   v1.1.2 — 2026-10-29 — file_store.owner_private_origins, a list row of the file stores.
  *   v1.1.1 — 2026-10-25 — email.company_smtp_private_hosts, the list row W2b added (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — The list rows that came with the rest of the settings' rows, and the one
@@ -31,6 +32,11 @@ const LIST_PATHS = [
 ];
 /** List rows that are set in the environment only: a stored key is sent only to these hosts. */
 const IMMUTABLE_LIST_PATHS = ['ai.provider_allowlist'];
+/** List rows whose entries come from a fixed set, with one valid value each; an empty list is valid. */
+const ENUM_LIST_PATHS: Record<string, string> = {
+    // The kinds of file the node's store takes at any size (config-schema-file-store.ts).
+    'file_store.kinds': 'video',
+};
 
 describe('the list helpers', () => {
     it('split a comma-separated text, trim the parts and drop the empty ones', () => {
@@ -57,9 +63,10 @@ describe('the list helpers', () => {
 
 describe('the list rows of the schema', () => {
     it('are exactly the settings the node holds as a list, typed object and marked list', () => {
-        expect(CONFIG_FIELDS.filter(f => f.list).map(f => f.dotPath).sort()).toEqual([...LIST_PATHS, ...IMMUTABLE_LIST_PATHS].sort());
+        expect(CONFIG_FIELDS.filter(f => f.list).map(f => f.dotPath).sort())
+            .toEqual([...LIST_PATHS, ...IMMUTABLE_LIST_PATHS, ...Object.keys(ENUM_LIST_PATHS)].sort());
         for (const path of IMMUTABLE_LIST_PATHS) expect(ALL_CONFIG_MAP[path].type, path).toBe('object');
-        for (const path of LIST_PATHS) {
+        for (const path of [...LIST_PATHS, ...Object.keys(ENUM_LIST_PATHS)]) {
             expect(ALL_CONFIG_MAP[path].type, path).toBe('object');
             expect(ALL_CONFIG_MAP[path].immutable, path).toBe(false);
         }
@@ -69,6 +76,11 @@ describe('the list rows of the schema', () => {
         for (const path of LIST_PATHS) {
             expect(ALL_CONFIG_MAP[path].validate('memory:read,memory:write'), path).toBe(false);
             expect(ALL_CONFIG_MAP[path].validate(['memory:read', 'memory:write']), path).toBe(true);
+        }
+        for (const [path, value] of Object.entries(ENUM_LIST_PATHS)) {
+            expect(ALL_CONFIG_MAP[path].validate(value), path).toBe(false);
+            expect(ALL_CONFIG_MAP[path].validate([value]), path).toBe(true);
+            expect(ALL_CONFIG_MAP[path].validate([value, 'not-a-value']), path).toBe(false);
         }
     });
 

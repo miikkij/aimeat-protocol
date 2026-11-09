@@ -36,6 +36,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   2026-11-08 — deleteOwnerCascade keeps the person's schema locks in force under the erasure's
+ *     pseudonym (schema-lock-erasure.ts; secaudit2026nov08 round 14).
  *   v1.18.0 — 2026-10-14 — deleteOwnerCascade runs the 28 identity columns left undecided through
  *     eraseAccountRecordsDb (account-records-erasure.ts): deleted with the account, or kept under the
  *     erasure's pseudonym (QA audit 2026-10-14, K3).
@@ -101,6 +103,7 @@ import { pseudonymiseTallyWriterDb } from './memory-tally.js';
 import { erasedPartyPseudonym, partyIdentities, erasedAccountParty } from '../../../erased-party.js';
 import { pseudonymiseLedgerPartyDb, settleErasedPartyWorkDb } from './work-ledger-erasure.js';
 import { eraseAccountRecordsDb } from './account-records-erasure.js';
+import { pseudonymiseSchemaLocksDb } from './schema-lock-erasure.js';
 import {
   cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb, deleteAccountCredentialsDb,
 } from './identity-erasure.js';
@@ -231,6 +234,9 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // The cortexes this person installed, now that the actions under their own identities are gone:
   // each record, with what its activation made and what is keyed by its name (../../../erased-cortex.ts).
   await deleteInstalledCortexesDb(db, name, ghiis.map(g => g.ghii));
+  // Every other schema lock the person or an agent or app of theirs holds stays in force under the
+  // pseudonym, so the next holder of the name does not hold it (schema-lock-erasure.ts).
+  await pseudonymiseSchemaLocksDb(db, name, ghiis.map(g => g.ghii), pseudonym);
 
   // What this person WROTE into somebody else's namespace is that other owner's record of who
   // touched their data, so it is pseudonymised rather than deleted — removing it would silently turn

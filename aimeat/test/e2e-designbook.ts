@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   2026-11-08 — A genre the node serves previews anonymously while a part by its id is in proposal
+ *     (the template, never the proposal): the spec's See-it link for genre-receipt answered 404.
  *   2026-10-17 — A part in proposal: its preview answers 404 anonymously and 200 to a frame holding
  *     the read's preview_url token, a forged token opens nothing, and its record is not public
  *     memory (plan doc-mvcn6c7e4e5q, V0.4). The genre preview of a proposal is read signed in: it
@@ -1221,6 +1223,20 @@ const GOOD_BODY = {
         assert(prev.status === 200, `genre preview is 200, got ${prev.status}`);
         const page = await prev.text();
         assert(/<!DOCTYPE html>/i.test(page) && !page.includes('demoFor('), 'a genre serves its template page, not the demo frame');
+    });
+
+    // 2026-11-08: production held genre-receipt as a part nobody had published, and the spec's
+    // "See it" link for that genre answered 404 to every owner it was sent to. A part the reader may
+    // not see now steps aside for the node's own genre template of the same id.
+    await test('a genre the node serves previews anonymously even while a part by its id is in proposal', async () => {
+        const held = await json('/v1/designbook', { method: 'POST', headers: auth(other.token), body: JSON.stringify({
+            id: 'genre-receipt', kind: 'genre', title: 'The receipt', summary: 'A till roll — fork it, swap the lines.',
+            body: { template: 'genre-receipt' }, tags: ['genre'] }) });
+        assert(held.status === 201, `the part proposes: ${JSON.stringify(held.body)}`);
+        assert((await json('/v1/designbook/genre-receipt')).status === 404, 'the proposal itself stays hidden from an anonymous read');
+        const prev = await fetch(`${BASE}/v1/designbook/genre-receipt/preview`);
+        assert(prev.status === 200, `the See-it link answers the genre's template, got ${prev.status}`);
+        assert(/<!DOCTYPE html>/i.test(await prev.text()), 'the answer is the template page');
     });
 
     // ── The AMBIENT kind: the one layer allowed to move at idle, proven on a look ──────────────

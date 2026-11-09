@@ -19,10 +19,21 @@
  *   records each passes on its own and the batch still lands over the line.
  * @structure
  *   - memoryCeilingRefusal() — value size, key count and byte budget for a planned set
+ *   - flipWithinCeilings() — a restore or unarchive kept only when it leaves every principal it grew within the limits
+ *   - archiveWithinCeiling() — an archive kept only when it leaves every principal it grew within the archived-key ceiling
+ *   - archivedKeyCount() — a principal's archived keys, counted from the rows on both providers
  * @usage
  *   const refusal = await memoryCeilingRefusal({ storage, config }, target, [{ key, value }]);
  *   if (refusal) return { ok: false, ...refusal };
+ *   const kept = await flipWithinCeilings({ storage, config }, [owner], () => storage.restoreMemory(owner, key), words);
  * @version-history
+ *   2026-11-08 — archiveWithinCeiling: archived memory keys get a ceiling of their own,
+ *     memoryMaxArchivedKeysPerAgent, asked when an archive adds to a principal's archived keys; and
+ *     flipWithinCeilings asks it too, for a restore from the bin of a record that was archived
+ *     (secaudit2026nov08b round 15b, storage/memory-totals:postgres-archived-rows-count-no-bytes).
+ *   2026-11-08 — flipWithinCeilings: a restore from the bin and an unarchive ask the key ceiling and
+ *     the byte quota, and a refusal names the setting (secaudit2026nov08 round 14,
+ *     services/memory-ceilings:count-returning-transitions-skip-ceiling).
  *   2026-11-04 — No countMemory and sumMemoryBytes for a storage without getMemoryTotals: it is
  *     required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The key count and the byte total come from one read of the kept totals
@@ -36,6 +47,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { MemoryRecord, Storage } from '../storage/interface.js';
 import { checkMemoryQuota, chargeOverage } from './quota.js';
+import { MEMORY_COUNT_EXCLUDED_PREFIXES } from '../storage/memory-totals.js';
 
 export interface CeilingRefusal {
     status: number;
@@ -144,4 +156,148 @@ export async function memoryCeilings(
             usedBytes: quota.currentBytes - replacing + additional,
         },
     };
+}
+
+/** Thrown inside the transaction of flipWithinCeilings to roll the flip back. */
+class CeilingRollback extends Error {
+    constructor(readonly refusal: CeilingRefusal) { super(refusal.message); }
+}
+
+/**
+ * Run a flip that returns stored rows to principals' totals (a restore from the bin, an unarchive) and
+ * keep it only when no principal it grew ends past the key ceiling or the byte quota
+ * (secaudit2026nov08 round 14, count-returning-transitions-skip-ceiling), or past the archived-key
+ * ceiling, which only a restore of an archived record from the bin can grow (round 15b).
+ *
+ * The flip runs in one transaction; the kept totals (storage/memory-totals.ts) are read before it and
+ * after it in the same transaction, so what the flip returned is measured by the same triggers that
+ * count it on either provider (PostgreSQL counts no bytes for an archived row, SQLite counts every
+ * row). A principal past a limit rolls the flip back. Only growth is refused: a principal the flip
+ * did not grow is never refused for being over a limit already. Overage within the quota is charged
+ * as a write's is. `owners` may name more principals than the flip touches.
+ */
+export async function flipWithinCeilings<T>(
+    deps: { storage: Storage; config: AimeatConfig },
+    owners: readonly string[],
+    flip: () => Promise<T>,
+    /** What the refusal says the flip was, and what happens to the rows: "Putting it back", "It stays in the bin." */
+    words: { act: string; stays: string },
+): Promise<{ ok: true; value: T } | { ok: false; refusal: CeilingRefusal }> {
+    const { storage, config } = deps;
+    const unique = [...new Set(owners)];
+    const overage: Array<[string, number]> = [];
+    // A record archived and then deleted keeps its archived flag in the bin, so putting it back adds
+    // to the archived keys; an unarchive only takes from them (secaudit2026nov08b round 15b).
+    const archivedCeiling = archivedCeilingOf(config);
+    try {
+        const value = await storage.transaction(async () => {
+            const before = new Map<string, { keys: number; bytes: number }>();
+            const archivedBefore = new Map<string, number>();
+            for (const o of unique) {
+                before.set(o, await storage.getMemoryTotals(o));
+                if (archivedCeiling !== null) archivedBefore.set(o, await archivedKeyCount(storage, o));
+            }
+            const out = await flip();
+            for (const o of unique) {
+                if (archivedCeiling !== null) {
+                    const refusal = archivedCeilingRefusal(archivedCeiling, o, archivedBefore.get(o)!, await archivedKeyCount(storage, o), words);
+                    if (refusal) throw new CeilingRollback(refusal);
+                }
+                const was = before.get(o)!;
+                const now = await storage.getMemoryTotals(o);
+                if (now.keys > was.keys && now.keys > config.memoryMaxKeysPerAgent) {
+                    throw new CeilingRollback({
+                        status: 413, code: 'QUOTA_EXCEEDED',
+                        message: `${words.act} would take ${o} past the memory key limit of ${config.memoryMaxKeysPerAgent} keys `
+                            + '(the node setting memoryMaxKeysPerAgent, AIMEAT_MEMORY_MAX_KEYS, which the operator sets on the Config tab). '
+                            + `${words.stays} One value may hold ${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one `
+                            + 'record holding an array or an object keyed by id, or ask the operator to raise the limit.',
+                    });
+                }
+                if (now.bytes > was.bytes) {
+                    const quota = await checkMemoryQuota(config, storage, o, now.bytes - was.bytes, 0, was.bytes);
+                    if (!quota.allowed) {
+                        throw new CeilingRollback({
+                            status: 413, code: 'QUOTA_EXCEEDED',
+                            message: `${words.act} would take ${o} past its memory quota. ${quota.reason ?? ''} `
+                                + `The quota is the node setting memoryQuotaMb (AIMEAT_MEMORY_QUOTA_MB, ${config.memoryQuotaMb} MB), `
+                                + `which the operator sets on the Config tab. ${words.stays} Remove records you no longer need, or ask the operator to raise the quota.`,
+                        });
+                    }
+                    if (quota.overageMorsels > 0) overage.push([o, quota.overageMorsels]);
+                }
+            }
+            return out;
+        });
+        for (const [o, morsels] of overage) await chargeOverage(storage, o, morsels, 'memory_overage');
+        return { ok: true, value };
+    } catch (err) {
+        if (err instanceof CeilingRollback) return { ok: false, refusal: err.refusal };
+        throw err;
+    }
+}
+
+/** How many archived keys a principal holds: rows archived, not in the bin, outside the excluded prefixes. */
+export async function archivedKeyCount(storage: Storage, owner: string): Promise<number> {
+    return storage.countMemory([owner], { archived: 'only', excludePrefixes: [...MEMORY_COUNT_EXCLUDED_PREFIXES] });
+}
+
+/** The archived-key ceiling, or null for no limit (0, or a config that does not set it). */
+function archivedCeilingOf(config: AimeatConfig): number | null {
+    const c = config.memoryMaxArchivedKeysPerAgent;
+    return typeof c === 'number' && c > 0 ? c : null;
+}
+
+/** The refusal when a flip grew a principal's archived keys past the ceiling; null when it did not. */
+function archivedCeilingRefusal(
+    ceiling: number, owner: string, was: number, now: number, words: { act: string; stays: string },
+): CeilingRefusal | null {
+    if (!(now > was && now > ceiling)) return null;
+    return {
+        status: 413, code: 'QUOTA_EXCEEDED',
+        message: `${words.act} would take ${owner} to ${now} archived memory keys, past the limit of ${ceiling} `
+            + '(the node setting memoryMaxArchivedKeysPerAgent, AIMEAT_MEMORY_MAX_ARCHIVED_KEYS, which the operator sets on the Config tab). '
+            + `${words.stays} Delete archived content you no longer need, or ask the operator to raise the limit.`,
+    };
+}
+
+/**
+ * Run an archive and keep it only when no principal it grew ends past the archived-key ceiling
+ * (memoryMaxArchivedKeysPerAgent; secaudit2026nov08b round 15b, storage/memory-totals:
+ * postgres-archived-rows-count-no-bytes).
+ *
+ * An archive takes rows out of the kept totals (storage/memory-totals.ts), so it frees room among live
+ * keys exactly as before; the archived rows are counted here instead, from the rows themselves on both
+ * providers, so rows archived before this ceiling existed are counted as they are, with no stored total
+ * to seed. The count is taken before and after the flip in one transaction, and a principal past the
+ * ceiling rolls the archive back whole. Only growth is refused: a principal already past the ceiling
+ * can still bring rows back and delete them, and archives nothing more until it is under the ceiling.
+ * 0 is no limit. `owners` may name more principals than the archive touches.
+ */
+export async function archiveWithinCeiling<T>(
+    deps: { storage: Storage; config: AimeatConfig },
+    owners: readonly string[],
+    flip: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; refusal: CeilingRefusal }> {
+    const { storage, config } = deps;
+    const ceiling = archivedCeilingOf(config);
+    const unique = [...new Set(owners)];
+    if (ceiling === null || unique.length === 0) return { ok: true, value: await flip() };
+    try {
+        const value = await storage.transaction(async () => {
+            const before = new Map<string, number>();
+            for (const o of unique) before.set(o, await archivedKeyCount(storage, o));
+            const out = await flip();
+            for (const o of unique) {
+                const refusal = archivedCeilingRefusal(ceiling, o, before.get(o)!, await archivedKeyCount(storage, o),
+                    { act: 'Archiving this', stays: 'Nothing was archived.' });
+                if (refusal) throw new CeilingRollback(refusal);
+            }
+            return out;
+        });
+        return { ok: true, value };
+    } catch (err) {
+        if (err instanceof CeilingRollback) return { ok: false, refusal: err.refusal };
+        throw err;
+    }
 }

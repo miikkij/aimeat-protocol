@@ -14,6 +14,8 @@
  *   - servedPageLocale(req, nodeLocale): ?lang, cookie, the node's language, then the browser's
  *
  * @version-history
+ *   2026-11-09 — resolveFlat() also collects the flat top-level keys under the prefix, as t() reads
+ *     them; the setting explanations an AI reads had missed 98 of them (guidance audit 2026-11-09).
  *   2026-11-02 — acceptLanguageLists() and pickedLocale(), for a static front page's language.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-12 — Spanish (es) added. localeFromCookie now matches any two-letter tag and
@@ -188,14 +190,27 @@ export function resolveFlat(locale: Locale, prefix: string): Record<string, stri
     }
   }
 
-  // Walk the primary locale
+  /** The flat top-level keys under the prefix ("explain.concept.goal.short" written as one key). */
+  function collectFlat(d: Dict, overwrite: boolean): void {
+    const lead = `${prefix}.`;
+    for (const [k, v] of Object.entries(d)) {
+      if (!k.startsWith(lead)) continue;
+      if (typeof v === 'string') { if (overwrite || !(k in result)) result[k] = v; }
+      else if (Array.isArray(v)) { if (overwrite || !(k in result)) result[k] = v.join(', '); }
+      else if (typeof v === 'object' && v !== null) collect(v as Dict, k, overwrite);
+    }
+  }
+
+  // Walk the primary locale: the nested object under the prefix, then its flat keys
   const sub = dict ? navigateTo(dict, prefix) : undefined;
   if (sub) collect(sub, prefix, true);
+  if (dict) collectFlat(dict, true);
 
   // Fill in missing keys from fallback
   if (fallback) {
     const fbSub = navigateTo(fallback, prefix);
     if (fbSub) collect(fbSub, prefix, false);
+    collectFlat(fallback, false);
   }
 
   return result;

@@ -8,6 +8,7 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.4.0 -- 2026-11-08 -- The import's conflict drop-down in the tools line has its question mark beside it: memory.importMode (components/HelpTip.js).
  *   v2.3.1 -- 2026-11-05 -- The expanded row's visibility menu offers "group" only on a record already at it, like the other menus: this menu names no group.
  *   v2.3.0 -- 2026-10-18 -- A key's visibility tag is the AudienceBadge: who can read it in words (Private, "<organism> members", Signed-in, Public), still the button that opens the picker (plan doc-mvcn6c7e4e5q, V6.4).
  *   v2.2.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry instead of a
@@ -89,6 +90,7 @@ import { FoldRow } from '/components/Folds.js';
 import { Tabs } from '/components/Tabs.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Select } from '/components/Select.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { TextField } from '/components/TextField.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { FileDrop } from '/components/FileDrop.js';
@@ -376,6 +378,7 @@ export function renderEntries(ctx) {
                 ['overwrite', t('profile.memory.importMode.overwrite') || 'Overwrite'],
                 ['rename', t('profile.memory.importMode.rename') || 'Import as new'],
               ]} />
+            <${HelpTip} term="memory.importMode" label=${t('profile.memory.importModeLabel')} />
             <${FileDrop} hidden accept="application/json,.json" inputRef=${importFileRef} onChange=${handleImportFile} />
           <//>
         <//>

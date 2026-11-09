@@ -5,11 +5,22 @@
  * @description The Capabilities page in the poster face: the agent's view of this node. The mast and
  *   the strip; four shelves as rows grouped by provider (extension actions, app tools, agent offers,
  *   hand-added and other), each with a filter row and a search; the hand-added form when the policy
- *   allows it; and the section that says how an agent finds and calls. What opens under a row is
- *   rows.js. Pure render over the ctx bag.
+ *   allows it; and the section with the rule an AI gets and the facts of a call (who may call, trust,
+ *   what is counted). What opens under a row is rows.js. The page explains itself the designed way
+ *   (.claude/rules/page-guidance.md): the page's start (PageStart "capabilities") and the title's
+ *   question mark (concept.node_capability). Pure render over the ctx bag.
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.21.0 -- 2026-11-08 -- The hand-added form's Webhook address and "Visible to agents" open their
+ *     explanations (help capabilities.webhook, capabilities.public). The line beside the Add button
+ *     (capspage.formHint) goes: the webhook's explanation says what it said, and FormActions loses
+ *     `apart`, which only spread that line from the button.
+ *   v1.20.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "capabilities" in the start slot and the title's question mark concept.node_capability.
+ *     Section 05 loses its lead paragraph (capspage.aiIntro) and the "Two catalogues" row
+ *     (capspage.aiTwoK, aiTwoBody), which explained the concept; the concept says it now, and the
+ *     section keeps the rule to copy and the facts of a call.
  *   v1.19.1 -- 2026-10-16 -- The policy line no longer names who may publish: the node enforced no such setting (QA audit D8-05).
  *   v1.19.0 -- 2026-09-26 -- On the component kit (page group G7): the frame is the SettingsPage (crumb, head with its tags as data, the loud copy, the rail's sections and sibling pages), the strip the FigureStrip, a shelf's filters, search line, rows and more line the List, the hand-added form the FoldRow over the Fields, the rule an AI gets the Box, the facts the Facts. The vouches tag counts nothing yet in the dim tone again (main's og-chip--dim). The page writes no class.
  *   v1.18.0 -- 2026-09-26 -- "Public" beside its check box is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -60,6 +71,7 @@ import { Space } from '/components/Layout.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Check } from '/components/Check.js';
+import { PageStart } from '/components/PageStart.js';
 
 const PAGE = 20;
 const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
@@ -106,9 +118,12 @@ export function renderPage(ctx) {
     { id: 'cp-ai', num: '05', label: x('secAi') },
   ];
 
+  // The start: the first thing is a search the person's AI makes, which this page cannot see, so it
+  // stays open until the person folds it.
+  const start = html`<${PageStart} id="capabilities" />`;
   return html`
-    <${SettingsPage} name="caps" crumb=${crumb()} title=${t('capabilities.tabLabel')} sub=${x('titleSub')} marks=${marks}
-      desc=${none ? x('descEmpty') : x('desc')} actions=${actions} strip=${strip}
+    <${SettingsPage} name="caps" crumb=${crumb()} title=${t('capabilities.tabLabel')} help="concept.node_capability" sub=${x('titleSub')} marks=${marks}
+      desc=${none ? x('descEmpty') : x('desc')} actions=${actions} start=${start} strip=${strip}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${shelf(ctx, 'ext', '01', x('secExt'), groups ? x('secExtSub', { actions: members(ext), ext: ext.length }) : null, ext, true)}
@@ -184,13 +199,12 @@ function secOther(ctx, num, other, canCreate) {
             <${Space} above="large">
               <${Fields} cols=${2}>
                 <${TextField} label=${x('formName')} value=${f.name} onInput=${(name) => ctx.setForm({ name })} />
-                <${TextField} label=${x('formWebhook')} placeholder="https://" value=${f.webhookUrl} onInput=${(webhookUrl) => ctx.setForm({ webhookUrl })} />
+                <${TextField} label=${x('formWebhook')} help="capabilities.webhook" placeholder="https://" value=${f.webhookUrl} onInput=${(webhookUrl) => ctx.setForm({ webhookUrl })} />
                 <${TextArea} wide label=${x('formSummary')} rows=${2} value=${f.summary} onInput=${(summary) => ctx.setForm({ summary })} />
                 <${TextField} label=${x('formTags')} value=${f.tags} onInput=${(tags) => ctx.setForm({ tags })} />
-                <${Check} checked=${f.visibility === 'public'} onChange=${(on) => ctx.setForm({ visibility: on ? 'public' : 'private' })}>${x('formPublic')}<//>
+                <${Check} help="capabilities.public" checked=${f.visibility === 'public'} onChange=${(on) => ctx.setForm({ visibility: on ? 'public' : 'private' })}>${x('formPublic')}<//>
               <//>
-              <${FormActions} apart>
-                <${Note} inline>${x('formHint')}<//>
+              <${FormActions}>
                 <${Action} small disabled=${ctx.busy === 'create' || !f.name.trim()} onClick=${() => ctx.createManual()}>${x('formCreate')}<//>
               <//>
             <//>` : null}` : null}`}
@@ -202,7 +216,6 @@ function secOther(ctx, num, other, canCreate) {
 function secAgent(ctx, num, all, calls, vouches) {
   return html`
     <${PageSection} id="cp-ai" num=${num} title=${x('secAi')} count=${null}>
-      <${Note} kind="lead">${x('aiIntro')}<//>
       <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>
@@ -211,7 +224,6 @@ function secAgent(ctx, num, all, calls, vouches) {
         { k: x('aiWhoK'), v: x('aiWhoBody') },
         { k: x('aiTrustK'), v: x('aiTrustBody'), sub: vouches ? x('aiTrustSub', { n: vouches }) : x('aiTrustNone') },
         { k: x('aiCallsK'), v: ctx.policy?.call_counting ? x('aiCallsOn', { n: calls }) : x('aiCallsOff', { n: calls }) },
-        { k: x('aiTwoK'), v: x('aiTwoBody') },
       ]} />
     <//>`;
 }

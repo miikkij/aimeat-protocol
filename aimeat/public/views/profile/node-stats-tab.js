@@ -3,8 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing real-time node statistics including uptime,
- *   request counts, tunnel metrics, mailbox stats, and security counters.
+ *   request counts, tunnel metrics, mailbox stats, and security counters. Not drawn with
+ *   SettingsPage (it is the Nodes page's second sub-tab, and the nodeStats tab on its own), so it
+ *   explains itself through what it draws (.claude/rules/page-guidance.md): the question mark
+ *   concept.node_stats after its heading's words, and the page's start (PageStart id "nodeStats")
+ *   under the heading.
  * @version-history
+ *   v1.11.0 -- 2026-11-08 -- Owners, Agents and P95 Latency open their explanation
+ *     (nodeStats.owners, nodeStats.agents, nodeStats.latencyP95): what each figure counts.
+ *   v1.10.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     the question mark concept.node_stats after the heading's words (HelpTip, as PageHead draws a
+ *     page's), and PageStart "nodeStats" under the heading, with the prompt that has one's own AI
+ *     read the figures.
  *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (FigureStrip lead, CardGrid of section Cards, Facts with the status code as the name's state, SubHeading, Note, Space): the page passes data and writes no class. Under the Nodes page head the sub-tab keeps its own name and line as a level-2 sub-heading (page group G8).
  *   v1.8.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.7.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -33,6 +43,8 @@ import { Card, CardGrid } from '/components/Card.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
+import { HelpTip, HelpLabel } from '/components/HelpTip.js';
+import { PageStart } from '/components/PageStart.js';
 import { getNodeStats } from '/js/services/stats.js';
 import { num, dateTime as fmtDateTime, duration } from '/js/format.js';
 
@@ -51,6 +63,8 @@ function fmtBytes(b) {
 // (accent/success/purple/blue/warn/danger) were drawn in ink by the poster skin (.pf .stat-card-value
 // overrode them), so the strip draws them as it draws every figure.
 const fig = (label, value) => ({ n: value, label });
+// A figure whose word opens its own explanation (`explain.<term>.*`).
+const helpFig = (label, value, term) => ({ key: label, n: value, label: html`<${HelpLabel} term=${term} label=${label}>${label}<//>` });
 
 // A status code's name is its state (2xx fine, 4xx attention, 5xx danger), as main coloured it.
 const codeState = (code) => (code.startsWith('2') ? 'fine' : code.startsWith('4') ? 'attention' : code.startsWith('5') ? 'danger' : undefined);
@@ -82,7 +96,12 @@ export default function NodeStatsTab() {
 
   // Under the Nodes page head (Jouni's decision "Nodes page head") this sub-tab keeps its own name
   // and line as a level-2 sub-heading: main showed them, and the Nodes head names the page, not it.
-  const head = html`<${SubHeading} level=${2} desc=${error ? null : t('profile.nodeStats.desc')}>${t('profile.nodeStats.title')}<//>`;
+  // The page's question mark after the heading's words, as PageHead draws one after a page title,
+  // and the page's start under the heading (this sub-tab has no SettingsPage head of its own).
+  const title = t('profile.nodeStats.title');
+  const head = html`
+    <${SubHeading} level=${2} desc=${error ? null : t('profile.nodeStats.desc')}>${title} <${HelpTip} term="concept.node_stats" label=${title} /><//>
+    <${PageStart} id="nodeStats" />`;
   if (error) return html`${head}<${Note} kind="meta">${t('profile.nodeStats.error')}<//>`;
   if (!data) return html`<${LoadingLine} text=${t('profile.nodeStats.loading')} />`;
   const s = data;
@@ -95,8 +114,8 @@ export default function NodeStatsTab() {
     <${FigureStrip} lead items=${[
       fig(t('profile.nodeStats.uptime'), fmtUptime(s.uptime_seconds)),
       fig(t('profile.nodeStats.requests'), num(s.requests_total || 0)),
-      fig(t('profile.nodeStats.owners'), s.active_owners || 0),
-      fig(t('profile.nodeStats.agents'), s.active_agents || 0),
+      helpFig(t('profile.nodeStats.owners'), s.active_owners || 0, 'nodeStats.owners'),
+      helpFig(t('profile.nodeStats.agents'), s.active_agents || 0, 'nodeStats.agents'),
       fig(t('profile.nodeStats.memoryWrites'), num(s.memory_writes || 0)),
       fig(t('profile.nodeStats.memoryReads'), num(s.memory_reads || 0)),
     ]} />
@@ -117,7 +136,7 @@ export default function NodeStatsTab() {
       fig(t('profile.nodeStats.msgReceived'), num(s.tunnel.messages_received_total || 0)),
       fig(t('profile.nodeStats.deliveryFails'), s.tunnel.delivery_failures_total),
       fig(t('profile.nodeStats.latencyAvg'), (s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'),
-      fig(t('profile.nodeStats.latencyP95'), (s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms'),
+      helpFig(t('profile.nodeStats.latencyP95'), (s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms', 'nodeStats.latencyP95'),
     ]) : null}
 
     ${s.mailbox ? section(t('profile.nodeStats.mailboxTitle'), [

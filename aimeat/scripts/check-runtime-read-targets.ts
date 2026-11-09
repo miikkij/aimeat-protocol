@@ -22,6 +22,8 @@
  *   cd aimeat && pnpm check:runtime-read-targets            # report
  *   cd aimeat && pnpm check:runtime-read-targets --strict   # the CI gate
  * @version-history
+ *   v1.3.0 — 2026-11-08 — Two more members, the account erasure's receiver-principal search (SQLite and
+ *     Postgres), whose table comes from the fixed RECEIVER_PRINCIPAL_COLUMNS list, never input.
  *   v1.2.0 — 2026-11-05 — Two more members, the re-encrypt job's sealed column listing (SQLite and
  *     Postgres), whose table comes from the fixed SEALED_COLUMNS map, never input.
  *   v1.1.0 — 2026-09-26 — Two more members, both the visit-retention fold (SQLite and Postgres), whose
@@ -64,6 +66,16 @@ const ALLOWED: Record<string, string> = {
         'The Postgres twin of the re-encrypt job listing: the table comes from the fixed SEALED_COLUMNS '
         + 'map through sql.table(), never input, with the same deletedAt filter for memory rows. '
         + 'Written 2026-11-05 (codebase analysis 2026-11-03, decision 4a of 2026-11-05).',
+    'src/storage/providers/sqlite/repos/account-records-erasure.ts:rows':
+        'Account erasure finds the erased person\'s receiver principals (receiver:<name>/…@<node>) in the '
+        + 'writer and reader columns that name one. The table and column come only from the fixed '
+        + 'RECEIVER_PRINCIPAL_COLUMNS list in storage/erased-account-records.ts, never from input, and the '
+        + 'pattern is escaped. No deletedAt filter on purpose: an erasure renames deleted rows too. The '
+        + 'values are only renamed to the pseudonym, never shown. Written 2026-11-08 (secaudit2026nov08b round 15).',
+    'src/storage/providers/postgres-kysely/methods/account-records-erasure.ts:r':
+        'The Postgres twin of the erasure\'s receiver-principal search: the table comes from the fixed '
+        + 'RECEIVER_PRINCIPAL_COLUMNS list through sql.table() and the column through sql.ref(), never '
+        + 'input; deleted rows are included as in SQLite. Written 2026-11-08 (secaudit2026nov08b round 15).',
 };
 
 export function main(): boolean {

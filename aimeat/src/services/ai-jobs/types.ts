@@ -14,6 +14,8 @@
  *   StartAiJobInput · AiJobError · AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.14.0 -- 2026-11-08 -- `waiting`: a queued job of a deactivated account says why it does not run
+ *     (secaudit2026nov08 round 14, reclaimJobs:restarts-deactivated-account-job).
  *   v1.13.0 -- 2026-11-04 -- `stopped_at` and `requeued_after_stop`: a job the node stopped is queued
  *     again once at the next start (restart.ts; codebase analysis 2026-11-03, item HA 1.4).
  *   v1.12.1 -- 2026-10-27 -- visibleToViewer moved here from service.ts, unchanged (max-file-lines; secaudit2026oct26).
@@ -155,6 +157,10 @@ export interface AiJobRecord {
     stopped_at?: string;
     /** How many times a restart put this job back in the queue after the node stopped it. */
     requeued_after_stop?: number;
+    /** Why a queued job does not run yet: its account is deactivated (run-gate.ts). The job stays
+     *  queued, nothing is spent, and it runs after the operator reactivates the account. Absent once
+     *  it runs. */
+    waiting?: string;
 }
 
 /**

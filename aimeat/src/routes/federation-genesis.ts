@@ -13,6 +13,8 @@
  *   - genesis-memory-read (POST/GET): forwards reads to peers or answers peer reads under federation consent
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  * @version-history
+ *   2026-11-08 — GET /v1/federation/cross-catalogue lists a local CSM only when it is public as well as
+ *     federable (secaudit2026nov08 round 14).
  *   2026-10-31 — An ingested entry is stored under genesisPeerKey, which never names the operator's
  *     subscription record, and GET /v1/federation/cross-catalogue lists catalogue entries only, not the
  *     cached answers of a local reader's genesis memory read (secaudit2026oct31w2 round 10).
@@ -65,6 +67,7 @@ import {
 } from '../services/genesis-memory-cache.js';
 import { logger } from '../utils/logger.js';
 import { actionPricingFromPeer, presentActionPricing } from '../services/action-pacing.js';
+import { csmMayRead } from '../services/csm-service.js';
 
 export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
     const router = Router();
@@ -164,6 +167,9 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                 );
                 for (const csm of localCsms) {
                     if (!csm.federate) continue;
+                    // A public CSM only: this list answers anyone, and a private, members or organism
+                    // CSM answers as a missing one to a caller it refuses (csm-service.ts ruling 2).
+                    if (!(await csmMayRead(storage, csm, null))) continue;
                     if (keyword && !matchesKeyword(csm, keyword)) continue;
                     entries.push({
                         type: 'csm',

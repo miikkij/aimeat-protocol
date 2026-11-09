@@ -21,6 +21,10 @@
  *   const got = await loadWorkspaceContent({ storage, config }, reader, { sub, ownerName, accessorGaii }, { organismId, ws });
  *   if (!got.ok) return refuse(got.status, got.code, got.message);
  * @version-history
+ *   2026-11-08 — Every value it hands out (`items` and `hydrate`) passes the credential mask
+ *     (shownMemoryValue), as presentMemories does: the share record's password and calendar key hashes
+ *     read as has_password and has_ics_key (secaudit2026nov08 round 14,
+ *     workspace-content:reserved-workspace-records-served-through-declared-namespace-unmasked).
  *   2026-11-04 — No per-key getMemory for a storage without getMemoryByKeys: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-11-04 — `truncated`: the workspace holds more rows than one read loads (5 000), which
@@ -40,6 +44,7 @@ import { decideWorkspaceRead } from './workspace-access.js';
 import { workspaceMetaReader, type WorkspaceMetaReader } from './workspace-meta.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
+import { shownMemoryValue } from './secret-records.js';
 
 export interface WorkspaceContentArgs {
   organismId: string;
@@ -127,7 +132,9 @@ export async function loadWorkspaceContent(
   const loaded = args.archived === 'only'
     ? all.filter(r => r.archived || r.key === `${root}meta.manifest` || r.key === `${root}meta.readme`)
     : all;
-  const hydrate = lazy ? (rows: MemoryRecord[]) => hydrateRows(storage, rows) : async (rows: MemoryRecord[]) => rows;
+  // Every value handed out passes the credential mask (services/secret-records.ts), the half of
+  // presentMemories the reader does not do: the share record shows has_password, never its hash.
+  const hydrate = lazy ? async (rows: MemoryRecord[]) => (await hydrateRows(storage, rows)).map(masked) : async (rows: MemoryRecord[]) => rows;
   /** One picked meta record, whole. */
   const whole = async (r: MemoryRecord | null): Promise<MemoryRecord | null> => (r ? (await hydrate([r]))[0] ?? null : null);
 
@@ -138,7 +145,7 @@ export async function loadWorkspaceContent(
   if (!decision.member) return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Not an active member of this organism' };
 
   const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
-  const items = decision.canRead ? await reader.show(loaded, target) : [];
+  const items = decision.canRead ? (await reader.show(loaded, target)).map(masked) : [];
   const readme = meta ? await whole(await meta.pick(ws!, 'meta.readme', loaded)) : (loaded.find(r => r.key === `${root}meta.readme`) ?? null);
   // The read is DECIDED on the stored manifest, but what is HANDED OUT (the manifest, the readme a
   // member sees of a workspace they may not read, and the name an overview takes from them) passes
@@ -153,6 +160,12 @@ export async function loadWorkspaceContent(
     descriptor: { manifest: shownManifest, readme: await shownOne(readme) },
     truncated, hydrate,
   };
+}
+
+/** The row with its value as a generic door may show it; the same object when the mask changes nothing. */
+function masked(r: MemoryRecord): MemoryRecord {
+  const value = shownMemoryValue(r.key, r.value);
+  return value === r.value ? r : { ...r, value };
 }
 
 /** A META row as a record without its value: the fields the decision and the reader use. */

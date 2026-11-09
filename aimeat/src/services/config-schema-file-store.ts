@@ -10,9 +10,11 @@
  * @structure FILE_STORE_CONFIG_FIELDS
  * @usage import { FILE_STORE_CONFIG_FIELDS } from './config-schema-file-store.js';
  * @version-history
+ *   v1.1.0 — 2026-11-08 — file_store.min_mb and file_store.kinds: which files the node's store takes
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
-import type { FileStoreConfig } from '../config-file-store.js';
+import { FILE_KINDS, type FileStoreConfig } from '../config-file-store.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
 
@@ -55,6 +57,13 @@ export const FILE_STORE_CONFIG_FIELDS: ConfigFieldShape<keyof FileStoreConfig>[]
     description: 'The blob service address. Empty for Azure itself; set it only for a test against Azurite, for example http://127.0.0.1:10000/devstoreaccount1' },
   { key: 'fileStoreAzureCredential', dotPath: 'file_store.azure_credential', envVar: 'AIMEAT_FILE_STORE_AZURE_CREDENTIAL', type: 'string', validate: () => true, immutable: true,
     description: 'One of: the storage account key, the account\'s connection string, or a container SAS URL with read, add, create, write, delete and list rights (secret)', adminDisplay: 'configured' },
+  { key: 'fileStoreMinMb', dotPath: 'file_store.min_mb', envVar: 'AIMEAT_FILE_STORE_MIN_MB', type: 'number',
+    validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 10240, immutable: false,
+    description: 'Which files the node\'s store is for, by size: a file at least this many megabytes long goes to the store, a smaller one keeps its bytes in this node\'s database unless its kind is in file_store.kinds. 0 sends every file to the store. Default 1. A file in the store that the rule no longer takes moves back to the database by itself at the next start and in the daily cleanup',
+    range: '0-10240' },
+  { key: 'fileStoreKinds', dotPath: 'file_store.kinds', envVar: 'AIMEAT_FILE_STORE_KINDS', type: 'object', list: true,
+    validate: v => Array.isArray(v) && v.every(s => typeof s === 'string' && FILE_KINDS.includes(s)), immutable: false,
+    description: 'Which files the node\'s store is for, by kind: video, audio, image or pdf go to the store whatever their size. Default video and audio. Empty: the size alone decides' },
   { key: 'ownerFileStores', dotPath: 'file_store.owner_stores', envVar: 'AIMEAT_OWNER_FILE_STORES', type: 'string', ...oneOf('auto', 'off', 'operator', 'self'), immutable: false,
     description: 'Whether a person may connect their own S3 bucket or Azure container with their own keys, so their files go there instead of the node\'s store and do not count toward the node\'s storage quota. self: everyone may. operator: only the people an operator approved; the others can ask. off: nobody; a store already connected stops taking new files. auto: operator when content access is signed-in (a company\'s node), self otherwise',
     range: 'auto|off|operator|self' },

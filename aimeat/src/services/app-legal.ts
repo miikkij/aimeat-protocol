@@ -37,6 +37,8 @@
  * @usage
  *   const out = await applyOwnerLegalUpdate(storage, { ownerGaii, filename }, { legal: body.legal, actor });
  * @version-history
+ *   v1.2.3 — 2026-11-08 — legalReadiness and LegalReadiness moved to ./app-build/legal-readiness.ts
+ *     unchanged and are re-exported here.
  *   v1.2.2 — 2026-10-07 — appSellsForMoney reads a tool's money prices with toolMoneyPrices, the
  *     function the checkout and the catalog use, instead of its own copy of the two-field test.
  *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
@@ -62,6 +64,8 @@ import { AppToolsDocSchema, toolMoneyPrices } from '../models/app-tool-schemas.j
 import { provenanceForWrite, provenanceDeclarationRefusal, ProvenanceScopeError, type DeclaredProvenance } from './ai/provenance.js';
 import { logger } from '../utils/logger.js';
 import { escapeHtml as esc } from '../utils/html-escape.js';
+import { legalReadiness, type LegalReadiness } from './app-build/legal-readiness.js';
+export { legalReadiness, type LegalReadiness };
 
 export const LEGAL_CONTENT_MAX = 200_000;
 export const LEGAL_URL_MAX = 2048;
@@ -192,14 +196,6 @@ export function stripLegalContent(manifest: AppManifest): AppManifest {
   return { ...manifest, legal };
 }
 
-export interface LegalReadiness {
-  /** The kinds this app should have, given what it is. */
-  recommended: AppLegalKind[];
-  /** Of those, the ones it does not have yet. */
-  missing: AppLegalKind[];
-  /** Why the recommendation is what it is, one line. */
-  reason: string;
-}
 
 /**
  * Does this app take MONEY for anything: a tool priced in a currency in its tools document
@@ -223,27 +219,8 @@ export async function appSellsForMoney(storage: Storage, app: Pick<AppRecord, 'o
   }
 }
 
-/**
- * Which pages an app ought to have. Every published app: terms and privacy. An app that takes
- * money (appSellsForMoney): also who is selling, how to withdraw, the accessibility statement the
- * EAA asks of e-commerce, and a support contact. Recommended, never blocked: the owner decides,
- * the details view shows what is missing, and a chip on the app's masthead says so.
- */
-export function legalReadiness(app: Pick<AppSummaryRecord, 'manifest'>, opts?: { sellsForMoney?: boolean }): LegalReadiness {
-  const m = app.manifest;
-  const sells = opts?.sellsForMoney === true;
-  const recommended: AppLegalKind[] = sells
-    ? ['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'support']
-    : ['terms', 'privacy'];
-  const have = new Set(Object.keys(m?.legal ?? {}));
-  return {
-    recommended,
-    missing: recommended.filter(k => !have.has(k)),
-    reason: sells
-      ? 'This app sells something, so it answers for the sale: who is selling, on what terms, how to withdraw, how the data is handled, and how the shop can be used by everyone.'
-      : 'A published app answers for its own terms and for the personal data it handles.',
-  };
-}
+// legalReadiness lives in ./app-build/legal-readiness.ts (a pure move, 2026-11-08) and is
+// re-exported above, so the publish answer can name it without an import cycle through this file.
 
 export interface LegalUpdateInput {
   legal: unknown;

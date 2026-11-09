@@ -18,6 +18,12 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './app-publish-next-steps.js';
  * @version-history
+ *   v1.3.1 — 2026-11-08 — `acceptance` names the one size matrix (390×844, 1280×900, 1280×460) the
+ *     skill and the spec name; it said 390 and 1440, which a real build met as a contradiction.
+ *     `legal_pages` says which recommended legal pages are missing and how to write them (the
+ *     structure page was the first place a build met them), and `agent_face` names its library and
+ *     says the record is public. The design spec's next calls name the app's owner, so a builder of
+ *     another owner's app reads and writes that app's spec and not one of its own by the same name.
  *   v1.3.0 — 2026-10-10 — `data_map` and `design_spec`, with `data_map_present` and
  *     `design_spec_present`: stated on every publish, present or not, like the face and the skill.
  *     The answer named two of the four things an app owes, and the two it named got done: the
@@ -48,6 +54,7 @@ import { appSizeHealth, type AppSizeHealth } from './app-size-health.js';
 import { logger } from '../utils/logger.js';
 import { designBookStep } from './app-genre-fork.js';
 import { levelStep } from './app-build-level.js';
+import { legalReadiness } from './app-build/legal-readiness.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -76,8 +83,8 @@ export function documentSteps(ownerName: string, filename: string, d: DocumentsB
       ? `This app has a data map, and ${d.dataMapRowsWithoutWhy} row(s) in it say no \`why\` yet. Read it with aimeat_datamap_get { app: "${app}" }, fill what you know, and update it if this change moved or added data.`
       : `This app has a data map. If this change moved or added where data lives, read it (aimeat_datamap_get { app: "${app}" }) and write the whole map back with aimeat_datamap_set.`;
   const designSpec = d.designSpecVersion === undefined
-    ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", filename: "${filename}", markdown }: what the app is for, its screens, where its data lives, what was decided and why, what is open, and what bit you; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
-    : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
+    ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", owner: "${ownerName}", filename: "${filename}", markdown }: what the app is for, its screens, where its data lives, what was decided and why, what is open, and what bit you; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
+    : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", owner: "${ownerName}", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
   return {
     data_map_present: !d.dataMapMissing,
     design_spec_present: d.designSpecVersion !== undefined,
@@ -94,12 +101,17 @@ export async function buildPublishNextSteps(
     // Resolve the face across the owner's whole keyspace (GHII + the owner's agents), matching what
     // the anonymous serve path serves — so an agent that published the face under its own GAII still
     // reports agent_face_present:true here.
-    const [faceRec, boundSkills] = await Promise.all([
+    const [faceRec, boundSkills, appRec] = await Promise.all([
       getOwnerScopePublicMemory(storage, config.nodeId, ownerName, agentFaceKey(filename))
         .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return null; }),
       listSkillsByBinding(storage, config, `app:${ownerName}/${filename}`, { ownerName })
         .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return []; }),
+      storage.getAppByOwnerName(ownerName, filename)
+        .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return null; }),
     ]);
+    // The legal pages the app's structure page reports as open, said here first. A real build met
+    // them only on the structure page after the four owed items were done (2026-11-08).
+    const legalMissing = appRec ? legalReadiness(appRec).missing : [];
 
     // How big it has become, and how fast. Best-effort like everything here: an app whose version
     // line cannot be read still gets its face and skill reminder.
@@ -132,9 +144,10 @@ export async function buildPublishNextSteps(
       ...(size ? { size } : {}),
       ...(track === 'atelier' && level ? { level } : {}),
       ...(track === 'atelier' && !level ? {
-        acceptance: 'Accept this app from screenshots at 390 and 1440, in both themes, placed '
+        acceptance: 'Accept this app from screenshots at 390×844 and 1280×900, in both themes, placed '
           + `beside the genre it forked (${genreAddress}), and ask while looking: would this pass `
-          + 'beside the genre? Measure alongside it: page width equal to the viewport, nothing '
+          + 'beside the genre? Measure alongside it, at 390×844, 1280×900 and 1280×460 (the one size matrix '
+          + 'of the skill and the spec): page width equal to the viewport, nothing '
           + 'past the viewport edge (including inside a box that clips), no text under 11 px, no '
           + 'control under 40 px at 390, contrast 4.5 for body text, no animation still running '
           + 'under reduced motion, and a clean console.',
@@ -148,7 +161,7 @@ export async function buildPublishNextSteps(
       // and an app without a bound skill teaches nobody how to operate it.
       agent_face: faceRec
         ? `This app has an agent face (${agentFaceKey(filename)}). Update it on the SAME writes that update the visible view, or agents and humans drift apart.`
-        : `No agent face yet. Publish one — AIMEATAgentFace.publish({ title, sections }, { app: "${filename}" }) — so an agent can read this app's state as markdown instead of scraping the DOM. One public memory record: ${agentFaceKey(filename)}.`,
+        : `No agent face yet. Publish one with /v1/libs/aimeat-agentface.js — AIMEATAgentFace.publish({ title, sections }, { app: "${filename}" }) — so an agent can read this app's state as markdown instead of scraping the DOM. One PUBLIC memory record: ${agentFaceKey(filename)}, so an app whose data is private describes what it does and never its records.`,
       bound_skill: boundSkills.length > 0
         ? `${boundSkills.length} skill(s) bound to this app. Keep them current with what the app does.`
         : `No skill bound yet. Write the operating guide as a skill with metadata.binding "app:${ownerName}/${filename}" (aimeat_skill_publish) — that is how anyone's AI learns to USE this app rather than guess at it.`,
@@ -156,6 +169,13 @@ export async function buildPublishNextSteps(
       // the face and the skill and stayed silent on these, and a builder who had read "next_steps
       // is the node's list of what this app still owes" shipped four versions without either.
       ...(documents ? documentSteps(ownerName, filename, documents) : {}),
+      // Recommended, never blocking (app-legal.ts): the publish does not wait for them.
+      ...(legalMissing.length ? {
+        legal_pages: `Recommended, not blocking: this app has no ${legalMissing.join(' or ')} page yet. `
+          + `Write each with aimeat_app_manage { action: "legal", filename: "${filename}", kind, format: "markdown", content }; `
+          + 'the structure page lists them as open until they exist. Say what the app really does with data: '
+          + 'the node itself adds a cookie notice to the page, which names any analytics the operator runs.',
+      } : {}),
       template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Learnings that would bite the next builder go to aimeat_appdev_pitfall_report.',
     };
   } catch (err) {

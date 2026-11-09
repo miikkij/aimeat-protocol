@@ -9,6 +9,8 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-08 — ai-transparency: what a receiver writes is said as what an incoming webhook writes
+ *     (secaudit2026nov08b round 15b).
  *   2026-11-07 — configure-routing: an agent's own text model (the chat's is agent "chat") and the operator's
  *     two model settings; aimeat-ai-model-policy: the operator's allowed models and lock (Jouni, 2026-11-07).
  *   2026-11-07 — ai-transparency: the level `machine`, a program with no model (what a receiver writes).
@@ -115,7 +117,7 @@ gated — only asserting is.
 | \`assisted\` | A person wrote it; a model edited, refined or filled in. |
 | \`synthesized\` | A model combined real sources into new content, at someone's direction. |
 | \`ai-generated\` | A model produced it. |
-| \`machine\` | A program produced it with no model and no person writing it: a sensor reading, another system's export. The node stamps it itself on what a receiver writes; declare it only for data a program of yours produced without a model. |
+| \`machine\` | A program produced it with no model and no person writing it: a sensor reading, another system's export. The node stamps it itself on what an incoming webhook writes; declare it only for data a program of yours produced without a model. |
 
 ## \`human_involvement\` — whether anyone checked
 

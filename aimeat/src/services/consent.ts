@@ -6,14 +6,21 @@
  *   authorization (visibility + group + private consent + organism-member resolution),
  *   audit-entry writing, and the consent-expiry background job. Used by the shared
  *   access-guard and every identity-scoped read path (memory, storage, knowledge).
+ *   A knowledge package's records (keys under packages/) answer to their own visibility: a consent
+ *   whose recipient is `*` never opens one that is not public (consentToEveryoneKeptOut).
  * @structure
  *   - matchesRecipient() — pure recipient-pattern matcher (sync; organism.* resolved elsewhere)
+ *   - consentToEveryoneKeptOut() — a consent to everyone does not open a knowledge package record
  *   - checkConsentForRead() — full read decision incl. async organism-membership resolution
  *   - auditDataAccess() — write a ConsentAuditEntry
  *   - expireConsents() / startConsentExpiryJob() — periodic expiry of stale grants
  * @usage
  *   import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
  * @version-history
+ *   2026-11-08 — A consent whose recipient is `*` does not open a record under packages/ that is not
+ *     public. The knowledge package page's Federation switch grants exactly that consent, to send the
+ *     public entries to peers and list the owner in the directory, and it opened every private entry
+ *     of the package to every reader, the anonymous one included (guide audit 2026-11-08, k1-federation).
  *   2026-10-20 — expireConsents() tells the member directory when it expired anything, so a person
  *     whose federation consent ran out leaves the directory without another change rebuilding it
  *     (secaudit 2026-10, consent-write:revoke-directory-refresh-optional).
@@ -38,6 +45,22 @@ import { logger } from '../utils/logger.js';
 import { barredAgentFor } from './organism-agent-access.js';
 import { notifyDirectoryChange } from './directory.js';
 
+/** The key space of knowledge packages: a manifest and its entries, each record with its own visibility. */
+const KNOWLEDGE_PACKAGE_PREFIX = 'packages/';
+
+/**
+ * Whether a consent to everyone is kept from opening this record. A record under packages/ is a
+ * knowledge package's manifest or entry, and who reads it is decided by that record's visibility,
+ * which the entry visibility route changes behind the publish gate. A consent whose recipient is `*`
+ * names no reader, so it does not widen that visibility: the package page's Federation switch grants
+ * `packages/<id>/*` to `*` with the reach `federation`, and what that consent is for (replicating the
+ * PUBLIC entries to peers, services/memory-replication.ts, and listing the owner in the directory,
+ * services/directory.ts) reads the consent itself and never this check. A named recipient (an
+ * organism, a person, an agent, a party) still opens what it names.
+ */
+export function consentToEveryoneKeptOut(recipient: string, memoryKey: string): boolean {
+  return recipient === '*' && memoryKey.startsWith(KNOWLEDGE_PACKAGE_PREFIX);
+}
 
 /**
  * Check if an accessor has consent to read a specific memory key.
@@ -46,8 +69,9 @@ import { notifyDirectoryChange } from './directory.js';
  * 1. If visibility is 'public' → always allow
  * 2. If accessor is the data owner → always allow
  * 3. If visibility is 'owner' → allow if same owner
- * 4. If visibility is 'private' → allow only for owner
- * 5. Otherwise: find matching consent → allow if active consent exists
+ * 4. If visibility is 'group' → allow a member of the sharing group with read permission
+ * 5. Otherwise: find a matching active consent → allow; a consent to everyone does not count for a
+ *    knowledge package record (consentToEveryoneKeptOut)
  */
 export async function checkConsentForRead(
   storage: Storage,
@@ -106,8 +130,10 @@ export async function checkConsentForRead(
     return { allowed: true, reason: 'group_member' };
   }
 
-  // Private data requires explicit consent
-  const matchingConsents = await storage.findMatchingConsents(ownerGaii, memoryKey, accessorGaii);
+  // Private data requires explicit consent. A consent to everyone does not open a knowledge package
+  // record that is not public: its visibility is the owner's word on who reads it.
+  const matchingConsents = (await storage.findMatchingConsents(ownerGaii, memoryKey, accessorGaii))
+    .filter(c => !consentToEveryoneKeptOut(c.recipient, memoryKey));
 
   if (matchingConsents.length > 0) {
     return {

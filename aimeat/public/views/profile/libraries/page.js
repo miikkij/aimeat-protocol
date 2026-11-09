@@ -5,11 +5,16 @@
  * @description The Libraries page in the poster face: the builder's shelf. The mast and the strip;
  *   three shelves as rows (the base the app signs in and stores with, the ready-made UI a cortex
  *   gives, the third-party libraries served from this node at a fixed version), each with a filter
- *   row and a search; and the fourth section that says how an AI takes a library into use. What
- *   opens under a row is rows.js. Pure render over the ctx bag.
+ *   row and a search; the faces with their licences; and the section with the rule an AI copies
+ *   and the facts of how a library is chosen, proven and used. The page explains itself the
+ *   designed way (.claude/rules/page-guidance.md): the start (PageStart "libraries") and the
+ *   title's question mark (concept.library). What opens under a row is rows.js. Pure render over
+ *   the ctx bag.
  * @structure renderPage · shelf · secFaces · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   v1.21.0 -- 2026-11-08 -- A shelf's filter row names its two groups whose words a person cannot read, and each group label opens its explanation: Model (third-party shelf, term libraries.modelTier) and Status (every shelf, term libraries.status) (.claude/rules/page-guidance.md).
+ *   v1.20.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart "libraries" and the title's question mark concept.library; the lead of section 05 explained the concept, so its words moved into the concept; the head's paragraph is two sentences.
  *   v1.19.0 -- 2026-10-03 -- Section 04, Faces: every face this server serves with its licence, an added face marked as added and one with no licence data as a warning (the font manager); the AI section is 05.
  *   v1.18.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its crumb, tags, loud copy, strip and rail as data; FigureStrip; Filters; SearchLine; List; More; Box; Facts; Note): the page passes data and writes no class (page group G8).
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -54,9 +59,13 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { x, shelfOf, isCommunity, crumb, pageLinks, aiRule } from './frame.js';
 import { packRow } from './rows.js';
 import { Hint } from '/components/Hint.js';
+import { PageStart } from '/components/PageStart.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const PAGE = 20;
 const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
+/** The label before a group of filters whose words need explaining; it opens the explanation. */
+const groupLabel = (term, words) => html`<${Label} key=${'k-' + term}><${HelpLabel} term=${term} label=${words}>${words}<//><//>`;
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 const used = (p) => p.used_by?.apps || 0;
 const proven = (p) => (p.proofs || []).length > 0;
@@ -89,6 +98,7 @@ export function renderPage(ctx) {
       crumb=${crumb()}
       title=${t('librariesTab.tabLabel')}
       sub=${x('titleSub')}
+      help="concept.library"
       marks=${packs ? [
         { label: x('chipAll', { n: all.length }), tone: 'sun' },
         { label: x('chipInUse', { n: inUse }) },
@@ -99,6 +109,7 @@ export function renderPage(ctx) {
       actions=${html`
         <${Loud} copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))}>${x('copyRule')}<//>
         <${Actions}><${Action} small href="https://design-book.apps.aimeat.io/" newTab>Design Book<//><//>`}
+      start=${html`<${PageStart} id="libraries" />`}
       strip=${strip}
       railTitle=${x('railTitle')}
       sections=${[
@@ -144,9 +155,11 @@ function shelf(ctx, key, num, title, sub, list, first) {
       facet(F.who === 'community', x('facetCommunity'), count(isCommunity), () => tog('who', 'community'), 'community'),
     ] : []),
     ...(key === 'third' ? [
+      groupLabel('libraries.modelTier', x('filterModel')),
       facet(F.model === 'any', x('model.any'), count((p) => p.modelTier === 'any'), () => tog('model', 'any'), 'any'),
       facet(F.model === 'frontier', x('model.frontier'), count((p) => p.modelTier === 'frontier'), () => tog('model', 'frontier'), 'frontier'),
     ] : []),
+    groupLabel('libraries.status', x('filterStatus')),
     facet(F.status === 'stable', x('status.stable'), count((p) => p.status === 'stable'), () => tog('status', 'stable'), 'stable'),
     facet(F.status === 'preview', x('status.preview'), count((p) => p.status === 'preview'), () => tog('status', 'preview'), 'preview'),
     ...(count((p) => p.status === 'deprecated') ? [facet(F.status === 'deprecated', x('status.deprecated'), count((p) => p.status === 'deprecated'), () => tog('status', 'deprecated'), 'deprecated')] : []),
@@ -198,7 +211,7 @@ function secFaces(ctx, num) {
     <//>`;
 }
 
-/* ── How an AI takes a library into use ──────────────────────────────────────────────────────── */
+/* ── How an AI takes a library into use: the rule to copy and the facts (the concept: concept.library) ── */
 
 function secAI(ctx, num, all) {
   const proofs = all.reduce((s, p) => s + (p.proofs || []).length, 0);
@@ -207,7 +220,6 @@ function secAI(ctx, num, all) {
   const appsUsing = ctx.appsUsing;
   return html`
     <${PageSection} id="lb-ai" num=${num} title=${x('secAi')} count=${null}>
-      <${Note} kind="lead">${x('aiIntro')}<//>
       <${Box} doors=${html`<${Action} small copy=${aiRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody', { base: ctx.nodeUrl })}<//>

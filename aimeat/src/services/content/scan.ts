@@ -22,6 +22,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.0.1 — 2026-11-02 — prune removes a gone item's profile sections file too.
+ *   v1.0.2 — 2026-11-08 — A scan passes over every `contentclass-` file, the fingerprint's sections
+ *     files too; it read them and stored a text copy of each.
  */
 import { randomBytes } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
@@ -41,7 +43,9 @@ type Deps = { storage: Storage; config: AimeatConfig };
 export const MAX_SCAN_ITEMS = 2000;
 const KEEP_MS = 60 * 60 * 1000;
 const STALL_MS = 6 * 60 * 60 * 1000;
-const SKIP_FILE_PREFIXES = ['contentclass-text/', 'apps/icons/', 'apps/screenshots/'];
+/** `contentclass-` is every file the pipeline stores itself (its kept text and a fingerprint's
+ *  sections); reading one would make a new one, as the arrival hook once did (intake.ts v1.3.0). */
+const SKIP_FILE_PREFIXES = ['contentclass-', 'apps/icons/', 'apps/screenshots/'];
 
 export interface ScanOptions {
   /** Exactly these stored files of the caller (keys). */

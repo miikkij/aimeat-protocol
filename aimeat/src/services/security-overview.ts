@@ -27,6 +27,8 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   2026-11-09 -- cors_wildcard: whether the default list holds *, so the page stops saying other
+ *     origins are refused when every origin is answered (guidance audit 2026-11-09).
  *   2026-11-02 -- password_lockout.enabled: the lockout is off unless auth.sign_in_lockout turns it on.
  *   2026-11-01 -- `parties`: the outside parties, the stopped ones, the wrong keys and the reads of the
  *     last seven days, for the Security page (services/parties/admin.ts; plan doc-mvwxcas3dom3, D2.9).
@@ -152,6 +154,8 @@ export interface SecurityOverview {
     totp: { enabled: boolean; issuer: string; backup_codes: number; max_failed: number; lockout_seconds: number };
     passkeys_enabled: boolean;
     cors_origins: number;
+    /** True when the default list holds `*`: every origin is answered, so the count says nothing about refusals. */
+    cors_wildcard: boolean;
     federation_auth_policy: AimeatConfig['federationAuthPolicy'];
     body_limit_mb: number;
     body_limit_large_mb: number;
@@ -328,6 +332,8 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
       totp: { enabled: config.totpEnabled, issuer: config.totpIssuer, backup_codes: config.totpBackupCodeCount, max_failed: config.totpMaxFailedAttempts, lockout_seconds: config.totpLockoutSeconds },
       passkeys_enabled: config.passkeyEnabled,
       cors_origins: (config.corsAllowedOrigins ?? []).length,
+      // An origin list, not a scope: `*` here is the CORS default "every origin" (middleware/cors.ts).
+      cors_wildcard: (config.corsAllowedOrigins ?? []).some(origin => origin === '*'),
       federation_auth_policy: config.federationAuthPolicy,
       body_limit_mb: config.jsonBodyLimitMb,
       body_limit_large_mb: config.jsonBodyLimitLargeMb,

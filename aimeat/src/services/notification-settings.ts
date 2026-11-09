@@ -17,6 +17,9 @@
  * @usage const s = await readNotificationSettings(storage, ghii); const p = prefsFor(s, source, type);
  *   await updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }));
  * @version-history
+ *   v1.5.0 — 2026-11-08 — Sender kind `ecosystem`: an outside app's notification is its own sender,
+ *     keyed by its GEAI, so the owner can tell it apart and mute it (secaudit2026nov08 round 14,
+ *     notification-create:ecosystem-sender-labelled-as-owner).
  *   v1.4.0 — 2026-10-28 — EmailPrefs.agentNarrowed is gone: the node no longer narrows an agent by
  *     itself, so there is no such email. The mail log kind `agent_narrowed` stays for the entries
  *     already written; a stored `agentNarrowed` is ignored.
@@ -45,9 +48,9 @@ import { updateRecord } from './record-cas.js';
 /** Under the reserved `notifications.` prefix (utils/reserved-keys.ts): a granted app cannot write it. */
 export const NOTIF_SETTINGS_KEY = 'notifications.settings';
 
-export type SenderKind = 'aimeat' | 'app' | 'extension' | 'agent' | 'owner';
+export type SenderKind = 'aimeat' | 'app' | 'extension' | 'agent' | 'owner' | 'ecosystem';
 /** Who sent a notification. `id` is the stable handle (an app's owner/file, an extension's name,
- *  an agent's GAII); `name` is what a person reads. */
+ *  an agent's GAII, an outside app's GEAI); `name` is what a person reads. */
 export interface NotifSource { kind: SenderKind; name: string; id?: string }
 export type NotifGroup = 'organisms' | 'messages' | 'workflows' | 'apps' | 'account' | 'other';
 export const NOTIF_GROUPS: NotifGroup[] = ['organisms', 'messages', 'workflows', 'apps', 'account', 'other'];
@@ -210,7 +213,7 @@ export function groupOfType(type: string): NotifGroup {
   return 'other';
 }
 
-/** The settings key for a sender: `app:owner/file`, `extension:name`, `agent:gaii`. */
+/** The settings key for a sender: `app:owner/file`, `extension:name`, `agent:gaii`, `ecosystem:geai`. */
 export const senderKey = (s: NotifSource): string => `${s.kind}:${s.id || s.name}`;
 
 /**
@@ -228,6 +231,7 @@ export function sourceOf(value: { type?: string; title?: string; source?: unknow
   const prefix = /^([^:]{1,80}):\s/.exec(title)?.[1];
   if (type === 'app') return { kind: 'app', name: prefix || 'App' };
   if (type === 'agent') return { kind: 'agent', name: prefix || 'agent' };
+  if (type === 'ecosystem') return { kind: 'ecosystem', name: prefix || 'App' };
   if (type === 'extension') return { kind: 'extension', name: title || 'extension' };
   if (type === 'custom') return { kind: 'owner', name: 'owner' };
   return { kind: 'aimeat', name: 'AIMEAT' };

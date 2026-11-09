@@ -16,6 +16,8 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-11-08 — The refusal of a receiver key off its address says incoming webhook and API key
+ *     (secaudit2026nov08b round 15b).
  *   2026-11-07 — optionalAuth recognises a receiver key by its prefix (aimeat_rcv_) and never turns it
  *     into req.auth: on /v1/receive/<owner>/<name> it is left to acceptCredential('receiver'), and on
  *     any other route it is refused 401. The receiver address skips the session check altogether.
@@ -345,7 +347,7 @@ export function optionalAuth(opts: OptionalAuthOptions = {}) {
     // anonymous identity; on every other route it is a credential this node refuses, 401.
     if (token && token.startsWith(RECEIVER_KEY_PREFIX)) {
       if (takesReceiverKey(req.method, req.path)) { next(); return; }
-      refuse(req, res, 'A receiver key writes only through its own receiver address, /v1/receive/<owner>/<name>. It is not a sign-in to this server.');
+      refuse(req, res, 'An incoming webhook\'s API key writes only through that webhook\'s own address, /v1/receive/<owner>/<name>. It is not a sign-in to this server.');
       return;
     }
     // The receiver address takes nothing but a receiver key, so a request there with a session or

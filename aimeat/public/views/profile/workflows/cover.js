@@ -5,13 +5,16 @@
  * @description The Workflows page in the poster face (design canvas "AIMEAT Työnkulkujen sivu",
  *   direction A). The COVER says of every workflow, in one sentence, what its last run did; lifts
  *   up what waits for the person and lets them answer there; gives a new workflow three roads (a
- *   chat over MCP, a chat without MCP with the answer pasted back, the form); and explains how to
- *   read all this as a fold. A workflow opens as its own page (detail.js), a run as its own
- *   (run.js), the form as its own (form.js). Pure render functions over the ctx bag; every part is
- *   a component that takes data (the page writes no class).
- * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock · howToRead
+ *   chat over MCP, a chat without MCP with the answer pasted back, the form). How the page explains
+ *   itself (.claude/rules/page-guidance.md): PageStart "workflows" under the head and the title's
+ *   question mark concept.workflow, which says what a step, a check, a run and "stopped short" are.
+ *   A workflow opens as its own page (detail.js), a run as its own (run.js), the form as its own
+ *   (form.js). Pure render functions over the ctx bag; every part is a component that takes data
+ *   (the page writes no class).
+ * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock
  * @usage import { renderWorkflowsView } from './workflows/cover.js';
  * @version-history
+ *   v1.17.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a workflow exists, its button the form) and the title's question mark concept.workflow. Section 04 "How to read this" (a fold of eight word explanations, howToRead) goes; what it said is in the concept.
  *   v1.16.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry instead of "no
  *     workflows" (ctx.itemsFailed) (QA audit F6-05).
  *   v1.15.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the page frame is the SettingsPage, the strip the FigureStrip, the check note and a waiting question the Box (the question's answers the Tabs, several at once where the question takes several, its own answer a TextField), the three roads the Roads, the paste box the TextArea with its message, how to read the page the Facts.
@@ -43,11 +46,10 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
-import { FoldSection } from '/components/FoldSection.js';
 import { scrollToSection } from '/components/Rail.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { FigureStrip } from '/components/FigureStrip.js';
-import { Facts } from '/components/Facts.js';
 import { Box } from '/components/Box.js';
 import { Roads, Road } from '/components/Roads.js';
 import { Tabs, Tab } from '/components/Tabs.js';
@@ -86,7 +88,11 @@ function renderCover(ctx) {
       ? { key: 'latest', n: rel(latest.lastRun.startedAt), label: c('stripLatest'), sub: loc(latest.def.title) || latest.def.id }
       : { key: 'latest', n: '·', label: c('stripLatest'), sub: c('noRunsYet') },
   ]} />`;
-  return html`<${SettingsPage} name="wp" crumb=${crumb(ctx, [])} title=${t('profile.workflows.title')}
+  // The start (page-guidance.md): folded once a workflow exists; its button is this page's own form.
+  const start = html`<${PageStart} id="workflows" done=${ctx.loading && !items.length ? null : items.length > 0}
+    action=${{ onClick: () => ctx.pickView({ kind: 'create' }) }} />`;
+  return html`<${SettingsPage} name="wp" crumb=${crumb(ctx, [])} title=${t('profile.workflows.title')} help="concept.workflow"
+    start=${start}
     marks=${[tag(items.length, 'chipWorkflows'), scheduled ? tag(scheduled, 'chipScheduled') : null,
       waiting ? tag(waiting, 'chipWaiting', 'coral') : null, partial ? tag(partial, 'chipPartial', 'coral') : null]}
     desc=${c('desc')}
@@ -99,14 +105,12 @@ function renderCover(ctx) {
       { id: 'wp-list', num: '01', label: t('profile.workflows.title'), count: items.length },
       { id: 'wp-waiting', num: '02', label: c('secWaiting'), count: waiting },
       { id: 'wp-new', num: '03', label: c('secNew'), count: '' },
-      { id: 'wp-how', num: '04', label: c('howTitle'), count: '', open: () => ctx.setFold('how', true) },
     ]}
     pagesLabel=${c('pages')} pages=${pageLinks()}
     after=${html`<${ctx.ConfirmUI} />`}>
       ${secWorkflows(ctx)}
       ${secWaiting(ctx)}
       ${secNew(ctx)}
-      <${FoldSection} clip id="wp-how" num="04" title=${c('howTitle')} sub=${c('howSub')} open=${ctx.folds.how} onToggle=${() => ctx.setFold('how', !ctx.folds.how)}>${howToRead()}<//>
   <//>`;
 }
 
@@ -182,12 +186,6 @@ function pasteBlock(ctx) {
         <${Action} small soft onClick=${() => ctx.setPasteOpen(false)}>${t('profile.cancel')}<//>
       <//>
     <//>`;
-}
-
-/** How to read this page: the words, in the reader's language, once. */
-export function howToRead() {
-  const rows = ['step', 'input', 'produced', 'partial', 'check', 'run', 'gate', 'trigger'];
-  return html`<${Facts} wide rows=${rows.map(k => ({ key: k, k: c('how.' + k + 'T'), v: c('how.' + k + 'D') }))} />`;
 }
 
 export { triggerWords };

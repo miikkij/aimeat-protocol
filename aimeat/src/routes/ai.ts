@@ -22,6 +22,7 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-11-08 — The files, the audio and the input pictures of a call are read with { storage, config }, so a package file asks the labels its version keeps, as GET /v1/pub does (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  *   2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer aiPayerOf gave
  *     (codebase analysis 2026-11-03, item B1).
  *   2026-11-02 — An ecosystem app's call is paid by its owner as the owner's app (aiPayerOf); its
@@ -225,7 +226,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         // Files for a model that reads them itself (the files capability), from the caller's own
         // storage or a data: URL (services/ai/call-files.ts).
         const reader = readerFor({ storage, config }, req.auth);
-        const fileList = files !== undefined ? await readCallFiles(storage, reader, resolve(req), files) : undefined;
+        const fileList = files !== undefined ? await readCallFiles({ storage, config }, reader, resolve(req), files) : undefined;
         const r = await completeForOwner(storage, config, gaii, {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
@@ -318,7 +319,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       if (typeof storage_key === 'string' && storage_key) {
         let found: Awaited<ReturnType<typeof readCallerAudio>>;
         try {
-          found = await readCallerAudio(storage, reader, gaii, storage_key, { mime, filename });
+          found = await readCallerAudio({ storage, config }, reader, gaii, storage_key, { mime, filename });
         } catch (e) {
           if (!(e instanceof ClassificationError)) throw e;
           return res.status(e.status).json(error(config.nodeId, e.code, e.message));
@@ -422,7 +423,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         // The pictures the model works from, read under the caller's classification reader before
         // anything is spent (services/ai/call-files.ts readImageInputs).
         const inputs = reference_images !== undefined || mask !== undefined
-          ? await readImageInputs(storage, readerFor({ storage, config }, req.auth), resolve(req), { references: reference_images, mask }, gaii)
+          ? await readImageInputs({ storage, config }, readerFor({ storage, config }, req.auth), resolve(req), { references: reference_images, mask }, gaii)
           : undefined;
         // No cancel on a client disconnect: the picture is stored and billed when it arrives, as it
         // always has been, because a provider may charge for a generation the node stopped reading.

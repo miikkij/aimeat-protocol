@@ -29,6 +29,7 @@ from .credentials import (
     ExpiredToken,
     daemon_route,
     expired_token_message,
+    shared_name_message,
     stored_agent_token,
 )
 from .workflow_spec import NONE, assess_offers_doc
@@ -228,7 +229,11 @@ def publish_offers(
 
     Args:
         doc: the offers document (use build_offers_doc / build_offer).
-        agent_name: the bare agent name -- becomes the memory key segment.
+        agent_name: the bare agent name -- becomes the memory key segment -- or the full
+            identity ``agent#owner@node``, which picks the credential (the stored token or the
+            daemon's ``X-Aimeat-Agent``) while the bare part is the key segment. A bare name the
+            agents of two owners carry in one connector home picks no stored token and raises,
+            naming both.
         node_url: node base URL. Falls back to env AIMEAT_NODE_URL.
         agent_token: Bearer token. Falls back to the connector-stored token
             (resolve_agent_token, which skips an expired JWT), then env AIMEAT_AGENT_TOKEN,
@@ -261,6 +266,11 @@ def publish_offers(
         if route is not None:
             url, token = route
             extra_headers[AGENT_HEADER] = agent_name
+    if not token:
+        # A bare name two owners' agents carry in this home picks no stored token (credentials.py).
+        shared = shared_name_message(agent_name)
+        if shared:
+            raise RuntimeError(shared)
     if not url:
         raise RuntimeError("node_url is required (pass it or set AIMEAT_NODE_URL).")
     if not token and expired:
@@ -276,7 +286,8 @@ def publish_offers(
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("publish_offers needs `requests` (pip install requests).") from exc
 
-    payload = {"key": f"agents.{agent_name}.offers", "value": doc}
+    # A full identity picks the credential above; the memory key segment is its bare agent name.
+    payload = {"key": f"agents.{agent_name.partition('#')[0]}.offers", "value": doc}
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", **extra_headers}
     http = session or requests
     resp = http.post(f"{url}/v1/memory", json=payload, headers=headers, timeout=30)

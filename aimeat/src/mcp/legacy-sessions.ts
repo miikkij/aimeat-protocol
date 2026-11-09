@@ -16,6 +16,10 @@
  *   const legacy = legacySessions({ config, storage, authority, authenticate, createMcpServer });
  *   await legacy.servePost(req, res, verified, token, serverRole);
  * @version-history
+ *   2026-11-08 — The session caps count per owner too (mcp.legacy_sessions_per_owner, 300), and past
+ *     the node cap the session closed is the least recently used one of the owner holding the most
+ *     sessions, so one account's agents do not close other accounts' sessions (secaudit2026nov08
+ *     round 14, mcp-legacy-session-node-cap-evicts-other-owners).
  *   2026-11-04 — Session caps: past mcp.legacy_sessions_per_principal (100) or mcp.legacy_sessions_total
  *     (1000) a new session closes the least recently used one, as the idle sweep closes one; 0 is no
  *     limit. The sweep's close moved into closeSession() unchanged (codebase analysis 2026-11-03, item C5).
@@ -86,6 +90,9 @@ export function legacySessions(deps: LegacySessionDeps) {
     // initialize can keep the agent's MCP use current (services/agent-mcp-touch.ts) without a
     // second token parse. Cleaned wherever the other session maps are.
     const sessionAgents = new Map<string, { gaii: string; platform: string }>();
+    // The account each session's principal acts for, so the caps count per owner (secaudit2026nov08
+    // round 14). Cleaned wherever the other session maps are.
+    const sessionOwners = new Map<string, string>();
     // Every config.mcpSessionSweepMs (10 s shipped): the scan is a Map walk over a handful of
     // sessions, and a short interval is what lets the idle floor go sub-minute. The E2E runner pins
     // 1 s so e2e-mcp-session-expiry proves a 6-second idle in 8 s rather than 18.
@@ -99,6 +106,7 @@ export function legacySessions(deps: LegacySessionDeps) {
         sessionPrincipals.delete(id);
         sessionLastSeen.delete(id);
         sessionAgents.delete(id);
+        sessionOwners.delete(id);
         forgetMcpSession(id);
     }
     const sweeper = setInterval(() => {
@@ -123,8 +131,14 @@ export function legacySessions(deps: LegacySessionDeps) {
      * then of the whole node past mcp.legacy_sessions_total, are closed the way the idle sweep closes
      * one; their client gets the spec's 404 and initializes again. 0 is no limit. The defaults (100
      * and 1000) are far above what one client opens. The new session is never the one closed.
+     *
+     * ONE ACCOUNT'S SESSIONS ARE PAID FOR BY THAT ACCOUNT (secaudit2026nov08 round 14). The sessions
+     * are also counted per owner, past mcp.legacy_sessions_per_owner, so the owner's own agents
+     * together have a bound, and past the node cap the session closed is the least recently used one
+     * of the owner holding the most sessions, not of whoever was idle longest. An owner with fewer
+     * sessions than another keeps them while the other has more.
      */
-    function enforceSessionCaps(newId: string, sub: string): void {
+    function enforceSessionCaps(newId: string, sub: string, owner: string | undefined): void {
         const leastRecent = (ids: string[]) => ids.sort((a, b) => (sessionLastSeen.get(a) ?? 0) - (sessionLastSeen.get(b) ?? 0));
         const perPrincipal = config.mcpLegacySessionsPerPrincipal;
         if (perPrincipal > 0) {
@@ -134,13 +148,32 @@ export function legacySessions(deps: LegacySessionDeps) {
                 if (t) closeSession(id, t, 'session cap (per principal)');
             }
         }
-        const total = config.mcpLegacySessionsTotal;
-        if (total > 0 && transports.size > total) {
-            const others = [...transports.keys()].filter(id => id !== newId);
-            for (const id of leastRecent(others).slice(0, transports.size - total)) {
+        const perOwner = config.mcpLegacySessionsPerOwner;
+        if (perOwner > 0 && owner) {
+            const ours = [...sessionOwners].filter(([id, o]) => o === owner && id !== newId).map(([id]) => id);
+            for (const id of leastRecent(ours).slice(0, Math.max(0, ours.length + 1 - perOwner))) {
                 const t = transports.get(id);
-                if (t) closeSession(id, t, 'session cap (node)');
+                if (t) closeSession(id, t, 'session cap (per owner)');
             }
+        }
+        const total = config.mcpLegacySessionsTotal;
+        while (total > 0 && transports.size > total) {
+            // The owner holding the most sessions (a session with no owner on record counts as its
+            // own), its least recently used session first.
+            const byOwner = new Map<string, string[]>();
+            for (const id of transports.keys()) {
+                if (id === newId) continue;
+                const o = sessionOwners.get(id) ?? `session:${id}`;
+                const list = byOwner.get(o);
+                if (list) list.push(id); else byOwner.set(o, [id]);
+            }
+            if (byOwner.size === 0) break;
+            const most = Math.max(...[...byOwner.values()].map(l => l.length));
+            const candidates = [...byOwner.values()].filter(l => l.length === most).flatMap(l => l);
+            const id = leastRecent(candidates)[0];
+            const t = transports.get(id);
+            if (!t) break;
+            closeSession(id, t, 'session cap (node)');
         }
     }
 
@@ -241,6 +274,7 @@ export function legacySessions(deps: LegacySessionDeps) {
                 sessionPrincipals.delete(transport.sessionId);
                 sessionLastSeen.delete(transport.sessionId);
                 sessionAgents.delete(transport.sessionId);
+                sessionOwners.delete(transport.sessionId);
                 forgetMcpSession(transport.sessionId);
             }
         };
@@ -259,10 +293,11 @@ export function legacySessions(deps: LegacySessionDeps) {
                 sessionChatInstances.set(transport.sessionId, chatInstanceId);
             }
             if (sessionAgentInfo) sessionAgents.set(transport.sessionId, sessionAgentInfo);
+            if (sessionOwner) sessionOwners.set(transport.sessionId, sessionOwner);
             // So DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey can take this socket down
             // with the agent's other credentials (mcp/session-registry.ts).
             noteMcpSession(transport.sessionId, authenticatedGaii, () => transport.close());
-            enforceSessionCaps(transport.sessionId, verified!.sub);
+            enforceSessionCaps(transport.sessionId, verified!.sub, sessionOwner);
         }
     }
 

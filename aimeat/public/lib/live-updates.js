@@ -44,6 +44,11 @@
  * session opens no stream, and the first view that brings one opens it signed. Before, the shell's
  * build watch asked for a visitor ticket before the auth lib had loaded, got 401 on every page load
  * of a signed-in person, and went without live updates for the ten seconds of the 401 retry.
+ * Visitor-to-signed switch (2026-11-09): the signed stream that replaces the build watch's visitor
+ * stream opened as a reconnect, so every page reconciled every domain about a second after it loaded
+ * and each part read its data twice: 6.4 MB again on the Memory page of an account with 20 000 keys.
+ * The views that bring the session loaded on mount, so that open is a first open and reconciles
+ * nothing; a reopen after a real gap still reconciles every domain.
  */
 
 /** This node shows its content to its own accounts only (routes/portal-spa.ts window.__SITE). */
@@ -102,7 +107,13 @@ export async function connect(getJwt) {
     // The build watch may hold a visitor stream; a view that has a session needs the signed one.
     // On a signed-in-only node the page opened no stream without the session (_open), so the first
     // view that has one opens it here.
-    if (isLeader && (es || closedNode()) && !streamSigned && getJwt?.()) { if (es) { es.close(); es = null; } _open(); }
+    if (isLeader && (es || closedNode()) && !streamSigned && getJwt?.()) {
+      if (es) { es.close(); es = null; }
+      // The signed stream replaces the visitor one: the views with the session loaded on mount, so
+      // its open is a first open, not a reconnect after a gap, and reconciles nothing.
+      everOpened = false;
+      _open();
+    }
     return;
   }
   started = true;

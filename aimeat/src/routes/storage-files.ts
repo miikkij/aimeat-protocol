@@ -11,6 +11,13 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-08 -- GET and HEAD /v1/storage/{key} ask the labels a data package version keeps, as GET /v1/pub
+ *     does, through the one ask (datapackage/source-labels.ts storedFileShownTo) (secaudit2026nov08b round 15b).
+ *   2026-11-08 -- GET /v1/pub asks about every label of a data package version's source items, not only
+ *     the highest-ranked one (secaudit2026nov08b round 15).
+ *   2026-11-08 -- GET /v1/pub asks the classification reader about a data package version's label source
+ *     beside the file, so a version built from labelled records keeps their strictest label
+ *     (secaudit2026nov08 round 14, dataproduct/sources-memory:records-source-drops-source-record-labels).
  *   2026-11-06 -- GET /v1/pub serves an attachment of a message in the caller's owner's mailbox to a
  *     caller that may read that mailbox in the owner's name (services/mailbox/attachment-read.ts); an
  *     agent holding messages:read-as-owner was refused CONSENT_DENIED no_matching_consent.
@@ -199,12 +206,12 @@ import { generateDownloadToken } from '../services/download-token.js';
 import { storageDownloadRouter } from './storage-files-download.js';
 import { odpsRedirectFor } from '../services/datapackage/odps-read.js';
 import { packageFileVerdict } from '../services/datapackage/file-read.js';
+import { storedFileShownTo } from '../services/datapackage/source-labels.js';
 import { withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
 // Named apart from this file's own byte `readerFor` below: this one is the classification reader.
 import { readerFor as contentReaderFor } from '../services/classification/reader.js';
-import { fileTarget } from '../services/classification/labels.js';
 import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.js';
 import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../services/content-defaults.js';
@@ -488,8 +495,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // The classification reader (TARGET-082) runs once the access decision below has admitted the
         // caller, so an outsider writes no refusal row into the owner's classification audit log
         // (TARGET-082 review). A file the admitted caller may not see answers as absent.
+        // A data package version built from labelled content keeps the labels of its source items
+        // (services/datapackage/source-labels.ts), asked beside the file's own.
         const hiddenFromCaller = async (): Promise<boolean> =>
-            !(await contentReaderFor({ storage, config }, req.auth).show([file], () => fileTarget(gaii, key, file.workspaceRef)))[0];
+            !(await storedFileShownTo({ storage, config }, contentReaderFor({ storage, config }, req.auth), gaii, key, file));
 
         // ?mode=handle — answer an ALLOWED read with a presigned URL + metadata instead of the bytes.
         // Same access decision as the byte path (this runs only after it passes); the caller just gets
@@ -706,8 +715,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         //
         // Metadata only: a HEAD answers entirely out of it, and reading the bytes to send none of
         // them is what made a range reader's first probe cost a full download.
+        // A data package version's file asks the labels the version keeps too, as GET /v1/pub does.
         const meta = await storage.getStorageFileMeta(gaii, key);
-        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key, meta.workspaceRef)) : [];
+        const file = meta ? await storedFileShownTo({ storage, config }, contentReaderFor({ storage, config }, req.auth), gaii, key, meta) : undefined;
         if (!file) {
             // ASCII only: a header value with a non-ASCII character (an em dash, say) makes Node throw
             // ERR_INVALID_CHAR and turns this 404 into a 500.
@@ -745,9 +755,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Namespaced to the caller (see the HEAD handler above): a file owned by anyone else is not
         // reachable here at all. The named alternative in the 404 is the whole point — an agent asked
         // for its OWNER's file by bare key and got a blank "not found" that read as data loss.
-        // The classification reader (TARGET-082): a file this caller may not see answers as absent.
+        // The classification reader (TARGET-082): a file this caller may not see answers as absent, and a
+        // data package version's file asks the labels the version keeps too, as GET /v1/pub does.
         const meta = await storage.getStorageFileMeta(gaii, key);
-        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key, meta.workspaceRef)) : [];
+        const file = meta ? await storedFileShownTo({ storage, config }, contentReaderFor({ storage, config }, req.auth), gaii, key, meta) : undefined;
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
                 `File not found in your namespace: ${key}. This route reads only your own files - for a file owned by someone else (e.g. your owner's upload or a DM attachment) use GET /v1/pub/{owner}/{key}.`));

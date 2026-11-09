@@ -11,6 +11,12 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   2026-11-08 — DELETE refuses the holder of a CSM's own lock row (`csm.<name>`, prefix) that is not
+ *     the CSM's registering account, its agent or the operator, with 403 SCHEMA_PATTERN_NOT_YOURS, as
+ *     PUT refuses it by rule 5 (secaudit2026nov08b round 15, D1).
+ *   2026-11-08 — GET /v1/schemas and GET /v1/memory/:key/schema leave out the lock row a CSM owns when
+ *     the CSM's visibility refuses the caller, so a private, members or organism CSM's name, account
+ *     and compiled schema are not public (secaudit2026nov08 round 14).
  *   2026-11-06 — PUT and DELETE ask one gate, auth/schema-lock-caller.ts (decision 13a of 2026-11-05,
  *     verb parity): the owner in person, the owner's agent holding memory:write and the operator;
  *     an app grant or an ecosystem app only on a lock it holds. PUT refused every agent and DELETE
@@ -42,7 +48,8 @@ import { SchemaSetSchema } from '../models/schemas.js';
 import { semanticContextErrors } from '../utils/onto-context.js';
 import { emitChange } from '../services/event-bus.js';
 import { operatorOverride } from '../services/operator-override.js';
-import { schemaLockRefusal } from '../services/schema-lock-rule.js';
+import { schemaLockRefusal, csmLockRemovalRefusal } from '../services/schema-lock-rule.js';
+import { csmLockShownTo } from '../services/csm-service.js';
 import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
 import { resolveIdentity, parseGAII, isOwnerInPerson } from '../utils/gaii.js';
@@ -66,6 +73,8 @@ function isCallersLock(lockedBy: string, auth: NonNullable<Request['auth']>, nod
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  /** The caller of a read, as the CSM routes take it: null when nobody (or the anonymous identity) is signed in. */
+  const readerOf = (req: Request) => (req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null);
 
   // PUT /v1/memory/:key/schema — set a schema for a memory key
   router.put('/v1/memory/:key/schema', requireAuth(), requireSchemaLockCaller(storage), async (req, res) => {
@@ -163,11 +172,13 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('schemas');
   });
 
-  // GET /v1/memory/:key/schema — read schema for a memory key (Tier 0, no auth)
+  // GET /v1/memory/:key/schema — read schema for a memory key (Tier 0, no auth). The lock a CSM owns
+  // answers as no lock to a caller the CSM's visibility refuses (csmLockShownTo).
   router.get('/v1/memory/:key/schema', async (req, res) => {
     const key = decodeURIComponent(req.params.key as string);
 
-    const record = await storage.findApplicableSchema(key);
+    const found = await storage.findApplicableSchema(key);
+    const record = found && await csmLockShownTo(storage, found.keyPattern, readerOf(req)) ? found : null;
 
     if (record) {
       res.json(success(config.nodeId, {
@@ -209,10 +220,21 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    if (!isCallersLock(record.lockedBy, req.auth!, config.nodeId) && !(await operatorOverride(storage, config, req.auth,
+    const holds = isCallersLock(record.lockedBy, req.auth!, config.nodeId);
+    if (!holds && !(await operatorOverride(storage, config, req.auth,
       { ownerOf: record.lockedBy, area: 'schema', action: 'delete', subject: key }))) {
       res.status(403).json(error(config.nodeId, 'NOT_SCHEMA_OWNER', 'Only whoever set this structure, or whoever runs the node, can remove it. Ask one of them.'));
       return;
+    }
+    // The holder of a CSM's own lock row removes it only as that CSM's registering account, as only that
+    // account sets it (rule 5; services/schema-lock-rule.ts csmLockRemovalRefusal).
+    if (holds) {
+      const caller = callerOf(req, config.nodeId, storage);
+      const notYours = await csmLockRemovalRefusal(storage, { ...caller.principalView, isOperator: await caller.operator() }, record);
+      if (notYours) {
+        res.status(notYours.status).json(error(config.nodeId, notYours.code, notYours.message, notYours.status, notYours.details));
+        return;
+      }
     }
 
     await storage.deleteSchema(key, record.applyTo);
@@ -229,11 +251,14 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('schemas');
   });
 
-  // GET /v1/schemas — list all schemas (Tier 0, no auth)
+  // GET /v1/schemas — list all schemas (Tier 0, no auth), less the lock rows of CSMs this caller may
+  // not read (csmLockShownTo).
   router.get('/v1/schemas', async (req, res) => {
     const prefix = req.query.prefix as string | undefined;
 
-    const schemas = await storage.listSchemas(prefix);
+    const viewer = readerOf(req);
+    const schemas = [];
+    for (const s of await storage.listSchemas(prefix)) if (await csmLockShownTo(storage, s.keyPattern, viewer)) schemas.push(s);
 
     res.json(success(config.nodeId, {
       schemas: schemas.map(s => ({

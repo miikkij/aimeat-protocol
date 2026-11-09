@@ -5,9 +5,11 @@
  * @description The sign-in dialog's typed values across a redraw, and the live username rules of the
  *   register tab. Moved out of modal.js unchanged when the two-step enrolment step took it past 800
  *   lines (max-file-lines), a pure extraction: both read only the document.
- * @structure captureInputs() · restoreInputs(vals) · wireUsernameRules()
+ * @structure captureInputs() · restoreInputs(vals) · wireUsernameRules() · wireEnterSubmits()
  * @usage import { captureInputs, restoreInputs, wireUsernameRules } from './modal-fields.js';
  * @version-history
+ *   v1.1.0 — 2026-11-08 — wireEnterSubmits() moved out of modal.js unchanged when the sign-in details
+ *     step took it past 800 lines (max-file-lines).
  *   v1.0.0 — 2026-11-02 — Moved out of modal.js unchanged (max-file-lines).
  */
 
@@ -61,4 +63,21 @@ export function wireUsernameRules() {
     });
   }
   if (regUser) regUser.addEventListener('input', syncUsernameRules);
+}
+
+// Enter submits the tab the field belongs to.
+export function wireEnterSubmits() {
+  [['aimeat-username', 'aimeat-go-btn'], ['aimeat-password', 'aimeat-go-btn'],
+    ['aimeat-reg-username', 'aimeat-reg-btn'], ['aimeat-reg-email', 'aimeat-reg-btn'],
+    ['aimeat-reg-password', 'aimeat-reg-btn'], ['aimeat-reg-displayname', 'aimeat-reg-btn'],
+  ].forEach(function (pair) {
+    var el = document.getElementById(pair[0]);
+    if (!el) return;
+    el.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      var btn = /** @type {any} */ (document.getElementById(pair[1]));
+      if (btn && !btn.disabled) btn.click();
+    });
+  });
 }

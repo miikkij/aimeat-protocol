@@ -10,11 +10,22 @@
  *   /v1/goals/{id}, the call the person's own AI makes with aimeat_goal_set; a change that would end
  *   running work is shown first (preview) and asked about.
  *
- *   The words a person may not know carry their question mark (explain.concept.*). Composed from
- *   library components only; it has no sheet of its own.
+ *   The words a person may not know carry their question mark (explain.concept.*). The list starts
+ *   with PageStart "goals" under the head, beside the title's question mark concept.goal
+ *   (.claude/rules/page-guidance.md). Composed from library components only; it has no sheet of its own.
  * @structure GoalsTab (default) · GoalRules({ goal, agents, onSaved, confirm, showToast })
  * @usage Registered in profile.js TABS as { id: 'goals', component: GoalsTab }.
  * @version-history
+ *   v1.3.0 — 2026-11-08 — The Rounds save sends the cron (and the condition) even when emptied, so the
+ *     server refuses an empty cron on a clock round instead of keeping the old one; the server now keeps
+ *     the time zone and the works per round this page does not show (group k3-goalrounds).
+ *   v1.2.0 — 2026-11-08 — The settings a label cannot explain carry their question mark: the way the
+ *     work is shared (goals.mode), when the coordinator is away (goals.substitute), the round time
+ *     (goals.roundCron), works started per day (goals.perDay) and the minutes before a taken work
+ *     returns to open work (goals.claimMinutes) (.claude/rules/page-guidance.md).
+ *   v1.1.0 — 2026-11-08 — PageStart under the list's head: what goals are for, the prompt that asks
+ *     one's own AI to propose a goal, and what follows; folded once a goal is listed
+ *     (.claude/rules/page-guidance.md).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { h } from 'preact';
@@ -29,6 +40,7 @@ import { useConfirm } from '/components/Modal.js';
 import { useOpenItem } from '/js/open-item.js';
 import { listAgents } from '/js/services/agents.js';
 import { PageHead } from '/components/PageHead.js';
+import { PageStart } from '/components/PageStart.js';
 import { PageSection } from '/components/PageSection.js';
 import { BackLink } from '/components/BackLink.js';
 import { Fields } from '/components/Field.js';
@@ -118,11 +130,11 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
 
     <${PageSection} title=${label('concept.coordinator', g('shareTitle', 'How the work is shared, and who takes part'))}>
       <${Fields}>
-      <${Choice} label=${g('mode', 'Way')} value=${mode} onChange=${setMode} options=${[
+      <${Choice} label=${g('mode', 'Way')} help="goals.mode" value=${mode} onChange=${setMode} options=${[
         ['single', g('modeSingle', 'One agent takes the whole goal')], ['coordinator', g('modeCoordinator', 'A coordinator leads')], ['plan', g('modePlan', 'A fixed plan')]]} />
       ${mode === 'coordinator' && html`
         <${Select} label=${g('coordinator', 'Coordinator')} value=${coordinator} onChange=${setCoordinator} options=${agentOptions} />
-        <${Choice} label=${g('substitute', 'When the coordinator is away')} value=${substitute} onChange=${setSubstitute} options=${[
+        <${Choice} label=${g('substitute', 'When the coordinator is away')} help="goals.substitute" value=${substitute} onChange=${setSubstitute} options=${[
           ['node', g('subNode', 'AIMEAT keeps it moving by its rules')], ['agent', g('subAgent', 'Another agent')], ['wait', g('subWait', 'Wait for the coordinator')]]} />
         ${substitute === 'agent' && html`<${Select} label=${g('substituteAgent', 'Substitute')} value=${subAgent} onChange=${setSubAgent} options=${agentOptions} />`}`}
       <${Check} checked=${anyAgent} onChange=${setAnyAgent}>${g('anyAgent', 'Any of my agents may take part')}<//>
@@ -167,10 +179,17 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       <${Choice} label=${g('trigger', 'A round starts')} value=${trigger} onChange=${setTrigger} options=${[
         ['none', g('tNone', 'No rounds: the goal ends')], ['manual', g('tManual', 'When I start it')], ['clock', g('tClock', 'By the clock')], ['condition', g('tCondition', 'By the clock, only when a condition holds (a watch)')]]} />
       ${(trigger === 'clock' || trigger === 'condition') && html`
-        <${TextField} label=${g('cron', 'When (cron, for example 0 7 * * 1-5)')} value=${cron} onInput=${setCron} code />`}
+        <${TextField} label=${g('cron', 'When (cron, for example 0 7 * * 1-5)')} value=${cron} onInput=${setCron} code help="goals.roundCron" />`}
       ${trigger === 'condition' && html`<${TextField} label=${g('condition', 'Act only when')} value=${condition} onInput=${setCondition} help="concept.watch" />`}
+      ${/* The save names only the fields on this page. The server keeps what it leaves out (the time
+            zone, the works per round), and an emptied field is sent empty, so an empty cron on a clock
+            round is refused and an emptied condition is cleared. */''}
       <${Actions}><${Loud} control disabled=${!!busy} onClick=${() => save('rounds', {
-        rounds: trigger === 'none' ? null : { trigger, ...(cron.trim() ? { cron: cron.trim() } : {}), ...(condition.trim() ? { condition: condition.trim() } : {}) },
+        rounds: trigger === 'none' ? null : {
+          trigger,
+          ...(trigger === 'clock' || trigger === 'condition' ? { cron: cron.trim() } : {}),
+          ...(trigger === 'condition' ? { condition: condition.trim() } : {}),
+        },
       })}>${g('save', 'Save')}<//><//>
       <//>
     <//>
@@ -180,8 +199,8 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       <${TextField} label=${g('usd', 'Spending limit for the whole goal ($, empty = none)')} value=${usd} onInput=${setUsd} inputMode="decimal" help="concept.spending" />
       <${TextField} label=${g('hops', 'Chain length')} value=${hops} onInput=${setHops} inputMode="numeric" help="concept.chain_length" />
       <${TextField} label=${g('fixRounds', 'Back-and-forth rounds')} value=${fixRounds} onInput=${setFixRounds} inputMode="numeric" help="concept.fix_round" />
-      <${TextField} label=${g('perDay', 'Works started per day')} value=${perDay} onInput=${setPerDay} inputMode="numeric" />
-      <${TextField} label=${g('claimMin', 'A taken work returns to open work after this many minutes without progress')} value=${claimMin} onInput=${setClaimMin} inputMode="numeric" />
+      <${TextField} label=${g('perDay', 'Works started per day')} value=${perDay} onInput=${setPerDay} inputMode="numeric" help="goals.perDay" />
+      <${TextField} label=${g('claimMin', 'A taken work returns to open work after this many minutes without progress')} value=${claimMin} onInput=${setClaimMin} inputMode="numeric" help="goals.claimMinutes" />
       <${Actions}><${Loud} control disabled=${!!busy} onClick=${() => save('limits', { limits: {
         usd: usd.trim() === '' ? null : Number(usd), hops: Number(hops), tasks_per_day: Number(perDay), fix_rounds: Number(fixRounds), claim_minutes: Number(claimMin) } })}>${g('save', 'Save')}<//><//>
       <//>
@@ -243,6 +262,9 @@ export default function GoalsTab({ showToast }) {
     <${ConfirmUI} />
     <${PageHead} title=${g('title', 'Goals')} help="concept.goal"
       desc=${g('desc', 'Every goal you or your AI gave your agents. Here are the rules the work moves by: who takes part, what the coordinator may do, the reactions, the rounds, the limits and the whole chain.')} />
+    ${/* The start (page-guidance.md) stands under the head; a goal is given on the home or by one's own
+          AI, so it has no button here. It folds once the list has a goal. */''}
+    <${PageStart} id="goals" done=${goals === null ? null : goals.length > 0} />
     <${Choice} tone="filter" ariaLabel=${g('show', 'Show')} value=${filter} onChange=${setFilter} options=${[
       ['running', g('fRunning', 'Running')], ['done', g('fDone', 'Done')], ['stopped', g('fStopped', 'Stopped')], ['expired', g('fExpired', 'Ended')], ['all', g('fAll', 'All')]]} />
     ${err && html`<${ErrorNote} text=${err} />`}

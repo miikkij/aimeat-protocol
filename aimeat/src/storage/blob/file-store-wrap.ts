@@ -20,11 +20,25 @@
  *   row names and removes it then. The sweep is also what removes the objects of an erased account,
  *   whose rows go by a cascade that runs in each provider and never passes through here.
  * @structure FileStoreTarget · FileStoreResolver · wrapStorageWithFileStores · directUploadTarget ·
- *   storedObjectFacts · discardStorageObject · adoptStorageObject · directDownloadUrl · relocateStorageFile
+ *   storedObjectFacts · discardStorageObject · adoptStorageObject · directDownloadUrl · RelocateOptions ·
+ *   RELOCATE_ATTEMPTS · relocateStorageFile
  * @usage wrapStorageWithFileStores(storage, resolver);   // once, right after createStorage
  *   await relocateStorageFile(storage, owner, key, target);   // the move actions
  *   const up = await directUploadTarget(storage, owner, undefined, 'image/png', 3600);   // client PUTs to up.url
  * @version-history
+ *   v1.4.0 — 2026-11-08 — A move writes only where the bytes are, and only while the row is the one it
+ *     read (moveStorageFileBytes, the row's version): a visibility, tags or provenance change between
+ *     the read and the write stays, and a re-upload in between keeps its bytes. A write that did not
+ *     land reads again and tries again, RELOCATE_ATTEMPTS times, then leaves the file where it is
+ *     (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
+ *   v1.3.1 — 2026-11-08 — A move out of a store writes the row as it is just before the write, so a
+ *     visibility narrowed during the download stays narrowed; a move into the database takes
+ *     `maxDatabaseBytes` and leaves a larger file in its store (`too-large`), and adoptStorageObject
+ *     passes it on (secaudit2026nov08b round 15, file-store/relocate-from-store-rewrites-stale-row,
+ *     file-store/relocate-to-database-without-file-or-quota-ceiling).
+ *   v1.3.0 — 2026-11-08 — A store takes only the files its rule names (store-takes.ts): a smaller file
+ *     of another kind keeps its bytes in the database, and a direct upload that turns out to be one is
+ *     moved there when it completes (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.2.0 — 2026-10-31 — Direct transfer: a signed write address for a new object, the row of a file
  *     whose object a client put there (adoptStorageObject), and a signed read address for a download
  *     door; the bytes of a large file never pass through the node
@@ -38,12 +52,16 @@ import type { Storage, StorageFileRecord } from '../interface.js';
 import { utf8VerdictFor } from '../../utils/app-content-type.js';
 import { logger } from '../../utils/logger.js';
 import { BlobStoreError, formatBlobRef, parseBlobRef, signedWriteHeaders, type BlobStore } from './blob-types.js';
+import { storeTakesFile, type StoreTakes } from './store-takes.js';
 
 export interface FileStoreTarget {
   storeId: string;
   store: BlobStore;
   /** Prepended to every object key, ending in `/` or empty. */
   prefix: string;
+  /** Which files the store takes (store-takes.ts); a file it does not take stays in the database.
+   *  The resolver always sets it; absent, the store takes every file. */
+  takes?: StoreTakes;
 }
 
 export interface FileStoreResolver {
@@ -52,6 +70,13 @@ export interface FileStoreResolver {
   forWrite(ownerGaii: string, choice?: string): Promise<FileStoreTarget | null>;
   /** The store a reference names; null when this node can no longer reach it (it was disconnected). */
   forRead(storeId: string): Promise<BlobStore | null>;
+  /** The rule of the store a reference names; null when this node no longer has the store. */
+  takesOf?(storeId: string): Promise<StoreTakes | null>;
+}
+
+/** Whether a target takes this file; a target with no rule takes every file. */
+function targetTakes(target: FileStoreTarget, size: number | undefined, mimeType: string | undefined): boolean {
+  return !target.takes || storeTakesFile(target.takes, size, mimeType);
 }
 
 /** The provider's own file methods, kept on the wrapped instance under a symbol: relocateStorageFile
@@ -119,7 +144,9 @@ export function wrapStorageWithFileStores(storage: Storage, resolver: FileStoreR
     const choice = file.storeChoice;
     delete file.storeChoice;
     const previous = await meta(file.ownerGaii, file.key);
-    const target = await resolver.forWrite(file.ownerGaii, choice);
+    const resolved = await resolver.forWrite(file.ownerGaii, choice);
+    // A store takes only the files it is for (store-takes.ts); the rest keep their bytes in the database.
+    const target = resolved && targetTakes(resolved, file.data.length, file.mimeType) ? resolved : null;
     if (!target) {
       const written = await create(file);
       if (previous?.blobRef) await discard(previous.blobRef, 'replaced by a database write');
@@ -214,8 +241,11 @@ export async function discardStorageObject(storage: Storage, blobRef: string, wh
  * Write the row of a file whose bytes a client already put in a store, through a signed address the
  * node made for exactly this reference. The object the key named before is removed after the row has
  * moved on, as with every write. A text file small enough gets its UTF-8 verdict from the object.
+ * A file the store does not take moves to the database unless it is over `opts.maxDatabaseBytes`
+ * (the per-file database ceiling); then it stays in the store, where its bytes already are.
  */
-export async function adoptStorageObject(storage: Storage, file: StorageFileRecord, blobRef: string): Promise<StorageFileRecord> {
+export async function adoptStorageObject(storage: Storage, file: StorageFileRecord, blobRef: string,
+  opts: RelocateOptions = {}): Promise<StorageFileRecord> {
   const raw = rawOf(storage);
   const ref = parseBlobRef(blobRef);
   if (!raw || !ref) throw new BlobStoreError(`File ${file.key} has an unreadable object reference`, 0, 'BAD_REFERENCE');
@@ -231,6 +261,13 @@ export async function adoptStorageObject(storage: Storage, file: StorageFileReco
   delete row.blobRef;
   const written = await raw.create({ ...row, data: Buffer.alloc(0), blobRef, utf8Verified });
   if (previous?.blobRef && previous.blobRef !== blobRef) await raw.discard(previous.blobRef, 'replaced by a new upload');
+  // The address was made before the size was known. A file the store does not take after all (a small
+  // one, of a kind it is not for) moves to the database now, as it would have gone there through the node.
+  const takes = raw.resolver.takesOf ? await raw.resolver.takesOf(ref.storeId) : null;
+  if (takes && !storeTakesFile(takes, file.size, file.mimeType)) {
+    const out = await relocateStorageFile(storage, file.ownerGaii, file.key, null, opts);
+    if (out === 'moved') return { ...written, blobRef: undefined };
+  }
   return written;
 }
 
@@ -253,25 +290,73 @@ export async function directDownloadUrl(storage: Storage, ownerGaii: string, key
   });
 }
 
-export type RelocateOutcome = 'moved' | 'already-there' | 'gone' | 'changed';
+/** `not-taken`: the target's rule does not take this file (store-takes.ts), so it stays where it is.
+ *  `too-large`: a move into the database would pass `maxDatabaseBytes`, so the file stays in its store.
+ *  `changed`: the file changed after each of RELOCATE_ATTEMPTS reads, so it stays where it is. */
+export type RelocateOutcome = 'moved' | 'already-there' | 'gone' | 'changed' | 'not-taken' | 'too-large';
+
+export interface RelocateOptions {
+  /** A move into the database leaves a file larger than this in its store (`too-large`). The callers
+   *  that move without the person pass the database's per-file ceiling (storageMaxFileSizeMb), or less
+   *  where the owner's storage quota leaves less room. Absent, no size is asked. */
+  maxDatabaseBytes?: number;
+}
+
+/** Whether a file of this many bytes would pass the move's database ceiling. */
+function overCeiling(ceiling: number | null, bytes: number | undefined): boolean {
+  return ceiling !== null && typeof bytes === 'number' && bytes > ceiling;
+}
+
+/** How many times a move reads the file and tries its write before it leaves the file where it is. */
+export const RELOCATE_ATTEMPTS = 3;
 
 /**
  * Move one file's bytes to `target` (a store) or, with null, back into the database. Everything else
  * about the file stays: its key, owner, visibility, tags, provenance and creation time.
  *
- * From the database the move is safe against a concurrent upload by construction: the object is
- * written, then the row is pointed at it only if it still holds the same bytes it was read with
- * (setStorageFileBlobRef). From a store, the row is re-written; it is read again just before, and a
- * row that changed in between is left alone. In both cases a move that does not land removes the
- * object it wrote, and the object the row named before is removed after the row has moved on.
+ * The write is conditional (moveStorageFileBytes): it sets only where the bytes are, and only while the
+ * row's version and object reference are the ones the move read together with the bytes. A visibility,
+ * tags or provenance change made while the bytes were on their way is never written over, and a
+ * re-upload in between (in the database or in a store) is never pointed at the old bytes. When the
+ * write did not land, the object it wrote is removed and the move reads the file again and tries
+ * again, RELOCATE_ATTEMPTS times in all; then it leaves the file where it is (`changed`). The object
+ * the row named before is removed after the row has moved on.
+ *
+ * With `maxDatabaseBytes`, a move into the database is asked three times, so a file over it is never
+ * read whole into the node: the row's size, then the object's own size where the store can say it
+ * (the store may hold other bytes than the row says), then the bytes that arrived.
  */
-export async function relocateStorageFile(storage: Storage, ownerGaii: string, key: string, target: FileStoreTarget | null): Promise<RelocateOutcome> {
+export async function relocateStorageFile(storage: Storage, ownerGaii: string, key: string, target: FileStoreTarget | null,
+  opts: RelocateOptions = {}): Promise<RelocateOutcome> {
   const raw = (storage as Wrapped)[RAW];
   if (!raw) throw new Error('relocateStorageFile: this storage has no file stores installed');
+  for (let attempt = 0; attempt < RELOCATE_ATTEMPTS; attempt++) {
+    const out = await relocateOnce(storage, raw, ownerGaii, key, target, opts);
+    if (out !== 'lost') return out;
+  }
+  return 'changed';
+}
+
+/** One read and one conditional write of a move; `lost` when the row changed after it was read. */
+async function relocateOnce(storage: Storage, raw: RawFileMethods, ownerGaii: string, key: string, target: FileStoreTarget | null,
+  opts: RelocateOptions): Promise<RelocateOutcome | 'lost'> {
+  const ceiling = !target && typeof opts.maxDatabaseBytes === 'number' && Number.isFinite(opts.maxDatabaseBytes) ? opts.maxDatabaseBytes : null;
+  if (ceiling !== null) {
+    const row = await raw.meta(ownerGaii, key);
+    if (!row) return 'gone';
+    const ref = parseBlobRef(row.blobRef);
+    if (!ref) return 'already-there';
+    if (overCeiling(ceiling, row.size)) return 'too-large';
+    const store = await raw.resolver.forRead(ref.storeId);
+    const facts = store?.head ? await store.head(ref.objectKey) : null;
+    if (overCeiling(ceiling, facts?.size)) return 'too-large';
+  }
   const file = await storage.getStorageFile(ownerGaii, key);
   if (!file) return 'gone';
   const from = file.blobRef;
   if ((parseBlobRef(from)?.storeId ?? null) === (target?.storeId ?? null)) return 'already-there';
+  if (target && !targetTakes(target, file.size, file.mimeType)) return 'not-taken';
+  if (overCeiling(ceiling, file.data.length)) return 'too-large';
 
   let blobRef: string | undefined;
   if (target) {
@@ -280,27 +365,23 @@ export async function relocateStorageFile(storage: Storage, ownerGaii: string, k
     blobRef = formatBlobRef(target.storeId, objectKey);
   }
 
-  if (!from) {
-    // Database to a store: the conditional update is the whole move.
-    if (await storage.setStorageFileBlobRef(ownerGaii, key, blobRef!, file.size)) return 'moved';
-    await raw.discard(blobRef, 'the file changed while it was being moved');
-    return 'changed';
-  }
-
-  const now = await raw.meta(ownerGaii, key);
-  if (!now || now.blobRef !== from) {
-    await raw.discard(blobRef, 'the file changed while it was being moved');
-    return now ? 'changed' : 'gone';
-  }
-  const utf8Verified = file.utf8Verified ?? utf8VerdictFor(file) ?? undefined;
+  // `file` is one row read: its version, its reference and the bytes that reference named. The write
+  // lands only on that row, so nothing the row gained after the read is lost.
+  const expect = { rowVersion: file.rowVersion, blobRef: from };
+  let landed: boolean;
   try {
-    await raw.create(target
-      ? { ...file, data: Buffer.alloc(0), blobRef, utf8Verified }
-      : { ...file, blobRef: undefined });
+    landed = await storage.moveStorageFileBytes(ownerGaii, key, target
+      ? { expect, blobRef, data: Buffer.alloc(0), size: file.size, utf8Verified: file.utf8Verified ?? utf8VerdictFor(file) ?? undefined }
+      // The size the database holds is the bytes that arrived, which the quota then counts.
+      : { expect, data: file.data, size: file.data.length, utf8Verified: utf8VerdictFor(file) ?? undefined });
   } catch (err) {
     await raw.discard(blobRef, 'the row write failed');
     throw err;
   }
-  await raw.discard(from, 'the file moved');
+  if (!landed) {
+    await raw.discard(blobRef, 'the file changed while it was being moved');
+    return (await raw.meta(ownerGaii, key)) ? 'lost' : 'gone';
+  }
+  if (from) await raw.discard(from, 'the file moved');
   return 'moved';
 }

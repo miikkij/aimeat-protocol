@@ -5,12 +5,15 @@
  * @description Profile › AppDev: what the person's coding agents learned while building apps, and
  *   the right start for the next build. The two prompts (flow, build), the pitfalls the agents
  *   filed with filters, search and paging from the server, the template proposals, the platform's
- *   own registry with counts first and rows on demand, and how it all accrues. Holds the state,
- *   the loads and the handlers; renders the poster face (appdev/page.js, appdev/rows.js). Live:
- *   re-reads the filed pitfalls and the proposals on a memory update.
+ *   own registry with counts first and rows on demand; how it all accrues is the title's question
+ *   mark (concept.appdev). Holds the state, the loads and the handlers; renders the poster face
+ *   (appdev/page.js, appdev/rows.js). Live: re-reads the filed pitfalls and the proposals on a
+ *   memory update.
  * @structure AppDevTab — state, loads, handlers, the ctx bag, render
  * @usage registered in views/profile.js TABS as id 'appdev'.
  * @version-history
+ *   v2.1.0 — 2026-11-08 — The description follows the page: how it accrues is the concept
+ *     concept.appdev behind the title's question mark, no longer a section (appdev/page.js v2.1.0).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v2.0.0 — 2026-09-03 — The poster face (design canvas "AppDev: tieto ja kiihdytys", direction A).
  *     On the production node the page was 117 cards in one column, 13 429 px, two checkboxes as

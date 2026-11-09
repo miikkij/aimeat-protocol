@@ -22,6 +22,9 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-11-08 — build-proto-timer and build-family-list (by name): the two jobs two real builds on
+ *     aimeat.io did, with the person's answers as the next turns, to measure a change to the
+ *     app-building instructions before and after; the note says what the build took.
  *   2026-11-08 — The two house-rules tasks report access (published, readable by the partner) and
  *     content apart; content is proven only in an accepted wording (house-rules.ts v3.0.0, round 3).
  *   2026-11-08 — The two house-rules tasks read a three-valued check (house-rules.ts v2.0.0): a run
@@ -120,6 +123,14 @@ async function flowPlan(ctx: Omit<TaskContext, 'metrics'>): Promise<{ appId: str
     if (!row) return null;
     const s = await api<{ plan: { appId: string; proposals?: unknown } }>(ctx.baseUrl, `/v1/apps/me/${encodeURIComponent(row.filename)}/structure`, ctx.ownerToken);
     return s.data?.plan ?? null;
+}
+
+/** What a build took: calls before the first publish, all calls, turns and minutes. */
+function buildCost(ctx: TaskContext): string {
+    const calls = ctx.metrics.toolCalls;
+    const firstPublish = calls.findIndex(c => /aimeat_app_(publish|draft_save|draft_write)$/.test(c.name));
+    const minutes = ctx.metrics.durationMs === null ? '-' : (ctx.metrics.durationMs / 60000).toFixed(1);
+    return `${firstPublish < 0 ? 'never published' : `${firstPublish} calls before the first publish`}, ${calls.length} calls, ${ctx.metrics.turnTexts.length} turns, ${minutes} min`;
 }
 
 const says = (ctx: TaskContext, ...needles: string[]) => needles.every(n => ctx.metrics.finalText.toLowerCase().includes(n.toLowerCase()));
@@ -272,7 +283,7 @@ export const TASKS: Task[] = [
             // Published ON THE ATELIER TRACK is the pass, since 2026-09-19. Until then published was
             // enough, and three Classic apps in a row counted as good while the developer was being
             // handed exactly that and rejecting it. What else the app is like goes in the note.
-            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
             const ok = onAtelier(quality);
             return { ok, detail: ok ? 'the app is published on the Atelier track' : 'the app is published, and it is not an Atelier app with a register', note: describeQuality(quality) };
         },
@@ -355,6 +366,72 @@ export const TASKS: Task[] = [
         },
     },
     {
+        // The two jobs two real builds on aimeat.io did on 2026-11-08, as the person says them, with
+        // the person's answers given as the next turns. They measure the app-building instructions
+        // before and after a change to them (a change may not make either worse): what was built,
+        // at what level, whether the owed items are there, and what it took to get there.
+        id: 'build-proto-timer',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'Make me a quick prototype of a timer for my workouts. Just quick, I want to try the idea. Call it "{marker}".',
+        goodTools: ['aimeat_handbook_get', 'aimeat_skill_get', 'aimeat_app_template_get', 'aimeat_app_publish'],
+        followUps: [
+            { prompt: 'A quick prototype. English and Finnish. Only I use it, nothing needs to be kept. No introduction. Decide the rest yourself and build it.' },
+            { prompt: 'Yes, publish it.' },
+        ],
+        verify: async (ctx) => {
+            const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
+            const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
+            if (!hit?.filename) return { ok: false, detail: 'no published app carries the name', note: buildCost(ctx) };
+            const q = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
+            const atelier = q.declaredTrack === 'atelier' && q.loadsAtelier;
+            const failed = [
+                ...(atelier ? [] : ['not on the Atelier track']),
+                ...(q.level === 'proto' ? [] : [`level ${q.level ?? 'not stated'}, not proto`]),
+                ...(q.blocking.length ? [`blocking ${q.blocking.join(', ')}`] : []),
+            ];
+            return {
+                ok: failed.length === 0,
+                detail: failed.length ? `published, and ${failed.join('; ')}` : 'a prototype on the Atelier track, published',
+                note: `${buildCost(ctx)}; parts read ${q.atelierPartsRead.join(',') || '-'}; ${describeQuality(q)}`,
+            };
+        },
+    },
+    {
+        id: 'build-family-list',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'Build me an app where our family keeps a shared shopping list. Call it "{marker}".',
+        goodTools: ['aimeat_handbook_get', 'aimeat_skill_get', 'aimeat_app_template_get', 'aimeat_app_publish', 'aimeat_datamap_set', 'aimeat_app_manage', 'aimeat_skill_publish'],
+        followUps: [
+            { prompt: 'The finest level. Finnish and English. We are a family of four: one shared list that everybody edits, and only the family can open it. Yes, the way you described it is right. No introduction. Take the design you recommend. Build it.' },
+            { prompt: 'Yes, build and publish it, and finish everything the publish says is still owed.' },
+        ],
+        verify: async (ctx) => {
+            const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
+            const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
+            if (!hit?.filename) return { ok: false, detail: 'no published app carries the name', note: buildCost(ctx) };
+            const q = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
+            const called = (name: string, has?: string) => ctx.metrics.toolCalls.some(c => c.name.endsWith(name) && !c.isError && (!has || JSON.stringify(c.input ?? {}).includes(has)));
+            const owed: Array<[string, boolean]> = [
+                ['agent face', called('aimeat_memory_write', '.agentface') || called('aimeat_invoke', 'agentface')],
+                ['bound skill', called('aimeat_skill_publish', `app:${ctx.ownerName}/`)],
+                ['data map', called('aimeat_datamap_set')],
+                ['design spec', called('aimeat_app_manage', 'spec_set')],
+            ];
+            const failed = [
+                ...(onAtelier(q) ? [] : ['not an Atelier app with a register']),
+                ...(q.blocking.length ? [`blocking ${q.blocking.join(', ')}`] : []),
+                ...owed.filter(([, ok]) => !ok).map(([n]) => `no ${n}`),
+            ];
+            return {
+                ok: failed.length === 0,
+                detail: failed.length ? `published, and ${failed.join('; ')}` : 'a finished Atelier app with the four owed items',
+                note: `${buildCost(ctx)}; level ${q.level ?? '-'}; register ${q.register ?? '-'}; parts read ${q.atelierPartsRead.join(',') || '-'}; ${describeQuality(q)}`,
+            };
+        },
+    },
+    {
         // An app that NEEDS PARTS. The tip calculator is covered whole by the genre it forks, so
         // three measured runs read the Design Book zero times and that was the right answer; it
         // cannot show whether a builder looks in the book, uses the kit, or keeps a person's data
@@ -370,7 +447,7 @@ export const TASKS: Task[] = [
             const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
             const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
             if (!hit?.filename) return { ok: false, detail: 'no published app carries the name' };
-            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls, ctx.ownerToken);
             const html = await fetch(`${ctx.baseUrl}/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(hit.filename)}?mode=inline`).then(res => res.text());
             // "Remember everything, on my phone too" is the node's store, not the browser's.
             // Through any name the page gave the global: two of three runs wrote `var A = window.AIMEAT`

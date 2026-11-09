@@ -6,15 +6,22 @@
  *   (the /v1/receivers routes of src/routes/receivers.ts, the same service functions the MCP tool
  *   aimeat_receiver calls), and the helpers that turn a receiver view (receiverView in
  *   src/services/receivers/contract.ts) into the reader's words: where it writes, its state and its
- *   tone, who made it, a delivery's line, the curl example and the sentence for one's own AI.
+ *   tone, who made it, a delivery's line and the curl example. (The sentence for one's own AI is the
+ *   page start's prompt, `pageStart.receivers.prompt`.)
  *   A receiver is an address and a key through which an outside program (a Lambda, a home sensor, a
  *   CRM export) writes into exactly one place of the owner's data over plain REST.
  * @structure x · api (list, get, deliveries, create, decide, patch, pause, resume, rotate, remove,
- *   csms) · targetWords · stateWord · stateTone · byWords · limitsWords · verbsWords · deliveryWords ·
+ *   csms, csmVersion) · targetWords · stateWord · stateTone · byWords · limitsWords · verbsWords · deliveryWords ·
  *   statusTone · addressPath · subFor · curlFor · dryRun · refusalWords · validName · validKey ·
  *   crumb · pageLinks · LIMITS
  * @usage import { x, api, targetWords, curlFor } from './frame.js';
  * @version-history
+ *   v1.3.0 — 2026-11-09 — api.csmVersion: the compiled schema of the version an incoming webhook checks
+ *     against, for the key-once view's example message (secaudit2026nov08b round 15d).
+ *   v1.2.0 — 2026-11-08 — sayToAi removed: the page start (components/PageStart.js) carries the
+ *     prompt for one's own AI.
+ *   v1.1.0 — 2026-11-08 — refusalWords knows ACCOUNT_DISABLED, a write refused while the account is
+ *     deactivated (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht;
  *     design canvas "Vastaanottimet", artboards Settings, Create, Detail and Chat).
  */
@@ -42,6 +49,8 @@ export const api = {
   remove: async (name) => (await apiDelete(`/v1/receivers/${enc(name)}`))?.data,
   /** The CSMs this account may read (GET /v1/csm), each { name, version, service_type }. */
   csms: async () => (await apiGet('/v1/csm'))?.data?.services || [],
+  /** One version of a CSM with its compiled JSON Schema (GET /v1/csm/{name}/versions/{version}). */
+  csmVersion: async (name, version) => (await apiGet(`/v1/csm/${enc(name)}/versions/${enc(version)}`))?.data || null,
 };
 
 /** The limits the server takes (RECEIVER_DEFAULTS and RECEIVER_MAXIMA in contract.ts). */
@@ -129,7 +138,8 @@ export function refusalWords(code) {
   if (!code) return '';
   const known = ['SCHEMA_INVALID', 'SCHEMA_VALIDATION_FAILED', 'TOO_LARGE', 'RATE_LIMITED', 'DAILY_LIMIT', 'VERB_NOT_ALLOWED',
     'UNSUPPORTED_MEDIA_TYPE', 'PREFIX_FULL', 'VERSION_CONFLICT', 'SUB_REQUIRED', 'INVALID_SUB', 'INVALID_INPUT',
-    'METHOD_NOT_ALLOWED', 'NOT_FOUND', 'PAUSED', 'STOPPED', 'EXPIRED', 'NOT_APPROVED', 'RECEIVERS_OFF', 'UNAUTHORIZED'];
+    'METHOD_NOT_ALLOWED', 'NOT_FOUND', 'PAUSED', 'STOPPED', 'EXPIRED', 'NOT_APPROVED', 'RECEIVERS_OFF', 'UNAUTHORIZED',
+    'ACCOUNT_DISABLED'];
   const c = code === 'SCHEMA_VALIDATION_FAILED' ? 'SCHEMA_INVALID' : code;
   return known.includes(code) ? x('code.' + c) : '';
 }
@@ -178,9 +188,6 @@ export async function dryRun(r, key, body) {
     return { ok: false, status: 0, code: 'NETWORK_ERROR', message: e?.message || '', fields: [] };
   }
 }
-
-/** The sentence a person says to their own AI to have it propose a receiver. */
-export const sayToAi = () => x('ai.sentence');
 
 /** The crumb's steps: Settings / Automation / Receivers, and the receiver's name on its own page. */
 export function crumb(ctx, name) {

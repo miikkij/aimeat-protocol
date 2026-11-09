@@ -2,15 +2,24 @@
  * @file living-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile "Living Documents" tab (Phase 0). Two areas: a personal TEMPLATE collection
- *   (create/edit/delete reusable charter+template skeletons) and the DEPLOYED instances (a template
- *   deployed into a workspace, rendered as living markdown). Phase 0 has no background pulse — content
- *   per slot is added/derived manually so the assemble→render model is exercised end to end. Surfaced
- *   as a top-level tab because instances generate cost once the pulse lands.
- *   See docs/plans/2026-06-21-living-documents-plan.md.
+ * @description Profile "Document templates" tab (living documents). Two areas: a personal TEMPLATE
+ *   collection (create/edit/delete reusable charter+template skeletons) and the DEPLOYED instances (a
+ *   template deployed into a workspace, rendered as living markdown). "Pulse now" refreshes an open
+ *   document here; the server's living-pulse core job (services/living-pulse.ts) refreshes the
+ *   sections no agent fills on each document's cadence with nobody present. How the page explains
+ *   itself (.claude/rules/page-guidance.md): PageStart "living" under the head and the title's
+ *   question mark concept.living_document. See docs/plans/2026-06-21-living-documents-plan.md.
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.26.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: an open
+ *     document's cadence (living.cadence, on its word) and a template section's slot id (living.slotId,
+ *     beside the field, which has no label of its own) (.claude/rules/page-guidance.md).
+ *   v1.25.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head (folded once a template or a document exists, its button New template)
+ *     and the title's question mark concept.living_document. The head's paragraph is two sentences and
+ *     no longer says the background refresh is to come: the server pulse runs (the description said
+ *     "Phase 0 has no background pulse", which stopped being true with services/living-pulse.ts).
  *   v1.24.0 -- 2026-10-25 -- The open document reads again on the live event, so a pending section
  *     decided elsewhere stops showing Approve and Reject; the two buttons wait while an answer is on its way.
  *   v1.23.0 -- 2026-10-02 -- The question marks that explain the automation fields: living.trust, living.activity_trigger (components/HelpTip.js).
@@ -74,6 +83,7 @@ import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { Action, Actions, Loud, Icon } from '/components/Action.js';
 import { Mark, Label, Code } from '/components/Mark.js';
@@ -85,6 +95,7 @@ import { Field, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Tab } from '/components/Tabs.js';
+import { HelpTip, HelpLabel } from '/components/HelpTip.js';
 import { SeriesBars } from '/components/SeriesBars.js';
 import * as living from '/js/services/living.js';
 import { listOrganisms, listWorkspaces } from '/js/services/organisms.js';
@@ -372,6 +383,7 @@ export default function LivingTab({ session, showToast }) {
               actions=${html`
                 <${TextField} placeholder=${t('profile.living.sectionDesc')} value=${s.desc} onInput=${v => patchSlot(i, { desc: v })} />
                 <${TextField} size="short" placeholder="slot-id" value=${s.slot} onInput=${v => patchSlot(i, { slot: v })} />
+                <${HelpTip} term="living.slotId" label="slot-id" />
                 <${Icon} small label=${t('field.remove')} onClick=${() => removeSlot(i)}>✕<//>`} />`)}
         <//>
         <${Line}><${Action} small onClick=${addSlot}>＋ ${t('profile.living.addSection')}<//><//>
@@ -425,7 +437,7 @@ export default function LivingTab({ session, showToast }) {
           <//>
           ${st.paused && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
           ${st.health === 'retired' && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="danger">${t('profile.living.retired')}: ${st.retired_reason || ''}<//>`}
-          <${Note} kind="meta" inline>· ${t('profile.living.cadence')}:<//>
+          <${Note} kind="meta" inline>· <${HelpLabel} term="living.cadence" label=${t('profile.living.cadence')}>${t('profile.living.cadence')}<//>:<//>
           <${Select} fit ariaLabel=${t('profile.living.cadence')} value=${opened.config.charter?.cadence || 'daily'} onChange=${v => changeCadence(v)}
             options=${[['hourly', t('profile.living.cadenceHourly')], ['daily', t('profile.living.cadenceDaily')], ['weekly', t('profile.living.cadenceWeekly')]]} />
         <//>
@@ -496,9 +508,14 @@ export default function LivingTab({ session, showToast }) {
 
   // ── Render: main ──
 
+  // The start (page-guidance.md): folded once a template or a document exists; its button is this
+  // page's own "New template". An opened document has the page to itself.
+  const start = opened ? null : html`<${PageStart} id="living"
+    done=${templates === null || instances === null ? null : (templates.length + instances.length) > 0}
+    action=${{ onClick: newTemplate }} />`;
   return html`
     <${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.living')]}
-      title=${t('profile.living.title')} desc=${t('profile.living.desc')} after=${ConfirmUI}>
+      title=${t('profile.living.title')} help="concept.living_document" desc=${t('profile.living.desc')} start=${start} after=${ConfirmUI}>
     ${opened ? renderOpened() : html`
       ${deploying && renderDeploy()}
       ${editing && renderEditor()}

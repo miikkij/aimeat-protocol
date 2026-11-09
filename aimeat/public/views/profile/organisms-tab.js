@@ -19,6 +19,8 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.38.0 -- 2026-11-08 -- The create form's shape, join policy and visibility drop-downs each have their question mark beside them: organism.shape, organism.joinPolicy, organism.visibility (components/HelpTip.js); the notes under them stay, because they follow the current choice.
+ *   v2.37.0 -- 2026-11-08 -- The Archived fold's title has no emoji (no emoji in the interface).
  *   v2.36.0 -- 2026-10-27 -- A refused create shows each field's message under that field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (js/input-limits.js) (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.35.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of an empty
  *     list, and leaves the lists as they were, so the open organism is no longer closed as if it had
@@ -111,6 +113,7 @@ import { Card } from '/components/Card.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { FileDrop } from '/components/FileDrop.js';
 import { Row } from '/components/Layout.js';
 import * as orgService from '/js/services/organisms.js';
@@ -628,10 +631,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     ${!showCreate ? null : html`
       <${Card} tone="section" title=${t('organisms.createTitle') || 'Create New Organism'}>
         <${Fields} errors=${formErrors}>
-          <${Select} fit name="shape" value=${formShape} onChange=${pickFormShape} ariaLabel=${t('organisms.shapeLabel')} options=${[
-            ['', t('organisms.shapeNone')],
-            ...shapes.map(s => [s.id, s.label]),
-          ]} />
+          <${Row} wrap>
+            <${Select} fit name="shape" value=${formShape} onChange=${pickFormShape} ariaLabel=${t('organisms.shapeLabel')} options=${[
+              ['', t('organisms.shapeNone')],
+              ...shapes.map(s => [s.id, s.label]),
+            ]} />
+            <${HelpTip} term="organism.shape" label=${t('organisms.shapeLabel')} />
+          <//>
           <${Note} kind="meta">
             ${chosenShape
               ? `${chosenShape.hint} ${t('organisms.shapeMakes', { list: chosenShape.workspaces.map(w => w.name).join(', ') })}`
@@ -661,11 +667,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               ['approval_required', t('organisms.policyApproval') || 'Approval required'],
               ['invite_only', t('organisms.policyInvite') || 'Invite only'],
             ]} />
+            <${HelpTip} term="organism.joinPolicy" label=${t('organisms.policyLabel')} />
             <${Select} fit name="visibility" value=${formVisibility} onChange=${setFormVisibility} ariaLabel=${t('organisms.setVisibility') || 'Who sees'} options=${[
               ['public', t('organisms.visPublic') || 'Public'],
               ['listed', t('organisms.visListed') || 'Listed'],
               ['private', t('organisms.visPrivate') || 'Private'],
             ]} />
+            <${HelpTip} term="organism.visibility" label=${t('organisms.setVisibility')} />
           <//>
           <${Note} kind="meta">
             ${tOr('organisms.policyHint.' + formPolicy, '')}${' '}
@@ -734,7 +742,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 ${sortMode === 'custom' && activeMine.length > 1 ? html`
                   <${Note}>${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}<//>` : null}`}
             ${archivedMine.length > 0 ? html`
-              <${Section} fold num="" title=${'🗄️ ' + (t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
+              <${Section} fold num="" title=${(t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
                 <${List} cols=${ORG_COLS} keepCols>${archivedMine.map(org => renderOrgRow(org, true))}<//>
               <//>` : null}
           `}

@@ -19,6 +19,18 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.8.5 -- 2026-11-08 -- inward.keyPlaceholder and inward.tokenPlaceholder: the call's placeholders
+ *     in the dialog's language; secret.unavailable and secret.see: the picker on a page whose sign-in
+ *     cannot list the vault (secaudit2026nov08b round 15c).
+ *   v0.8.4 -- 2026-11-08 -- inward.signInWhy and inward.signIn: the program road says its address
+ *     needs the person signed in, and offers the sign-in (secaudit2026nov08b round 15c).
+ *   v0.8.3 -- 2026-11-08 -- The program road says incoming webhook and API key where it said receiver
+ *     and receiver key; the outgoing hook's refusal says recipient (secaudit2026nov08b round 15b).
+ *   v0.8.2 -- 2026-11-08 -- inward.keyWhere and inward.ownerWhere: where the key of the program road's
+ *     call comes from, and what goes in place of the account name when the page does not know it
+ *     (secaudit2026nov08b round 15b).
+ *   v0.8.1 -- 2026-11-08 -- The words that name the shell a curl line is for (shell.*), and the two
+ *     steps of the Windows form (secaudit2026nov08b round 15).
  *   v0.8.0 — 2026-11-07 — The words of the program road (inward.receiverWhy, inward.receiverMake,
  *     inward.receiverCall); the memory road's own call says it writes with one's own sign-in.
  *   v0.7.0 — 2026-09-06 — The words the header editor, the secret picker and the agent pick say,
@@ -47,9 +59,19 @@ export const WORDS = {
     'inward.expected': 'Näin vastauksen pitää näyttää',
     'inward.testRead': 'Kokeile lukemista',
     'inward.write': 'Kirjoita arvo omalla tunnuksellasi',
-    'inward.receiverWhy': 'Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon vastaanottimen kautta. Vastaanottimen avain kirjoittaa vain tähän avaimeen.',
-    'inward.receiverMake': 'Tee vastaanotin tälle arvolle',
-    'inward.receiverCall': 'Ohjelman kutsu vastaanottimeen',
+    'inward.receiverWhy': 'Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon saapuvan webhookin kautta. Webhookin API-avain kirjoittaa vain tähän muistiavaimeen.',
+    'inward.receiverMake': 'Tee saapuva webhook tälle arvolle',
+    'inward.receiverCall': 'Ohjelman kutsu saapuvaan webhookiin',
+    'shell.posix': 'macOS ja Linux',
+    'shell.windows': 'Windowsissa: PowerShell tai komentokehote',
+    'shell.windowsFile': 'Tallenna tämä tiedostoon {file}',
+    'shell.windowsRun': 'Aja sitten tämä komento samassa kansiossa',
+    'inward.keyWhere': 'Liitä API-avain kutsuun kohtaan {placeholder}. Yllä oleva linkki avaa sivun, joka näyttää avaimen vain kerran, kun teet sen. Kopioi avain silloin.',
+    'inward.ownerWhere': 'Kirjoita käyttäjätunnuksesi kohtaan {placeholder}.',
+    'inward.signInWhy': 'Ohjelman osoitteessa pitää olla käyttäjätunnuksesi, ja tämä sivu tietää sen vasta, kun olet kirjautunut. Kirjaudu sisään, niin tunnuksesi tulee alla olevaan kutsuun kohdan {placeholder} tilalle.',
+    'inward.signIn': 'Kirjaudu sisään',
+    'inward.keyPlaceholder': '<API-avaimesi>',
+    'inward.tokenPlaceholder': '<tokenisi>',
     'inward.agent': 'Sano tämä omalle tekoälyllesi',
     'inward.range': 'Sallittu väli',
     'outward.title': 'Kun tämä muuttuu, kerro jollekin',
@@ -75,6 +97,8 @@ export const WORDS = {
     'secret.pick': 'Lisää salaisuus',
     'secret.none': 'Yhtään salaisuutta ei ole vielä tallessa.',
     'secret.add': 'Lisää sellainen Pääsy-sivulla',
+    'secret.unavailable': 'Tämä sivu ei näe salaisuuksiesi luetteloa. Kirjoita salaisuuden nimi arvoon muodossa {{secret:NIMI}}.',
+    'secret.see': 'Katso salaisuutesi Pääsy-sivulla',
     'agent.pick': 'Valitse agentti',
     'agent.none': 'Yksikään agenteistasi ei voi vielä toimia.',
     'agent.connect': 'Yhdistä agentti Agenttisi-sivulla',
@@ -113,9 +137,19 @@ export const WORDS = {
     'inward.expected': 'This is the shape the answer must have',
     'inward.testRead': 'Test read',
     'inward.write': 'Write the value with your own sign-in',
-    'inward.receiverWhy': 'A program, such as a sensor or a cloud function, writes the value through a receiver. The receiver\'s key writes into this key only.',
-    'inward.receiverMake': 'Make a receiver for this value',
-    'inward.receiverCall': 'The program\'s call to the receiver',
+    'inward.receiverWhy': 'A program, such as a sensor or a cloud function, writes the value through an incoming webhook. The webhook\'s API key writes into this memory key only.',
+    'inward.receiverMake': 'Make an incoming webhook for this value',
+    'inward.receiverCall': 'The program\'s call to the incoming webhook',
+    'shell.posix': 'macOS and Linux',
+    'shell.windows': 'On Windows: PowerShell or Command Prompt',
+    'shell.windowsFile': 'Save this as {file}',
+    'shell.windowsRun': 'Then run this command in the same folder',
+    'inward.keyWhere': 'Put the API key in place of {placeholder} in the call. The link above opens the page that shows the key once, when you make it, so copy it then.',
+    'inward.ownerWhere': 'Write your username in place of {placeholder}.',
+    'inward.signInWhy': 'The program\'s address must have your username, and this page knows it only when you are signed in. Sign in, and the call below gets your username in place of {placeholder}.',
+    'inward.signIn': 'Sign in',
+    'inward.keyPlaceholder': '<your API key>',
+    'inward.tokenPlaceholder': '<your token>',
     'inward.agent': 'Say this to your own AI',
     'inward.range': 'The range it accepts',
     'outward.title': 'When this changes, tell someone',
@@ -141,6 +175,8 @@ export const WORDS = {
     'secret.pick': 'Insert a secret',
     'secret.none': 'No secrets are kept yet.',
     'secret.add': 'Add one on the Access page',
+    'secret.unavailable': 'This page cannot list your secrets. Write a secret\'s name into the value as {{secret:NAME}}.',
+    'secret.see': 'See your secrets on the Access page',
     'agent.pick': 'Pick an agent',
     'agent.none': 'None of your agents can act yet.',
     'agent.connect': 'Connect one on the Your agents page',
@@ -157,7 +193,7 @@ export const WORDS = {
     'refusal.ALLOWLIST_REFUSED': 'This address is not one this node is allowed to call.',
     'refusal.RATE_LIMITED': 'Too many calls have been made this minute.',
     'refusal.PAYLOAD_TOO_LARGE': 'The message is too big to send.',
-    'refusal.UPSTREAM_FAILED': 'The receiver did not answer.',
+    'refusal.UPSTREAM_FAILED': 'The recipient did not answer.',
     'refusal.NO_EXTENSION': 'This node\'s living-hooks extension did not answer.',
     'refusal.UNKNOWN': 'The call did not go through.',
     'sentence.write': 'Write into AIMEAT memory, under the key {key}, the value {sample}. The document "{title}" reads it from there.',

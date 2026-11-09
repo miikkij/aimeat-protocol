@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit 4bc3cc631) on 2026-11-07. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 2303f0ce6) on 2026-11-08. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -14,7 +14,7 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 | Hosted app | an app on `<app>.apps.<host>` | A scoped app grant the owner approves (PKCE code flow) | `aimeat/src/routes/app-grants.ts` |
 | Visitor from another node | `alice@home-node`, role `federated` | Signed in on its home node; off by default (`AIMEAT_FEDERATION_AUTH_POLICY=disabled`) | `.claude/rules/security.md` |
 | Outside party | `party:alice/name@node-id` | A key or short party token; reads only the data packages shared with it by name | [Identity model](../coding-guidelines/identity-model.md) |
-| Receiver (an outside program writing in) | `receiver:alice/name@node-id` | Its own key (a random value with the receiver-key prefix) on `/v1/receive/alice/name` only; writes into exactly one key, key prefix or row space of its owner; refused 401 on every other route | `aimeat/src/services/receivers/verify.ts`, `aimeat/src/auth/middleware.ts` |
+| Incoming webhook (an outside program writing in) | `receiver:alice/name@node-id` | Its own API key (a random value with the prefix that marks an incoming webhook's API key) on `/v1/receive/alice/name` only; writes into exactly one key, key prefix or row space of its owner; refused 401 on every other route | `aimeat/src/services/receivers/verify.ts`, `aimeat/src/auth/middleware.ts` |
 
 ## Sign-in methods
 
@@ -93,11 +93,13 @@ flowchart LR
   idp["Directory: user disabled or deleted"] -->|SCIM active:false or DELETE| deact
   op["Operator: Deactivate on the Owners tab, or aimeat_admin_owner_disable"] --> deact
   deact["Account deactivated<br/>flag written first"] --> creds["Every credential ends in the same request"]
-  deact --> bg["Schedules, workflow triggers, unattended extension runs wait"]
+  deact --> bg["Schedules, workflow triggers, unattended extension runs, queued AI jobs wait"]
   deact --> data["Data, memberships and history stay"]
   data -->|operator or the person, in person| erase["Erasure: DELETE /v1/owners/:name"]
-  deact -->|aimeat_admin_owner_enable| react["Reactivated: the person signs in again, old credentials stay dead"]
+  deact -->|aimeat_admin_owner_enable| react["Reactivated: the person signs in again, old sessions and tokens stay dead"]
 ```
+
+Incoming webhook API keys and outside party keys are not revoked: they are refused while the account is deactivated and work again on reactivation, as schedules do. To end one for good, delete the incoming webhook or the party, or have the operator stop the incoming webhook.
 
 | What | On deactivation | Source |
 |---|---|---|
@@ -105,14 +107,26 @@ flowchart LR
 | Personal access tokens | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
 | App grants | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
 | MCP OAuth tokens | Refused at every request; refresh tokens deleted | `aimeat/src/services/owner-lifecycle.ts` |
-| Live connector tunnels | Closed | `aimeat/src/services/owner-lifecycle.ts` |
+| Live connector tunnels | Closed, on every process of the node | `aimeat/src/services/owner-lifecycle.ts`, `aimeat/src/services/connect-tunnel/cross-process.ts` |
 | New sign-in | 403 `ACCOUNT_DISABLED` on every method, SAML included | `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/src/routes/saml-login.ts` |
 | Schedules, workflow triggers, unattended extension runs | Skipped with a log line, kept | `aimeat/src/services/owner-lifecycle.ts` |
+| AI jobs already queued, and jobs a restart or another process takes up | Wait in the queue with a sentence that names the deactivation; nothing is paid or written; they run after reactivation | `aimeat/src/services/ai-jobs/run-gate.ts` |
+| Incoming webhook API keys | Refused with 403 `ACCOUNT_DISABLED` on every call; nothing is written, read or deleted. The incoming webhook is kept and the API key works again on reactivation | `aimeat/src/services/receivers/verify.ts` |
+| Outside party keys and tokens, share links, app party sign-ins | Refused with 403 `ACCOUNT_DISABLED`; nothing shared can be read. The party is kept and its key works again on reactivation | `aimeat/src/services/parties/verify.ts`, `aimeat/src/services/parties/invite.ts`, `aimeat/src/services/app-parties/service.ts` |
+| Webhooks to the person's agents | Not sent, nothing counted against the webhook; delivery resumes on reactivation | `aimeat/src/services/webhook-dispatcher.ts` |
 | Data, organism memberships, history | Kept | [Organisation node sign-in](../organisation-node-sign-in.md), section 7 |
 | Other federated nodes | The federation attestation refuses the account | `aimeat/test/e2e-owner-deactivation.ts` |
 
 - Each deactivation and reactivation by an operator writes an operator trail: a usage row, a log line and a line on the person's feed (`aimeat/src/services/owner-lifecycle.ts`).
 - Erasure is a separate, final act. The person, or an operator, both in person, call `DELETE /v1/owners/:name` (`aimeat/src/routes/owners.ts`). An organism the person owned passes to an admin or member, or is left without a seated owner when there is nobody (`aimeat/src/services/owner-erasure.ts`).
+- AI jobs of the person and their agents that are still queued, running, or waiting for a deactivated account stop at the erasure. Nothing more is paid for them, and no job record, answer or job log is written for the erased account, so a later account with the same name finds none (`aimeat/src/services/ai-jobs/service.ts`, `aimeat/src/services/ai-jobs/run-gate.ts`).
+
+## Organism code keys
+
+- An owner of an organism can make a code key: the node makes an account whose password is the code that owner chose, so that owner knows it until the holder signs in. The holder's first sign-in replaces the code with a new password, whichever method it is: password, passkey, sign-in link by email, or an identity provider (`aimeat/src/services/owner-session.ts`, `aimeat/src/services/key-credentials.ts`).
+- The new password is shown to the browser that completed the first sign-in. After a password or passkey sign-in it is in the sign-in answer, and the node does not mail it at that sign-in. An address that was verified before the first sign-in never gets it, because the person who minted the key could have verified an address of their own. When the account had no verified address, the node keeps the password sealed and mails it once to the address the holder verifies later, with a code asked for after the first sign-in, unless the password has changed by then (`aimeat/src/services/key-credentials.ts`). After a sign-in link or an identity provider, the code stops working at once and the new password is shown once to that browser session, never mailed (`aimeat/src/routes/ghii/key-credentials-screen.ts`). On the same screen the holder can add a passkey and confirm an email address of their own (`aimeat/src/static/sdk-libs/auth/modal-key-credentials.js`).
+- Confirming an email address with the code before the first sign-in (`POST /v1/ghii/verify-email`, or `GET /v1/ghii/magic-link/verify` after it) gives out the account's app agent key without counting as the first sign-in. The first sign-in, by any method, rekeys that agent: the key and every token issued with it before stop working, and the screen and the sign-in answer say so (`agent_keys_ended`). The agent and its permissions stay (`aimeat/src/services/key-credentials.ts`).
+- A code key acts only on the account it made. Erasing that account closes the key, and an account registered later with the same name is not listed, cancelled or given a new password by the old key (`aimeat/src/services/owner-erasure.ts`, `aimeat/src/routes/organisms/workspace-access.ts`).
 
 ## Passkeys and the domain
 
@@ -166,7 +180,7 @@ Two settings decide the sign-in policy. Both can be changed while the node runs:
 - `on`: `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` wrong passwords lock the account for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (429 `PASSWORD_LOCKED`), and `AIMEAT_TOTP_MAX_FAILED` wrong codes for `AIMEAT_TOTP_LOCKOUT_SECONDS` (429 `TOTP_LOCKED`) (`aimeat/src/services/password-check.ts`).
 - An organisation whose policy requires an account lockout sets it `on`.
 
-**Who changes them.** A change that weakens any of these settings is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set`. The same rule refuses an AI the removal of a saved value of these settings (`DELETE /v1/admin/config/:path`). Each setting's row in the Config schema carries the rule. The admin Config API, its MCP tool and the reset apply it; an import from Consul or with `aimeat config import` at the server does not, because the values come from the operator's own configuration (`aimeat/src/services/config-strictness.ts`, `aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`).
+**Who changes them.** A change that weakens any of these settings is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set`. The same rule refuses an AI the removal of a saved value of these settings (`DELETE /v1/admin/config/:path`). Each setting's row in the Config schema carries the rule. The admin Config API, its MCP tool and the reset apply it. The Consul import (`POST /v1/admin/consul/import`) applies it to an AI credential too: a Consul value that would weaken one of these settings is not imported, and the answer names it in `held_back`; the operator in person imports every value. An import with `aimeat config import` at the server does not apply it, because the values come from the operator's own configuration and no AI credential runs it (`aimeat/src/services/config-strictness.ts`, `aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`, `aimeat/src/services/consul-config.ts`).
 
 ## First-run setup
 
@@ -241,13 +255,13 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 | Personal access token | None unless `expires_in` is given | per token | `DELETE /v1/access/tokens/:id`; revoking it ends its exchanged JWT at the next request | `aimeat/src/routes/access-tokens.ts` |
 | MCP OAuth access and refresh tokens | per MCP client | per client | `POST /v1/mcp/token/revoke`, agent removal | `aimeat/src/mcp/oauth.ts` |
 | SCIM token | Until replaced | per connection | `aimeat_admin_sso_scim_token` issues a new one | `aimeat/src/routes/scim.ts` |
-| Receiver key | 365 days by default, at most 730 | `expires_days` per receiver | `POST /v1/receivers/:name/rotate` (the old key works for 15 minutes unless `overlap_minutes` is 0), pause, delete; the operator's stop `POST /v1/admin/receivers/:owner/:name/stop` | `aimeat/src/services/receivers/manage.ts` |
+| Incoming webhook API key | 365 days by default, at most 730 | `expires_days` per incoming webhook | `POST /v1/receivers/:name/rotate` (the old API key works for 15 minutes unless `overlap_minutes` is 0), pause, delete; the operator's stop `POST /v1/admin/receivers/:owner/:name/stop` (the operator's start returns the incoming webhook to the state the stop replaced, so the owner's pause stays). Refused while the owner's account is deactivated. Not ended when the agent or ecosystem app that made it, or that changed its API key and so holds the working one, is deleted: the owner is told and pauses it | `aimeat/src/services/receivers/manage.ts`, `aimeat/src/services/receivers/makers.ts` |
 
 - Every access JWT the node issues is EdDSA. Each kind of token (a session, a download address, a share link, an app grant and the others) is signed with its own key, derived from the node's Ed25519 key for that kind alone and named in the token's header, so a token of one kind does not verify as another (`aimeat/src/auth/node-signer.ts`). A token issued before 2026-11-04 was signed with the node key itself and keeps working until it expires. Personal access tokens, SCIM tokens and refresh tokens are opaque random values stored as SHA-256 hashes (`aimeat/src/routes/access-tokens.ts`, `aimeat/src/routes/scim.ts`).
 - Token revocations persist in the database. Each process caches the answer for 60 seconds and marks a token it revokes itself at once (`aimeat/src/auth/jwt.ts`).
 - A password reset ends every sign-in session of the person; a password change ends every one but the current session; the person's agents keep theirs (`aimeat/src/routes/ghii/recovery.ts`).
 - Personal access tokens are created by the owner only, may carry full owner or operator access when the owner chooses it, and are stored as hashes (`aimeat/src/routes/access-tokens.ts`).
-- A receiver key is made when the owner creates or approves a receiver, shown once and stored as its SHA-256. It is never a session: the auth middleware recognises the receiver-key prefix (`RECEIVER_KEY_PREFIX` in `aimeat/src/services/receivers/contract.ts`) and refuses it on every route but the receiver's own address, and the key is refused in a query string. An agent makes one only with `receivers:manage`, which no wildcard carries; without it the agent proposes and the owner approves in person. Who may make receivers is `AIMEAT_RECEIVERS_MODE` (`auto`, `off`, `operator`, `self`); `auto` asks the operator on a node with `AIMEAT_CONTENT_ACCESS=signed-in` and lets the owner decide elsewhere. Five wrong keys for one receiver within an hour open a security incident (`aimeat/src/services/receivers/verify.ts`, `aimeat/src/services/receivers/policy.ts`).
+- An incoming webhook's API key is made when the owner creates or approves the incoming webhook (in the code and the routes, a receiver), shown once and stored as its SHA-256. It is never a session: the auth middleware recognises the API key's prefix (`RECEIVER_KEY_PREFIX` in `aimeat/src/services/receivers/contract.ts`) and refuses it on every route but the webhook's own address, and the API key is refused in a query string. An agent makes one only with `receivers:manage`, which no wildcard carries; without it the agent proposes and the owner approves in person. Who may make incoming webhooks is `AIMEAT_RECEIVERS_MODE` (`auto`, `off`, `operator`, `self`); `auto` asks the operator on a node with `AIMEAT_CONTENT_ACCESS=signed-in` and lets the owner decide elsewhere. Five wrong API keys for one incoming webhook within an hour open a security incident (`aimeat/src/services/receivers/verify.ts`, `aimeat/src/services/receivers/policy.ts`).
 
 ## Admin credentials
 

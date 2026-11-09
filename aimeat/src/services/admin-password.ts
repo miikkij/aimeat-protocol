@@ -28,6 +28,8 @@
  *   if (pw.kind === 'limited') { res.setHeader('Retry-After', String(pw.retryAfterSec)); ... 429 }
  *   if (pw.kind !== 'ok') { ... 401 }
  * @version-history
+ *   v1.2.0 — 2026-11-08 — checkAdminPasswordOnNode reserves the count before it compares, so wrong
+ *     passwords sent together are compared only up to the count (secaudit2026nov08 round 14).
  *   v1.1.0 — 2026-11-04 — checkAdminPasswordOnNode: the count in the node's storage, and the routes ask
  *     it (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-11-04 — Initial: the three compares and two counters moved here (codebase analysis
@@ -97,12 +99,32 @@ export function checkAdminPassword(config: AdminPasswordConfig, address: string,
 /** checkAdminPassword counted across every process of the node: the same count, limit and answers. */
 export async function checkAdminPasswordOnNode(config: AdminPasswordConfig, address: string, input: unknown): Promise<AdminPasswordCheck> {
   if (typeof input !== 'string' || !input) return { kind: 'missing' };
-  const now = Date.now();
-  const answer = decide(config, input, await misses.read(address), now);
-  if (answer) return answer;
-  await misses.bump(address, missCount(config, now));
-  return { kind: 'wrong' };
+  // RESERVE BEFORE THE COMPARE. The count is raised first, in one statement that answers the count
+  // after it, and the password is compared only while that count is within the limit. Reading the count
+  // and raising it after the compare let every request sent together read the same count, so a burst
+  // was compared in full (secaudit2026nov08 round 14). A right password takes its count back, so the
+  // count stays the number of wrong passwords, as before. A request that finds the count full takes
+  // its count back too and tries again after a short wait: a right password sent together with others
+  // finds their counts taken back by then, and a wrong one keeps its count, so the limit holds.
+  for (let attempt = 0; ; attempt++) {
+    const now = Date.now();
+    const reserved = await misses.bump(address, missCount(config, now));
+    if (reserved.count <= config.adminAuthRateLimitMax) {
+      const answer = decide(config, input, null, now);
+      if (!answer) return { kind: 'wrong' };
+      await misses.release(address, now);
+      return answer;
+    }
+    await misses.release(address, now);
+    if (attempt >= FULL_COUNT_RETRIES) {
+      return decide(config, input, { count: reserved.count - 1, expiresAt: reserved.expiresAt }, now) ?? { kind: 'wrong' };
+    }
+    await new Promise(r => setTimeout(r, 20 * (attempt + 1)));
+  }
 }
+
+/** How often a request that found the count full tries again (20, 40, 60, 80 ms apart) before it is refused. */
+const FULL_COUNT_RETRIES = 4;
 
 /** The refusal sentence for an address over the count: the rule, why, and what to do now. */
 export function adminPasswordLimitedMessage(check: { retryAfterSec: number; max: number; windowSec: number }): string {

@@ -9,6 +9,8 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  *
  * @version-history
+ *   2026-11-08 — checkStorageQuota takes the file's media type: a small file the person's store does
+ *     not take stays in the database and counts toward the node's quota (store-takes.ts).
  *   2026-11-04 — checkMemoryQuota takes the byte total its caller already read (codebase analysis
  *     2026-11-03, item C3); storage.sumMemoryBytes reads the kept total instead of summing the rows.
  *   v1.4.1 — 2026-10-30 — checkStorageQuota takes the store the writer named: a file put in one of the
@@ -177,10 +179,13 @@ export async function checkStorageQuota(
     additionalBytes: number,
     /** The store the writer named for the file (`own:<name>`, `node:<name>`), when one was named. */
     storeChoice?: string,
+    /** The file's media type: a store takes a small file only when it is of a kind the store is for. */
+    mimeType?: string,
 ): Promise<QuotaCheckResult> {
     const currentBytes = await getStorageTotalBytes(storage, gaii);
-    // A file that goes to the storage its owner connected uses none of the node's.
-    if (additionalBytes > 0 && await writesToOwnStore({ storage, config }, gaii, storeChoice)) {
+    // A file that goes to the storage its owner connected uses none of the node's. A small file the
+    // store does not take stays in the database and counts (store-takes.ts).
+    if (additionalBytes > 0 && await writesToOwnStore({ storage, config }, gaii, storeChoice, { size: additionalBytes, mimeType })) {
         return { allowed: true, currentBytes, quotaBytes: config.storageQuotaMb * 1024 * 1024, overageBytes: 0, overageMorsels: 0 };
     }
     const projectedBytes = currentBytes + additionalBytes;

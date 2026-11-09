@@ -30,6 +30,10 @@
  *   if (refusal) return { ok: false, ...refusal };
  *   const shown = await organismReadableRecords({ storage, config }, callerContext, records);
  * @version-history
+ *   2026-11-08 — The contributor grant that opens a workspace's content is the role the node stamped
+ *     (wsRoleOf in services/workspace-roles.ts), never the purpose text: a consent whose purpose a
+ *     person typed as `workspace-contributor` gave write access. A grant past its end date opens
+ *     nothing, before the expiry job marks it too.
  *   2026-10-21 — organismReadableRecords keeps the records of an organism that no longer exists in the
  *     listing, as the owner-scope reads returned them before 2026-10-20: there is no organism whose
  *     rule could refuse them. A barred agent of a live organism still loses that organism's records.
@@ -85,6 +89,7 @@ import { findWorkspaceRegistration } from './workspace-meta.js';
 import { agentBarred, agentBarredMessage, attachedAsParticipant } from './organism-agent-access.js';
 import { isOwnerInPerson, parseGaiiLoose } from '../utils/gaii.js';
 import { fencedSpaceRefusal, type ManifestWrite } from './fenced-space.js';
+import { wsRoleOf } from './workspace-roles.js';
 import type { CallerContext } from './caller-context.js';
 
 /** The session asking, in the terms this rule decides on. */
@@ -223,12 +228,17 @@ export async function checkOrganismNamespaceAccess(
             // Workspace CONTENT: the creator's 'contributor' ROLE grant, and only that, so the
             // creator can revoke write by removing the grant. A 'viewer' grant is read-only and does
             // not match here. The role is granted to the OWNER, so all their agents inherit it.
+            // The role is the one the node stamped (wsRoleOf), never the purpose a person typed: a
+            // purpose of `workspace-contributor` gave write access until 2026-11-08. A grant past
+            // its end date writes nothing, even before the expiry job marks it.
             if (wsCreator) {
                 const creatorGhii = `${wsCreator}@${config.nodeId}`;
                 const recipient = `ghii:${caller.owner}@${config.nodeId}`;
                 const pattern = `organism.${organismId}.w.${wsId}.**`;
+                const nowIso = new Date().toISOString();
                 const grants = await storage.listConsents(creatorGhii, { status: 'active' });
-                hasConsent = grants.some(c => c.purpose === 'workspace-contributor' && c.dataPattern === pattern && c.recipient === recipient);
+                hasConsent = grants.some(c => c.dataPattern === pattern && c.recipient === recipient
+                    && wsRoleOf(c) === 'contributor' && (!c.expires || c.expires > nowIso));
             }
         } else {
             // Flat organism namespace: the writer's own contribution consent, owned by the member's

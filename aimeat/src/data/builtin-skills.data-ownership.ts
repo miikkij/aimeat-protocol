@@ -27,6 +27,15 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-08 — Sections 4 and 5: archived keys have a limit of their own; an archive past it, and a
+ *     restore from the bin of an archived record past it, answer QUOTA_EXCEEDED (secaudit2026nov08b
+ *     round 15b, services/memory-ceilings.ts archiveWithinCeiling).
+ *   2026-11-08 — Section 2: under a CSM the person may not read, the CSM's lock answers as no lock on a
+ *     copy, as on every memory write (secaudit2026nov08b round 15, routes/memory/bulk.ts and copy.ts).
+ *   2026-11-08 — Sections 4 and 5: a restore and an unarchive answer QUOTA_EXCEEDED past the memory key
+ *     limit or quota (secaudit2026nov08 round 14, services/memory-ceilings.ts flipWithinCeilings).
+ *   2026-11-08 — Section 6: erasure closes the still-open access key that made the account
+ *     (owner-erasure.ts step code_invitation; secaudit2026nov08 round 14).
  *   2026-11-05 — Section 2: an imported entry at `group` keeps its record's group, or is stored private (routes/memory/bulk.ts).
  *   2026-11-02 — Section 6: erasure removes the person's own MCP servers and their own sign-ins on
  *     shared ones (owner-erasure.ts step mcp_user_credentials).
@@ -189,7 +198,9 @@ What an export leaves out, and why:
   \`POST /v1/memory/copy\` (an agent's call). It keeps the source's classification and never lowers it;
   for a record of a workspace or an organism that is the higher of its own and the workspace's or
   organism's classification.
-  A schema lock on the key holds for the copy too: a value that does not match is refused (422).
+  A schema lock on the key holds for the copy too: a value that does not match is refused (422). Under
+  the keys of a data description (CSM) the person may not read, its lock answers as no lock, as on
+  every memory write.
 
 ## 3. Who wrote this
 
@@ -217,7 +228,11 @@ What an export leaves out, and why:
   \`memory:write\`. \`NOT_RESTORABLE\` means it was never deleted, is not theirs, or the window closed.
   \`MORSEL_PRICE_REMOVED\` means the record is an app tool manifest or an offers document that still
   holds the old morsel price: it stays in the bin, and the person writes it again with the pacing
-  amount (\`tollMorsels\`) instead.
+  amount (\`tollMorsels\`) instead. \`QUOTA_EXCEEDED\` means putting it back would take its holder past
+  the node's memory key limit or memory quota, the same limits a write answers to, or, for a record
+  that was archived when it was deleted, past the archived memory key limit: it stays in the
+  bin, and the message names the setting. Fold small records into one, remove what is no longer
+  needed, or ask the operator to raise the limit.
 - Payment holds and beneficiary shares (\`commerce.hold.\`, \`commerce.hold-in.\`, \`commerce.benefit.\`)
   are written only by the payment routes. The person, signed in themselves, may delete one of theirs to
   clear a finished hold away; an agent may not, and a deleted one does not come back from the bin
@@ -285,7 +300,13 @@ let knowledge age, and you should offer them, not wait to be asked:
   workspace, space or one record) makes it read-only and takes it out of overviews, lists and search,
   while it stays readable by key. Read-only holds on every write: a write, an update of a version
   (what the Memory page and an app's update use) and a tag or visibility change all answer
-  \`ARCHIVED\` until it is unarchived. \`action: "unarchive"\` brings it back as it was. Only the
+  \`ARCHIVED\` until it is unarchived. Archived keys leave the memory key limit, so archiving frees room,
+  and count toward an archived memory key limit of their own: an archive that would take the person or
+  one of their agents past it answers \`QUOTA_EXCEEDED\` naming the setting, and nothing is archived.
+  Delete archived content that is no longer needed (bringing it back and deleting it are never refused
+  by that limit), or ask the operator to raise it. \`action: "unarchive"\` brings it back as it was, unless that would
+  take someone past the memory key limit or memory quota: then nothing comes back and the answer is
+  \`QUOTA_EXCEEDED\`, naming the setting. Only the
   organism's creator or an admin archives or brings back, in person or through one of their own
   agents; an agent attached to the organism is refused whoever its owner is, on REST and over MCP alike. Use it for a
   finished project, not for something wrong; wrong things are deleted.
@@ -314,7 +335,7 @@ let knowledge age, and you should offer them, not wait to be asked:
   they want to keep. Then erasure: \`DELETE /v1/owners/{name}\` from their own signed-in session,
   which no MCP tool and no page offers today. **It is immediate and has no window.** It removes the
   account, every agent, all their memory and files, consents, memberships, schedules, connections,
-  their own MCP servers and their own sign-ins on servers the node or a group shares, and apps. It also takes their name out of every group's list of owners, admins and members, and takes
+  their own MCP servers and their own sign-ins on servers the node or a group shares, and apps. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a
   pseudonym: finished work and disputes (the other party has a right to them), other people's ledger

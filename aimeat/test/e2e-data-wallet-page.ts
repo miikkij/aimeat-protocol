@@ -7,7 +7,13 @@
  *   and keys point at, and says the consent quota; GET /v1/consent/audit takes a key prefix and a page;
  *   both refuse without a token, and one owner's denials never show in another owner's wallet. On
  *   aimeat.io on 2026-09-04 the page rendered 2 856 rows at once and no name for any of its 13 organisms.
+ *   The grant form's May do: POST /v1/consent takes `role`, a purpose typed as `workspace-contributor`
+ *   opens no write, an explicit write grant with an end date writes, a read grant does not, and write
+ *   where no check reads it is refused before anything is stored.
  * @version-history
+ *   v1.1.0 — 2026-11-08 — May do is a field the server reads, never the purpose text: the attack (a
+ *     purpose word wrote), the use (Read and write with an end date was filed read-only), read gives
+ *     no write, and the refusals.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -152,7 +158,70 @@ await test('Revoking a permission keeps it as a record with its time', async () 
   assert(body.data.permSummary.active_consents === body.data.consents.consents.filter((x: any) => x.status === 'active').length, 'the summary counts the active subset');
 });
 
+// ── May do: the role is a field the server reads, never the purpose text ─────────────────────────
+// Until 2026-11-08 the write check read purpose === 'workspace-contributor', so the attack below wrote,
+// and the form's Read and write with an end date was filed read-only, so the use below was refused.
+const wsDoc = (id: string) => `organism.${orgId}.w.${WS}.docs.${id}`;
+const bWrites = (id: string) => json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key: wsDoc(id), value: { by: 'guest' } }) });
+const inThirtyDays = () => new Date(Date.now() + 30 * 86_400_000).toISOString();
+const roleGrants: string[] = [];
+
+await test('The guest joins the organism and, with a read permission only, cannot write the workspace', async () => {
+  const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({}) });
+  assert(j.status === 201, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+  const w = await bWrites('noperm');
+  assert(w.status === 403, `a member with a viewer grant wrote: ${w.status}`);
+});
+
+await test('Purpose text "workspace-contributor" grants no write (attack)', async () => {
+  const c = await json('/v1/consent', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ data_pattern: `organism.${orgId}.w.${WS}.**`, recipient: `ghii:${bGhii()}`, purpose: 'workspace-contributor', scope: 'private', expires: inThirtyDays() }) });
+  assert(c.status === 201, `consent ${c.status}: ${JSON.stringify(c.body.error)}`);
+  roleGrants.push(c.body.data.id);
+  assert(c.body.data.metadata?.wsRole !== 'contributor', `the purpose word stamped the role: ${JSON.stringify(c.body.data.metadata)}`);
+  const w = await bWrites('attack');
+  assert(w.status === 403, `the purpose word gave write access: ${w.status}`);
+  assert(w.body.error?.code === 'CONSENT_REQUIRED', `refusal code ${w.body.error?.code}`);
+});
+
+await test('An explicit read-and-write grant with an end date gives write, and keeps its purpose (use)', async () => {
+  const c = await json('/v1/consent', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ data_pattern: `organism.${orgId}.w.${WS}.**`, recipient: `ghii:${bGhii()}`, purpose: 'Project Lighthouse until launch', role: 'write', scope: 'private', expires: inThirtyDays() }) });
+  assert(c.status === 201, `consent ${c.status}: ${JSON.stringify(c.body.error)}`);
+  roleGrants.push(c.body.data.id);
+  assert(c.body.data.purpose === 'Project Lighthouse until launch', `purpose saved: ${c.body.data.purpose}`);
+  assert(c.body.data.metadata?.wsRole === 'contributor', `role stamped: ${JSON.stringify(c.body.data.metadata)}`);
+  const w = await bWrites('allowed');
+  assert(w.status === 201, `the write grant did not open the workspace: ${w.status} ${JSON.stringify(w.body.error)}`);
+  const r = await json(`/v1/consent/${c.body.data.id}`, { method: 'DELETE', headers: auth(A.token) });
+  assert(r.status === 200, `revoke ${r.status}`);
+  const after = await bWrites('after-revoke');
+  assert(after.status === 403, `a revoked write grant still wrote: ${after.status}`);
+});
+
+await test('A read grant gives no write', async () => {
+  const c = await json('/v1/consent', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ data_pattern: `organism.${orgId}.w.${WS}.**`, recipient: `ghii:${bGhii()}`, purpose: 'reads the plan', role: 'read', scope: 'private', expires: inThirtyDays() }) });
+  assert(c.status === 201, `consent ${c.status}: ${JSON.stringify(c.body.error)}`);
+  roleGrants.push(c.body.data.id);
+  const w = await bWrites('readonly');
+  assert(w.status === 403, `a read grant gave write access: ${w.status}`);
+});
+
+await test('Write where no write check reads it is refused with the reason, and nothing is stored', async () => {
+  const before = (await json('/v1/consent', { headers: auth(A.token) })).body.data;
+  const count = (before.consents ?? before).length;
+  for (const body of [
+    { data_pattern: 'probe.dw.open.**', recipient: `ghii:${bGhii()}` },
+    { data_pattern: `organism.${orgId}.w.${WS}.**`, recipient: `organism.${orgId}` },
+  ]) {
+    const c = await json('/v1/consent', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ...body, purpose: 'x', role: 'write', scope: 'private' }) });
+    assert(c.status === 400 && c.body.error?.code === 'WRITE_NOT_SUPPORTED', `${body.data_pattern} → ${body.recipient}: ${c.status} ${JSON.stringify(c.body.error)}`);
+  }
+  const after = (await json('/v1/consent', { headers: auth(A.token) })).body.data;
+  assert((after.consents ?? after).length === count, 'a refused write grant was stored');
+});
+
 await test('Clean up: the remaining permission is revoked and the probe key deleted', async () => {
+  for (const id of roleGrants) await json(`/v1/consent/${id}`, { method: 'DELETE', headers: auth(A.token) });
+  await json(`/v1/memory/${encodeURIComponent(wsDoc('allowed'))}`, { method: 'DELETE', headers: auth(B.token) });
   const r = await json(`/v1/consent/${wsConsentId}`, { method: 'DELETE', headers: auth(A.token) });
   assert(r.status === 200, `revoke ${r.status}`);
   const del = await json('/v1/memory/probe.dw.secret', { method: 'DELETE', headers: auth(A.token) });

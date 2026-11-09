@@ -2,8 +2,15 @@
  * @file federation-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile tab showing federated peer nodes and their online/offline status.
+ * @description Profile tab showing federated peer nodes and their online/offline status. The page
+ *   explains itself the designed way (.claude/rules/page-guidance.md): the title's question mark is
+ *   concept.peer, and the page's start (PageStart id "federation") gives the prompt that has one's own
+ *   AI read where this server stands, with a link to the admin Federation page where peers are
+ *   approved and changed.
  * @version-history
+ *   v1.12.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "federation" (its link opens the admin Federation page) and the title's question
+ *     mark concept.peer; the head's line is two sentences and the empty line says how the list fills.
  *   v1.11.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so a peer id or URL with an ampersand showed as &amp;.
  *   v1.11.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage, List, Mark, Note): the page passes data and writes no class. Put back from main: a member peer and a permanent one stand out (the success colour on main, the tag's fine tone now) from a visiting, genesis or temporary one (the plain tag) (page group G8).
  *   v1.10.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -36,6 +43,7 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
+import { PageStart } from '/components/PageStart.js';
 import { listPeers } from '/js/services/federation.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -63,11 +71,17 @@ export default function FederationTab() {
   // the info colour: the settled one is the tag's fine tone now, the others the plain tag.
   const kindMark = (settled, words) => html`<${Mark} tone=${settled ? 'fine' : undefined}>${words}<//>`;
 
+  // The start: the prompt has one's own AI read where this server stands; the peers are approved and
+  // changed on the admin Federation page, which the link opens.
+  const start = html`<${PageStart} id="federation" link=${{ href: '/v1/admin?tab=federation' }} />`;
+
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.federation')]}
       title=${t('profile.federation.title')}
-      desc=${t('profile.federation.desc')}>
+      help="concept.peer"
+      desc=${t('profile.federation.desc')}
+      start=${start}>
     ${!federation ? html`<${LoadingLine} text=${t('profile.federation.loading')} />`
       : federation.length === 0 ? html`<${Note} kind="quiet">${t('profile.federation.empty')}<//>`
       : html`<${PageSection} band title=${t('profile.federation.peers')}>

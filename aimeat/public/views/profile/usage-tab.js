@@ -24,8 +24,15 @@
  *   - REPORTS         — button definitions: id, label key, and which stats it leads with
  *   - getRange(period) — preset key → { from, to }
  *   - UsageTab (default) — fetch + render
+ *   HOW IT EXPLAINS ITSELF (.claude/rules/page-guidance.md): the title's question mark is
+ *   concept.usage (the two kinds of report, what is counted and what is not), and the page's start
+ *   (PageStart id "usage") gives the prompt that has one's own AI read the same reports.
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.10.0 -- 2026-11-08 -- Unpriced and Refused open their explanation (usage.unpriced,
+ *     usage.refused): the word in the figure strip, and Refused's column head in the activity table.
+ *   v1.9.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "usage" and the title's question mark concept.usage.
  *   v1.8.0 -- 2026-09-26 -- Every part is a component that takes data (SettingsPage, Tabs for the
  *     report bar and the time window, FigureStrip, List with its empty line, Note, Layout); the page
  *     writes no class and its pf-ureport-* rules go.
@@ -55,6 +62,8 @@ import { Note } from '/components/Note.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { List, Row, Name, Num } from '/components/List.js';
 import { Row as Line, Space } from '/components/Layout.js';
+import { PageStart } from '/components/PageStart.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -162,14 +171,17 @@ export default function UsageTab() {
         { label: t('profile.usage.statCost'), value: usd(totals?.cost_usd) },
         { label: t('profile.usage.statTokens'), value: compact(totals?.total_tokens) },
         { label: t('profile.usage.statCalls'), value: compact(totals?.calls) },
-        { label: t('profile.usage.statUnpriced'), value: compact(totals?.unpriced_calls) },
+        { label: t('profile.usage.statUnpriced'), term: 'usage.unpriced', value: compact(totals?.unpriced_calls) },
       ]
     : [
         { label: t('profile.usage.statCalls'), value: compact(totals?.calls) },
-        { label: t('profile.usage.statRefused'), value: compact(totals?.refusals) },
+        { label: t('profile.usage.statRefused'), term: 'usage.refused', value: compact(totals?.refusals) },
         { label: t('profile.usage.statErrors'), value: compact(totals?.errors) },
         { label: t('profile.usage.statSlowest'), value: ms(totals?.duration_ms_max) },
       ];
+
+  // A word that opens its own explanation (`explain.<term>.*`); without a term the word alone.
+  const helpWord = (words, term) => (term ? html`<${HelpLabel} term=${term} label=${words}>${words}<//>` : words);
 
   const headers = current.kind === 'spend'
     ? [t('profile.usage.colName'), t('profile.usage.statCost'), t('profile.usage.statTokens'), t('profile.usage.statCalls')]
@@ -199,17 +211,21 @@ export default function UsageTab() {
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.usage')]}
       title=${t('profile.usage.title')}
-      desc=${t('profile.usage.intro')}>
+      help="concept.usage"
+      desc=${t('profile.usage.intro')}
+      start=${html`<${PageStart} id="usage" />`}>
       ${controls}
 
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${loading && !data ? html`<${Note} kind="loading">${t('profile.usage.loading')}<//>` : null}
 
       ${data ? html`<${TabPanel} value=${`${report}-${period}`} label=${t(REPORTS.find(r => r.id === report)?.label || '')}>
-        <${FigureStrip} lead items=${statCards.map(c => ({ key: c.label, n: c.value, label: c.label }))} />
+        <${FigureStrip} lead items=${statCards.map(c => ({ key: c.label, n: c.value, label: helpWord(c.label, c.term) }))} />
         ${chart}
         <${List} keepCols cols=${headers.length > 4 ? 'name-n-n-n-n' : 'name-n-n-n'}
-          head=${headers.map((hd, i) => (i ? { label: hd, num: true } : hd))}
+          head=${headers.map((hd, i) => (i
+            ? { label: helpWord(hd, hd === t('profile.usage.statRefused') ? 'usage.refused' : null), num: true }
+            : hd))}
           empty=${emptyWords}
           rows=${rows}
           render=${(row, ri) => html`<${Row} key=${ri}>${row.map((cell, i) => (i

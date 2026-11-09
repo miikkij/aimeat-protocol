@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   (2026-11-08) hand-rolled names 390×844 and 1280×900, the skill's size matrix, where it said 390 and 1440.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-25 — intake-form-undeclared: the forms a page submits to are named in <meta name="aimeat-intake"> (services/app-intake-forms.ts).
  *   2026-10-19 — no-max-tokens: a text job runs uncapped and its record says truncated (wish
@@ -207,7 +208,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'genre-not-forked',
     title: 'A genre\'s name over a page that is not its fork',
     symptom: 'The head says `aimeat-register` `genre-<id>` and the page is the default look with a hero, forms and cards stacked in it: the same dashboard every app becomes, in new paint. It passes the register gate, which asks only that a register is named, and it passes contrast, width and tap-size checks, none of which say whether the page is any good. Publishing warns (`app_hints`, pitfall `genre-not-forked`) when the page carries under a fifth of the genre\'s own styles; a real fork keeps about four fifths.',
-    fix: 'Fork the genre: `aimeat_app_template_get { id: "genre-<id>" }` returns the whole page. Keep its composition, its type and its physics, and change the words, the sources and the images; let kit components serve the page where it needs a live part. A look preset is for a screen with no genre of its own. If the page has a look of its own, declare `content="custom:<name>"`. Before handing over, put it beside the genre at 390 and 1440 px in both themes and ask whether it holds up: passing tests do not answer that.',
+    fix: 'Fork the genre: `aimeat_app_template_get { id: "genre-<id>" }` returns the whole page. Keep its composition, its type and its physics, and change the words, the sources and the images; let kit components serve the page where it needs a live part. A look preset is for a screen with no genre of its own. If the page has a look of its own, declare `content="custom:<name>"`. Before handing over, put it beside the genre at 390×844 and 1280×900 in both themes and ask whether it holds up: passing tests do not answer that.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',

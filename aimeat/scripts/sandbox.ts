@@ -48,7 +48,15 @@
  *   cd aimeat && pnpm sandbox --reset      # throw the data away and seed again
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
+ *   AIMEAT_SANDBOX_DB_URL=postgresql://u:p@localhost:5432/aimeat_sandbox_x pnpm sandbox
+ *                                          # the same node on PostgreSQL, with its own state file
+ *   AIMEAT_SANDBOX_PRELOAD=scripts/perf/trace-preload.mjs pnpm sandbox   # extra --import modules
  * @version-history
+ *   v1.10.0 — 2026-11-09 — AIMEAT_SANDBOX_DB_URL runs the sandbox on PostgreSQL (postgres-kysely, the
+ *     production backend), with its own .sandbox-pg.json and .sandbox-pg.log, so a SQLite sandbox and
+ *     a PostgreSQL one stand side by side; the database is created when missing and dropped on
+ *     --reset. AIMEAT_SANDBOX_PRELOAD adds --import modules to the node (comma-separated paths), for
+ *     the per-request query trace in scripts/perf/. Both for measuring at real account size.
  *   v1.9.1 — 2026-11-08 — When the test mailbox sends no redirect, the error names the status, the
  *     address and the start of the answer (incident: pnpm sandbox fails at the test mailbox step;
  *     the second start on the same machine passed, so the cause is still open).
@@ -102,8 +110,13 @@ ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..');
-const STATE_FILE = join(AIMEAT, '.sandbox.json');
-const LOG_FILE = join(AIMEAT, '.sandbox.log');
+/** Set: the sandbox runs on this PostgreSQL database instead of a SQLite file, with its own state. */
+const PG_URL = process.env.AIMEAT_SANDBOX_DB_URL ?? '';
+const STATE_FILE = join(AIMEAT, PG_URL ? '.sandbox-pg.json' : '.sandbox.json');
+const LOG_FILE = join(AIMEAT, PG_URL ? '.sandbox-pg.log' : '.sandbox.log');
+/** Extra modules the node is started with (--import), as file URLs. */
+const EXTRA_PRELOADS = (process.env.AIMEAT_SANDBOX_PRELOAD ?? '').split(',').map(s => s.trim()).filter(Boolean)
+    .map(p => pathToFileURL(resolve(AIMEAT, p)).href);
 const NODE_ID = 'aimeat-local-001-dev';
 const PASSWORD = 'SandboxPw123!';
 
@@ -161,9 +174,9 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         AIMEAT_BASE_URL: `http://localhost:${port}`,
         AIMEAT_NODE_ID: NODE_ID,
         AIMEAT_NODE_TYPE: 'full',
-        AIMEAT_STORAGE: 'sqlite',
-        AIMEAT_SQLITE_PATH: dbPath,
-        DATABASE_URL: '',
+        AIMEAT_STORAGE: PG_URL ? 'postgres-kysely' : 'sqlite',
+        AIMEAT_SQLITE_PATH: PG_URL ? '' : dbPath,
+        DATABASE_URL: PG_URL,
         AIMEAT_LOG_LEVEL: process.env.AIMEAT_SANDBOX_LOG_LEVEL ?? 'info',
         // The idle stop (scripts/lib/sandbox-idle.mjs) watches this process.
         AIMEAT_SANDBOX_IDLE_WATCH: '1',
@@ -210,7 +223,8 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
 
         // Ceilings high, so a look at a feature is not a look at a limit.
         AIMEAT_MEMORY_MAX_VALUE_SIZE_KB: '1024',
-        AIMEAT_MEMORY_MAX_KEYS: '10000',
+        // AIMEAT_SANDBOX_MAX_KEYS: aimeat.io runs 100 000, which a seed at real account size needs.
+        AIMEAT_MEMORY_MAX_KEYS: process.env.AIMEAT_SANDBOX_MAX_KEYS ?? '10000',
         AIMEAT_MEMORY_QUOTA_MB: '100',
         AIMEAT_STORAGE_QUOTA_MB: '100',
 
@@ -361,12 +375,36 @@ async function refreshOwnerToken(o: { name: string; password: string }): Promise
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
+/** The PostgreSQL URL with its password hidden, for the state file and the report. */
+function redacted(url: string): string {
+    return url.replace(/\/\/([^:/@]+):[^@]*@/, '//$1:***@');
+}
+
+/** The sandbox's PostgreSQL database: dropped first when `fresh`, then created when it is missing. */
+async function ensurePgDatabase(fresh: boolean): Promise<void> {
+    const { default: pg } = await import('pg');
+    const database = decodeURIComponent(new URL(PG_URL).pathname.replace(/^\//, ''));
+    const admin = new pg.Client({ connectionString: PG_URL.replace(/\/[^/?]+(\?|$)/, '/postgres$1'), statement_timeout: 60_000 });
+    await admin.connect();
+    try {
+        // An identifier cannot be a bound parameter, so it is quoted rather than trusted.
+        const ident = `"${database.replace(/"/g, '""')}"`;
+        if (fresh) await admin.query(`DROP DATABASE IF EXISTS ${ident} WITH (FORCE)`);
+        const { rows } = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [database]);
+        if (rows.length === 0) await admin.query(`CREATE DATABASE ${ident}`);
+    } finally {
+        await admin.end();
+    }
+}
+
 function startNode(port: number, dbPath: string): number {
-    mkdirSync(dirname(dbPath), { recursive: true });
+    if (!PG_URL) mkdirSync(dirname(dbPath), { recursive: true });
     const log = openSync(LOG_FILE, 'a');
+    const dbArgs = PG_URL ? ['--db', 'postgres-kysely', '--db-url', PG_URL] : ['--db', 'sqlite', '--db-path', dbPath];
+    const preloads = EXTRA_PRELOADS.flatMap(p => ['--import', p]);
     // Detached, so the sandbox outlives the command that started it: that is the whole point. The
     // idle preload is what ends it, because nothing else ever ran `--stop` (scripts/lib/sandbox-idle.mjs).
-    const child = spawn('node', ['--import', 'tsx', '--import', IDLE_PRELOAD, 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', dbPath], {
+    const child = spawn('node', ['--import', 'tsx', '--import', IDLE_PRELOAD, ...preloads, 'src/index.ts', 'start', ...dbArgs], {
         cwd: AIMEAT,
         env: sandboxEnv(port, dbPath),
         stdio: ['ignore', log, log],
@@ -574,7 +612,8 @@ async function up(reset: boolean): Promise<void> {
     if (reset && s) {
         stopNode(s.pid);
         await new Promise(r => setTimeout(r, 500));
-        for (const suffix of ['', '-shm', '-wal']) {
+        if (PG_URL) await ensurePgDatabase(true);
+        for (const suffix of PG_URL ? [] : ['', '-shm', '-wal']) {
             const f = s.dbPath + suffix;
             if (existsSync(f)) { try { unlinkSync(f); } catch { /* a handle still open; the node is gone, the next boot overwrites */ } }
         }
@@ -595,11 +634,12 @@ async function up(reset: boolean): Promise<void> {
     }
 
     const port = s?.port ?? await pickPort();
-    const dbPath = s?.dbPath ?? join(AIMEAT, 'data', `sandbox-${port}.db`);
+    const dbPath = PG_URL ? redacted(PG_URL) : s?.dbPath ?? join(AIMEAT, 'data', `sandbox-${port}.db`);
     const baseUrl = `http://localhost:${port}`;
     BASE = baseUrl;
 
-    console.log(`  starting a sandbox node on :${port} (sqlite at ${dbPath})…`);
+    if (PG_URL) await ensurePgDatabase(false);
+    console.log(`  starting a sandbox node on :${port} (${PG_URL ? 'postgres-kysely' : 'sqlite'} at ${dbPath})…`);
     const pid = startNode(port, dbPath);
     await waitUntilUp(baseUrl);
 

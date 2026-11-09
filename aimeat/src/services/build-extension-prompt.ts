@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   2026-11-08 — ADDITIVE: ctx.workspace.archiveRecords names the archived memory key limit and its
+ *     QUOTA_EXCEEDED (secaudit2026nov08b round 15b).
  *   v1.7.8 — 2026-11-01 — ADDITIVE: ctx.email's body is text, and a `[Label](https://…)` line or a bare
  *     https line becomes a button or a link (services/email-text-links.ts).
  *   v1.7.7 — 2026-10-25 — ADDITIVE: the owner is part of an extension's address too (`owner`,
@@ -165,7 +167,7 @@ function sandboxSection(): string {
     '| `ctx.workspace.publish(orgId, ws, namespace, id, {expectedVersion})` | Publish the draft; `.latest` lands under the member |',
     '| `ctx.workspace.publishRecords(orgId, ws, namespace, [{id, value, visibility}], {expectedVersions, createOnly, dryRun})` | Publish up to 1000 records in ONE call. Answers `{published, skipped, failed, results: [{instance, ok, code, violations}]}`, one result per record. `dryRun` writes nothing; `createOnly` refuses an existing id (code `EXISTS`) |',
     '| `ctx.workspace.deleteRecords(orgId, ws, namespace, ids)` | Remove up to 2000 of the caller\'s own records in ONE call. Answers `{deleted: [{id, keys}], failed: [{id, reason}], rows_removed}` |',
-    '| `ctx.workspace.archiveRecords(orgId, ws, namespace, ids)` | Archive up to 500 records in ONE call: they leave every read and stay restorable. The caller must be the organism\'s creator or an admin; a token needs `organism:write`. Answers `{archived: [ids], rows}`. Use it so a space that only grows (closed tickets, finished sessions) stays fast to read |',
+    '| `ctx.workspace.archiveRecords(orgId, ws, namespace, ids)` | Archive up to 500 records in ONE call: they leave every read and stay restorable. The caller must be the organism\'s creator or an admin; a token needs `organism:write`. Answers `{archived: [ids], rows}`. Use it so a space that only grows (closed tickets, finished sessions) stays fast to read. Archived records count toward an archived memory key limit of their own (10 000 per identity by default): past it the call throws `QUOTA_EXCEEDED` and archives none of the ids, so delete archived records the space no longer needs |',
     '| `ctx.workspace.appendRows(orgId, ws, space, [{body, rowId, occurredAt}])` | Append up to 500 rows to a ROW space that names this extension (manifest `workspace: { rows: true }`). A repeated `rowId` replaces the stored row, which is how an ingest removes duplicates. Answers `{written, rowIds, pruned}`. Works on a schedule and a workflow step too |',
     '| `ctx.workspace.readRows(orgId, ws, space, {where, since, until, changedSince, limit, cursor, order})` | One page of such a row space, newest first: `{rows, cursor, indexed}`. `where` takes only the space\'s `indexOn` fields |',
     '| `ctx.workspace.readRow(orgId, ws, space, rowId)` | One row of such a row space by its id, in the shape `readRows` gives a row; `null` when there is no such row. One call, whatever the size of the space: use it whenever you hold the id, and never page through `readRows` to find one |',

@@ -12,6 +12,9 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-11-08 — establishOwnerSession decides a code key's first sign-in for every sign-in road: the
+ *     key stops being the password, and the new details go in the answer or wait for the session's
+ *     screen (secaudit2026nov08 round 14, key-credentials:rotation-gated-on-login-count-not-pending-invitation).
  *   2026-11-03 — restoreSessionHint(): a page load that carries the refresh cookie and no hint sets
  *     the hint, so a session from before the hint restores at boot (serveSpa; WP10e B15 follow-up).
  *   2026-11-02 — The required two-step test moved into checkRefreshSession (reason
@@ -58,6 +61,7 @@ import type { SessionRecord } from '../storage/repositories/session.repository.j
 import { issueJWT, AccountDisabledError } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { recordAccountEvent } from './account-events.js';
+import { issueFirstLoginKeyCredentials, owePendingKeyCredentials, type IssuedKeyCredentials } from './key-credentials.js';
 import { logger } from '../utils/logger.js';
 import { isExternalPrincipal } from '../utils/gaii.js';
 import { twoStepCovers, hasStrongWayIn, TWO_STEP_SETUP_REQUIRED } from './sign-in-policy.js';
@@ -260,18 +264,29 @@ export interface EstablishedSession {
   token: string;
   sessionId: string;
   expiresIn: number;
+  /** A code key's first sign-in, with the answer able to carry them: the issued sign-in details. */
+  keyCredentials?: IssuedKeyCredentials | null;
+  /** A code key's first sign-in by a road that redirects: the details wait for this session's screen. */
+  keyCredentialsOwed?: boolean;
 }
 
 /**
  * Create an owner login session: mint a refresh token (cookie) + a short-lived access
  * JWT bound to the session, and persist the session row. Called on successful login.
+ *
+ * A CODE KEY'S FIRST SIGN-IN IS DECIDED HERE, whichever way the person signed in (password, passkey,
+ * an emailed link, an identity provider): the key, which the person who minted it also knows, stops
+ * being the password when its invitation is still unaccepted (services/key-credentials.ts). It was
+ * decided by the login count in the password route only, so a first sign-in by a link or a provider
+ * left the key working (secaudit2026nov08 round 14). `keyCredentials: 'answer'` (the password and
+ * passkey routes) puts the new details in the answer; otherwise they wait for this session's screen.
  */
 export async function establishOwnerSession(
   storage: Storage,
   config: AimeatConfig,
   req: Request,
   res: Response,
-  identity: { owner: string; roles: string[] },
+  identity: { owner: string; roles: string[]; keyCredentials?: 'answer' | 'screen'; back?: string | null },
 ): Promise<EstablishedSession> {
   // Refuse before write (BR-04): a deactivated account gets no session row and no cookie.
   // Callers map this to 403 ACCOUNT_DISABLED; issueJWT below would refuse anyway (backstop).
@@ -279,6 +294,7 @@ export async function establishOwnerSession(
   if (ownerRecord?.disabledAt) throw new AccountDisabledError(identity.owner);
 
   const sessionId = randomUUID();
+  const keyStep = await firstSignInKeyStep(storage, config, identity, sessionId);
   const rawToken = newRefreshToken(req);
   const now = Date.now();
   const issuedAt = new Date(now).toISOString();
@@ -306,7 +322,21 @@ export async function establishOwnerSession(
     sessionId,
   );
 
-  return { token, sessionId, expiresIn: config.accessTtlSeconds };
+  return { token, sessionId, expiresIn: config.accessTtlSeconds, ...keyStep };
+}
+
+/** The code-key step of a sign-in: nothing for every account but a code key's at its first sign-in. */
+async function firstSignInKeyStep(
+  storage: Storage, config: AimeatConfig,
+  identity: { owner: string; keyCredentials?: 'answer' | 'screen'; back?: string | null }, sessionId: string,
+): Promise<Pick<EstablishedSession, 'keyCredentials' | 'keyCredentialsOwed'>> {
+  const ghii = await storage.getGHII(`${identity.owner}@${config.nodeId}`);
+  if (!ghii) return {};
+  if (identity.keyCredentials === 'answer') {
+    const issued = await issueFirstLoginKeyCredentials(storage, config, ghii);
+    return issued ? { keyCredentials: issued } : {};
+  }
+  return await owePendingKeyCredentials(storage, ghii, sessionId, identity.back ?? null) ? { keyCredentialsOwed: true } : {};
 }
 
 /** Why a refresh session does not hold. */

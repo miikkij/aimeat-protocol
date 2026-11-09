@@ -511,6 +511,85 @@ await test('20. A REMOVED scope is told the same way, and stops applying once re
     await t.close();
 });
 
+// ─── Phase 5: erasing an account ends its live connections ───
+// secaudit2026nov08b round 15 (owner-erasure.ts:eraseOwner/tunnel-sockets-not-detached and
+// eraseOwner/mcp-sessions-not-closed): the erasure ended the credentials in storage, but the agent's
+// open tunnel socket and its open MCP notification stream stayed, keyed by a GAII the released name
+// produces again for the next account of that name.
+console.log('\nPhase 5 — Erasing an account ends its live connections');
+
+async function newAccountWithHelper(name: string): Promise<{ owner: string; agent: string }> {
+  const owner = (await registerOwner(BASE, name)).token;
+  const { status, body } = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${owner}` },
+    body: JSON.stringify({ name: 'helper', owner: name, capabilities: ['memory'], scopes: ['*'] }),
+  });
+  assert(status === 201, `agent status ${status}: ${JSON.stringify(body)}`);
+  return { owner, agent: await getToken(body.data.agent.gaii, body.data.private_key) };
+}
+
+/** A 2025-era MCP session and its open GET notification stream: whether it ended within `ms`, and a stop. */
+async function openMcpStream(agentToken: string): Promise<{ endedWithin: (ms: number) => Promise<boolean>; stop: () => Promise<void> }> {
+  const init = await fetch(`${BASE}/v1/mcp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'erasure probe', version: '1.0.0' } } }),
+  });
+  await init.body?.cancel().catch(() => { /* the answer is not needed */ });
+  const sessionId = init.headers.get('mcp-session-id');
+  assert(init.status === 200 && !!sessionId, `mcp initialize ${init.status}`);
+  const stream = await fetch(`${BASE}/v1/mcp`, {
+    headers: { Accept: 'text/event-stream', 'mcp-session-id': sessionId!, Authorization: `Bearer ${agentToken}` },
+  });
+  assert(stream.status === 200 && !!stream.body, `mcp GET stream ${stream.status}`);
+  const reader = stream.body!.getReader();
+  let ended = false;
+  const drained = (async () => { for (;;) { const r = await reader.read().catch(() => ({ done: true })); if (r.done) { ended = true; return; } } })();
+  return {
+    endedWithin: async (ms: number) => { await Promise.race([drained, sleep(ms)]); return ended; },
+    stop: async () => { if (!ended) await reader.cancel().catch(() => { /* closed by the test */ }); },
+  };
+}
+
+await test('21. Erasing an account closes its agent\'s tunnel socket and its open MCP stream; the next holder of the name gets nothing on them', async () => {
+  const name = `tunerase${Date.now()}`;
+  const first = await newAccountWithHelper(name);
+  const t = await TunnelClient.connect(BASE, first.agent);
+  const stream = await openMcpStream(first.agent);
+  assert(!(await stream.endedWithin(500)), 'the MCP notification stream is open before the erasure');
+  const erased = await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${first.owner}` } });
+  assert(erased.status === 200, `erasure status ${erased.status}`);
+
+  const told = await t.waitForAuthRevoked(3000);
+  assert(told !== null, 'the erased agent\'s connector must be told its credential is gone');
+  assert(told!.message === 'Account deleted', `the connector is told why: ${JSON.stringify(told)}`);
+  await sleep(150);
+  assert(!t.isOpen, 'the erased agent\'s tunnel socket must be closed');
+  const streamEnded = await stream.endedWithin(3000);
+  await stream.stop();
+  assert(streamEnded, 'the erased agent\'s open MCP notification stream must end');
+
+  // The released name, registered again with an agent of the same name: its task goes to its own
+  // connector when one connects, never to the erased person's.
+  const second = await newAccountWithHelper(name);
+  const delivered = t.delivers.length;
+  const task = await json('/v1/agents/helper/tasks', {
+    method: 'POST', headers: { Authorization: `Bearer ${second.owner}` },
+    body: JSON.stringify({ title: 'for the new helper', description: 'for the new helper', status: 'queued' }),
+  });
+  assert(task.status === 201, `task status ${task.status}: ${JSON.stringify(task.body)}`);
+  await sleep(300);
+  assert(t.delivers.length === delivered, 'nothing for the next holder of the name may reach the erased person\'s socket');
+  const own = await TunnelClient.connect(BASE, second.agent);
+  const backlog = await own.waitForBacklog(3000);
+  const ids = ((backlog?.payload as any)?.tasks ?? []).map((x: any) => x.id);
+  assert(ids.includes(task.body.data.task.id), 'the new account\'s own connector receives its task');
+  await own.close();
+  await t.close();
+  const cleanup = await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${second.owner}` } });
+  assert(cleanup.status === 200, `cleanup erasure status ${cleanup.status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner', async () => {

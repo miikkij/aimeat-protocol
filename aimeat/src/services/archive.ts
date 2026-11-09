@@ -15,10 +15,15 @@
  *   `archived` on its entry in the `organism.{id}.meta.workspaces` registry; a record-table/space and a
  *   single record have no separate marker — their archived state is the flag on their rows, counted via
  *   countArchivedByKeyPrefix. The write guard (isKeyArchived) enforces read-only.
- * @structure ARCHIVE ROOT format; archiveTarget/unarchiveTarget; isKeyArchived; setRegistryWorkspaceArchived;
+ * @structure ARCHIVE ROOT format; archiveTarget/unarchiveTarget; archivedOwnersUnder; isKeyArchived; setRegistryWorkspaceArchived;
  *   archiveRoleOf (the creator-or-admin rule); archiveRecordsBatchOp (many records of one space)
  * @usage import { archiveTarget, unarchiveTarget, isKeyArchived } from '../services/archive.js';
  * @version-history
+ *   2026-11-08 — liveOwnersUnder, and archiveRecordsBatchOp takes the config and asks the archived-key
+ *     ceiling (memoryMaxArchivedKeysPerAgent) of the archiving account around the whole batch
+ *     (secaudit2026nov08b round 15b, storage/memory-totals:postgres-archived-rows-count-no-bytes).
+ *   2026-11-08 — archivedOwnersUnder: the principals an unarchive can return rows to, whose memory
+ *     limits organism-archive-op.ts asks before the flip (secaudit2026nov08 round 14).
  *   v1.2.0 — 2026-10-13 — archiveRecordsBatchOp takes one more refusal for the keys it would archive
  *     and asks it before the first record is archived. The extension sandbox passes the fenced-space
  *     rule (services/fenced-space.ts): a record space that names extensions takes an agent's archive
@@ -29,6 +34,9 @@
  *   v1.0.0 — 2026-06-26 — Initial: record/space/workspace/organism archive + cascade + smart restore + guard.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { AimeatConfig } from '../config.js';
+import { archiveWithinCeiling } from './memory-ceilings.js';
+import { isSameOwner } from '../utils/gaii.js';
 
 /** What level a target sits at. The level fixes the key prefix archived and the `archivedRoot` stamp. */
 export type ArchiveLevel = 'organism' | 'workspace' | 'space' | 'record';
@@ -145,6 +153,35 @@ export async function unarchiveTarget(storage: Storage, t: ArchiveTarget, actor:
   return { root, count, level: t.level };
 }
 
+/**
+ * The principals holding archived rows under a target's key scope: every principal an unarchive of it
+ * can return rows to, and possibly more (organism-archive-op.ts asks their memory limits first).
+ */
+export async function archivedOwnersUnder(storage: Storage, t: ArchiveTarget): Promise<string[]> {
+  return ownersUnder(storage, t, 'only');
+}
+
+/**
+ * The principals holding rows not yet archived under a target's key scope: every principal an archive
+ * of it can add archived keys to, and possibly more (archiveWithinCeiling in services/memory-ceilings.ts
+ * asks their archived-key ceiling around the flip).
+ */
+export async function liveOwnersUnder(storage: Storage, t: ArchiveTarget): Promise<string[]> {
+  return ownersUnder(storage, t, 'exclude');
+}
+
+async function ownersUnder(storage: Storage, t: ArchiveTarget, archived: 'only' | 'exclude'): Promise<string[]> {
+  const { base } = keyScopeFor(t);
+  const owners = new Set<string>();
+  const page = 1000;
+  for (let offset = 0; ; offset += page) {
+    const { items } = await storage.listAllMemoryMeta({ prefix: base, archived, limit: page, offset });
+    for (const r of items) owners.add(r.ownerGaii);
+    if (items.length < page) break;
+  }
+  return [...owners];
+}
+
 export interface ArchivedState { archived: boolean; level?: ArchiveLevel; root?: string }
 
 /**
@@ -203,7 +240,7 @@ export type ArchiveBatchResult =
  * Answers the ids that had rows to archive and the number of rows flagged.
  */
 export async function archiveRecordsBatchOp(
-  storage: Storage, who: ArchiveCaller,
+  deps: { storage: Storage; config: AimeatConfig }, who: ArchiveCaller,
   args: { organismId: string; ws: string; namespace: string; ids: string[] },
   /**
    * One more refusal for the record keys this call would archive, asked after every check below
@@ -212,6 +249,7 @@ export async function archiveRecordsBatchOp(
    */
   refusalForKeys?: (keys: string[]) => Promise<{ status: number; code: string; message: string } | null>,
 ): Promise<ArchiveBatchResult> {
+  const { storage } = deps;
   const { organismId, ws, namespace, ids } = args;
   if (!SEGMENT.test(String(ws || ''))) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'ws must be a workspace id' };
   if (!NAMESPACE.test(String(namespace || ''))) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'namespace must be a dotted space namespace such as shared.claim' };
@@ -228,13 +266,22 @@ export async function archiveRecordsBatchOp(
   const unique = [...new Set(ids.map(String))];
   const refused = await refusalForKeys?.(unique.map(id => `organism.${organismId}.w.${ws}.${namespace}.${id}`));
   if (refused) return { ok: false, status: refused.status, code: refused.code, message: refused.message };
-  const archived: string[] = [];
-  let rows = 0;
-  for (const id of unique) {
-    const key = `organism.${organismId}.w.${ws}.${namespace}.${id}`;
-    const r = await archiveTarget(storage, { level: 'record', orgId: organismId, ws, key }, who.principal);
-    if (r.count > 0) archived.push(id);
-    rows += r.count;
-  }
-  return { ok: true, data: { archived, rows } };
+  // The archived-key ceiling of the archiving account, in person and through its agents, as
+  // organismArchiveOp asks it; the whole batch is one archive and is rolled back whole
+  // (secaudit2026nov08b round 15b).
+  const own = (await liveOwnersUnder(storage, { level: 'space', orgId: organismId, ws, namespace }))
+    .filter(o => isSameOwner(o, who.principal));
+  const kept = await archiveWithinCeiling(deps, own, async () => {
+    const archived: string[] = [];
+    let rows = 0;
+    for (const id of unique) {
+      const key = `organism.${organismId}.w.${ws}.${namespace}.${id}`;
+      const r = await archiveTarget(storage, { level: 'record', orgId: organismId, ws, key }, who.principal);
+      if (r.count > 0) archived.push(id);
+      rows += r.count;
+    }
+    return { archived, rows };
+  });
+  if (!kept.ok) return { ok: false, status: kept.refusal.status, code: kept.refusal.code, message: kept.refusal.message };
+  return { ok: true, data: kept.value };
 }

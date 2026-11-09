@@ -25,11 +25,14 @@
  *   verifyLink with a session (EXTENSION POINT: signInWith); nothing of it is built.
  *
  *   EVERY REQUEST RE-READS THE PARTY (appPartyFromRequest): the token must name this app, the party
- *   must be active with the token's epoch, the node's setting must not be off, and an Origin header,
- *   when the browser sends one, must be the app's own address or the node's.
+ *   must be active with the token's epoch, the node's setting must not be off, the app's owner must
+ *   not be deactivated, and an Origin header, when the browser sends one, must be the app's own
+ *   address or the node's.
  * @structure AppPartyCtx · signUp · signIn · verifyLink · partyMe · signOut · appPartyFromRequest · signInWith
  * @usage const out = await signUp(deps, { owner, filename }, body);
  * @version-history
+ *   v1.3.0 — 2026-11-08 — appPartyFromRequest answers 403 ACCOUNT_DISABLED while the app's owner is
+ *     deactivated, and admits again after reactivation (secaudit2026nov08 round 14, older item O3).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-11-04 — The link mail goes through mail-gate.ts sendMail as sign-in mail (codebase
@@ -61,6 +64,7 @@ import {
     type AppPartyRecord,
 } from './contract.js';
 import { appIdOf, changeAppParties, readAppParties, registrationMode, signupOpen } from './store.js';
+import { deactivatedSince } from '../account-deactivated.js';
 
 export type AppPartyAnswer<T> = { ok: true; status?: number; data: T } | { ok: false; status: number; code: string; message: string };
 type Refusal = Extract<AppPartyAnswer<never>, { ok: false }>;
@@ -268,6 +272,9 @@ export async function appPartyFromRequest(
     const party = (await readAppParties(deps.storage, app.ownerGhii, appId)).parties.find(p => p.uid === claims.uid);
     if (!party || party.epoch !== claims.ep) return refuse(401, 'INVALID_PARTY_CREDENTIAL', 'This sign-in has ended. Sign in again.');
     if (party.status !== 'active') return refuse(403, 'PARTY_STOPPED', 'Your registration to this app is stopped. Ask the app\'s owner.');
+    // The app's owner is deactivated: the sign-in waits, and works again on reactivation (nothing is deleted).
+    const deactivated = await deactivatedSince(deps.storage, app.ownerGhii);
+    if (deactivated) return refuse(403, 'ACCOUNT_DISABLED', `The account that owns this app was deactivated on ${deactivated}, so the app does not take sign-ins now. Your registration stays and works again if the operator of this server reactivates the account.`);
     const originRaw = req.headers.origin;
     const origin = Array.isArray(originRaw) ? originRaw[0] : originRaw;
     if (origin) {

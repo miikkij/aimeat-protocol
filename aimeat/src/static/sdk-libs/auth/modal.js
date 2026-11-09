@@ -10,9 +10,15 @@
  *   `emailRequired`) — the email, asked up front rather than demanded after a failed create.
  *   Social buttons sit outside both tabs because one provider button serves both.
  * @structure showLoginModal(opts, renderBtn, onClosed?) → { buildModalInner, wireModal, render, switchLang,
- *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
+ *   openEmailCompletion (modal-email-step.js), showView, capture/restoreInputs, keep/resumeView }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.22.0 -- 2026-11-08 -- The language switch keeps the view on screen and what it holds (modal-view-keep.js):
+ *     a code key's first sign-in keeps its details step, the two-step, code, link, email and recovery
+ *     views keep theirs. The complete-account step moved to modal-email-step.js unchanged (max-file-lines)
+ *     (secaudit2026nov08b round 15b).
+ *   v1.21.0 — 2026-11-08 — A code key's first sign-in opens the sign-in details step (modal-key-credentials.js)
+ *     before the dialog closes, and opts.keyCredentials opens it from the front page (secaudit2026nov08 round 14).
  *   v1.20.0 — 2026-11-04 — opts.line replaces the line under the headline on both tabs: why the person is here.
  *   v1.19.0 — 2026-11-02 — The operator's sign-in policy. With password sign-in off the dialog shows no
  *     password form and says which ways in remain; with `operators` the form stands under a line
@@ -101,8 +107,11 @@ import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-
 import { showAuthErrorIn } from './auth-error.js';
 import { signupInProgress } from './signup-state.js';
 import { EMAIL_RE, OWNER_NAME_RE, passwordRefusalText, operatorsOnlyNoteHtml } from './modal-constants.js';
-import { captureInputs, restoreInputs, wireUsernameRules } from './modal-fields.js';
+import { captureInputs, restoreInputs, wireUsernameRules, wireEnterSubmits } from './modal-fields.js';
 import { twoStepViewHtml, wireTwoStepStep } from './modal-two-step.js';
+import { keyCredentialsViewHtml, wireKeyCredentialsStep } from './modal-key-credentials.js';
+import { wireEmailStep } from './modal-email-step.js';
+import { keepView, resumeView } from './modal-view-keep.js';
 
 /** The domain in the crumb above the headline: this node's own, so a self-hosted node shows its
  *  domain there and the wordmark beside it says what the software is. */
@@ -145,15 +154,20 @@ export function showLoginModal(opts, renderBtn, onClosed) {
 
   // Typed values survive a re-render (captureInputs, restoreInputs: modal-fields.js).
   // Switch language: persist the choice, reload translations, re-render in place (no page reload).
+  // The view on screen and what it holds come back too (modal-view-keep.js): the steps are set by
+  // each wireModal(), so `steps` names the drawing on screen.
+  /** @type {Record<string, any>} */ var steps = {};
   function switchLang(next) {
     if (next === lang) return;
     writeLang(next);
     var vals = captureInputs();
+    var kept = keepView(steps);
     loadModalI18n(next).then(function (fresh) {
       lang = next;
       if (fresh && Object.keys(fresh).length) i = fresh;
       render(false);
       restoreInputs(vals);
+      resumeView(steps, kept);
     });
   }
 
@@ -329,6 +343,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + totpViewHtml(i, field)
       // Two-step enrolment (hidden): the operator requires two-step sign-in (modal-two-step.js).
       + twoStepViewHtml(i, field)
+      // A code key's first sign-in: the new sign-in details (modal-key-credentials.js).
+      + keyCredentialsViewHtml(i, field)
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
       // A returning person signing in does not need to be sold the thing they already have. A
       // numbered index under an ink rule, the last line in bold.
@@ -358,6 +374,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     // behind the dialog, and Escape, close only while nothing has been typed, because losing
     // a half-filled form to a stray click is worse than a dialog that stays.
     function holdsTypedInput() {
+      // The sign-in details step holds a password shown once: only its own button closes it.
+      if (/** @type {any} */ (document.getElementById('aimeat-key-view') || {}).style?.display === '') return true;
       var inputs = modal.querySelectorAll('.aimeat-inp');
       for (var k = 0; k < inputs.length; k++) if (/** @type {any} */ (inputs[k]).value) return true;
       return false;
@@ -412,18 +430,25 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       document.getElementById('aimeat-email-view').style.display = view === 'email' ? '' : 'none';
       document.getElementById('aimeat-totp-view').style.display = view === 'totp' ? '' : 'none';
       document.getElementById('aimeat-two-step-view').style.display = view === 'two-step' ? '' : 'none';
+      document.getElementById('aimeat-key-view').style.display = view === 'key' ? '' : 'none';
       var ll = document.getElementById('aimeat-login-link-view'); if (ll) ll.style.display = view === 'login-link' ? '' : 'none';
-      // The code step and the two-step enrolment carry their own heading: the masthead and the tabs go.
-      var step = view === 'totp' || view === 'two-step';
+      // The code step, the two-step enrolment and the sign-in details carry their own heading.
+      var step = view === 'totp' || view === 'two-step' || view === 'key';
       modal.querySelectorAll('.aimeat-headline, .aimeat-line, .aimeat-tabs').forEach(function (el) { /** @type {any} */ (el).style.display = step ? 'none' : ''; });
     }
 
     /** A finished sign-in, whichever step produced it. The caller's onLogin is not called here: the
      *  session core's 'login' event reaches it through on-login.js, once, with the road it came by. */
     function finishLogin() {
+      // A code key's first sign-in answered new sign-in details: they are shown before the dialog goes.
+      var s = /** @type {any} */ (typeof auth.getSession === 'function' ? auth.getSession() : null);
+      var kc = s && s._keyCredentials;
+      if (kc && kc.password) { s._keyCredentials = null; keyStep.open({ credentials: kc, jwt: s.jwt }); return; }
       modal.remove();
       renderBtn();
     }
+    var keyStep = wireKeyCredentialsStep({ i: i, showView: showView, onDone: function () { modal.remove(); renderBtn(); } });
+    if (opts.keyCredentials) { var owed = opts.keyCredentials; opts.keyCredentials = null; keyStep.open(owed); }
 
     // The passkey button. Its whole ceremony lives in the auth lib; the modal only says where the
     // finished session goes, which is the same place every other sign-in ends.
@@ -434,7 +459,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     });
 
     // "Email me a sign-in link": absent on a node that sends no mail.
-    wireLoginLinkStep({ i: i, api: api, showView: showView, redirect: opts.redirect, openFirst: linkFirst && tab === 'signin' ? opts : null });
+    var linkStep = wireLoginLinkStep({ i: i, api: api, showView: showView, redirect: opts.redirect, openFirst: linkFirst && tab === 'signin' ? opts : null });
 
     // The second-factor step. It holds the password for its own call and drops it when it closes.
     var totpStep = wireTotpStep({
@@ -458,37 +483,9 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     }
     if (opts.twoStepSetup) { var setupToken = opts.twoStepSetup; opts.twoStepSetup = null; twoStep.open(setupToken); }
 
-    // Credentials captured from the last correct-password attempt that hit the email gate.
-    var pendingEmailLogin = null;
-
-    // Open the email step. 'attach' — existing account needs a verified email. 'register' — brand-new
-    // account under the email gate: step1 POST /v1/ghii (with email) creates it. Both finish identically.
-    // `prefillEmail` comes from the Register tab, which already asked: the address is filled in and
-    // the code sent straight away, so the person never types it twice.
-    function openEmailCompletion(user, pass, hasEmail, mode, displayName, prefillEmail) {
-      pendingEmailLogin = { username: user, password: pass, mode: mode || 'attach', displayName: displayName || user };
-      showView('email');
-      document.getElementById('aimeat-em-step1').style.display = '';
-      document.getElementById('aimeat-em-step2').style.display = 'none';
-      var emailInput = /** @type {any} */ (document.getElementById('aimeat-em-email'));
-      emailInput.value = prefillEmail || '';
-      var titleEl = document.querySelector('#aimeat-em-step1 h3');
-      var desc = document.querySelector('#aimeat-em-step1 p');
-      if (pendingEmailLogin.mode === 'register') {
-        if (titleEl) titleEl.textContent = i.registerEmailTitle || 'Add your email';
-        if (desc) desc.textContent = i.registerEmailDesc || 'Enter your email to create your account. We’ll send a verification code to confirm it.';
-      } else {
-        if (titleEl) titleEl.textContent = i.completeAccountTitle || 'One last step';
-        if (desc) {
-          desc.textContent = hasEmail
-            ? (i.completeAccountDescResend || 'Confirm your email to finish signing in. We’ll send a verification code — edit the address if it’s wrong.')
-            : (i.completeAccountDesc || 'Add an email to finish setting up your account. We’ll send a verification code to confirm it.');
-        }
-      }
-      document.getElementById('aimeat-em-err').style.display = 'none';
-      if (prefillEmail) { sendEmailCode(); return; }
-      setTimeout(function () { emailInput.focus(); }, 50);
-    }
+    // The complete-account step: an address to confirm before the first session (modal-email-step.js).
+    var emailStep = wireEmailStep({ i: i, api: api, auth: auth, showView: showView, finishLogin: finishLogin, twoStepAsked: twoStepAsked, totpStep: totpStep });
+    var openEmailCompletion = emailStep.open;
 
     // Forgot password link
     document.getElementById('aimeat-forgot-pw').addEventListener('click', function (e) {
@@ -509,140 +506,17 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       document.getElementById(id).addEventListener('click', function () { showView('login'); });
     });
 
-    /** POST /v1/ghii/login/attach-email: checks the password, records the address, mails a code. */
-    function attachEmail(pending, email) {
-      return api('/v1/ghii/login/attach-email', {
-        method: 'POST',
-        body: JSON.stringify({ username: pending.username, password: pending.password, email: email }),
-      });
-    }
-
-    // Complete-account step 1 — send a verification code (re-verifies password server-side).
-    // Named rather than inline so the Register tab can drive the same step with the address it
-    // already collected, instead of repeating the create-and-verify calls.
-    async function sendEmailCode() {
-      var email = /** @type {any} */ (document.getElementById('aimeat-em-email')).value.trim();
-      var errEl = document.getElementById('aimeat-em-err');
-      errEl.style.display = 'none';
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        errEl.textContent = i.errEmailInvalid || 'Please enter a valid email address.';
-        errEl.style.display = 'block';
-        return;
-      }
-      if (!pendingEmailLogin) { showView('login'); return; }
-      var btn = /** @type {any} */ (document.getElementById('aimeat-em-send'));
-      btn.textContent = i.working || 'Working...';
-      btn.disabled = true;
-      var pending = pendingEmailLogin;
-      try {
-        var res;
-        if (pending.mode === 'register') {
-          // Brand-new account under the email gate: create it now WITH the email (returns verification_id).
-          res = await api('/v1/ghii', {
-            method: 'POST',
-            credentials: 'include',
-            body: JSON.stringify({
-              username: pending.username,
-              display_name: pending.displayName,
-              password: pending.password,
-              email: email,
-              // The account's locale, so the verification code arrives in the language the
-              // person is reading right now. Without it every account was created locale-less
-              // and every system email fell back to English (UX-remake v3, measured).
-              locale: currentModalLang(),
-            }),
-          }).catch(function (e) {
-            // The name is taken. When it is this person's own account, made by an earlier press whose
-            // code step never showed, the same password gets a new code for it through attach-email
-            // instead of a dead end. A wrong password keeps the "taken" answer, which is then true.
-            if (e.code !== 'NAME_TAKEN') throw e;
-            return attachEmail(pending, email).catch(function (e2) {
-              if (e2.code === 'ALREADY_VERIFIED') return null;
-              throw e;
-            });
-          });
-          // Taken, the password matches and the address is already confirmed: the account is
-          // finished, so this is a sign-in.
-          if (res === null) {
-            try {
-              await auth.loginWithPassword(pending.username, pending.password);
-            } catch (le) {
-              if (twoStepAsked(le)) return;
-              if (le.code !== 'TOTP_REQUIRED') throw le;
-              totpStep.openTotpStep(pending.username, pending.password);
-              return;
-            }
-            pendingEmailLogin = null;
-            finishLogin();
-            return;
-          }
-        } else {
-          res = await attachEmail(pending, email);
-        }
-        pending.verificationId = res.data && res.data.verification_id;
-        document.getElementById('aimeat-em-step1').style.display = 'none';
-        document.getElementById('aimeat-em-step2').style.display = '';
-        setTimeout(function () { /** @type {any} */ (document.getElementById('aimeat-em-code')).focus(); }, 50);
-      } catch (e) {
-        errEl.textContent = e.code === 'NAME_TAKEN'
-          ? (i.errNameTaken || 'That username is taken. If it is yours, sign in instead.')
-          : e.message;
-        errEl.style.display = 'block';
-      } finally {
-        btn.textContent = i.sendVerificationCode || 'Send Verification Code';
-        btn.disabled = false;
-      }
-    }
-    document.getElementById('aimeat-em-send').addEventListener('click', sendEmailCode);
-
-    // Complete-account step 2 — confirm the code, then re-run the password login for a normal session.
-    document.getElementById('aimeat-em-confirm').addEventListener('click', async function () {
-      var code = /** @type {any} */ (document.getElementById('aimeat-em-code')).value.trim();
-      var msgEl = document.getElementById('aimeat-em-msg2');
-      var errEl = document.getElementById('aimeat-em-err2');
-      msgEl.style.display = 'none';
-      errEl.style.display = 'none';
-      if (!code) { errEl.textContent = i.errCodeRequired || 'Enter the verification code.'; errEl.style.display = 'block'; return; }
-      if (!pendingEmailLogin) { showView('login'); return; }
-      var btn = /** @type {any} */ (document.getElementById('aimeat-em-confirm'));
-      btn.textContent = i.working || 'Working...';
-      btn.disabled = true;
-      try {
-        await api('/v1/ghii/verify-email', {
-          method: 'POST',
-          body: JSON.stringify({ verification_id: pendingEmailLogin.verificationId, code: code }),
-        });
-        msgEl.textContent = i.emailVerifiedSigningIn || 'Verified! Signing you in...';
-        msgEl.style.display = 'block';
-        await auth.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
-        pendingEmailLogin = null;
-        finishLogin();
-      } catch (e) {
-        if (twoStepAsked(e)) { pendingEmailLogin = null; return; }
-        errEl.textContent = e.message;
-        errEl.style.display = 'block';
-        btn.textContent = i.confirmAndSignIn || 'Confirm & Sign In';
-        btn.disabled = false;
-      }
-    });
-
     // Forgot password and forgot username.
-    wireRecoveryViews({ i: i, api: api, showView: showView });
+    var recovery = wireRecoveryViews({ i: i, api: api, showView: showView });
 
-    // Enter submits the tab the field belongs to.
-    [['aimeat-username', 'aimeat-go-btn'], ['aimeat-password', 'aimeat-go-btn'],
-      ['aimeat-reg-username', 'aimeat-reg-btn'], ['aimeat-reg-email', 'aimeat-reg-btn'],
-      ['aimeat-reg-password', 'aimeat-reg-btn'], ['aimeat-reg-displayname', 'aimeat-reg-btn'],
-    ].forEach(function (pair) {
-      var el = document.getElementById(pair[0]);
-      if (!el) return;
-      el.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        var btn = /** @type {any} */ (document.getElementById(pair[1]));
-        if (btn && !btn.disabled) btn.click();
-      });
-    });
+    // The steps of this drawing, by view name, for the language switch (modal-view-keep.js).
+    steps = {
+      key: keyStep, 'two-step': twoStep, totp: totpStep, 'login-link': linkStep, email: emailStep,
+      'forgot-pw': recovery.forgotPw, 'forgot-user': recovery.forgotUser,
+    };
+
+    // Enter submits the tab the field belongs to (modal-fields.js).
+    wireEnterSubmits();
 
     /** Restore a submit button after a failed attempt. */
     function releaseBtn(id, label) {

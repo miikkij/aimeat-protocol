@@ -30,6 +30,8 @@
  *     NOT_AN_OBJECT instead of being replaced by the patch.
  *   2026-11-09 — A merge into a context or ontology key keeps the version it replaces, pruned to the
  *     newest HISTORY_KEEP (services/context/history-keys.ts).
+ *   2026-11-08 — The schema lock is asked with the caller: a CSM's own lock does not govern a caller that
+ *     CSM's visibility refuses (secaudit2026nov08b round 15). Since 2026-11-09 the call is in the service.
  *   2026-11-05 — visibility 'group' on a record that has no group is refused with 400 INVALID_INPUT:
  *     this route takes no group id (storage/memory-sharing.ts).
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of

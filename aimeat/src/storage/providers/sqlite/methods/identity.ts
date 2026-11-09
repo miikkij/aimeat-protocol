@@ -8,6 +8,8 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   2026-11-08 — deleteOwner keeps the person's schema locks in force under the erasure's pseudonym
+ *     (repos/schema-lock-erasure.ts; secaudit2026nov08 round 14).
  *   v1.10.0 — 2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   v1.9.0 — 2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   v1.8.0 — 2026-10-25 — credentialsValidAfter on update and read (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
@@ -40,6 +42,7 @@ import { eraseAccountRecords } from '../repos/account-records-erasure.js';
 import { settleErasedPartyWork, settleDeletedAgentWork } from '../repos/work-erasure.js';
 import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
 import { deleteInstalledCortexes } from '../repos/cortex-erasure.js';
+import { pseudonymiseSchemaLocks } from '../repos/schema-lock-erasure.js';
 import { deleteEcosystemApps } from '../repos/eco-app-erasure.js';
 import { deleteAccountCredentials } from '../repos/credential-erasure.js';
 import { clearGrantsToIdentity as clearGrantsToIdentityIn } from '../repos/grantee-erasure.js';
@@ -189,6 +192,9 @@ export const identityMethods = {
       // gone: each record, with what its activation made and what is keyed by its name
       // (repos/cortex-erasure.ts, the rule in ../../../erased-cortex.ts).
       deleteInstalledCortexes(this.db, name, ghiiRows.map(r => r.ghii));
+      // Every other schema lock the person or an agent or app of theirs holds stays in force under
+      // the pseudonym, so the next holder of the name does not hold it (repos/schema-lock-erasure.ts).
+      pseudonymiseSchemaLocks(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
 
       // What this person WROTE into somebody else's namespace is that other owner's record of who
       // touched their data, so it is pseudonymised rather than deleted — removing it would silently

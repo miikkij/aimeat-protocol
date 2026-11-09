@@ -21,9 +21,11 @@
  *   is refused (an nginx 502 on orgnode.example, 2026-10-14) and no computer ever appears, so the
  *   steps ask the operator to turn it on and restart instead of showing commands that cannot work.
  * @structure AgentGuide({ session, onConnect, onNew }) · ConnectorSteps({ session, accepting? }) ·
- *   NoComputersHere({ session }) · nodeTakesComputers() · PlacesPicture() · NoAgentsYet({ onPick })
+ *   NoComputersHere({ session }) · nodeTakesComputers() · NoAgentsYet({ onPick })
  * @usage <${AgentGuide} session=${session} onConnect=${openConnect} onNew=${openNew} first />
  * @version-history
+ *   v1.2.0 — 2026-11-08 — The "Where agents run" fold is gone: the four places are explained in the
+ *     page's question mark, concept.agent (.claude/rules/page-guidance.md: no fold hides an explanation).
  *   v1.1.0 — 2026-10-14 — ConnectorSteps shows NoComputersHere when the node's connector tunnel is
  *     off (GET /v1/agents/v2/connectors tunnel_enabled), with the setting for the operator (Jouni,
  *     2026-10-14: "ei saisi näyttää lisää tietokone jos 502 ja enable tunnel ei ole laitettu true:ksi").
@@ -40,12 +42,10 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { Section } from '/components/Section.js';
 import { Note } from '/components/Note.js';
 import { Choice } from '/components/Choice.js';
-import { Facts } from '/components/Facts.js';
 import { Code } from '/components/Mark.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Stack } from '/components/Layout.js';
-import { PLACES } from './agent-facts.js';
 
 const g = (key, vars) => t('profile.agents.guide.' + key, vars);
 
@@ -108,13 +108,6 @@ export function ConnectorSteps({ session, accepting }) {
   `;
 }
 
-/** The four places an agent can run, one row each: what runs there, its model and who pays. */
-export function PlacesPicture() {
-  return html`<${Facts} rows=${PLACES.map(id => ({
-    k: g(`places.${id}.title`), v: g(`places.${id}.what`), sub: g(`places.${id}.sub`),
-  }))} />`;
-}
-
 const ANSWERS = ['ask', 'away', 'timetable', 'app'];
 
 /** What each answer leads to: its sentence and the one door it opens. */
@@ -145,23 +138,19 @@ function Result({ answer, where, setWhere, session, onConnect, onNew }) {
   `;
 }
 
-/** Section 01: the question, the answer, and the picture of where agents run. */
+/** Section 01: the question and the answer. Where agents run is in the page's question mark. */
 export function AgentGuide({ session, onConnect, onNew, first = false }) {
   const [answer, setAnswer] = useState(null);
   const [where, setWhere] = useState(null);
-  const [placesOpen, setPlacesOpen] = useState(false);
   const pick = (v) => { setAnswer(v); setWhere(null); };
   return html`
-    <${Section} id="agp-guide" num="01" title=${g('title')} first=${first}
-      doors=${html`<${Action} small soft onClick=${() => setPlacesOpen(v => !v)}>${placesOpen ? t('profile.agents.page.close') : g('placesDoor')}<//>`}>
+    <${Section} id="agp-guide" num="01" title=${g('title')} first=${first}>
       <${Note} kind="lead">${g('lead')}<//>
       <${Stack} gap="medium">
         <${Choice} ariaLabel=${g('title')} value=${answer} onChange=${pick} boxed cols=${4}
           options=${ANSWERS.map(id => ({ value: id, label: g(id), hint: g(`${id}Hint`) }))} />
         ${answer && html`<${Stack} gap="medium"><${Result} answer=${answer} where=${where} setWhere=${setWhere}
-          session=${session} onConnect=${onConnect} onNew=${onNew} /><//>`}
-        ${placesOpen && html`<${PlacesPicture} />`}
-      <//>
+          session=${session} onConnect=${onConnect} onNew=${onNew} /><//>`}      <//>
     <//>
   `;
 }

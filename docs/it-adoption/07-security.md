@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.2.0 (commit f36018fcd) on 2026-11-05. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 2303f0ce6) on 2026-11-08. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -90,7 +90,7 @@ The same code runs a single-user laptop node and a multi-user public node. The d
 | Agents | Device authorization (RFC 8628): the owner approves the agent and picks its scopes | [Identity model](../coding-guidelines/identity-model.md) |
 | Guessing | Per-address tarpit in front of password, code and signature routes; a sign-in rate limit (`AIMEAT_LOGIN_RATE_LIMIT_MAX`). Account lockout is off by default; `AIMEAT_SIGN_IN_LOCKOUT=on` locks after `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5) for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15) | `aimeat/src/middleware/login-tarpit.ts`, `aimeat/.env.example` |
 | Rate limits | Per caller (`sub`) or per IP, per area, with role multipliers fixed in code; `AIMEAT_RL_GLOBAL` is the fallback | [Security practices](../coding-guidelines/security.md) |
-| Deprovisioning | SCIM `active: false` or an operator's Deactivate ends every session, agent token, access token, app grant and connector tunnel of the person within the request; their data stays | [Organisation node sign-in](../organisation-node-sign-in.md) section 7 |
+| Deprovisioning | SCIM `active: false` or an operator's Deactivate ends every session, agent token, access token, app grant and connector tunnel of the person within the request; the API keys of their incoming webhooks, outside party keys and agent webhooks are refused or held until reactivation; their data stays | [Organisation node sign-in](../organisation-node-sign-in.md) section 7 |
 | Owner key | The Ed25519 owner key returned at registration signs no one in since 4.0.0 | [Security practices](../coding-guidelines/security.md) |
 
 Sign-in policy in detail (tenant allowlist, registration modes, SAML, SCIM) is in [04 Identity and access](04-identity-access.md).

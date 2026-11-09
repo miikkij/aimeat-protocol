@@ -43,6 +43,16 @@
  *   v1.3.0 — 2026-08-11 — Security audit H-2: gateOwnerOrAiUse excludes agent and ecosystem sessions
  *     from the owner branch, matching requireScope and routes/ai.ts. classify/plan/distribute spend
  *     the owner's AI key, so an agent reaches them on `ai:use`.
+ *   v1.4.0 — 2026-11-08 — classify/plan/distribute are paid by the owner GHII with the agent or the
+ *     outside app named (notebookPayer, as POST /v1/ai/complete takes callerOf(req).payer), so the
+ *     owner's allowance, budget, the agent's cap, the app rules and the owner's own key apply; the
+ *     read side keeps the caller's own identity (secaudit2026nov08 round 14,
+ *     aimeat/notebook-ai/payer-is-caller-identity-not-owner).
+ *   v1.4.1 — 2026-11-08 — An app grant is named as its app on classify/plan/distribute (the credential's
+ *     `app` claim, as POST /v1/ai/complete takes it), so the owner's allowlist, per-app quota, policy
+ *     for apps and per-app model list apply and the use is booked under that app; it was planned as the
+ *     owner in person under the notebook feature id (secaudit2026nov08b round 15,
+ *     librarian:notebook-app-grant-planned-as-owner).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -57,6 +67,7 @@ import { denyScope403 } from '../auth/deny.js';
 import { librarianSearch } from '../services/librarian.js';
 import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
+import { aiCallerFromCredential, type AiCallerContext } from '../services/ai/caller-context.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 import { planNote } from '../services/notebook-plan.js';
@@ -85,6 +96,18 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
       'Sign in, or give your assistant permission to use AI on your behalf in Profile → Agents.',
       undefined, { required_scope: 'ai:use' }));
     return false;
+  }
+
+  /**
+   * Who pays for a notebook AI call and who asks: the owner GHII pays (caller-facts.ts
+   * payerOfPrincipal), and an agent, an outside app or an app grant is named as the asker, from the
+   * credential as POST /v1/ai/complete does (routes/ai-policy.ts aiCallerOf). An app grant's identity
+   * is the owner GHII with its app beside it, so the principal alone planned it as the owner in person
+   * under the notebook feature id, outside the owner's rules for that app (secaudit2026nov08b round 15).
+   * The owner in person is the owner, as before.
+   */
+  function notebookPayer(req: Request): { gaii: string; who: AiCallerContext } {
+    return { gaii: callerOf(req, config.nodeId, storage).payer.payer, who: aiCallerFromCredential(req.auth!, resolveIdentity(req.auth!, config.nodeId)) };
   }
 
   // GET /v1/librarian/search — ranked full-text search across all of the caller's content.
@@ -172,7 +195,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     try {
       const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
       const result = await classifyNote(storage, config, {
-        gaii: viewerGaii,
+        ...notebookPayer(req),
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,
@@ -204,7 +227,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     try {
       const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
       const result = await planNote(storage, config, {
-        gaii: viewerGaii,
+        ...notebookPayer(req),
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,
@@ -236,7 +259,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     try {
       const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
       const result = await distributeNote(storage, config, {
-        gaii: viewerGaii,
+        ...notebookPayer(req),
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,

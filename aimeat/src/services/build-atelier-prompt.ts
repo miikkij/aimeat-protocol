@@ -28,6 +28,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.45.0 — 2026-11-08 — Jouni asked for it (B): the level is the interview's question 0 and decides
+ *     the rest (a prototype asks three questions, draws no layouts, no introduction, the data map only
+ *     for shared data, reads `libraries` and `patterns`; an ordinary page skips the introduction and
+ *     the genre and book parts; the finest is unchanged). Measured before and after with the
+ *     cold-agent tasks build-proto-timer and build-family-list.
  *   v1.44.0 — 2026-11-08 — ADDITIVE (Jouni approved the instruction audit's fixes): the genre fork
  *     and the register are scoped to the level `fine` where the text said "every app", matching the
  *     publish gate (app-artifact-lint.ts, 2026-09-19); "Finishing" names the four things every app
@@ -177,6 +182,7 @@ import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
 import { ornamentsPromptPart } from '../data/atelier-ornaments.js';
 import { KIT_PROMPT_PARAGRAPH } from './design-book/kit.js';
+import { MODEL_QUALITY_ADVICE } from './model-recommendation.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -189,8 +195,8 @@ const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
 export const ATELIER_COMPONENTS: ReadonlyArray<{ id: string; summary: string; example: string }> = [
   {
     id: 'app',
-    summary: 'The shell that carries the whole ceremony: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve, and the ambient layer behind the frame (the look decides; `ambient` names a preset, `{ preset, alpha, speed }`, or `false`). Fill handle.main; switch states with handle.status().',
-    example: "var a = AIMEAT.atelier.app({ title: 'Errands', look: 'vivid', onReady: function (s) { render(a, s); } });",
+    summary: 'The shell that carries the whole ceremony: login pill + boot, language re-render, designed loading/empty/error/sign-in states, the only scrolling region, the bottom chrome reserve, and the ambient layer behind the frame (the look decides; `ambient` names a preset, `{ preset, alpha, speed }`, or `false`). Fill handle.main; switch states with handle.status(). SIGN-IN IS ON BY DEFAULT: a signed-out visitor sees only "Log in to continue". An app used without signing in passes `requireLogin: false`, and onReady runs at once with a null session.',
+    example: "var a = AIMEAT.atelier.app({ title: 'Errands', look: 'vivid', onReady: function (s) { render(a, s); } });   // add requireLogin: false for an app anyone uses signed out",
   },
   {
     id: 'hero',
@@ -522,7 +528,7 @@ function composeBody(config: AimeatConfig): string {
   const following = genres.filter(g => g.light === 'follows').map(g => '`' + g.id + '`');
   body += 'FIXED OR FOLLOWING is the owner\'s choice, and both are right. A FIXED genre is a finished object with its own colours: it looks the same at noon and at night, and the sign-in bar\'s light/dark control stands down on it. A FOLLOWING page is drawn in the theme\'s `--ak-*` tokens and changes with the person\'s light/dark and palette, which is what a tool people work in all day usually wants. '
     + (following.length ? 'Following today: ' + following.join(', ') + '; every other genre is fixed. ' : 'Every genre is fixed today. ')
-    + 'A fixed genre becomes a following one by replacing its hardcoded colours with `--ak-*` tokens and changing `<meta name="aimeat-light">` to `follows`: keep the composition, the type and the physics, and check it in BOTH modes beside the original, because a palette that was tuned for one ground rarely survives the other untouched. Every picture of a genre is one address away (`See it`), and the whole shelf is ' + bookUrl + '/v1/design-book; give the owner the links, do not describe a look in words when they can look.\n\n';
+    + 'A fixed genre becomes a following one by replacing its hardcoded colours with `--ak-*` tokens and changing `<meta name="aimeat-light">` to `follows`: keep the composition, the type and the physics, and check it in BOTH modes beside the original, because a palette that was tuned for one ground rarely survives the other untouched. Every picture of a genre is one address away (`See it`); give the owner those links, do not describe a look in words when they can look.\n\n';
   body += 'THE TRAP THIS SECTION EXISTS TO STOP: a mosaic block stack wearing a look is a tool '
     + 'screen, never a statement — assembling components and applying a world reads as "the '
     + 'same dashboard in new paint" no matter which world. When a page must IMPRESS, start '
@@ -786,15 +792,16 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
   }
   if (opts.idea) full += `The app idea, in the owner's words: ${opts.idea}\n\n`;
   full += '## First, a short interview\n\n'
-    + 'Unless you are Claude Opus or Claude Fable, open that message with one sentence: apps built '
-    + 'with Claude Opus or Claude Fable turn out noticeably better, and they can switch now or go on with you.\n'
+    + MODEL_QUALITY_ADVICE + '\n'
     + 'Ask, in one message, and wait for answers:\n'
+    + '0. Which level: a quick prototype, an ordinary page or the finest ("Then propose" says what each gets)? If their first words say it ("just quick"), that is the answer.\n'
     + '1. What should the app do, in one or two sentences?\n'
     + '2. Who uses it — just you, or others too (shared data)?\n'
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'
     + '4. Which languages should it speak?\n'
     + '5. Anything it must NOT do?\n\n'
-    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n\n';
+    + 'THE LEVEL DECIDES THE REST. `proto`: ask 1, 2 and 4 only, draw no layouts, no introduction, the data map only for shared data, read parts `libraries` and `patterns` only. `plain`: no introduction unless asked, no `genre` or `book`. `fine` or no answer: all of it.\n\n'
+    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and, unless the level is `proto`, `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n\n';
   full += buildDataMapStep('atelier') + INTRODUCTION_QUESTION + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.

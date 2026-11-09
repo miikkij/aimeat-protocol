@@ -17,6 +17,9 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-09: ThingsBlock reads the owner's own apps (GET /v1/apps?own=true) and walks the node's
+ *     whole catalogue only when a favourite is another owner's app, whose chip takes its name from
+ *     that list: 600 kB and two requests less on a Home at 288 apps on the node.
  *   2026-11-01: The credit plate says no message count, only "Tekoälysaldoa jäljellä X €" (Jouni, 1.11
  *     04.00: no promises about what the credit lasts).
  *   2026-11-01: The credit plate reads "Tekoälysaldoa jäljellä X € – saat vielä noin N viestiä" in the
@@ -299,7 +302,7 @@ export function ThingsBlock(/** @type {{ ctx?: any, props?: Record<string, any>,
   const { data: orgs } = useShared('organisms', ORGANISMS_PATH(owner), ['organisms'], pickOrganisms);
   const { data: packages } = useShared('knowledge', KNOWLEDGE_PATH, ['knowledge', 'memory'], pickPackages);
   const { prefs, toggleStar, setAppsMode } = useHomePrefs();
-  const { data: favorites } = useShared('app-favorites', '/v1/memory/app-catalog.favorites?soft=1', ['memory'],
+  const { data: favorites, ready: favoritesReady } = useShared('app-favorites', '/v1/memory/app-catalog.favorites?soft=1', ['memory'],
     (d) => (d?.exists === false ? { refs: [] } : (d?.value ?? { refs: [] })));
 
   const showApps = rows.includes('apps');
@@ -307,16 +310,22 @@ export function ThingsBlock(/** @type {{ ctx?: any, props?: Record<string, any>,
   // The complete list, paginated: one 200-row page once paged a busy node's owner out of their own
   // apps entirely. Not through useShared because listApps walks pages rather than being one GET.
   const [ownApps, setOwnApps] = useState([]);
+  // A favourite may be another owner's app, and its chip takes that app's name from the list, so
+  // the whole catalogue is read only then; otherwise the owner's own apps (GET /v1/apps?own=true).
+  // Undefined while the favourites are still loading; a failed read counts as no favourites.
+  const needCatalogue = favoritesReady
+    ? (favorites?.refs ?? []).some((ref) => String(ref).split('/')[0] !== owner)
+    : undefined;
   useEffect(() => {
-    if (!owner || !showApps) return undefined;
+    if (!owner || !showApps || needCatalogue === undefined) return undefined;
     let live = true;
-    // No owner filter here: listApps walks EVERY page and FavoriteApps picks this person's out.
-    // One 200-row page once let a busy node page the owner's own apps out of the row entirely.
-    listApps()
+    // listApps walks EVERY page: one 200-row page once let a busy node page the owner's own apps out
+    // of the row entirely. FavoriteApps picks this person's out of whichever list it gets.
+    listApps({ own: !needCatalogue })
       .then((list) => { if (live) setOwnApps(Array.isArray(list) ? list : []); })
       .catch((err) => { swallowed('surface: own apps', err); });
     return () => { live = false; };
-  }, [owner, showApps]);
+  }, [owner, showApps, needCatalogue]);
 
   return html`
     <${Things}

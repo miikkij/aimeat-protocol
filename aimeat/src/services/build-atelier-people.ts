@@ -24,6 +24,12 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.9.0 — 2026-11-09 — The fork says the genre's masthead is the only top bar and the node's pill
+ *     sits in it as it comes (look and functions kept, restyled only when the owner asks).
+ *   v1.8.0 — 2026-11-08 — The proposal repeats the level the interview asked first; the Design Book
+ *     line is owed on `fine` (a prototype and an ordinary page do not read the book).
+ *   v1.7.1 — 2026-11-08 — The fork's sign-in sample uses onSession: with onLogin a person who comes
+ *     back on a saved session got an empty app (appdev pitfall handle-both-auth-paths).
  *   v1.7.0 — 2026-11-07 — The proposal offers three to five designs and one is always the clean look
  *     (it replaced "Two or three genres"), states the introduction the interview agreed, and on
  *     `plain` keeps the designs as looks and the introduction (build-introduction-step.ts). Jouni:
@@ -106,7 +112,7 @@ export const ATELIER_MOSAIC_IN_GENRE = '## The Design Book in a genre fork: the 
 /** After the interview, before the body. Not part of the spec token: it is about the conversation. */
 export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answer\n\n'
   + 'Before any code, show the owner what you are about to build, in their words, and wait. They decide from this; they must not find out what you chose by looking at the result.\n\n'
-  + '- **FIRST, THE LEVEL. It is the owner\'s choice and never yours; ask it in these words or plainer ones, and say what each one gets them.** '
+  + '- **FIRST, THE LEVEL (question 0; repeat it). It is the owner\'s choice and never yours; ask it in these words or plainer ones, and say what each one gets them.** '
   + '(1) **A quick prototype**: a working draft to try one idea, the kit\'s components as they come, no styling. Fast, and plain to look at. '
   + '(2) **An ordinary page**: works and looks tidy, with a ready layout and a ready look from the Design Book, following their light and dark theme. Not distinctive. '
   + '(3) **The finest**: a committed look forked from a genre, proven parts from the Design Book, components of its own where the book has none. It takes the longest and is the one worth showing. '
@@ -115,7 +121,7 @@ export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answe
   + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` the rest of this list shrinks to the languages, who signs in and the first screen, and on `plain` to those, the designs as looks and the introduction: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does writing down why you took, passed over and made each thing (the build notes, part `book`). A page that states no level is held to `fine`.\n'
   + ATELIER_DESIGNS_PROPOSAL_LINE
   + '- **Fixed colours or following their theme?** Ask it, or recommend one and say why. A fixed genre keeps its own colours in light and dark; a following page changes with the person\'s theme and palette. Part `genre` says which each genre is and gives an address for each (`See it`), and the whole shelf is one link: send the owner the links so they choose by looking. If they want a genre that is fixed and want it to follow the theme, say that it means moving its colours to the theme\'s tokens, and that you will show it in both modes before they decide.\n'
-  + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `book`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. The working screen of the app is a mosaic inside the genre, and its arrangement is where a fill from the book lands (part `book` shows how). THIS LINE IS OWED IN EVERY PROPOSAL, word for word in its shape: "From the Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take nothing, because <what you looked at and why none of it fits>". Taking nothing is allowed; taking nothing in silence is not. What you have to make because the book lacks it is written down with its reason in the page\'s build notes; it is offered to the book when the owner is satisfied with the app, and not because the build is finished.\n'
+  + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `book`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. The working screen of the app is a mosaic inside the genre, and its arrangement is where a fill from the book lands (part `book` shows how). ON `fine` THIS LINE IS OWED IN EVERY PROPOSAL, word for word in its shape: "From the Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take nothing, because <what you looked at and why none of it fits>". Taking nothing is allowed; taking nothing in silence is not. What you have to make because the book lacks it is written down with its reason in the page\'s build notes; it is offered to the book when the owner is satisfied with the app, and not because the build is finished.\n'
   + '- **The languages: English and Finnish, unless they say otherwise.** Two languages is the default on this node. The language you are talking in is not the app\'s language list. Building for one language is the owner\'s decision, so ask it as a question if you think one is right, and do not decide it.\n'
   + '- **Who signs in**, and what is kept for them. An app nobody signs in to says so here.\n'
   + ATELIER_DATA_MAP_PROPOSAL_LINE
@@ -125,7 +131,7 @@ export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answe
 
 /** In the body, right after the genre section, so it travels in part `genre`. */
 export const ATELIER_FORK_PEOPLE_SECTION = '## A fork people sign in to, in two languages\n\n'
-  + 'A genre is a finished page with no sign-in, no language switch and its words in one language. Your fork adds all three, the same way every time. Do not write a header or a sign-in control of your own: the bar below is the node\'s, it carries the language switch and the light and dark control, and a hand-made one is the first thing a review sends back.\n\n'
+  + 'A genre is a finished page with no sign-in, no language switch and its words in one language. Your fork adds all three, the same way every time. THE GENRE\'S MASTHEAD IS THE ONLY TOP BAR, and the node\'s pill always sits in it AS IT COMES: its look and its functions stay, restyled only when the owner asks. No other header or sign-in control: the pill carries the language switch and light and dark, and spending work on the bar is work taken from the app.\n\n'
   + '**Two languages is the default: `en fi`.** Keep both unless the owner asked for one. Every word the page shows goes through a dictionary; a string typed into the markup is a string that cannot change language, and a page where the bar is Finnish and the content English is refused at review.\n\n'
   + '```html\n'
   + '<!-- head: the languages you ACTUALLY carry, and every scope the app uses -->\n'
@@ -149,7 +155,7 @@ export const ATELIER_FORK_PEOPLE_SECTION = '## A fork people sign in to, in two 
   + '  }\n'
   + '  i18n.onChange(paint);   // the bar\'s switch fires this; never build a switch of your own\n'
   + '  paint();\n'
-  + '  AIMEAT.auth.mountLoginButton(\'#pill\', { onLogin: start, onLogout: paint });\n'
+  + '  AIMEAT.auth.mountLoginButton(\'#pill\', { onSession: start, onLogout: paint });   // never onLogin: it misses a reload\n'
   + '</script>\n'
   + '```\n\n'
   + 'The switch must keep what the person was doing: a conversation, a half-filled form and the settings survive it, because `paint()` changes words and nothing else. Numbers, dates and money follow the language too (`toLocaleString(i18n.lang())`). Languages of speech recognition or of an AI answer are separate settings; do not tie them to this switch unless the owner asks.\n\n'

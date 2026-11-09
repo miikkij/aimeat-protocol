@@ -34,8 +34,12 @@ __all__ = [
     "ExpiredToken",
     "daemon_route",
     "expired_token_message",
+    "held_node_url",
     "jwt_expiry",
+    "owners_holding",
+    "shared_name_message",
     "stored_agent_token",
+    "stored_agent_token_file",
 ]
 
 #: The header the connector daemon reads to pick which of its agents a proxied call runs as.
@@ -76,15 +80,51 @@ def jwt_expiry(token: str) -> datetime | None:
         return None
 
 
+def owners_holding(agent: str) -> list[str]:
+    """The owners whose token (``tokens/<agent>@<owner>.token``) or key (``keys/<agent>@<owner>.key``)
+    for the bare name ``agent`` this home holds, sorted. The Node connector counts both kinds the
+    same way (config.ts otherOwnerHoldsAgent): an agent the daemon's enrolment connected holds only a
+    key, so counting token files alone missed it."""
+    home = aimeat_home()
+    owners: set[str] = set()
+    for folder, ext in (("tokens", ".token"), ("keys", ".key")):
+        try:
+            files = list((home / folder).glob(f"{agent}@*{ext}"))
+        except OSError:
+            continue
+        for path in files:
+            name = path.name[: -len(ext)]
+            file_agent, _, owner = name.partition("@")
+            if file_agent == agent and owner:
+                owners.add(owner)
+    return sorted(owners)
+
+
+def shared_name_message(agent_name: str | None) -> str | None:
+    """Why a bare ``agent_name`` picks no stored credential: the agents of two or more owners in this
+    home carry it. None for a full identity, or a name at most one owner holds."""
+    if not agent_name or "#" in agent_name:
+        return None
+    owners = owners_holding(agent_name)
+    if len(owners) < 2:
+        return None
+    held = ", ".join(f"{agent_name}@{o}" for o in owners)
+    return (
+        f"'{agent_name}' is the name of more than one owner's agent in the connector home {aimeat_home()}: "
+        f"{held}. Nothing was sent. Pass the full identity, agent#owner@node (for example "
+        f"{agent_name}#{owners[0]}@<node id>), as agent_name for the agent this crew runs as."
+    )
+
+
 def _candidates(agent_name: str) -> list[Path]:
     """The token files for ``agent_name``, in the order they are read.
 
     1. ``<AIMEAT_HOME>/agents/<name>/.token`` (the documented location; see mcp_client.http_params).
     2. ``<AIMEAT_HOME>/tokens/<agent>@<owner>.token``, where the Node connector keeps a v1 bearer and
        where the hosted fleet writes the concierge's (aimeat-commercial provision.ts). ``agent_name``
-       may be the full identity ``agent#owner@node``; a bare name is used when exactly one owner's
-       file matches it, because two owners' agents of one name on one machine cannot be told apart by
-       the name alone.
+       may be the full identity ``agent#owner@node``; a bare name is used when exactly one owner
+       holds a token or a key of that name in the home, because two owners' agents of one name on one
+       machine cannot be told apart by the name alone (owners_holding).
     """
     home = aimeat_home()
     agent, owner = agent_name, None
@@ -100,7 +140,7 @@ def _candidates(agent_name: str) -> list[Path]:
             matches = sorted(tokens_dir.glob(f"{agent}@*.token"))
         except OSError:
             matches = []
-        if len(matches) == 1:
+        if len(matches) == 1 and len(owners_holding(agent)) == 1:
             candidates.append(matches[0])
     return candidates
 
@@ -108,6 +148,13 @@ def _candidates(agent_name: str) -> list[Path]:
 def stored_agent_token(agent_name: str) -> tuple[str | None, list[ExpiredToken]]:
     """The first stored token for ``agent_name`` that has not expired, and the expired files passed
     over on the way. Each expired file is logged once per process, with when it expired."""
+    token, _file, expired = stored_agent_token_file(agent_name)
+    return token, expired
+
+
+def stored_agent_token_file(agent_name: str) -> tuple[str | None, Path | None, list[ExpiredToken]]:
+    """``stored_agent_token`` with the file the token was read from, so a caller can find the node
+    that token belongs to (``held_node_url``)."""
     expired: list[ExpiredToken] = []
     now = time.time()
     for token_file in _candidates(agent_name):
@@ -125,8 +172,50 @@ def stored_agent_token(agent_name: str) -> tuple[str | None, list[ExpiredToken]]
                 _REPORTED.add(str(token_file))
                 logger.warning("The stored agent token %s; it is not sent.", found.describe())
             continue
-        return token, expired
-    return None, expired
+        return token, token_file, expired
+    return None, None, expired
+
+
+def _token_file_names(token_file: Path) -> tuple[str, str | None]:
+    """The agent and owner a stored token file is for: ``tokens/<agent>@<owner>.token``, or
+    ``agents/<agent>/.token``, which names no owner."""
+    if token_file.name == ".token":
+        return token_file.parent.name, None
+    agent, _, owner = token_file.name[: -len(".token")].partition("@")
+    return agent, owner or None
+
+
+def held_node_url(token_file: Path) -> tuple[str | None, Path | None]:
+    """The node a stored token belongs to, as the Node connector decides it (auth.ts heldNodeUrl,
+    config.ts fallbackConfigFor): the agent's own settings, ``agents/<owner>/<agent>/config.yaml``,
+    then the older shared ``agents/<agent>/config.yaml``; else the home's ``config.yaml`` when it
+    names this agent and owner, or names no agent at all (an install with one agent, and the hosted
+    fleet's home).
+
+    Returns ``(address, None)``, or ``(None, path)`` when the home's ``config.yaml`` was written for
+    another agent or owner and so was not used, or ``(None, None)`` when nothing names an address.
+    The connector writes the home's file only for the first agent it connects, so its address is
+    not the node of a token stored later for another agent (secaudit2026nov08 round 14).
+    """
+    from .paths import connector_config_path, read_config_scalar
+
+    home = aimeat_home()
+    agent, owner = _token_file_names(token_file)
+    own_configs = [home / "agents" / owner / agent / "config.yaml"] if owner else []
+    own_configs.append(home / "agents" / agent / "config.yaml")
+    for path in own_configs:
+        url = read_config_scalar(path, "node_url")
+        if url:
+            return url.rstrip("/"), None
+    global_path = connector_config_path()
+    url = read_config_scalar(global_path, "node_url")
+    if not url:
+        return None, None
+    named_agent = read_config_scalar(global_path, "agent")
+    named_owner = read_config_scalar(global_path, "owner")
+    if (named_agent and named_agent != agent) or (named_owner and owner and named_owner != owner):
+        return None, global_path
+    return url.rstrip("/"), None
 
 
 def expired_token_message(agent_name: str, expired: list[ExpiredToken]) -> str:

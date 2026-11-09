@@ -112,3 +112,103 @@ def test_with_aimeat_home_set_a_stored_token_and_the_homes_config_pair_as_before
 
     node = _node(agent_name="concierge")
     assert (node.url, node.token) == ("http://fleet-node.example.invalid", "stored-token")
+
+
+# A home with two agents on two nodes. The connector writes the home's config.yaml for the first
+# agent it connects (with its agent: and owner: lines) and every agent's own node_url to
+# agents/<owner>/<agent>/config.yaml. A stored token goes only to the node its own agent was
+# connected to, the way the Node connector's heldNodeUrl and fallbackConfigFor decide it
+# (secaudit2026nov08 round 14).
+
+
+def _two_agent_home(root: Path, monkeypatch) -> Path:
+    home = root / "two-agent-home"
+    (home / "tokens").mkdir(parents=True)
+    (home / "config.yaml").write_text(
+        "node_url: http://node-a.example.invalid\nagent: x\nowner: me\n", encoding="utf-8"
+    )
+    (home / "tokens" / "x@me.token").write_text("x-token", encoding="utf-8")
+    (home / "tokens" / "y@me.token").write_text("y-token", encoding="utf-8")
+    monkeypatch.setenv("AIMEAT_HOME", str(home))
+    return home
+
+
+def test_a_stored_token_goes_to_its_own_agents_node_not_the_first_agents(
+    clean_env, tmp_path, monkeypatch
+) -> None:
+    home = _two_agent_home(tmp_path, monkeypatch)
+    (home / "agents" / "me" / "y").mkdir(parents=True)
+    (home / "agents" / "me" / "y" / "config.yaml").write_text(
+        "node_url: http://node-b.example.invalid\n", encoding="utf-8"
+    )
+
+    node = _node(agent_name="y")
+    assert (node.url, node.token) == ("http://node-b.example.invalid", "y-token")
+
+
+def test_the_old_shared_per_agent_config_names_the_node_too(clean_env, tmp_path, monkeypatch) -> None:
+    home = _two_agent_home(tmp_path, monkeypatch)
+    (home / "agents" / "y").mkdir(parents=True)
+    (home / "agents" / "y" / "config.yaml").write_text(
+        "node_url: 'http://node-b.example.invalid/'\n", encoding="utf-8"
+    )
+
+    node = _node(agent_name="y")
+    assert (node.url, node.token) == ("http://node-b.example.invalid", "y-token")
+
+
+def test_a_home_config_written_for_another_agent_is_not_used_for_a_stored_token(
+    clean_env, tmp_path, monkeypatch
+) -> None:
+    home = _two_agent_home(tmp_path, monkeypatch)
+
+    with pytest.raises(DecideError) as refused:
+        _node(agent_name="y")
+    message = str(refused.value)
+    assert str(home / "config.yaml") in message, "the refusal names the file that was not used"
+    assert "AIMEAT_NODE_URL" in message, "the refusal says how to name the node"
+
+
+def test_a_daemon_that_serves_the_agent_carries_the_call_when_its_node_is_unknown(
+    clean_env, tmp_path, monkeypatch
+) -> None:
+    import json
+    import os
+
+    home = _two_agent_home(tmp_path, monkeypatch)
+    (home / "serve.json").write_text(json.dumps({
+        "schema_version": 3, "port": 9, "pid": os.getpid(), "secret": "s3cret",
+        "agents": [{"agent": "y", "owner": "me", "gaii": "y#me@node-b"}],
+    }), encoding="utf-8")
+
+    node = _node(agent_name="y")
+    assert (node.url, node.token, node.via_daemon_agent) == ("http://127.0.0.1:9", "s3cret", "y")
+
+
+def test_a_home_config_written_for_another_owner_is_not_used_for_a_stored_token(
+    clean_env, tmp_path, monkeypatch
+) -> None:
+    home = _two_agent_home(tmp_path, monkeypatch)
+    (home / "tokens" / "x@other.token").write_text("other-x-token", encoding="utf-8")
+
+    with pytest.raises(DecideError):
+        _node(agent_name="x#other@node-b")
+
+
+def test_the_first_agent_still_pairs_with_the_home_config(clean_env, tmp_path, monkeypatch) -> None:
+    _two_agent_home(tmp_path, monkeypatch)
+
+    node = _node(agent_name="x")
+    assert (node.url, node.token) == ("http://node-a.example.invalid", "x-token")
+    node = _node(agent_name="x#me@node-a")
+    assert (node.url, node.token) == ("http://node-a.example.invalid", "x-token")
+
+
+def test_an_address_in_the_environment_still_wins_for_a_stored_token(
+    clean_env, tmp_path, monkeypatch
+) -> None:
+    _two_agent_home(tmp_path, monkeypatch)
+    monkeypatch.setenv("AIMEAT_NODE_URL", "http://named-node.example.invalid")
+
+    node = _node(agent_name="y")
+    assert (node.url, node.token) == ("http://named-node.example.invalid", "y-token")

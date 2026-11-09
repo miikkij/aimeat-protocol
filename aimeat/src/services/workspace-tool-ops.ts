@@ -30,6 +30,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-08 — readWorkspaceOp lists no record the node keeps under the workspace root (the share
+ *     record, an access request, a fingerprint) as a row of a space a manifest declares over it
+ *     (secaudit2026nov08 round 14).
  *   2026-11-04 — readWorkspaceOp's batch-open reads the workspace's rows without values and the values
  *     of the records it opens only, and their provenance only; both modes answer `truncated: true` when
  *     the workspace holds more rows than one read loads (codebase analysis 2026-11-03, item C7).
@@ -153,7 +156,7 @@ import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput
 import { mediaKindOfValue, type AiProvenanceLevel, type AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes, documentContentBytes } from '../utils/memory-content.js';
 import { directValueProvenance, type DeclarationParser } from './workspace-direct-provenance.js';
-import { instanceFromKey, recordAt } from './workspace-record-key.js';
+import { instanceFromKey, recordAt, isNodeReservedWorkspaceKey } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
 import { normalizeHtmlPageValue, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
 import { isPageStale } from './workspace-opened.js';
@@ -254,6 +257,8 @@ export async function readWorkspaceOp(
         const inst = new Map<string, Slot>();
         for (const r of items) {
             if (!r.key.startsWith(nsPrefix) || longer.some(p => r.key.startsWith(p))) continue;
+            // The share record, an access request, a fingerprint: the node's own, never a row.
+            if (isNodeReservedWorkspaceKey(r.key)) continue;
             // The role is read from the END of the key, as the write guard reads it, so an id with a
             // dot in it is one record under its whole id. Split from the front, `v1.2.draft` was record
             // `v1` with a role nothing set, an empty slot that made the whole index answer 500 for

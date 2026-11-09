@@ -115,4 +115,12 @@ describe('the eight steps', () => {
     expect(s.find((x) => x.id === 'requirements')!.detail).toMatchObject({ legalMissing: ['privacy'], aiUnanswered: 2 });
     expect(state(s, 'build')).toBe('fine');
   });
+  // The store answers forkable undefined for an app nobody opened for forking; settings and the app
+  // list read that as false, and this step read it as true (a real build, 2026-11-08).
+  it('reads forkable as the store and the settings read it: undefined is not forkable', () => {
+    const closed = computeStructure({ ...base, app: { versionNumber: 1, manifest: { description: 'd' } } as never });
+    expect(closed.find((x) => x.id === 'visibility')!.detail.forkable).toBe(false);
+    const open = computeStructure({ ...base, app: { versionNumber: 1, forkable: true, manifest: { description: 'd' } } as never });
+    expect(open.find((x) => x.id === 'visibility')!.detail.forkable).toBe(true);
+  });
 });

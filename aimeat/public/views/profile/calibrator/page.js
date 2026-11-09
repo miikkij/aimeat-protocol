@@ -5,11 +5,14 @@
  * @description One calibration in the poster face, result first: the mast names it and starts a
  *   run; the strip says the latest score and where it came from; then 01 the runs as rows with the
  *   chart, 02 the prompt and the target output with their versions, 03 the models (models.js), 04
- *   the four instruction prompts folded, 05 how your own AI calibrates. Pure render over the ctx
- *   bag the tab builds; the run rows are run.js.
+ *   the four instruction prompts folded, 05 how your own AI calibrates. The title's question mark
+ *   is concept.calibration, as on the list (.claude/rules/page-guidance.md). Pure render over the
+ *   ctx bag the tab builds; the run rows are run.js.
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-08 -- The title of section 04 opens one explanation for the four instruction prompts (term calibrator.instructionPrompts; .claude/rules/page-guidance.md).
+ *   v2.1.0 -- 2026-11-08 -- The title's question mark concept.calibration, the same explanation as on the list (.claude/rules/page-guidance.md).
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the frame is SettingsPage (crumb, head with its rename field, strip, rail as data), the sections Section (the four instruction prompts still fold), the runs and the versions the List, the editors Field and Text area with the count beside the label, the roads Roads, the lines Note (component plan, page group G4).
  *   v1.17.0 -- 2026-09-26 -- The ready-made request is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -54,6 +57,7 @@ import { Note } from '/components/Note.js';
 import { Field, Fields } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Roads, Road } from '/components/Roads.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Stack } from '/components/Layout.js';
 import { x, dateWord, timeWord, isEmptyRun, runAverage, runsInOrder, judgeOf, candidatesOf, crumb, pageLinks } from './frame.js';
 import { ScoreChart } from './chart.js';
@@ -90,7 +94,7 @@ export function renderPage(ctx) {
     ],
   };
   return html`
-    <${SettingsPage} page crumb=${crumb(p.name)} ...${mast(ctx, runs, latest)} strip=${strip(ctx, runs, latest)} rail=${rail}
+    <${SettingsPage} page crumb=${crumb(p.name)} help="concept.calibration" ...${mast(ctx, runs, latest)} strip=${strip(ctx, runs, latest)} rail=${rail}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${secRuns(ctx, runs, empties)}
       ${secPrompt(ctx)}
@@ -219,7 +223,7 @@ function versionRow(ctx, v, viewing) {
 
 function secTemplates(ctx) {
   return html`
-    <${Section} id="cal-templates" num="04" title=${x('secTemplates')} count=${null}>
+    <${Section} id="cal-templates" num="04" title=${html`<${HelpLabel} term="calibrator.instructionPrompts" label=${x('secTemplates')}>${x('secTemplates')}<//>`} count=${null}>
       <${Note} kind="lead">${x('templatesIntro')}<//>
       <${Folds}>
         ${TEMPLATES.map((tp, i) => {

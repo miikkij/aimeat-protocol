@@ -8,6 +8,8 @@
  *   removes the object it made, a replaced or deleted file's object is removed, and a move from the
  *   database lands only on a row that still holds the bytes it was read with.
  * @version-history
+ *   v1.0.1 -- 2026-11-08 -- The fake database has moveStorageFileBytes, the write a move makes now; no
+ *     assertion changed (secaudit2026nov08b round 15b).
  *   v1.0.0 -- 2026-10-29 -- Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { describe, it, expect } from 'vitest';
@@ -114,6 +116,13 @@ function fakeDb(opts: { failCreate?: () => boolean } = {}) {
       const r = rows.get(id(o, k));
       if (!r || r.blobRef || r.size !== size) return false;
       rows.set(id(o, k), { ...r, blobRef: ref, data: Buffer.alloc(0) });
+      return true;
+    },
+    // The conditional write a move makes since round 15b: where the bytes are, while the reference is unchanged.
+    async moveStorageFileBytes(o: string, k: string, m: { expect: { blobRef?: string }; blobRef?: string; data: Buffer; size: number }) {
+      const r = rows.get(id(o, k));
+      if (!r || r.blobRef !== m.expect.blobRef) return false;
+      rows.set(id(o, k), { ...r, blobRef: m.blobRef, data: m.data, size: m.size });
       return true;
     },
   };

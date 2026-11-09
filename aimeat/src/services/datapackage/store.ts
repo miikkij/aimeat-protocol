@@ -28,6 +28,11 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-08 — `opts.labelSource` is the list of source items, and loadResourceRows asks about each of
+ *     their labels (./source-labels.ts; secaudit2026nov08b round 15).
+ *   2026-11-08 — publishPackage records the version's label source (`opts.labelSource`) before any write,
+ *     and loadResourceRows asks the classification reader about it beside the file: a version built from
+ *     labelled records keeps the strictest source label (./source-labels.ts; secaudit2026nov08 round 14).
  *   2026-11-03 — publishPackage checks provenance.i18n (normaliseI18n) and provenance.attribution
  *     (text) for every caller, so POST /v1/datapackages refuses what the data product path refuses.
  *   2026-11-01 — WP10e: `licenses[]` names the deed and the licence's name (./licences.ts); a version's
@@ -94,7 +99,8 @@
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, A4/B1/B2).
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow, ContentLabelTarget } from '../../storage/interface.js';
+import { recordVersionLabelSource, hiddenBySourceLabel } from './source-labels.js';
 import { writeStorageFile } from '../storage-file-write.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../resource-events.js';
 import {
@@ -182,8 +188,9 @@ export type PublishResult =
  */
 export async function publishPackage(
     deps: StoreDeps, ownerGhii: string, input: PublishInput, producedBy: ProducedBy,
-    /** dryRun: check and build the version, store nothing (services/dataproduct preview). */
-    opts: { dryRun?: boolean } = {},
+    /** dryRun: check and build the version, store nothing (services/dataproduct preview). labelSource:
+     *  the source items whose labels the version keeps (./source-labels.ts), recorded before any write. */
+    opts: { dryRun?: boolean; labelSource?: readonly ContentLabelTarget[] | null } = {},
 ): Promise<PublishResult> {
     const { storage, config } = deps;
     const ownerName = localAccountName(ownerGhii);
@@ -354,6 +361,9 @@ export async function publishPackage(
             resources: bodies.map(b => ({ name: b.name, url: publicUrl(config.baseUrl, ownerGhii, resourceKey(input.name, contentHash, b.name)), rowCount: b.rows.length, bytes: b.data.length })),
         };
     }
+
+    // The label the version keeps, recorded before its files are readable (./source-labels.ts).
+    if (opts.labelSource !== undefined) await recordVersionLabelSource(storage, ownerGhii, input.name, contentHash, opts.labelSource);
 
     // TARGET-058: an agent publishing a package is model-touched output, and that gets DECLARED
     // rather than inferred from the shape of the caller. `provenanceForWrite` decides from the
@@ -650,8 +660,10 @@ async function loadResourceRows(
     // reads the stricter way (services/classification/reader-kind.ts): a label that keeps content inside
     // the owner's account or an organism hides it from the party too.
     const asReader = reader?.party ? { sub: reader.sub ?? '', owner: '', roles: ['party'] } : reader?.sub ? reader as ReaderAuth : null;
-    const [shown] = await readerFor(deps, asReader).show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
-    if (!shown) return null;
+    const content = readerFor(deps, asReader);
+    const [shown] = await content.show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
+    // A version built from labelled content keeps the labels of its source items (./source-labels.ts).
+    if (!shown || await hiddenBySourceLabel(deps, content, parsed.ownerGhii, parsed.name, hash)) return null;
     return { all: fromCsv(shown.data, res.schema), res };
 }
 

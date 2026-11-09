@@ -111,12 +111,12 @@
         "fi": "Ohjelma kirjoittaa tietoihisi"
       },
       "summary": {
-        "en": "Give one outside program its own address and key, and it writes into one place you choose.",
-        "fi": "Anna ulkopuoliselle ohjelmalle oma osoite ja avain, niin se kirjoittaa yhteen paikkaan, jonka valitset."
+        "en": "Give one outside program its own address and API key, and it writes into one place you choose.",
+        "fi": "Anna ulkopuoliselle ohjelmalle oma osoite ja API-avain, niin se kirjoittaa yhteen paikkaan, jonka valitset."
       },
       "body": {
-        "en": "Make a receiver: its own address and key for one outside program, such as a sensor or an AWS Lambda. It writes into one place you choose, and what it sends is checked against the description you gave.",
-        "fi": "Tee vastaanotin: oma osoite ja avain yhdelle ulkopuoliselle ohjelmalle, kuten anturille tai AWS Lambdalle. Se kirjoittaa yhteen paikkaan, jonka sinä valitset, ja sen lähettämä tieto tarkistetaan antamaasi kuvausta vasten."
+        "en": "Make an incoming webhook: its own address and API key for one outside program, such as a sensor or an AWS Lambda. It writes into one place you choose, and what it sends is checked against the description you gave.",
+        "fi": "Tee saapuva webhook: oma osoite ja API-avain yhdelle ulkopuoliselle ohjelmalle, kuten anturille tai AWS Lambdalle. Se kirjoittaa yhteen paikkaan, jonka sinä valitset, ja sen lähettämä tieto tarkistetaan antamaasi kuvausta vasten."
       }
     },
     {
@@ -137,8 +137,8 @@
         "fi": "Tekoälysi laatii tietokuvauksen yhdestä esimerkistä, ja sinä valitset, kuka sen näkee."
       },
       "body": {
-        "en": "Your AI drafts a data description from one example message. You choose who can read it, and a receiver uses it to refuse data that does not fit.",
-        "fi": "Tekoälysi laatii tietokuvauksen yhdestä esimerkkiviestistä. Sinä valitset, kuka sen näkee, ja vastaanotin hylkää sen avulla tiedon, joka ei sovi kuvaukseen."
+        "en": "Your AI drafts a data description from one example message. You choose who can read it, and an incoming webhook uses it to refuse data that does not fit.",
+        "fi": "Tekoälysi laatii tietokuvauksen yhdestä esimerkkiviestistä. Sinä valitset, kuka sen näkee, ja saapuva webhook hylkää sen avulla tiedon, joka ei sovi kuvaukseen."
       }
     },
     {

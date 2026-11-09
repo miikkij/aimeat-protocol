@@ -9,6 +9,9 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-appdev-pitfalls).
  * @version-history
+ *   v1.3.0 — 2026-11-08 — Every row's `open` is the call that opens it: the shared row's
+ *     read_public with its owner, the own row's aimeat_memory_read (which then opens it), and the
+ *     curated row's GET address.
  *   v1.2.0 — 2026-10-20 — The owner-scope learned entries read as the caller may: on
  *     aimeat_appdev_pitfall_list, GET /v1/appdev/pitfalls/index and /learned an agent without
  *     memory:read-as-owner lists no private entry of its owner or a sibling and keeps the sibling's
@@ -286,6 +289,19 @@ await test('share=true publishes an entry platform-wide; owner B sees it (and ON
     const text = body.result?.content?.[0]?.text ?? '';
     assert(body.result?.isError !== true && /dvh already excludes the keyboard/.test(text),
         `the hinted door did not open the shared entry: ${text.slice(0, 200)}`);
+
+    // Every row names the call that opens it (2026-11-08: a build read its OWN entry with the
+    // shared-entry tool and got "not found", because the hint named both rules and no row said which).
+    const sharedArgs = JSON.parse(String(row.open).replace(/^aimeat_memory_read_public /, ''));
+    assert(String(row.open).startsWith('aimeat_memory_read_public ') && sharedArgs.gaii === row.owner && sharedArgs.key === row.key,
+        `shared row's open is not its read_public call: ${row.open}`);
+    const ownList = JSON.parse((await A.call('aimeat_appdev_pitfall_list', { scope: 'own', status: 'all', limit: 100 })).result.content[0].text);
+    const ownRow = ownList.pitfalls.find((p: any) => p.source === 'learned');
+    assert(ownRow && String(ownRow.open).startsWith('aimeat_memory_read '), `own row's open is not aimeat_memory_read: ${JSON.stringify(ownRow)}`);
+    const ownBody = await A.call('aimeat_memory_read', JSON.parse(String(ownRow.open).replace(/^aimeat_memory_read /, '')));
+    assert(ownBody.result?.isError !== true, `the own row's open call did not open it: ${ownBody.result?.content?.[0]?.text?.slice(0, 200)}`);
+    const curated = platOut.pitfalls.find((p: any) => p.source === 'curated');
+    assert(curated && /^GET https?:\/\/\S+\/v1\/appdev\/pitfalls\//.test(String(curated.open)), `curated row's open is not a GET address: ${JSON.stringify(curated)}`);
 });
 
 await test('status=outdated hides an entry from default lists (kept, retrievable)', async () => {

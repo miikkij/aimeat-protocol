@@ -16,9 +16,12 @@
  *
  *   The token is held in a closure and dropped when the step closes. A wrong code keeps the step
  *   open; the node counts it toward the account's code lock.
- * @structure twoStepViewHtml(i, field) · wireTwoStepStep(ctx) → { open(setupToken) }
+ * @structure twoStepViewHtml(i, field) · wireTwoStepStep(ctx) → { open(setupToken), keep(), resume(state) }
  * @usage import { twoStepViewHtml, wireTwoStepStep } from './modal-two-step.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-08 -- keep() and resume(): the language switch draws the step again with the QR
+ *     code, the key and the typed code, or with the backup codes, without asking the node for a new
+ *     key (modal-view-keep.js; secaudit2026nov08b round 15b).
  *   v1.1.0 — 2026-11-02 — The key shows in groups of four and wraps between groups; a copy gives it
  *     without the spaces (browser check at 375 px).
  *   v1.0.0 — 2026-11-02 — Initial (IT review: an operator can require two-step sign-in).
@@ -80,7 +83,7 @@ export function twoStepViewHtml(i, field) {
  * @param {(view: string) => void} ctx.showView The modal's view switcher.
  * @param {(data: any) => Promise<any>} ctx.adopt Makes the session from the finish answer (session.js).
  * @param {(session: any) => void} ctx.onSuccess What the modal does when a session comes back.
- * @returns {{ open: (setupToken: string) => void }}
+ * @returns {{ open: (setupToken: string) => void, keep?: () => any, resume?: (state: any) => void }}
  */
 export function wireTwoStepStep(ctx) {
   var i = ctx.i;
@@ -164,36 +167,66 @@ export function wireTwoStepStep(ctx) {
     }
   });
 
+  /** A checked sign-in that stops at the enrolment: ask the node for the secret and show it. */
+  function open(setupToken) {
+    token = setupToken;
+    finished = null;
+    codeEl.value = '';
+    errEl.style.display = 'none';
+    setupEl.style.display = '';
+    doneEl.style.display = 'none';
+    if (qrEl) qrEl.style.display = 'none';
+    if (secretEl) secretEl.textContent = '';
+    rawSecret = '';
+    ctx.showView('two-step');
+    api('/v1/ghii/login/two-step/start', { method: 'POST', body: JSON.stringify({ setup_token: setupToken }) })
+      .then(function (r) {
+        var d = r.data || {};
+        if (qrEl && typeof d.qr_data_url === 'string' && d.qr_data_url.indexOf('data:image/') === 0) {
+          qrEl.src = d.qr_data_url;
+          qrEl.style.display = '';
+        }
+        // In groups of four, as authenticator apps print a key, so it wraps between groups on a
+        // phone. A copy gives the key without the spaces (the copy listener below).
+        rawSecret = String(d.secret || '');
+        if (secretEl) secretEl.textContent = rawSecret.replace(/(.{4})(?=.)/g, '$1 ');
+        setTimeout(function () { codeEl.focus(); }, 50);
+      })
+      .catch(function (e) {
+        if (e.code === 'SETUP_TOKEN_EXPIRED') { token = null; fail(expiredText()); }
+        else fail(e.message);
+      });
+  }
+
+  /** The backup codes of a finished enrolment, as list items. */
+  function showCodes(answer) {
+    var codes = (answer && answer.data && answer.data.backup_codes) || [];
+    codesEl.innerHTML = codes.map(function (c) { return '<li><code>' + escHtml(String(c)) + '</code></li>'; }).join('');
+  }
+
   return {
-    /** A checked sign-in that stops at the enrolment: ask the node for the secret and show it. */
-    open: function (setupToken) {
-      token = setupToken;
-      finished = null;
-      codeEl.value = '';
+    open: open,
+    /** What the step holds while it is on screen, for the language switch (modal-view-keep.js). */
+    keep: function () {
+      var view = $('aimeat-two-step-view');
+      if (!view || view.style.display === 'none' || (!token && !finished)) return null;
+      return {
+        token: token, finished: finished, secret: rawSecret, code: codeEl.value,
+        qr: qrEl && qrEl.style.display !== 'none' ? String(qrEl.src || '') : '',
+      };
+    },
+    /** Draw the step again with what keep() returned. The node is asked again only when its key had not arrived yet. */
+    resume: function (state) {
+      if (!state.finished && !state.secret) { if (state.token) open(state.token); return; }
+      token = state.token; finished = state.finished; rawSecret = state.secret || '';
       errEl.style.display = 'none';
-      setupEl.style.display = '';
-      doneEl.style.display = 'none';
-      if (qrEl) qrEl.style.display = 'none';
-      if (secretEl) secretEl.textContent = '';
-      rawSecret = '';
+      if (qrEl && state.qr.indexOf('data:image/') === 0) { qrEl.src = state.qr; qrEl.style.display = ''; }
+      if (secretEl) secretEl.textContent = rawSecret.replace(/(.{4})(?=.)/g, '$1 ');
+      codeEl.value = state.code || '';
+      setupEl.style.display = finished ? 'none' : '';
+      doneEl.style.display = finished ? '' : 'none';
+      if (finished) showCodes(finished);
       ctx.showView('two-step');
-      api('/v1/ghii/login/two-step/start', { method: 'POST', body: JSON.stringify({ setup_token: setupToken }) })
-        .then(function (r) {
-          var d = r.data || {};
-          if (qrEl && typeof d.qr_data_url === 'string' && d.qr_data_url.indexOf('data:image/') === 0) {
-            qrEl.src = d.qr_data_url;
-            qrEl.style.display = '';
-          }
-          // In groups of four, as authenticator apps print a key, so it wraps between groups on a
-          // phone. A copy gives the key without the spaces (the copy listener below).
-          rawSecret = String(d.secret || '');
-          if (secretEl) secretEl.textContent = rawSecret.replace(/(.{4})(?=.)/g, '$1 ');
-          setTimeout(function () { codeEl.focus(); }, 50);
-        })
-        .catch(function (e) {
-          if (e.code === 'SETUP_TOKEN_EXPIRED') { token = null; fail(expiredText()); }
-          else fail(e.message);
-        });
     },
   };
 }

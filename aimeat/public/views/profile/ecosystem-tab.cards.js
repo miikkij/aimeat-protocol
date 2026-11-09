@@ -8,6 +8,7 @@
  *   details" disclosure: principal, grants, subscriptions, binding). Extracted from ecosystem-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.19.0 -- 2026-11-08 -- The event subscriptions' heading opens what each event in the picker sends and when (ecosystem.events; .claude/rules/page-guidance.md).
  *   v1.18.1 -- 2026-09-26 -- The sample prompt's copy button stands beside the prompt again (Beside;
  *     main's .pf-eco-mcp-sample-row), and the technical details are on the grey ground again (Box
  *     tone="dim"; main's .pf-eco-tech). Fix pass.
@@ -68,6 +69,7 @@ import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { keyFp, OUTBOUND_EVENTS, resolveOrganismName } from './ecosystem-tab.helpers.js';
 import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 /**
  * One "Data this app wrote" entry: collapsed row (key + visibility chip + timeAgo) that expands to
@@ -204,7 +206,7 @@ export function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, subFo
                   technical detail, so it is now its own section on the card, above the list of what
                   it actually wrote — claim first, then evidence. See ecosystem-tab.js. */ ''}`)}
 
-          ${part(t('profile.ecosystem.subscriptions'), html`
+          ${part(html`<${HelpLabel} term="ecosystem.events" label=${t('profile.ecosystem.subscriptions')}>${t('profile.ecosystem.subscriptions')}<//>`, html`
             <${Note}>${t('profile.ecosystem.subscriptionsDirection')}<//>
             ${appSubs.length === 0
               ? html`<${Note} kind="quiet">${t('profile.ecosystem.noSubs')}<//>`

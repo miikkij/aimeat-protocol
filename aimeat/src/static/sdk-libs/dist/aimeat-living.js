@@ -3397,9 +3397,19 @@
       "inward.expected": "Näin vastauksen pitää näyttää",
       "inward.testRead": "Kokeile lukemista",
       "inward.write": "Kirjoita arvo omalla tunnuksellasi",
-      "inward.receiverWhy": "Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon vastaanottimen kautta. Vastaanottimen avain kirjoittaa vain tähän avaimeen.",
-      "inward.receiverMake": "Tee vastaanotin tälle arvolle",
-      "inward.receiverCall": "Ohjelman kutsu vastaanottimeen",
+      "inward.receiverWhy": "Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon saapuvan webhookin kautta. Webhookin API-avain kirjoittaa vain tähän muistiavaimeen.",
+      "inward.receiverMake": "Tee saapuva webhook tälle arvolle",
+      "inward.receiverCall": "Ohjelman kutsu saapuvaan webhookiin",
+      "shell.posix": "macOS ja Linux",
+      "shell.windows": "Windowsissa: PowerShell tai komentokehote",
+      "shell.windowsFile": "Tallenna tämä tiedostoon {file}",
+      "shell.windowsRun": "Aja sitten tämä komento samassa kansiossa",
+      "inward.keyWhere": "Liitä API-avain kutsuun kohtaan {placeholder}. Yllä oleva linkki avaa sivun, joka näyttää avaimen vain kerran, kun teet sen. Kopioi avain silloin.",
+      "inward.ownerWhere": "Kirjoita käyttäjätunnuksesi kohtaan {placeholder}.",
+      "inward.signInWhy": "Ohjelman osoitteessa pitää olla käyttäjätunnuksesi, ja tämä sivu tietää sen vasta, kun olet kirjautunut. Kirjaudu sisään, niin tunnuksesi tulee alla olevaan kutsuun kohdan {placeholder} tilalle.",
+      "inward.signIn": "Kirjaudu sisään",
+      "inward.keyPlaceholder": "<API-avaimesi>",
+      "inward.tokenPlaceholder": "<tokenisi>",
       "inward.agent": "Sano tämä omalle tekoälyllesi",
       "inward.range": "Sallittu väli",
       "outward.title": "Kun tämä muuttuu, kerro jollekin",
@@ -3425,6 +3435,8 @@
       "secret.pick": "Lisää salaisuus",
       "secret.none": "Yhtään salaisuutta ei ole vielä tallessa.",
       "secret.add": "Lisää sellainen Pääsy-sivulla",
+      "secret.unavailable": "Tämä sivu ei näe salaisuuksiesi luetteloa. Kirjoita salaisuuden nimi arvoon muodossa {{secret:NIMI}}.",
+      "secret.see": "Katso salaisuutesi Pääsy-sivulla",
       "agent.pick": "Valitse agentti",
       "agent.none": "Yksikään agenteistasi ei voi vielä toimia.",
       "agent.connect": "Yhdistä agentti Agenttisi-sivulla",
@@ -3463,9 +3475,19 @@
       "inward.expected": "This is the shape the answer must have",
       "inward.testRead": "Test read",
       "inward.write": "Write the value with your own sign-in",
-      "inward.receiverWhy": "A program, such as a sensor or a cloud function, writes the value through a receiver. The receiver's key writes into this key only.",
-      "inward.receiverMake": "Make a receiver for this value",
-      "inward.receiverCall": "The program's call to the receiver",
+      "inward.receiverWhy": "A program, such as a sensor or a cloud function, writes the value through an incoming webhook. The webhook's API key writes into this memory key only.",
+      "inward.receiverMake": "Make an incoming webhook for this value",
+      "inward.receiverCall": "The program's call to the incoming webhook",
+      "shell.posix": "macOS and Linux",
+      "shell.windows": "On Windows: PowerShell or Command Prompt",
+      "shell.windowsFile": "Save this as {file}",
+      "shell.windowsRun": "Then run this command in the same folder",
+      "inward.keyWhere": "Put the API key in place of {placeholder} in the call. The link above opens the page that shows the key once, when you make it, so copy it then.",
+      "inward.ownerWhere": "Write your username in place of {placeholder}.",
+      "inward.signInWhy": "The program's address must have your username, and this page knows it only when you are signed in. Sign in, and the call below gets your username in place of {placeholder}.",
+      "inward.signIn": "Sign in",
+      "inward.keyPlaceholder": "<your API key>",
+      "inward.tokenPlaceholder": "<your token>",
       "inward.agent": "Say this to your own AI",
       "inward.range": "The range it accepts",
       "outward.title": "When this changes, tell someone",
@@ -3491,6 +3513,8 @@
       "secret.pick": "Insert a secret",
       "secret.none": "No secrets are kept yet.",
       "secret.add": "Add one on the Access page",
+      "secret.unavailable": "This page cannot list your secrets. Write a secret's name into the value as {{secret:NAME}}.",
+      "secret.see": "See your secrets on the Access page",
       "agent.pick": "Pick an agent",
       "agent.none": "None of your agents can act yet.",
       "agent.connect": "Connect one on the Your agents page",
@@ -3507,7 +3531,7 @@
       "refusal.ALLOWLIST_REFUSED": "This address is not one this node is allowed to call.",
       "refusal.RATE_LIMITED": "Too many calls have been made this minute.",
       "refusal.PAYLOAD_TOO_LARGE": "The message is too big to send.",
-      "refusal.UPSTREAM_FAILED": "The receiver did not answer.",
+      "refusal.UPSTREAM_FAILED": "The recipient did not answer.",
       "refusal.NO_EXTENSION": "This node's living-hooks extension did not answer.",
       "refusal.UNKNOWN": "The call did not go through.",
       "sentence.write": 'Write into AIMEAT memory, under the key {key}, the value {sample}. The document "{title}" reads it from there.',
@@ -5359,16 +5383,57 @@
     const slug = raw.replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     return (slug || "living-value").slice(0, 40).replace(/-$/, "");
   }
-  function receiverRoad(base, key, doc, id, sample) {
+  function shellQuoted(text) {
+    return "'" + String(text).replace(/'/g, "'\\''") + "'";
+  }
+  var WINDOWS_BODY_FILE = "value.json";
+  function windowsCall(address, bearer, body) {
+    return {
+      file: WINDOWS_BODY_FILE,
+      body: JSON.stringify(body),
+      curl: 'curl.exe -X POST "' + address + '" -H "Content-Type: application/json" -H "Authorization: Bearer ' + bearer + '" --data-binary "@' + WINDOWS_BODY_FILE + '"'
+    };
+  }
+  var SAMPLE_MAX = 1e3;
+  function sampleParam(body) {
+    const json = JSON.stringify(body) || "";
+    return json && json.length <= SAMPLE_MAX ? "&sample=" + encodeURIComponent(json) : "";
+  }
+  var OWNER_PLACEHOLDER = "<owner>";
+  var KEY_PLACEHOLDER = "<your API key>";
+  var TOKEN_PLACEHOLDER = "<your token>";
+  function placeholderIn(key, langs, fallback) {
+    const word = say(key, langs);
+    return /^<[^"$`\\%!'<>]+>$/.test(word) ? word : fallback;
+  }
+  function ownerForAddress(owner, nodeId) {
+    let name = typeof owner === "string" ? owner.trim() : "";
+    const at = name.indexOf("@");
+    if (at >= 0) name = nodeId && name.slice(at + 1) === String(nodeId) ? name.slice(0, at) : "";
+    return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) ? name : "";
+  }
+  function receiverRoad(apex, owner, key, doc, id, sample, keyPlaceholder) {
     const name = receiverNameFor(doc, id);
-    const address = base + "/v1/receive/<owner>/" + name;
+    const address = apex + "/v1/receive/" + (owner || OWNER_PLACEHOLDER) + "/" + name;
     return {
       name,
       key,
-      settings: base + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
+      owner,
+      ownerKnown: !!owner,
+      /** The page does not know the account name: the dialog says so and offers the sign-in (ownerNotice). */
+      signInNeeded: !owner,
+      keyPlaceholder,
+      ownerPlaceholder: OWNER_PLACEHOLDER,
+      settings: apex + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name) + sampleParam({ value: sample }),
       address,
-      curl: "curl -X POST " + address + ` -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>" -d '` + JSON.stringify({ value: sample }) + "'"
+      curl: "curl -X POST " + shellQuoted(address) + ' -H "Content-Type: application/json" -H "Authorization: Bearer ' + keyPlaceholder + '" -d ' + shellQuoted(JSON.stringify({ value: sample })),
+      /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
+      windows: windowsCall(address, keyPlaceholder, { value: sample })
     };
+  }
+  function ownerNotice(receiver, canSignIn) {
+    if (receiver && receiver.ownerKnown) return null;
+    return canSignIn ? { kind: "signIn", words: "inward.signInWhy", button: "inward.signIn" } : { kind: "write", words: "inward.ownerWhere" };
   }
   function inwardShape(ctx) {
     const doc = ctx.doc || {};
@@ -5384,6 +5449,9 @@
     const path = String(subject.path || "");
     const expected = subject.raw ? sample : shapeFor(path || "value", sample);
     const base = String(ctx.base || "");
+    const apex = String(ctx.apex || base);
+    const keyPlaceholder = placeholderIn("inward.keyPlaceholder", wanted, KEY_PLACEHOLDER);
+    const tokenPlaceholder = placeholderIn("inward.tokenPlaceholder", wanted, TOKEN_PLACEHOLDER);
     const key = memoryKeyFor(doc, subjectId);
     const body = { key, value: { value: sample } };
     const hasRange = typeof subject.min === "number" || typeof subject.max === "number" || typeof subject.step === "number";
@@ -5406,11 +5474,14 @@
         key,
         request: {
           method: "POST",
-          url: base + "/v1/memory",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer <your token>" },
+          url: apex + "/v1/memory",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + tokenPlaceholder },
           body
         },
-        curl: "curl -X POST " + base + `/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d '` + JSON.stringify(body) + "'"
+        tokenPlaceholder,
+        curl: "curl -X POST " + shellQuoted(apex + "/v1/memory") + ' -H "Content-Type: application/json" -H "Authorization: Bearer ' + tokenPlaceholder + '" -d ' + shellQuoted(JSON.stringify(body)),
+        /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
+        windows: windowsCall(apex + "/v1/memory", tokenPlaceholder, body)
       },
       /**
        * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through
@@ -5419,7 +5490,7 @@
        * hold: a personal access token writes into its own test identity, and an agent token reaches
        * all of the owner's memory. `settings` opens the owner's Receivers page with this key filled in.
        */
-      receiver: receiverRoad(base, key, doc, subjectId, sample),
+      receiver: receiverRoad(apex, ownerForAddress(ctx.owner, ctx.nodeId), key, doc, subjectId, sample, keyPlaceholder),
       /** The agent road: the same thing said out loud, in the language the page is reading. */
       sentence: fill(say("sentence.write", wanted), {
         key,
@@ -5591,6 +5662,84 @@
       }
     };
   }
+  function signedInOwner() {
+    try {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      const session = ns && ns.auth && typeof ns.auth.getSession === "function" ? ns.auth.getSession() : null;
+      return session && typeof session.owner === "string" ? session.owner : "";
+    } catch (e) {
+      console.warn("[aimeat-living] The signed-in account could not be read:", e && /** @type {Error} */
+      e.message);
+      return "";
+    }
+  }
+  function signInOffer() {
+    try {
+      const auth = (
+        /** @type {any} */
+        window.AIMEAT && /** @type {any} */
+        window.AIMEAT.auth
+      );
+      if (!auth || typeof auth.signIn !== "function") return null;
+      if (typeof auth.getSession === "function" && auth.getSession()) return null;
+      return function() {
+        return Promise.resolve(auth.signIn());
+      };
+    } catch (e) {
+      console.warn("[aimeat-living] The page's sign-in could not be read:", e && /** @type {Error} */
+      e.message);
+      return null;
+    }
+  }
+  var SECRETS_SCOPE = "secrets:manage";
+  function tokenClaims(jwt) {
+    const parts = String(jwt || "").split(".");
+    if (parts.length !== 3) return null;
+    try {
+      return JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    } catch (e) {
+      console.warn("[aimeat-living] The session's token could not be read:", e && /** @type {Error} */
+      e.message);
+      return null;
+    }
+  }
+  function canListSecrets(session) {
+    if (!session || typeof session.fetch !== "function") return false;
+    const claims = tokenClaims(session.jwt) || {};
+    const scopes = Array.isArray(claims.scopes) ? claims.scopes : [];
+    if (scopes.indexOf(SECRETS_SCOPE) >= 0) return true;
+    if (session._appOrigin || claims.app) return false;
+    const roles = Array.isArray(claims.roles) ? claims.roles : Array.isArray(session.roles) ? session.roles : [];
+    return roles.indexOf("owner") >= 0;
+  }
+  function currentSession2() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.auth && typeof ns.auth.getSession === "function" ? ns.auth.getSession() : null;
+  }
+  function secretsListable() {
+    try {
+      return canListSecrets(currentSession2());
+    } catch (e) {
+      console.warn("[aimeat-living] The session could not be read:", e && /** @type {Error} */
+      e.message);
+      return false;
+    }
+  }
+  async function vaultNames() {
+    if (!secretsListable()) return null;
+    const data = await ownerRead("/v1/secrets");
+    if (!data) return null;
+    const list = Array.isArray(data.secrets) ? data.secrets : [];
+    return list.map(function(s) {
+      return String(s && s.name ? s.name : s);
+    }).filter(Boolean);
+  }
   async function ownerRead(path) {
     try {
       const ns = (
@@ -5622,6 +5771,13 @@
     const langs = typeof spec.langs === "function" ? spec.langs : function() {
       return [];
     };
+    if (spec.names === null) {
+      return pickOrWords({
+        words: say("secret.unavailable", langs()),
+        doorWords: say("secret.see", langs()),
+        href: apexPage("/v1/profile?tab=access")
+      });
+    }
     const names = Array.isArray(spec.names) ? spec.names : [];
     if (!names.length) {
       return pickOrWords({
@@ -5707,7 +5863,8 @@
     }
     function draw() {
       while (list.firstChild) list.removeChild(list.firstChild);
-      const names = spec.secrets() || [];
+      const got = spec.secrets();
+      const names = got === null ? null : got || [];
       rows.forEach(function(row, i) {
         const name = (
           /** @type {HTMLInputElement} */
@@ -5777,24 +5934,65 @@
     if (typeof value2 === "object") return JSON.stringify(value2);
     return String(value2);
   }
+  function windowsBlock(host, call, words2, langs) {
+    if (!call) return;
+    const fold = document.createElement("details");
+    fold.className = "ak-living__copy";
+    const summary = document.createElement("summary");
+    summary.className = "ak-living__copy-label";
+    summary.textContent = words2("shell.windows");
+    fold.appendChild(summary);
+    copyBlock(fold, { label: fill(words2("shell.windowsFile"), { file: call.file }), text: call.body, langs });
+    copyBlock(fold, { label: words2("shell.windowsRun"), text: call.curl, langs });
+    host.appendChild(fold);
+  }
+  function ownerNoticeBlock(host, notice, placeholder, words2, signIn, onSignedIn) {
+    if (!notice) return;
+    const box = document.createElement("div");
+    box.className = "ak-living__dialog-signin";
+    box.setAttribute("data-ak-part", "signIn");
+    const line = document.createElement("p");
+    line.className = "ak-living__dialog-signin-text";
+    line.textContent = fill(words2(notice.words), { placeholder });
+    box.appendChild(line);
+    if (notice.kind === "signIn" && signIn) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ak-btn ak-btn--primary ak-living__dialog-test";
+      button.textContent = words2(notice.button);
+      button.addEventListener("click", function() {
+        signIn().then(function(session) {
+          if (session) onSignedIn(session);
+        }).catch(function(e) {
+          console.debug("[aimeat-living] sign-in closed", e);
+        });
+      });
+      box.appendChild(button);
+    }
+    host.appendChild(box);
+  }
   function openInward(spec) {
     const langs = typeof spec.langs === "function" ? spec.langs : function() {
       return [];
     };
-    const shape = inwardShape(spec);
+    const shape = inwardShape(Object.assign({
+      apex: apexPage(""),
+      owner: signedInOwner(),
+      nodeId: NODE_ID
+    }, spec));
     const words2 = function(key) {
       return say(key, langs());
     };
     const subjectNode = (((spec.doc || {}).model || {}).nodes || {})[shape.subject] || {};
-    const draft = {
+    const draft = Object.assign({
       road: shape.road,
       url: shape.url,
       path: shape.path,
       every: shape.every,
       key: shape.key,
       headers: Object.assign({}, subjectNode.headers || {})
-    };
-    let vault = [];
+    }, spec.draft || {});
+    let vault = secretsListable() ? [] : null;
     const k = kit();
     const handle = k.dialog({
       title: words2("inward.title"),
@@ -5853,13 +6051,12 @@
             draft.headers = map;
           }
         });
-        ownerRead("/v1/secrets").then(function(data) {
-          const list = data && Array.isArray(data.secrets) ? data.secrets : [];
-          vault = list.map(function(s) {
-            return String(s && s.name ? s.name : s);
-          }).filter(Boolean);
-          headers.refresh();
-        });
+        if (vault !== null) {
+          vaultNames().then(function(names) {
+            vault = names;
+            headers.refresh();
+          });
+        }
         expected.block = copyBlock(urlRoad.body, {
           label: words2("inward.expected"),
           text: JSON.stringify(shape.expected, null, 2),
@@ -5899,16 +6096,33 @@
         receiverLink.textContent = words2("inward.receiverMake");
         receiverLine.appendChild(receiverLink);
         keyRoad.body.appendChild(receiverLine);
+        ownerNoticeBlock(
+          keyRoad.body,
+          ownerNotice(shape.receiver, !!signInOffer()),
+          shape.receiver.ownerPlaceholder,
+          words2,
+          signInOffer(),
+          function() {
+            handle.close("signed-in");
+            openInward(Object.assign({}, spec, { draft: Object.assign({}, draft) }));
+          }
+        );
         copyBlock(keyRoad.body, {
-          label: words2("inward.receiverCall"),
+          label: words2("inward.receiverCall") + " (" + words2("shell.posix") + ")",
           text: shape.receiver.curl,
           langs
         });
+        windowsBlock(keyRoad.body, shape.receiver.windows, words2, langs);
+        const keyWhere = document.createElement("p");
+        keyWhere.className = "ak-living__dialog-range";
+        keyWhere.textContent = fill(words2("inward.keyWhere"), { placeholder: shape.receiver.keyPlaceholder });
+        keyRoad.body.appendChild(keyWhere);
         copyBlock(keyRoad.body, {
-          label: words2("inward.write"),
+          label: words2("inward.write") + " (" + words2("shell.posix") + ")",
           text: shape.write.curl,
           langs
         });
+        windowsBlock(keyRoad.body, shape.write.windows, words2, langs);
         copyBlock(host, { label: words2("inward.agent"), text: shape.sentence, langs });
         if (shape.range) {
           const line = document.createElement("p");
@@ -5990,7 +6204,7 @@
       enabled: shape.enabled,
       headers: Object.assign({}, writtenHeaders)
     };
-    let vault = [];
+    let vault = secretsListable() ? [] : null;
     const k = kit();
     const handle = k.dialog({
       title: words2("outward.title"),
@@ -6070,13 +6284,12 @@
             draft.headers = map;
           }
         });
-        ownerRead("/v1/secrets").then(function(data) {
-          const list = data && Array.isArray(data.secrets) ? data.secrets : [];
-          vault = list.map(function(s) {
-            return String(s && s.name ? s.name : s);
-          }).filter(Boolean);
-          headers.refresh();
-        });
+        if (vault !== null) {
+          vaultNames().then(function(names) {
+            vault = names;
+            headers.refresh();
+          });
+        }
         const agentBox = el("div", { class: "ak-living__dialog-fields" });
         agentRoad.body.appendChild(agentBox);
         fields(agentBox, [

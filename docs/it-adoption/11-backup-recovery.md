@@ -1,6 +1,6 @@
 # 11 Backup and recovery
 
-> Checked against AIMEAT node 4.2.0 (commit 7bc5742c4) on 2026-11-07. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 93a5ffba1) on 2026-11-08. Maintained with the code: see the README for how.
 
 This page is for the sysadmin who owns backups and the continuity planner who sets recovery targets. It lists what must be backed up for a node to come back as the same node, gives the procedure in short, proposes RTO and RPO values for the organisation to decide, and describes the restore test. The commands for each storage backend are in [Backup and restore](../operations/backup-and-restore.md), which stays the single home for them.
 
@@ -11,7 +11,7 @@ A node is its data, its secrets and its identity key. Back up all three at the s
 | Part | Where it is | What is lost without it | Source |
 |---|---|---|---|
 | Database | SQLite: the file `AIMEAT_SQLITE_PATH` names, with its `-wal` and `-shm` files. PostgreSQL: the database `DATABASE_URL` names | Every account, record, workspace, app, setting and log record kept in the database | [Backup and restore](../operations/backup-and-restore.md) |
-| Stored file bytes | In the database when `AIMEAT_FILE_STORE=database` (the default). In an S3 bucket or Azure container when set to `s3` or `azure`, and in a person's own storage when `AIMEAT_OWNER_FILE_STORES` allows it | The content of uploaded files | `aimeat/.env.example` |
+| Stored file bytes | In the database when `AIMEAT_FILE_STORE=database` (the default). In an S3 bucket or Azure container when set to `s3` or `azure`, and in a person's own storage when `AIMEAT_OWNER_FILE_STORES` allows it; a store takes only the files its rule names (default 1 MB and up, and video and audio, `AIMEAT_FILE_STORE_MIN_MB`, `AIMEAT_FILE_STORE_KINDS`), so the smaller files stay in the database and its backup. A file a store does not take but which is larger than the database's per-file limit (`AIMEAT_STORAGE_MAX_FILE_SIZE_MB`), or which would take a person past their storage quota (`AIMEAT_STORAGE_QUOTA_MB`), stays in its store | The content of uploaded files | `aimeat/.env.example` |
 | Data key | `AIMEAT_ENCRYPTION_KEY` (or `AIMEAT_TOTP_ENCRYPTION_KEY` when the first is not set), in `.env` or the process manager | Every stored secret becomes unreadable: AI provider keys, the secrets vault, extension and MCP server secrets, two-step sign-in secrets, secret Config settings | `aimeat/.env.example`, [Backup and restore](../operations/backup-and-restore.md) |
 | Key passphrase | `AIMEAT_KEY_PASSPHRASE` | The sealed copy of the node key in the database and the encrypted key file cannot be opened | `aimeat/.env.example` |
 | Node identity key | `AIMEAT_NODE_KEY_PATH`, default `~/.aimeat/nodes/<node id>/node-key.json` | The node's identity. A node whose sealed copy does not open and that finds no key file refuses to start rather than make a new identity, which would break every issued token and every federation peer | [Backup and restore](../operations/backup-and-restore.md) |

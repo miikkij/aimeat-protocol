@@ -26,6 +26,8 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-11-08 — establishForGhii answers the sign-in details screen's address when the sign-in was a
+ *     code key's first (secaudit2026nov08 round 14, key-credentials:rotation-gated-on-login-count-not-pending-invitation).
  *   2026-11-04 — The pending sign-up token is signed with its purpose's own key (auth/node-signer.ts);
  *     a token signed before, with the node key, verifies as before until it expires (codebase
  *     analysis 2026-11-03, item B9).
@@ -321,6 +323,10 @@ export async function createOwnerForProvider(
  * Establish an owner session for a resolved GHII after an external login: roles are read from the
  * OWNER record (never copied from anywhere else), the login counters bump, the cookie + access
  * token land. Throws AccountDisabledError from establishOwnerSession for a deactivated account.
+ *
+ * Answers the address the browser goes to first when this was a code key's first sign-in: the front
+ * page's sign-in details screen (`/?auth_step=key_credentials`), which shows the new password and then
+ * continues to `back`. Null otherwise; the caller goes where it was going (secaudit2026nov08 round 14).
  */
 export async function establishForGhii(
   storage: Storage,
@@ -328,7 +334,8 @@ export async function establishForGhii(
   req: Request,
   res: Response,
   ghiiRecord: GHIIRecord,
-): Promise<void> {
+  back: string | null = null,
+): Promise<string | null> {
   const now = new Date().toISOString();
   const ownerName = ghiiRecord.ownerName;
   const ownerRecord = await storage.getOwner(ownerName);
@@ -342,8 +349,14 @@ export async function establishForGhii(
     loginCount: (ghiiRecord.loginCount ?? 0) + 1,
   });
 
-  await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
+  const s = await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles, keyCredentials: 'screen', back });
   emitChange('ghii');
+  return s.keyCredentialsOwed ? keyCredentialsScreenUrl(config) : null;
+}
+
+/** The front page's sign-in details screen (sdk-libs/auth/index.js reads `auth_step=key_credentials`). */
+export function keyCredentialsScreenUrl(config: Pick<AimeatConfig, 'baseUrl'>): string {
+  return `${config.baseUrl}/?auth_step=key_credentials`;
 }
 
 /** A provider identity to save on an account once its second factor is given. */
@@ -539,8 +552,9 @@ export async function finalizeExternalSignup(
     }
   }
 
-  await establishForGhii(storage, config, req, res, ghiiRecord);
+  const back = safeRedirectPath(pending.redirect);
+  const screen = await establishForGhii(storage, config, req, res, ghiiRecord, back);
   if (opts.onLogin) await opts.onLogin(ghiiRecord);
   clearPendingCookie(req, res);
-  return { ok: true, ghii: ghiiRecord, redirect: safeRedirectPath(pending.redirect) };
+  return { ok: true, ghii: ghiiRecord, redirect: screen ?? back };
 }

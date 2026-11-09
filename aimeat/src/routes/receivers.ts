@@ -11,6 +11,8 @@
  * @structure receiversRouter(config, storage)
  * @usage app.use(receiversRouter(config, storage));
  * @version-history
+ *   v1.0.1 — 2026-11-08 — The owner-only refusal says incoming webhook; routes and codes stay
+ *     (secaudit2026nov08b round 15b).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { Router } from 'express';
@@ -82,7 +84,7 @@ export function receiversRouter(config: AimeatConfig, storage: Storage): Router 
         await send(req, res, 200, deliveriesForCaller(deps, caller(req), String(req.params.name), { onlyRefused: req.query.refused === 'true' }));
     });
     // The owner in person decides a proposal: an agent cannot approve what an agent proposed.
-    router.post('/v1/receivers/:name/decide', ...session, requireOwnerPrincipal('Only the owner, signed in, approves a receiver someone proposed.'),
+    router.post('/v1/receivers/:name/decide', ...session, requireOwnerPrincipal('Only the owner, signed in, approves an incoming webhook someone proposed.'),
         validateBody(ReceiverDecisionSchema, config.nodeId), async (req, res) => {
         await send(req, res, 200, (async () => decideProposal(deps, caller(req), String(req.params.name), decisionOf(req.body?.decision)))());
     });

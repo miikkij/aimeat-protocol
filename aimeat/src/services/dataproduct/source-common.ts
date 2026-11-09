@@ -13,10 +13,14 @@
  * @structure ResolvedSource · SourceDeps · tableOf · audienceOfStored · sourceError · needWord · AUDIENCE_RANK
  * @usage const t = tableOf(spec.id, rows, types);
  * @version-history
+ *   v1.1.1 — 2026-11-08 — labelSources is filled by every source that copies labelled items
+ *     (secaudit2026nov08b round 15).
+ *   v1.1.0 — 2026-11-08 — ResolvedSource.labelSources: the label addresses of the items the rows were
+ *     copied from (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.1).
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
 import type { FieldType } from '../datapackage/contract.js';
 import { mapColumns } from '../workflow/engine-step-rows.js';
@@ -32,6 +36,13 @@ export interface ResolvedSource extends SourceTable {
     /** The `pkg:owner/name@sha256:...` of a datapackage source, for the new version's lineage. */
     lineage?: string;
     fetchedAt: string;
+    /**
+     * The label address of each item the rows were copied from, when the source's items carry
+     * classification labels of their own (records, memory and app records, a stored file, another
+     * package version's label source and file; an extension run's reads). The version records them
+     * (services/datapackage/source-labels.ts), so the copy keeps the readers of every one of their labels.
+     */
+    labelSources?: ContentLabelTarget[];
 }
 
 /** What a source reader takes. */

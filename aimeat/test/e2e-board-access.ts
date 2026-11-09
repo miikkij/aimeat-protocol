@@ -3,8 +3,12 @@
  * @description E2E tests for board access control improvements.
  *   Verifies that shared boards auto-include same-owner agents, that private boards
  *   remain isolated, that external agents can be granted access via PATCH members,
- *   and that board listing aggregation works correctly for owners.
+ *   that board listing aggregation works correctly for owners, and that the posting rule 'anyone'
+ *   admits only a caller that may read the board.
  * @version-history
+ *   v1.4.0 — 2026-11-08 — Tests 17c-17e: a shared board with posting 'anyone' refuses a post and a
+ *     reply from a caller that cannot read it, and still takes them from a roster member; a public
+ *     board with posting 'anyone' takes a post from another owner's agent (services/board-post.ts).
  *   v1.3.0 — 2026-10-20 — Test 15b: a subscriber taken off the roster receives no callback for the
  *     next post and its subscription is gone, while a still-admitted subscriber receives it
  *     (secaudit 2026-10, board-subscribers:notify-without-read-recheck).
@@ -508,6 +512,97 @@ await test('17b. owner2 (plain owner, not the board owner) gets 403 on PATCH mem
     });
     assert(read.status === 403,
         `agent-C reached the board after the refused PATCH, so the write happened anyway: ${read.status}`);
+});
+
+// ─── Phase 4b: posting rule 'anyone' admits only a caller that may read the board ───
+//
+// boardPostAccessRefusal (services/board-post.ts) asked nothing when a shared board's posting rule
+// was 'anyone', so a caller of another owner that knew the board's id posted and replied to a board
+// it could not read. Both halves are asserted: the non-reader is refused on the post and the reply
+// route, and a reader (the roster) and anyone on a public board still post.
+console.log('\nPhase 4b — posting \'anyone\' means anyone who may read the board');
+
+let anyoneSharedBoardId = '';
+let anyoneSharedPostId = '';
+
+await test('17c. agent-C (not on the roster) CANNOT post or reply to a shared board whose posting rule is anyone', async () => {
+    const created = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ name: 'BA Shared Anyone Board', visibility: 'shared', rules: { posting: 'anyone' } }),
+    });
+    assert(created.status === 201, `create status ${created.status}: ${JSON.stringify(created.body)}`);
+    anyoneSharedBoardId = created.body.data.id;
+
+    const own = await json(`/v1/boards/${anyoneSharedBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ title: 'Keeper notice', body: 'A notice by the keeper' }),
+    });
+    assert(own.status === 201, `keeper post status ${own.status}: ${JSON.stringify(own.body)}`);
+    anyoneSharedPostId = own.body.data.id;
+
+    const read = await json(`/v1/boards/${anyoneSharedBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(read.status === 403, `precondition: agent-C must not read this board, got ${read.status}`);
+
+    const post = await json(`/v1/boards/${anyoneSharedBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentCToken}` },
+        body: JSON.stringify({ title: 'Intruder', body: 'Posted to a board I cannot read' }),
+    });
+    assert(post.status === 403, `a caller that cannot read the board must not post to it, got ${post.status}: ${JSON.stringify(post.body)}`);
+
+    const reply = await json(`/v1/boards/${anyoneSharedBoardId}/posts/${anyoneSharedPostId}/replies`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentCToken}` },
+        body: JSON.stringify({ body: 'A reply to a board I cannot read' }),
+    });
+    assert(reply.status === 403, `a caller that cannot read the board must not reply on it, got ${reply.status}: ${JSON.stringify(reply.body)}`);
+
+    // The refusal comes before the write: the keeper sees only the keeper's own notice.
+    const list = await json(`/v1/boards/${anyoneSharedBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(list.status === 200, `keeper read status ${list.status}`);
+    const byC = (list.body.data.posts as any[]).filter((p: any) => p.author_gaii === agentCGaii || p.authorGaii === agentCGaii);
+    assert(byC.length === 0, `agent-C's post was stored anyway: ${JSON.stringify(byC)}`);
+});
+
+await test('17d. agent-C on the roster CAN post to the shared board whose posting rule is anyone', async () => {
+    const added = await json(`/v1/boards/${anyoneSharedBoardId}/members`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${owner1Token}` },
+        body: JSON.stringify({ add: [agentCGaii] }),
+    });
+    assert(added.status === 200, `PATCH members status ${added.status}: ${JSON.stringify(added.body)}`);
+
+    const post = await json(`/v1/boards/${anyoneSharedBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentCToken}` },
+        body: JSON.stringify({ title: 'Member notice', body: 'Posted by a member who reads the board' }),
+    });
+    assert(post.status === 201, `a member must post under 'anyone', got ${post.status}: ${JSON.stringify(post.body)}`);
+});
+
+await test('17e. agent-C (another owner) CAN post to a public board whose posting rule is anyone', async () => {
+    // An owner session opens it: an agent's public board may be held private behind the publish gate.
+    const created = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${owner1Token}` },
+        body: JSON.stringify({ name: 'BA Public Anyone Board', visibility: 'public', rules: { posting: 'anyone', post_cost: 0 } }),
+    });
+    assert(created.status === 201, `create status ${created.status}: ${JSON.stringify(created.body)}`);
+    assert(created.body.data.visibility === 'public', `precondition: the board must be public, got ${created.body.data.visibility}`);
+    const publicBoardId = created.body.data.id;
+
+    const post = await json(`/v1/boards/${publicBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentCToken}` },
+        body: JSON.stringify({ title: 'Public notice', body: 'Anyone signed in posts on a public board' }),
+    });
+    assert(post.status === 201, `anyone signed in must post to a public 'anyone' board, got ${post.status}: ${JSON.stringify(post.body)}`);
 });
 
 // ─── Phase 5: Board listing aggregation ───

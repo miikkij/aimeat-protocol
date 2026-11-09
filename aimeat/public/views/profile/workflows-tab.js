@@ -10,6 +10,7 @@
  * @structure WorkflowsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v2.3.2 -- 2026-11-08 -- The folds no longer hold `how`: the cover's "How to read this" section went into the page's question mark, concept.workflow (.claude/rules/page-guidance.md).
  *   v2.3.1 -- 2026-10-19 -- The step pickers' agents come from listAgents as the array it returns, in alphabetical order.
  *   v2.3.0 -- 2026-10-16 -- The menu find opens one workflow here (useOpenItem, js/open-item.js).
  *   v2.2.0 -- 2026-10-16 -- A failed load is drawn as one (itemsFailed: the could-not-load note with
@@ -52,7 +53,7 @@ export default function WorkflowsTab({ showToast }) {
   const [detail, setDetail] = useState(null);      // { id, runs, checks, runCount, checkCount, blueprint, blueprintResolved }
   const [detailLoading, setDetailLoading] = useState(false);
   const [run, setRun] = useState(null);
-  const [folds, setFolds] = useState({ how: false, settings: false, prompt: false, raw: false, end: false, llm: false });
+  const [folds, setFolds] = useState({ settings: false, prompt: false, raw: false, end: false, llm: false });
   const [checks, setChecks] = useState({});        // id → { at, status, steps }
   const [checking, setChecking] = useState(null);
   const [checkNote, setCheckNote] = useState(null);

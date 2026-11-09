@@ -11,6 +11,8 @@
  * @structure CompaniesTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'companies'.
  * @version-history
+ *   v2.2.0 — 2026-11-08 — ctx.loaded says the list has been read once, so the cover's start
+ *     (PageStart "companies") stays folded while it loads and folds for good once a company exists.
  *   v2.1.0 — 2026-10-16 — The menu find opens one company here (useOpenItem, js/open-item.js).
  *   v2.0.0 — 2026-08-31 — The poster face (design canvas "AIMEAT Yritysten sivu", direction A).
  *     A row per company and a page behind it; the organism link reaches the page for the first
@@ -40,6 +42,8 @@ const EMPTY_SMTP = { host: '', port: '587', secure: false, username: '', passwor
 export default function CompaniesTab({ showToast, session }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [companies, setCompanies] = useState([]);
+  // Whether the list has been read once: the page's start stays folded until it knows.
+  const [loaded, setLoaded] = useState(false);
   const [apps, setApps] = useState([]);
   const [organisms, setOrganisms] = useState([]);
   const [extras, setExtras] = useState({});
@@ -64,6 +68,7 @@ export default function CompaniesTab({ showToast, session }) {
     try {
       const rows = await api.listCompanies();
       setCompanies(rows);
+      setLoaded(true);
       // The counts and the sending identity, one company at a time. An owner has a handful of
       // companies, not a page of them, so the fan-out stays small; each read fails soft.
       const ex = {};
@@ -83,7 +88,7 @@ export default function CompaniesTab({ showToast, session }) {
         const ok = await api.addressAnswers(co.id).catch((err) => { swallowed('companies-tab: address', err); return null; });
         if (ok !== null) setAddr((prev) => ({ ...prev, [co.id]: ok }));
       });
-    } catch (err) { swallowed('companies-tab', err); }
+    } catch (err) { swallowed('companies-tab', err); setLoaded(true); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -312,7 +317,7 @@ export default function CompaniesTab({ showToast, session }) {
   const setFold = (k, open_) => setFolds((f) => ({ ...f, [k]: open_ }));
 
   const ctx = {
-    companies, apps, organisms, extras, addr, session, company,
+    companies, loaded, apps, organisms, extras, addr, session, company,
     create, busy, folds, editingFacts, factValues, front, portfolio, smtp, smtpForm, orgPick, ConfirmUI,
     setCreateName, doCreate, open, back, setFold,
     startFacts, cancelFacts, setFact, saveFacts,

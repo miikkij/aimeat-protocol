@@ -26,10 +26,14 @@
  *   One pseudonym value per identity of the person (`<pseudonym>`, `<pseudonym>.1`, …), as the
  *   classification audit does, so two identities of one person cannot meet on a unique key such as
  *   FinanceVoucher (ownerGhii, fiscalYearId, voucherNumber).
- * @structure ErasedAccountRecordRule · ERASED_ACCOUNT_RECORDS · erasedIdentities(name, ghiis, actors)
+ * @structure ErasedAccountRecordRule · ERASED_ACCOUNT_RECORDS · erasedIdentities(name, ghiis, actors) ·
+ *   RECEIVER_PRINCIPAL_COLUMNS · receiverPrincipalPatterns(name, ghiis)
  * @usage
  *   for (const rule of ERASED_ACCOUNT_RECORDS) { … rule.pg or rule.sqlite, rule.column, rule.action }
  * @version-history
+ *   v1.3.0 — 2026-11-08 — The person's receiver principals (`receiver:<name>/<receiver>@<node>`), found
+ *     in the row and classification-audit columns a receiver writes, are pseudonymised like the
+ *     agents (RECEIVER_PRINCIPAL_COLUMNS, receiverPrincipalPatterns; secaudit2026nov08b round 15).
  *   v1.2.0 — 2026-10-25 — ReleasedComponentName.holder, pseudonymised: the next holder of an account
  *     name does not inherit the bare extension and cortex names the erased account released (owner
  *     namespaces wish, secaudit2026oct22).
@@ -105,4 +109,38 @@ export const ERASED_ACCOUNT_RECORDS: readonly ErasedAccountRecordRule[] = [
  */
 export function erasedIdentities(name: string, ghiis: string[], actors: string[], pseudonym: string): Array<{ identity: string; replacement: string }> {
   return [...new Set([...ghiis, name, ...actors])].map((identity, i) => ({ identity, replacement: i ? `${pseudonym}.${i}` : pseudonym }));
+}
+
+/**
+ * The columns a receiver of the person writes its principal into (`receiver:<name>/<receiver>@<node>`,
+ * services/receivers/contract.ts receiverPrincipalOf): the rows it appends to a row space and their
+ * kept revisions (services/receivers/receive.ts runSpace), and the classification audit of what it
+ * read back (it reads as its principal). A receiver is a service record that the erasure removes, and
+ * one deleted before the account left its rows as well, so the values are found in these columns,
+ * not in a table of receivers. The principal holds the bare account name, which is released for reuse,
+ * so a later account's receiver of the same name had the same principal and took the rows as its own
+ * (secaudit2026nov08b round 15, receiver-principal-not-pseudonymised).
+ */
+export const RECEIVER_PRINCIPAL_COLUMNS: ReadonlyArray<Pick<ErasedAccountRecordRule, 'pg' | 'sqlite' | 'column'>> = [
+  { pg: 'WorkspaceRow', sqlite: 'workspace_rows', column: 'createdBy' },
+  { pg: 'WorkspaceRow', sqlite: 'workspace_rows', column: 'updatedBy' },
+  { pg: 'WorkspaceRowRevision', sqlite: 'workspace_row_revisions', column: 'createdBy' },
+  { pg: 'WorkspaceRowRevision', sqlite: 'workspace_row_revisions', column: 'updatedBy' },
+  { pg: 'WorkspaceRowRevision', sqlite: 'workspace_row_revisions', column: 'replacedBy' },
+  { pg: 'ClassificationAudit', sqlite: 'classification_audit', column: 'reader' },
+];
+
+/** LIKE has its own wildcards. A stored identity must match itself and nothing wider. */
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, m => `\\${m}`);
+}
+
+/**
+ * LIKE patterns, escaped with a backslash, for every receiver principal of the person:
+ * `receiver:<name>/<any receiver>@<node>` for the node of each GHII. An account name holds no '/', so
+ * the pattern cannot reach another account's receivers.
+ */
+export function receiverPrincipalPatterns(name: string, ghiis: string[]): string[] {
+  const nodes = [...new Set(ghiis.map(g => g.slice(g.lastIndexOf('@') + 1)).filter(Boolean))];
+  return nodes.map(node => `receiver:${escapeLike(name)}/%@${escapeLike(node)}`);
 }

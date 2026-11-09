@@ -6,11 +6,17 @@
  *   direction A). The COVER answers in the order a person asks: what I have (packages as a table,
  *   drafts, published and datasets apart), how I make a new one (three roads: an agent over MCP, a
  *   chat with a prompt and the result pasted back, a finished package pasted in), what the organisms
- *   share, and what in the public library is worth taking. A package opens as its own page
- *   (package.js). Pure render functions over the ctx bag knowledge-tab.js assembles.
+ *   share, and what in the public library is worth taking. Under the head stand the page's start
+ *   (PageStart: what the page is for, the prompt that has one's own AI make a package, whose button
+ *   goes to "Make a package", and what happens next) and the title's question mark (concept.knowledge).
+ *   A package opens as its own page (package.js). Pure render functions over the ctx bag
+ *   knowledge-tab.js assembles. How the page explains itself: .claude/rules/page-guidance.md.
  * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · secLibrary
  * @usage import { renderKnowledgeView } from './knowledge/cover.js';
  * @version-history
+ *   v1.21.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head (folded once the person has a package; its button goes to "Make a
+ *     package") and the title's question mark, concept.knowledge.
  *   v1.20.0 -- 2026-10-16 -- A failed first load of the packages shows the could-not-load note with Retry
  *     instead of "no packages" (ctx.packagesFailed) (QA audit F6-05).
  *   v1.19.0 -- 2026-09-26 -- On the component kit (page group G7): the page is the SettingsPage (crumb,
@@ -70,6 +76,7 @@ import { Note } from '/components/Note.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { List, Row, Name, Desc, Cell, Doors, Group } from '/components/List.js';
 import { Hint } from '/components/Hint.js';
+import { PageStart } from '/components/PageStart.js';
 import { c, num, rel, ctWord, synthWord, visWord, relWord, manifestOf, statsOf, groupOf, GROUP_ORDER, pkgId, authorName, crumb, packageHead, packageRow, pageLinks } from './frame.js';
 import { renderPackage } from './package.js';
 import { LoadFailed } from '/js/load-state.js';
@@ -118,9 +125,11 @@ function renderCover(ctx) {
     { id: 'kp-orgs', num: '03', label: c('secOrganisms'), count: ctx.organismPackages.length },
     { id: 'kp-library', num: '04', label: c('secLibrary'), count: ctx.discovered.length },
   ];
+  // The start: folded once the person has a package; its button goes to the three ways of making one.
+  const start = html`<${PageStart} id="knowledge" done=${ctx.loading ? null : pkgs.length > 0} action=${{ onClick: toMake }} />`;
   return html`
-    <${SettingsPage} name="kp" crumb=${crumb(ctx, [])} title=${t('knowledge.tabLabel')} marks=${marks} desc=${c('desc')}
-      actions=${actions} strip=${strip} railTitle=${c('railTitle')} sections=${sections} pagesLabel=${c('pages')} pages=${pageLinks()}>
+    <${SettingsPage} name="kp" crumb=${crumb(ctx, [])} title=${t('knowledge.tabLabel')} help="concept.knowledge" marks=${marks} desc=${c('desc')}
+      actions=${actions} start=${start} strip=${strip} railTitle=${c('railTitle')} sections=${sections} pagesLabel=${c('pages')} pages=${pageLinks()}>
       ${secPackages(ctx)}
       ${secMake(ctx)}
       ${secOrganisms(ctx)}

@@ -47,6 +47,12 @@
  *   manifest they start from had already lost its list. The set-up, the owner's "Guard:" and the
  *   clean-up pass.
  * @version-history
+ *   v1.1.2 — 2026-11-08 — The agent-owned legacy form is stored by the agent itself. Since
+ *     secaudit2026nov08b round 15 (services/intake/form-owner.ts) a form writes as the identity that
+ *     stored its config record, never as a name inside the value, so the owner storing a config that
+ *     names the agent no longer stands for an agent's form: the test's setup no longer matched what
+ *     production holds. Its assertions are unchanged. A new case beside it: the owner's config that
+ *     names the agent writes as the owner. Decided by the developer on 2026-11-08.
  *   v1.1.1 — 2026-10-18 — An MCP OAuth session minted before its grant held organism:direct is
  *     answered with the refresh refusal (401 invalid_token, mcp/permission-ask-gate.ts since
  *     2026-10-17), not the rule's ACCESS_DENIED; still nothing is written. The test's setup no
@@ -527,15 +533,15 @@ await test('Refused: an agent defining a public form onto the fenced space', asy
 });
 
 await test('Refused: a submission to a stored form whose owner identity is an agent', async () => {
-    // A form stored before the rule, or written by hand: its config names the agent as the identity
-    // every submission is written under. The owner writes the config record here to stand for it.
+    // A form stored before the rule, or written by hand: the agent stored its config record, so the
+    // agent is the identity every submission is written under (services/intake/form-owner.ts).
     const now = new Date().toISOString();
     const cfg = {
         formId: 'legacy-form', orgId, ws: WS, namespace: NS, ownerGhii: O.agentGaii, allowedFields: ['title'], requiredFields: [], defaults: {},
         mode: 'publish', honeypotField: null, enabled: true, discoverable: true, maxPerDay: null, title: 'Legacy', fields: [{ key: 'title' }],
         successMessage: '', redirectUrl: null, createdAt: now, updatedAt: now,
     };
-    const seeded = await post('/v1/memory', asOwner(), { key: `${root()}.meta.intake.legacy-form`, value: cfg, visibility: 'owner' });
+    const seeded = await post('/v1/memory', asAgent(), { key: `${root()}.meta.intake.legacy-form`, value: cfg, visibility: 'owner' });
     assert(seeded.status === 201, `seed the form config ${seeded.status}: ${JSON.stringify(seeded.body?.error)}`);
     const before = await json(`/v1/organisms/${orgId}/workspace/index?ws=${WS}`, { headers: asOwner() });
     const sub = await post(`/v1/intake/${orgId}/${WS}/legacy-form`, {}, { title: 'through an agent\'s form' });
@@ -549,6 +555,23 @@ await test('Refused: a submission to a stored form whose owner identity is an ag
     assert(sub.body.error.details == null, `the public refusal carries no details: ${JSON.stringify(sub.body.error.details)}`);
     const after = await json(`/v1/organisms/${orgId}/workspace/index?ws=${WS}`, { headers: asOwner() });
     assert(after.body.data.counts.decision === before.body.data.counts.decision, `no record was written: ${before.body.data.counts.decision} → ${after.body.data.counts.decision}`);
+});
+
+await test('Guard: the owner\'s stored form config that names the agent writes as the owner', async () => {
+    // The identity inside the value is not who the form writes as: the owner stored this config, so
+    // the owner, who may write the fenced space in person, takes the submission (secaudit2026nov08b
+    // round 15, services/intake/form-owner.ts).
+    const now = new Date().toISOString();
+    const cfg = {
+        formId: 'named-form', orgId, ws: WS, namespace: NS, ownerGhii: O.agentGaii, allowedFields: ['title'], requiredFields: [], defaults: {},
+        mode: 'publish', honeypotField: null, enabled: true, discoverable: true, maxPerDay: null, title: 'Named', fields: [{ key: 'title' }],
+        successMessage: '', redirectUrl: null, createdAt: now, updatedAt: now,
+    };
+    const seeded = await post('/v1/memory', asOwner(), { key: `${root()}.meta.intake.named-form`, value: cfg, visibility: 'owner' });
+    assert(seeded.status === 201, `seed the form config ${seeded.status}: ${JSON.stringify(seeded.body?.error)}`);
+    const sub = await post(`/v1/intake/${orgId}/${WS}/named-form`, {}, { title: 'through the owner\'s form' });
+    assert(sub.status === 200 && typeof sub.body.data.id === 'string', `submit to the owner's form ${sub.status}: ${JSON.stringify(sub.body?.error)}`);
+    assert((await ownerOpens('decision', sub.body.data.id))?.value?.title === 'through the owner\'s form', 'the submission is a record of the space');
 });
 
 // ══ The second part: the permission organism:direct, the route that names an extension on a

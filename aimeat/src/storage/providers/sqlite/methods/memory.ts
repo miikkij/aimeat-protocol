@@ -8,6 +8,8 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-11-08 — countMemory's type names the `archived` filter it already passed to the repository
+ *     (secaudit2026nov08b round 15b, the archived-key count of services/memory-ceilings.ts).
  *   2026-11-04 — META_COLS, rowToMeta and allPaged moved unchanged to ../repos/memory-meta.ts (800-line limit).
  *   2026-11-04 — getMemoryTotals and compactMemoryTotals over memory_totals; sumMemoryBytes reads it
  *     (repos/memory.ts); setMemory's first read takes version, trackable and groupId, and the whole
@@ -266,7 +268,7 @@ export const memoryMethods = {
     return results;
   },
 
-  async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; excludePrefixes?: string[] }): Promise<number> {
+  async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] }): Promise<number> {
     return countMemoryRepo(this.db, ownerGaiis, opts);
   },
 

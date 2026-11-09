@@ -24,6 +24,8 @@
  * @structure STEP_IDS · structurePageUrl · computeStructure · readStructureFor · writePlanFor · listPlansFor
  * @usage const out = await readStructureFor(storage, config, req.auth!, { owner, filename });
  * @version-history
+ *   v1.2.1 — 2026-11-08 — The visibility step reads forkable as the store and the settings do: an app
+ *     with no forkable flag is not forkable (it said true while the settings said false).
  *   v1.2.0 — 2026-10-30 — A choice of an option the AI drew carries its name; the answer lists the values each choice takes.
  *   v1.1.0 — 2026-10-29 — A layout, nav, look or genre step carries the choice's note, which describes a custom one.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
@@ -127,7 +129,7 @@ export function computeStructure(input: {
     : { id: 'builders', state: 'not_needed', detail: { count: 0 }, said: 'Only the owner builds this app.' });
 
   if (app) {
-    steps.push({ id: 'visibility', state: 'fine', detail: { listing: appListingOf(app), forkable: app.forkable !== false }, said: `The app is ${appListingOf(app)}.` });
+    steps.push({ id: 'visibility', state: 'fine', detail: { listing: appListingOf(app), forkable: !!app.forkable }, said: `The app is ${appListingOf(app)}.` });
   } else if (c.visibility) {
     steps.push({ id: 'visibility', state: 'fine', detail: { intended: c.visibility.value, by: c.visibility.by }, said: `The app is to be ${c.visibility.value} when it is published.` });
   } else {

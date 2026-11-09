@@ -8,29 +8,47 @@
  *   so it is a poor durable password AND its displayed form (an uppercase EXC_VIP_NN display name)
  *   does not match the real login username. On the account's FIRST successful sign-in we therefore
  *   ISSUE durable credentials: a freshly generated, validator-clean, dash-free password that replaces
- *   the code, delivered to the user as the exact login username + password. Delivery is BOTH:
- *     1. returned to the just-authenticated owner in the login response (so the entry surface — e.g.
- *        M-ROOM — can show it, and so it survives a disabled/failed mail transport), and
- *     2. emailed (best effort), to the account's own address when the account has proven it.
+ *   the code, delivered to the user as the exact login username + password. The credentials are
+ *   returned to the just-authenticated owner in the login response, so the entry surface shows them.
+ *   Nothing is mailed at the first sign-in: an address proven before it may be one that whoever knew
+ *   the key proved (the developer's ruling 1 of 2026-11-08).
  *   The rotation runs exactly once, gated by the invitation flipping from pending → accepted.
  *
- *   THE MAIL WAITS FOR A PROVEN ADDRESS. The address a code key names is chosen by whoever minted the
- *   key, and signing in with the key does not prove that the holder reads it, so the credentials mail
- *   is an owner mail like every other mail to the account's address (mail-gate.ts kind `owner`,
- *   owner-mail-address.ts provenOwnerAddress). When the address is not proven at the first sign-in,
- *   the issued password is kept sealed with the node's data key (encryption.ts encryptBound) in the
+ *   THE MAIL WAITS FOR AN ADDRESS THE HOLDER PROVES. The address a code key names is chosen by whoever
+ *   minted the key, and signing in with the key does not prove that the holder reads it, so the
+ *   credentials mail is an owner mail like every other mail to the account's address (mail-gate.ts kind
+ *   `owner`, owner-mail-address.ts provenOwnerAddress). When the address is not proven at the first
+ *   sign-in, the issued password is kept sealed with the node's data key (encryption.ts encryptBound) in the
  *   pseudo-owner namespace NS_HELD, one record per account under HELD_KEY_PREFIX, which the data key's
  *   re-encrypt job lists (key-reencrypt/sources.ts), and the login response says so
  *   (`email_held`, `email_note`). When the account then proves its address (routes/ghii/web-verify.ts,
  *   routes/ghii/recovery.ts), sendHeldKeyCredentials mails it once and deletes the record. A record is
  *   deleted unsent when the account's password changed since it was issued (the mailed password would
  *   no longer sign in), and it lapses after HELD_TTL_HOURS.
- * @structure IssuedKeyCredentials · NS_HELD · HELD_TTL_HOURS · keyCredentialsPending ·
- *   issueFirstLoginKeyCredentials · sendHeldKeyCredentials
+ * @structure IssuedKeyCredentials · NS_HELD · HELD_TTL_HOURS · pendingCodeInvitationOf · accountMadeBy ·
+ *   keyCredentialsPending · notePreSignInAgentKey · issueFirstLoginKeyCredentials ·
+ *   owePendingKeyCredentials · takeOwedKeyCredentials · sendHeldKeyCredentials
+ *
+ *   AN AGENT KEY FROM BEFORE THE FIRST SIGN-IN STOPS AT IT. A mailbox proof (POST /v1/ghii/verify-email,
+ *   GET /v1/ghii/magic-link/verify) hands out the account's app agent key without counting as the first
+ *   sign-in, so whoever knew the code could take one with an address of their own. Each such key is
+ *   recorded (notePreSignInAgentKey) and the first sign-in, by any road, rekeys that agent and ends its
+ *   credentials; the answer says so (`agent_keys_ended`, `agent_keys_note`).
  * @usage
  *   const cred = await issueFirstLoginKeyCredentials(storage, config, ghiiRecord); // null if N/A
  *   await sendHeldKeyCredentials(storage, config, ghii);                           // after the address is proven
  * @version-history
+ *   v1.3.0 — 2026-11-08 — secaudit2026nov08b round 15. An agent key a mailbox proof handed out before
+ *     the first sign-in stops at that sign-in (notePreSignInAgentKey, endPreSignInAgentKeys); the
+ *     credentials carry agent_keys_ended and agent_keys_note.
+ *   v1.2.1 — 2026-11-08 — secaudit2026nov08 round 14b. An address proven before the first sign-in no
+ *     longer gets the credentials mail at that sign-in; the login response carries them (ruling 1).
+ *   v1.2.0 — 2026-11-08 — secaudit2026nov08 round 14. The first sign-in is decided by the key's
+ *     invitation for every sign-in road (services/owner-session.ts establishOwnerSession): a link or an
+ *     identity provider replaces the key at once and the details wait for that session's screen
+ *     (owePendingKeyCredentials, takeOwedKeyCredentials, POST /v1/ghii/key-credentials). A key acts only
+ *     on the account it made and only while pending (pendingCodeInvitationOf, accountMadeBy). The held
+ *     mail goes only to an address whose proof started after the first sign-in.
  *   v1.1.2 — 2026-11-06 — keyCredentialsPending(): POST /v1/ghii/verify-email raised the login count of
  *     a key holder who confirmed the address before the first sign-in, so that sign-in was not the
  *     first and the key stayed the password.
@@ -55,6 +73,9 @@ import { sendMail, type MailMessage } from './mail-gate.js';
 import { getEncryptionKey, encryptBound, decryptBound } from './encryption.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { logger } from '../utils/logger.js';
+import { generateKeyPair } from '../auth/keypair.js';
+import { updateRecord } from './record-cas.js';
+import { randomBytes } from 'node:crypto';
 
 export interface IssuedKeyCredentials {
   username: string;   // exact login username (bare owner name), shown verbatim
@@ -64,6 +85,10 @@ export interface IssuedKeyCredentials {
   email_held?: boolean;
   /** Present with email_held: what happens to the mail, in a sentence the entry surface shows. */
   email_note?: string;
+  /** Present when agent keys handed out before this sign-in stopped working at it: how many. */
+  agent_keys_ended?: number;
+  /** Present with agent_keys_ended: a sentence the entry surface shows. */
+  agent_keys_note?: string;
 }
 
 /**
@@ -88,7 +113,69 @@ const HELD_NOTE = 'The email with these sign-in details was not sent, because th
 const NOT_HELD_NOTE = 'The email with these sign-in details was not sent, because this account\'s email address is not verified yet. '
   + 'Keep the password shown here: this node cannot send it later.';
 
+const AGENT_KEYS_NOTE = 'Before this sign-in, an email address was confirmed with the access code, and an agent key for this account was given out then. '
+  + 'That key no longer works.';
+
 interface HeldRecord { sealed: string; invitationId: string; passwordHash: string }
+
+/**
+ * The agent keys a mailbox proof handed out while the code was still the account's password
+ * (routes/ghii/web-verify.ts: POST /v1/ghii/verify-email and GET /v1/ghii/magic-link/verify do not
+ * count as the first sign-in). Whoever knew the code could prove an address of their own and take
+ * such a key, so the first sign-in ends it (secaudit2026nov08b round 15,
+ * pre-first-sign-in-app-agent-key-survives-rotation). One record per account in NS_HELD; it holds
+ * public keys only.
+ */
+const PRE_SIGN_IN_AGENTS_PREFIX = 'key-credentials-pre-sign-in-agents.';
+const preSignInAgentsKey = (ghii: string): string => `${PRE_SIGN_IN_AGENTS_PREFIX}${ghii}`;
+interface PreSignInAgents { agents: Array<{ gaii: string; publicKey: string }> }
+
+/**
+ * Record that the agent `gaii` of the account `ghii` was given the key whose public half is
+ * `publicKey` before the account's first sign-in. Called by the mailbox proofs only while
+ * keyCredentialsPending is true. Throws on a write failure, so the caller answers no key it could not
+ * record.
+ */
+export async function notePreSignInAgentKey(storage: Storage, ghii: string, gaii: string, publicKey: string): Promise<void> {
+  // Written on the version read, so two proofs at once both stay listed. No lapse: a code key waits
+  // for its holder without an end date, and the first sign-in deletes this record.
+  await updateRecord<PreSignInAgents>(storage, NS_HELD, preSignInAgentsKey(ghii),
+    v => ({ agents: Array.isArray((v as PreSignInAgents | null | undefined)?.agents) ? (v as PreSignInAgents).agents : [] }),
+    cur => ({ agents: [...cur.agents.filter(a => a.gaii !== gaii), { gaii, publicKey }] }),
+    { tag: 'system', ttlHours: null });
+}
+
+/**
+ * At the first sign-in: every agent key recorded by notePreSignInAgentKey stops, as POST
+ * /v1/agents/:gaii/rekey stops a key. The agent gets a new key nobody holds, every credential issued
+ * to it before now is refused (credentialsValidAfter, auth/agent-alive.ts), its session rows and MCP
+ * OAuth refresh tokens end, and its connector tunnel closes. The agent itself, its permissions and
+ * what it wrote stay; the holder gets a fresh key with a sign-in link or by rekeying it. An agent
+ * whose key changed since, or that is not this account's, is left alone (a later account of the name
+ * has keys of its own). Answers how many keys stopped.
+ */
+async function endPreSignInAgentKeys(storage: Storage, ghii: GHIIRecord): Promise<number> {
+  const row = await storage.getMemory(NS_HELD, preSignInAgentsKey(ghii.ghii));
+  if (!row) return 0;
+  const listed = (row.value as PreSignInAgents | null)?.agents ?? [];
+  let ended = 0;
+  for (const { gaii, publicKey } of listed) {
+    const agent = await storage.getAgent(gaii);
+    if (!agent || agent.owner !== ghii.username || agent.publicKey !== publicKey) continue;
+    const nobodys = await generateKeyPair();
+    await storage.updateAgent(gaii, { publicKey: nobodys.publicKey, credentialsValidAfter: new Date().toISOString() });
+    await storage.revokeSessionsByGaii(gaii);
+    await storage.deleteOAuthRefreshTokensByGaii(gaii);
+    try { nodeContext().tunnel?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('First sign-in: the agent\'s tunnel did not close', { gaii, error: String(err) }); }
+    ended++;
+  }
+  await storage.deleteMemory(NS_HELD, preSignInAgentsKey(ghii.ghii));
+  return ended;
+}
+
+/** The two answer fields that say agent keys stopped; none when none did. */
+const agentKeysAnswer = (ended: number): Pick<IssuedKeyCredentials, 'agent_keys_ended' | 'agent_keys_note'> =>
+  ended > 0 ? { agent_keys_ended: ended, agent_keys_note: AGENT_KEYS_NOTE } : {};
 
 /** The context a held password is sealed under: it opens only for this account and this key invitation. */
 export const heldContext = (ghii: string, invitationId: string): string => `key-credentials-held:${ghii}:${invitationId}`;
@@ -118,13 +205,39 @@ async function holdCredentials(storage: Storage, config: AimeatConfig, inv: Invi
 }
 
 /**
+ * The code invitation that provisioned the account holding `username` now, while it is still pending;
+ * null otherwise. The invitation names the account by its bare name, which is released for reuse when
+ * the account is erased, so the account must be the one the key made: registered at or before the
+ * invitation, the test services/account-instance.ts heldSince makes. A later holder of the name is not
+ * the key's account, and a cancelled or expired key has no account any more (secaudit2026nov08 round
+ * 14). A missing creation time on either side shows no change of person and keeps the invitation.
+ */
+export async function pendingCodeInvitationOf(storage: Storage, account: Pick<GHIIRecord, 'username' | 'createdAt'>): Promise<InvitationRecord | null> {
+  const inv = await storage.getCodeInvitationByProvisionedOwner(account.username);
+  if (!inv || inv.status === 'cancelled' || inv.status === 'expired') return null;
+  return accountMadeBy(account, inv) ? inv : null;
+}
+
+/**
+ * Whether `account` is the one the code invitation `inv` provisioned: registered at or before the
+ * invitation (the key makes the account first, then records the invitation). A later holder of the
+ * name was registered after it. A missing time on either side answers true.
+ */
+export function accountMadeBy(account: Pick<GHIIRecord, 'createdAt'>, inv: Pick<InvitationRecord, 'createdAt'>): boolean {
+  const named = Date.parse(inv.createdAt ?? '');
+  const registered = Date.parse(account.createdAt ?? '');
+  return !(Number.isFinite(named) && Number.isFinite(registered) && registered > named);
+}
+
+/**
  * Whether `username` is a code key's account whose first sign-in has not happened yet: its invitation
  * is not accepted, so the key is still its password. An address confirmed before that sign-in
  * (routes/ghii/web-verify.ts) must not count as it, or the key is never replaced. False on a read failure.
  */
-export async function keyCredentialsPending(storage: Storage, username: string): Promise<boolean> {
+export async function keyCredentialsPending(storage: Storage, nodeId: string, username: string): Promise<boolean> {
   try {
-    const inv = await storage.getCodeInvitationByProvisionedOwner(username);
+    const account = await storage.getGHII(`${username}@${nodeId}`);
+    const inv = account ? await pendingCodeInvitationOf(storage, account) : null;
     return !!inv && !inv.acceptedBy;
   } catch (err) {
     // The caller counts the entry as a sign-in, as before this check existed.
@@ -136,8 +249,8 @@ export async function keyCredentialsPending(storage: Storage, username: string):
 /**
  * If `ghii` is a provisioned-code account signing in for the first time, rotate its bootstrap code to
  * a durable clean password, flip the invitation to accepted (so this happens once), and return the
- * issued credentials (also emailed, best effort, to a proven address; else held until the address is
- * proven). Returns null for any account not created by a code key or already activated. Never throws —
+ * issued credentials (not mailed now; held for an unproven address until the holder proves one).
+ * Returns null for any account not created by a code key or already activated. Never throws —
  * a failure here must not break login.
  */
 export async function issueFirstLoginKeyCredentials(
@@ -146,12 +259,16 @@ export async function issueFirstLoginKeyCredentials(
   ghii: GHIIRecord,
 ): Promise<IssuedKeyCredentials | null> {
   try {
-    const inv = await storage.getCodeInvitationByProvisionedOwner(ghii.username);
+    const inv = await pendingCodeInvitationOf(storage, ghii);
     // Only a code invite whose credentials have NOT yet been issued qualifies. acceptedBy is the
     // once-only gate; we deliberately leave status as 'pending' (code-key activation is derived from
     // lastLoginAt, the per-inviter quota counts pending keys, and the keys list filters on pending —
     // flipping status here would silently free a quota slot and drop the key from that list).
     if (!inv || inv.acceptedBy) return null;
+
+    // An agent key a mailbox proof handed out while the code was the password stops first: when this
+    // throws, nothing below has changed and the next sign-in is the first one again.
+    const agentKeysEnded = await endPreSignInAgentKeys(storage, ghii);
 
     // Issue the durable credential and rotate the password away from the dash-carrying code.
     const password = generateReadablePassword();
@@ -163,18 +280,79 @@ export async function issueFirstLoginKeyCredentials(
     const now = new Date().toISOString();
     await storage.updateInvitation(inv.id, { acceptedAt: now, acceptedBy: ghii.username });
 
-    // Deliver by email too (best effort — the credentials are already in the login response), to the
-    // account's address when it is proven; otherwise the password waits for the address.
+    // The credentials are in the login response. An address proven before this first sign-in gets no
+    // mail: whoever knew the key could prove an address of their own on the account before the holder
+    // signed in (the developer's ruling 1 of 2026-11-08, secaudit2026nov08 round 14b). An unproven
+    // address holds the password until the holder proves an address with a code asked for after this
+    // sign-in (sendHeldKeyCredentials).
     const emailSvc = nodeContext().email;
-    if (!emailSvc?.enabled) return { username: ghii.username, password, email_sent: false };
-    const outcome = await sendMail(emailSvc, { kind: 'owner', account: ghii }, await credentialsMessage(storage, config, inv, ghii, password));
-    if (outcome !== 'no_address') return { username: ghii.username, password, email_sent: outcome === 'sent' };
+    const agentKeys = agentKeysAnswer(agentKeysEnded);
+    if (!emailSvc?.enabled || provenOwnerAddress(ghii)) return { username: ghii.username, password, email_sent: false, ...agentKeys };
     const held = await holdCredentials(storage, config, inv, ghii, password, passwordHash);
-    return { username: ghii.username, password, email_sent: false, email_held: held, email_note: held ? HELD_NOTE : NOT_HELD_NOTE };
+    return { username: ghii.username, password, email_sent: false, email_held: held, email_note: held ? HELD_NOTE : NOT_HELD_NOTE, ...agentKeys };
   } catch (err) {
     logger.warn('First-login key-credential issuance failed', { error: (err as Error).message });
     return null;
   }
+}
+
+/** The key of the marker that says a first sign-in's details wait for that session's screen. */
+const OWED_KEY_PREFIX = 'key-credentials-owed.';
+const owedKey = (ghii: string): string => `${OWED_KEY_PREFIX}${ghii}`;
+/** How long the details wait for the screen of the session that signed in. */
+export const OWED_TTL_HOURS = 24;
+
+interface OwedRecord { invitationId: string; sessionId: string; passwordHash: string; back: string | null; agentKeysEnded?: number }
+
+/**
+ * A code key's first sign-in by a road that answers with a redirect (an emailed sign-in link, an
+ * identity provider): the key stops being the password AT ONCE (it is replaced by a random one that
+ * nobody holds), the invitation is accepted, and a marker says the new details wait for the screen of
+ * the session `sessionId` (takeOwedKeyCredentials). Nothing secret is stored: the password is made
+ * when the screen asks for it. Answers whether this was such a first sign-in. Never throws.
+ */
+export async function owePendingKeyCredentials(storage: Storage, ghii: GHIIRecord, sessionId: string, back: string | null): Promise<boolean> {
+  try {
+    const inv = await pendingCodeInvitationOf(storage, ghii);
+    if (!inv || inv.acceptedBy) return false;
+    // As at a password first sign-in (issueFirstLoginKeyCredentials): the agent keys first.
+    const agentKeysEnded = await endPreSignInAgentKeys(storage, ghii);
+    const passwordHash = await hashPassword(randomBytes(32).toString('base64url'));
+    await storage.updateGHII(ghii.ghii, { passwordHash });
+    const now = new Date().toISOString();
+    await storage.updateInvitation(inv.id, { acceptedAt: now, acceptedBy: ghii.username });
+    const value: OwedRecord = { invitationId: inv.id, sessionId, passwordHash, back, ...(agentKeysEnded > 0 ? { agentKeysEnded } : {}) };
+    await storage.setMemory({
+      key: owedKey(ghii.ghii), ownerGaii: NS_HELD, value, visibility: 'private', tags: ['system'],
+      ttlHours: OWED_TTL_HOURS, version: 1, createdAt: now, updatedAt: now,
+    });
+    return true;
+  } catch (err) {
+    logger.warn('First sign-in key step failed', { error: (err as Error).message });
+    return false;
+  }
+}
+
+/**
+ * The screen of the session that completed a code key's first sign-in asks for its details: a new
+ * password is made and set now, and answered once with the place the sign-in was going to. Null when
+ * nothing waits for this session, the wait lapsed, or the password was changed in between (then the
+ * person already has a password of their own). Shown, never mailed (the developer's ruling 1 of
+ * 2026-11-08).
+ */
+export async function takeOwedKeyCredentials(
+  storage: Storage, ghii: string, sessionId: string,
+): Promise<{ credentials: IssuedKeyCredentials; back: string | null } | null> {
+  const row = await storage.getMemory(NS_HELD, owedKey(ghii));
+  const owed = row?.value as OwedRecord | null | undefined;
+  if (!row || !owed || owed.sessionId !== sessionId) return null;
+  await storage.deleteMemory(NS_HELD, owedKey(ghii));
+  const lapsed = !!row.createdAt && Date.now() > Date.parse(row.createdAt) + OWED_TTL_HOURS * 3_600_000;
+  const rec = await storage.getGHII(ghii);
+  if (lapsed || !rec || rec.passwordHash !== owed.passwordHash) return null;
+  const password = generateReadablePassword();
+  await storage.updateGHII(ghii, { passwordHash: await hashPassword(password) });
+  return { credentials: { username: rec.username, password, email_sent: false, ...agentKeysAnswer(owed.agentKeysEnded ?? 0) }, back: owed.back };
 }
 
 /**
@@ -184,10 +362,18 @@ export async function issueFirstLoginKeyCredentials(
  * whatever follows, so the mail goes at most once; nothing is sent when the password changed since it
  * was issued or when the record lapsed. Answers whether a mail left.
  */
-export async function sendHeldKeyCredentials(storage: Storage, config: AimeatConfig, ghii: string): Promise<boolean> {
+export async function sendHeldKeyCredentials(storage: Storage, config: AimeatConfig, ghii: string, proofStartedAt?: string): Promise<boolean> {
   try {
     const row = await storage.getMemory(NS_HELD, heldKey(ghii));
     if (!row) return false;
+    // Only a proof STARTED after the first sign-in: a code asked for before it (by anyone who knew the
+    // key, through attach-email) and confirmed after it does not receive the password
+    // (secaudit2026nov08 round 14). The record keeps waiting for a proof the holder starts. Both routes
+    // that prove an address pass the time their code was asked for.
+    if (proofStartedAt !== undefined) {
+      const started = Date.parse(proofStartedAt);
+      if (!Number.isFinite(started) || !row.createdAt || started <= Date.parse(row.createdAt)) return false;
+    }
     const rec = await storage.getGHII(ghii);
     // Still unproven: the record keeps waiting (the callers call this after the address is proven).
     if (rec && !provenOwnerAddress(rec)) return false;
@@ -197,7 +383,7 @@ export async function sendHeldKeyCredentials(storage: Storage, config: AimeatCon
     if (!held?.sealed || lapsed) return false;
     // A password the person has changed since no longer signs in, and is not mailed.
     if (!rec || rec.passwordHash !== held.passwordHash) return false;
-    const inv = await storage.getCodeInvitationByProvisionedOwner(rec.username);
+    const inv = await pendingCodeInvitationOf(storage, rec);
     const key = getEncryptionKey(config);
     if (!inv || inv.id !== held.invitationId || !key) return false;
     const password = decryptBound(held.sealed, key, heldContext(ghii, inv.id));

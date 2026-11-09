@@ -10,6 +10,8 @@
  * @structure registerCoreResources(mcp, storage, config, agentGaii)
  * @usage registerCoreResources(mcp, storage, config, agentGaii);  // from registerCoreTools
  * @version-history
+ *   2026-11-08 — The file read goes through the one ask of a stored file's read (datapackage/source-labels.ts
+ *     storedFileShownTo), as GET /v1/pub reads (secaudit2026nov08b round 15b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-09-29 — Moved from mcp/core.ts (max-file-lines), with the classification reader.
@@ -20,6 +22,7 @@ import type { Storage } from '../storage/interface.js';
 import { presentMemory } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { memoryTarget, fileTarget } from '../services/classification/labels.js';
+import { storedFileShownTo } from '../services/datapackage/source-labels.js';
 
 export function registerCoreResources(mcp: McpServer, storage: Storage, config: AimeatConfig, agentGaii: string): void {
     // Resource template: memory entries
@@ -70,8 +73,10 @@ export function registerCoreResources(mcp: McpServer, storage: Storage, config: 
         { mimeType: 'application/octet-stream', description: 'Agent binary storage files' },
         async (uri, variables) => {
             const key = decodeURIComponent(variables.key as string);
+            // The one ask of a stored file's read (datapackage/source-labels.ts): the file's own label, and
+            // the labels a data package version keeps, which no file of an agent's namespace has.
             const stored = await storage.getStorageFile(agentGaii, key);
-            const [file] = stored ? await readerForAgent({ storage, config }, agentGaii).show([stored], () => fileTarget(agentGaii, key, stored.workspaceRef)) : [];
+            const file = stored ? await storedFileShownTo({ storage, config }, readerForAgent({ storage, config }, agentGaii), agentGaii, key, stored) : undefined;
             if (!file) return { contents: [{ uri: uri.toString(), text: 'Not found' }] };
             return { contents: [{ uri: uri.toString(), blob: file.data.toString('base64'), mimeType: file.mimeType }] };
         },

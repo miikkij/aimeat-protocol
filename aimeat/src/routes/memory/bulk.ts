@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — The bundle asks the labels a data package version keeps of a package file, as GET /v1/pub
+ *     does (datapackage/source-labels.ts storedFileShownTo; secaudit2026nov08b round 15b).
+ *   2026-11-08 — The schema lock is asked with the caller, on bulk and on import: a CSM's own lock does not
+ *     govern a caller that CSM's visibility refuses (secaudit2026nov08b round 15).
  *   2026-11-05 — A bulk entry at 'group' that names no group and finds none on the record fails by name,
  *     and so does one naming a group id with no group (storage/memory-sharing.ts). An import takes no group id, so its entry at 'group' keeps the group
  *     its record has, or is stored private with its data kept. The import wrote it to nobody.
@@ -116,7 +120,7 @@ import { emitMemoryWritten, emitRecordChange, emitRecordChangePriorUnknown } fro
 import { isServiceOwnedKey, isOwnerRemovableServiceKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { fileTarget } from '../../services/classification/labels.js';
+import { storedFileShownTo } from '../../services/datapackage/source-labels.js';
 import { leaveMemories } from '../../services/classification-exits.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { fencedKeysRefusal } from '../../services/fenced-space.js';
@@ -276,7 +280,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         maxValueSizeBytes: config.memoryMaxValueSizeKb * 1024,
         totalQuotaBytes: config.memoryQuotaMb * 1024 * 1024,
       },
-      validate: (key, value) => validateMemoryWrite(key, value, storage),
+      // A CSM's own lock does not govern a caller that CSM's visibility refuses (round 15).
+      validate: (key, value) => validateMemoryWrite(key, value, storage, undefined, req.auth ?? null),
     }, 'bulk');
     await fileBatchWriteAsks({ storage, config }, ownerAsks, result);
 
@@ -499,7 +504,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         maxValueSizeBytes: config.memoryMaxValueSizeKb * 1024,
         totalQuotaBytes: Number.MAX_SAFE_INTEGER,   // preserve prior import behaviour (no total-bytes cap)
       },
-      validate: (key, value) => validateMemoryWrite(key, value, storage),
+      validate: (key, value) => validateMemoryWrite(key, value, storage, undefined, req.auth ?? null),
     }, 'import');
     await fileBatchWriteAsks({ storage, config }, ownerAsks, result);
 
@@ -684,7 +689,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       try {
         if (kind === 'file') {
           const stored = await storage.getStorageFile(owner, key);
-          const [file] = stored ? await reader.show([stored], () => fileTarget(owner, key, stored.workspaceRef)) : [];
+          // A data package version's file asks the labels the version keeps too, as GET /v1/pub does.
+          const file = stored ? await storedFileShownTo({ storage, config }, reader, owner, key, stored) : undefined;
           if (!file) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
           archive.append(file.data as Buffer, { name: `files/${sanitize(key)}` });
           manifest.items.push({ kind, key, owner_gaii: owner, included: true, mime_type: file.mimeType, size: file.size, url: `${config.baseUrl}/v1/pub/${encodeURIComponent(owner)}/${encKeyPath(key)}` });

@@ -5,7 +5,10 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   (2026-11-08) aimeat_appdev_pitfall_list names each row's `open` call instead of a rule to pick one.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
+ *   2026-11-08 — aimeat_consent_grant takes `role` (read | write), the field POST /v1/consent reads, so
+ *     the role reaches the AI too; write keeps the route's rules and names aimeat_workspace_member_grant.
  *   2026-11-01 — aimeat_consent_grant takes a party recipient with pinned_version, allow_url_key and
  *     terms_required: a named share of a data package (plan doc-mvwxcas3dom3, D3.4).
  *   2026-10-29 — The two operator propose-then-confirm tools moved unchanged to ./operator-config.ts (max-file-lines).
@@ -220,6 +223,7 @@ export const capabilitiesGroupsSkillsTools = [
             pinned_version: { type: 'string', description: 'For a party recipient: share one version of the package (sha256:<hex>) instead of the newest.', zod: z.string().max(80) },
             allow_url_key: { type: 'boolean', description: 'For a party recipient: the CSV address may carry the party key (Google Sheets). Off by default.' },
             terms_required: { type: 'boolean', description: 'For a party recipient: the party accepts the terms before the first read. Default true for a person, false for a program.' },
+            role: { type: 'string', description: 'What the recipient may do: read (the default) or write. Write is the contributor role on ONE workspace (data_pattern organism.<organism>.w.<workspace>.**) for ONE person on this node (target_gaii ghii:<name>@<this node>), and only the workspace\'s creator gives it with a consent, signed in as themselves; any other write is refused with WRITE_NOT_SUPPORTED and the reason. An agent gives a member write with aimeat_workspace_member_grant. The purpose text never decides the role.', zod: z.enum(['read', 'write']) },
         },
     },
     {
@@ -562,7 +566,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_appdev_pitfall_list',
-        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. One full learned entry: aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one (the list names its owner); curated detail via GET /v1/appdev/pitfalls/{id}.',
+        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. Every row carries `open`, the exact call that opens it in full (aimeat_memory_read for your own entry, aimeat_memory_read_public with its owner for a shared one, a GET address for a curated one).',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List AppDev Pitfalls', readOnlyHint: true },

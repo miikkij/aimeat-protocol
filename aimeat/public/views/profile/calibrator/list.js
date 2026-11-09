@@ -2,12 +2,15 @@
  * @file public/views/profile/calibrator/list.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The calibrations as a list in the poster face: the mast says what a calibration is
- *   and takes the name of a new one; each calibration is a row with its latest score, its judge
- *   and its runs; archived ones are folded away behind one door.
+ * @description The calibrations as a list in the poster face: the mast says in two sentences what a
+ *   calibration gives and takes the name of a new one; the start (PageStart "calibrator": what it is
+ *   for, the prompt for one's own AI, what happens next) and the title's question mark
+ *   (concept.calibration) explain it (.claude/rules/page-guidance.md); each calibration is a row
+ *   with its latest score, its judge and its runs; archived ones are folded away behind one door.
  * @structure renderList · listRow
  * @usage import { renderList } from './list.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart "calibrator" (folded once there is a calibration) and the title's question mark concept.calibration, which now holds how a calibration works; the head's paragraph is two sentences.
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the frame is SettingsPage (crumb, head, rail as data), the rows the List, the score the Figure, the new name the Text field with its Loud action, the lines the Note (component plan, page group G4).
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 -- 2026-09-26 -- A score is the small stat number (.poster-stat-number--small), as the wallet's amounts, a unification: the look most tabs use.
@@ -38,6 +41,7 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Figure } from '/components/Figure.js';
 import { TextField } from '/components/TextField.js';
+import { PageStart } from '/components/PageStart.js';
 
 /** A score's state colour: fine from 80 %, the plain colour from 50 %, coral under it. */
 const scoreTone = (v) => (v >= 80 ? 'fine' : v >= 50 ? undefined : 'notice');
@@ -59,9 +63,12 @@ export function renderList(ctx) {
     <${Actions}>
       ${archived.length ? html`<${Action} tone="more" onClick=${() => ctx.setShowArchived(!ctx.showArchived)}>${ctx.showArchived ? x('hideArchived') : x('showArchived', { n: archived.length })}<//>` : null}
     <//>`;
+  // The start: folded once there is a calibration. Its first step is in the person's own AI: the
+  // calibrator has no MCP tool, so the AI helps write the prompt and the target output.
+  const start = html`<${PageStart} id="calibrator" done=${ctx.projects ? all.length > 0 : null} />`;
   return html`
-    <${SettingsPage} crumb=${crumb()} title=${t('profile.calibrator.tabLabel')} sub=${x('titleSub')} marks=${marks} desc=${x('listDesc')}
-      actions=${actions} railTitle=${x('railTitle')} pagesLabel=${x('pages')} pages=${pageLinks()}>
+    <${SettingsPage} crumb=${crumb()} title=${t('profile.calibrator.tabLabel')} sub=${x('titleSub')} help="concept.calibration" marks=${marks} desc=${x('listDesc')}
+      actions=${actions} start=${start} railTitle=${x('railTitle')} pagesLabel=${x('pages')} pages=${pageLinks()}>
       <${List} cols="name-score-desc-doors" loading=${!ctx.projects ? x('loading') : false}
         head=${[x('colCalibration'), x('colScore'), x('colState'), '']}
         empty=${html`<${Note} kind="quiet"><b>${x('emptyLead')}</b> ${x('emptyBody')}<//>`}>

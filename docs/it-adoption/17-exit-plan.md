@@ -78,7 +78,7 @@ Once the node key and the process are gone, every token the node issued to peopl
 
 ### Erasing one account while the node runs
 
-`DELETE /v1/owners/:name` erases an account in one transaction: the person's and every agent's records and files, consents, memberships, sessions, keys, schedules, connections, attached servers, apps and extensions. It is immediate, with no grace window. What other people also hold (finished work, disputes, their ledger lines and receipts, AI provenance records) stays under a pseudonym `erased:<hash>` ([Data ownership](../data-ownership.md#6-a-person-can-leave), `aimeat/src/services/owner-erasure.ts`).
+`DELETE /v1/owners/:name` erases an account in one transaction: the person's and every agent's records and files, consents, memberships, sessions, keys, schedules, connections, attached servers, apps and extensions. It is immediate, with no grace window. What other people also hold (finished work, disputes, their ledger lines and receipts, AI provenance records, the structure locks the person or their agents set on keys other accounts write) stays under a pseudonym `erased:<hash>`, so whoever registers the released name next holds none of it ([Data ownership](../data-ownership.md#6-a-person-can-leave), `aimeat/src/services/owner-erasure.ts`). A structure lock of an account erased before 2026-11-08 gets the same pseudonym once, at the first start of a node that has this rule, when no account of that name exists; a lock older than the account that holds its name now is left as it is and named on the Security page for the operator to decide (`aimeat/src/services/csm/erased-lock-holders.ts`).
 
 | Detail | What happens | Source |
 |---|---|---|

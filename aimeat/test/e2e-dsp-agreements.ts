@@ -17,6 +17,13 @@
  *       participant still gets in, and a negotiation that ended stops counting.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dsp-agreements
  * @version-history
+ *   2026-11-08 — Revoking the share a share-offer agreement stood on ends the agreement: a finalised one
+ *     records its end and terminates its transfer, one not yet verified is terminated, both to the
+ *     consumer; Data you share drops it; an agreement on a live share is untouched by another revoke; a
+ *     share past its end date ends its agreement when the owner reads it (secaudit2026nov08 round 14b).
+ *   2026-11-08 — The party listing drops an open-offer package once it is private; two approvals of one
+ *     priced request make one agreement that reads; a share-offer agreement stops reading when the share
+ *     it stood on is revoked, and is not made on a revoked one (secaudit2026nov08 round 14).
  *   v1.0.1 — 2026-11-03 — PARTICIPANT_BUSY names the Config label (secaudit2026nov02d round 13b).
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
@@ -325,6 +332,188 @@ async function run(): Promise<void> {
         assert(t.status === 200 && t.body.state === 'TERMINATED', show(t));
         const r = await request(Z, roomOffer.id, datasetId(B.name, Q), `urn:uuid:zagain-${stamp}`);
         assert(r.status === 201, `Z after one ended: ${show(r)}`);
+    });
+
+    // ── secaudit2026nov08 round 14 ──
+    // The library's party reach builds its reader from the share as the read does: an open-offer
+    // agreement lists the package only while it is public.
+    let xPartyName = '';
+    let xToken = '';
+    await test('X\'s party lists the package of its open-offer agreement while the package is public', async () => {
+        const parties = await call('/v1/parties', { token: A.token });
+        const party = parties.body.data.parties.find((q: Body) => q.kind === 'dataspace' && q.did === X.id);
+        assert(party, `X's party: ${show(parties)}`);
+        xPartyName = party.name;
+        const key = await call(`/v1/parties/${encodeURIComponent(xPartyName)}/keys`, { token: A.token, body: {} });
+        assert(key.status === 201, `a key for X's party: ${show(key)}`);
+        const tok = await call('/v1/parties/token', { body: { grant_type: 'client_credentials', client_id: `${A.name}/${xPartyName}`, client_secret: key.body.data.key } });
+        assert(tok.status === 200, `party token: ${show(tok)}`);
+        xToken = tok.body.access_token;
+        const l = await call('/v1/catalogue/knowledge?reach=party&kind=data&limit=50', { token: xToken });
+        const names = (l.body.data?.packages ?? []).map((p: Body) => p.datapackage?.name);
+        assert(l.status === 200 && names.includes(SC), `SC is listed while public: ${show(l)}`);
+    });
+
+    await test('The owner narrows the package to private: X\'s listing drops it, as the read through the same share refuses it', async () => {
+        const p3 = await publish(A.token, SC, 'private', 'third');
+        assert(p3.status === 201, `v3 private: ${show(p3)}`);
+        const read = await call(`${scopeRead.endpoint}/items`, { token: scopeRead.token });
+        assert(read.status !== 200, `the open-offer agreement reads a private package: ${show(read)}`);
+        const l = await call('/v1/catalogue/knowledge?reach=party&kind=data&limit=50', { token: xToken });
+        const names = (l.body.data?.packages ?? []).map((p: Body) => p.datapackage?.name);
+        assert(l.status === 200 && !names.includes(SC), `the listing still names the narrowed package: ${show(l)}`);
+        assert(!l.text.includes('third'), `the listing carries facts of the private version: ${show(l)}`);
+    });
+
+    // Two approvals of one priced request that arrive together make one agreement, and it reads.
+    const RACE = `agrrace${stamp}`;
+    await test('Two approvals of one priced request at the same time: one agreement, one sale, and the agreement reads', async () => {
+        assert((await publish(A.token, RACE, 'private', 'race')).status === 201, 'publish the race package');
+        const sell = await call(`/v1/datapackages/${A.name}/${RACE}/exchange`, { token: A.token, method: 'PUT', body: {
+            model: 'per_month', prices_money: [{ amount: 2_000_000, currency: 'EUR' }], usage_terms: { derivatives: true, resale: false, attribution: true },
+        } });
+        assert(sell.status === 200, `list on EXCHANGE: ${show(sell)}`);
+        const offer = await offerOf(X, datasetId(A.name, RACE), 'exchange');
+        const consumer = `urn:uuid:race-${stamp}`;
+        const r = await request(X, offer, datasetId(A.name, RACE), consumer);
+        assert(r.status === 201, show(r));
+        const pid = r.body.providerPid;
+        await sleep(800);
+        const both = await Promise.all([0, 1].map(() => call(`/v1/dataspace/negotiations/${encodeURIComponent(pid)}/approve`, { token: A.token, body: {} })));
+        assert(both.some(a => a.status === 200), `one approval makes the agreement: ${both.map(show).join(' | ')}`);
+        assert(both.every(a => a.status === 200 || a.status === 409), `the other one is 200 or 409: ${both.map(show).join(' | ')}`);
+        const agreement = await finalise(X, pid, consumer);
+        const read = await pull(X, agreement, `urn:uuid:racet-${stamp}`);
+        const rows = await call(`${read.endpoint}/items`, { token: read.token });
+        assert(rows.status === 200, `the booked agreement reads: ${show(rows)}`);
+        const booked = await feeRecordsOf(agreementOfPid(pid));
+        assert(booked === 1, `one sale for one agreement: ${booked}`);
+    });
+
+    // A share-offer agreement stands on the share it was made on.
+    const SRC = `agrsrc${stamp}`, SRC2 = `agrsrcb${stamp}`;
+    let srcShareId = '';
+    let srcRead = { endpoint: '', token: '' };
+    await test('A share-offer agreement reads while the share it stood on is live', async () => {
+        assert((await publish(A.token, SRC, 'private', 'source')).status === 201, 'publish the source package');
+        const s = await call('/v1/consent', { token: A.token, body: { recipient: `party:${A.name}/${xPartyName}@${node}`, data_pattern: `datapkg:${SRC}`, purpose: 'The source share' } });
+        assert(s.status === 201, `the source share: ${show(s)}`);
+        srcShareId = s.body.data.id;
+        assert((await call('/v1/dataspace/settings', { token: A.token, method: 'PUT', body: { package: SRC, auto_agree: true } })).status === 200, 'auto_agree');
+        const offer = await offerOf(X, datasetId(A.name, SRC), 'share');
+        const consumer = `urn:uuid:src-${stamp}`;
+        const r = await request(X, offer, datasetId(A.name, SRC), consumer);
+        assert(r.status === 201, show(r));
+        const agreement = await finalise(X, r.body.providerPid, consumer);
+        srcRead = await pull(X, agreement, `urn:uuid:srct-${stamp}`);
+        const rows = await call(`${srcRead.endpoint}/items`, { token: srcRead.token });
+        assert(rows.status === 200, `the agreement reads while its share is live: ${show(rows)}`);
+    });
+
+    await test('The owner revokes the share the agreement stood on: the next read through the agreement is refused', async () => {
+        const d = await call(`/v1/consent/${encodeURIComponent(srcShareId)}`, { token: A.token, method: 'DELETE' });
+        assert(d.status === 200, `revoke the source share: ${show(d)}`);
+        const rows = await call(`${srcRead.endpoint}/items`, { token: srcRead.token });
+        assert(rows.status === 403 && rows.text.includes('SHARE_ENDED'), `a read after the source share ended: ${show(rows)}`);
+    });
+
+    await test('An approval after the owner revoked the share the offer stood on makes no agreement', async () => {
+        assert((await publish(A.token, SRC2, 'private', 'source2')).status === 201, 'publish the second source package');
+        const s = await call('/v1/consent', { token: A.token, body: { recipient: `party:${A.name}/${xPartyName}@${node}`, data_pattern: `datapkg:${SRC2}`, purpose: 'The second source share' } });
+        assert(s.status === 201, `the second source share: ${show(s)}`);
+        const offer = await offerOf(X, datasetId(A.name, SRC2), 'share');
+        const consumer = `urn:uuid:srcb-${stamp}`;
+        const r = await request(X, offer, datasetId(A.name, SRC2), consumer);
+        assert(r.status === 201, show(r));
+        await sleep(800);
+        assert((await call(`/v1/consent/${encodeURIComponent(s.body.data.id)}`, { token: A.token, method: 'DELETE' })).status === 200, 'revoke the second source share');
+        const ap = await call(`/v1/dataspace/negotiations/${encodeURIComponent(r.body.providerPid)}/approve`, { token: A.token, body: {} });
+        assert(ap.status === 409 && ap.text.includes('AGREEMENT_REFUSED'), `approve on a revoked share: ${show(ap)}`);
+    });
+
+    // ── secaudit2026nov08 round 14b: revoking the share an agreement stood on ends the agreement ──
+    /** The owner's negotiation of a package, as GET /v1/dataspace/negotiations shows it. */
+    const negotiationOfPackage = async (name: string): Promise<Body> => {
+        const l = await call('/v1/dataspace/negotiations', { token: A.token });
+        assert(l.status === 200, `negotiations: ${show(l)}`);
+        const n = (l.body.data.negotiations as Body[]).find(x => x.package === name && x.agreement_id);
+        assert(n, `the agreement of ${name}: ${show(l)}`);
+        return n;
+    };
+    const sharedIds = async (): Promise<string> => {
+        const r = await call('/v1/datapackages/shared', { token: A.token });
+        assert(r.status === 200, `Data you share: ${show(r)}`);
+        return r.text;
+    };
+    await test('After the share it stood on is revoked, the finalised agreement has ended, its transfer is terminated to the consumer, and Data you share no longer lists it', async () => {
+        const n = await negotiationOfPackage(SRC);
+        assert(n.state === 'FINALIZED' && n.agreement_ended_at && /share this agreement stood on has ended/.test(n.ended_reason ?? ''),
+            `the agreement still stands after its share was revoked: ${JSON.stringify(n).slice(0, 400)}`);
+        const end = await waitFor(m => m.path === `/cb/transfers/urn:uuid:srct-${stamp}/termination`, 'the transfer termination');
+        assert(end.body['@type'] === 'TransferTerminationMessage', `the termination message: ${JSON.stringify(end.body)}`);
+        assert(!(await sharedIds()).includes(n.share_id), 'Data you share still lists the agreement\'s share');
+        const rows = await call(`${srcRead.endpoint}/items`, { token: srcRead.token });
+        assert(rows.status === 403 && rows.text.includes('SHARE_ENDED'), `a read after the agreement ended: ${show(rows)}`);
+    });
+
+    const SRC3 = `agrsrcc${stamp}`;
+    await test('An agreement not yet verified ends with a negotiation termination to the consumer when its share is revoked', async () => {
+        assert((await publish(A.token, SRC3, 'private', 'source3')).status === 201, 'publish the third source package');
+        const s = await call('/v1/consent', { token: A.token, body: { recipient: `party:${A.name}/${xPartyName}@${node}`, data_pattern: `datapkg:${SRC3}`, purpose: 'The third source share' } });
+        assert(s.status === 201, `the third source share: ${show(s)}`);
+        assert((await call('/v1/dataspace/settings', { token: A.token, method: 'PUT', body: { package: SRC3, auto_agree: true } })).status === 200, 'auto_agree');
+        const offer = await offerOf(X, datasetId(A.name, SRC3), 'share');
+        const consumer = `urn:uuid:srcc-${stamp}`;
+        const r = await request(X, offer, datasetId(A.name, SRC3), consumer);
+        assert(r.status === 201, show(r));
+        await waitFor(m => m.path === `/cb/negotiations/${consumer}/agreement`, 'the agreement');
+        assert((await call(`/v1/consent/${encodeURIComponent(s.body.data.id)}`, { token: A.token, method: 'DELETE' })).status === 200, 'revoke the third source share');
+        const n = await call(`/v1/dataspace/negotiations/${encodeURIComponent(r.body.providerPid)}`, { token: A.token });
+        assert(n.status === 200 && n.body.data.negotiation.state === 'TERMINATED', `the agreement after its share was revoked: ${show(n)}`);
+        const t = await waitFor(m => m.path === `/cb/negotiations/${consumer}/termination`, 'the negotiation termination');
+        assert(t.body['@type'] === 'ContractNegotiationTerminationMessage' && t.body.code === 'SHARE_ENDED', `the termination message: ${JSON.stringify(t.body)}`);
+        assert(!(await sharedIds()).includes(n.body.data.negotiation.share_id), 'Data you share still lists the agreement\'s share');
+    });
+
+    const SRC4 = `agrsrcd${stamp}`;
+    await test('Usage: an agreement on a live share keeps reading when the owner revokes another share of the same party', async () => {
+        assert((await publish(A.token, SRC4, 'private', 'source4')).status === 201, 'publish the fourth source package');
+        const s = await call('/v1/consent', { token: A.token, body: { recipient: `party:${A.name}/${xPartyName}@${node}`, data_pattern: `datapkg:${SRC4}`, purpose: 'The fourth source share' } });
+        assert(s.status === 201, `the fourth source share: ${show(s)}`);
+        assert((await call('/v1/dataspace/settings', { token: A.token, method: 'PUT', body: { package: SRC4, auto_agree: true } })).status === 200, 'auto_agree');
+        const offer = await offerOf(X, datasetId(A.name, SRC4), 'share');
+        const consumer = `urn:uuid:srcd-${stamp}`;
+        const r = await request(X, offer, datasetId(A.name, SRC4), consumer);
+        assert(r.status === 201, show(r));
+        const agreement = await finalise(X, r.body.providerPid, consumer);
+        const read = await pull(X, agreement, `urn:uuid:srcdt-${stamp}`);
+        const other = await call('/v1/consent', { token: A.token, body: { recipient: `party:${A.name}/${xPartyName}@${node}`, data_pattern: `datapkg:${SRC4}`, purpose: 'Another share, revoked' } });
+        assert(other.status === 201, `another share: ${show(other)}`);
+        assert((await call(`/v1/consent/${encodeURIComponent(other.body.data.id)}`, { token: A.token, method: 'DELETE' })).status === 200, 'revoke the other share');
+        await sleep(1000);
+        const n = await call(`/v1/dataspace/negotiations/${encodeURIComponent(r.body.providerPid)}`, { token: A.token });
+        assert(n.status === 200 && n.body.data.negotiation.state === 'FINALIZED' && !n.body.data.negotiation.agreement_ended_at, `the agreement on a live share: ${show(n)}`);
+        assert(!received.some(m => m.path === `/cb/transfers/urn:uuid:srcdt-${stamp}/termination`), 'its transfer was terminated');
+        const rows = await call(`${read.endpoint}/items`, { token: read.token });
+        assert(rows.status === 200, `the agreement on a live share reads: ${show(rows)}`);
+        assert((await sharedIds()).includes(n.body.data.negotiation.share_id), 'Data you share lists the live agreement');
+    });
+
+    const SRC5 = `agrsrce${stamp}`;
+    await test('A share that reaches its end date ends the agreement made on it, as the owner reads the negotiation', async () => {
+        assert((await publish(A.token, SRC5, 'private', 'source5')).status === 201, 'publish the fifth source package');
+        const until = Date.now() + 12_000;
+        const s = await call('/v1/consent', { token: A.token, body: { recipient: `party:${A.name}/${xPartyName}@${node}`, data_pattern: `datapkg:${SRC5}`, purpose: 'A short share', expires: new Date(until).toISOString() } });
+        assert(s.status === 201, `the short share: ${show(s)}`);
+        assert((await call('/v1/dataspace/settings', { token: A.token, method: 'PUT', body: { package: SRC5, auto_agree: true } })).status === 200, 'auto_agree');
+        const offer = await offerOf(X, datasetId(A.name, SRC5), 'share');
+        const consumer = `urn:uuid:srce-${stamp}`;
+        const r = await request(X, offer, datasetId(A.name, SRC5), consumer);
+        assert(r.status === 201, show(r));
+        await finalise(X, r.body.providerPid, consumer);
+        await sleep(Math.max(0, until - Date.now()) + 1000);
+        const n = await call(`/v1/dataspace/negotiations/${encodeURIComponent(r.body.providerPid)}`, { token: A.token });
+        assert(n.status === 200 && n.body.data.negotiation.agreement_ended_at, `the agreement after its share's end date: ${show(n)}`);
     });
 
     await call('/v1/admin/config', { token: OP.token, method: 'PUT', body: { changes: [

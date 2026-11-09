@@ -26,6 +26,14 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.41.0 -- 2026-11-08 -- A bare agent name that agents of two owners carry in one connector home
+    picks no stored token: decide() and publish_offers() stop and ask for the full identity
+    agent#owner@node; publish_offers() takes a full identity, and create_liaison_agent(agent_identity=...)
+    binds the offers tool to it (secaudit2026nov08b round 15).
+  0.40.0 -- 2026-11-08 -- A token stored in the connector home goes only to its own agent's node
+    (agents/<owner>/<agent>/config.yaml; the home's config.yaml only when it names this agent or
+    none), as the Node connector's heldNodeUrl does; and the liaison's aimeat_offers_publish tool is
+    bound to the liaison's own agent, refusing a call that names another (secaudit2026nov08 round 14).
   0.39.0 -- 2026-10-26 -- An agent token from the argument or AIMEAT_AGENT_TOKEN is no longer sent
     to the node_url in the current folder's .aimeat/config.yaml (secaudit2026oct22). decide._node
     reads that file only when AIMEAT_HOME is set, or when the token was read from the same home;
@@ -258,7 +266,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.39.0"
+__version__ = "0.41.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

@@ -3,8 +3,21 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
- *   reach the account's API. Operator-only in the menu (the Infrastructure group).
+ *   reach the account's API. Operator-only in the menu (the Infrastructure group). The page explains
+ *   itself the designed way (.claude/rules/page-guidance.md): the title's question mark is
+ *   concept.cors (what an allowed address is, the order the lists rank in, the default), and the
+ *   page's start (PageStart id "security") opens the account's own list as its action and folds once
+ *   the account has a list of its own.
  * @version-history
+ *   v1.25.0 -- 2026-11-08 -- The Allowed Origins card's title opens its explanation
+ *     (security.allowedOrigins): what one entry may be, how the list is split, and what an empty list does.
+ *   v1.24.1 -- 2026-11-08 -- The origin lists open for editing one origin per line: they were joined
+ *     with a literal backslash-n, so saving two or more stored one broken origin.
+ *   v1.24.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "security" (its action edits the account's own list) and the title's question mark
+ *     concept.cors. The "How Inheritance Works" section and its English-only chain line go: the
+ *     order the lists rank in is in concept.cors. The head's line no longer names sign-in and
+ *     sessions, which moved to the Access page in v1.6.0.
  *   v1.23.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of an empty
  *     CORS list and no sessions, a posture that was not the real one (QA audit F6-05, E7-04).
  *   v1.22.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
@@ -72,7 +85,9 @@ import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Card } from '/components/Card.js';
 import { Note } from '/components/Note.js';
-import { Mark, Code } from '/components/Mark.js';
+import { Mark } from '/components/Mark.js';
+import { PageStart } from '/components/PageStart.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Action, Loud } from '/components/Action.js';
 import { TextArea } from '/components/TextField.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -182,15 +197,22 @@ export default function SecurityTab({ session, showToast }) {
             <${Loud} control onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}<//>
             <${Action} small row tone="danger" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}<//>
             <${Action} small row onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}<//>`
-        : html`<${Action} small row onClick=${() => setCorsEditAgent({ name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : '' })}>${t('profile.security.edit')}<//>`}<//>
+        : html`<${Action} small row onClick=${() => setCorsEditAgent({ name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\n') : '' })}>${t('profile.security.edit')}<//>`}<//>
     <//>`;
   };
+
+  // The start: folded once the account has a list of its own; its button opens the same field as the
+  // Edit link of "Allowed Origins".
+  const editGhii = () => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\n') : '');
+  const start = html`<${PageStart} id="security" done=${!isInherited} action=${{ onClick: editGhii }} />`;
 
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.security')]}
       title=${t('profile.security.title')}
+      help="concept.cors"
       desc=${t('profile.security.desc')}
+      start=${start}
       after=${html`<${ConfirmUI} />`}>
 
       ${securityData.managedBy && html`
@@ -205,7 +227,8 @@ export default function SecurityTab({ session, showToast }) {
 
       <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.ghiiTitle')}<//><//>
       <${Space} below="large"><${Note}>${t('profile.security.ghiiDesc')}<//><//>
-      <${Card} tone="section" title=${t('profile.security.allowedOrigins')}
+      <${Card} tone="section"
+        title=${html`<${HelpLabel} term="security.allowedOrigins" label=${t('profile.security.allowedOrigins')}>${t('profile.security.allowedOrigins')}<//>`}
         aside=${html`<${Mark} tone=${isInherited ? undefined : 'ink'}>${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}<//>`}>
         <${Stack}>
           <${Note}>
@@ -223,7 +246,7 @@ export default function SecurityTab({ session, showToast }) {
               <${Action} small onClick=${() => setCorsEditGhii(null)}>${t('profile.cancel')}<//>
             <//>
           ` : html`
-            <${Line}><${Action} small onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}<//><//>
+            <${Line}><${Action} small onClick=${editGhii}>${t('profile.security.edit')}<//><//>
           `}
         <//>
       <//>
@@ -239,14 +262,6 @@ export default function SecurityTab({ session, showToast }) {
             <//>
           <//>`
       }
-
-      <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.inheritanceTitle')}<//><//>
-      <${Card} tone="section">
-        <${Note}>${t('profile.security.inheritanceDesc')}<//>
-        <${Space} above="tight"><${Code}>
-          Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
-        <//><//>
-      <//>
     <//>
   `;
 }

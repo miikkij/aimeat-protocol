@@ -10,7 +10,10 @@
  *                           from the offer, marked with the agreement (`dspAgreement`, node-written).
  *                           The share is no wider than the offer: an open offer stood on the package
  *                           being public, so its share reads what a public reader reads (`publicOnly`);
- *                           a share offer keeps the version the share it stood on pins.
+ *                           a share offer keeps the version the share it stood on pins, and stands
+ *                           on that share (`sourceShare`): it is made only while that share is live,
+ *                           and reads only while it stays live (services/parties/shares.ts
+ *                           standingShares).
  *     exchange offer        an EXCHANGE contract: an entitlement on the listing's coordinate, prepaid
  *                           for what the compensate duty prices (a month of reads, or a block of
  *                           PER_READ_BLOCK reads), the share bound to it (`contract`), and the sale
@@ -30,6 +33,12 @@
  * @structure Materialised · AgreementSale · materialiseAgreement · bookAgreementSale · endAgreement
  * @usage const m = await materialiseAgreement(deps, negotiation); if (!m.ok) terminate(m.message);
  * @version-history
+ *   2026-11-08 — endAgreement's keepKeys leaves the share's transfer keys to expire, for an agreement
+ *     that ends because the share it stood on ended (secaudit2026nov08 round 14b).
+ *   2026-11-08 — endAgreement's keepSlot takes back only one call's addition when another call made the
+ *     same negotiation's agreement (secaudit2026nov08 round 14).
+ *   2026-11-08 — A share offer's agreement records the share it stood on and is made only while that
+ *     share is live (secaudit2026nov08 round 14).
  *   v1.1.0 — 2026-11-02 — The sale is booked once, when the agreement is made (bookAgreementSale), never
  *     for one that is not; ending one of several stacked priced agreements takes back only what it
  *     added (secaudit2026nov02d round 13).
@@ -41,7 +50,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { grantConsent } from '../consent-write.js';
-import { endShares, setShareMeta, shareMetaOf, sharePatternOf } from '../parties/shares.js';
+import { endShares, isLiveShare, setShareMeta, shareMetaOf, sharePatternOf } from '../parties/shares.js';
 import { partyRefOf } from '../parties/contract.js';
 import { changeParty } from '../parties/store.js';
 import { UNCHANGED } from '../record-cas.js';
@@ -111,11 +120,13 @@ async function anotherLiveAgreement(storage: Storage, n: NegotiationRecord): Pro
 /**
  * Undo what an agreement added to the contract slot of its participant and package: revoke the slot
  * when no other agreement of the participant on the package is live, else take back its share only.
+ * `keepSlot` takes back its share only in every case: another call made the same negotiation's
+ * agreement, which stands on the same slot.
  */
-async function undoContract(storage: Storage, n: NegotiationRecord, ref: string, owner: string): Promise<void> {
+async function undoContract(storage: Storage, n: NegotiationRecord, ref: string, owner: string, keepSlot = false): Promise<void> {
     const ext = `datapkg:${owner}/${n.packageName}`;
-    if (n.priced && await anotherLiveAgreement(storage, n)) await takeBack(storage, ref, ext, n.priced.model);
-    else await revokeEntitlement(storage, ref, ext, 'read');
+    if (n.priced && (keepSlot || await anotherLiveAgreement(storage, n))) await takeBack(storage, ref, ext, n.priced.model);
+    else if (!keepSlot) await revokeEntitlement(storage, ref, ext, 'read');
 }
 
 /** The version a share offer's share pins: recorded at the request, or read from the share itself. */
@@ -130,6 +141,13 @@ async function sharePin(storage: Storage, n: NegotiationRecord): Promise<string 
 export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Promise<Materialised> {
     const { storage, config } = deps;
     if (n.offerKind === 'tck' || !n.packageName || !n.agreementId) return { ok: true, value: null };
+    // A share offer stands on a live share: one the owner ended before the agreement makes nothing.
+    let sourceShare: string | undefined;
+    if (n.offerKind === 'share') {
+        const source = n.offerRef ? await storage.getConsent(n.offerRef) : null;
+        if (!source || !isLiveShare(source)) return { ok: false, code: 'OFFER_GONE', message: 'The share this offer stood on has ended.' };
+        sourceShare = source.id;
+    }
     const party = await ensureParticipantParty(storage, n.ownerGhii, n.participantId, `dsp:${n.providerPid}`);
     if (party === 'full') return { ok: false, code: 'QUOTA_EXCEEDED', message: 'The provider holds the most outside parties one account may.' };
     if (party === 'taken') return { ok: false, code: 'PARTY_EXISTS', message: 'The provider has another party under this participant\'s name.' };
@@ -173,6 +191,7 @@ export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Pr
     const publicOnly = n.offerKind === 'open';
     const share = await setShareMeta(storage, granted.value, {
         dspAgreement: n.agreementId, termsAcceptedAt: new Date().toISOString(), ...(contract ? { contract } : {}), ...(publicOnly ? { publicOnly: true } : {}),
+        ...(sourceShare ? { sourceShare } : {}),
     });
     if (!share && publicOnly) {
         // A share that does not say it reads what a public reader reads would be wider than the offer.
@@ -204,16 +223,22 @@ export async function bookAgreementSale(deps: Deps, n: NegotiationRecord, sale: 
     });
 }
 
-/** End what an agreement made: its share, its part of the contract, and every transfer key of the share. */
-export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: string): Promise<number> {
+/**
+ * End what an agreement made: its share, its part of the contract, and every transfer key of the share.
+ * `opts.keepSlot`: another call made this negotiation's agreement on the same contract slot, so only
+ * what this call added is taken back and the slot stays. `opts.keepKeys`: the transfer keys of the
+ * share stay on the party until they expire; they open nothing once the share has ended, and a read
+ * with one is refused SHARE_ENDED, which tells the reader why (./source-share.ts).
+ */
+export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: string, opts: { keepSlot?: boolean; keepKeys?: boolean } = {}): Promise<number> {
     const { storage, config } = deps;
     const m = n.materialised;
     if (!m) return 0;
     const ended = await endShares(storage, n.ownerGhii, c => c.id === m.shareId, reason);
     const owner = localAccountName(n.ownerGhii);
     const ref = partyRefOf(owner, m.partyName, config.nodeId);
-    if (m.entitlementId && n.packageName) await undoContract(storage, n, ref, owner);
-    await changeParty(storage, n.ownerGhii, m.partyName, p => {
+    if (m.entitlementId && n.packageName) await undoContract(storage, n, ref, owner, opts.keepSlot === true);
+    if (!opts.keepKeys) await changeParty(storage, n.ownerGhii, m.partyName, p => {
         const keys = p.keys.filter(k => k.share !== m.shareId);
         return keys.length === p.keys.length ? UNCHANGED : { ...p, keys };
     });

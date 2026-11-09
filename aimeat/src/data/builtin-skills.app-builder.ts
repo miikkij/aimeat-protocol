@@ -25,6 +25,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   2026-11-08 — "Which model builds it" says the model rule by quality (MODEL_QUALITY_ADVICE), never
+ *     by name (Jouni).
  *   2026-11-08 — The description's first sentence says a new app is built with
  *     aimeat-app-builder-atelier: the handbook's skill list shows the first sentence only, and the
  *     old one named the Classic track and nothing else (instruction audit 2026-11-08).
@@ -72,6 +74,7 @@
  *     node's diverged copy.
  */
 import type { BuiltinSkill } from './builtin-skills.js';
+import { MODEL_QUALITY_ADVICE } from '../services/model-recommendation.js';
 
 export const APP_BUILDER_SKILL_ENTRY: BuiltinSkill =
 {
@@ -101,10 +104,8 @@ response's \`next_steps.size\` says so.
 
 ## Which model builds it
 
-Unless you are Claude Opus or Claude Fable, say once, in your first message about the app, that
-apps built with Claude Opus or Claude Fable turn out noticeably better, and that the person can
-switch now or go on with you. Measured on this node: the same app request succeeded 3 times in 3
-on Opus and once in 3 on a lighter model, which read a third of the guidance.
+${MODEL_QUALITY_ADVICE} Measured on this node: the same app request succeeded 3 times in 3 on a
+strong model and once in 3 on a lighter one, which read a third of the guidance.
 
 ## First, the track: a new app is built on Atelier
 

@@ -12,6 +12,13 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-08 -- e2e-package-file-label-reads.ts joins the list (not the guard tier): the reads of a data package's stored files ask the labels the version keeps, as GET /v1/pub does (secaudit2026nov08b round 15b).
+ *   2026-11-08 -- e2e-datapackage-label-sources.ts joins the list (not the guard tier): a data package version keeps the labels of every item it was copied from (secaudit2026nov08b round 15).
+ *   2026-11-08 -- e2e-intake-form-owner.ts joins the list (not the guard tier): a public intake form writes its submissions as the identity that stored its config, not as an account the config value names (secaudit2026nov08b round 15).
+ *   2026-11-08 -- e2e-workspace-reserved-parts.ts joins the list (not the guard tier): the node-reserved parts of a workspace are no space of any manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
+ *   2026-11-08 -- e2e-schema-lock-holders.ts joins the list (not the guard tier): a CSM's lock belongs to its registering account, a wildcard lock does not outrank another account's deeper lock, a package's cortex asks the lock rule, and an erased account's locks do not pass to the next holder of the name (secaudit2026nov08 round 14).
+ *   2026-11-08 -- e2e-csm-ownership.ts joins the list (not the guard tier): only the registering account's own receivers block a CSM delete, a package CSM takes the installer's prefix, the next account of an erased name has no CSM rights, a private CSM's schema-lock row is not public (secaudit2026nov08 round 14).
+ *   2026-11-08 -- e2e-receivers-lifecycle.ts joins the list (not the guard tier): the operator's start keeps the owner's pause, a deactivated account's receiver and party keys wait, a removed maker's receivers are named (secaudit2026nov08 round 14).
  *   2026-11-07 -- e2e-csm.ts joins the list (not the guard tier): a new CSM's name gets the owner's prefix, its visibility filters every read, PUT keeps versions and refuses a stale one, the draft stores nothing, an agent needs csm:write (developer ruling 2026-11-07).
  *   2026-11-07 -- e2e-receivers.ts joins the list (not the guard tier): receivers, the address and key an outside program writes into one place of an owner's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-11-07 -- e2e-rows-schema.ts joins the list (not the guard tier): a row space's JSON Schema binds every writer, and only the creator or an admin changes it (developer ruling 2026-11-07).
@@ -1023,6 +1030,9 @@ const ALL_SUITES = [
     'test/e2e-operator-welcome.ts',
     'test/e2e-registration-invites.ts',
     'test/e2e-login-by-email.ts',
+    // A code key's first sign-in replaces the key whichever way in, and a key acts only on its own
+    // account (secaudit2026nov08 round 14).
+    'test/e2e-code-key-first-sign-in.ts',
     'test/e2e-owner-usage.ts',
     'test/e2e-owner-home.ts',
     // One export, every section of it: the Article 15 and 20 door read against fixtures built first.
@@ -1274,6 +1284,9 @@ const ALL_SUITES = [
     // only way out of it. Four refusals guard the door, including an operator's own '*' agent.
     'test/e2e-organism-owner-repair.ts',
     'test/e2e-intake.ts',
+    // A form writes its submissions as the identity that stored its config, never as an account
+    // the config value names.
+    'test/e2e-intake-form-owner.ts',
     // A conversation through an intake form: a visitor's token opens one conversation and no
     // other, and the node's caps refuse before a write.
     'test/e2e-intake-thread.ts',
@@ -1333,10 +1346,16 @@ const ALL_SUITES = [
     'test/e2e-dataproduct-canvas.ts',
     // A records source allows the audience its workspace admits, not the whole organism (secaudit2026nov02d round 13).
     'test/e2e-dataproduct-records-audience.ts',
+    // A data package version keeps the labels of every item it was copied from: records, another package, a memory record, an extension run's reads (secaudit2026nov08b round 15).
+    'test/e2e-datapackage-label-sources.ts',
+    // The other reads of a package's stored files ask the labels the version keeps, as GET /v1/pub does (secaudit2026nov08b round 15b).
+    'test/e2e-package-file-label-reads.ts',
     // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
     'test/e2e-party.ts',
     // Receivers: an outside program writes into exactly one place of an owner's data with its own key; the shape, the target, the key, the lifecycle, the verbs, the permissions and the node setting.
     'test/e2e-receivers.ts',
+    // A receiver and an outside party when people change: the operator's start keeps the owner's pause, a deactivated account's keys wait, a removed maker's receivers are named (secaudit2026nov08 round 14).
+    'test/e2e-receivers-lifecycle.ts',
     // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
     'test/e2e-data-share.ts',
     // A named share to a person on another AIMEAT node: exactly that visitor reads, a namesake never (WP9c).
@@ -1355,6 +1374,8 @@ const ALL_SUITES = [
     'test/e2e-iam-parties.ts',
     // CSMs: the owner prefix, visibility on every read, versions with a stale-version refusal, the draft, csm:write (developer ruling 2026-11-07).
     'test/e2e-csm.ts',
+    // Who controls a CSM and who reads its schema-lock row: ruling 2 on deletion, a package CSM's prefix, the next account of an erased name, a private CSM's lock row (secaudit2026nov08 round 14).
+    'test/e2e-csm-ownership.ts',
     // The one-time share link: the mail, preview, redeem once with a new key, the refusals, and DuckDB and pandas reading as a party (WP9b). Runs its own node with mail on (28566).
     'test/e2e-party-invite.ts',
     // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
@@ -1507,6 +1528,9 @@ const ALL_SUITES = [
     'test/e2e-workspace-fenced-space.ts',
     // A record id with a dot lists under its whole id and no longer makes the index unreadable (secaudit2026oct31w2).
     'test/e2e-workspace-dotted-id.ts',
+    // The node-reserved parts of a workspace (share, access requests, fingerprints) are no space of any
+    // manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
+    'test/e2e-workspace-reserved-parts.ts',
     'test/e2e-workspace-rows.ts',
     // A row space's JSON Schema binds every writer: owner, member, agent over REST and MCP, app (ruling 2026-11-07).
     'test/e2e-rows-schema.ts',
@@ -1642,6 +1666,8 @@ const ALL_SUITES = [
     'test/e2e-ontology.ts',
     // Who may set a schema lock on which pattern; a delete or a cortex deactivation removes only its own row.
     'test/e2e-schema-lock-rule.ts',
+    // Who holds a lock: a CSM's, a wildcard over a deeper lock, a package's cortex, an erased account's.
+    'test/e2e-schema-lock-holders.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',
@@ -1774,6 +1800,9 @@ const ALL_SUITES = [
     'test/e2e-ecosystem-events.ts',
     'test/e2e-ecosystem-capabilities.ts',
     'test/e2e-ecosystem-validation.ts',
+    // An outside app's approval grants a word outside every wildcard only when the owner names it,
+    // and its notification names the app as its sender (secaudit2026nov08 round 14).
+    'test/e2e-ecosystem-own-tick-sender.ts',
     'test/e2e-agent-governance.ts',
     'test/e2e-workflows.ts',
     'test/e2e-workflows-human.ts',

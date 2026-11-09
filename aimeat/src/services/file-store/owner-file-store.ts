@@ -28,6 +28,8 @@
  *   approvalOf · ownerMayUse · sealCredential · ownerStoreSpec
  * @usage const rec = await readOwnerStores(ctx, 'alice'); const entry = rec && defaultEntry(rec);
  * @version-history
+ *   v1.3.0 — 2026-11-08 — An entry keeps which files it takes (`takes`)
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.2.1 — 2026-11-05 — credentialContext exported for the data key's re-encrypt job (codebase
  *     analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.2.0 — 2026-10-31 — An entry keeps its last browser check (browserAccess).
@@ -38,6 +40,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { ownerStoreId, type BlobSpec } from '../../storage/blob/blob-types.js';
+import type { StoreTakes } from '../../storage/blob/store-takes.js';
 import { signedInOnly } from '../../config-visibility.js';
 import { decryptBound, encryptBound, getEncryptionKey } from '../encryption.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
@@ -74,6 +77,8 @@ export interface OwnerStoreEntry {
   lastCheck?: { at: string; ok: boolean; message: string };
   /** Whether a browser on this node may send to it directly: written with lastCheck. */
   browserAccess?: BrowserAccess;
+  /** Which files it takes (storage/blob/store-takes.ts); absent reads as DEFAULT_TAKES. */
+  takes?: StoreTakes;
 }
 
 export interface OwnerFileStores {

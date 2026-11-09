@@ -7,6 +7,12 @@
  *   with an empty template pulses to completion without one, which is exactly what makes the scan
  *   path testable.
  * @version-history
+ *   2026-11-08 -- A member of another account who republishes the allowed content with a fresh status
+ *     resumes no paused document and revives no retired one: the holder's status stays (secaudit2026nov08b
+ *     round 15, living-pulse-spend.ts:livingConfigContent:status-outside-allowance-hash).
+ *   2026-11-08 -- The owner's allowance for a config another account published holds for that content:
+ *     the member's next publish of other sections calls no AI until the owner allows it again with one
+ *     press (secaudit2026nov08 round 14, living-pulse-spend.ts:allowLivingSpend:allowance-bound-to-spender-not-config-content).
  *   2026-11-02 -- A config a member of another account published over gathers nothing and calls no AI
  *     until the owner allows it; a draft of that member the owner publishes calls the AI as before
  *     (secaudit2026nov02d round 13, publishDraft:cross-account-living-config-outside-pulse-spend-tally).
@@ -413,6 +419,128 @@ await test('Usage: a draft of another account that the owner publishes is the ow
     const events = await ledgerEvents('xown');
     assert(events.some(e => AI_ATTEMPT.includes(e)) && !events.includes('derive-waiting'), `the owner's publish did not call the AI as before: ${JSON.stringify(events)}`);
     assert(!(await spendAsks()).some(q => q.target?.key === spendKey('xown')), 'asked about the owner\'s own publish');
+});
+
+// ── The owner's allowance holds for the content the owner was asked about (secaudit2026nov08 round 14) ──
+// The allowance was stored per writer, so after one press the same member could publish new sections,
+// which choose what of the owner's material the pulse searches and copies, and the pulse ran them on the
+// owner's reach and AI with no new question.
+const countOf = (events: string[], wanted: string[]) => events.filter(e => wanted.includes(e)).length;
+
+await test('Usage: after the owner allows the other account\'s config, the next pulse calls the AI', async () => {
+    const ask = (await spendAsks()).find(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner');
+    assert(!!ask, 'the question is there');
+    const yes = await json(`/v1/publish-requests/${ask.id}/decision`, { method: 'POST', headers: auth(token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve: ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    await new Promise(r => setTimeout(r, 50));
+    const before = countOf(await ledgerEvents('xacct'), AI_ATTEMPT);
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xacct'), AI_ATTEMPT) > before, 'the allowed config did not call the AI');
+    await triggerPulse();
+    assert(!(await spendAsks()).some(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner'), 'the pulse asked again with nothing changed');
+});
+
+await test('Refused: when that member publishes other sections, the pulse calls no AI and asks the owner again with one press', async () => {
+    const d = await json('/v1/memory', { method: 'POST', headers: auth(bobToken), body: JSON.stringify({
+        key: `organism.${orgId}.w.${WS}.living.xacct.draft`, value: { ...spendConfig('xacct'), template: [{ slot: 'b', section: `${spendWord('xacct')} changed` }] }, visibility: 'private' }) });
+    assert(d.status === 201 || d.status === 200, `draft: ${d.status}: ${JSON.stringify(d.body.error)}`);
+    const p = await publishAs(bobToken, 'xacct');
+    assert(p.status === 200, `publish: ${p.status}: ${JSON.stringify(p.body.error)}`);
+    const before = await ledgerEvents('xacct');
+    await triggerPulse();
+    const after = await ledgerEvents('xacct');
+    assert(countOf(after, AI_ATTEMPT) === countOf(before, AI_ATTEMPT), `the pulse called the owner's AI for the changed config: ${JSON.stringify(after)}`);
+    assert(countOf(after, ['derive-waiting']) > countOf(before, ['derive-waiting']), `the ledger says the section waits: ${JSON.stringify(after)}`);
+    const waiting = (await spendAsks()).filter(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner');
+    assert(waiting.length === 1, `one new waiting question: ${JSON.stringify(waiting)}`);
+    assert(String(waiting[0].requested_by?.principal ?? '').startsWith(`${bobName}@`), `the question names the member: ${JSON.stringify(waiting[0].requested_by)}`);
+});
+
+await test('Usage: the owner allows the changed config with one press, and the next pulse calls the AI', async () => {
+    const ask = (await spendAsks()).find(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner');
+    assert(!!ask, 'the new question is there');
+    const yes = await json(`/v1/publish-requests/${ask.id}/decision`, { method: 'POST', headers: auth(token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve: ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    await new Promise(r => setTimeout(r, 50));
+    const before = countOf(await ledgerEvents('xacct'), AI_ATTEMPT);
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xacct'), AI_ATTEMPT) > before, 'the allowed changed config did not call the AI');
+});
+
+// ── The owner's pause and a retirement survive a member's republish (secaudit2026nov08b round 15) ──
+// The allowance hash leaves out `status`, which the pulse rewrites on every run, but `status` also holds
+// the owner's pause, the retirement, the pulse count and the cadence clock. A member of another account
+// republished the allowed content with a fresh status and the next pulse ran on the owner's AI again.
+const readConfig = async (doc: string) => {
+    const r = await json(`/v1/memory/${encodeURIComponent(spendKey(doc))}`, { headers: auth(token) });
+    assert(r.status === 200, `config read ${doc}: ${r.status}`);
+    return r.body.data.value as Record<string, any>;
+};
+const setStatusAsOwner = async (doc: string, change: Record<string, unknown>) => {
+    const v = await readConfig(doc);
+    const w = await writeAs(token, spendKey(doc), { ...v, status: { ...(v.status ?? {}), ...change } }, 'private');
+    assert(w.status === 200 || w.status === 201, `owner save ${doc}: ${w.status}: ${JSON.stringify(w.body.error)}`);
+};
+const bobPublishes = async (doc: string, value: Record<string, unknown>) => {
+    const d = await json('/v1/memory', { method: 'POST', headers: auth(bobToken), body: JSON.stringify({
+        key: `organism.${orgId}.w.${WS}.living.${doc}.draft`, value, visibility: 'private' }) });
+    assert(d.status === 201 || d.status === 200, `draft ${doc}: ${d.status}: ${JSON.stringify(d.body.error)}`);
+    const p = await publishAs(bobToken, doc);
+    assert(p.status === 200, `publish ${doc}: ${p.status}: ${JSON.stringify(p.body.error)}`);
+};
+const xacctAllowed = () => ({ ...spendConfig('xacct'), template: [{ slot: 'b', section: `${spendWord('xacct')} changed` }] });
+
+await test('Usage: the owner pauses the document as the Living page does; the pulse calls no AI and asks nothing', async () => {
+    await setStatusAsOwner('xacct', { paused: true });
+    const before = countOf(await ledgerEvents('xacct'), AI_ATTEMPT);
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xacct'), AI_ATTEMPT) === before, 'the paused document called the AI');
+    assert(!(await spendAsks()).some(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner'), 'the owner\'s pause filed a question');
+});
+
+await test('Refused: a member\'s republish with a status that has no pause keeps the owner\'s pause; the pulse calls no AI', async () => {
+    await bobPublishes('xacct', { ...xacctAllowed(), status: { health: 'green', pulses: 0 } });
+    const before = countOf(await ledgerEvents('xacct'), AI_ATTEMPT);
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xacct'), AI_ATTEMPT) === before, `the member's republish resumed the owner's paused document: ${JSON.stringify(await ledgerEvents('xacct'))}`);
+    const v = await readConfig('xacct');
+    assert(v.status?.paused === true, `the owner's pause is gone: ${JSON.stringify(v.status)}`);
+});
+
+await test('Usage: the owner resumes the document, and the next pulse calls the AI unasked', async () => {
+    await setStatusAsOwner('xacct', { paused: false });
+    const before = countOf(await ledgerEvents('xacct'), AI_ATTEMPT);
+    await new Promise(r => setTimeout(r, 100));   // past the config's 0.06 s cadence
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xacct'), AI_ATTEMPT) > before, 'the resumed document did not call the AI');
+    assert(!(await spendAsks()).some(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner'), 'the owner\'s resume filed a question');
+});
+
+const retireConfig = () => ({ ...spendConfig('xretire'), charter: { cadence_minutes: 0.001, stop: [{ max_pulses: 2 }] } });
+
+await test('Usage: an allowed config of another account retires at its stop condition', async () => {
+    const s = await writeAs(token, 'lpspendsrc.xretire', { text: `${spendWord('xretire')} a note the owner keeps for their own documents` }, 'owner');
+    assert(s.status === 201, `source: ${s.status}: ${JSON.stringify(s.body.error)}`);
+    const c = await writeAs(token, spendKey('xretire'), { ...spendConfig('xretire'), template: [] }, 'private');
+    assert(c.status === 201, `owner config: ${c.status}: ${JSON.stringify(c.body.error)}`);
+    await bobPublishes('xretire', retireConfig());
+    await triggerPulse();
+    const ask = (await spendAsks()).find(q => q.target?.key === spendKey('xretire') && q.state === 'awaiting_owner');
+    assert(!!ask, 'the question is there');
+    const yes = await json(`/v1/publish-requests/${ask.id}/decision`, { method: 'POST', headers: auth(token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve: ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    await new Promise(r => setTimeout(r, 50));
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xretire'), AI_ATTEMPT) > 0, 'the allowed config did not call the AI');
+    assert((await readConfig('xretire')).status?.health === 'retired', 'the config did not retire at max_pulses');
+});
+
+await test('Refused: a member\'s republish with a fresh status does not revive a retired document', async () => {
+    await bobPublishes('xretire', { ...retireConfig(), status: {} });
+    const before = countOf(await ledgerEvents('xretire'), AI_ATTEMPT);
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xretire'), AI_ATTEMPT) === before, `the member's republish revived the retired document: ${JSON.stringify(await ledgerEvents('xretire'))}`);
+    assert((await readConfig('xretire')).status?.health === 'retired', 'the retirement is gone');
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

@@ -24,10 +24,28 @@
  *   that re-reads on the frame sees the new state and a request after it is judged by it. Events are
  *   told in the order they arrived. After the wire was down, every registry is read again, because
  *   whatever was sent meanwhile is lost.
- * @structure MAX_MESSAGE_BYTES · RELOAD_WAIT_MS · RemoteReload · encodeMessage · createBusRelay ·
- *   startBusRelay · stopBusRelays
- * @usage const relay = await startBusRelay(storage, config.nodeId, reloads); // null on SQLite
+ *
+ *   A LOST EVENT. Delivery is at most once: a send that fails is dropped, a process that crashes
+ *   before its send loses it, and a listening connection can go deaf without ending. With several
+ *   processes per node each registry therefore has a stored mark the changing process moves before
+ *   its event goes out (RegistryVersions), and every process reads again, every REGISTRY_RESYNC_MS, a
+ *   registry whose mark moved since it read it. So a removed peer or a closed opening stays in force on
+ *   another process for at most that long. A mark counts as read only after a read: a process reads
+ *   every registry once when it first listens, because it loaded them earlier in its start and a change
+ *   made in between came as no event. With one process per node (the default) there are no marks, no
+ *   timer and no read at the first listen.
+ * @structure MAX_MESSAGE_BYTES · RELOAD_WAIT_MS · REGISTRY_RESYNC_MS · RegistryVersions · storedRegistryVersions ·
+ *   RemoteReload · encodeMessage · createBusRelay · startBusRelay · stopBusRelays
+ * @usage const relay = await startBusRelay(storage, config.nodeId, reloads, { severalProcesses }); // null on SQLite
  * @version-history
+ *   2026-11-08 — The mcpSessionsClose channel (mcp/session-registry.ts; secaudit2026nov08b round 15b).
+ *   v1.1.1 — 2026-11-08 — Several processes: the registries are read once after the first listen, so a
+ *     change another process made while this one started is in force; publish counts its own new mark
+ *     as read only when the mark before it was the one read here (secaudit2026nov08b round 15,
+ *     bus-relay.ts:resync/first-mark-taken-without-read). The accountErased channel (owner-erasure.ts).
+ *   v1.1.0 — 2026-11-08 — Registry marks and the resync timer on a node with several processes, so a
+ *     lost event cannot keep a removed peer or a closed opening in force (secaudit2026nov08 round 14,
+ *     registry-reload/no-resync-after-lost-notify); the aiJobCancel and tunnelControl channels.
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import { randomUUID } from 'node:crypto';
@@ -52,7 +70,48 @@ const PART_TTL_MS = 30_000;
 /** At most this many cut messages are joined at once. */
 const MAX_JOINING = 256;
 
-const CHANNELS: ReadonlySet<string> = new Set<BusChannelName>(['change', 'delivery', 'task-moved', 'publicActivity', 'memoryWritten', 'rowsAppended', 'appChange']);
+const CHANNELS: ReadonlySet<string> = new Set<BusChannelName>(['change', 'delivery', 'task-moved', 'publicActivity', 'memoryWritten', 'rowsAppended', 'appChange', 'aiJobCancel', 'tunnelControl', 'accountErased', 'mcpSessionsClose']);
+
+/** How often a process with several siblings compares the registries' stored marks with what it read (resync). */
+export const REGISTRY_RESYNC_MS = 30_000;
+
+/**
+ * Where each registry's change mark is stored, for a node with several processes. The process that
+ * makes a change writes a new mark before its event goes out; every process compares the marks with
+ * the ones it read on a timer and reads a registry again whose mark moved. So a lost event (a send
+ * that failed, a crash before the send, a listening connection that went deaf without ending) keeps a
+ * removed peer or a closed opening in force for at most REGISTRY_RESYNC_MS, not until a restart.
+ * A change written to storage without the node (no new mark) is not picked up by the timer.
+ */
+export interface RegistryVersions {
+  /** The current mark of the registry `domain` names, or null when none was written yet. */
+  read(domain: string): Promise<string | null>;
+  /** Write a new mark for `domain` and answer it. */
+  bump(domain: string): Promise<string>;
+}
+
+/** The marks as memory records of the node's system identity, one per registry. */
+export function storedRegistryVersions(storage: Pick<Storage, 'getMemory' | 'setMemory'>, nodeId: string): RegistryVersions {
+  const owner = `system@${nodeId}`;
+  const key = (domain: string) => `bus.registry-version.${domain}`;
+  return {
+    async read(domain) {
+      const v = (await storage.getMemory(owner, key(domain)))?.value as { mark?: unknown } | undefined;
+      return typeof v?.mark === 'string' ? v.mark : null;
+    },
+    async bump(domain) {
+      const existing = await storage.getMemory(owner, key(domain));
+      const now = new Date().toISOString();
+      const mark = randomUUID();
+      await storage.setMemory({
+        key: key(domain), ownerGaii: owner, value: { mark, at: now }, visibility: 'private',
+        tags: ['bus'], ttlHours: null, version: existing ? existing.version + 1 : 1,
+        createdAt: existing?.createdAt ?? now, updatedAt: now,
+      });
+      return mark;
+    },
+  };
+}
 
 /** One registry this process keeps in memory, read again when another process changed it. */
 export interface RemoteReload {
@@ -110,6 +169,8 @@ export interface BusRelay extends BusTransport {
   receive(payload: string): void;
   /** Read every registry again (after the wire was down). */
   reloadAll(): Promise<void>;
+  /** Read again every registry whose stored mark moved since this process read it (RegistryVersions). A no-op without marks. */
+  resync(): Promise<void>;
   /** Resolves when everything received so far was told and everything published so far was sent. */
   idle(): Promise<void>;
 }
@@ -121,13 +182,30 @@ export interface BusRelayOptions {
   reloads?: readonly RemoteReload[];
   processId?: string;
   reloadWaitMs?: number;
+  /** The registries' stored marks: given on a node with several processes only (startBusRelay). */
+  versions?: RegistryVersions;
 }
 
 /** A relay that is not yet anybody's transport and listens to nothing: startBusRelay wires it. */
 export function createBusRelay(opts: BusRelayOptions): BusRelay {
   const processId = opts.processId ?? randomUUID();
   const waitMs = opts.reloadWaitMs ?? RELOAD_WAIT_MS;
-  const reloads = (opts.reloads ?? []).map(r => ({ ...r, request: singleFlight(r.name, () => r.run()) }));
+  const versions = opts.versions;
+  // The mark each registry had when this process last read it; a read takes the mark first, so a
+  // change made during the read moves the mark again and is read at the next resync.
+  const seen = new Map<string, string | null>();
+  const markOf = (r: RemoteReload): string => r.domains[0] ?? r.name;
+  const readMark = (r: RemoteReload): Promise<string | null | undefined> => versions
+    ? versions.read(markOf(r)).catch((err: unknown) => { logger.warn('bus: a registry mark was not read', { registry: r.name, error: String(err) }); return undefined; })
+    : Promise.resolve(undefined);
+  const reloads = (opts.reloads ?? []).map(r => ({
+    ...r,
+    request: singleFlight(r.name, async () => {
+      const mark = await readMark(r);
+      await r.run();
+      if (mark !== undefined) seen.set(r.name, mark);
+    }),
+  }));
 
   let outbox: string[] = [];
   let flushScheduled = false;
@@ -187,6 +265,31 @@ export function createBusRelay(opts: BusRelayOptions): BusRelay {
   return {
     processId,
     publish(channel, evt) {
+      if (versions && channel === 'change') {
+        // A registry change: its new mark is written before the event goes out (the send waits on
+        // the same chain), so a process that hears the event and reads the registry reads the new
+        // mark with it, and one that misses the event finds the mark moved at its next resync.
+        const domain = (evt as ChangeEvent).domain;
+        const due = reloads.filter(r => r.domains.includes(domain));
+        if (due.length) {
+          sending = sending.then(async () => {
+            // This process made the change and holds it, so the new mark counts as read here, but
+            // only when the mark before it is the one this process read. Otherwise another process
+            // changed the registry since, its event may be lost, and the mark stays unread so the next
+            // resync reads the registry once (secaudit2026nov08b round 15).
+            await Promise.all(due.map(async (r) => {
+              const before = await readMark(r);
+              try {
+                const mark = await versions.bump(markOf(r));
+                if (before !== undefined && seen.has(r.name) && seen.get(r.name) === before) seen.set(r.name, mark);
+              } catch (err) {
+                logger.warn('bus: a registry mark was not written; other processes rely on the event alone', { registry: r.name, error: String(err) });
+              }
+            }));
+          });
+          if (!flushScheduled) { flushScheduled = true; setImmediate(flush); }
+        }
+      }
       const messages = encodeMessage(processId, channel, evt);
       if (messages.length === 0) {
         logger.warn('bus: an event too long for the other processes was told in this process only', { channel, limitBytes: MAX_MESSAGE_BYTES });
@@ -216,6 +319,17 @@ export function createBusRelay(opts: BusRelayOptions): BusRelay {
     async reloadAll() {
       await Promise.all(reloads.map(r => r.request()));
     },
+    async resync() {
+      if (!versions) return;
+      await Promise.all(reloads.map(async (r) => {
+        const mark = await readMark(r);
+        if (mark === undefined) return;
+        if (!seen.has(r.name)) { seen.set(r.name, mark); return; }
+        if (seen.get(r.name) === mark) return;
+        logger.info('bus: a registry changed on another process with no event here; reading it again', { registry: r.name });
+        await r.request();
+      }));
+    },
     async idle() {
       if (flushScheduled) flush();
       await Promise.all([sending, telling]);
@@ -223,7 +337,7 @@ export function createBusRelay(opts: BusRelayOptions): BusRelay {
   };
 }
 
-interface Running { relay: BusRelay; wire: BusWire; detach: () => void }
+interface Running { relay: BusRelay; wire: BusWire; detach: () => void; timer?: ReturnType<typeof setInterval> }
 // process-local: the relays this process runs, one per node it serves, so a stop closes their connections.
 const running = new Set<Running>();
 
@@ -233,12 +347,25 @@ const running = new Set<Running>();
  * loaded. A failed first connection is logged and retried by the wire; until it listens, events from
  * other processes do not arrive here, and this process's still go out.
  */
-export async function startBusRelay(storage: Storage, nodeId: string, reloads: readonly RemoteReload[]): Promise<BusRelay | null> {
+export async function startBusRelay(
+  storage: Storage, nodeId: string, reloads: readonly RemoteReload[], opts: { severalProcesses?: boolean } = {},
+): Promise<BusRelay | null> {
   const wire = storage.busWire?.();
   if (!wire) return null;
-  const relay = createBusRelay({ wire, nodeId, reloads });
+  // Several processes: the registries carry stored marks, and a timer reads again what moved
+  // (RegistryVersions). One process, the default: neither, as before 2026-11-08.
+  const versions = opts.severalProcesses ? storedRegistryVersions(storage, nodeId) : undefined;
+  const relay = createBusRelay({ wire, nodeId, reloads, ...(versions ? { versions } : {}) });
   const detach = addBusTransport(relay);
-  running.add({ relay, wire, detach });
+  const run: Running = { relay, wire, detach };
+  if (versions) {
+    // The marks as they are now. They count as read only after the read once listening (below).
+    await relay.resync();
+    // process-local: each process compares the stored marks with what it read; the marks are in storage.
+    run.timer = setInterval(() => { void relay.resync(); }, REGISTRY_RESYNC_MS);
+    run.timer.unref?.();
+  }
+  running.add(run);
   try {
     await wire.listen({
       message: (payload) => relay.receive(payload),
@@ -247,6 +374,11 @@ export async function startBusRelay(storage: Storage, nodeId: string, reloads: r
         void relay.reloadAll();
       },
     });
+    // Several processes: the registries were loaded early in this process's start, and a change
+    // another process made between that load and this listen arrived as no event. They are read once
+    // now that events arrive, each read taking its mark first. A first listen that failed is made
+    // good by `reconnected` above (secaudit2026nov08b round 15, resync/first-mark-taken-without-read).
+    if (versions) await relay.reloadAll();
   } catch (err) {
     logger.warn('bus: not listening to the other processes yet; the connection is retried', { error: String(err) });
   }
@@ -258,6 +390,7 @@ export async function stopBusRelays(): Promise<void> {
   const all = [...running];
   running.clear();
   for (const r of all) {
+    if (r.timer) clearInterval(r.timer);
     r.detach();
     await r.relay.idle().catch((err: unknown) => { logger.warn('bus: events were left unsent at the stop', { error: String(err) }); });
     await r.wire.close().catch((err: unknown) => { logger.warn('bus: the listening connection did not close cleanly at the stop', { error: String(err) }); });
