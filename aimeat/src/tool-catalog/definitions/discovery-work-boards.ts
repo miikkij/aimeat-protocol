@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-09 — aimeat_admin_hooks says five gates and six moments that are only told, as HOOK_NAMES
+ *     in services/hooks.ts has them (it said four and seven).
  *   2026-11-08 — aimeat_admin_incident_resolve decides a lock of the erased lock holders incident
  *     ("pseudonymise" or "keep") (secaudit2026nov08 round 14b).
  *   2026-11-06 — aimeat_storage_download says that a mailbox attachment opens with messages:read-as-owner.
@@ -727,7 +729,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_admin_hooks',
-        description: 'Operator-only. The Hooks page in one read: the eleven moments in this node\'s life where it can call out to somebody\'s own code, which four of them DECIDE whether the thing happens (a pre_ hook can refuse a registration, a work request, a board post or a new federation peer) and which seven are only told afterwards, what is bound to each and whether that action is still published and still carries an address, which actions could be bound, and every call the node has made with what came back. Read this before advising anyone about hooks: a bound gate whose address stops answering refuses everything it guards, and `failing` names any gate in that state. The same data as GET /v1/admin/hooks. Returns an operator-role error for non-operators.',
+        description: 'Operator-only. The Hooks page in one read: the eleven moments in this node\'s life where it can call out to somebody\'s own code, which five of them DECIDE whether the thing happens (a pre_ hook can refuse an owner\'s registration, an agent\'s registration, a work request, a board post or a new federation peer) and which six are only told afterwards, what is bound to each and whether that action is still published and still carries an address, which actions could be bound, and every call the node has made with what came back. Read this before advising anyone about hooks: a bound gate whose address stops answering refuses everything it guards, and `failing` names any gate in that state. The same data as GET /v1/admin/hooks. Returns an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Hooks', readOnlyHint: true },

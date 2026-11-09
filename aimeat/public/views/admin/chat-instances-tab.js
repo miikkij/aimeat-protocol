@@ -11,6 +11,9 @@
  *   - ChatInstancesTab({ data, reload }): operator-channel CRUD + chat-session list
  *
  * @version-history
+ *   v1.3.0 — 2026-11-09 — The sessions show two figures, your own (the list) and the whole server's
+ *     (the menu's count), and say that the list holds your own; it showed one count beside a menu
+ *     count that disagreed with it (guidance audit 2026-11-09).
  *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself (the Message is `plain`, so its body is a text node), so a channel name, a message
  *     body, an author or an app name with a quote or an ampersand showed as &quot; / &amp;.
@@ -184,9 +187,14 @@ export default function ChatInstancesTab({ data, reload }) {
     <//>
 
     <!-- AI Chat Instances -->
+    ${/* GET /v1/chat-instances answers with the caller's own sessions; the menu's count is the whole
+          server's (GET /v1/admin/dashboard counts.chat_instances). Both are named, so they never
+          read as one number that disagrees with itself. */''}
     <${StatsGrid} items=${[
-      { label: t('dashboard.totalSessions'), value: sessions.length, tone: 'cyan' },
+      { label: t('dashboard.chatOwnSessions'), value: sessions.length, tone: 'cyan' },
+      { label: t('dashboard.chatServerSessions'), value: data.dash?.counts?.chat_instances ?? sessions.length, tone: 'green' },
     ]} />
+    <${Note} kind="hint">${t('dashboard.chatOwnOnly')}<//>
 
     ${!sessions.length
       ? html`<${Empty} text=${t('dashboard.noChatInstances')} />`

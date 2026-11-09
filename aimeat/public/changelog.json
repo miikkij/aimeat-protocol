@@ -2,6 +2,28 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-11-09",
+      "kind": "feature",
+      "id": "2026-11-09-explain-this-page-to-me",
+      "highlight": true,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Explain this page to me",
+        "fi": "Selitä tämä sivu minulle"
+      },
+      "summary": {
+        "en": "Copy one prompt into any AI chat, and it explains the page for your role and at your level.",
+        "fi": "Kopioi yksi kehote mihin tahansa tekoälykeskusteluun, ja se selittää sivun roolisi ja osaamisesi mukaan."
+      },
+      "body": {
+        "en": "Every page of Settings & Controls and the admin has a prompt that you copy into any AI chat. It carries what the page is and who you are, so your AI explains the page for your role and at your level. The admin pages now also open with what the page is for and what to do first.",
+        "fi": "Jokaisella Asetukset ja hallinta -sivulla ja ylläpidon sivulla on nyt kehote, jonka kopioit mihin tahansa tekoälykeskusteluun. Siinä on sivun selitys ja tieto siitä, kuka olet, joten tekoälysi selittää sivun roolisi ja osaamisesi mukaan. Ylläpidon sivut kertovat nyt myös ensimmäiseksi, mihin sivu on ja mitä teet ensin."
+      }
+    },
+    {
       "date": "2026-11-08",
       "kind": "fix",
       "id": "2026-11-08-an-extensions-refusal-says-why",
