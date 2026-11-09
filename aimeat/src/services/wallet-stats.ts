@@ -9,13 +9,17 @@
  *   sign and the kind of every row. `ledger_sum` and `unrecorded` exist because the daily pace
  *   credits the balance without writing a row: the difference between the balance and the rows is
  *   what accrued on its own, and a page can say so instead of showing "allowance received 0".
- * @structure lifetimeOf(transactions, balance) → WalletLifetime
+ * @structure lifetimeOf(transactions, balance) → WalletLifetime ·
+ *   lifetimeFromTypeSums(sums, balance) → the same figures from the database's per-type totals
  * @usage const lifetime = lifetimeOf(rows, ghii.morselBalance ?? 0);
  * @version-history
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
  *   v1.1.0 — 2026-10-11 — A `pacing_pack` row (pacing capacity bought with money) is not earned.
+ *   v1.2.0 — 2026-11-09 — lifetimeFromTypeSums: the figures from per-type totals the database sums,
+ *     so GET /v1/wallet no longer reads every row of the ledger.
  */
 import type { WalletTransaction } from '../storage/interface.js';
+import type { TransactionTypeSum } from '../storage/repositories/wallet.repository.js';
 
 /** Row kinds that are the pace, a gift or a purchase rather than something earned from somebody. */
 const GRANTED = new Set(['allowance', 'daily_allowance', 'welcome_bonus', 'mint', 'pacing_pack']);
@@ -64,5 +68,38 @@ export function lifetimeOf(transactions: readonly WalletTransaction[], balance: 
     earned, spent, received_allowance: receivedAllowance, welcome_bonus: welcomeBonus,
     in: inSum, out: outSum, ledger_sum: ledgerSum, unrecorded: (Number(balance) || 0) - ledgerSum,
     by_type: byType, total_rows: transactions.length,
+  };
+}
+
+/**
+ * The same figures as lifetimeOf, from the database's per-type totals (storage.sumTransactionsByType
+ * with the principal) instead of the rows. Each type's positive part is (total + absTotal) / 2 and its
+ * negative part (total − absTotal) / 2, so nothing a row could say is lost. GET /v1/wallet read up to
+ * 100 000 rows on every page's header for these: 172 ms at 50 000 rows on PostgreSQL (2026-11-09).
+ */
+export function lifetimeFromTypeSums(sums: readonly TransactionTypeSum[], balance: number): WalletLifetime {
+  let earned = 0, receivedAllowance = 0, welcomeBonus = 0, inSum = 0, outSum = 0, ledgerSum = 0, rows = 0;
+  const byType: Record<string, { count: number; sum: number }> = {};
+  for (const s of sums) {
+    const type = String(s.type || 'unknown');
+    const total = Number(s.total) || 0;
+    const abs = Number(s.absTotal) || 0;
+    const positive = (total + abs) / 2;
+    const negative = (abs - total) / 2;
+    const slot = byType[type] || (byType[type] = { count: 0, sum: 0 });
+    slot.count += Number(s.count) || 0;
+    slot.sum += total;
+    rows += Number(s.count) || 0;
+    ledgerSum += total;
+    inSum += positive;
+    outSum += negative;
+    if (type === 'allowance' || type === 'daily_allowance') receivedAllowance += positive;
+    else if (type === 'welcome_bonus') welcomeBonus += positive;
+    if (!GRANTED.has(type)) earned += positive;
+  }
+  return {
+    earned, spent: outSum, received_allowance: receivedAllowance, welcome_bonus: welcomeBonus,
+    in: inSum, out: outSum, ledger_sum: ledgerSum, unrecorded: (Number(balance) || 0) - ledgerSum,
+    by_type: byType, total_rows: rows,
   };
 }

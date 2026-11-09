@@ -11,6 +11,8 @@
  *   - GET  /v1/wallet/history      — deprecated alias for /transactions
  *   - POST /v1/wallet/request      — request daily allowance morsels
  * @version-history
+ *   2026-11-09 — GET /v1/wallet computes `lifetime` from per-type totals the database sums
+ *     (lifetimeFromTypeSums) instead of reading up to 100 000 rows; the answer is the same.
  *   2026-10-15 — POST /v1/wallet/request grants the day's morsels once a day (grantDailyAllowance;
  *     409 ALREADY_GRANTED_TODAY), the grant the daily job makes (feature-list audit 135).
  *   v1.1.0 — 2026-07-27 — Transactions carry `initiator_gaii`: who made the call, beside whose balance
@@ -47,7 +49,7 @@ import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { cached, TTL } from '../services/cache.js';
 import { createWalletTabService } from '../services/db/wallet-tab-db-service.js';
-import { lifetimeOf } from '../services/wallet-stats.js';
+import { lifetimeFromTypeSums } from '../services/wallet-stats.js';
 import { resolvePacingToll } from '../services/extension-access/pacing.js';
 import { pacingPackOffer } from '../commerce/pacing-pack.js';
 
@@ -78,7 +80,9 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
 
     const identity = ghiiRecord.ghii;
     const balance = ghiiRecord.morselBalance ?? 0;
-    const transactions = await storage.getTransactions(identity, 100_000);
+    // Per-type totals summed by the database: every page's header asks this route, and reading the
+    // rows (up to 100 000) to add them up cost 172 ms at 50 000 rows on PostgreSQL (2026-11-09).
+    const typeSums = await storage.sumTransactionsByType(undefined, identity);
 
     // Escrow is tracked per identity (work items name the person's GHII or an agent's GAII), so iterate
     // both. Cached 60s per owner — this is a full work-item scan per identity and the wallet polls on
@@ -95,8 +99,8 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       ['domain:work', 'domain:wallet'],
     );
 
-    // Lifetime figures from every row kind, computed once for this route and the tab's composite.
-    const lifetime = lifetimeOf(transactions, balance);
+    // Lifetime figures from every row kind, the same ones the tab's composite computes from its rows.
+    const lifetime = lifetimeFromTypeSums(typeSums, balance);
 
     const isAgentSession = req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner');
     const defaultToll = resolvePacingToll(config, null);

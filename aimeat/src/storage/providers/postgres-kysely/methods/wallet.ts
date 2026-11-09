@@ -10,6 +10,7 @@
  *   2026-10-31 — sumTransactionsSince takes an optional counterparty, for the per-peer settlement ceiling
  *     (services/settlement-ceiling.ts; secaudit2026oct31w2 round 10).
  *   2026-10-16 — getTransactions breaks a timestamp tie by id, the order SQLite uses (QA audit D4-04).
+ *   2026-11-09 — sumTransactionsByType(since, gaii): one principal's ledger, resolved as getTransactions resolves it.
  *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
@@ -78,7 +79,7 @@ export const walletMethods = {
     const rows = await this.db.selectFrom('Transaction').selectAll().orderBy('timestamp', 'desc').limit(Math.min(limit, 10000)).execute();
     return rows.map(mapTx);
   },
-  async sumTransactionsByType(this: PostgresKyselyStorage, since?: string): Promise<TransactionTypeSum[]> {
+  async sumTransactionsByType(this: PostgresKyselyStorage, since?: string, gaii?: string): Promise<TransactionTypeSum[]> {
     let q = this.db.selectFrom('Transaction').select([
       'type',
       sql<string>`count(*)`.as('count'),
@@ -86,6 +87,7 @@ export const walletMethods = {
       sql<string>`coalesce(sum(abs("amount")), 0)`.as('absTotal'),
     ]);
     if (since) q = q.where('timestamp', '>=', new Date(since));
+    if (gaii) q = q.where('gaii', '=', (await resolveGhii(this.db, gaii)) ?? gaii);
     const rows = await q.groupBy('type').execute();
     // count and sum come back as strings (bigint / numeric); the totals fit a JS number.
     return rows.map(r => ({ type: r.type, count: Number(r.count), total: Number(r.total), absTotal: Number(r.absTotal) }));

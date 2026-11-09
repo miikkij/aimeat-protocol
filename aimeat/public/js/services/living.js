@@ -18,6 +18,8 @@
  *   - instances: listInstances / readInstance / addSource / deriveSlotFromSources / setSlotContent
  *   - render: renderInstanceMarkdown(instance)
  * @version-history
+ *   v1.0.2 — 2026-11-09 — parseConfigKey takes dot-free organism and workspace ids, as the server's
+ *     copies do (code scanning alert 1784).
  *   v1.0.1 — 2026-10-04 — Waiting for an agent task stops on a declined task as on a failed one.
  *   v1.0.0 — 2026-06-21 — Phase 0: templates + deploy + manual derive + assemble/render.
  */
@@ -198,7 +200,8 @@ export async function deployTemplate(template, orgId, wsId) {
 
 /** Parse a living config key → loc, or null. e.g. organism.{org}.w.{ws}.living.{docId}.latest */
 function parseConfigKey(key) {
-  const m = /^organism\.(.+?)\.w\.(.+?)\.living\.([^.]+)\.latest$/.exec(key);
+  // Organism and workspace ids hold no dot; `[^.]+` keeps the match linear (code scanning 1784).
+  const m = /^organism\.([^.]+)\.w\.([^.]+)\.living\.([^.]+)\.latest$/.exec(key);
   return m ? { orgId: m[1], wsId: m[2], docId: m[3] } : null;
 }
 

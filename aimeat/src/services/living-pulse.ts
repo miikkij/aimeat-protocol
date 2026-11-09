@@ -25,6 +25,7 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-11-09 — CONFIG_RE takes dot-free organism and workspace ids (code scanning alert 1784).
  *   2026-11-08 — livingSpendHold takes the config the pulse runs, so the owner's allowance for a writer
  *     of another account is matched against exactly that content (secaudit2026nov08 round 14).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
@@ -105,7 +106,9 @@ import { livingSpendHold, pulseSpender, spenderOfOtherAccount } from './living-p
 export interface LivingNotify { push?: PushService; email?: EmailService }
 
 interface Loc { orgId: string; wsId: string; docId: string }
-const CONFIG_RE = /^organism\.(.+?)\.w\.(.+?)\.living\.([^.]+)\.latest$/;
+// Organism and workspace ids hold no dot (services/write-guards.ts KEY_RE); `[^.]+` keeps the match
+// linear where two lazy `.+?` around `.w.` backtracked polynomially (code scanning 1784).
+const CONFIG_RE = /^organism\.([^.]+)\.w\.([^.]+)\.living\.([^.]+)\.latest$/;
 const MAX_PER_SCAN = 25;           // safety cap per scheduler tick
 const DERIVE_SYSTEM =
   'You maintain ONE section of a living document. Rewrite the section so it is current, concise and well-organized, using ONLY the sources provided. Keep strictly to the section scope. Output clean markdown only — no preamble. Cite sources inline as 〔origin〕 where useful. Do not invent facts beyond the sources.';

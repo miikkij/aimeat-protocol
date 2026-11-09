@@ -28,6 +28,8 @@
  * @structure isLivingConfigLatestKey · holderLivingStatus
  * @usage const value = holderLivingStatus(`${base}.latest`, draftValue, existingLatest?.value, publisherGhii, holderGhii);
  * @version-history
+ *   v1.0.2 -- 2026-11-09 -- The key pattern takes dot-free organism and workspace ids, so it no longer
+ *     backtracks polynomially on a crafted key (code scanning alert 1784, js/polynomial-redos).
  *   v1.0.1 -- 2026-11-08 -- Moved from src/services/living-config-publish.ts into a domain folder
  *     (check:services-flat); no behaviour change.
  *   v1.0.0 -- 2026-11-08 -- Initial (secaudit2026nov08b round 15,
@@ -35,7 +37,9 @@
  */
 import { canonicalJson } from '../../utils/memory-content.js';
 
-const LIVING_LATEST_RE = /^organism\.(.+?)\.w\.(.+?)\.living\.([^.]+)\.latest$/;
+// Organism and workspace ids hold no dot (services/write-guards.ts KEY_RE), so each segment is
+// `[^.]+`: two lazy `.+?` around `.w.` backtracked polynomially on a crafted key (code scanning 1784).
+const LIVING_LATEST_RE = /^organism\.([^.]+)\.w\.([^.]+)\.living\.([^.]+)\.latest$/;
 
 /** A living-document config's published key (services/living-pulse.ts CONFIG_RE). */
 export const isLivingConfigLatestKey = (key: string): boolean => LIVING_LATEST_RE.test(key);
