@@ -10,6 +10,7 @@ $reviewProfile = Join-Path $reviewRoot 'profile'
 $reviewRoaming = Join-Path $reviewProfile 'AppData/Roaming'
 $reviewLocal = Join-Path $reviewProfile 'AppData/Local'
 foreach ($folder in @($reviewData, $reviewProfile, $reviewRoaming, $reviewLocal,
+  (Join-Path $reviewProfile 'Desktop'), (Join-Path $reviewProfile 'Documents'),
   (Join-Path $reviewProfile '.claude'), (Join-Path $reviewProfile '.cursor'),
   (Join-Path $reviewProfile '.codex'), (Join-Path $reviewRoaming 'Code/User'))) {
   New-Item -ItemType Directory -Force -Path $folder | Out-Null

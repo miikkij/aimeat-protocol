@@ -33,9 +33,10 @@
 dialog {
   color: var(--text); background: var(--card-bg); border: 2px solid var(--text);
   width: min(38rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);
-  overflow: auto; padding: 1.5rem; box-sizing: border-box;
+  overflow: auto; margin: auto; padding: 1.5rem; box-sizing: border-box;
 }
 dialog::backdrop { background: var(--bg); opacity: .8; }
+dialog .poster-action { max-width: 100%; white-space: normal; text-align: left; }
 #restoreSummary, #backupResult, #lastBackup, #stateError { overflow-wrap: anywhere; white-space: pre-wrap; }
 .service > * { min-width: 0; }
 .service select { min-height: 2.5rem; max-width: 100%; }
