@@ -22,6 +22,8 @@
  * @structure ContextsTab() — state + handlers → renderContextsView(ctx)
  * @usage registered in profile.js TABS as id 'contexts'.
  * @version-history
+ *   v1.1.0 — 2026-11-09 — DRAFT: the chosen context's fingerprint is read (api.fingerprint) when the
+ *     choice or its version changes, for the view's fingerprint part.
  *   v1.0.0 — 2026-11-08 — Initial.
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -92,6 +94,18 @@ export default function ContextsTab({ session, showToast }) {
     return () => { live = false; };
   }, [needsOrgs]);
 
+  // The chosen context's fingerprint, read when the choice or its version changes (draft, 2026-11-09).
+  const [fingerprint, setFingerprint] = useState(null);
+  const fpKey = current ? `${current.key}@${current.version}` : '';
+  useEffect(() => {
+    if (!fpKey) return undefined;
+    let live = true;
+    const key = fpKey.slice(0, fpKey.lastIndexOf('@'));
+    setFingerprint({ key, loading: true });
+    api.fingerprint(key).then((fp) => { if (live) setFingerprint({ key, ...(fp || { profile: null }) }); });
+    return () => { live = false; };
+  }, [fpKey]);
+
   // A context opened from the address that sits in the archive opens the archive group too.
   useEffect(() => { if (current?.archivedAt && current.key === selected) setArchivedOpen(true); }, [current, selected]);
 
@@ -159,7 +173,7 @@ export default function ContextsTab({ session, showToast }) {
     archivedOpen, toggleArchived: () => setArchivedOpen((o) => !o),
     viewsOpen, setViewOpen: (id, view) => setViewsOpen((m) => ({ ...m, [id]: view })),
     deleted, restore, dismissDeleted: () => setDeleted(null),
-    archive, bringBack, setReaders, remove,
+    archive, bringBack, setReaders, remove, fingerprint,
     copied: () => toast(x('copiedToast')),
   };
   return renderContextsView(ctx);

@@ -129,6 +129,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'instruction-block': ['explain', 'copy'], 'contact-picker': ['pick', 'search'], tags: ['pick', 'list'], 'app-sandbox': ['view', 'open'], 'html-page-frame': ['view', 'open'],
     'own-aimeat': ['explain', 'navigate'],
     'store-door': ['navigate', 'status'],
+    fingerprint: ['view', 'explain'],
     // The shell and the parts catalogued on 2026-09-24
     'page-base': ['layout'], 'top-bar': ['navigate', 'notify'], button: ['act'], 'copy-button': ['copy'], card: ['layout', 'view'],
     badge: ['status'], pill: ['status'], seg: ['pick'], 'start-page': ['pick', 'edit'], 'status-dot': ['status'],

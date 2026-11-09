@@ -47,6 +47,14 @@ export const api = {
   /** To the bin: the answer carries restorable_until. */
   remove: async (key) => (await apiDelete(`/v1/memory/${enc(key)}`))?.data,
   restore: async (key) => (await apiPost(`/v1/memory/${enc(key)}/restore`, {}))?.data,
+  /** The fingerprint the person's AI made of a context (GET /v1/content/facts), or null when there is none. */
+  fingerprint: async (key) => {
+    const d = await apiGet(`/v1/content/facts?kind=memory&key=${enc(key)}&with_profile=true`).then((r) => r?.data, () => null);
+    const profile = d?.facts?.profile;
+    return profile && Array.isArray(profile.sections)
+      ? { profile, sections: d.profile_sections ?? null, madeAt: profile.at ?? null }
+      : null;
+  },
 };
 
 /** The slug of a context key: context.lisbon-trip → lisbon-trip. */

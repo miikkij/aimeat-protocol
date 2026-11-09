@@ -15,9 +15,11 @@
  *   Pure render over the ctx bag of contexts-tab.js; every part is a library component, and the
  *   file writes no class.
  * @structure renderContextsView · listPart · contextRow · deletedNote · detailPart · headPart ·
- *   corePart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
+ *   fingerprintPart · corePart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
  * @usage import { renderContextsView } from './contexts/view.js';
  * @version-history
+ *   v1.4.0 — 2026-11-09 — DRAFT for the developer's look: the fingerprint as the first numbered part
+ *     (components/Fingerprint.js, the drawing Pages shows), or the sentence that asks the AI for one.
  *   v1.3.0 — 2026-11-08 — The guidance follows the page-guidance rule: the page's own introduction is
  *     gone, and the head's paragraph, the title's question mark (concept.context), the standard
  *     PageStart and the list's empty line carry it; the view toggle lost its tooltip-only words.
@@ -50,6 +52,7 @@ import { Box } from '/components/Box.js';
 import { Markdown } from '/components/Markdown.js';
 import { Peek, nextPeek } from '/components/Peek.js';
 import { Beside, Stack, Touch } from '/components/Layout.js';
+import { Fingerprint } from '/components/Fingerprint.js';
 import { x, xn, marksOf, readersWords, OWN_READERS, chatSentence, crumb, CONTEXT_PREFIX } from './frame.js';
 
 const html = htm.bind(h);
@@ -130,7 +133,7 @@ function deletedNote(ctx) {
 
 function detailPart(ctx, c) {
   if (!c) return null;
-  const parts = [corePart, conceptsPart, referencesPart, linksPart, viewsPart];
+  const parts = [fingerprintPart, corePart, conceptsPart, referencesPart, linksPart, viewsPart];
   let n = 0;
   const numbered = parts.map((part) => part(ctx, c, () => String(++n).padStart(2, '0')));
   return html`
@@ -176,6 +179,41 @@ function headPart(ctx, c) {
         <${Action} small control tone="danger" disabled=${ctx.busy} onClick=${() => ctx.remove(c)}>${x('delete')}<//>
       <//>
       <${Note} kind="hint">${x('continueHint', { sentence })}<//>
+    <//>`;
+}
+
+/**
+ * What the context is made of, at a glance: the fingerprint the person's AI made of it (the same
+ * drawing as in Pages). Without one, the sentence that asks the AI for it, to copy into chat. The
+ * fingerprint describes the version it was made of; a context shaped since says so.
+ */
+function fingerprintPart(ctx, c, nextNum) {
+  const fp = ctx.fingerprint;
+  if (!fp || fp.key !== c.key || fp.loading) {
+    return html`<${PageSection} id="ctx-fingerprint" num=${nextNum()} title=${x('fingerprint')}>
+      <${Note} kind="loading" /><//>`;
+  }
+  const ask = x('fingerprintAsk', { name: c.name, key: c.key });
+  if (!fp.profile) {
+    return html`
+      <${PageSection} id="ctx-fingerprint" num=${nextNum()} title=${x('fingerprint')}>
+        <${Note} kind="quiet">${x('noFingerprint')}<//>
+        <${Actions}>
+          <${Action} small control copy=${ask} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${x('fingerprintCopy')}<//>
+        <//>
+        <${Note} kind="hint">${x('fingerprintHint', { sentence: ask })}<//>
+      <//>`;
+  }
+  const older = fp.madeAt && c.shapedAt && String(c.shapedAt) > String(fp.madeAt);
+  return html`
+    <${PageSection} id="ctx-fingerprint" num=${nextNum()} title=${x('fingerprint')}>
+      <${Fingerprint} profile=${fp.profile} sections=${fp.sections} title=${c.name} />
+      <${Note} kind="hint">${older
+        ? x('fingerprintOlder', { date: date(fp.madeAt) })
+        : x('fingerprintMade', { date: date(fp.madeAt) })}<//>
+      ${older ? html`<${Actions}>
+        <${Action} small control copy=${ask} copiedLabel=${x('copied')} onCopied=${() => ctx.copied()}>${x('fingerprintCopy')}<//>
+      <//>` : null}
     <//>`;
 }
 
