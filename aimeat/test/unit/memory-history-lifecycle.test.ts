@@ -4,12 +4,17 @@
  *   pruneMemoryHistory keeps the newest N, and purgeDeletedMemory takes a purged key's history with
  *   it, on every provider (SQLite always, PostgreSQL when DATABASE_URL is set).
  * @version-history
+ *   v1.0.1 — 2026-11-09 — A run that asks for PostgreSQL and has no URL is refused, not run on SQLite
+ *     alone (requirePostgresWhenAsked).
  *   v1.0.0 — 2026-11-09 — Initial (services/context/history-keys.ts).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
+
+requirePostgresWhenAsked('memory-history-lifecycle');
 
 const SQLITE_PATH = `./test/.history-lifecycle-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
