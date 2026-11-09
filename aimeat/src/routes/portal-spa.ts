@@ -22,6 +22,8 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.17.0 — 2026-11-09 — isCurrentAssetTag(): whether a requested `?v=` is the file's current content
+ *     tag, so the static server can let the browser keep that address for good.
  *   v1.16.0 — 2026-11-06 — stampAssets() tags each importmap module and stylesheet with its own
  *     content hash (utils/asset-version.ts) instead of the build stamp, so a deploy changes the
  *     address of the files that changed and of no other. The build stamp stays the fallback for a
@@ -142,6 +144,17 @@ export const BUILD_ID = pageBuildId(runningBuild(), PROCESS_BUILD_ID);
  * checkout reaches the next reload.
  */
 const assetVersionOf: AssetVersioner = publicAssetVersioner(BUILD_ID !== PROCESS_BUILD_ID);
+
+/**
+ * True when `tag` is the current content tag of the public file at `urlPath`, the tag the shell
+ * stamps on it. Such an address names those bytes and no others, so the static server lets the
+ * browser keep it for good (server-bootstrap/static-files.ts). A tag that is not the file's current
+ * one (a page from before a deploy asking for an old address) answers false, so new bytes are never
+ * kept under an old address.
+ */
+export function isCurrentAssetTag(urlPath: string, tag: string): boolean {
+  return tag.length > 0 && assetVersionOf(urlPath) === `?v=${tag}`;
+}
 
 /**
  * Serve spa.html with:
