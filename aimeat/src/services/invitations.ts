@@ -21,6 +21,10 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-11-09 — membershipAfterGrant: what a direct workspace-role grant does about the grantee's
+ *     organism membership. A role granted to an account outside the organism opened nothing; the
+ *     grant now sends that account the name invitation when the granter may invite, and says where
+ *     the grantee stands.
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The emailed-invitation limit is counted in the node's storage (takeInviteEmailOnNode; codebase analysis 2026-11-03, HA stage 2).
@@ -81,6 +85,7 @@ import { nodeContext } from './node-context.js';
 import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
+import { isOrganismOwner } from './organism-ownership.js';
 import { localAccountName } from '../utils/gaii.js';
 import { findWorkspaceRegistration, workspaceRegistrations } from './workspace-meta-read.js';
 import { isValidEmail } from '../utils/email-validator.js';
@@ -759,4 +764,53 @@ export async function addOrganismMember(
   emitChange('notifications', `${invitee}@${config.nodeId}`);
   emitChange('organisms');
   return { membership, grantedWorkspaces };
+}
+
+/**
+ * Where a grantee stands in the organism after a direct workspace-role grant.
+ * - `organism_member` true: the role works now; `invitation` is null.
+ * - `invitation: 'sent'`: this call invited them; the role works once they accept.
+ * - `invitation: 'pending'`: an invitation was already waiting for their answer.
+ * - `invitation: 'needs_admin'`: the granter may not invite; an organism owner or admin must.
+ * - `invitation: 'refused'`: the invitation could not be made; `invitation_refusal` is its code
+ *   (OWNER_NOT_FOUND, BANNED, INVALID_INPUT for an account of another node).
+ */
+export interface GrantMembership {
+  organism_member: boolean;
+  invitation: 'sent' | 'pending' | 'needs_admin' | 'refused' | null;
+  invitation_refusal?: string;
+}
+
+/**
+ * What a direct workspace-role grant does about the grantee's ORGANISM membership. A workspace role
+ * is read only for an active member of the organism (services/workspace-access.ts, gate 1), so a
+ * role granted to an account outside it opened nothing: the grant answered 200, the person was told
+ * they were added, and every read answered "Not an active member of this organism". Both grant
+ * endpoints (POST /v1/organisms/:id/workspace-access/grant and the MCP tool
+ * aimeat_workspace_member_grant) call this after the grant. For a grantee who is not a member it
+ * sends the name invitation, carrying the granted roles, when the granter is an organism owner or
+ * admin: the rule of POST /v1/organisms/:id/invitations. Nobody becomes a member without accepting.
+ */
+export async function membershipAfterGrant(
+  storage: Storage, config: AimeatConfig,
+  input: { orgId: string; grantee: string; granter: string; grants: InvitationWorkspaceGrant[] },
+): Promise<GrantMembership> {
+  const owner = localAccountName(input.grantee);
+  const existing = await storage.getMembership(input.orgId, owner);
+  if (existing?.status === 'active') return { organism_member: true, invitation: null };
+  if (existing?.status === 'invited') return { organism_member: false, invitation: 'pending' };
+  const organism = await storage.getOrganism(input.orgId);
+  if (!organism) return { organism_member: false, invitation: 'refused', invitation_refusal: 'NOT_FOUND' };
+  if (!isOrganismOwner(organism, input.granter) && !organism.admins.includes(input.granter)) {
+    return { organism_member: false, invitation: 'needs_admin' };
+  }
+  try {
+    await createNameInvitation(storage, config, {
+      organism, inviterGhii: input.granter, inviteeRaw: owner, role: 'member', workspaces: input.grants,
+    });
+    return { organism_member: false, invitation: 'sent' };
+  } catch (e) {
+    if (e instanceof InvitationError) return { organism_member: false, invitation: 'refused', invitation_refusal: e.code };
+    throw e;
+  }
 }

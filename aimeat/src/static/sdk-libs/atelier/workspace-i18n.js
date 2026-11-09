@@ -10,6 +10,8 @@
  *   import { tw } from './workspace-i18n.js';
  *   tw('team.title');
  * @version-history
+ *   v0.64.0 — 2026-11-09 — team.grantedInvited, grantedPending, grantedNeedsAdmin, grantedRefused:
+ *     what the team says when an added account is not yet a member of the organism.
  *   v0.63.0 — 2026-10-02 — The team's Invitations tab and invitation into several workspaces; the
  *     picker's private choice and its list of workspaces; follow.private.
  *   v0.62.0 — 2026-10-01 — follow.wait: what a block that follows the picker says before a workspace
@@ -55,6 +57,10 @@ const STRINGS = {
     'team.add': 'Add',
     'team.invite': 'Invite',
     'team.granted': '{who} is now a {role}.',
+    'team.grantedInvited': '{who} is not yet a member of this organism, so they got an invitation. The role works when they accept it.',
+    'team.grantedPending': '{who} has an invitation to this organism that waits for their answer. The role works when they accept it.',
+    'team.grantedNeedsAdmin': '{who} is not a member of this organism. Ask an owner or admin of the organism to invite them. The role works after that.',
+    'team.grantedRefused': '{who} is not a member of this organism, and the invitation could not be sent ({why}). The role works only for a member.',
     'team.declined': 'You declined the request from {who}.',
     'team.removed': '{who} no longer has access.',
     'team.inviteSent': 'Invitation sent to {email}.',
@@ -140,6 +146,10 @@ const STRINGS = {
     'team.add': 'Lisää',
     'team.invite': 'Kutsu',
     'team.granted': '{who} on nyt {role}.',
+    'team.grantedInvited': '{who} ei ole vielä tämän organismin jäsen, joten hän sai kutsun. Rooli tulee voimaan, kun hän hyväksyy kutsun.',
+    'team.grantedPending': '{who} on jo saanut kutsun tähän organismiin, ja kutsu odottaa hänen vastaustaan. Rooli tulee voimaan, kun hän hyväksyy kutsun.',
+    'team.grantedNeedsAdmin': '{who} ei ole tämän organismin jäsen. Pyydä organismin omistajaa tai ylläpitäjää kutsumaan hänet. Rooli tulee voimaan sen jälkeen.',
+    'team.grantedRefused': '{who} ei ole tämän organismin jäsen, eikä kutsua voitu lähettää ({why}). Rooli toimii vain jäsenellä.',
     'team.declined': 'Hylkäsit pyynnön: {who}.',
     'team.removed': 'Käyttäjällä {who} ei enää ole pääsyä.',
     'team.inviteSent': 'Kutsu lähti osoitteeseen {email}.',
@@ -225,6 +235,10 @@ const STRINGS = {
     'team.add': 'Agregar',
     'team.invite': 'Invitar',
     'team.granted': '{who} ahora es {role}.',
+    'team.grantedInvited': '{who} todavía no es miembro de este organismo, así que ha recibido una invitación. El rol funciona cuando la acepte.',
+    'team.grantedPending': '{who} ya tiene una invitación a este organismo que espera su respuesta. El rol funciona cuando la acepte.',
+    'team.grantedNeedsAdmin': '{who} no es miembro de este organismo. Pide a un propietario o administrador del organismo que le invite. El rol funciona después.',
+    'team.grantedRefused': '{who} no es miembro de este organismo y no se pudo enviar la invitación ({why}). El rol solo funciona para un miembro.',
     'team.declined': 'Rechazaste la solicitud de {who}.',
     'team.removed': '{who} ya no tiene acceso.',
     'team.inviteSent': 'La invitación se envió a {email}.',

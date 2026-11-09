@@ -197,12 +197,16 @@ export function workspaceMembers(h) {
     /**
      * Give a person a role, or change the one they hold: POST /v1/organisms/:id/workspace-access/grant
      * { ws, grantee, role }. Needs the organism:invite scope on an app session, and the caller must be
-     * the workspace's creator or an organism owner or admin.
+     * the workspace's creator or an organism owner or admin. A role works only for a member of the
+     * organism: `organism_member` says whether the person is one, and when they are not, `invitation`
+     * says what happened ('sent': the node invited them and the role works once they accept;
+     * 'pending'; 'needs_admin': an organism owner or admin must invite them; 'refused', with
+     * `invitation_refusal`).
      * @param {string} orgId
      * @param {string} wsId
      * @param {string} account  An account name, a GHII or a GAII; the grant goes to the person.
      * @param {'viewer'|'contributor'} role
-     * @returns {Promise<{ ws: string, grantee: string, role: string }>}
+     * @returns {Promise<{ ws: string, grantee: string, role: string, organism_member?: boolean, invitation?: string|null, invitation_refusal?: string }>}
      */
     async grant(orgId, wsId, account, role) {
       var res = await h.authFetch(orgPath(orgId) + '/workspace-access/grant', post({ ws: wsId, grantee: account, role: role }));

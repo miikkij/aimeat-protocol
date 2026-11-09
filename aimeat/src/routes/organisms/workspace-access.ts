@@ -6,6 +6,9 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-09 — POST workspace-access/grant says where the grantee stands in the organism and, for
+ *     an account outside it, sends the organism invitation when the granter may invite
+ *     (services/invitations.ts membershipAfterGrant). The role opened nothing for a non-member before.
  *   2026-11-08 — A code key's list entry and cancel act only on the account the key made (registered
  *     at or before the invitation); after that account's erasure the cancel closes the key and leaves
  *     a later holder of the name alone (secaudit2026nov08 round 14).
@@ -106,7 +109,7 @@ import { workspaceMetaReader } from '../../services/workspace-meta.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { decideAccessRequest, requestStatus } from '../../services/workspace-access-decision.js';
-import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
+import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, membershipAfterGrant, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
@@ -422,7 +425,12 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       i18n: { key: 'workspace_access_granted', vars: { ws: String(ws), role } },
     });
     emitChange('notifications');
-    res.json(success(config.nodeId, { ws, grantee: granteeOwnerName, role }));
+    // A role is read only by an active member of the organism: say where the grantee stands, and
+    // invite an account outside it when the granter may (the MCP grant tool calls the same function).
+    const standing = await membershipAfterGrant(storage, config, {
+      orgId: id, grantee, granter: req.auth!.owner as string, grants: [{ ws: ws as string, role }],
+    });
+    res.json(success(config.nodeId, { ws, grantee: granteeOwnerName, role, ...standing }));
   });
 
   /* ── POST /v1/organisms/:id/workspace-access/revoke — creator/admin removes a member's access.

@@ -49781,13 +49781,21 @@ paths:
   /v1/organisms/{id}/workspace-access/grant:
     post:
       operationId: grantWorkspaceRole
-      summary: Directly grant an existing member a workspace role (no prior request)
+      summary: Directly grant a workspace role (no prior request)
       description: |
         The workspace creator (or an org admin) adds an existing organism member to a workspace with a
         role — `viewer` (read) or `contributor` (read+write) — without a prior access request. `grantee`
         may be an owner name, GHII, or GAII; the grant applies to the OWNER, so all their agents inherit
         it. Modelled as a consent the workspace creator owns on `organism.{id}.w.{ws}.**` (the audit
         record), stamped with its source. Re-granting a different role replaces the prior one.
+
+        A role is read only by an active member of the organism. The answer says where the grantee
+        stands: `organism_member` true, or false with `invitation`. For an account outside the
+        organism the call also sends the organism's name invitation, carrying this role, when the
+        caller is an organism owner or admin (`sent`); `pending` means an invitation already waits,
+        `needs_admin` that the caller manages the workspace and may not invite, and `refused` that
+        the invitation could not be made (`invitation_refusal` carries the code). The role works
+        once the person accepts.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -49804,7 +49812,7 @@ paths:
                 grantee: { type: string, description: Owner name, GHII, or GAII to grant (applies to the owner) }
                 role: { type: string, enum: [viewer, contributor], description: viewer = read; contributor = read+write }
       responses:
-        '200': { description: 'Granted: { ws, grantee, role }' }
+        '200': { description: 'Granted: { ws, grantee, role, organism_member, invitation, invitation_refusal? }' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
