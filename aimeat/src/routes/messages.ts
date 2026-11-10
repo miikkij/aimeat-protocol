@@ -21,6 +21,8 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-11-10 — GET /v1/messages/conversations takes waiting, since, limit and preview (additive), with
+ *     `total`: the Home's waiting band reads the five threads it shows, not the whole list.
  *   2026-11-08 — An attachment's transcription read asks the labels a data package version keeps of a package file (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  *   2026-11-08 — GET /requests answers from MessagesInboxService.pendingRequests, the read the overview
  *     already made, and each request carries `body`, its first message with line breaks.
@@ -502,7 +504,30 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
    * listConversations per agent). Owner is server-derived → only this owner's agents (no cross-owner leak). */
   router.get('/v1/messages/conversations', requireAuth(), requireLocalSession(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const { conversations } = await readOwnerConversations(storage, readerOf(req));
-    res.json(success(config.nodeId, { conversations }));
+    // Additive, for the Home's "waiting for your answer" band, which showed five threads out of a
+    // 236 kB answer: waiting=true keeps the threads whose last message came in, outside the agents'
+    // own mailboxes; since keeps those updated at or after it; limit hands out the first ones in the
+    // list's own order and `total` counts them all; preview cuts each last message to that many
+    // characters. Without them the answer is what it was.
+    const waiting = req.query.waiting === 'true';
+    const sinceRaw = typeof req.query.since === 'string' ? Date.parse(req.query.since) : NaN;
+    const since = Number.isFinite(sinceRaw) ? new Date(sinceRaw).toISOString() : '';
+    const limitRaw = parseInt(String(req.query.limit ?? ''), 10);
+    const previewRaw = parseInt(String(req.query.preview ?? ''), 10);
+    if (!waiting && !since && !Number.isFinite(limitRaw) && !Number.isFinite(previewRaw)) {
+      res.json(success(config.nodeId, { conversations }));
+      return;
+    }
+    const matching = waiting ? conversations.filter(c => c.lastDirection === 'inbound' && !c.viaAgent) : conversations;
+    const kept = since ? matching.filter(c => String(c.updatedAt || '') >= since) : matching;
+    const page = Number.isFinite(limitRaw) ? kept.slice(0, Math.min(200, Math.max(1, limitRaw))) : kept;
+    const preview = Number.isFinite(previewRaw) ? Math.min(2000, Math.max(1, previewRaw)) : 0;
+    res.json(success(config.nodeId, {
+      conversations: preview ? page.map(c => ({ ...c, lastMessage: String(c.lastMessage ?? '').slice(0, preview) })) : page,
+      total: kept.length,
+      // Before `since`: the band shows itself when threads wait outside the chosen window too.
+      total_any_time: matching.length,
+    }));
   });
 
   /* ── GET /v1/messages/overview — the whole inbox mount in ONE call (requests + conversations +

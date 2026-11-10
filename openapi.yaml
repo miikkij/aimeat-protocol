@@ -66641,9 +66641,28 @@ paths:
       description: >-
         Same readers as GET /v1/messages/inbox. The owner in person also sees their agents' threads
         with other people, tagged `viaAgent`; an app or a delegated agent sees the owner's own threads.
+        With any of `waiting`, `since`, `limit` or `preview` the answer also carries `total`, the number
+        of threads that matched before `limit`.
       tags: [Direct Messages]
       security:
         - BearerAuth: []
+      parameters:
+        - name: waiting
+          in: query
+          schema: { type: string, enum: ['true'] }
+          description: Only the threads whose last message came in (`lastDirection` inbound), outside the agents' own mailboxes.
+        - name: since
+          in: query
+          schema: { type: string, format: date-time }
+          description: Only the threads updated at or after this time.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200 }
+          description: The first this many threads, in the list's own order.
+        - name: preview
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 2000 }
+          description: Cut each `lastMessage` to this many characters.
       responses:
         '200':
           description: Conversation summaries
@@ -66661,6 +66680,12 @@ paths:
                             type: array
                             items:
                               $ref: '#/components/schemas/ConversationSummary'
+                          total:
+                            type: integer
+                            description: With waiting, since, limit or preview, the threads that matched before `limit`.
+                          total_any_time:
+                            type: integer
+                            description: With the same parameters, the threads that matched before `since` and `limit`.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

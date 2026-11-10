@@ -17,6 +17,9 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-10: YourTurnBlock asks for the waiting threads of its window only, the first `max` and
+ *     the count of all (GET /v1/messages/conversations?waiting&since&limit&preview); the same rows
+ *     and the same "N more are waiting".
  *   2026-11-09: ThingsBlock reads the owner's own apps (GET /v1/apps?own=true) and walks the node's
  *     whole catalogue only when a favourite is another owner's app, whose chip takes its name from
  *     that list: 600 kB and two requests less on a Home at 288 apps on the node.
@@ -71,10 +74,13 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { useShared } from '/views/surface/shared-read.js';
+
+/** How much of each waiting thread's last message the band asks for; a row shows one line of it. */
+const TURN_PREVIEW = 240;
 import { useHomeState } from '/views/surface/home-state.js';
 import { useHomePrefs } from '/views/surface/home-prefs.js';
 import {
-  MailboxRow, YourTurn, FleetLine, Things, FavoriteApps, Playbooks, TrustLine, Achievements,
+  MailboxRow, YourTurn, FleetLine, Things, FavoriteApps, Playbooks, TrustLine, Achievements, turnWindow,
 } from '/views/home/status-parts.js';
 import { HomeHeader } from '/views/home/header.js';
 import { HomeJourney } from '../home/journey.js';
@@ -185,19 +191,29 @@ function handleOf(id) {
 export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
   const max = Number.isFinite(props.max) ? props.max : 5;
   const { prefs, writePrefs } = useHomePrefs();
-  const { data } = useShared('turn', '/v1/messages/conversations', ['messages'],
-    (d) => (d?.conversations ?? [])
-      .filter((c) => c.lastDirection === 'inbound' && !c.viaAgent)
-      .map((c) => ({
-        id: c.conversationId,
-        who: c.groupAlias || handleOf(c.peerGhii),
-        said: String(c.lastMessage ?? '').trim(),
-        at: c.updatedAt,
-      })));
+  // The server keeps the waiting threads of the window and hands out the first `max` with the count
+  // of all of them (waiting, since, limit, preview): the whole list was 236 kB at a heavy account's
+  // size for five rows. The window starts at the minute, so the address stays the same within it.
+  const span = turnWindow(prefs?.turnDays);
+  const since = span > 0 ? new Date(Math.floor((Date.now() - span * 86400000) / 60000) * 60000).toISOString() : '';
+  const path = `/v1/messages/conversations?waiting=true&limit=${max}&preview=${TURN_PREVIEW}${since ? `&since=${encodeURIComponent(since)}` : ''}`;
+  const { data } = useShared(`turn|${span}|${max}|${since}`, path, ['messages'],
+    (d) => ({
+      total: d?.total ?? null,
+      anyTime: d?.total_any_time ?? null,
+      threads: (d?.conversations ?? [])
+        .filter((c) => c.lastDirection === 'inbound' && !c.viaAgent)
+        .map((c) => ({
+          id: c.conversationId,
+          who: c.groupAlias || handleOf(c.peerGhii),
+          said: String(c.lastMessage ?? '').trim(),
+          at: c.updatedAt,
+        })),
+    }));
   if (!data) return null;
   // How far back the band looks is the person's choice, kept in home.prefs so it follows them to
   // every device and an AI can read or set it with the memory tools.
-  return html`<${YourTurn} threads=${data} max=${max}
+  return html`<${YourTurn} threads=${data.threads} total=${data.total} anyTime=${data.anyTime} max=${max}
     days=${prefs?.turnDays} onDays=${(d) => writePrefs({ turnDays: d })} />`;
 }
 

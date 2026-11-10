@@ -17,6 +17,8 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-11-10: YourTurn takes `total` and `anyTime` from a server-filtered read (the waiting threads
+ *     of the window and how many wait at any time); without them it filters as before.
  *   2026-10-25: YourTurn shows the threads of the window the person chose (1 to 90 days or any time,
  *     7 by default, kept in home.prefs.turnDays) and keeps its band when the window is empty, so the
  *     choice stays reachable; YourTurn and Things carry a question mark on their heading (Jouni).
@@ -119,14 +121,16 @@ export function MailboxRow({ mail }) {
  * read-only elsewhere; putting them in a list titled "waiting for your answer" would be asking a
  * person to answer mail that is not addressed to them.
  */
-export function YourTurn({ threads, max, days, onDays }) {
+export function YourTurn({ threads, total, anyTime, max, days, onDays }) {
   const all = threads ?? [];
-  if (!all.length) return null;
   const span = turnWindow(days);
+  // With `total` the server already kept the window's waiting threads (blocks-home.js YourTurnBlock),
+  // and `anyTime` says whether any thread waits at all: nothing waiting hides the band as before.
+  if (!all.length && !(anyTime > 0)) return null;
   const since = span > 0 ? Date.now() - span * 86400000 : 0;
   const fresh = all.filter((r) => !since || (Date.parse(r.at || '') || 0) >= since);
   const rows = fresh.slice(0, max ?? 5);
-  const hidden = fresh.length - rows.length;
+  const hidden = (total ?? fresh.length) - rows.length;
   const title = tr('home.turn.title', 'Waiting for your answer');
   const label = tr('home.turn.daysLabel', 'Messages from');
   // The band stays when the chosen window holds nothing, because the choice that emptied it is in

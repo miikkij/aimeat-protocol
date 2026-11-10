@@ -1,10 +1,17 @@
-// E2E Tests for Agent Federated Direct Messages (Phase A)
-// Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-dm
-//
-// Verifies the federated-inbox send path FROM an agent: an agent holding messages:send can send a
-// direct message (and attachments) to a person across the node, the sender is the agent's GAII, the
-// recipient receives it past the first-contact gate, and an agent WITHOUT messages:send is rejected.
-// (The aimeat_dm_send MCP tool is a thin wrapper over the same sendDirectMessage path exercised here.)
+/**
+ * @file test/e2e-agent-dm.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description E2E Tests for Agent Federated Direct Messages (Phase A).
+ *   Verifies the federated-inbox send path FROM an agent: an agent holding messages:send can send a
+ *   direct message (and attachments) to a person across the node, the sender is the agent's GAII, the
+ *   recipient receives it past the first-contact gate, and an agent WITHOUT messages:send is rejected.
+ *   (The aimeat_dm_send MCP tool is a thin wrapper over the same sendDirectMessage path exercised here.)
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-dm
+ * @version-history
+ *   2026-11-10 — 14b: GET /v1/messages/conversations with waiting, since, limit and preview, and its
+ *     counts (the Home's waiting band).
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -272,6 +279,23 @@ await test('14. Bob (a different owner) does NOT see Alice\'s agent conversation
     const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${bob.token}` } });
     const leaked = convs.body.data.conversations.find((x: any) => x.viaAgent === dmbot.gaii);
     assert(leaked === undefined, 'Bob must not see Alice\'s agent-owned conversations');
+});
+
+await test('14b. The waiting threads of a window, a page of them, with the counts (the Home band\'s read)', async () => {
+    const H = { Authorization: `Bearer ${bob.token}` };
+    const all = await json('/v1/messages/conversations', { headers: H });
+    assert(!('total' in all.body.data), 'without the new parameters the answer is the list alone, as before');
+    const want = all.body.data.conversations.filter((c: any) => c.lastDirection === 'inbound' && !c.viaAgent);
+    assert(want.length >= 1, `Bob has a thread waiting on him: ${JSON.stringify(all.body.data.conversations.map((c: any) => c.lastDirection))}`);
+    const waiting = await json('/v1/messages/conversations?waiting=true&limit=1&preview=5', { headers: H });
+    const d = waiting.body.data;
+    assert(d.total === want.length && d.total_any_time === want.length, `counts ${d.total}/${d.total_any_time} vs ${want.length}`);
+    assert(d.conversations.length === 1 && d.conversations[0].conversationId === want[0].conversationId, 'the first waiting thread, in the list\'s order');
+    assert(String(d.conversations[0].lastMessage ?? '').length <= 5, 'the last message cut to the preview');
+    const future = await json(`/v1/messages/conversations?waiting=true&since=${encodeURIComponent(new Date(Date.now() + 86400000).toISOString())}`, { headers: H });
+    assert(future.body.data.total === 0 && future.body.data.total_any_time === want.length && future.body.data.conversations.length === 0, 'a window with none says so, and how many wait at any time');
+    const alice2 = await json('/v1/messages/conversations?waiting=true', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(!alice2.body.data.conversations.some((c: any) => c.viaAgent), 'an agent\'s own mailbox is not waiting on the owner');
 });
 
 console.log('\nPhase D — an agent in a GROUP thread (support@operators) can read its own correspondence');
