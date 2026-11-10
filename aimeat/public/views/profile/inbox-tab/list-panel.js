@@ -3,15 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The left side of the Messages page: the contact requests, then the conversations in
- *   the sections the server placed them in (services/inbox-organize/): other people, the owner's own
- *   agents grouped by agent, one heading per group rule, and the archive at the bottom. Every section
+ *   sections: on top the ones waiting for the owner's answer, then those the server placed
+ *   (services/inbox-organize/): other people, the owner's own agents grouped by agent, one heading per
+ *   group rule, and the archive at the bottom. Every section
  *   and every person or agent group closes and remembers it. A row can be archived or brought back
  *   from the list itself, a group all at once, and many rows by selecting them. Rows that stand for
  *   several threads (a broadcast, copies with one subject, a fold rule) open with a disclosure.
  *   Prop-driven: InboxTab and useInboxOrganize (./use-organize.js) keep the state.
- * @structure ListPanel · rowIds
+ * @structure ListPanel · rowIds · isWaiting
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.13.0 — 2026-11-10 — "Waiting for your answer" is the top section: a conversation whose last
+ *     message came in leaves its own section for it and goes back once answered, the Home band's rule
+ *     (Jouni: "näyttäisi ne viestit mihinkä on vielä vastaamatta ensimmäisenä"). The own agents' and
+ *     a group rule's sections keep their rows.
  *   v1.12.0 — 2026-11-10 — A section shows its first 25 entries and "Show N more" adds 50 (report item
  *     2.4); the heading's counts stay the whole section's.
  *   v1.11.0 — 2026-11-08 — A request opens to its whole first message (`body` from the server) with
@@ -59,6 +64,9 @@ const DAY_MS = 86_400_000;
 /** A section's first entries, and how many more a press of "Show more" adds. */
 const SECTION_ROWS = 25;
 const SECTION_MORE = 50;
+
+/** A conversation waiting for the owner's answer: its last message came in, outside the agents' own mailboxes. */
+export const isWaiting = (c) => c.lastDirection === 'inbound' && !c.viaAgent;
 
 /** Every thread a row stands for: itself and whatever is folded under it. */
 export function rowIds(c) {
@@ -237,10 +245,15 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
     <//>`;
   };
 
-  const people = [], agents = [], archive = [], chats = [];
+  const waiting = [], people = [], agents = [], archive = [], chats = [];
   const groups = new Map();
   for (const c of conversations) {
     if (c.section === 'archive') archive.push(c);
+    // The last message came in, and not to one of the owner's agents' own mailboxes: the Home band's
+    // rule (GET /v1/messages/conversations?waiting=true). The row leaves its own section for the top
+    // one, and goes back to it once the owner answers. The owner's own agents and a group rule's
+    // section keep theirs: those sections exist so a flood stays under its own heading.
+    else if (c.section !== 'agents' && !(c.section === 'group' && c.group) && isWaiting(c)) waiting.push(c);
     // A group chat has a section of its own: filed under a person, it read as that person's conversation.
     else if (isChatGroup(c) && c.section !== 'group') chats.push(c);
     else if (c.section === 'agents') agents.push(c);
@@ -278,6 +291,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
           : html`<${Action} tone="quiet" onClick=${() => org.startSelecting()}>${t('inbox.org.select')}<//>`}
         <//>` : null}
 
+      ${section('waiting', t('inbox.org.sectionWaiting'), waiting, (r) => r.map(c => anyRow(c, false)))}
       ${section('chats', t('inbox.group.section'), chats, (r) => r.map(c => anyRow(c, false)))}
       ${section('people', t('inbox.org.sectionPeople'), people, peopleBody)}
       ${section('agents', t('inbox.org.sectionAgents'), agents, agentsBody)}

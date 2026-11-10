@@ -19282,6 +19282,7 @@
   "inbox.sentForYouByTitle": "Agenttisi kirjoitti ja lähetti tämän sinun nimissäsi. Vastaanottaja näkee, mikä agentti sen lähetti.",
   "inbox.sentByTheirAgent": "Lähettänyt agentti {agent}",
   "inbox.sentByTheirAgentTitle": "Lähettäjän agentti kirjoitti ja lähetti tämän lähettäjän nimissä.",
+  "inbox.org.sectionWaiting": "Odottaa vastaustasi",
   "inbox.org.sectionPeople": "Ihmiset",
   "inbox.org.sectionAgents": "Omat agentit",
   "inbox.org.sectionArchive": "Arkisto",
