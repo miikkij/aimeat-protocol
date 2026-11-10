@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.1 -- 2026-11-10 -- GET /v1/memory/files?count=true counts with one aggregate
+ *     (sumStorageBytesForOwners, the same rows) instead of listing every file; with exclude_prefix it
+ *     still lists and counts.
  *   v1.16.0 -- 2026-11-10 -- GET /v1/memory/files takes exclude_prefix, limit and offset (additive): the
  *     Memory page reads its files a page at a time instead of all of them.
  *   v1.15.3 -- 2026-11-09 -- GET /v1/memory/files lists the owner's and every agent's files in one IN
@@ -349,24 +352,36 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the session came from. A federated session falls to the else branch and sees its own `sub`,
     // which is what a visitor should see. Found by the AI triage of 2026-09-13.
     const isOwnerSession = isOwnerInPerson(req.auth);
+    // The identities whose files are listed: the owner in person sees the GHII's and every agent's,
+    // anyone else their own `sub`.
+    const holders = isOwnerSession
+      ? [`${req.auth!.owner as string}@${config.nodeId}`, ...(await storage.getAgentsByOwner(req.auth!.owner as string)).map(a => a.gaii)]
+      : [req.auth!.sub];
+    // Additive, for the Memory page: exclude_prefix leaves out the files under one key prefix (the
+    // content class pipeline's own text files), and limit/offset hand out a page. `total` counts
+    // every file that matched; without the parameters the answer is what it was.
+    const excludePrefix = typeof req.query.exclude_prefix === 'string' ? req.query.exclude_prefix : '';
+
+    // A count of every file is one aggregate over the same rows the listing reads (the page asks for
+    // it after each change to state the upload limit); listing 1 700 files to take their number cost
+    // about 110 ms at a heavy account's size.
+    if (req.query.count === 'true' && !excludePrefix) {
+      res.json(success(config.nodeId, {
+        count: (await storage.sumStorageBytesForOwners(holders)).count,
+        max_file_size_bytes: config.storageMaxFileSizeMb * 1024 * 1024,
+      }));
+      return;
+    }
+
+    // GHII's own files first, then each agent's, in ONE IN query: one query per agent, in turn,
+    // was 81 at 79 agents.
     let files: Awaited<ReturnType<typeof storage.listStorageFiles>>;
     if (isOwnerSession) {
-      const callerOwner = req.auth!.owner as string;
-      const ownerGhii = `${callerOwner}@${config.nodeId}`;
-      const agents = await storage.getAgentsByOwner(callerOwner);
-      // GHII's own files first, then each agent's, in ONE IN query: one query per agent, in turn,
-      // was 81 at 79 agents.
-      const holders = [ownerGhii, ...agents.map(a => a.gaii)];
       const byOwner = await storage.listStorageFilesForOwners(holders);
       files = holders.flatMap(g => byOwner[g] ?? []);
     } else {
       files = await storage.listStorageFiles(req.auth!.sub);
     }
-
-    // Additive, for the Memory page: exclude_prefix leaves out the files under one key prefix (the
-    // content class pipeline's own text files), and limit/offset hand out a page. `total` counts
-    // every file that matched; without the parameters the answer is what it was.
-    const excludePrefix = typeof req.query.exclude_prefix === 'string' ? req.query.exclude_prefix : '';
     if (excludePrefix) files = files.filter(f => !f.key.startsWith(excludePrefix));
 
     if (req.query.count === 'true') {

@@ -148,6 +148,10 @@ await test('Files a page at a time: the mount carries the first ones and the cou
   const all = await json('/v1/memory/files', { headers: auth(A.token) });
   const every: string[] = all.body.data.files.map((f: any) => f.key);
   assert(all.body.data.total === every.length && every.includes(`contentclass-text/${SPACE}.txt`) && !('limit' in all.body.data), 'without the new parameters the answer is every file');
+  const counted = await json('/v1/memory/files?count=true', { headers: auth(A.token) });
+  assert(counted.body.data.count === every.length, `count=true counts the same files: ${counted.body.data.count} vs ${every.length}`);
+  const countedLess = await json(`/v1/memory/files?count=true&exclude_prefix=${encodeURIComponent('contentclass-text/')}`, { headers: auth(A.token) });
+  assert(countedLess.body.data.count === every.filter(k => !k.startsWith('contentclass-text/')).length, `count=true leaves the prefix out: ${countedLess.body.data.count}`);
   const wanted = every.filter(k => !k.startsWith('contentclass-text/'));
   const mount = await json(`/v1/memory/tab?summary=true&files_limit=2&files_exclude_prefix=${encodeURIComponent('contentclass-text/')}`, { headers: auth(A.token) });
   assert(mount.body.data.files.files.length === 2 && mount.body.data.files.total === wanted.length, `mount: ${mount.body.data.files.files.length} of ${mount.body.data.files.total}, want 2 of ${wanted.length}`);
