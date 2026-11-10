@@ -22,6 +22,9 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.18.0 — 2026-11-10 — The modules only a relative import reaches join the importmap (utils/
+ *     relative-modules.ts) and get their content tag, so the browser keeps them as it keeps the rest:
+ *     555 modules that were revalidated on every page load, level after level of the import graph.
  *   v1.17.0 — 2026-11-09 — isCurrentAssetTag(): whether a requested `?v=` is the file's current content
  *     tag, so the static server can let the browser keep that address for good.
  *   v1.16.0 — 2026-11-06 — stampAssets() tags each importmap module and stylesheet with its own
@@ -83,6 +86,7 @@ import { buildGlossaryBody } from './glossary.js';
 import { SIGN_IN_STEP_PATHS } from '../data/sign-in-steps.js';
 import { pageBuildId, runningBuild } from '../utils/build-stamp.js';
 import { publicAssetVersioner, type AssetVersioner } from '../utils/asset-version.js';
+import { relativeModulePaths, addModulesToImportmap } from '../utils/relative-modules.js';
 
 /**
  * The site-link block handed to the browser, with empty entries dropped so the injected
@@ -303,10 +307,27 @@ export function serveSpa(
     `<!-- AIMEAT v${version} · build ${BUILD_ID} -->\n</head>`,
   );
 
+  // The modules only a relative import reaches join the importmap, so they are tagged and kept by the
+  // browser like the rest (utils/relative-modules.ts).
+  html = addModulesToImportmap(html, relativeModulesOf(dirname(spaPath)));
   html = stampAssets(html, v, assetVersionOf);
 
   res.setHeader('Cache-Control', 'no-cache');
   res.type('text/html').send(html);
+}
+
+/**
+ * The relatively imported modules of the public directory, scanned once per process: the files under
+ * public/ change only with a deploy, and a module added in a source checkout without a restart is
+ * loaded untagged, as every relative import was before, which is slower and never wrong.
+ */
+const relativeModules: { dir: string; paths: string[] } = { dir: '', paths: [] };
+function relativeModulesOf(publicDir: string): string[] {
+  if (relativeModules.dir !== publicDir) {
+    relativeModules.paths = relativeModulePaths(publicDir);
+    relativeModules.dir = publicDir;
+  }
+  return relativeModules.paths;
 }
 
 /**

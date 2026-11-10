@@ -1018,12 +1018,17 @@ The stamp is added by the regular expression; no code change is needed.
 **What needs no importmap entry:**
 
 - Relative imports (`./profile/some-tab.js`): they resolve to a plain address, which the importmap
-  maps when it has an entry for it and the server revalidates (`no-cache` with an ETag) when not.
+  maps. `serveSpa()` adds an identity entry for every module a relative import reaches
+  (`src/utils/relative-modules.ts`, scanned once per process), so each is tagged and kept by the
+  browser like an absolute one: 555 modules that were revalidated on every page load until
+  2026-11-10 (199 of them on the admin page). A module added in a source checkout without a restart
+  loads untagged, which is slower and never wrong.
 - Bare specifiers already in the map (`preact`, `htm`).
 - CSS files: `stampAssets()` stamps every stylesheet link.
 
 **Key files:** `public/spa.html` (the importmap, the stylesheet links and `ROUTES`),
-`src/routes/portal-spa.ts` (`BUILD_ID`, `serveSpa()`, `stampAssets()`), `src/utils/asset-version.ts`.
+`src/routes/portal-spa.ts` (`BUILD_ID`, `serveSpa()`, `stampAssets()`), `src/utils/asset-version.ts`,
+`src/utils/relative-modules.ts`.
 
 A `.js`, `.mjs` or `.css` file asked for under its CURRENT content tag (the `?v=` the shell stamped)
 is served `public, max-age=31536000, immutable`: those bytes never change under that address, so a
