@@ -16,8 +16,8 @@
  * @version-history
  *   2026-11-10 -- A stream reopened with `since` gets one `catchup` frame with the domains that changed
  *     after it (services/live/change-journal.ts), through the same owner, scope and membership tests,
- *     or null when the journal cannot answer; each domain frame carries its position as `id`, and
- *     `hello` the position at open. Before, every reopen made the page reload everything.
+ *     or null when the journal cannot answer; each domain frame carries its position as `at` in its
+ *     data (the frame keeps its one `data:` line), and `hello` the position at open. Before, every reopen made the page reload everything.
  *   2026-11-04 -- The stream and socket tickets are issued into the node's storage, so a ticket from one
  *     process opens the stream on another; the same 30 s, the same answers (codebase analysis
  *     2026-11-03, HA stage 2).
@@ -362,8 +362,9 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       if (!domains.length) return; // everything in this window was filtered out
       const send = (): void => {
         if (ended) return;
-        // The frame's id is the journal's position after it, which a reopened stream asks from.
-        res.write(`id: ${journal.position()}\ndata: ${JSON.stringify({ domains })}\n\n`);
+        // `at` is the journal's position after the frame, which a reopened stream asks from. It rides in
+        // the data, so the frame keeps its one `data:` line for every client that reads it by hand.
+        res.write(`data: ${JSON.stringify({ domains, at: journal.position() })}\n\n`);
         flush();
       };
       if (credential && Date.now() - lastChecked >= RECHECK_BEFORE_FRAME_MS) {

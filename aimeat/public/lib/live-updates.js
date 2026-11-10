@@ -51,7 +51,7 @@
  * nothing; a reopen after a real gap still reconciles every domain.
  * Catch-up after a gap (2026-11-10): a reopen reconciled every domain, so each part of the page read
  * its data again after a laptop lid or a network change. The stream now says where the node's change
- * journal stands (`hello.at`, each frame's id); a reopen sends the last one as `since`, and the node
+ * journal stands (`hello.at`, each frame's `at`); a reopen sends the last one as `since`, and the node
  * answers with one `catchup` frame naming the domains that changed in the gap, or null when it cannot
  * tell (a restart, another process, a gap older than it keeps), which reconciles every domain as
  * before. No answer within two seconds reconciles every domain too.
@@ -76,7 +76,7 @@ const MAX_RECONNECT_DELAY = 60000;
 let reconnectDelay = INITIAL_RECONNECT_DELAY;
 let everOpened = false;
 // Where the node's change journal stood at the last frame this stream heard (`hello.at`, each frame's
-// id). A reopen sends it as `since`, and the node answers with one `catchup` frame naming what changed
+// `at`). A reopen sends it as `since`, and the node answers with one `catchup` frame naming what changed
 // in the gap (routes/sse.ts); without an answer in CATCHUP_WAIT_MS the page reloads everything.
 let lastPos = null;
 let catchupTimer = null;
@@ -351,11 +351,11 @@ async function _open() {
 
     es.onmessage = (event) => {
       reconnectDelay = INITIAL_RECONNECT_DELAY;
-      if (event.lastEventId) lastPos = event.lastEventId;
       let domains = null;
       try {
         const p = JSON.parse(event.data);
         if (Array.isArray(p.domains)) domains = p.domains;
+        if (typeof p.at === 'string') lastPos = p.at;
       } catch { /* legacy {"t":"change"} or non-JSON ⇒ treat as "everything" */ }
       ingestDomains(domains);
       relay(domains);
