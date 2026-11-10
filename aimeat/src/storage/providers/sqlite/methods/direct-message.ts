@@ -8,6 +8,8 @@
  * @structure directMessageMethods
  * @usage Object.assign(SqliteStorage.prototype, directMessageMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-10 — listConversationsForParticipants reads every identity in one statement
+ *     (repos/direct-message.ts listConversationsForParticipantsAll), as PostgreSQL does.
  *   v1.1.0 — 2026-11-09 — listConversationsForParticipants: the per-identity lookup for many identities.
  *   v1.0.0 — 2026-10-05 — 30 methods (createDirectMessage, getDirectMessage, getDirectMessagesByIds, …) moved
  *     here from messaging.ts so the file mirrors postgres-kysely/methods/direct-message.ts (secaudit 2026-10,
@@ -153,10 +155,10 @@ export const directMessageMethods = {
   },
 
   async listConversationsForParticipants(this: SqliteStorage, identities: readonly string[], opts?: { limit?: number }): Promise<Record<string, ConversationRecord[]>> {
-    // In-process and synchronous here, so one lookup per identity costs microseconds (81 took 1.5 ms
-    // in all at 79 agents); the batch exists for PostgreSQL, where each one is a round trip.
-    const out: Record<string, ConversationRecord[]> = {};
-    for (const identity of identities) out[identity] = directMessageRepo.listConversationsForParticipant(this.db, identity);
+    // One statement for every identity, as on PostgreSQL: the statement count of a request is the
+    // same on both providers, which is what e2e-query-budget holds (the loop it replaces took 1.5 ms
+    // for 81 identities here, and counted 81).
+    const out = directMessageRepo.listConversationsForParticipantsAll(this.db, identities);
     if (opts?.limit === undefined) return out;
     // At most `limit` threads in all, newest first, as the PostgreSQL query reads them.
     const keep = new Set([...new Map(Object.values(out).flat().map(c => [c.id, c] as const)).values()]

@@ -255,6 +255,7 @@
     "check:deps": "depcruise src --config .dependency-cruiser.cjs --ignore-known",
     "check:family-index": "tsx scripts/check-family-index.ts",
     "check:services-flat": "tsx scripts/check-services-flat.ts",
+    "check:owner-agent-reads": "tsx scripts/check-owner-agent-reads.ts",
     "deps:report": "depcruise src --config .dependency-cruiser.cjs --no-ignore-known",
     "deps:baseline": "depcruise-baseline src --config .dependency-cruiser.cjs",
     "deps:baseline:shrink": "tsx scripts/deps-baseline-shrink.ts",

@@ -59,6 +59,7 @@ import { INSTALL_NAME_MAX } from './connect-tunnel-roster.js';
 import { emitChange } from './event-bus.js';
 import { parseGAII, runAsNode } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { loadOwnerAgents } from './db/owner-identity.js';
 import { programViewsOf, type StoredAgentPrograms, type ProgramAsk, type ProgramView } from './connector-programs-view.js';
 
 /** Where an owner's connectors live, in the owner's own namespace. */
@@ -245,7 +246,8 @@ export function syncConnectors(ctx: RegistryContext, owner: string, closedId?: s
 export async function listConnectors(ctx: RegistryContext, owner: string): Promise<ConnectorView[]> {
   const reg = await readRegistry(ctx, owner);
   const live = liveConnectors(ctx, owner);
-  const agents = await ctx.storage.getAgentsByOwner(owner);
+  // The read scope's copy when a composite opened one (the overview, the Home's agents band).
+  const agents = await loadOwnerAgents(ctx.storage, owner);
   const exists = new Set(agents.map(a => a.name));
   const keyless = new Set(agents.filter(a => !a.enrolledAt && !a.publicKey).map(a => a.name));
   const now = new Date().toISOString();

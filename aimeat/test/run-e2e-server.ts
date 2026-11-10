@@ -7,6 +7,8 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   2026-11-10 -- QUERY_TRACE_SUITES: e2e-query-budget's node starts with the database trace preload
+ *     and writes one line per request to queryTraceFile(port) (performance work 2026-11).
  *   2026-11-07 -- e2e-csm joins ANONYMOUS_OFF_SUITES (a private or members CSM refused to a caller with no
  *            sign-in; developer ruling 2026-11-07).
  *   2026-11-07 -- e2e-receivers joins ANONYMOUS_OFF_SUITES (receiver keys refused off their address, and
@@ -81,7 +83,7 @@ import { requirePortFree, waitForExit } from './helpers/runner-ports.js';
 import { recordNodeOutput } from './helpers/runner-node-log.js';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { keptGroups, keptTestValues, productionLaneOn, productionOverlay } from './run-e2e-production-lane.js';
@@ -255,6 +257,16 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     // would be the anonymous identity, and the members refusal could not be proved (developer ruling 2026-11-07).
     'e2e-csm',
 ];
+
+/**
+ * The suites whose node runs with the database trace (scripts/perf/trace-preload.mjs): one JSON line
+ * per request with the number of statements it ran, in queryTraceFile(port). The query budget suite
+ * reads it to prove a request's statements do not grow with the number of an owner's agents.
+ */
+export const QUERY_TRACE_SUITES: readonly string[] = ['e2e-query-budget'];
+
+/** Where a traced node on `port` writes its request lines; the suite derives the same path. */
+export const queryTraceFile = (port: string | number): string => resolve(tmpdir(), `aimeat-query-trace-${port}.jsonl`);
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */
 export function anonymousModeFor(suite?: string): string {
@@ -756,6 +768,14 @@ export async function startServer(target: RunnerTarget, suite?: string): Promise
 
     const env = { ...process.env, ...pinnedEnv(target, suite) };
     const serverArgs = [...nodeEntryArgs(), 'start', '--db', target.dbType];
+    // A suite that counts the database statements of each request gets the trace preload
+    // (scripts/perf/trace-preload.mjs) and a trace file of its own, which it reads by the port.
+    if (suite && QUERY_TRACE_SUITES.includes(suite)) {
+        const traceFile = queryTraceFile(target.port);
+        if (existsSync(traceFile)) unlinkSync(traceFile);
+        env.AIMEAT_PERF_TRACE_FILE = traceFile;
+        serverArgs.unshift('--import', pathToFileURL(resolve(process.cwd(), 'scripts/perf/trace-preload.mjs')).href);
+    }
     if (target.dbType === 'sqlite') {
         serverArgs.push('--db-path', target.dbPath);
     } else if (target.dbType === 'postgres-kysely' && target.dbUrl) {

@@ -13,6 +13,7 @@
  *   listClassificationAudit · pruneClassificationAudit · deleteClassificationAuditByScope
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-10 — listClassificationAudit takes ownerGaiis (IN), as the SQLite twin does.
  *   v1.1.0 — 2026-09-29 — An older row no longer overwrites a newer row's label (compare lastAt).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
@@ -98,6 +99,10 @@ export const classificationAuditMethods = {
     const limit = Math.min(Math.max(filter.limit ?? 200, 1), 1000);
     let q = this.db.selectFrom('ClassificationAudit').selectAll();
     if (filter.ownerGaii) q = q.where('ownerGaii', '=', filter.ownerGaii);
+    if (filter.ownerGaiis) {
+      if (filter.ownerGaiis.length === 0) return [];
+      q = q.where('ownerGaii', 'in', [...filter.ownerGaiis]);
+    }
     if (filter.scope) q = q.where('scope', '=', filter.scope);
     if (filter.since) q = q.where('lastAt', '>=', filter.since);
     if (filter.action) q = q.where('action', '=', filter.action);

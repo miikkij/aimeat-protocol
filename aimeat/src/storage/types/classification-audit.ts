@@ -16,6 +16,7 @@
  *   ClassificationAuditFilter
  * @usage import type { ClassificationAuditRow } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-11-10 — ClassificationAuditFilter.ownerGaiis: many identities' rows in one read.
  *   v1.1.0 — 2026-09-30 — The action `exception`: the exceptions list in the audit (a text column,
  *     so neither provider needs a migration).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
@@ -58,6 +59,8 @@ export interface ClassificationAuditRow {
 /** A filtered read of the log, newest first. `since` compares with `lastAt`. */
 export interface ClassificationAuditFilter {
   ownerGaii?: string;
+  /** Rows of any of these identities, in one read (an owner's log covers their agents and apps too). */
+  ownerGaiis?: readonly string[];
   scope?: string;
   since?: string;
   action?: string;

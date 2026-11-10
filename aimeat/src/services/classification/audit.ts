@@ -48,6 +48,7 @@
  *   recordClassificationAudit({ scope, ownerGaii, kind: 'memory', key, label: 'luottamuksellinen',
  *     reader: 'claude#alice@node', readerKind: 'ai', action: 'used', purpose: 'chat:anthropic/claude' });
  * @version-history
+ *   v1.4.0 -- 2026-11-10 -- A waiting row matches a filter's ownerGaiis too (many holders in one read).
  *   v1.3.0 -- 2026-11-04 -- A recorded row is written within a second (flushSoon), not up to 60 s later
  *     (codebase analysis 2026-11-03, HA stage 1 item 1.6).
  *   v1.2.0 — 2026-09-30 — The action `exception` (an entry of the exceptions list made, used or
@@ -284,6 +285,7 @@ export async function shutdownClassificationAudit(): Promise<void> {
 
 function matches(r: ClassificationAuditRow, f: ClassificationAuditFilter): boolean {
   return (!f.ownerGaii || r.ownerGaii === f.ownerGaii)
+    && (!f.ownerGaiis || (r.ownerGaii !== null && f.ownerGaiis.includes(r.ownerGaii)))
     && (!f.scope || r.scope === f.scope)
     && (!f.since || r.lastAt >= f.since)
     && (!f.action || r.action === f.action);

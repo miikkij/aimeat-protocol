@@ -1296,6 +1296,7 @@ const ALL_SUITES = [
     'test/e2e-wallet-page.ts',
     'test/e2e-data-wallet-page.ts',
     'test/e2e-memory-tab-summary.ts',
+    'test/e2e-query-budget.ts',
     'test/e2e-model-suite.ts',
     'test/e2e-access-page.ts',
     'test/e2e-invitations.ts',

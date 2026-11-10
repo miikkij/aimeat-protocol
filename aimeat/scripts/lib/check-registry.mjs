@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-10: check:owner-agent-reads, the direct getAgentsByOwner calls in src/services/ may only fall (performance work, architecture item 1).
  *  - 2026-11-10: check:blocked-names, no served file's address is blocked by EasyList, EasyPrivacy or uBlock Origin's Privacy list (EasyPrivacy's `/fingerprint.js^` took the admin page down on 2026-11-09).
  *  - 2026-11-05: check:services-flat, the number of flat files in src/services/ may only fall (codebase analysis 2026-11-03, item D-h).
  *  - 2026-11-04: check:pooler-safe, no session advisory lock and no LISTEN outside the event bus's own connection (codebase analysis 2026-11-03, item HA stage 3).
@@ -149,6 +150,7 @@ export const FAST_CHECKS = [
     // Codebase analysis 2026-11-03, D-h: src/services/ grew 66 % in four weeks, half of it in the
     // top level. The flat-file count may only fall; new service code goes in a domain folder.
     { script: 'check:services-flat', label: 'No new flat file in src/services/: new service code goes in a domain folder' },
+    { script: 'check:owner-agent-reads', label: "An owner's agent list is read through loadOwnerAgents, once per read scope; the direct calls only fall" },
     { script: 'check:sse-parity', label: 'An agent writes, and the open page hears about it' },
     { script: 'check:imports-tracked', label: 'Every relative import points at a tracked file' },
     { script: 'check:package-scripts', label: 'Every package.json script points at a tracked file and an existing script' },

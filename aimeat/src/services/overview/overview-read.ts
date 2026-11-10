@@ -39,6 +39,8 @@ import { listConnectors, wantedInstalls } from '../connector-registry.js';
 import { readAgentTies, readTieChoices } from '../agent-ties.js';
 import { resolveAppUrls } from '../app-urls.js';
 import { logger } from '../../utils/logger.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import { loadOwnerAgents } from '../db/owner-identity.js';
 import {
   RANGE_HOURS, QUIET_DAYS,
   type OverviewRange, type OverviewItem, type OverviewEdge, type OverviewView, type OverviewLane,
@@ -74,7 +76,17 @@ async function part<T>(name: string, partial: string[], fallback: T, run: () => 
   }
 }
 
-export async function readOverview(
+/**
+ * The overview in one read scope: the owner's agent list is read once (loadOwnerAgents) and shared by
+ * the connectors and every other part that needs it.
+ */
+export function readOverview(
+  deps: { config: AimeatConfig; storage: Storage }, caller: OverviewCaller, range: OverviewRange,
+): Promise<OverviewView> {
+  return runInReadScope(() => readOverviewNow(deps, caller, range));
+}
+
+async function readOverviewNow(
   deps: { config: AimeatConfig; storage: Storage }, caller: OverviewCaller, range: OverviewRange,
 ): Promise<OverviewView> {
   const { config, storage } = deps;
@@ -86,7 +98,7 @@ export async function readOverview(
   const partial: string[] = ['agent-app-use'];
 
   const [agents, connectors, wanted, ties, choices, counts, listed] = await Promise.all([
-    storage.getAgentsByOwner(owner),
+    loadOwnerAgents(storage, owner),
     part('machines', partial, [], () => listConnectors(deps, owner)),
     part('machines', partial, {} as Record<string, string>, () => wantedInstalls(deps, owner)),
     part('agent-ties', partial, { apps: {}, workplaces: {} }, () => readAgentTies(deps, owner)),

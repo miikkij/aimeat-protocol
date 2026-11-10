@@ -32,7 +32,7 @@ import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { LegacyMemoryAdapter } from '../../storage/adapter/legacy-memory-adapter.js';
 import { MemoryRepository } from '../../storage/repositories-impl/memory-repository.js';
 import { MemoryDbService } from './memory-db-service.js';
-import { resolveOwnerIdentities } from './owner-identity.js';
+import { resolveOwnerIdentities, loadOwnerAgents } from './owner-identity.js';
 import { metaRowView, summarizeMemory, type MemorySummary } from './memory-tab-summary.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
@@ -67,7 +67,8 @@ export class MemoryTabService {
    */
   overview(reader: ContentReader, ownerName: string, ownerGhii: string, opts: { summary?: boolean; todayFrom?: string } = {}): Promise<MemoryTabOverview> {
     return runInReadScope(async () => {
-      const agents = await this.storage.getAgentsByOwner(ownerName);
+      // The scope's copy, which listOwnerScopeMeta's identity set reads too.
+      const agents = await loadOwnerAgents(this.storage, ownerName);
       const gaiis = [ownerGhii, ...agents.map(a => a.gaii)];
 
       const [allMeta, filesByOwner, consents, ownedGroups, memberGroups, organisms] = await Promise.all([

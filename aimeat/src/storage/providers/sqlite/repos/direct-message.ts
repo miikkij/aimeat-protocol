@@ -8,6 +8,8 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.10.0 -- 2026-11-10 -- listConversationsForParticipantsAll: many identities' group threads in one
+ *     statement.
  *   v1.9.0 -- 2026-10-26 -- Reactions on a single message (direct_message_reactions, Postgres 0118) and
  *     listDirectMessageCopies.
  *   v1.8.0 -- 2026-10-21 -- Group chat: a conversation's open invitations (`invited`), updateConversation
@@ -647,6 +649,32 @@ export function listConversationsForParticipant(db: Database.Database, identity:
     'SELECT * FROM conversations WHERE participants LIKE ? ORDER BY updatedAt DESC',
   ).all(needle) as Record<string, unknown>[];
   return rows.map(deserializeConversation);
+}
+
+/**
+ * The same lookup for many identities in one statement per 400 of them (one per identity was 81
+ * statements at 80 agents; e2e-query-budget). A row is given to each identity its parsed membership
+ * names exactly, newest first, as the single lookup gives it.
+ */
+export function listConversationsForParticipantsAll(db: Database.Database, identities: readonly string[]): Record<string, ConversationRecord[]> {
+  const out: Record<string, ConversationRecord[]> = {};
+  for (const identity of identities) out[identity] = [];
+  const wanted = new Set(identities);
+  const seen = new Set<string>();
+  const found: ConversationRecord[] = [];
+  for (let i = 0; i < identities.length; i += 400) {
+    const chunk = identities.slice(i, i + 400);
+    const rows = db.prepare(
+      `SELECT * FROM conversations WHERE ${chunk.map(() => 'participants LIKE ?').join(' OR ')} ORDER BY updatedAt DESC`,
+    ).all(...chunk.map(id => `%${JSON.stringify(id)}%`)) as Record<string, unknown>[];
+    for (const row of rows) {
+      const c = deserializeConversation(row);
+      if (!seen.has(c.id)) { seen.add(c.id); found.push(c); }
+    }
+  }
+  found.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
+  for (const c of found) for (const p of c.participants ?? []) if (wanted.has(p)) out[p].push(c);
+  return out;
 }
 
 /**

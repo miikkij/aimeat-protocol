@@ -13,6 +13,7 @@
  *   pruneClassificationAudit · deleteClassificationAuditByScope
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-10 — listClassificationAudit takes ownerGaiis (IN), as the PostgreSQL twin does.
  *   v1.1.0 — 2026-09-29 — An older row no longer overwrites a newer row's label (compare lastAt).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
@@ -80,6 +81,10 @@ export const classificationAuditMethods = {
     const where: string[] = [];
     const args: unknown[] = [];
     if (filter.ownerGaii) { where.push('ownerGaii = ?'); args.push(filter.ownerGaii); }
+    if (filter.ownerGaiis) {
+      if (filter.ownerGaiis.length === 0) return [];
+      where.push(`ownerGaii IN (${filter.ownerGaiis.map(() => '?').join(', ')})`); args.push(...filter.ownerGaiis);
+    }
     if (filter.scope) { where.push('scope = ?'); args.push(filter.scope); }
     if (filter.since) { where.push('lastAt >= ?'); args.push(filter.since); }
     if (filter.action) { where.push('action = ?'); args.push(filter.action); }

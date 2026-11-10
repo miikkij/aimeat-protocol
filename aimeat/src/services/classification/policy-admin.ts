@@ -24,6 +24,8 @@
  * @usage
  *   const out = await writePolicy(deps, actor, 'owner', null, { enabled: true });
  * @version-history
+ *   v1.7.0 — 2026-11-10 — The owner's audit log reads every holder (the owner, their agents and apps)
+ *     in one query (filter.ownerGaiis), not one per holder; the same rows.
  *   v1.6.0 — 2026-10-22 — The owner's audit log follows memory:read-as-owner: for a caller that does
  *     not read every record of its owner, a row on a record of the owner or a sibling it may not read
  *     with owner_scope is left out and the answer carries `note` (owner-scope-labels.ts; secaudit
@@ -274,10 +276,9 @@ export async function readAuditLog(
     ]);
     holders.push(...agents.map(a => a.gaii), ...apps.map(a => a.geai));
   }
-  const lists = await Promise.all([...new Set(holders)].map(ownerGaii => listClassificationAuditMerged(deps.storage, { ownerGaii, ...common })));
-  const merged = lists.flat()
-    .sort((a, b) => (a.lastAt < b.lastAt ? 1 : a.lastAt > b.lastAt ? -1 : 0))
-    .slice(0, limit);
+  // Every holder in one read, newest first and cut at the limit (one read per holder was 81
+  // statements at 80 agents; e2e-query-budget). The same rows as the per-holder reads merged.
+  const merged = await listClassificationAuditMerged(deps.storage, { ownerGaiis: [...new Set(holders)], ...common });
   // memory:read-as-owner (owner-scope-labels.ts): a row on a record of the owner or a sibling that
   // this caller may not read with owner_scope is left out, and the answer names the permission.
   const ownerView = ownerScopeLabelView(deps.storage, actor);

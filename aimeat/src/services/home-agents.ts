@@ -46,6 +46,8 @@ import { nodeTimeZone } from './display-prefs.js';
 import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent-ties.js';
 import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
 import { logger } from '../utils/logger.js';
+import { runInReadScope } from '../storage/read-scope/read-scope.js';
+import { loadOwnerAgents } from './db/owner-identity.js';
 
 export type WorksWhen = 'ask' | 'clock' | 'talk' | 'always' | 'records';
 
@@ -136,13 +138,20 @@ function watchedSpaces(doc: Record<string, unknown> | undefined): WatchedSpace[]
  * `only` names one agent: `workers` then holds that agent alone (or nothing when the person has no
  * such worker), which is what the page of one agent reads.
  */
-export async function readHomeAgents(
+export function readHomeAgents(
+  deps: { config: AimeatConfig; storage: Storage }, owner: string, limit: number, only?: string,
+): Promise<HomeAgentsView> {
+  // One read scope, so the agent list is read once and the connectors share it (loadOwnerAgents).
+  return runInReadScope(() => readHomeAgentsNow(deps, owner, limit, only));
+}
+
+async function readHomeAgentsNow(
   deps: { config: AimeatConfig; storage: Storage }, owner: string, limit: number, only?: string,
 ): Promise<HomeAgentsView> {
   const { config, storage } = deps;
   const ownerGhii = `${owner}@${config.nodeId}`;
   const [agents, proposals, connectors, wanted, counts, jobs, ties] = await Promise.all([
-    storage.getAgentsByOwner(owner),
+    loadOwnerAgents(storage, owner),
     listProposals(deps, owner),
     listConnectors(deps, owner),
     wantedInstalls(deps, owner),

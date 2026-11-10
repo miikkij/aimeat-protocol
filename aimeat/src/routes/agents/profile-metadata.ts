@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-10 — GET /v1/agents reads every agent's onboarding record in one query (getOnboardingMany),
+ *     not one per agent; the same records.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No per-organism scan for a storage without getMemoryByKeysAnyOwner: it is required on
@@ -235,12 +237,14 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // Onboarding is half of the health verdict, so it is fetched whether or not stats were asked
     // for — the verdict is not an optional extra of one query parameter. In practice this costs
     // nothing new: the Agents tab always passes include=stats, which fetched exactly this already.
+    // Every agent's record in one query (one per agent was 80 statements at 80 agents; e2e-query-budget).
     if (agents.length > 0) {
-      const obs = await Promise.all(agents.map(a => storage.getOnboarding(a.gaii).catch(err => {
+      for (const a of agents) onboardingByGaii[a.gaii] = null;
+      const obs = await storage.getOnboardingMany(agents.map(a => a.gaii)).catch(err => {
         logger.warn('GET /v1/agents: continuing after a suppressed failure', { error: String(err) });
-        return null;
-      })));
-      agents.forEach((a, i) => { onboardingByGaii[a.gaii] = obs[i] ?? null; });
+        return [] as AgentOnboardingRecord[];
+      });
+      for (const r of obs) onboardingByGaii[r.agentGaii] = r;
     }
     // One clock for the whole page: two cards in one response must not straddle a threshold and
     // then disagree about what time it is. The connected set comes with it, because a spawn agent
