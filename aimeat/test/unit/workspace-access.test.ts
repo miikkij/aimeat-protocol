@@ -284,7 +284,9 @@ describe('workspaceAccessMiddleware', () => {
       expect(nextCalled).toBe(false);
       expect(res._status).toBe(403);
       expect(res._body.error.code).toBe('ACCESS_DENIED');
-      expect(res._body.error.message).toContain('Agent not authorized');
+      // The refusal names why and what to do since 2026-11-10 ("Agent not authorized for this
+      // workspace namespace" said neither): the owner `org` is not a member of org-1.
+      expect(res._body.error.message).toContain('not an active member');
     });
 
     it('denies agent WRITE to meta namespace (PUT)', async () => {
