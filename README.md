@@ -17,7 +17,7 @@ Claude, ChatGPT, Cursor or another AI remembers your work from one conversation 
 AIMEAT began at the end of February 2026 as the AI Memory Exchange and Action Transfer, and has grown far past that since. It is open source under the MIT licence. It runs on [aimeat.io](https://aimeat.io/), on your own server, or on your own computer.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/portal-landing.png" alt="The aimeat.io front page: Accelerate your AI. Reach level 5., with Start free and Try the Experience Center buttons beside five steps from where you start to the goal" width="820" />
+  <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/portal-landing.png" alt="The aimeat.io front page: You set the course. AI brings the speed., an AI that remembers your things and does the routines for you, the prices, and a Who are you? choice from sole trader to personal use" width="820" />
 </p>
 
 **Try it first, without an account.** The [Experience Center](https://experience-center.apps.aimeat.io/) is a free tour in English, Finnish and Spanish. It shows what AIMEAT gets done, with examples from real apps, and gives you steps to try with your own AI as you go.
