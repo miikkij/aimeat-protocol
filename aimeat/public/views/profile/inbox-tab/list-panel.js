@@ -12,6 +12,8 @@
  * @structure ListPanel · rowIds
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.12.0 — 2026-11-10 — A section shows its first 25 entries and "Show N more" adds 50 (report item
+ *     2.4); the heading's counts stay the whole section's.
  *   v1.11.0 — 2026-11-08 — A request opens to its whole first message (`body` from the server) with
  *     "Read the whole message" under its two lines.
  *   v1.10.0 — 2026-10-21 — Group chat: the group invitations (`groupInvitations`) over the requests, and
@@ -40,10 +42,12 @@
  *     had, with the fold generalised to the subject and rule folds.
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Action } from '/components/Action.js';
+import { More } from '/components/List.js';
 import {
   ConversationList, ConversationTools, ConversationRequests, ConversationRequest, ConversationSection,
   ConversationGroup, ConversationRow, ConversationFold,
@@ -52,6 +56,9 @@ import { peerName, isAgentPeer, subThreadLabel, groupConversations, stampShort, 
 import { isChatGroup } from './group-chat.js';
 
 const DAY_MS = 86_400_000;
+/** A section's first entries, and how many more a press of "Show more" adds. */
+const SECTION_ROWS = 25;
+const SECTION_MORE = 50;
 
 /** Every thread a row stands for: itself and whatever is folded under it. */
 export function rowIds(c) {
@@ -61,6 +68,8 @@ export function rowIds(c) {
 export function ListPanel({ requests, conversations, activeConv, peerDisplay, peerAvatar, accept, block, openConversation, openFolds = {}, toggleFold, org, groupInvitations }) {
   /** An agent peer's own avatar or null (inbox-tab.js peerAvatar); ConversationList draws it in the identicon's place. */
   const avatarFor = (id) => (peerAvatar ? peerAvatar(id) : null);
+  /** How many entries each section shows, by section key, once "Show more" was pressed. */
+  const [shownBy, setShownBy] = useState(/** @type {Record<string, number>} */ ({}));
   const selecting = !!org?.selecting;
   const selected = org?.selected || new Set();
   const isSelected = (c) => rowIds(c).every(id => selected.has(id));
@@ -208,12 +217,24 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
       : groupBlock(`a:${agent}`, agent, peerDisplay(agent), convs, agent)));
   };
 
+  /**
+   * A section shows its first SECTION_ROWS entries (a row, a fold or a person's group), then "Show N
+   * more" adds SECTION_MORE. Every row drawn at once was 3 575 elements at 158 conversations
+   * (performance work 2026-11-09, report item 2.4); the counts in the heading stay the whole section's.
+   */
   const section = (key, label, rows, body, closedByDefault = false) => {
     if (!rows.length) return null;
     const open = !org.isCollapsed(key, closedByDefault);
+    const entries = open ? body(rows) : null;
+    const limit = shownBy[key] ?? SECTION_ROWS;
+    const rest = entries ? entries.length - limit : 0;
     return html`<${ConversationSection} key=${key} kind=${key.split(':')[0]} label=${label}
       count=${countOf(rows)} unread=${unreadOf(rows)} open=${open}
-      onToggle=${() => org.toggleCollapsed(key, closedByDefault)}>${open ? body(rows) : null}<//>`;
+      onToggle=${() => org.toggleCollapsed(key, closedByDefault)}>
+      ${entries ? entries.slice(0, limit) : null}
+      ${rest > 0 ? html`<${More} label=${t('inbox.org.showMore', { count: String(Math.min(SECTION_MORE, rest)) })}
+        onMore=${() => setShownBy((s) => ({ ...s, [key]: limit + SECTION_MORE }))} />` : null}
+    <//>`;
   };
 
   const people = [], agents = [], archive = [], chats = [];

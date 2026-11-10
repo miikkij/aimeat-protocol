@@ -17442,6 +17442,7 @@
   "inbox.org.archivedToast": "Archivadas: {count}. Una conversación vuelve a la lista cuando alguien que no sea uno de tus agentes escribe en ella.",
   "inbox.org.restoredToast": "De vuelta en la lista: {count}.",
   "inbox.org.foldCount": "{count} conversaciones",
+  "inbox.org.showMore": "Mostrar {count} más",
   "inbox.org.unreadCount": "{count} sin leer",
   "inbox.org.whyManual": "Archivada {when}",
   "inbox.org.whyRule": "Regla: {rule}",

@@ -19298,6 +19298,7 @@
   "inbox.org.archivedToast": "Arkistoitu: {count}. Keskustelu palaa listalle, kun joku muu kuin oma agenttisi kirjoittaa siihen.",
   "inbox.org.restoredToast": "Palautettu listalle: {count}.",
   "inbox.org.foldCount": "{count} keskustelua",
+  "inbox.org.showMore": "Näytä {count} lisää",
   "inbox.org.unreadCount": "{count} lukematta",
   "inbox.org.whyManual": "Arkistoitu {when}",
   "inbox.org.whyRule": "Sääntö: {rule}",
