@@ -10,6 +10,8 @@
  *   - describes: disabled state · subscribe · unsubscribe · sendNotification · broadcastToOrganism
  * @usage cd aimeat && pnpm exec vitest run test/unit/push-service.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-10 — What the push says: the recipient's language from `i18n`, the sender's name
+ *     from `from`, both taken off the wire, and the buttons translated.
  *   v1.1.0 — 2026-08-11 — Per-device subscriptions (audit H-8): fan-out, per-endpoint pruning on
  *     410, and the two-device case that used to collapse into one.
  *   v1.0.0 — 2026-04-15 — Initial push service tests.
@@ -64,6 +66,8 @@ function makeMockStorage() {
         }),
         listPushSubscriptions: vi.fn(async () => [...subscriptions.values()]),
         getOrganism: vi.fn(async (id: string) => organisms.get(id) ?? null),
+        // The account's language, which display-prefs.ts reads: alice reads Finnish, bob has none.
+        getGHIIByOwner: vi.fn(async (owner: string) => (owner === 'alice' ? { locale: 'fi' } : null)),
     } as unknown as Storage & {
         subscriptions: Map<string, PushSubscriptionRecord>;
         organisms: Map<string, OrganismRecord>;
@@ -310,6 +314,54 @@ describe('Push Service', () => {
 
             expect(sent).toHaveBeenCalledTimes(1);
             expect((sent.mock.calls[0][0] as { endpoint: string }).endpoint).toBe('https://push.example.com/alice');
+        });
+    });
+
+    describe('what the push says (Chrome on Android reads it for spam)', () => {
+        /** The JSON the device receives, from the one delivery the spy saw. */
+        async function wireFor(owner: string, payload: PushPayload): Promise<Record<string, unknown>> {
+            storage.subscriptions.set(rowKey(owner, `https://push.example.com/${owner}`), makeSubscription(owner));
+            const sent = vi.spyOn(webpush, 'sendNotification').mockResolvedValue({} as never);
+            const service = createPushService(ENABLED_CONFIG, storage);
+            expect(await service.sendNotification(owner, payload)).toBe(true);
+            // The last delivery: a second call in one test reuses the same spy.
+            return JSON.parse(sent.mock.calls.at(-1)![1] as string) as Record<string, unknown>;
+        }
+
+        it('is written in the recipient\'s language, its variables filled', async () => {
+            const wire = await wireFor('alice', {
+                title: 'Workflow "Weekly report" stopped at step fetch', body: 'Open the workflow to see why.',
+                i18n: { title: { key: 'workflow_step_failed.title', vars: { name: 'Weekly report', step: 'fetch' } }, body: { key: 'workflow_step_failed.body' } },
+            });
+            expect(wire.title).toBe('Työnkulku "Weekly report" pysähtyi askeleeseen fetch');
+            expect(wire.body).toBe('Avaa työnkulku, niin näet syyn.');
+        });
+
+        it('takes the node-only fields off before it leaves', async () => {
+            const wire = await wireFor('alice', { title: 't', body: 'b', i18n: { title: { key: 'push_test.title' } }, from: 'Recipes' });
+            expect(wire).not.toHaveProperty('i18n');
+            expect(wire).not.toHaveProperty('from');
+        });
+
+        it('falls back to the English it was given when no language has the key, or the account has no language', async () => {
+            expect((await wireFor('alice', { title: 'Plain words', body: 'b', i18n: { title: { key: 'no_such_notice.title' } } })).title).toBe('Plain words');
+            expect((await wireFor('bob', { title: 'x', body: 'b', i18n: { title: { key: 'push_test.title' } } })).title).toBe('AIMEAT: test notification');
+        });
+
+        it('names its sender before a title that does not say who it is from', async () => {
+            expect((await wireFor('bob', { title: 'Your soup is ready', body: '', from: 'Recipes' })).title).toBe('Recipes: Your soup is ready');
+        });
+
+        it('does not name the sender twice', async () => {
+            expect((await wireFor('bob', { title: 'Recipes: Your soup is ready', body: '', from: 'Recipes' })).title).toBe('Recipes: Your soup is ready');
+        });
+
+        it('says its buttons in the recipient\'s language', async () => {
+            const wire = await wireFor('alice', {
+                title: 't', body: 'b',
+                actions: [{ action: 'a1', title: 'Run as me', i18n: { key: 'workflow_run_refused.run_as_me' } }, { action: 'a2', title: 'Keep' }],
+            });
+            expect(wire.actions).toEqual([{ action: 'a1', title: 'Aja itse' }, { action: 'a2', title: 'Keep' }]);
         });
     });
 

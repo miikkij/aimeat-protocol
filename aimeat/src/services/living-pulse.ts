@@ -25,6 +25,8 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-11-10 — The retire push names the document ('Your living document "<title>" stopped updating')
+ *     in the owner's language, with the reason as its body; it read 'Living document retired'.
  *   2026-11-09 — CONFIG_RE takes dot-free organism and workspace ids (code scanning alert 1784).
  *   2026-11-08 — livingSpendHold takes the config the pulse runs, so the owner's allowance for a writer
  *     of another account is matched against exactly that content (secaudit2026nov08 round 14).
@@ -179,7 +181,11 @@ async function notifyStop(services: LivingNotify | undefined, storage: Storage, 
   const body = `"${title}" stopped refreshing: ${reason}`;
   try {
     if (services.push?.enabled) {
-      await services.push.sendNotification(localAccountName(ownerGaii), { title: 'Living document retired', body, url: '/v1/profile?tab=living', tag: 'living:retired' });
+      // Named by the document's own title and said in the owner's language; the reason is the charter's words.
+      await services.push.sendNotification(localAccountName(ownerGaii), {
+        title: `Your living document "${title}" stopped updating`, body: reason, url: '/v1/profile?tab=living', tag: 'living:retired',
+        i18n: { title: { key: 'living_retired.title', vars: { title } } },
+      });
     }
   } catch (err) { logger.warn('notifyStop: push best-effort', { error: String(err) }); }
   try {

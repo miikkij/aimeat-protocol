@@ -12,6 +12,7 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   2026-11-10 — The operator's test push uses the same calm words as /v1/push/test, in their language.
  *   v1.7.0 — 2026-11-07 — GET /v1/admin/csm carries each CSM's visibility and version (the operator sees
  *     every CSM whatever its visibility), and DELETE /v1/admin/csm/:name goes through
  *     services/csm-service.ts deleteCsmAs: 409 IN_USE while a module uses the CSM, its kept versions go too.
@@ -550,8 +551,9 @@ export function adminFeaturesRouter(
     router.post('/v1/admin/push/test', ...auth, handle(async (req, res) => {
         const ownerName = req.auth!.owner;
         const ok = await services.pushService.sendNotification(ownerName, {
-            title: 'AIMEAT Test',
-            body: 'Push notifications are working!',
+            title: 'AIMEAT: test notification',
+            body: 'Notifications reach this device.',
+            i18n: { title: { key: 'push_test.title' }, body: { key: 'push_test.body' } },
             icon: '/icons/icon-192.png',
             url: '/v1/admin?tab=push',
             tag: 'test',

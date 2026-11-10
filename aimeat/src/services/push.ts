@@ -13,6 +13,13 @@
  *   const push = createPushService(config, storage);
  *   await push.sendNotification(ownerName, { title: '...', body: '...' });
  * @version-history
+ *   v1.3.0 -- 2026-11-10 -- A push is written in the recipient's language and names its sender.
+ *     `i18n` carries `notiftext.` keys that sendNotification resolves with the owner's locale
+ *     (the bell already did this, the push carried the English fallback), and `from` puts the
+ *     sender's name before a title that does not already say it. Both are taken off before the
+ *     payload is sent. Chrome on Android hides a push behind a spam warning when its on-device
+ *     model reads the title, body and button text as deceptive; a member reported several AIMEAT
+ *     pushes landing there.
  *   v1.2.1 -- 2026-09-26 -- broadcastToOrganism takes each member's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.2.0 -- 2026-08-11 -- One subscription per DEVICE (audit H-8): sendNotification fans out over
  *     every device the owner registered and prunes only the endpoint that reported itself gone;
@@ -26,11 +33,17 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, PushSubscriptionRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { createT, toLocale, type Locale } from '../i18n.js';
 import { getStats } from './stats.js';
+import { displayPrefsFor } from './display-prefs.js';
 
 const require = createRequire(import.meta.url);
 
+/** Words in the reader's language: a locale key under `notiftext.` (full path) and its {var} values. */
+export interface PushText { key: string; vars?: Record<string, string | number> }
+
 export interface PushPayload {
+  /** The English fallback, sent as is when `i18n.title` is absent or no language has its key. */
   title: string;
   body: string;
   icon?: string;
@@ -38,8 +51,51 @@ export interface PushPayload {
   url?: string;
   tag?: string;
   /** OS-level notification action buttons ({ action, title }); the SW renders + routes these. */
-  actions?: Array<{ action: string; title: string }>;
+  actions?: Array<{ action: string; title: string; i18n?: PushText }>;
   data?: Record<string, unknown>;
+  /** The title and body in the recipient's language, resolved in sendNotification. */
+  i18n?: { title?: PushText; body?: PushText };
+  /**
+   * The sender's name when someone other than the node sent it (an app, an agent, an extension, an
+   * outside app). It goes before the title unless the title already names the sender, so the lock
+   * screen never shows words with no one behind them.
+   */
+  from?: string;
+}
+
+/** The text a `notiftext.` key gives in this language with its {var} filled; null when no language has the key. */
+export function pushTextIn(locale: Locale, text: PushText): string | null {
+  const full = `notiftext.${text.key}`;
+  const said = createT(locale)(full);
+  if (said === full) return null;
+  // The bell's {var} form (public/js/services/notifications.js), not the server's {{var}}.
+  return said.replace(/\{(\w+)\}/g, (m, name: string) => (text.vars && name in text.vars ? String(text.vars[name]) : m));
+}
+
+/** The language a person reads their notifications in: the one on their account, else English. */
+export async function pushLocaleOf(storage: Storage, ownerName: string): Promise<Locale> {
+  return toLocale((await displayPrefsFor(storage, ownerName)).locale ?? undefined);
+}
+
+/** The sender's name before the title, unless the title already says who it is from. */
+export function titleWithSender(title: string, from: string | undefined): string {
+  const name = from?.trim();
+  if (!name || title.toLowerCase().includes(name.toLowerCase())) return title;
+  return `${name}: ${title}`;
+}
+
+/** What goes on the wire: the words resolved for this owner, and the fields only the node reads taken off. */
+async function wirePayload(storage: Storage, ownerName: string, payload: PushPayload): Promise<Omit<PushPayload, 'i18n' | 'from'>> {
+  const { i18n, from, actions, ...rest } = payload;
+  const wantsWords = !!(i18n?.title || i18n?.body || actions?.some(a => a.i18n));
+  const locale = wantsWords ? await pushLocaleOf(storage, ownerName) : 'en';
+  const said = (t: PushText | undefined): string | null => (t ? pushTextIn(locale, t) : null);
+  return {
+    ...rest,
+    title: titleWithSender(said(i18n?.title) ?? payload.title, from),
+    body: said(i18n?.body) ?? payload.body,
+    ...(actions ? { actions: actions.map(a => ({ action: a.action, title: said(a.i18n) ?? a.title })) } : {}),
+  };
 }
 
 export interface PushService {
@@ -124,12 +180,13 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
       const own = fromApp ? all.filter(s => s.appId === fromApp) : [];
       const subs = own.length > 0 ? own : all.filter(s => !s.appId);
       if (!subs.length) return false;
+      const wire = JSON.stringify(await wirePayload(storage, ownerName, payload));
       let delivered = 0;
       for (const sub of subs) {
         try {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: sub.keys },
-            JSON.stringify(payload),
+            wire,
             { TTL: 86400 },
           );
           // COUNT THE DELIVERY BEFORE WRITING IT DOWN. The notification has arrived; stamping when

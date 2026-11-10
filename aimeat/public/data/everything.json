@@ -3151,10 +3151,10 @@
      "slug": "g-13-push-to-every-device",
      "cells": [
       "<strong>Push to every device</strong>",
-      "Web push to each device you enabled, not only the last one.",
+      "Web push to each device you enabled, not only the last one. A push says the same as the bell: in the language of your account, and with the name of the app, agent or extension that sent it in front of its title. One event sends one push.",
       "<code>/v1/push/*</code>"
      ],
-     "plain": "Push to every device Web push to each device you enabled, not only the last one. /v1/push/*"
+     "plain": "Push to every device Web push to each device you enabled, not only the last one. A push says the same as the bell: in the language of your account, and with the name of the app, agent or extension that sent it in front of its title. One event sends one push. /v1/push/*"
     },
     {
      "slug": "g-13-email-digest",

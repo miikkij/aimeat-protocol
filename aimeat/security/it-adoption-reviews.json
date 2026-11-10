@@ -193,7 +193,7 @@
       "digest": "sha256:4a124591b51f02e11c124e14"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-09",
+      "reviewedOn": "2026-11-10",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -220,7 +220,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:dfea0b3861a6d6b6893f9f2f"
+      "digest": "sha256:e2bd579e9448beeb94c42858"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -433,7 +433,7 @@
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
-      "aimeat/src/services/notification-sweeps.ts": "5d29eeb2b0e63500",
+      "aimeat/src/services/notification-sweeps.ts": "daa347e946222090",
       "aimeat/src/services/bus-relay.ts": "cd9d487584979f5e",
       "aimeat/src/server-bootstrap/bus-relay-start.ts": "a77a01c5de30a627",
       "aimeat/src/services/process-lease.ts": "56b5c28544c3d11b",

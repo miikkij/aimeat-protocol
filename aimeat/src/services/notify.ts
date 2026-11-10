@@ -55,10 +55,15 @@
  *   v1.8.0 -- 2026-09-26 -- A `navigate` button may carry `i18n` too, such as the workflow refusal's
  *     "Approve again".
  *   v1.8.1 -- 2026-09-26 -- The push recipient's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.9.0 -- 2026-11-10 -- The push says what the bell says: the record's `i18n` key and its
+ *     buttons' keys ride along, so push.ts writes the push in the recipient's language, and a
+ *     notice from an app, an agent, an extension or an outside app carries its sender's name
+ *     (an extension's title was free text with no name in front). The "N more from" summary
+ *     is said in the reader's language as well.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
-import type { PushService } from './push.js';
+import type { PushService, PushPayload } from './push.js';
 import { logger } from '../utils/logger.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -197,7 +202,18 @@ export interface NotifyInput {
 export interface NotifyResult { stored: boolean; pushed: boolean; held: boolean; muted: boolean }
 
 /** One push per sender per window, in-process: the last push time and how many were folded since. */
-const throttle = new Map<string, { at: number; folded: number; timer: NodeJS.Timeout | null; sample: { title: string; link: string } }>();
+const throttle = new Map<string, { at: number; folded: number; timer: NodeJS.Timeout | null; sample: { title: string; link: string; i18n?: NotifText } }>();
+
+/** A record's words as the push carries them: `notiftext.<key>.title` and `.body`, as the bell reads them. */
+export function notifPushText(i18n: NotifText | undefined): PushPayload['i18n'] {
+  if (!i18n) return undefined;
+  return { title: { key: `${i18n.key}.title`, vars: i18n.vars }, body: { key: `${i18n.key}.body`, vars: i18n.vars } };
+}
+
+/** The name a push puts before its title: anyone but the node itself and the owner writing to themselves. */
+export function pushSenderName(source: NotifSource): string | undefined {
+  return source.kind === 'aimeat' || source.kind === 'owner' ? undefined : source.name;
+}
 
 /**
  * Translate a bell-vocabulary link into a URL that opens correctly from a cold start (push
@@ -264,7 +280,7 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
     const slot = throttle.get(tkey);
     if (windowMs > 0 && slot && Date.now() - slot.at < windowMs) {
       slot.folded++;
-      slot.sample = { title: input.title, link: input.link ?? '' };
+      slot.sample = { title: input.title, link: input.link ?? '', ...(input.i18n ? { i18n: input.i18n } : {}) };
       if (!slot.timer) {
         slot.timer = setTimeout(() => {
           const s = throttle.get(tkey);
@@ -272,11 +288,21 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
           s.timer = null;
           const n = s.folded; s.folded = 0; s.at = Date.now();
           if (n <= 0 || !pushService?.enabled) return;
-          void pushService.sendNotification(localAccountName(recipientGhii), {
-            title: n === 1 ? s.sample.title : `${n} more from ${source.name}`,
-            body: n === 1 ? '' : s.sample.title,
-            url: n === 1 ? notifLinkToUrl(s.sample.link) : '/v1/profile?tab=notifications',
+          const sampleTitle = s.sample.i18n ? { key: `${s.sample.i18n.key}.title`, vars: s.sample.i18n.vars } : undefined;
+          void pushService.sendNotification(localAccountName(recipientGhii), n === 1 ? {
+            title: s.sample.title,
+            body: '',
+            url: notifLinkToUrl(s.sample.link),
             tag: `notif:${senderKey(source)}`,
+            ...(sampleTitle ? { i18n: { title: sampleTitle } } : {}),
+            from: pushSenderName(source),
+          } : {
+            // The summary names its sender in its own words, so it takes no `from` in front.
+            title: `${n} more from ${source.name}`,
+            body: s.sample.title,
+            url: '/v1/profile?tab=notifications',
+            tag: `notif:${senderKey(source)}`,
+            i18n: { title: { key: 'push_more.title', vars: { count: n, sender: source.name } }, body: sampleTitle },
           }).catch(err => { logger.warn('notify: summary push is best-effort', { error: String(err) }); });
         }, windowMs - (Date.now() - slot.at));
         slot.timer.unref?.();
@@ -284,7 +310,7 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
       result.held = true;
       return result;
     }
-    throttle.set(tkey, { at: Date.now(), folded: 0, timer: null, sample: { title: input.title, link: input.link ?? '' } });
+    throttle.set(tkey, { at: Date.now(), folded: 0, timer: null, sample: { title: input.title, link: input.link ?? '', ...(input.i18n ? { i18n: input.i18n } : {}) } });
     // Same tag per type ⇒ a newer notification of the same kind replaces the shown one instead
     // of stacking. A recipient without a push subscription is a silent no-op inside the service.
     // Mirror up to two actions into the OS-level push (Notification.actions caps low, and a lock
@@ -296,8 +322,11 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
       body: input.body ?? '',
       url: notifLinkToUrl(input.link),
       tag: `notif:${input.type}`,
-      actions: actions.slice(0, 2).map(a => ({ action: a.id, title: a.label })),
+      actions: actions.slice(0, 2).map(a => ({ action: a.id, title: a.label, ...('i18n' in a && a.i18n ? { i18n: a.i18n } : {}) })),
       data: { notifId: id, actions },
+      // The bell's words in the reader's language, and who it is from (push.ts resolves both).
+      i18n: notifPushText(input.i18n),
+      from: pushSenderName(source),
       // WHICH APP THIS IS FROM, passed as the app rather than as an icon URL. When the person has
       // installed it and allowed notifications there, this arrives on the app's OWN origin and wears
       // its name and icon on every platform, iOS included, where the icon inside a payload is

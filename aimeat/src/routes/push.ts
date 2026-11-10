@@ -12,6 +12,8 @@
  *   - GET    /v1/push/vapid-key  — public VAPID key (no auth)
  * @usage app.use(pushRouter(config, storage, pushService));
  * @version-history
+ *   2026-11-10 — The test push reads 'AIMEAT: test notification' / 'Notifications reach this device.' in
+ *     the owner's language; 'Push notifications are working!' was the kind of text Chrome on Android flags.
  *   2026-10-15 — The requestedEndpoint comment says what the clients send now (feature-list audit #132).
  *   v1.3.0 — 2026-08-30 — GET /v1/push/subscriptions: the owner's devices, so the Notifications
  *     page can show and remove each one instead of only this browser.
@@ -205,8 +207,9 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
     try {
       const ownerName = req.auth!.owner;
       const ok = await pushService.sendNotification(ownerName, {
-        title: 'AIMEAT Test',
-        body: 'Push notifications are working!',
+        title: 'AIMEAT: test notification',
+        body: 'Notifications reach this device.',
+        i18n: { title: { key: 'push_test.title' }, body: { key: 'push_test.body' } },
         icon: '/icons/icon-192.png',
         url: '/v1/profile?tab=notifications',
         tag: 'test',

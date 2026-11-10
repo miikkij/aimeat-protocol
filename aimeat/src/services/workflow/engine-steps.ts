@@ -6,6 +6,10 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-11-10 — One push per event: askHumanInput and maybeAlertAgentOffline no longer push
+ *     beside notify(), which already pushes in the owner's language and under their push settings. The
+ *     failed-step push reads 'Workflow "<name>" stopped at step <id>' / 'Open the workflow to see why.'
+ *     in the owner's language, in place of a system-error look that Chrome on Android can hide as spam.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.15.0 — 2026-11-04 — The workflow-end mail goes through notification-create.ts mailOwnerFrom:
@@ -532,7 +536,7 @@ export function dispatchDataPackageStep(
  * Deliver a human-input step's question to the owner and return the human bookkeeping record the
  * engine pins into the run. The question `prompt` is {var}-templated HERE so what the run stores is
  * exactly what was asked (same pinning philosophy as the resolved signals). Delivery = in-app inbox
- * notification (notify: inbox + web-push in one call) plus a direct push when enabled; both are
+ * notification (notify: inbox + web-push in one call); it is
  * best-effort — a delivery problem parks the run all the same, and the pending-inputs endpoint /
  * dashboards still surface the question.
  */
@@ -547,12 +551,10 @@ export async function askHumanInput(
   const optionsSummary = question.options.map(o => o.label).join(' / ');
   const body = `${name}: step "${step.id}" — ${question.prompt} [${optionsSummary}]`;
   logger.info(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" waiting for human input`);
+  // notify() stores it and pushes it, in the owner's language and under the owner's push settings.
+  // A second, direct push here sent the same question twice in English and past quiet hours.
   try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: '/v1/profile?tab=workflows', i18n: { key: 'workflow_input_needed', vars: { name, step: step.id, question: question.prompt, options: optionsSummary } } }); }
   catch (err) { logger.warn('askHumanInput: in-app notify best-effort', { error: String(err) }); }
-  if (deps.pushService?.enabled) {
-    deps.pushService.sendNotification(localAccountName(ownerGhii), { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
-      .catch(err => { logger.warn('askHumanInput: push best-effort', { error: String(err) }); });
-  }
   return { question, askedAt: now };
 }
 
@@ -566,11 +568,18 @@ export async function onStepFail(deps: StepDeps, ownerGhii: string, run: Workflo
   logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${stepId}" ${reason}`);
   // 1. Guaranteed owner alert (deterministic, node-owned).
   if (deps.pushService?.enabled) {
+    // Calm words that say what stopped and where to look, in the owner's language. The old
+    // `Workflow step failed` / `step "x" → failed` read like a system error on a lock screen.
+    const name = loc(run.defSnapshot.title) || run.workflowId;
     deps.pushService.sendNotification(ownerName, {
-      title: 'Workflow step failed',
-      body: `${loc(run.defSnapshot.title) || run.workflowId}: step "${stepId}" → ${reason}`,
+      title: `Workflow "${name}" stopped at step ${stepId}`,
+      body: 'Open the workflow to see why.',
       url: '/v1/profile?tab=workflows',
       tag: `workflow:${run.workflowId}`,
+      i18n: {
+        title: { key: 'workflow_step_failed.title', vars: { name, step: stepId } },
+        body: { key: 'workflow_step_failed.body' },
+      },
     }).catch(err => { logger.warn('onStepFail: push best-effort', { error: String(err) }); });
   }
   // 2. Best-effort inspector dispatch (crew-owned; absent ⇒ skip silently, the push already fired).
@@ -581,7 +590,7 @@ export async function onStepFail(deps: StepDeps, ownerGhii: string, run: Workflo
 }
 
 /**
- * Heads-up alert (owner opt-in via pushService + always the in-app inbox) fired at dispatch when a
+ * Heads-up alert (the in-app inbox, and a push when the owner's settings allow it) fired at dispatch when a
  * step's agent(s) look OFFLINE — so the owner can bring the crew online before the offline grace
  * elapses and the step fails. Best-effort: a notify/push problem never disturbs the run.
  */
@@ -595,12 +604,9 @@ export async function maybeAlertAgentOffline(deps: StepDeps, ownerGhii: string, 
   const title = 'Workflow agent offline';
   const body = `${name}: step "${step.id}" was dispatched but its agent (${agents}) looks offline — it will fail in ~${graceMin} min unless the agent connects.`;
   logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" dispatched to offline agent(s) ${agents}`);
+  // notify() stores it and pushes it once; a direct push here sent it a second time (see askHumanInput).
   try { await notify(deps.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: '/v1/profile?tab=workflows', i18n: { key: 'workflow_agent_offline', vars: { name, step: step.id, agents, minutes: graceMin } } }); }
   catch (err) { logger.warn('agents: in-app notify best-effort', { error: String(err) }); }
-  if (deps.pushService?.enabled) {
-    deps.pushService.sendNotification(ownerName, { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
-      .catch(err => { logger.warn('agents: push best-effort', { error: String(err) }); });
-  }
 }
 
 /**

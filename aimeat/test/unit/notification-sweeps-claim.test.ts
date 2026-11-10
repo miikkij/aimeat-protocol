@@ -142,7 +142,8 @@ describe('the held-push sweep', () => {
         await seed(quietJustEnded(), [notif('n1', { held: true }), notif('n2', { held: true })]);
         const [a, b] = await Promise.all([sweepHeldPushes(storage, config, push, 6), sweepHeldPushes(storage, config, push, 6)]);
         expect(a.pushed + b.pushed).toBe(1);
-        expect(pushes).toEqual(['2 notifications while you were quiet']);
+        // The English fallback; push.ts says it in the recipient's language from `i18n`.
+        expect(pushes).toEqual(['2 notifications arrived during your quiet hours']);
         const stillHeld = (await storage.listMemory(OWNER, { prefix: NOTIF_PREFIX })).filter(r => (r.value as { held?: boolean }).held);
         expect(stillHeld).toHaveLength(0);
     });

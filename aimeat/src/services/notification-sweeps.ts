@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Two timed passes over notifications, both best-effort and both reading the owner's
  *   settings record. The morning pass: when an owner's quiet hours have just ended, the pushes that
- *   were held during them go out as ONE push ("N notifications while you were quiet"), and the held
+ *   were held during them go out as ONE push ("N notifications arrived during your quiet hours"), and the held
  *   marks are cleared. The digest pass: an owner who asked for it gets one email listing what has
  *   stayed unread for longer than they chose, sent to the verified address on their account, each
  *   notification in exactly one digest (the bookmark is the last run's cutoff). Neither pass ever
@@ -14,6 +14,9 @@
  *   readNotificationInbox and findOwnerNotificationsByIds (the bell's page and the by-id lookup)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.6.0 -- 2026-11-10 -- The morning push is said in the recipient's language (digestText with the
+ *     account's locale), a single held notice names its sender, and the summary title reads
+ *     "N notifications arrived during your quiet hours". It went out in English, stored words.
  *   v1.5.1 -- 2026-11-08 -- The digest bookmark (lastDigestAt) is the run's cutoff, not its send time, so a
  *     notification that arrived in the hours before a digest goes in the next one; until now it was never
  *     mailed. sweepNotificationDigests takes the clock as an optional third argument, for tests.
@@ -49,8 +52,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { MemoryRecord, Storage } from '../storage/interface.js';
-import type { PushService } from './push.js';
-import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
+import { pushLocaleOf, type PushService } from './push.js';
+import { NOTIF_PREFIX, notifLinkToUrl, pushSenderName } from './notify.js';
 import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './notification-settings.js';
 import { nodeContext } from './node-context.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
@@ -188,12 +191,22 @@ export async function sweepHeldPushes(storage: Storage, _config: AimeatConfig, p
         if (won) held.push(n);
       }
       if (!held.length) continue;
+      // Said in the recipient's language, as the bell says it, and naming who a single one is from.
       const first = held[0].value;
-      const ok = await push.sendNotification(localAccountName(ghii), {
-        title: held.length === 1 ? first.title : `${held.length} notifications while you were quiet`,
-        body: held.length === 1 ? first.body : held.slice(0, 5).map(n => n.value.title).join('\n'),
-        url: held.length === 1 ? notifLinkToUrl(first.link) : '/v1/profile?tab=notifications',
+      const locale = await pushLocaleOf(storage, localAccountName(ghii));
+      const one = digestText(first, locale);
+      const ok = await push.sendNotification(localAccountName(ghii), held.length === 1 ? {
+        title: one.title,
+        body: one.body,
+        url: notifLinkToUrl(first.link),
         tag: 'notif:quiet-summary',
+        from: pushSenderName(sourceOf(first)),
+      } : {
+        title: `${held.length} notifications arrived during your quiet hours`,
+        body: held.slice(0, 5).map(n => digestText(n.value, locale).title).join('\n'),
+        url: '/v1/profile?tab=notifications',
+        tag: 'notif:quiet-summary',
+        i18n: { title: { key: 'push_quiet_summary.title', vars: { count: held.length } } },
       });
       if (ok) pushed++;
     } catch (err) { logger.warn('notification sweep: held pushes are best-effort', { ghii, error: String(err) }); }
