@@ -6,9 +6,11 @@
  *   passed 800 lines (max-file-lines), a pure extraction; its two marks live in modal-styles.js.
  *   Since 2026-11-02 also the two pieces of the password sign-in policy the dialog shows: the refusal
  *   text and the operators-only line (auth.password_sign_in).
- * @structure EMAIL_RE · OWNER_NAME_RE · passwordRefusalText(i, fallback) · operatorsOnlyNoteHtml(i, passkeyShown)
+ * @structure EMAIL_RE · OWNER_NAME_RE · passwordRefusalText(i, fallback) · foreignAddressText(i, address, e) · operatorsOnlyNoteHtml(i, passkeyShown)
  * @usage import { EMAIL_RE, OWNER_NAME_RE } from './modal-constants.js';
  * @version-history
+ *   v1.2.0 — 2026-11-10 — foreignAddressText: another node's full address gets a sentence that says
+ *     what to type instead of "Cannot reach home node".
  *   v1.1.0 — 2026-11-02 — passwordRefusalText and operatorsOnlyNoteHtml (the operator's sign-in policy).
  *   v1.0.0 — 2026-10-31 — Moved out of modal.js unchanged (max-file-lines).
  */
@@ -42,6 +44,25 @@ export function passwordRefusalText(i, fallback) {
  * line has a field's spacing to the username below.
  * @param {Record<string, string>} i @param {boolean} passkeyShown
  */
+/**
+ * The answer to a full AIMEAT address (`name@node-id`) of ANOTHER node that this node cannot sign in
+ * with: it has no route to that node, or takes no sign-in from it. A password manager fills such an
+ * address in from the person's own node on the parent domain, and the node's own sentence ("Cannot
+ * reach home node …") gave the person nothing to do. Returns null for every other refusal, so a home
+ * node that did not answer (502/504) keeps its own words.
+ * @param {Record<string, string>} i Modal strings.
+ * @param {string} address The address as typed.
+ * @param {{ code?: string, status?: number }} e The refused sign-in.
+ * @returns {string | null}
+ */
+export function foreignAddressText(i, address, e) {
+  var noRoute = e.code === 'FEDERATION_UNREACHABLE' && e.status === 400;
+  if (!noRoute && e.code !== 'FEDERATION_AUTH_DISABLED' && e.code !== 'FEDERATION_AUTH_NOT_ALLOWED') return null;
+  var name = address.substring(0, address.indexOf('@'));
+  return String(i.errForeignAddress || '{address} is an account on another AIMEAT. This server has its own accounts, so you cannot sign in here with it. Write your username on this server (perhaps {name}) or your email address.')
+    .replace('{address}', address).replace('{name}', name);
+}
+
 export function operatorsOnlyNoteHtml(i, passkeyShown) {
   if (PASSWORD_SIGN_IN !== 'operators') return '';
   return (passkeyShown ? '<div class="aimeat-or"><span></span><b>' + escHtml(i.orLabel || 'OR') + '</b><span></span></div>' : '')

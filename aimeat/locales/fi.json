@@ -20500,6 +20500,8 @@
     "errIdentifierRequired": "Kirjoita käyttäjänimesi tai sähköpostiosoitteesi.",
     "errPassRequired": "Kirjoita salasanasi.",
     "errWrongCredentials": "Tuo käyttäjänimi tai sähköposti ja salasana eivät täsmää yhteenkään tiliin täällä.",
+    "errForeignAddress": "{address} on tili toisessa AIMEATissa. Tällä palvelimella on omat tilinsä, joten et voi kirjautua sillä tänne. Kirjoita käyttäjänimesi tällä palvelimella (ehkä {name}) tai sähköpostiosoitteesi.",
+    "errLinkNotEmail": "Tämä ei ole sähköpostiosoite. Kirjoita koko sähköpostiosoitteesi, esimerkiksi {example}.",
     "errNameTaken": "Käyttäjänimi on varattu. Jos se on sinun, kirjaudu sisään.",
     "headlineNew": "Tervetuloa.",
     "lineNew": "Valitse käyttäjänimi ja salasana.",

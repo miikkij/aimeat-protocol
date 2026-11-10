@@ -13,6 +13,8 @@
  * @structure api(path, opts) · authApi(path, jwt, opts) · sessionHeaders(given, jwt, body)
  * @usage import { api } from './http.js';
  * @version-history
+ *   v1.2.0 — 2026-11-10 — The thrown error carries the HTTP status, so the sign-in dialog can tell
+ *     "no route to that node" (400) from "that node did not answer" (502/504).
  *   v1.1.0 — 2026-09-13 — sessionHeaders: the one header merge behind every session's fetch, by name
  *     rather than by object key, so a caller's lower-case content-type no longer doubles the header
  *     and empties req.body, a Headers instance is kept, and a FormData body keeps its own type.
@@ -28,9 +30,12 @@ export async function api(path, opts = {}) {
   if (!data.ok) {
     // Preserve the machine-readable code + details on the thrown Error so callers can branch
     // (e.g. EMAIL_NOT_VERIFIED → open the email-completion flow) instead of matching on text.
-    const err = /** @type {Error & { code?: string, details?: unknown }} */ (new Error(data.error?.message || 'API error'));
+    // The HTTP status too: one code can mean two things (FEDERATION_UNREACHABLE is 400 when this
+    // node has no route to the home node at all, 502/504 when the home node did not answer).
+    const err = /** @type {Error & { code?: string, details?: unknown, status?: number }} */ (new Error(data.error?.message || 'API error'));
     err.code = data.error?.code;
     err.details = data.error?.details;
+    err.status = resp.status;
     throw err;
   }
   return data;

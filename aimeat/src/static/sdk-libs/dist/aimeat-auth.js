@@ -447,11 +447,12 @@
     const data = await resp.json();
     if (!data.ok) {
       const err = (
-        /** @type {Error & { code?: string, details?: unknown }} */
+        /** @type {Error & { code?: string, details?: unknown, status?: number }} */
         new Error(data.error?.message || "API error")
       );
       err.code = data.error?.code;
       err.details = data.error?.details;
+      err.status = resp.status;
       throw err;
     }
     return data;
@@ -2377,6 +2378,24 @@
     });
   }
 
+  // src/static/sdk-libs/auth/modal-constants.js
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+  function passwordRefusalText(i, fallback) {
+    if (PASSWORD_SIGN_IN === "operators") return i.passwordOperatorsRefused || fallback;
+    return i.passwordSignInOff || fallback;
+  }
+  function foreignAddressText(i, address, e) {
+    var noRoute = e.code === "FEDERATION_UNREACHABLE" && e.status === 400;
+    if (!noRoute && e.code !== "FEDERATION_AUTH_DISABLED" && e.code !== "FEDERATION_AUTH_NOT_ALLOWED") return null;
+    var name = address.substring(0, address.indexOf("@"));
+    return String(i.errForeignAddress || "{address} is an account on another AIMEAT. This server has its own accounts, so you cannot sign in here with it. Write your username on this server (perhaps {name}) or your email address.").replace("{address}", address).replace("{name}", name);
+  }
+  function operatorsOnlyNoteHtml(i, passkeyShown) {
+    if (PASSWORD_SIGN_IN !== "operators") return "";
+    return (passkeyShown ? '<div class="aimeat-or"><span></span><b>' + escHtml(i.orLabel || "OR") + "</b><span></span></div>" : "") + '<div class="aimeat-field"><p class="aimeat-sub-desc">' + escHtml(i.passwordOperatorsOnly || "Password sign-in is only for the operators of this server.") + "</p></div>";
+  }
+
   // src/static/sdk-libs/auth/modal-login-link.js
   function loginLinkAskHtml(i) {
     if (!EMAIL_LOGIN) return "";
@@ -2389,7 +2408,7 @@
       return linkFirst && i[key] || i[plain] || fallback;
     };
     var said = linkFirst && i.loginLinkTitleFirst;
-    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">' + (said ? "" : '<h3 class="aimeat-sub-title">' + escHtml(first("loginLinkTitleFirst", "loginLinkTitle", "Sign in with an emailed link")) + '</h3><p class="aimeat-sub-desc">' + escHtml(first("loginLinkDescFirst", "loginLinkDesc", "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.")) + "</p>") + field(first("emailLabelFirst", "emailLabel", "Email"), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="' + escHtml(i.emailPlaceholder || "you@example.com") + '">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first("loginLinkSendFirst", "loginLinkSend", "Send the link")) + "</button>" + (linkFirst ? "" : '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + "</button>") + "</div>" + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + "</p>" : "") + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + "</p>" : "") + (linkFirst ? '<p class="aimeat-sub-desc">' + (i.loginLinkPasswordWhy ? escHtml(i.loginLinkPasswordWhy) + " " : "") + '<a href="#" id="aimeat-ll-back" class="aimeat-link">' + escHtml(back) + "</a></p>" : "") + '<p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
+    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">' + (said ? "" : '<h3 class="aimeat-sub-title">' + escHtml(first("loginLinkTitleFirst", "loginLinkTitle", "Sign in with an emailed link")) + '</h3><p class="aimeat-sub-desc">' + escHtml(first("loginLinkDescFirst", "loginLinkDesc", "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.")) + "</p>") + field(first("emailLabelFirst", "emailLabel", "Email"), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="' + escHtml(i.emailPlaceholder || "you@example.com") + '">') + '<p id="aimeat-ll-err" class="aimeat-err"></p><div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first("loginLinkSendFirst", "loginLinkSend", "Send the link")) + "</button>" + (linkFirst ? "" : '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + "</button>") + "</div>" + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + "</p>" : "") + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + "</p>" : "") + (linkFirst ? '<p class="aimeat-sub-desc">' + (i.loginLinkPasswordWhy ? escHtml(i.loginLinkPasswordWhy) + " " : "") + '<a href="#" id="aimeat-ll-back" class="aimeat-link">' + escHtml(back) + "</a></p>" : "") + '<p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
   }
   function hereAddress() {
     if (inIsolatedFrame()) return "";
@@ -2416,13 +2435,18 @@
       document.getElementById("aimeat-ll-send")
     );
     var msgEl = document.getElementById("aimeat-ll-msg");
+    var errEl = (
+      /** @type {HTMLElement} */
+      document.getElementById("aimeat-ll-err")
+    );
     function open() {
       var typed = (
         /** @type {any} */
         document.getElementById("aimeat-username")
       );
-      if (typed && typed.value.indexOf("@") > 0 && !emailEl.value) emailEl.value = typed.value.trim();
+      if (typed && EMAIL_RE.test(typed.value.trim()) && !emailEl.value) emailEl.value = typed.value.trim();
       msgEl.style.display = "none";
+      errEl.style.display = "none";
       ctx.showView("login-link");
       setTimeout(function() {
         emailEl.focus();
@@ -2439,6 +2463,14 @@
     async function send() {
       var email = emailEl.value.trim();
       if (!email) {
+        emailEl.focus();
+        return;
+      }
+      errEl.style.display = "none";
+      if (!EMAIL_RE.test(email)) {
+        errEl.textContent = String(i.errLinkNotEmail || "That is not an email address. Write your whole email address, for example {example}.").replace("{example}", i.emailPlaceholder || "you@example.com");
+        errEl.style.display = "block";
+        msgEl.style.display = "none";
         emailEl.focus();
         return;
       }
@@ -2492,18 +2524,6 @@
   }
   function signupInProgress() {
     return inProgress;
-  }
-
-  // src/static/sdk-libs/auth/modal-constants.js
-  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
-  function passwordRefusalText(i, fallback) {
-    if (PASSWORD_SIGN_IN === "operators") return i.passwordOperatorsRefused || fallback;
-    return i.passwordSignInOff || fallback;
-  }
-  function operatorsOnlyNoteHtml(i, passkeyShown) {
-    if (PASSWORD_SIGN_IN !== "operators") return "";
-    return (passkeyShown ? '<div class="aimeat-or"><span></span><b>' + escHtml(i.orLabel || "OR") + "</b><span></span></div>" : "") + '<div class="aimeat-field"><p class="aimeat-sub-desc">' + escHtml(i.passwordOperatorsOnly || "Password sign-in is only for the operators of this server.") + "</p></div>";
   }
 
   // src/static/sdk-libs/auth/modal-fields.js
@@ -3534,7 +3554,8 @@
             releaseBtn("aimeat-go-btn", signInLabel);
             return;
           }
-          errEl.textContent = e.message.includes("Invalid username or password") ? i.errWrongCredentials || "That username or email and password do not match an account here." : e.code === "PASSWORD_SIGN_IN_OFF" ? passwordRefusalText(i, e.message) : e.message;
+          const foreign = isFederated ? foreignAddressText(i, raw, e) : null;
+          errEl.textContent = foreign ? foreign : e.message.includes("Invalid username or password") ? i.errWrongCredentials || "That username or email and password do not match an account here." : e.code === "PASSWORD_SIGN_IN_OFF" ? passwordRefusalText(i, e.message) : e.message;
           errEl.style.display = "block";
           releaseBtn("aimeat-go-btn", signInLabel);
         }

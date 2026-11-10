@@ -25,6 +25,9 @@
  * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open, keep, resume }
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.8.0 — 2026-11-10 — Only an email address is sent. An AIMEAT address (`name@node-id`), which a
+ *     password manager fills in, is refused under the field with a sentence that says what to write,
+ *     and it no longer comes along from the sign-in field.
  *   v1.7.0 -- 2026-11-08 -- keep() and resume(): the language switch draws the step again with the typed
  *     address and, once the link was sent, the sent line (modal-view-keep.js; secaudit2026nov08b round 15b).
  *   v1.6.0 — 2026-11-01 — Opened first, the link to the password reads "Muut kirjautumistavat"
@@ -49,6 +52,7 @@ import { escHtml } from './theme.js';
 import { EMAIL_LOGIN, APEX_URL, NODE_URL } from './config.js';
 import { inIsolatedFrame } from './app-frame.js';
 import { currentModalLang } from './i18n.js';
+import { EMAIL_RE } from './modal-constants.js';
 
 /** The link in the sign-in form's link row, or nothing on a node that sends no mail. */
 export function loginLinkAskHtml(i) {
@@ -75,6 +79,8 @@ export function loginLinkViewHtml(i, field, linkFirst) {
     + (said ? '' : '<h3 class="aimeat-sub-title">' + escHtml(first('loginLinkTitleFirst', 'loginLinkTitle', 'Sign in with an emailed link')) + '</h3>'
       + '<p class="aimeat-sub-desc">' + escHtml(first('loginLinkDescFirst', 'loginLinkDesc', 'Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.')) + '</p>')
     + field(first('emailLabelFirst', 'emailLabel', 'Email'), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="' + escHtml(i.emailPlaceholder || 'you@example.com') + '">')
+    // A refusal of what was typed, under the field it is about.
+    + '<p id="aimeat-ll-err" class="aimeat-err"></p>'
     + '<div class="aimeat-actions">'
     + '<button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first('loginLinkSendFirst', 'loginLinkSend', 'Send the link')) + '</button>'
     // Opened first, the password is not a second button beside Send: a buyer never chose one, so it
@@ -123,12 +129,15 @@ export function wireLoginLinkStep(ctx) {
   var emailEl = /** @type {any} */ (document.getElementById('aimeat-ll-email'));
   var sendBtn = /** @type {any} */ (document.getElementById('aimeat-ll-send'));
   var msgEl = document.getElementById('aimeat-ll-msg');
+  var errEl = /** @type {HTMLElement} */ (document.getElementById('aimeat-ll-err'));
 
   function open() {
-    // An address already typed into the sign-in field comes along.
+    // An email address already typed into the sign-in field comes along. Only an email: an AIMEAT
+    // address (`name@node-id`) carries an @ too, and a password manager fills one in.
     var typed = /** @type {any} */ (document.getElementById('aimeat-username'));
-    if (typed && typed.value.indexOf('@') > 0 && !emailEl.value) emailEl.value = typed.value.trim();
+    if (typed && EMAIL_RE.test(typed.value.trim()) && !emailEl.value) emailEl.value = typed.value.trim();
     msgEl.style.display = 'none';
+    errEl.style.display = 'none';
     ctx.showView('login-link');
     setTimeout(function () { emailEl.focus(); }, 30);
   }
@@ -141,6 +150,18 @@ export function wireLoginLinkStep(ctx) {
   async function send() {
     var email = emailEl.value.trim();
     if (!email) { emailEl.focus(); return; }
+    // The browser's type="email" takes `name@node-id` (no dot needed), and the node answers "sent"
+    // to any address so as not to say which accounts exist. Without this check a person whose
+    // password manager filled in their AIMEAT address waits for a mail that never comes.
+    errEl.style.display = 'none';
+    if (!EMAIL_RE.test(email)) {
+      errEl.textContent = String(i.errLinkNotEmail || 'That is not an email address. Write your whole email address, for example {example}.')
+        .replace('{example}', i.emailPlaceholder || 'you@example.com');
+      errEl.style.display = 'block';
+      msgEl.style.display = 'none';
+      emailEl.focus();
+      return;
+    }
     var label = i.loginLinkSend || 'Send the link';
     sendBtn.textContent = i.working || 'Working...';
     sendBtn.disabled = true;

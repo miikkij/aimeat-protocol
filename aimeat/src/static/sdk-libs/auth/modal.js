@@ -13,6 +13,8 @@
  *   openEmailCompletion (modal-email-step.js), showView, capture/restoreInputs, keep/resumeView }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.23.0 — 2026-11-10 — Another node's full address (`name@node-id`) that this node cannot sign in
+ *     with gets a sentence naming what to type instead of "Cannot reach home node" (foreignAddressText).
  *   v1.22.0 -- 2026-11-08 -- The language switch keeps the view on screen and what it holds (modal-view-keep.js):
  *     a code key's first sign-in keeps its details step, the two-step, code, link, email and recovery
  *     views keep theirs. The complete-account step moved to modal-email-step.js unchanged (max-file-lines)
@@ -106,7 +108,7 @@ import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
 import { showAuthErrorIn } from './auth-error.js';
 import { signupInProgress } from './signup-state.js';
-import { EMAIL_RE, OWNER_NAME_RE, passwordRefusalText, operatorsOnlyNoteHtml } from './modal-constants.js';
+import { EMAIL_RE, OWNER_NAME_RE, passwordRefusalText, foreignAddressText, operatorsOnlyNoteHtml } from './modal-constants.js';
 import { captureInputs, restoreInputs, wireUsernameRules, wireEnterSubmits } from './modal-fields.js';
 import { twoStepViewHtml, wireTwoStepStep } from './modal-two-step.js';
 import { keyCredentialsViewHtml, wireKeyCredentialsStep } from './modal-key-credentials.js';
@@ -588,7 +590,9 @@ export function showLoginModal(opts, renderBtn, onClosed) {
           releaseBtn('aimeat-go-btn', signInLabel);
           return;
         }
-        errEl.textContent = e.message.includes('Invalid username or password')
+        const foreign = isFederated ? foreignAddressText(i, raw, e) : null;
+        errEl.textContent = foreign ? foreign
+          : e.message.includes('Invalid username or password')
           ? (i.errWrongCredentials || 'That username or email and password do not match an account here.')
           : e.code === 'PASSWORD_SIGN_IN_OFF' ? passwordRefusalText(i, e.message) : e.message;
         errEl.style.display = 'block';

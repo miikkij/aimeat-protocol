@@ -18577,6 +18577,8 @@
     "errIdentifierRequired": "Escribe tu nombre de usuario o tu correo.",
     "errPassRequired": "Escribe tu contraseña.",
     "errWrongCredentials": "Ese nombre de usuario o correo y esa contraseña no coinciden con ninguna cuenta de aquí.",
+    "errForeignAddress": "{address} es una cuenta de otro AIMEAT. Este servidor tiene sus propias cuentas, así que no puedes entrar aquí con ella. Escribe tu nombre de usuario en este servidor (quizá {name}) o tu correo.",
+    "errLinkNotEmail": "Eso no es una dirección de correo. Escribe tu correo completo, por ejemplo {example}.",
     "errNameTaken": "Ese nombre de usuario está ocupado. Si es tuyo, inicia sesión.",
     "headlineNew": "Te damos la bienvenida.",
     "lineNew": "Elige un nombre de usuario y una contraseña.",

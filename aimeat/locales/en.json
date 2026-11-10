@@ -19733,6 +19733,8 @@
     "errIdentifierRequired": "Enter your username or email.",
     "errPassRequired": "Enter your password.",
     "errWrongCredentials": "That username or email and password do not match an account here.",
+    "errForeignAddress": "{address} is an account on another AIMEAT. This server has its own accounts, so you cannot sign in here with it. Write your username on this server (perhaps {name}) or your email address.",
+    "errLinkNotEmail": "That is not an email address. Write your whole email address, for example {example}.",
     "errNameTaken": "That username is taken. If it is yours, sign in instead.",
     "headlineNew": "Welcome in.",
     "lineNew": "Pick a username and password.",
