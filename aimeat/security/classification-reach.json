@@ -2360,9 +2360,10 @@
         "memoryDb.searchOwnerScope": 1,
         "searchText": 1,
         "memoryDb.listOwnerScopeMeta": 1,
-        "listMemoryMeta": 1
+        "listMemoryMeta": 1,
+        "listMemoryMetaForOwners": 1
       },
-      "why": "Reviewed 2026-10-16 (QA audit D2-06): the search and the metadata listing that GET /v1/memory, GET /v1/memory/search, aimeat_memory_list and aimeat_memory_search share, moved here from those four files; every caller passes the rows through the classification reader (reader.show, presentMemories) before any reaches the caller, as those files did."
+      "why": "Reviewed 2026-10-16 (QA audit D2-06): the search and the metadata listing that GET /v1/memory, GET /v1/memory/search, aimeat_memory_list and aimeat_memory_search share, moved here from those four files; every caller passes the rows through the classification reader (reader.show, presentMemories) before any reaches the caller, as those files did. 2026-11-10: listMemoryMetaPage reads a cursor page with listMemoryMetaForOwners and hands each batch to the caller's `keep`, which is the same chain: GET /v1/memory runs reader.show, the owner-scope view and the organism rule, aimeat_memory_list the owner-scope view, the organism rule and readerForAgent.show; no row leaves the function without passing it."
     },
     "src/services/memory-replication.ts": {
       "reads": {

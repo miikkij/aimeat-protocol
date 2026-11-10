@@ -19,12 +19,20 @@ let dir = '';
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'relmods-'));
   for (const d of ['views/profile/dw', 'components', 'lib']) mkdirSync(join(dir, d), { recursive: true });
-  writeFileSync(join(dir, 'views/profile/dw/page.js'), "import { a } from './rows.js';\nimport '../shared.js';\nconst m = () => import('./lazy.js');\n// see './gone.js'\n");
+  // The fixture's import lines are built from pieces, so the repository's own import check
+  // (check:imports-tracked) does not read them as imports of this test file.
+  const q = "'";
+  writeFileSync(join(dir, 'views/profile/dw/page.js'), [
+    `import { a } from ${q}./rows.js${q};`,
+    `import ${q}../shared.js${q};`,
+    `const m = () => import(${q}./lazy.js${q});`,
+    `// see ${q}./gone.js${q}`,
+  ].join('\n') + '\n');
   writeFileSync(join(dir, 'views/profile/dw/rows.js'), "export const a = 1;\n");
   writeFileSync(join(dir, 'views/profile/dw/lazy.js'), "export default 1;\n");
   writeFileSync(join(dir, 'views/profile/shared.js'), "import { b } from '/components/B.js';\n");
   writeFileSync(join(dir, 'components/B.js'), "export const b = 1;\n");
-  writeFileSync(join(dir, 'lib/vendor.js'), "import './inner.js';\n");
+  writeFileSync(join(dir, 'lib/vendor.js'), `import ${q}./inner.js${q};\n`);
   writeFileSync(join(dir, 'lib/inner.js'), "\n");
 });
 afterAll(() => { rmSync(dir, { recursive: true, force: true }); });
