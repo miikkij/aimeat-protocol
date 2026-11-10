@@ -14,6 +14,8 @@
  *   is proven with a set version in package-metadata-signature-window.test.ts.
  * @usage cd aimeat && pnpm exec vitest run test/unit/package-pull-metadata.test.ts
  * @version-history
+ *   v1.1.1 -- 2026-11-10 -- The last case reads the running version, so the nightly's 4.0.0 run
+ *     (AIMEAT_TEST_SOFTWARE_VERSION) expects the pull and 4.3.0 the refusal.
  *   v1.1.0 -- 2026-11-10 -- Node 4.3.0 closes the unsigned-metadata window: the last case expects
  *     METADATA_UNSIGNED and no write.
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
@@ -25,6 +27,11 @@ import type { PeerInfo } from '../../src/services/federation.js';
 import { generateKeyPair, sign } from '../../src/auth/keypair.js';
 import { buildDescriptor, signAttestation, attestationSignString } from '../../src/services/packages/peer/package-attestation.js';
 import { buildZip } from '../../src/services/packages/compose/package-zip.js';
+import { UNSIGNED_PACKAGE_METADATA_REMOVED_IN } from '../../src/config-federation.js';
+import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
+
+/** The nightly also runs this file as node 4.0.0 (AIMEAT_TEST_SOFTWARE_VERSION), inside the window. */
+const windowOpen = !versionAtLeast(getSoftwareVersion(), UNSIGNED_PACKAGE_METADATA_REMOVED_IN);
 
 let served: Buffer = Buffer.alloc(0);
 const written: Array<{ name: string; meta: unknown[] }> = [];
@@ -98,12 +105,18 @@ describe('a pull checks the signed component metadata', () => {
         expect(written.length).toBe(1);
     });
 
-    it('refuses a node that signs no metadata yet, from this release on, and writes nothing', async () => {
+    it(windowOpen
+        ? 'pulls as before from a node that signs no metadata yet, while the window is open'
+        : 'refuses a node that signs no metadata yet, from UNSIGNED_PACKAGE_METADATA_REMOVED_IN on, and writes nothing', async () => {
         const honest = pkg('ext:shop-ext:lookup');
         const descriptor = buildDescriptor(honest, NODE);
         delete descriptor.metadata_sha256;
         served = await buildZip(honest, { descriptor, signature: await sign(privateKey, attestationSignString(descriptor)) });
         const out = await pull();
+        if (windowOpen) {
+            expect(out.ok, JSON.stringify(out)).toBe(true);
+            return;
+        }
         expect(out.ok, JSON.stringify(out)).toBe(false);
         expect((out as { code?: string }).code).toBe('METADATA_UNSIGNED');
         expect(written).toEqual([]);
