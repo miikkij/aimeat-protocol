@@ -44,6 +44,8 @@
  *     tietuetila ottaa agentin kirjoituksen vain sovelluksen oman laajennuksen kautta").
  *     withToolSkus(): an app's address with no tool part gets the addresses of the tools the task
  *     names, the third form the production draft model writes.
+ *   v1.7.1 — 2026-11-10 — joinsAgentList's comment: the node no longer narrows a member's listed
+ *     agent where every member's agent is admitted; the answer is unchanged.
  *   v1.7.0 — 2026-10-13 — joinsAgentList(): an agent that works on a workspace's records goes onto
  *     its organism's agent list only where the organism admits listed agents alone. In any other
  *     organism the list took the workspace away from it (seen on aimeat.io 2026-10-13).
@@ -644,14 +646,13 @@ export function withBrowserSites(crewDef) {
  * Whether an agent that works on a workspace's records goes onto its organism's agent list
  * (`agentGaiis`). `organism` is the organism as GET /v1/organisms/:id answers it.
  *
- * The list means two different things (services/organism-agent-access.ts). In an organism that
- * admits only listed agents it is how a member's agent gets in, and a listed agent acts with its
- * owner's rights: the agent must be on it. In an organism that admits every member's agent (the
- * node leaves `agentAccess` out for it) a listed agent is an organism-level participant, which
- * reaches the organism's shared area and no workspace: the agent must NOT be on it. Measured on
- * aimeat.io on 2026-10-13: an agent the page had listed in such an organism read the meeting note
- * it was woken for, and every record it wrote into that workspace was refused (ACCESS_DENIED);
- * taken off the list, the same agent wrote them.
+ * In an organism that admits only listed agents, the list is how a member's agent gets in: the agent
+ * must be on it. In an organism that admits every member's agent (the node leaves `agentAccess` out
+ * for it) the agent gets in with its owner's rights anyway, so listing it adds nothing. Measured on
+ * aimeat.io on 2026-10-13: an agent the page had listed in such an organism had every workspace
+ * write refused, because the node read a listed agent there as an organism-level participant. The
+ * node stopped doing that for an agent whose owner is a member on 2026-11-10
+ * (services/organism-agent-access.ts attachedAsParticipant); this page still leaves it off the list.
  *
  * An organism that could not be read counts as "no": a wrong yes stops the agent's work, and a
  * wrong no leaves a refusal whose message names the list and who can add the agent to it.

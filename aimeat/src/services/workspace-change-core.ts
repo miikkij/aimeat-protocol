@@ -30,6 +30,9 @@
  *   const standing = await workspaceStanding(deps, caller, orgId, ws);
  *   if (isRefusal(standing)) return standing;
  * @version-history
+ *   2026-11-10 — workspaceStanding refuses an attached agent only when its owner is not an active
+ *     member (attachedAsParticipant takes the membership); an active member's attached agent stands
+ *     where its owner stands.
  *   2026-11-04 — No value scan for a storage without listMemoryKeysByPrefix: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — existingDocIds reads a page's id from the end of its key (recordRowAt), so a page
@@ -111,10 +114,11 @@ export async function workspaceStanding(
     const { storage, config } = deps;
     const organism = await storage.getOrganism(orgId);
     if (!organism) return refusal(404, 'NOT_FOUND', 'Organism not found. Check the id with aimeat_organism_list.');
-    if (attachedAsParticipant(organism, caller.principal)) {
-        return refusal(403, 'ACCESS_DENIED', 'An agent attached to the organism works in its shared area and does not change a workspace. Make the change as a member instead.');
-    }
     const membership = caller.owner ? await storage.getMembership(orgId, caller.owner) : null;
+    // An attached agent of an active member acts with the member's rights (attachedAsParticipant).
+    if (attachedAsParticipant(organism, caller.principal, membership)) {
+        return refusal(403, 'ACCESS_DENIED', 'This agent is attached to the organism, but its owner is not an active member, so it works in the organism\'s shared area and does not change a workspace. Its owner joins the organism first; then the change is made as that member.');
+    }
     if (!membership || membership.status !== 'active') {
         return refusal(403, 'ACCESS_DENIED', 'You are not an active member of this organism. Join it first, then ask the workspace creator for access.');
     }

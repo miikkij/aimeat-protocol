@@ -15,6 +15,8 @@
  *   itself. The last part checks return_url on aimeat_organism_invite_email.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-agent-access
  * @version-history
+ *   2026-11-10 — Under "all", the creator's agent that is still on the list writes the workspace
+ *     through aimeat_workspace_write and aimeat_memory_write (attaching an agent takes no right away).
  *   2026-10-21 — A record of an organism that no longer exists stays in an agent's owner-scope reads
  *     (REST list, aimeat_memory_list, aimeat_memory_read), as before v57; the barred agent still gets
  *     nothing of the live organism.
@@ -451,6 +453,17 @@ async function run() {
         assert(g.status === 200, `the unlisted agent is still refused under "all": ${g.status}`);
         const s = await readShared(a2.token);
         assert(s.status === 200, `the consent did not reach the agent again under "all": ${s.status}`);
+    });
+
+    await test('under "all", the creator\'s agent that stays on the list keeps its owner\'s rights: a workspace write lands', async () => {
+        // On aimeat.io on 2026-11-10 the creator's attached agent was read as an organism-level
+        // participant under "all", and every workspace write was refused with "request access".
+        const doc = await callTool(A, 'aimeat_workspace_write', {
+            organism_id: orgId, ws: wsId, space: 'doc', value: { title: 'attached under all', markdown: 'written by the creator\'s attached agent' },
+        });
+        assert(!doc.isError, `the creator's attached agent could not write its workspace under "all": ${doc.text.slice(0, 300)}`);
+        const w = await callTool(A, 'aimeat_memory_write', { key: `organism.${orgId}.w.${wsId}.doc.listed-all`, value: { title: 'attached under all' } });
+        assert(!w.isError, `the memory write was refused under "all": ${w.text.slice(0, 300)}`);
     });
 
     await test('aimeat_organism_invite_email keeps a return_url on this node and drops a foreign one', async () => {

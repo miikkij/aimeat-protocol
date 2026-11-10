@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.13.1 -- 2026-11-10 -- Fresher org data replaces each untouched field on its own. It replaced the whole form or nothing, so with one field touched, an Agents setting changed elsewhere stayed at its old value and the save sent it back.
  *   v1.13.0 -- 2026-10-27 -- A refused save shows each field's message under the name, description or type field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.12.0 -- 2026-10-24 -- "Records of processing" (compliance-records.js, plan doc-mvlftkh9zmc9
  *     C7.4): the organism's registers and what they leave open; the creator and admins get the
@@ -69,6 +70,7 @@ import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { swallowed } from '/js/swallowed.js';
 import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
 import { INPUT_LIMITS } from '/js/input-limits.js';
+import { refreshUntouched } from './form-baseline.js';
 import { OrganismRecords } from '/views/profile/organisms/compliance-records.js';
 
 const TYPE_PRESETS = ['community', 'team', 'club', 'cooperative', 'project'];
@@ -92,17 +94,13 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
   // The type is a preset or a word of the owner's own; "other" opens the field with the custom word.
   const [customType, setCustomType] = useState(!TYPE_PRESETS.includes(baseline.type));
 
-  // Fresher org data replaces the form only while the person has not touched it, so a live update
-  // never clobbers typing.
+  // Fresher org data replaces each field the person has not touched, and a touched field keeps the
+  // typing, so a live update never clobbers it (form-baseline.js says why it is field by field).
   const prevBaselineRef = useRef(baseline);
   useEffect(() => {
     const prev = prevBaselineRef.current;
-    const untouched = form.name === prev.name && form.description === prev.description
-      && form.type === prev.type && form.join_policy === prev.join_policy
-      && form.visibility === prev.visibility && form.member_visibility === prev.member_visibility
-      && form.agent_access === prev.agent_access
-      && form.interests.join(' ') === prev.interests.join(' ');
-    if (untouched) { setForm(baseline); setCustomType(!TYPE_PRESETS.includes(baseline.type)); }
+    setForm(refreshUntouched(form, prev, baseline));
+    if (form.type === prev.type) setCustomType(!TYPE_PRESETS.includes(baseline.type));
     prevBaselineRef.current = baseline;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseline]);

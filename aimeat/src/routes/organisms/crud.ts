@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-10 — PUT lets only the account holder in person widen agent_access back to "all"
+ *     (isOwnerInPerson). isOwnerPrincipal also admitted a session holding account:security, which an
+ *     agent can hold.
  *   2026-11-04 — No per-organism read for a storage without listPendingApprovalsForOrgs: it is required
  *     on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — POST /v1/organisms and PUT /v1/organisms/:id check their bodies with validateBody
@@ -82,9 +85,8 @@ import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism
 import { publicShapes } from '../../data/organism-shapes.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
-import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
+import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { agentBarred } from '../../services/organism-agent-access.js';
-import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
 import { purgeExceptions } from '../../services/classification/exceptions.js';
 import { removeComplianceDocs } from '../../services/compliance/docs.js';
@@ -364,7 +366,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const result = await updateOrganismRecord({ storage, config }, organism, {
       name, description, type, location, interests, readme,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
-      agentAccess: agent_access, callerIsPerson: isOwnerPrincipal(req.auth),
+      agentAccess: agent_access, callerIsPerson: isOwnerInPerson(req.auth),
       // Making it public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
       publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) },
     });

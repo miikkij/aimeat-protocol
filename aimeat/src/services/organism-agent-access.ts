@@ -22,15 +22,19 @@
  *   shared gates reached from elsewhere: canReadWorkspace (services/workspace-access.ts), the
  *   `organism.*` key gate (services/organism-namespace-access.ts) and consent to an organism
  *   (services/consent.ts).
- * @structure agentAccessOf(), agentBarred(), attachedAsParticipant(), agentBarredMessage(), barredAgentFor()
+ * @structure agentAccessOf(), agentBarred(), attachedAsParticipant(), participantRefusalMessage(),
+ *   agentBarredMessage(), barredAgentFor()
  * @usage if (agentBarred(organism, req.auth?.sub)) → refuse as for a non-member
  * @version-history
+ *   v1.1.0 — 2026-11-10 — attachedAsParticipant takes the owner's membership: an agent whose owner is
+ *     an active member acts with the owner's rights in both modes, so attaching it never narrows it.
+ *     participantRefusalMessage says what the narrow rule allows and how to get past it.
  *   v1.0.0 — 2026-09-28 — Initial.
  *   v1.0.1 — 2026-09-28 — agentBarred and barredAgentFor test that the principal is a string before
  *     reading it; any other value is no agent, as a missing one is (CodeQL
  *     js/type-confusion-through-parameter-tampering, alerts 1676 and 1677).
  */
-import type { Storage, OrganismRecord } from '../storage/interface.js';
+import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../storage/interface.js';
 import { isGEAI } from '../utils/gaii.js';
 
 export const AGENT_ACCESS_VALUES = ['all', 'listed'] as const;
@@ -53,16 +57,32 @@ export function agentBarred(
 }
 
 /**
- * Is this agent on `agentGaiis` as an organism-level participant, which some gates give less than a
- * member (the shared area, not the workspaces)? Only where the organism admits every member's agent.
- * Where it admits only listed agents, the list is how a member's agent gets in at all, so being on it
- * narrows nothing: the agent acts with its owner's rights, and an agent whose owner is not a member
- * gets nothing.
+ * Is this agent on `agentGaiis` as an organism-level participant only, which some gates give less
+ * than a member (the shared area and a read of meta, no workspace)?
+ *
+ * Being on the list never takes a right away. An agent whose owner is an active member acts with the
+ * owner's rights in both modes, so the answer is false for it, and `ownerMembership` is the owner's
+ * membership row (null when there is none). The narrow rule is for an agent the organism admits
+ * although its owner is not a member, and only where the organism admits every member's agent. Where
+ * it admits only listed agents, an agent whose owner is not a member gets nothing, as before.
+ *
+ * Until 2026-11-10 the answer ignored the owner: with agentAccess 'all', attaching the creator's own
+ * agent in the Agents section took every workspace write away from it, and setting 'listed' gave it
+ * back (wish-organismiin-liitetty-agentti-ei-saa-menett-omistajansa-ty-ti).
  */
 export function attachedAsParticipant(
   organism: Pick<OrganismRecord, 'agentAccess' | 'agentGaiis'>, principal: string,
+  ownerMembership: Pick<OrganismMembershipRecord, 'status'> | null | undefined,
 ): boolean {
+  if (ownerMembership?.status === 'active') return false;
   return agentAccessOf(organism) !== 'listed' && (organism.agentGaiis ?? []).includes(principal);
+}
+
+/** The refusal an organism-level participant hears for anything outside the shared area. */
+export function participantRefusalMessage(organism: Pick<OrganismRecord, 'name'>, principal: string): string {
+  return `${principal} is attached to the organism "${organism.name}", but its owner is not an active member of it. `
+    + 'Such an agent reads and writes the organism\'s shared area and reads its meta records, and reaches no workspace. '
+    + 'To work in a workspace, its owner joins the organism (an owner or admin invites them), and the workspace\'s creator gives the owner the contributor role.';
 }
 
 /** The refusal, in words the agent can act on and pass to its owner. */

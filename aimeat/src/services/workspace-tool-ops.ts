@@ -30,6 +30,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-10 — writeWorkspaceDraftsOp passes the organism rule's refusal through (status, code,
+ *     reason). It answered every refusal with "You are not approved to write to this workspace. Request
+ *     access...", which sent the organism creator's own agent to request access to its own workspace.
  *   2026-11-08 — readWorkspaceOp lists no record the node keeps under the workspace root (the share
  *     record, an access request, a fingerprint) as a row of a space a manifest declares over it
  *     (secaudit2026nov08 round 14).
@@ -396,7 +399,16 @@ export async function writeWorkspaceDraftsOp(
     // The rule is services/organism-namespace-access.ts, the one the HTTP door answers to.
     const writeRefusal = await checkOrganismNamespaceAccess({ storage, config },
         { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes }, `${wsRoot(organismId, ws)}.probe`, 'write');
-    if (writeRefusal) return refuse(403, 'ACCESS_DENIED', 'You are not approved to write to this workspace. Request access with aimeat_workspace_access(action:"request") and wait for the creator to approve.');
+    // The rule's own status, code and reason reach the caller. Only a missing contributor role is told
+    // to request access: the rule's sentence for it names the internal probe key. Every other refusal
+    // (an agent the organism does not admit, an owner who is not a member, an attached agent of a
+    // non-member) has its own way out, and "request access" sent the creator's agent to ask for its own
+    // workspace (2026-11-10).
+    if (writeRefusal) {
+        return refuse(writeRefusal.status, writeRefusal.code, writeRefusal.code === 'CONSENT_REQUIRED'
+            ? 'You do not hold the contributor role in this workspace, so you cannot write to it. Request it with aimeat_workspace_access(action:"request") and wait for the workspace\'s creator to approve.'
+            : writeRefusal.message, writeRefusal.details);
+    }
     const norm = normalizeWriteItems({ space: args.space, value: args.value, id: args.id, section: args.section, items: args.items });
     if ('error' in norm) return refuse(400, 'INVALID_INPUT', norm.error);
     const batch = args.items !== undefined && args.items !== null;

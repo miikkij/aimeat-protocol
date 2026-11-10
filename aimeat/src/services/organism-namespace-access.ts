@@ -30,6 +30,12 @@
  *   if (refusal) return { ok: false, ...refusal };
  *   const shown = await organismReadableRecords({ storage, config }, callerContext, records);
  * @version-history
+ *   2026-11-10 — An agent attached to the organism (agentGaiis) whose owner is an active member acts
+ *     with the owner's rights when the organism admits every member's agent, as it already did when it
+ *     admits only listed ones. The narrow participant rule (shared area, meta read) is for an attached
+ *     agent whose owner is not a member, and its refusal says so and what to do. With agentAccess
+ *     'all', the creator's own attached agent was refused every workspace write on aimeat.io
+ *     (wish-organismiin-liitetty-agentti-ei-saa-menett-omistajansa-ty-ti).
  *   2026-11-08 — The contributor grant that opens a workspace's content is the role the node stamped
  *     (wsRoleOf in services/workspace-roles.ts), never the purpose text: a consent whose purpose a
  *     person typed as `workspace-contributor` gave write access. A grant past its end date opens
@@ -86,7 +92,7 @@ import type { Storage, ConsentRecord } from '../storage/interface.js';
 import { matchesRecipient } from '../storage/consent-recipient.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
 import { findWorkspaceRegistration } from './workspace-meta.js';
-import { agentBarred, agentBarredMessage, attachedAsParticipant } from './organism-agent-access.js';
+import { agentAccessOf, agentBarred, agentBarredMessage, attachedAsParticipant, participantRefusalMessage } from './organism-agent-access.js';
 import { isOwnerInPerson, parseGaiiLoose } from '../utils/gaii.js';
 import { fencedSpaceRefusal, type ManifestWrite } from './fenced-space.js';
 import { wsRoleOf } from './workspace-roles.js';
@@ -163,14 +169,21 @@ export async function checkOrganismNamespaceAccess(
         return { status: 403, code: 'ACCESS_DENIED', message: agentBarredMessage(organism, caller.principal) };
     }
 
-    // An organism-level agent is attached to the organism rather than a member of it. It reads and
-    // writes the shared namespace, reads meta, and gets nothing else — a workspace key included.
-    // Where the organism admits only listed agents, the list is how a member's agent gets in at all,
-    // so a listed agent acts with its owner's rights below instead (attachedAsParticipant).
-    if (attachedAsParticipant(organism, caller.principal)) {
+    // Memberships are keyed by the BARE owner name — organisms.ts (join/leave/admin) and consent.ts
+    // (organism resolution) both look membership up with the owner name, not the full GHII.
+    const membership = await storage.getMembership(organismId, caller.owner);
+
+    // An agent on the organism's list where every member's agent is admitted reads and writes the
+    // shared namespace and reads meta in its own right. Past that area, an agent whose owner is NOT a
+    // member gets nothing (an organism-level participant), and an agent whose owner IS an active
+    // member acts with the owner's rights below, in both modes. Attaching an agent adds the area and
+    // never takes a right away (attachedAsParticipant, 2026-11-10).
+    if (agentAccessOf(organism) !== 'listed' && (organism.agentGaiis ?? []).includes(caller.principal)) {
         if (key.startsWith(`organism.${organismId}.shared.`)) return null;
         if (key.startsWith(`organism.${organismId}.meta.`) && mode === 'read') return null;
-        return { status: 403, code: 'ACCESS_DENIED', message: 'Agent not authorized for this workspace namespace' };
+    }
+    if (attachedAsParticipant(organism, caller.principal, membership)) {
+        return { status: 403, code: 'ACCESS_DENIED', message: participantRefusalMessage(organism, caller.principal) };
     }
 
     const userGhii = await storage.getGHIIByOwner(caller.owner);
@@ -178,9 +191,6 @@ export async function checkOrganismNamespaceAccess(
         return { status: 403, code: 'ACCESS_DENIED', message: 'Not a member of this organism' };
     }
 
-    // Memberships are keyed by the BARE owner name — organisms.ts (join/leave/admin) and consent.ts
-    // (organism resolution) both look membership up with the owner name, not the full GHII.
-    const membership = await storage.getMembership(organismId, caller.owner);
     if (!membership || membership.status !== 'active') {
         return { status: 403, code: 'ACCESS_DENIED', message: 'Not an active member of this organism' };
     }

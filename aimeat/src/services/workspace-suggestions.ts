@@ -35,6 +35,8 @@
  * @usage
  *   const r = await decideSuggestion({ storage, config }, caller, { orgId, id, decision: 'approve' });
  * @version-history
+ *   2026-11-10 — listSuggestions lets an active member's attached agent list as its owner does
+ *     (attachedAsParticipant takes the membership).
  *   2026-10-13 — Approving a suggestion hands the approver's session (its scopes included) to the
  *     organism namespace rule and to applySpaces, which compares the manifest before and after with
  *     the fenced-space rule before it writes (services/fenced-space.ts, ruled 2026-10-13).
@@ -261,7 +263,7 @@ export async function listSuggestions(
     const organism = await storage.getOrganism(orgId);
     if (!organism) return refusal(404, 'NOT_FOUND', 'Organism not found. Check the id with aimeat_organism_list.');
     const membership = await storage.getMembership(orgId, caller.owner);
-    if (!membership || membership.status !== 'active' || attachedAsParticipant(organism, caller.principal)) {
+    if (!membership || membership.status !== 'active' || attachedAsParticipant(organism, caller.principal, membership)) {
         return refusal(403, 'ACCESS_DENIED', 'You are not an active member of this organism. Join it first.');
     }
     await expireOverdueApprovals(storage, nowOf(deps).toISOString());

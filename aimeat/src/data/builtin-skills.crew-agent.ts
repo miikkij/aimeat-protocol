@@ -12,6 +12,9 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-11-10 -- Section 2: in an organism that admits every member's agent, a listed agent works
+ *     with its owner's rights; the line that kept it off the list described a node defect, fixed
+ *     the same day (services/organism-agent-access.ts attachedAsParticipant).
  *   2026-10-25 -- Section 2: a runtime reconnecting an existing agent sends `proof`, signed with the
  *     agent's key; without it the owner sees a takeover (secaudit2026oct22, lead 2150).
  *   2026-10-25 -- Section 2: an agent made by another agent gets no looser a clearance than that
@@ -140,9 +143,8 @@ examples: email, a calendar, meeting notes from a recording.
    workspace's creator can retire it. An organism that admits only its listed agents lets the
    agent in by that list alone: approving on the page adds the agent to it, and an agent approved
    another way has to be attached there by a person before it can read the workspace. In an
-   organism that admits every member's agent, the agent stays OFF that list: a listed agent there
-   reaches the organism's shared area and no workspace, so its writes into the workspace it
-   watches are refused.
+   organism that admits every member's agent, the agent needs no place on that list: it works
+   there with its owner's rights, listed or not.
 3. **Propose it.** \`aimeat_agent_propose\` with \`name\`, a \`purpose\` the owner can decide from
    (it is the sentence they read, so name their data in it: "reads the open deals in your Sales
    workspace each morning and lists what to act on"), \`scopes\`, \`mode\`, \`run_mode\` and the
