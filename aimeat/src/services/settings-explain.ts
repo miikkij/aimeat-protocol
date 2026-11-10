@@ -122,12 +122,9 @@ function startParts(): string[] {
         : text));
 }
 
-/** Built once: the locales are read once at start. */
-let startCache: string[] | null = null;
-function startTexts(): string[] {
-    startCache ??= startParts();
-    return startCache;
-}
+/** The index parts, built once at start from the locales read once at start, as TERMS is. */
+const START_TEXTS: string[] = startParts();
+const startTexts = (): string[] => START_TEXTS;
 
 /** One language's explanation, laid out as the dialog lays it out. */
 function languageText(locale: Locale, term: string): string {
