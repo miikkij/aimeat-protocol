@@ -151,8 +151,9 @@ jobs:
         working-directory: aimeat
         run: pnpm test
 
-  # THE GUARD TIER BLOCKS. 145 suites, chosen on one question: does a failure here mean a
-  # principal can reach money, an identity, or another account's data that they must not? The
+  # THE GUARD TIER BLOCKS. 146 suites, chosen on one question: does a failure here mean a
+  # principal can reach money, an identity, or another account's data that they must not? One more
+  # (e2e-query-budget, 2026-11-10) asks whether a page's request runs a statement per agent. The
   # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). The runner
   # prints the assertion total and runs the tier over four lanes — four nodes at once, each suite
   # still alone on an empty database — which is what brought a backend from six minutes to under

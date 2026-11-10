@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-10 -- e2e-query-budget.ts joins GUARD_SUITES (145 → 146), Jouni's decision: three consecutive 6/6 runs alone on each backend in the production-settings lane.
  *   2026-11-10 -- e2e-memory-tab-summary.ts joins the list (not the guard tier): the Memory page's summary says what the full answer gives, and a key space's pages reach every key once.
  *   2026-11-08 -- e2e-package-file-label-reads.ts joins the list (not the guard tier): the reads of a data package's stored files ask the labels the version keeps, as GET /v1/pub does (secaudit2026nov08b round 15b).
  *   2026-11-08 -- e2e-datapackage-label-sources.ts joins the list (not the guard tier): a data package version keeps the labels of every item it was copied from (secaudit2026nov08b round 15).
@@ -2139,6 +2140,11 @@ const GUARD_SUITES = [
     // been passing its leak check unread. The suites now name their agents' scopes and wait out a 429.
     'test/e2e-secret-canary-sweep.ts',      // no read route or read-only MCP tool hands a planted secret to anyone
     'test/e2e-concurrency.ts',              // parallel spending, work and posting never double-spend or lose a write
+    // Joined 2026-11-10 on Jouni's word ("Kyselytesti guard-tasolle"), the one suite here that is not a
+    // refusal or an isolation boundary: it proves no first-load request runs a statement per agent,
+    // which is what stalls a heavy account on PostgreSQL. Earned the usual way, alone in the
+    // production-settings lane, three consecutive 6-of-6 runs on BOTH backends.
+    'test/e2e-query-budget.ts',             // no first-load request reads once per agent (3 vs 80 agents)
 ];
 
 /**
