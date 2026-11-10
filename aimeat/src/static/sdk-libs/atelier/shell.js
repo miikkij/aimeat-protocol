@@ -26,6 +26,12 @@
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
  * @version-history
+ *   v0.69.0 — 2026-11-10 — Two optional hooks. onSession(session): with requireLogin off the app
+ *     starts once, and a session that appears after onReady ran (a restore that finished late, a
+ *     sign-in) never reached it; it does now. onOffline(who): the node gives no answer and the
+ *     sign-in library names the person who signed in on this browser last, so an app that keeps a
+ *     copy on the device opens it; the sign-in card leaves, and the session that arrives when the
+ *     network returns still goes to onReady. An app that gives neither behaves as before.
  *   v0.68.1 — 2026-11-02 — A phone reaches every page of a side-navigation app (Jouni, Kehitysputki
  *     on a phone: no menu at all, because every entry had a group and the bar was empty). The bar
  *     ends in a Menu entry that opens every page in a sheet, grouped as the column groups them,
@@ -201,6 +207,7 @@ function ambientSpec(want) {
  *   nav?: 'bottom'|'side', navValue?: string, navLabel?: string,
  *   requireLogin?: boolean, ambient?: AmbientWish, motion?: boolean, margins?: string|false,
  *   onReady?: (session: any) => void, onLogout?: () => void,
+ *   onSession?: (session: any) => void, onOffline?: (who: { owner: string, ghii: string, displayName: string, at: string }) => void,
  * }} spec
  *   `margins` puts one of the node's margin figures ('a'..'h', margins.js) on the empty sides of a
  *   wide frame; the person's own home choice is the app's to read and hand to margins().
@@ -462,6 +469,7 @@ export function app(spec) {
   // catches the session. Booting is once; logout re-arms it.
   const requireLogin = spec.requireLogin !== false;
   let booted = false;
+  let readySaid = false;   // requireLogin off: onReady has run, so a later session goes to onSession
   let pollTimer = null;
   let graceTimer = null;
 
@@ -489,6 +497,9 @@ export function app(spec) {
     if (a && typeof a.mountLoginButton === 'function') {
       a.mountLoginButton(pill, {
         onLogin: function () { tryBoot(); },
+        // An app open to signed-out visitors starts once, with whatever session stood then. A
+        // session that appears after that (a restore that finished late, a sign-in) reaches it here.
+        onSession: function (session) { if (!requireLogin && readySaid && spec.onSession) spec.onSession(session); },
         onLogout: function () {
           // Auth also emits logout when it discards a stale stored session. Public apps
           // remain booted; their onLogout hook can clear any account-specific content.
@@ -502,10 +513,23 @@ export function app(spec) {
         },
       });
     }
+    // The node gives no answer and somebody signed in on this browser before: an app that keeps a
+    // copy of its data on the device opens it for that person. The gate leaves; the app is not
+    // booted, so the session that arrives when the network returns still reaches onReady.
+    if (a && typeof a.on === 'function' && spec.onOffline) {
+      a.on('offline', function (who) {
+        if (booted && requireLogin) return;
+        if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
+        root.classList.remove('ak-app--gate');
+        status('none');
+        spec.onOffline(who);
+      });
+    }
     if (!requireLogin) {
       booted = true;
       status('none');
       if (spec.onReady) spec.onReady(a && a.getSession ? a.getSession() : null);
+      readySaid = true;
       return;
     }
     status('loading');

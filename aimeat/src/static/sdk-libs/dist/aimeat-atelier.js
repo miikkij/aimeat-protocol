@@ -26004,6 +26004,7 @@ Known schemas:
     }
     const requireLogin = spec.requireLogin !== false;
     let booted = false;
+    let readySaid = false;
     let pollTimer = null;
     let graceTimer = null;
     function auth() {
@@ -26039,6 +26040,11 @@ Known schemas:
           onLogin: function() {
             tryBoot();
           },
+          // An app open to signed-out visitors starts once, with whatever session stood then. A
+          // session that appears after that (a restore that finished late, a sign-in) reaches it here.
+          onSession: function(session) {
+            if (!requireLogin && readySaid && spec.onSession) spec.onSession(session);
+          },
           onLogout: function() {
             if (requireLogin) {
               booted = false;
@@ -26050,10 +26056,23 @@ Known schemas:
           }
         });
       }
+      if (a && typeof a.on === "function" && spec.onOffline) {
+        a.on("offline", function(who) {
+          if (booted && requireLogin) return;
+          if (graceTimer) {
+            clearTimeout(graceTimer);
+            graceTimer = null;
+          }
+          root.classList.remove("ak-app--gate");
+          status("none");
+          spec.onOffline(who);
+        });
+      }
       if (!requireLogin) {
         booted = true;
         status("none");
         if (spec.onReady) spec.onReady(a && a.getSession ? a.getSession() : null);
+        readySaid = true;
         return;
       }
       status("loading");

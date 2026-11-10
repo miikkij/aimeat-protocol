@@ -619,7 +619,7 @@
       if (cache.key === key) cache.data = r.data || { unavailable: true, reason: "empty answer" };
     }).catch(function(err) {
       console.debug("[aimeat-auth] the AI state was not read:", err);
-      if (cache.key === key) cache.data = { unavailable: true, reason: String(err && err.code || err) };
+      if (cache.key === key) cache.data = { unavailable: true, reason: String(err && err.code || err), refused: !!(err && err.code) };
     }).then(function() {
       if (cache.key !== key) return;
       cache.pending = null;
@@ -634,9 +634,14 @@
     if (invalidate || typeof window === "undefined") return;
     invalidate = function(ev) {
       var d = ev && ev.detail && ev.detail.domains;
-      if (Array.isArray(d) && !d.some(function(x) {
-        return DOMAINS.indexOf(x) >= 0;
-      })) return;
+      if (d && typeof d.forEach === "function") {
+        var ours = false;
+        d.forEach(function(x) {
+          if (DOMAINS.indexOf(x) >= 0) ours = true;
+        });
+        if (!ours) return;
+      }
+      if (cache.data && cache.data.unavailable && cache.data.refused) return;
       var s = cache.session;
       if (s && keyOf(s) === cache.key && !cache.pending) fetchState(s);
     };
@@ -1502,6 +1507,81 @@
     };
   }
 
+  // src/static/sdk-libs/auth/last-identity.js
+  var KEY = "last_identity";
+  var PROBE_MS = 5e3;
+  var announced = null;
+  var returning = null;
+  on("login", function(session) {
+    announced = null;
+    if (!session || !session.owner || session.gaii) return;
+    save(KEY, {
+      owner: String(session.owner),
+      ghii: String(session.ghii || ""),
+      displayName: String(session.displayName || ""),
+      at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  });
+  function lastIdentity() {
+    const v = load(KEY);
+    return v && typeof v.owner === "string" && v.owner ? v : null;
+  }
+  function forgetLastIdentity() {
+    announced = null;
+    remove(KEY);
+  }
+  function offlineIdentity() {
+    return announced;
+  }
+  function nodeUnreachable() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(true);
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = setTimeout(function() {
+      if (ctl) ctl.abort();
+    }, PROBE_MS);
+    return fetch(NODE_URL + "/v1/build", { cache: "no-store", credentials: "omit", mode: "no-cors", signal: ctl ? ctl.signal : void 0 }).then(function() {
+      return false;
+    }, function() {
+      return true;
+    }).finally(function() {
+      clearTimeout(timer);
+    });
+  }
+  function settleNoSession(retry, knownDown) {
+    return (knownDown ? Promise.resolve(true) : nodeUnreachable()).then(function(down) {
+      if (!down) {
+        const stood = !!announced || !!load("session");
+        remove("session");
+        forgetLastIdentity();
+        if (stood) emit("logout");
+        return false;
+      }
+      const who = lastIdentity();
+      if (who && !announced) {
+        announced = who;
+        emit("offline", who);
+      }
+      if (!returning && typeof window !== "undefined") {
+        returning = function() {
+          window.removeEventListener(
+            "online",
+            /** @type {() => void} */
+            returning
+          );
+          returning = null;
+          try {
+            retry();
+          } catch (e) {
+            console.warn("[aimeat-auth] The restore after the network returned failed:", e && /** @type {Error} */
+            e.message);
+          }
+        };
+        window.addEventListener("online", returning);
+      }
+      return true;
+    });
+  }
+
   // src/static/sdk-libs/auth/pill.js
   var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/><path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
   var LOGOUT_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>';
@@ -1668,13 +1748,26 @@
       window.removeEventListener("aimeat-look-change", render);
     };
     if (isAppOrigin() && !auth2.getSession()) {
-      restoreSessionFromAppOrigin(false).then((s) => {
-        if (!s && load("session")) {
-          remove("session");
-          emit("logout");
+      const tryRestore = () => {
+        if (navigator.onLine === false) {
+          settleNoSession(tryRestore, true);
+          return;
         }
-      }).catch(() => {
-      });
+        let settled = false;
+        nodeUnreachable().then((down) => {
+          if (down && !settled && !auth2.getSession()) {
+            settled = true;
+            settleNoSession(tryRestore, true);
+          }
+        });
+        restoreSessionFromAppOrigin(false).then((s) => {
+          if (s || settled) return;
+          settled = true;
+          settleNoSession(tryRestore);
+        }).catch(() => {
+        });
+      };
+      tryRestore();
     } else if (!auth2.getSession() && load("session")) {
       auth2.login().catch(() => null).then((s) => {
         if (s) return;
@@ -4310,6 +4403,15 @@
       return currentSession;
     },
     /**
+     * Who to open an offline copy for: { owner, ghii, displayName, at } when this page load restored no
+     * session because the node gave no answer and somebody signed in on this browser before; null while
+     * a session is live and whenever the node was reached. It names a person and authorises nothing.
+     * The 'offline' event carries the same value when it is found (last-identity.js).
+     */
+    offlineIdentity() {
+      return currentSession ? null : offlineIdentity();
+    },
+    /**
      * Patch mutable, non-secret session metadata in place (e.g. displayName after a profile edit),
      * persist it, and notify the login pill so it re-renders live — no page reload.
      */
@@ -4338,6 +4440,7 @@
       currentSession = null;
       remove("session");
       remove("owner_key");
+      forgetLastIdentity();
       emit("logout");
       await deleteKey("agent_key");
       await deleteKey("owner_key");

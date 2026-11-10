@@ -40,12 +40,17 @@
  *   const now = await AIMEAT.push.state(session);   // { ok: true, enabled: true, ... }
  *   await AIMEAT.push.disable(session);
  * @version-history
+ *   v1.1.0 — 2026-11-10 — enable() leaves /sw-offline.js in place when the aimeat-offline library
+ *     registered it at this scope: that worker handles push too, and registering /sw.js over it
+ *     took the app's kept copy away.
  *   v1.0.0 — 2026-09-15 — Initial: the browser half of push on a published app's own origin.
  */
 import { attach } from '../_core/namespace.js';
 
 /** The worker this library registers. The node serves it on the app origin; see src/static/app-sw.js. */
 const SW_PATH = '/sw.js';
+/** The wider worker the aimeat-offline library registers at the same scope: /sw.js plus a kept copy of the page. */
+const SW_OFFLINE_PATH = '/sw-offline.js';
 /** One registration per app origin, at the root, so a notification click can reach any page. */
 const SW_SCOPE = '/';
 /** The app-grant word this whole library needs. Named in every refusal that comes back 403. */
@@ -185,6 +190,17 @@ async function currentSubscription(known) {
   }
 }
 
+/**
+ * Whether this origin's registration already runs the worker of an app that opens with no
+ * connection (src/static/app-sw-offline.js), which handles push as /sw.js does.
+ * @returns {Promise<boolean>}
+ */
+async function offlineWorkerRuns() {
+  const registration = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+  const worker = registration && (registration.active || registration.waiting || registration.installing);
+  return !!worker && new URL(worker.scriptURL).pathname === SW_OFFLINE_PATH;
+}
+
 /** Ask for the permission, once, and answer with whatever the browser settled on. */
 async function askPermission() {
   if (Notification.permission === 'granted') return 'granted';
@@ -215,7 +231,10 @@ async function enable(session) {
   if (sessionless) return sessionless;
 
   try {
-    await navigator.serviceWorker.register(SW_PATH, { scope: SW_SCOPE });
+    // An app that opens with no connection runs /sw-offline.js at this scope, and that worker is
+    // /sw.js plus the kept copy of the page. Registering /sw.js over it would take the copy away,
+    // so the worker that is there stays.
+    if (!(await offlineWorkerRuns())) await navigator.serviceWorker.register(SW_PATH, { scope: SW_SCOPE });
   } catch (err) {
     return refuse('WORKER_FAILED',
       'This app could not start its notification worker. Its node must serve /sw.js on this origin: ' + say(err));

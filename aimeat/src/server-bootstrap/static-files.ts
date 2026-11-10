@@ -11,6 +11,8 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.18.0 -- 2026-11-10 -- /sw-offline.js on an app origin: the worker of an app that opens with
+ *     no connection (src/static/app-sw-offline.js). /sw.js is unchanged.
  *   v1.17.0 -- 2026-11-09 -- A .js, .mjs or .css file asked for under its current content tag
  *     (`?v=`, portal-spa.ts isCurrentAssetTag) is `public, max-age=31536000, immutable`: a returning
  *     visitor's browser no longer asks again about every module before drawing (about 2 s per page
@@ -93,7 +95,7 @@ import { serveSpa } from '../routes/portal.js';
 import { isCurrentAssetTag } from '../routes/portal-spa.js';
 import { buildAuthMd } from '../services/auth-md.js';
 import { resolveAssetDir } from './asset-dirs.js';
-import { appOriginServiceWorker } from '../utils/app-sw-source.js';
+import { appOriginServiceWorker, appOriginOfflineWorker } from '../utils/app-sw-source.js';
 import { appFrameHostScript, appFrameCoreScript } from '../utils/app-frame-assets.js';
 import { pageOriginOf } from '../services/html-page.js';
 
@@ -396,6 +398,21 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       if (!source) { next(); return; }
       res.setHeader('Cache-Control', 'no-cache');
       res.type('application/javascript').send(source);
+    });
+
+    /**
+     * THE WORKER OF AN APP THAT OPENS WITH NO CONNECTION, on an app origin only. /sw.js above stays
+     * what it is, with no fetch handler, for every app that does not ask: this second file is the
+     * push worker plus a kept copy of the app's own page, and only the served library aimeat-offline
+     * registers it, for a page that declares <meta name="aimeat-offline" content="shell">. The apex
+     * has no such file and falls through to a 404. Not cached, for the reason given above.
+     */
+    app.get('/sw-offline.js', (req, res, next) => {
+      if (!req.appOrigin) { next(); return; }
+      const offlineSource = appOriginOfflineWorker();
+      if (!offlineSource) { next(); return; }
+      res.setHeader('Cache-Control', 'no-cache');
+      res.type('application/javascript').send(offlineSource);
     });
 
     app.use(express.static(publicDir, {

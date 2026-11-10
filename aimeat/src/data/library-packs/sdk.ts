@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.39.0 — 2026-11-10 — aimeat-offline joins, from library-packs/sdk-offline.ts.
  *   v1.38.1 — 2026-11-08 — aimeat-agentface has a promptLine, so both build specifications' library
  *     lists name it: the publish answer asked for it and the list said it did not exist.
  *   v1.38.0 — 2026-11-07 — aimeat-auth's aiDoc: the pill's AI light and bolt, an app's needs beside them,
@@ -167,6 +168,7 @@ import { SDK_UI_PACKS } from './sdk-ui.js';
 // registry, so it lives in its own file for the same reason. Pure list, spread back in below.
 import { LIVING_PACKS } from './sdk-living.js';
 import { PROMPT_PACKS } from './sdk-prompt.js';
+import { OFFLINE_PACKS } from './sdk-offline.js';
 import { DECIDE_PACKS } from './sdk-decide.js';
 import { REFINERY_PACKS } from './sdk-refinery.js';
 import { WORKFLOWS_PACKS } from './sdk-workflows.js';
@@ -562,6 +564,7 @@ export const SDK_PACKS: LibraryPack[] = [
   ...SDK_UI_PACKS,
   ...LIVING_PACKS,
   ...PROMPT_PACKS,
+  ...OFFLINE_PACKS,
   {
     id: 'aimeat-audio',
     kind: 'sdk',

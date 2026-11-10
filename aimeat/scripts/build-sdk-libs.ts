@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.17.0 - 2026-11-10 - Register aimeat-offline (an app opens and keeps working with no connection).
  *   v1.16.0 - 2026-11-01 - Register aimeat-parties (an app's users without an account; plan D4.2).
  *   v1.15.0 - 2026-10-05 - Register aimeat-validate (input checked against a JSON Schema).
  *   v1.14.0 — 2026-09-29 — Register aimeat-labels (content classification, TARGET-082 V5).
@@ -109,6 +110,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'push', entry: 'push/index.js' },
   { name: 'webhook', entry: 'webhook/index.js' },
   { name: 'prompt', entry: 'prompt/index.js' },
+  { name: 'offline', entry: 'offline/index.js' },
 ];
 
 function banner(name: string): string {

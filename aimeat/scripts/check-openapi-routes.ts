@@ -97,6 +97,7 @@ const NOT_API: Record<string, string> = {
     'GET /sitemap-portfolios.xml': ASSET,
     'GET /sitemap-datasets.xml': ASSET,
     'GET /sw.js': ASSET,
+    'GET /sw-offline.js': ASSET,
     'GET /{}.txt': ASSET,
     'GET /v1/portal/cookie-consent.js': ASSET,
     // The contract documents GET /v1/libs, the catalogue that lists every library with its URL and

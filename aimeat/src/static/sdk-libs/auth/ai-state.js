@@ -23,6 +23,10 @@
  *   pillHtml += aiStatusHtml(st, i, 'led') + name + aiStatusHtml(st, i, 'bolt');
  *   wireAiState(container);
  * @version-history
+ *   v1.0.1 — 2026-11-10 — On an app page the served live library names the changed domains in a Set,
+ *     which the filter read as "no list", so every live event of the app asked /v1/ai/capabilities
+ *     again; and a refused read (a grant without ai:use) was asked again on each of them. The filter
+ *     reads a Set or an array, and a refusal is kept for the session.
  *   v1.0.0 — 2026-11-07 — Initial.
  */
 import { authApi } from './http.js';
@@ -48,7 +52,9 @@ function fetchState(session) {
     // light nor the bolt, because it cannot say anything true about them. The state carries why.
     .catch(function (err) {
       console.debug('[aimeat-auth] the AI state was not read:', err);
-      if (cache.key === key) cache.data = { unavailable: true, reason: String((err && err.code) || err) };
+      // `refused` is the node's own refusal (it carries a code); a failed request without one (no
+      // network) is tried again on the next change.
+      if (cache.key === key) cache.data = { unavailable: true, reason: String((err && err.code) || err), refused: !!(err && err.code) };
     })
     .then(function () {
       if (cache.key !== key) return;
@@ -63,7 +69,16 @@ function listenOnce() {
   if (invalidate || typeof window === 'undefined') return;
   invalidate = function (ev) {
     var d = ev && ev.detail && ev.detail.domains;
-    if (Array.isArray(d) && !d.some(function (x) { return DOMAINS.indexOf(x) >= 0; })) return;
+    // The SPA names the domains in an array and the served live library in a Set; either one that
+    // names none of ours is somebody else's change. A missing or null list means "anything".
+    if (d && typeof d.forEach === 'function') {
+      var ours = false;
+      d.forEach(function (x) { if (DOMAINS.indexOf(x) >= 0) ours = true; });
+      if (!ours) return;
+    }
+    // A refused read (an app whose grant has no ai:use) is not asked again for this session: the
+    // answer cannot change until the person grants the word, and that makes a new session.
+    if (cache.data && cache.data.unavailable && cache.data.refused) return;
     var s = cache.session;
     if (s && keyOf(s) === cache.key && !cache.pending) fetchState(s);
   };

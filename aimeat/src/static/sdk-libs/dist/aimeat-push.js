@@ -15,6 +15,7 @@
 
   // src/static/sdk-libs/push/index.js
   var SW_PATH = "/sw.js";
+  var SW_OFFLINE_PATH = "/sw-offline.js";
   var SW_SCOPE = "/";
   var GRANT_SCOPE = "push:receive";
   function refuse(code, reason) {
@@ -97,6 +98,11 @@
       return null;
     }
   }
+  async function offlineWorkerRuns() {
+    const registration = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+    const worker = registration && (registration.active || registration.waiting || registration.installing);
+    return !!worker && new URL(worker.scriptURL).pathname === SW_OFFLINE_PATH;
+  }
   async function askPermission() {
     if (Notification.permission === "granted") return "granted";
     if (Notification.permission === "denied") return "denied";
@@ -113,7 +119,7 @@
     const sessionless = unusable(session);
     if (sessionless) return sessionless;
     try {
-      await navigator.serviceWorker.register(SW_PATH, { scope: SW_SCOPE });
+      if (!await offlineWorkerRuns()) await navigator.serviceWorker.register(SW_PATH, { scope: SW_SCOPE });
     } catch (err) {
       return refuse(
         "WORKER_FAILED",

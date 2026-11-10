@@ -131,4 +131,12 @@ export interface LibraryPack {
   promptLine?: string;
   /** Build-app-prompt grouping for sdk packs. */
   promptGroup?: 'core' | 'ai' | 'economy' | 'media';
+  /**
+   * 'atelier': the line is in the Atelier specification's list only. The Classic specification's
+   * library section is one part of at most MAX_PART_CHARS (services/build-app-layers.ts) and was
+   * 23 984 characters of 24 000 on a long node address when this field was added (2026-11-10), so a
+   * library written after that goes to the track every new app is built on. Every pack stays in
+   * GET /v1/libs and GET /v1/library-packs whatever this says.
+   */
+  promptTrack?: 'atelier';
 }

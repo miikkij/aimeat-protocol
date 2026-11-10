@@ -8,6 +8,8 @@
  * @structure listeners · emit(event, data, meta) · on(event, fn) · off(event, fn).
  * @usage import { emit, on, off } from './events.js';
  * @version-history
+ *   v1.2.0 — 2026-11-10 — A new event, 'offline': a page load restored no session because the node
+ *     gave no answer, and its data is the last identity kept on this browser (last-identity.js).
  *   v1.1.0 — 2026-09-13 — emit takes an optional third argument that reaches every listener as its
  *     second. 'login' uses it for { restored }, so a page, and the login pill's onLogin, can tell a
  *     session restored on page load from one somebody just signed in with. A listener that takes

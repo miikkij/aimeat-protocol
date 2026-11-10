@@ -14,6 +14,10 @@
  *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v2.1.0 — 2026-11-10 — On an app origin, a page load that restores no session asks whether the
+ *     node answered at all before it signs the person out. With no answer the stored session stays,
+ *     no 'logout' is emitted and the app hears 'offline' with the last identity (last-identity.js);
+ *     the restore runs again when the browser reports a network.
  *   v2.0.0 — 2026-11-07 — The pill shows the person's AI (wish-resurssipalkki-teko-lybudjetti-
  *     tallennus-ja-nelj-ovea, design C): the light before the name is green when their own AI is
  *     connected, the bolt after it is yellow, red or grey for the AI power here, an app's needs show
@@ -74,6 +78,7 @@ import { ensureClusterStyles, clampPopover } from './cluster.js';
 import { load, remove } from './crypto.js';
 import { emit } from './events.js';
 import { loginWatcher } from './on-login.js';
+import { settleNoSession, nodeUnreachable } from './last-identity.js';
 
 // The signed-out compact trigger: three sliders, the usual mark for "adjust how this looks". Inline
 // SVG in currentColor, so it follows the pill's ink in every theme and palette.
@@ -322,9 +327,20 @@ export function mountPill(auth, selector, opts = {}) {
   // Silent SSO: on an app origin with no session yet, attempt the silent bridge ourselves. Always
   // re-confirm via the bridge on load (the cached session is only a UI cache); drop a stale cache.
   if (isAppOrigin() && !auth.getSession()) {
-    restoreSessionFromAppOrigin(false).then((s) => {
-      if (!s && load('session')) { remove('session'); emit('logout'); }
-    }).catch(() => {});
+    // No session from the bridge means "signed out" only when the node answered. With no answer the
+    // person keeps their stored session and the app hears 'offline' (last-identity.js); the node's
+    // own answer is asked beside the bridge, because the bridge waits eight seconds for one.
+    const tryRestore = () => {
+      if (navigator.onLine === false) { settleNoSession(tryRestore, true); return; }
+      let settled = false;
+      nodeUnreachable().then((down) => { if (down && !settled && !auth.getSession()) { settled = true; settleNoSession(tryRestore, true); } });
+      restoreSessionFromAppOrigin(false).then((s) => {
+        if (s || settled) return;
+        settled = true;
+        settleNoSession(tryRestore);
+      }).catch(() => {});
+    };
+    tryRestore();
   } else if (!auth.getSession() && load('session')) {
     // Anywhere else the stored blob is the same UI cache, and it used to be the only thing the pill
     // looked at: it drew "logged in" while getSession() stayed null and every call in the app had no

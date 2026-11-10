@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.17.0 - 2026-11-10 - Serves aimeat-offline.js (an app opens and keeps working with no connection).
  * v2.16.0 - 2026-11-01 - Serves aimeat-parties.js, which answered 404 since D4 shipped it (WP9d).
  * v2.16.0 - 2026-11-02 - The aimeat-auth prelude carries the sign-in policy (passwordSignIn, twoStepRequired), which the sign-in dialog reads.
  * v2.15.0 - 2026-10-31 - The aimeat-auth prelude says whether the sign-in dialog opens on the emailed link (linkFirst, a store-bought node; v28 #7).
@@ -230,6 +231,9 @@ const SDK_LIB_NAMES = [
   // aimeat-parties.js — an app's own users without an account sign up and in (plan doc-mvwxcas3dom3,
   // D4.2). Built and in the packs table since D4 and missing here, so it answered 404 (found in WP9d).
   'parties',
+  // aimeat-offline.js — an app keeps working, and opens, with no connection: the kept page (the
+  // app origin's /sw-offline.js), a copy of data on the device and the changes that wait.
+  'offline',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

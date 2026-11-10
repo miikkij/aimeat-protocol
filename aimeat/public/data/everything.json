@@ -2573,6 +2573,15 @@
      "plain": "Installable apps and their notifications Install a published app with its own name and icon. An installed app can register push notifications for its own origin under the push:receive permission. App manifest, /v1/libs/aimeat-push.js, /v1/push/*"
     },
     {
+     "slug": "g-10-apps-that-work-with-no-connection",
+     "cells": [
+      "<strong>Apps that work with no connection</strong>",
+      "An app that asks for it opens and keeps working on a train or a plane. Its page is kept on the device, a person's data has a copy there, and changes wait in order until the node answers again. With a connection the node's current version always wins. With no connection nobody is signed out: the app opens the copy of the person who signed in on that browser last, and sends nothing until the session is restored. Only at an app's own address; an app that does not ask is served as before.",
+      "<code>&lt;meta name=&quot;aimeat-offline&quot; content=&quot;shell&quot;&gt;</code>, <code>/v1/libs/aimeat-offline.js</code>, <code>/sw-offline.js</code> on the app origin, <code>AIMEAT.auth.offlineIdentity()</code>"
+     ],
+     "plain": "Apps that work with no connection An app that asks for it opens and keeps working on a train or a plane. Its page is kept on the device, a person's data has a copy there, and changes wait in order until the node answers again. With a connection the node's current version always wins. With no connection nobody is signed out: the app opens the copy of the person who signed in on that browser last, and sends nothing until the session is restored. Only at an app's own address; an app that does not ask is served as before. <meta name=\"aimeat-offline\" content=\"shell\">, /v1/libs/aimeat-offline.js, /sw-offline.js on the app origin, AIMEAT.auth.offlineIdentity()"
+    },
+    {
      "slug": "g-10-app-tools",
      "cells": [
       "<strong>App tools</strong>",
@@ -4973,6 +4982,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 509
+  "rows": 510
  }
 }

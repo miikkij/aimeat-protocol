@@ -1,6 +1,6 @@
 # 13 Apps, agents and endpoints
 
-> Checked against AIMEAT node 4.2.0 (commit 2303f0ce6) on 2026-11-08. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.0 (commit 2be5cbef7) on 2026-11-10. Maintained with the code: see the README for how.
 
 This page covers the code that runs on behalf of people: apps published on the node, extensions and packages installed into it, the connector on a person's own computer, AI chats that connect over MCP, outside MCP servers the node calls, and the `aimeat-crewai` agent runtime. It is for the security officer and the workstation and network owners. Each section says what runs where, who approves it, and how to remove it.
 
@@ -30,6 +30,25 @@ For an organisation node, set `AIMEAT_APP_DEFAULT_ACCESS=signed-in`, `AIMEAT_APP
 - An AI job waits in a queue, so its starter is asked again when the job runs. A job that an app, an ecosystem app or an agent queued ends before the provider is called, and nothing is paid, when the owner has revoked that app's grant, disconnected that ecosystem app, deleted that agent, or taken `ai:use` from it since. The job's error names the page where the owner gives the permission back (`aimeat/src/services/ai-jobs/run-gate.ts`).
 - An app can never hold `account:security` (`aimeat/src/auth/account-security.ts`). It holds `app:write` only when the owner approved that word on the app's consent screen (`aimeat/src/services/app-grant-vocabulary.ts`, `APP_GRANTABLE_SCOPES`).
 - When an app goes away, its address stays held for its owner for `AIMEAT_APP_HELD_LABEL_DAYS` (90), because its visitors' browser data lives on that origin (`aimeat/.env.example`).
+
+### What an app keeps in the browser, and apps that work with no connection
+
+An app's browser storage belongs to its own origin, so one app cannot read what another keeps. Most apps keep nothing there but the sign-in library's own entries. An app that asks to work with no connection keeps more, and it has to ask in two places: its page declares `<meta name="aimeat-offline" content="shell">` and it loads the served library `aimeat-offline`. There is no node setting for this; an app that does not ask is served exactly as before.
+
+| What is kept on the device | By whom | What it holds | When it leaves |
+|---|---|---|---|
+| The sign-in library's session entry (the app origin's `localStorage`, key `session` under the library's prefix `aimeat` and an underscore) | every app a person signs in to | account name, display name, the short app access token (`AIMEAT_ACCESS_TTL`) | sign-out; a page load where the node answers that nobody is signed in |
+| The last identity (same place, key `last_identity` under the same prefix) | every app a person signs in to | account name, GHII, display name, time. No token and no key. | sign-out; a page load where the node answers that nobody is signed in |
+| The kept page (Cache Storage `aimeat-app-shell-v1`, written by the worker `/sw-offline.js`) | only an app that asks | the app's HTML and the scripts, stylesheets, fonts, pictures and manifest its page loads with a plain GET. Never an answer to `fetch()` or to a request with an `Authorization` header, so no record and no API answer. | the app stops asking (the next load that reaches the node deletes it); the app's address answers 401, 403, 404 or 410 (the kept HTML is deleted); site data is cleared |
+| The app's copy of a person's data and the changes that wait (IndexedDB `aimeat-offline`, or a database of the app's own) | only an app that keeps one | whatever the app read for that person and has not sent yet, named by account. Not encrypted beyond what the device does. | the app deletes it on sign-out (`AIMEAT.offline.forget`), unless changes still wait; site data is cleared |
+
+What IT needs to know:
+
+- **The node's answer always wins.** The worker asks the node first for every part of the page and uses its kept copy only when the node gives no answer (for the HTML also when it gives none within four seconds). A new version of an app, or its removal, reaches every device at the next load that reaches the node (`aimeat/src/static/app-sw-offline.js`).
+- **With no answer from the node, nobody is signed out and nobody can sign in.** The sign-in library then tells the app who signed in on this browser last (`aimeat/src/static/sdk-libs/auth/last-identity.js`). The app may open that person's copy on the device. It holds no valid session, so nothing is read from or written to the node until the network returns and the session is restored.
+- **A copy on a device is outside the node's access control.** A grant the owner revokes, an account the operator disables, or a classification that hides a record takes effect on the device at its next load that reaches the node, not before. Whoever can open the browser profile can open the copy. For data that must not rest on unmanaged devices, do not publish apps that ask to work with no connection, or require managed devices with disk encryption and a screen lock.
+- **`/sw-offline.js` is served on app origins only**, never on the node's own address, and `/sw.js` on an app origin is unchanged: it carries notifications and answers no request (`aimeat/src/server-bootstrap/static-files.ts`).
+- To see which published apps ask for it, search the app sources for the meta: the declaration is in the page's head.
 
 ### Opening one app to the internet on a closed node
 

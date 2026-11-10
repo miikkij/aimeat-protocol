@@ -20,6 +20,8 @@
  *   · buildLlmsPacksTable()
  * @usage import { getLibraryPacks, buildPromptLibrarySections } from '../data/library-packs.js';
  * @version-history
+ *   v1.3.0 — 2026-11-10 — The Classic specification's library list leaves out a pack marked
+ *     promptTrack 'atelier': that list is one part under a size limit and was full.
  *   v1.2.0 — 2026-10-09 — PackChange, PackProof and LibraryPack come from ./library-packs/types.ts
  *     (re-exported here unchanged) instead of a second copy in this file; the leaf file had been
  *     restored on 2026-09-05 and nothing imported it.
@@ -122,7 +124,8 @@ export function buildPromptLibrarySections(nodeUrl: string): string {
   s += '### Available Client Libraries\n';
   s += 'Load with <script src> from the node base ' + nodeUrl + '/v1/libs/. Include ONLY the ones you use. Load aimeat-auth first — the others build on its session.\n\n';
   for (const { group, heading } of PROMPT_GROUP_HEADINGS) {
-    const lines = SDK_PACKS.filter(p => p.promptGroup === group && p.promptLine && p.status !== 'deprecated');
+    // A pack marked for the Atelier track is left out: this section is one part under a size limit.
+    const lines = SDK_PACKS.filter(p => p.promptGroup === group && p.promptLine && p.status !== 'deprecated' && p.promptTrack !== 'atelier');
     if (lines.length === 0) continue;
     s += heading + '\n';
     s += lines.map(p => p.promptLine as string).join('\n') + '\n\n';

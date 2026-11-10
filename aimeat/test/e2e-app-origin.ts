@@ -10,6 +10,9 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-11-10 — An app origin serves /sw-offline.js, the worker of an app that opens with no
+ *     connection, beside the unchanged /sw.js; the apex serves none; the library that registers it
+ *     is served.
  *   2026-11-06 — Phase 10 switches search on with a text about the app in the same request: search
  *     needs 150 words of the app's own text (TARGET-093, Jouni 2026-11-06).
  *   2026-11-06 — The discovery block is one statement and four links (TARGET-092): the owner and the app
@@ -392,6 +395,34 @@ async function main() {
             const res = await onAppOrigin('/', SUB);
             const csp = res.header('content-security-policy') ?? '';
             assert(/worker-src[^;]*'self'/.test(csp), `worker-src must allow 'self': ${csp}`);
+        });
+
+        // ── The worker of an app that opens with no connection ─────────────────────────────
+        await test('an app origin serves the wider worker at /sw-offline.js, beside /sw.js', async () => {
+            const res = await onAppOrigin('/sw-offline.js', SUB);
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert((res.header('content-type') ?? '').includes('javascript'), 'served as script');
+            // It is the push worker plus the kept copy: it loads /sw.js rather than carrying a second
+            // copy of the push handlers, and it is the one worker here that answers a fetch.
+            assert(/importScripts\((['"])\/sw\.js\1\)/.test(res.body), 'it loads the push worker');
+            assert(/addEventListener\((['"])fetch\1/.test(res.body), 'it answers the page\'s own parts');
+            // A request that carries a session never comes from the kept copy.
+            assert(/headers\.has\((['"])authorization\1\)/.test(res.body), 'a request with Authorization is left to the network');
+            assert((res.header('cache-control') ?? '').includes('no-cache'), 'not cached');
+        });
+
+        await test('the node’s own address serves no /sw-offline.js', async () => {
+            // Only an app origin keeps a page. On the apex the path must not answer a worker, or a
+            // page of the node itself could register one over the node's own.
+            const res = await fetch(`${BASE}/sw-offline.js`, { redirect: 'manual' });
+            const type = res.headers.get('content-type') ?? '';
+            assert(res.status !== 200 || !type.includes('javascript'), `the apex answered a script: ${res.status} ${type}`);
+        });
+
+        await test('the served library that registers it is there', async () => {
+            const res = await fetch(`${BASE}/v1/libs/aimeat-offline.js`);
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert((await res.text()).includes('/sw-offline.js'), 'the library names the worker it registers');
         });
 
         // ── The app's own face on a home screen ────────────────────────────────────────────

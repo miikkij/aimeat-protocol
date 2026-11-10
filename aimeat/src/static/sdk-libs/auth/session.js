@@ -12,6 +12,8 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.9.0 — 2026-11-10 — auth.offlineIdentity(): the last person who signed in here, when the node
+ *     gives no answer (last-identity.js); logout() removes the kept identity.
  *   v1.8.1 — 2026-11-01 — A boot with no stored session restores from the cookie only when the node's
  *     hint cookie is there, so a signed-out visitor's page asks no refresh (WP10e B15).
  *   v1.8.0 — 2026-11-02 — auth.adoptLoginAnswer(data): the session of a finished two-step enrolment.
@@ -64,6 +66,7 @@ import { api, authApi, sessionHeaders } from './http.js';
 import { onLoginWhileOpen } from './on-login.js';
 import { parentAuth } from './app-frame.js';
 import { hasSessionHint } from './session-hint.js';
+import { forgetLastIdentity, offlineIdentity } from './last-identity.js';
 
 // The app-origin helpers moved to ./app-origin.js on 2026-09-04 (pure extraction, 800-line ceiling).
 // Re-exported from here because pill.js and the SDK's consumers import them from './session.js'.
@@ -651,6 +654,16 @@ export const auth = {
   },
 
   /**
+   * Who to open an offline copy for: { owner, ghii, displayName, at } when this page load restored no
+   * session because the node gave no answer and somebody signed in on this browser before; null while
+   * a session is live and whenever the node was reached. It names a person and authorises nothing.
+   * The 'offline' event carries the same value when it is found (last-identity.js).
+   */
+  offlineIdentity() {
+    return currentSession ? null : offlineIdentity();
+  },
+
+  /**
    * Patch mutable, non-secret session metadata in place (e.g. displayName after a profile edit),
    * persist it, and notify the login pill so it re-renders live — no page reload.
    */
@@ -677,6 +690,7 @@ export const auth = {
     currentSession = null;
     remove('session');
     remove('owner_key');
+    forgetLastIdentity();   // before the event: a sign-out leaves nobody to open an offline copy for
     emit('logout');
     // SECURITY: Delete CryptoKeys from IndexedDB
     await deleteKey('agent_key');

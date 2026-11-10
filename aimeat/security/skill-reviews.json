@@ -517,13 +517,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-11-09",
+      "reviewedOn": "2026-11-10",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:aaaa2c59728d287a07d79650"
+      "digest": "sha256:b30b4b547a7a7abf09ffa63c"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -716,7 +716,7 @@
       "scripts/gen_image.py": "e2435908849b31d3"
     },
     "project:aimeat-library-authoring": {
-      "aimeat/scripts/build-sdk-libs.ts": "9f7c9e6018b803da",
+      "aimeat/scripts/build-sdk-libs.ts": "bbefdfada0757d7f",
       ".githooks/pre-commit": "ba558088830eb13c",
       "aimeat/src/services/build-extension-prompt.ts": "b57f2f004de1f861"
     },

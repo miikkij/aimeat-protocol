@@ -145,7 +145,7 @@
       "digest": "sha256:3d9c7b9517edaeaa75f51cbc"
     },
     "13-apps-agents-endpoints.md": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-10",
       "watches": [
         "aimeat/src/cli/connect/command-trust.ts",
         "aimeat/src/routes/connect-install.ts",
@@ -153,9 +153,12 @@
         "aimeat/src/services/mcp-client/capability-consent.ts",
         "aimeat/src/services/mcp-client/capability-use-setting.ts",
         "aimeat/src/services/receivers/receive.ts",
-        "aimeat/src/services/receivers/contract.ts"
+        "aimeat/src/services/receivers/contract.ts",
+        "aimeat/src/static/app-sw-offline.js",
+        "aimeat/src/static/sdk-libs/auth/last-identity.js",
+        "aimeat/src/static/sdk-libs/offline/store.js"
       ],
-      "digest": "sha256:aabdb44d6088d2ccfe057188"
+      "digest": "sha256:9703adc8036e3dc03f01c262"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-04",
@@ -372,7 +375,10 @@
       "aimeat/src/services/mcp-client/capability-consent.ts": "0c5c747d1d1aafc7",
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "c79f3a0670fd31eb",
       "aimeat/src/services/receivers/receive.ts": "23774d484171476e",
-      "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87"
+      "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
+      "aimeat/src/static/app-sw-offline.js": "86b1945e771e0aee",
+      "aimeat/src/static/sdk-libs/auth/last-identity.js": "5bf2640a302bc906",
+      "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407"
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
