@@ -49,6 +49,12 @@
  * and each part read its data twice: 6.4 MB again on the Memory page of an account with 20 000 keys.
  * The views that bring the session loaded on mount, so that open is a first open and reconciles
  * nothing; a reopen after a real gap still reconciles every domain.
+ * Catch-up after a gap (2026-11-10): a reopen reconciled every domain, so each part of the page read
+ * its data again after a laptop lid or a network change. The stream now says where the node's change
+ * journal stands (`hello.at`, each frame's id); a reopen sends the last one as `since`, and the node
+ * answers with one `catchup` frame naming the domains that changed in the gap, or null when it cannot
+ * tell (a restart, another process, a gap older than it keeps), which reconciles every domain as
+ * before. No answer within two seconds reconciles every domain too.
  */
 
 /** This node shows its content to its own accounts only (routes/portal-spa.ts window.__SITE). */
@@ -69,6 +75,12 @@ const INITIAL_RECONNECT_DELAY = 2000;
 const MAX_RECONNECT_DELAY = 60000;
 let reconnectDelay = INITIAL_RECONNECT_DELAY;
 let everOpened = false;
+// Where the node's change journal stood at the last frame this stream heard (`hello.at`, each frame's
+// id). A reopen sends it as `since`, and the node answers with one `catchup` frame naming what changed
+// in the gap (routes/sse.ts); without an answer in CATCHUP_WAIT_MS the page reloads everything.
+let lastPos = null;
+let catchupTimer = null;
+const CATCHUP_WAIT_MS = 2000;
 let authRetried = false;             // the one 10 s retry after a 401 has been spent
 let authDead = false;                // session known dead: no timers run until the tab is shown again
 const AUTH_RETRY_DELAY = 10000;
@@ -112,6 +124,7 @@ export async function connect(getJwt) {
       // The signed stream replaces the visitor one: the views with the session loaded on mount, so
       // its open is a first open, not a reconnect after a gap, and reconciles nothing.
       everOpened = false;
+      lastPos = null;
       _open();
     }
     return;
@@ -289,7 +302,9 @@ async function _open() {
     // Another tab took the lock while the ticket was on its way: the stream is that tab's to open.
     if (!isLeader) return;
 
-    es = new EventSource(`/v1/events?ticket=${encodeURIComponent(ticket)}`);
+    // A reopen asks for what changed since the last frame this tab heard.
+    const since = everOpened && lastPos ? lastPos : null;
+    es = new EventSource(`/v1/events?ticket=${encodeURIComponent(ticket)}${since ? `&since=${encodeURIComponent(since)}` : ''}`);
 
     // The node's 15 s keepalive, relayed so the followers know this stream is alive.
     es.addEventListener('alive', beat);
@@ -297,24 +312,46 @@ async function _open() {
     // Which build answers: a restart on new code reloads the page (watchBuild).
     es.addEventListener('hello', (event) => {
       let build = null;
-      try { build = JSON.parse(event.data).build; } catch { /* not ours to read */ }
+      try {
+        const hello = JSON.parse(event.data);
+        build = hello.build;
+        if (typeof hello.at === 'string') lastPos = hello.at;
+      } catch { /* not ours to read */ }
       if (bc) { try { bc.postMessage({ type: 'hello', build }); } catch { /* channel closed */ } }
       checkBuild(build);
+    });
+
+    // What changed while the stream was away: a list of domains, or null for "everything".
+    es.addEventListener('catchup', (event) => {
+      clearTimeout(catchupTimer);
+      catchupTimer = null;
+      let domains = null;
+      try {
+        const p = JSON.parse(event.data);
+        if (Array.isArray(p.domains)) domains = p.domains;
+      } catch { /* unreadable: everything */ }
+      if (domains === null || domains.length) { ingestDomains(domains); relay(domains); }
     });
 
     es.onopen = () => {
       reconnectDelay = INITIAL_RECONNECT_DELAY;
       authRetried = false;
       authDead = false;
-      // Reconnect catch-up: after a gap we may have missed events, so force one "all domains"
-      // reconcile (locally + relayed). Skip on the very first open (views load on mount).
-      if (everOpened) { ingestDomains(null); relay(null); }
+      // Reconnect catch-up: after a gap we may have missed events. With a position the node answers
+      // with the domains that changed (the `catchup` frame above); without one, or without an answer,
+      // one "all domains" reconcile (locally + relayed). Skip on the very first open (views load on mount).
+      if (everOpened) {
+        clearTimeout(catchupTimer);
+        if (since) catchupTimer = setTimeout(() => { catchupTimer = null; ingestDomains(null); relay(null); }, CATCHUP_WAIT_MS);
+        else { ingestDomains(null); relay(null); }
+      }
       everOpened = true;
       beat();
     };
 
     es.onmessage = (event) => {
       reconnectDelay = INITIAL_RECONNECT_DELAY;
+      if (event.lastEventId) lastPos = event.lastEventId;
       let domains = null;
       try {
         const p = JSON.parse(event.data);

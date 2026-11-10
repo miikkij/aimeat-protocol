@@ -14,6 +14,10 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   2026-11-10 -- A stream reopened with `since` gets one `catchup` frame with the domains that changed
+ *     after it (services/live/change-journal.ts), through the same owner, scope and membership tests,
+ *     or null when the journal cannot answer; each domain frame carries its position as `id`, and
+ *     `hello` the position at open. Before, every reopen made the page reload everything.
  *   2026-11-04 -- The stream and socket tickets are issued into the node's storage, so a ticket from one
  *     process opens the stream on another; the same 30 s, the same answers (codebase analysis
  *     2026-11-03, HA stage 2).
@@ -90,6 +94,7 @@ import { isOrganismMember, type AudienceAuth } from '../services/audience.js';
 import { streamCredentialOf, streamCredentialRevoked, type StreamCredential } from '../auth/stream-credential.js';
 import { logger } from '../utils/logger.js';
 import { endOnDrain } from '../services/node-lifecycle.js';
+import { createChangeJournal } from '../services/live/change-journal.js';
 
 interface Ticket {
   sub: string;
@@ -156,6 +161,9 @@ const DRAFT_COALESCE_MS = 1000;
 const MEMBERSHIP_TTL_MS = 30_000;
 
 export function sseRouter(config: AimeatConfig, storage: Storage): Router {
+  // The numbered recent changes of this process, for a reopened stream's catch-up.
+  const journal = createChangeJournal();
+  onChangeEvent(evt => journal.record(evt));
   const router = Router();
 
   // Ticket endpoint — exchange JWT for a single-use SSE connection ticket
@@ -294,7 +302,8 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     res.write(':open\n\n');
     // Which build answers. A node restarted on new code drops every stream; the reconnect reads a
     // different build here, and an open SPA page reloads on it instead of asking /v1/build on a timer.
-    res.write(`event: hello\ndata: ${JSON.stringify({ build: BUILD_ID })}\n\n`);
+    // `at` is where the change journal stands: the page sends it back as `since` when it reopens.
+    res.write(`event: hello\ndata: ${JSON.stringify({ build: BUILD_ID, at: journal.position() })}\n\n`);
     flush();
 
     // Keepalive. 15s keeps the connection under the read timeout of common proxies (which is where a
@@ -353,7 +362,8 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       if (!domains.length) return; // everything in this window was filtered out
       const send = (): void => {
         if (ended) return;
-        res.write(`data: ${JSON.stringify({ domains })}\n\n`);
+        // The frame's id is the journal's position after it, which a reopened stream asks from.
+        res.write(`id: ${journal.position()}\ndata: ${JSON.stringify({ domains })}\n\n`);
         flush();
       };
       if (credential && Date.now() - lastChecked >= RECHECK_BEFORE_FRAME_MS) {
@@ -411,6 +421,31 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     // listens for its app and the build, and the domains are the business of the signed-in shell.
     const domainFrames = !t.app && visitorIp === undefined;
     if (domainFrames) onChangeEvent(handler);
+
+    // A page reopening its stream after a gap sends the last position it heard (`since`). The changes
+    // after it go out as one `catchup` frame, through the tests a live frame passes; a position the
+    // journal cannot answer for, or a stream without domain frames, says null: reload everything,
+    // which is what every reopen said before (services/live/change-journal.ts).
+    const sincePos = typeof req.query.since === 'string' ? req.query.since : '';
+    if (sincePos) {
+      const missed = domainFrames ? journal.since(sincePos) : null;
+      void (async (): Promise<void> => {
+        let domains: string[] | null = null;
+        if (missed) {
+          const out = new Set<string>();
+          for (const e of missed) {
+            if (e.ownerGaii && localAccountName(e.ownerGaii) !== ownerKey) continue;
+            if (!filterDomains([e.domain], t.allow).length) continue;
+            if (e.organismId && !(await isMember(e.organismId))) continue;
+            out.add(e.domain);
+          }
+          domains = [...out];
+        }
+        if (ended) return;
+        res.write(`event: catchup\ndata: ${JSON.stringify({ domains })}\n\n`);
+        flush();
+      })().catch((err: unknown) => logger.warn('sse: catch-up not sent, the page reloads everything after its wait', { error: String(err) }));
+    }
 
     // The followed app's own events, as a named `app` event so a client listening for domain frames
     // never mistakes one for "everything changed". A new version goes at once; a draft is told only

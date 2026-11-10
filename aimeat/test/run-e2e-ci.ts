@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-10 -- e2e-live-catchup.ts joins the list (not the guard tier): a reopened live stream gets the domains that changed while it was away, and only its owner's.
  *   2026-11-10 -- e2e-query-budget.ts joins GUARD_SUITES (145 → 146), Jouni's decision: three consecutive 6/6 runs alone on each backend in the production-settings lane.
  *   2026-11-10 -- e2e-memory-tab-summary.ts joins the list (not the guard tier): the Memory page's summary says what the full answer gives, and a key space's pages reach every key once.
  *   2026-11-08 -- e2e-package-file-label-reads.ts joins the list (not the guard tier): the reads of a data package's stored files ask the labels the version keeps, as GET /v1/pub does (secaudit2026nov08b round 15b).
@@ -1298,6 +1299,7 @@ const ALL_SUITES = [
     'test/e2e-data-wallet-page.ts',
     'test/e2e-memory-tab-summary.ts',
     'test/e2e-query-budget.ts',
+    'test/e2e-live-catchup.ts',
     'test/e2e-model-suite.ts',
     'test/e2e-access-page.ts',
     'test/e2e-invitations.ts',
