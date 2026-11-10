@@ -9,10 +9,13 @@
  *   any write when it does not match (secaudit2026oct26,
  *   packages/peer/package-pull:pullPackage:unsigned-manifest-metadata-installed).
  *
- *   Usage kept: the same package signed and served pulls; an attestation from a node that signs no
- *   metadata yet pulls as before.
+ *   Usage kept: the same package signed and served pulls. An attestation from a node that signs no
+ *   metadata is refused from node 4.3.0 (UNSIGNED_PACKAGE_METADATA_REMOVED_IN); the window before it
+ *   is proven with a set version in package-metadata-signature-window.test.ts.
  * @usage cd aimeat && pnpm exec vitest run test/unit/package-pull-metadata.test.ts
  * @version-history
+ *   v1.1.0 -- 2026-11-10 -- Node 4.3.0 closes the unsigned-metadata window: the last case expects
+ *     METADATA_UNSIGNED and no write.
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
@@ -95,12 +98,14 @@ describe('a pull checks the signed component metadata', () => {
         expect(written.length).toBe(1);
     });
 
-    it('pulls as before from a node that signs no metadata yet', async () => {
+    it('refuses a node that signs no metadata yet, from this release on, and writes nothing', async () => {
         const honest = pkg('ext:shop-ext:lookup');
         const descriptor = buildDescriptor(honest, NODE);
         delete descriptor.metadata_sha256;
         served = await buildZip(honest, { descriptor, signature: await sign(privateKey, attestationSignString(descriptor)) });
         const out = await pull();
-        expect(out.ok, JSON.stringify(out)).toBe(true);
+        expect(out.ok, JSON.stringify(out)).toBe(false);
+        expect((out as { code?: string }).code).toBe('METADATA_UNSIGNED');
+        expect(written).toEqual([]);
     });
 });
