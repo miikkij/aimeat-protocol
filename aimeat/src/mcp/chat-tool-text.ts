@@ -18,6 +18,8 @@
  * @structure CHAT_TOOL_TEXT · listedForChat(json, params) · shortenChatTools(mcp, names)
  * @usage in createMcpServer, for role 'chat', after keepOnly(): shortenChatTools(mcp, toolsForSurface('chat'))
  * @version-history
+ *   v1.1.1 — 2026-11-10 — aimeat_memory_write's `patch` is listed as plain JSON with no words, as
+ *     `value` is: its full text made the tool 1 128 characters on the chat surface, over 800.
  *   v1.1.0 — 2026-11-02 — aimeat_home_feed, a start tool since crew70.
  *   v1.0.0 — 2026-10-31 — Initial (v31 K63).
  */
@@ -60,12 +62,12 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
         params: {
             ai_provenance: 'When a model wrote it: { level: "ai-generated", model: your own model id }; text a person wrote: { level: "original" }.',
             key: 'Such as "notes/today".',
-            value: '', visibility: '', tags: '',
+            value: '', patch: '', visibility: '', tags: '',
         },
         fields: PROVENANCE_FIELDS,
         unlisted: ['ai_provenance_id', 'group_id', 'ttl_hours', 'owner_scope', 'expected_version'],
         // Any JSON, and one of the visibility words the description names.
-        plain: { value: {}, visibility: { type: 'string' } },
+        plain: { value: {}, patch: {}, visibility: { type: 'string' } },
     },
     aimeat_agent_propose: {
         description: 'Propose a new agent; nothing exists until the person approves it. Read first what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in `purpose`. Send `crew_def` (the smallest that runs: {"agents":[{"role":"Reader","goal":"…","backstory":"…","tools":["memory"]}],"tasks":[{"id":"main","agent":"Reader","description":"… {{ctx.prompt}} …","expected_output":"…"}]}), the `scopes` the job needs (never more than you hold) and `schedule` for work on a clock. Give the person `approval_url` and `next_step` from the answer.',

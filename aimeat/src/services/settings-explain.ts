@@ -13,12 +13,16 @@
  *   `explain.high`, `explain.examples`, `explain.when`) come from each locale, as on the page.
  *
  *   PARTS. `start` lists the terms by area (the first segment of the term id) with the English
- *   title, and a concept also with its short text; `<term>` is one explanation in full, in English,
- *   Finnish and Spanish.
+ *   title, and a concept also with its short text; when the list outgrows one tool result it
+ *   continues in `start.2`, `start.3` …, split between areas, each part naming the next one.
+ *   `<term>` is one explanation in full, in English, Finnish and Spanish.
  *   The same split as the feature map (services/feature-map.ts).
- * @structure settingsExplainPieceIds() · settingsExplainParts() · settingsExplainPiece(id)
+ * @structure START_PART_BUDGET · areaSection(area) · startParts() · settingsExplainPieceIds() ·
+ *   settingsExplainParts() · settingsExplainPiece(id)
  * @usage const piece = settingsExplainPiece('ai.temperature'); piece?.text
  * @version-history
+ *   v1.3.0 — 2026-11-10 — The index continues in `start.2` … when it outgrows one tool result: the
+ *     60 concepts and 265 settings made `start` 29 935 characters, over the 24 000 of one result.
  *   v1.2.0 — 2026-10-26 — The start part lists a setting by its title only (a concept keeps its short
  *     text), so the index stays within one tool result (24 000 characters) as settings are added.
  *   v1.1.0 — 2026-10-03 — The `concept` area (explain.concept.<id>.*: the system's own words in plain
@@ -63,7 +67,7 @@ function word(locale: Locale, name: string): string {
 }
 
 export function settingsExplainPieceIds(): string[] {
-    return ['start', ...TERMS];
+    return [...startTexts().map((_, i) => startId(i + 1)), ...TERMS];
 }
 
 function areasInOrder(): string[] {
@@ -71,25 +75,58 @@ function areasInOrder(): string[] {
     return [...AREA_ORDER.filter(a => seen.includes(a)), ...seen.filter(a => !AREA_ORDER.includes(a))];
 }
 
-function startText(): string {
-    const sections = areasInOrder().flatMap(area => [
+/**
+ * The most characters one index part holds before the next area starts a new part. One tool result
+ * is 24 000 characters (test/e2e-mcp-orientation.ts 17l); the rest is room for the closing line.
+ */
+const START_PART_BUDGET = 22_000;
+
+/** The index parts' ids: `start`, then `start.2`, `start.3` … when the list outgrows one part. */
+const startId = (n: number) => (n === 1 ? 'start' : `start.${n}`);
+
+function areaSection(area: string): string {
+    return [
         '',
         `## ${area}`,
-        // A concept carries its short text here; a setting carries its title only, so the index of
-        // every setting stays within one tool result as settings are added. Its part has the rest.
+        // A concept carries its short text here; a setting carries its title only. Its part has the rest.
         ...TERMS.filter(t => areaOf(t) === area).map(t => area === 'concept'
             ? `- \`settings/${t}\` **${part('en', t, 'title') || t}**: ${part('en', t, 'short')}`
             : `- \`settings/${t}\` **${part('en', t, 'title') || t}**`),
-    ]);
+    ].join('\n');
+}
+
+/**
+ * The index in parts of at most START_PART_BUDGET characters, split between areas, each part naming
+ * the next one, as the feature map splits a long area (services/feature-map.ts). An area larger than
+ * the budget on its own still goes whole into one part.
+ */
+function startParts(): string[] {
     const concepts = TERMS.filter(t => areaOf(t) === 'concept').length;
-    return [
+    const lead = [
         `# What a word or a setting means (${concepts} concepts, ${TERMS.length - concepts} settings)`,
         '',
         'The `concept` area comes first: the words this system uses (shared place or organism, workspace, agent, memory, morsel, connecting your AI, permission, package, app, AI provider, knowledge), each explained in plain words for a person who is not technical. Read one before you use the word with the person, or when they ask what it is. Use these words and these meanings, in their language, so that you and the pages say the same thing.',
         'The other areas are the explanations a page shows behind the question mark next to a setting. Read one when the person asks what a setting means or which value to pick.',
         'Ask for one with aimeat_handbook_get { tier: "settings/<term>" }, for example "settings/concept.organism": it holds the full explanation in English, Finnish and Spanish. Answer in the person\'s language with the matching section. Do not recite this list.',
-        ...sections,
     ].join('\n');
+    const parts: string[] = [lead];
+    for (const section of areasInOrder().map(areaSection)) {
+        const last = parts.length - 1;
+        if (parts[last].length + section.length > START_PART_BUDGET && parts[last].includes('\n## ')) {
+            parts.push(`# What a word or a setting means, continued (part ${parts.length + 1})`);
+        }
+        parts[parts.length - 1] += `\n${section}`;
+    }
+    return parts.map((text, i) => (i < parts.length - 1
+        ? `${text}\n\nThe list continues in \`settings/${startId(i + 2)}\`.`
+        : text));
+}
+
+/** Built once: the locales are read once at start. */
+let startCache: string[] | null = null;
+function startTexts(): string[] {
+    startCache ??= startParts();
+    return startCache;
 }
 
 /** One language's explanation, laid out as the dialog lays it out. */
@@ -119,9 +156,20 @@ function termText(term: string): string {
     ].join('\n');
 }
 
-/** One part by id: `start` (the terms by area), or a term id. Null for an id the locales do not have. */
+/** The index part's number for `start` (1) and `start.<n>` (n); 0 for any other id. */
+function startNumber(id: string): number {
+    if (id === 'start') return 1;
+    const m = /^start\.(\d+)$/.exec(id);
+    return m ? Number(m[1]) : 0;
+}
+
+/** One part by id: `start` and `start.<n>` (the terms by area), or a term id. Null for an id the locales do not have. */
 export function settingsExplainPiece(id: string): { id: string; text: string } | null {
-    if (id === 'start') return { id, text: startText() };
+    const n = startNumber(id);
+    if (n > 0) {
+        const text = startTexts()[n - 1];
+        return text === undefined || id !== startId(n) ? null : { id, text };
+    }
     return TERM_SET.has(id) ? { id, text: termText(id) } : null;
 }
 
@@ -129,7 +177,8 @@ export function settingsExplainPiece(id: string): { id: string; text: string } |
 export function settingsExplainParts(): Array<{ id: string; what: string; chars: number }> {
     return settingsExplainPieceIds().map(id => ({
         id,
-        what: id === 'start' ? 'The concepts in plain words, then the settings by area, with their part ids' : (part('en', id, 'title') || id),
+        what: id === 'start' ? 'The concepts in plain words, then the settings by area, with their part ids'
+            : startNumber(id) > 0 ? 'The settings by area, continued' : (part('en', id, 'title') || id),
         chars: settingsExplainPiece(id)?.text.length ?? 0,
     }));
 }
