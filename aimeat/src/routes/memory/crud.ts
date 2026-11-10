@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-10 — GET /v1/memory?include=meta&limit takes `cursor` (additive): one page in key order read
+ *     in SQL batches after it (services/memory-query.ts listMemoryMetaPage), with `next_cursor`.
  *   2026-11-10 — GET /v1/memory?include=meta takes `sort` (updated, key, size) and `offset`, so the
  *     Memory page reads one key space a page at a time; without them the answer is unchanged.
  *   2026-11-09 — GET /v1/memory with owner_scope or ?agent= lists a same-owner record kept at
@@ -104,7 +106,8 @@ import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
 import { readsAsOwner, ownerScopeView, ownerScopeViewAdmitting } from '../../services/owner-scope-read.js';
 import { organismReadableRecords } from '../../services/organism-namespace-access.js';
 import { callerOf } from '../../middleware/caller.js';
-import { listMemoryMetaFor, searchMemoryRecords } from '../../services/memory-query.js';
+import { listMemoryMetaFor, listMemoryMetaPage, searchMemoryRecords } from '../../services/memory-query.js';
+import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
 import { memoryPageWithValues, shownMemoryBytes } from '../../services/memory-list-page.js';
 import { sortMetaRows } from '../../services/db/memory-tab-summary.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
@@ -422,7 +425,39 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // just to omit them from the response and total the bytes in JS.)
     // The classification reader (TARGET-082): a key this reader may not see is neither listed nor counted.
     const reader = readerFor({ storage, config }, req.auth);
+    /** One row of the metadata listing, the same on a cursor page and on the whole listing. */
+    const listedMetaItem = (r: MemoryMetaRow): Record<string, unknown> => ({
+      key: r.key,
+      owner_gaii: r.ownerGaii,
+      bytes: r.byteSize,
+      visibility: r.visibility,
+      zone: visibilityToZone(r.visibility),
+      tags: r.tags,
+      version: r.version,
+      flagCount: r.flagCount ?? 0,
+      created_at: r.createdAt,
+      updated_at: r.updatedAt,
+      // The record of how this was made, per item; null is UNSTATED, never "a person wrote it".
+      ai_provenance_id: r.aiProvenanceId ?? null,
+      // Same key under other same-owner identities; those copies are shadowed by this one
+      // and appear nowhere else in the response (owner-scope listings only).
+      ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
+      ...warningField(r),
+    });
     if (metaOnly) {
+      // ?cursor with ?limit: one page in key order, read in SQL batches after the cursor through the
+      // same filters, instead of every matching row (services/memory-query.ts listMemoryMetaPage).
+      // The answer carries `next_cursor` and no total or quota, which only a whole read can say.
+      if (typeof req.query.cursor === 'string' && limit !== undefined && req.query.count !== 'true') {
+        const page = await listMemoryMetaPage({ storage, config }, {
+          ownerScopeOf: (ownerScope && !agentParam) ? req.auth!.owner : null, gaii,
+          prefix, visibility, tags, maxFlags, archived, cursor: req.query.cursor, limit,
+          keep: async rows => organismView(await ownerScopeViewAdmitting(storage,
+            await reader.show(rows, r => memoryTarget(r.ownerGaii, r.key)), self, !restricted, isForeignPrincipal(req.auth))),
+        });
+        res.json(success(config.nodeId, { items: page.rows.map(listedMetaItem), next_cursor: page.nextCursor, limit }));
+        return;
+      }
       // The listing aimeat_memory_list reads too (services/memory-query.ts).
       const allMeta = await organismView(await ownerScopeViewAdmitting(storage, await reader.show(
         await listMemoryMetaFor({ storage, config }, {
@@ -447,24 +482,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       let totalBytes = 0;
       for (const r of allMeta) totalBytes += r.byteSize;
       res.json(success(config.nodeId, {
-        items: metaRows.map(r => ({
-          key: r.key,
-          owner_gaii: r.ownerGaii,
-          bytes: r.byteSize,
-          visibility: r.visibility,
-          zone: visibilityToZone(r.visibility),
-          tags: r.tags,
-          version: r.version,
-          flagCount: r.flagCount ?? 0,
-          created_at: r.createdAt,
-          updated_at: r.updatedAt,
-          // The record of how this was made, per item; null is UNSTATED, never "a person wrote it".
-          ai_provenance_id: r.aiProvenanceId ?? null,
-          // Same key under other same-owner identities; those copies are shadowed by this one
-          // and appear nowhere else in the response (owner-scope listings only).
-          ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
-          ...warningField(r),
-        })),
+        items: metaRows.map(listedMetaItem),
         total: allMeta.length,
         ...(offset ? { offset } : {}),
         ...(metaRows.length < allMeta.length

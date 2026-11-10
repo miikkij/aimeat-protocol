@@ -18793,6 +18793,11 @@ paths:
             type: integer
             minimum: 0
           description: 'With include=meta: rows to skip before the page (with `limit`, one page of a key space). Echoed back when given.'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: 'With include=meta and limit: one page in key order after this key ("" for the first page), read in SQL batches through the same filters as the whole listing. The answer is { items, next_cursor, limit }, with no total or quota; next_cursor is null when the listing ended.'
       responses:
         '200':
           description: |

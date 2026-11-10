@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-10 — aimeat_memory_list takes `cursor`: a page in key order read in SQL batches, with
+ *     next_cursor (GET /v1/memory?cursor; performance work, architecture item 4).
  *   2026-11-09 — aimeat_memory_write's `tags` says that leaving it out keeps the record's tags.
  *   2026-11-09 — aimeat_memory_write takes `patch` (a JSON Merge Patch) in place of `value`;
  *     aimeat_memory_history: a memory entry's kept earlier versions and what each write changed;
@@ -580,6 +582,7 @@ export const schedulesTasksMemoryTools = [
             tags: { type: 'array', description: 'Optional tag filters.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             owner_scope: { type: 'boolean', description: 'When true, list same-owner GHII and all same-owner agent memory. Their private records are listed only with the memory:read-as-owner scope.', zod: flexibleBoolean },
             limit: { type: 'number', description: 'Maximum entries to return (recommended on large stores).', zod: z.number().int().positive().max(MEMORY_LIST_MAX_LIMIT) },
+            cursor: { type: 'string', description: 'Page through a large store in key order: pass "" for the first page and the answer\'s next_cursor for the next one, until next_cursor is null. Each page reads only its own rows. Used with limit.', zod: z.string().max(INPUT_LIMITS.key) },
         },
     },
     {

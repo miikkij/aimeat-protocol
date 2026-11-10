@@ -21,6 +21,8 @@
  *     POST /v1/outbound/send take; another owner's agent is refused the same id.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-rest-parity
  * @version-history
+ *   2026-11-10 — A cursor walk of the owner-scope listing gives the same keys on GET /v1/memory?cursor
+ *     and aimeat_memory_list with `cursor`, each once.
  *   2026-10-16 — Initial (QA audit D2-05, D2-06, D2-08, F12b-01).
  */
 import * as ed from '@noble/ed25519';
@@ -264,6 +266,30 @@ await test('Memory: the owner-scope listing lists a key held by the owner and th
     const mcpKeys = (items as any[]).map(i => i.key).sort();
     assert(restKeys.filter(k => k === shared).length === 1, `REST lists ${shared} ${restKeys.filter(k => k === shared).length} times`);
     assert(JSON.stringify(restKeys) === JSON.stringify(mcpKeys), `REST ${JSON.stringify(restKeys)} vs MCP ${JSON.stringify(mcpKeys)}`);
+});
+
+await test('A cursor walk of the owner-scope listing gives the same keys on REST and aimeat_memory_list, each once', async () => {
+    const rest = await json(`/v1/memory?owner_scope=true&include=meta&prefix=${encodeURIComponent(MEM + '.')}`, { headers: auth(agent.token) });
+    const whole = (rest.body.data.items as any[]).map(i => i.key).sort();
+    const walkRest: string[] = [];
+    let cursor = '';
+    for (let guard = 0; guard < 50; guard++) {
+        const page = await json(`/v1/memory?owner_scope=true&include=meta&prefix=${encodeURIComponent(MEM + '.')}&limit=1&cursor=${encodeURIComponent(cursor)}`, { headers: auth(agent.token) });
+        walkRest.push(...(page.body.data.items as any[]).map(i => i.key));
+        if (page.body.data.next_cursor === null) break;
+        cursor = page.body.data.next_cursor;
+    }
+    const walkMcp: string[] = [];
+    cursor = '';
+    for (let guard = 0; guard < 50; guard++) {
+        const page = await agent.session.call('aimeat_memory_list', { prefix: `${MEM}.`, owner_scope: true, limit: 1, cursor });
+        assert(!page.isError, `MCP page: ${page.text}`);
+        walkMcp.push(...(page.data.items as any[]).map(i => i.key));
+        if (page.data.next_cursor === null) break;
+        cursor = page.data.next_cursor;
+    }
+    assert(JSON.stringify(walkRest) === JSON.stringify(whole), `REST walk ${JSON.stringify(walkRest)} vs whole ${JSON.stringify(whole)}`);
+    assert(JSON.stringify(walkMcp) === JSON.stringify(whole), `MCP walk ${JSON.stringify(walkMcp)} vs whole ${JSON.stringify(whole)}`);
 });
 
 // ── Organism archive ─────────────────────────────────────────────────────────

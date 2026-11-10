@@ -72,6 +72,8 @@ export const memoryListOutput = {
     values_omitted: z.boolean().optional(),
     /** How to actually read a value that belongs to another same-owner identity. */
     note: z.string().optional(),
+    /** With `cursor`: the cursor of the next page, or null when the listing ended. */
+    next_cursor: z.string().nullable().optional(),
 };
 
 /** Generic { items, count } list output (work inbox, etc.). */

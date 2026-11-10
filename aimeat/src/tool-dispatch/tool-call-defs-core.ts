@@ -10,6 +10,7 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-10 -- aimeat_memory_list forwards `cursor` to GET /v1/memory ("" included: the first page).
  *   2026-11-09 -- aimeat_memory_write with `patch` proxies PATCH /v1/memory/:key (utils/memory-write-mode.ts
  *     decides value or patch); aimeat_memory_history, a proxy over GET /v1/memory/history/:key; aimeat_context_check,
  *     over GET /v1/memory/context-check/:slug.
@@ -213,6 +214,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
                 tags: tags?.length ? tags.join(',') : undefined,
                 owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
                 limit: optionalNumber(input, 'limit'),
+                // A page in key order after the cursor; "" is the first page, so it is forwarded as given.
+                cursor: typeof input.cursor === 'string' ? input.cursor : undefined,
                 // A LISTING IS A LISTING. `include=meta` is what the node MCP surface has always
                 // answered with and what this tool's published output schema promises ("the listing
                 // carries no values (always the case)"); this door was the one shipping them, and

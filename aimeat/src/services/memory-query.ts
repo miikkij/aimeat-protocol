@@ -19,11 +19,13 @@
  *   What each surface still decides itself: who may ask for the owner scope, the visibility filter
  *   for a caller that does not read as the owner (ownerScopeView), the classification reader, and the
  *   shape of the answer.
- * @structure searchMemoryRecords · listMemoryMetaFor
+ * @structure searchMemoryRecords · listMemoryMetaPage · listMemoryMetaFor
  * @usage
  *   const hits = await searchMemoryRecords({ storage, config }, { ownerScopeOf: null, gaii, q, limit: 50 });
  *   const rows = await listMemoryMetaFor({ storage, config }, { ownerScopeOf: ownerName, gaii, prefix });
  * @version-history
+ *   v1.1.0 — 2026-11-10 — listMemoryMetaPage: a page in key order after a cursor, read in SQL batches
+ *     (performance work, architecture item 4); GET /v1/memory and aimeat_memory_list take `cursor`.
  *   v1.0.0 — 2026-10-16 — Initial, out of routes/memory/crud.ts, mcp/memory-extended.ts and mcp/core.ts (QA audit D2-06).
  */
 import type { AimeatConfig } from '../config.js';
@@ -64,6 +66,50 @@ export async function searchMemoryRecords(deps: Deps, args: {
     ? await memoryDb.searchOwnerScope(args.ownerScopeOf, args.q, opts)
     : await deps.storage.searchText(args.q, { ...opts, ownerGaiis: [args.gaii] });
   return hits.map(h => h.record);
+}
+
+/** Rows read per SQL batch of a cursor page at least: more than any account's identities hold one key. */
+const PAGE_BATCH_MIN = 200;
+const byKeyBytes = (a: { key: string }, b: { key: string }): number => Buffer.compare(Buffer.from(a.key), Buffer.from(b.key));
+
+/**
+ * One page of the metadata listing in key order, after `cursor` (empty for the first page), read in
+ * SQL a batch at a time with the key cursor (MemoryListOpts `after`) instead of every matching row.
+ * `keep` is the caller's filter chain (the classification reader, the owner-scope view, the organism
+ * rule), applied to each batch; batches are read until `limit` rows are kept or the listing ends.
+ * A full batch leaves its last key for the next one, so the rows of one key under several of the
+ * owner's identities are always deduplicated together (GHII first, as the whole listing does).
+ * `nextCursor` is the last key returned when the page filled, null when the listing ended.
+ */
+export async function listMemoryMetaPage(deps: Deps, args: {
+  ownerScopeOf: string | null;
+  gaii: string;
+  cursor: string;
+  limit: number;
+  keep: (rows: MemoryMetaRow[]) => Promise<MemoryMetaRow[]>;
+} & ListOpts): Promise<{ rows: MemoryMetaRow[]; nextCursor: string | null }> {
+  const { ownerScopeOf, gaii, cursor, limit, keep, ...opts } = args;
+  const identities = ownerScopeOf ? await resolveOwnerIdentities(deps.storage, deps.config.nodeId, ownerScopeOf) : [gaii];
+  const out: MemoryMetaRow[] = [];
+  let after: string | undefined = cursor || undefined;
+  for (;;) {
+    const fetch = Math.max(PAGE_BATCH_MIN, (limit - out.length) * 2);
+    const raw = await deps.storage.listMemoryMetaForOwners(identities, { ...opts, after, limit: fetch });
+    const full = raw.length >= fetch;
+    let batch = raw;
+    if (full) {
+      const lastKey = raw[raw.length - 1].key;
+      const whole = raw.filter(r => r.key !== lastKey);
+      if (whole.length) batch = whole;
+    }
+    const kept = await keep(MemoryRepository.dedupByKey(batch, identities).sort(byKeyBytes));
+    for (const r of kept) {
+      out.push(r);
+      if (out.length === limit) return { rows: out, nextCursor: r.key };
+    }
+    if (!full || !batch.length) return { rows: out, nextCursor: null };
+    after = batch[batch.length - 1].key;
+  }
 }
 
 /**

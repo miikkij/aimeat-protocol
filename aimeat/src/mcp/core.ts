@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-10 — aimeat_memory_list takes `cursor`: one page in key order after it, read in SQL batches
+ *     through the same filters (services/memory-query.ts listMemoryMetaPage), with next_cursor.
  *   2026-11-09 — aimeat_memory_read and aimeat_memory_list with owner_scope show an agent its owner's
  *     record kept at organism:<id> when that organism admits the agent (ownerScopeViewAdmitting).
  *   2026-11-09 — aimeat_memory_write without `tags` keeps the record's tags; `[]` clears them.
@@ -184,7 +186,7 @@ import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeViewAdmitting } from '../services/owner-scope-read.js';
 import { organismReadableRecords } from '../services/organism-namespace-access.js';
-import { listMemoryMetaFor } from '../services/memory-query.js';
+import { listMemoryMetaFor, listMemoryMetaPage } from '../services/memory-query.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { scopeDeniedText } from './scope-denied-answer.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
@@ -635,20 +637,41 @@ export function registerCoreTools(
     mcp.registerTool(
         'aimeat_memory_list',
         { description: descriptionFor('aimeat_memory_list'), outputSchema: memoryListOutput, annotations: annotationsFor('aimeat_memory_list'), inputSchema: zodShapeFor('aimeat_memory_list') },
-        async ({ prefix, visibility, tags, owner_scope, limit, response_format }) => {
+        async ({ prefix, visibility, tags, owner_scope, limit, cursor, response_format }) => {
             const cap = Math.min(limit ?? MEMORY_LIST_DEFAULT_LIMIT, MEMORY_LIST_MAX_LIMIT);
             let entries: Awaited<ReturnType<Storage['listMemoryMeta']>>;
             let truncated = false;
+            if (owner_scope && !parseGAII(agentGaii)) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({ error: 'Invalid agent GAII', gaii: agentGaii }, null, 2),
+                    }],
+                };
+            }
+            // A cursor page: the rows after it in key order, read in SQL batches through the same
+            // filters as the whole listing below (services/memory-query.ts listMemoryMetaPage).
+            if (typeof cursor === 'string') {
+                const page = await listMemoryMetaPage({ storage, config }, {
+                    ownerScopeOf: owner_scope ? localAccountName(agentGaii) : null, gaii: agentGaii,
+                    prefix, visibility, tags, cursor, limit: cap,
+                    keep: async rows => {
+                        const scoped = owner_scope
+                            ? await organismReadableRecords({ storage, config }, caller(), await ownerScopeViewAdmitting(storage, rows, agentGaii, readsAsOwner(caller()), caller().visitor))
+                            : rows;
+                        return readerForAgent({ storage, config }, agentGaii).show(scoped, e => memoryTarget(e.ownerGaii, e.key));
+                    },
+                });
+                const pageItems = page.rows.map(e => ({
+                    key: e.key, owner_gaii: e.ownerGaii, visibility: e.visibility, tags: e.tags, version: e.version,
+                    updated_at: e.updatedAt, ai_provenance_id: e.aiProvenanceId ?? null,
+                }));
+                return structuredResult('aimeat_memory_list', response_format, {
+                    items: pageItems, count: pageItems.length, next_cursor: page.nextCursor,
+                    ...(owner_scope ? { values_omitted: true, note: OWNER_SCOPE_LIST_NOTE } : {}),
+                });
+            }
             if (owner_scope) {
-                const parsed = parseGAII(agentGaii);
-                if (!parsed) {
-                    return {
-                        content: [{
-                            type: 'text' as const,
-                            text: JSON.stringify({ error: 'Invalid agent GAII', gaii: agentGaii }, null, 2),
-                        }],
-                    };
-                }
                 // The owner-scope listing GET /v1/memory?owner_scope=true reads (services/memory-query.ts):
                 // the owner's GHII, every agent and every ecosystem app in one query, one row per key.
                 // The organism rule too, as GET /v1/memory?owner_scope=true (secaudit 2026-10, v57).

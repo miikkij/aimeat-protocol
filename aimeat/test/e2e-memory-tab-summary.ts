@@ -138,6 +138,21 @@ await test('A key space a page at a time: sort and offset reach every key once',
   assert(times.every((t: string, i: number) => i === 0 || times[i - 1] >= t), 'newest change first');
 });
 
+await test('A cursor walks the listing in key order to the same keys, with next_cursor and no total', async () => {
+  const walked: string[] = [];
+  let cursor = '';
+  for (let guard = 0; guard < 10; guard++) {
+    const page = await json(`/v1/memory?include=meta&prefix=${SPACE}.&limit=2&cursor=${encodeURIComponent(cursor)}`, { headers: auth(A.token) });
+    assert(page.status === 200 && Array.isArray(page.body.data.items) && !('total' in page.body.data), `page ${page.status} ${JSON.stringify(page.body.data).slice(0, 200)}`);
+    walked.push(...page.body.data.items.map((i: any) => i.key));
+    if (page.body.data.next_cursor === null) break;
+    cursor = page.body.data.next_cursor;
+  }
+  assert(walked.join() === ['alpha', 'bravo', 'charlie', 'delta', 'echo'].map(k => `${SPACE}.${k}`).join(), `walked ${walked.join()}`);
+  const other = await json(`/v1/memory?include=meta&prefix=${SPACE}.&limit=10&cursor=`, { headers: auth(B.token) });
+  assert(other.body.data.items.length === 0 && other.body.data.next_cursor === null, "another owner's cursor page holds none of the owner's keys");
+});
+
 await test('Files a page at a time: the mount carries the first ones and the count of all, the listing pages the rest', async () => {
   for (const name of ['a', 'b', 'c']) {
     const f = await json('/v1/memory/files', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${SPACE}/file-${name}.txt`, content: Buffer.from(`file ${name}`).toString('base64'), mime_type: 'text/plain', visibility: 'private' }) });
