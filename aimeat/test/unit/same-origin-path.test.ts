@@ -12,13 +12,14 @@
  *   route-level arms live with their routes (account-events.test.ts, e2e-mcp-proxy.ts).
  * @usage cd aimeat && pnpm exec vitest run test/unit/same-origin-path.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-10 — withQueryParam: a parameter lands before the fragment.
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09 A2-3, A5-5).
  */
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { isSameOriginPath, safeRedirectPath } from '../../src/utils/same-origin-path.js';
+import { isSameOriginPath, safeRedirectPath, withQueryParam } from '../../src/utils/same-origin-path.js';
 import { safeNotificationLink } from '../../src/services/extension-notify.js';
 import { isSafeNotifActionEndpoint } from '../../src/services/notify.js';
 import { createPrincipalNotification } from '../../src/services/notification-create.js';
@@ -56,6 +57,25 @@ describe('isSameOriginPath and safeRedirectPath', () => {
     // An empty fallback lets a caller tell "no safe address" apart from "go to the root".
     expect(safeRedirectPath('/\\evil.example', '')).toBe('');
     expect(safeRedirectPath('/spa.html#access', '')).toBe('/spa.html#access');
+  });
+});
+
+// A query parameter added after the `#` is part of the fragment, so location.search never sees it.
+// A first sign-in from a link ending in `#/` lost the username-choice marker that way and looped
+// back to the sign-in dialog.
+describe('withQueryParam', () => {
+  it('puts the parameter into the query, before any fragment', () => {
+    expect(withQueryParam('/', 'aimeat_signup', '1')).toBe('/?aimeat_signup=1');
+    expect(withQueryParam('/a.html?x=1', 'aimeat_signup', '1')).toBe('/a.html?x=1&aimeat_signup=1');
+    expect(withQueryParam('/a.html#/', 'aimeat_signup', '1')).toBe('/a.html?aimeat_signup=1#/');
+    expect(withQueryParam('/a.html?x=1#/view?y=2', 'aimeat_signup', '1')).toBe('/a.html?x=1&aimeat_signup=1#/view?y=2');
+    expect(withQueryParam('/a.html?#top', 'k', 'a b')).toBe('/a.html?k=a%20b#top');
+  });
+
+  it('leaves the parameter readable by URLSearchParams(location.search)', () => {
+    const url = new URL(`https://node.example${withQueryParam('/apps/o/turva.html#/', 'aimeat_signup', '1')}`);
+    expect(new URLSearchParams(url.search).get('aimeat_signup')).toBe('1');
+    expect(url.hash).toBe('#/');
   });
 });
 

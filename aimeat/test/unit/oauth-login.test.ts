@@ -13,6 +13,8 @@
  *   v2.0.0 — 2026-07-01 — Generalised to the provider registry: router now takes OidcProvider[].
  *     Added Casdoor + Entra coverage (incl. tenant gating, email fallback, cross-provider link) and
  *     the /v1/auth/providers discovery assertion; Google behaviour is unchanged.
+ *   v2.1.0 — 2026-11-10 — A first sign-in whose return address has a fragment gets the
+ *     username-choice marker before the fragment.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -211,6 +213,16 @@ describe('Multi-provider social login (oauth-login router)', () => {
     expect(ghii!.emailVerifiedAt).toBeTruthy();
     expect(ghii!.verificationLevel).toBe(1);
     expect(ghii!.emailHash).toBe(emailHashOf('newuser@example.com'));
+  });
+
+  it('a first sign-in from a page address with a fragment gets the marker before the fragment', async () => {
+    fakeEntra.setClaims({ sub: 'e-hash-1', tid: ENTRA_TENANT, email: 'hash@corp.example', name: 'Hash User' });
+    const authz = await rawGet(`${base}/v1/ghii/login/entra?redirect=${encodeURIComponent('/apps/o/turva.html#/')}`);
+    expect(authz.status).toBe(302);
+    const state = new URL(authz.location!).searchParams.get('state')!;
+    const res = await rawGet(`${base}/v1/ghii/login/entra/callback?code=abc&state=${encodeURIComponent(state)}`);
+    expect(res.status).toBe(302);
+    expect(res.location).toBe(`${base}/apps/o/turva.html?aimeat_signup=1#/`);
   });
 
   it('finalize falls back to the suggested username when none is provided', async () => {

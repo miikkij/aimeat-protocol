@@ -14,9 +14,13 @@
  *
  *   A leaf module, so the notification services can ask it without importing the sign-in tree it
  *   used to live in (services/external-login.ts).
- * @structure isSameOriginPath · safeRedirectPath
+ * @structure isSameOriginPath · safeRedirectPath · withQueryParam
  * @usage res.redirect(safeRedirectPath(returnUrl, '/profile#access'));
  * @version-history
+ *   v1.1.0 — 2026-11-10 — withQueryParam: adds a query parameter before the fragment. A return
+ *     address keeps the page's `#` part, and a marker appended after it was part of the fragment,
+ *     so location.search never saw it: a first sign-in from a link ending in `#/` looped back to
+ *     the sign-in dialog instead of asking for a username.
  *   v1.0.0 — 2026-09-24 — Moved out of services/external-login.ts and hardened: a backslash or a
  *     control character anywhere refuses the address, and a caller names its own fallback.
  */
@@ -41,4 +45,18 @@ export function isSameOriginPath(raw: unknown): raw is string {
  */
 export function safeRedirectPath(raw: unknown, fallback = '/'): string {
   return isSameOriginPath(raw) ? raw : fallback;
+}
+
+/**
+ * `path` with `name=value` added to its query, before any fragment. Everything after the first `#`
+ * is the fragment, which a browser keeps out of location.search, so a parameter appended to the
+ * end of `/app.html#/` would be invisible to the page that reads it.
+ */
+export function withQueryParam(path: string, name: string, value: string): string {
+  const hashAt = path.indexOf('#');
+  const head = hashAt < 0 ? path : path.slice(0, hashAt);
+  const fragment = hashAt < 0 ? '' : path.slice(hashAt);
+  const param = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
+  const sep = !head.includes('?') ? '?' : head.endsWith('?') || head.endsWith('&') ? '' : '&';
+  return `${head}${sep}${param}${fragment}`;
 }

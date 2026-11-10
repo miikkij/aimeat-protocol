@@ -17,6 +17,8 @@
  *   /v1/ghii/username-available, GET /v1/auth/providers (OIDC providers + listed SSO connections).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   2026-11-10 — The username-choice marker goes before the return address's fragment
+ *     (withQueryParam): appended after `#/`, the page never saw it and the first sign-in looped.
  *   2026-11-08 — A code key's first sign-in by a provider goes to the sign-in details screen first
  *     (secaudit2026nov08 round 14).
  *   2026-10-27 — GET /v1/ghii/login/pending reads the pending sign-up through readPendingSignup (the
@@ -63,7 +65,7 @@ import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
 import { bindLoginRound, endLoginRound, loginRoundHeldBy } from '../middleware/login-round-binding.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
-import { safeRedirectPath } from '../utils/same-origin-path.js';
+import { safeRedirectPath, withQueryParam } from '../utils/same-origin-path.js';
 import { logger } from '../utils/logger.js';
 
 export function oauthLoginRouter(
@@ -173,8 +175,7 @@ export function oauthLoginRouter(
 
         if (result.outcome === 'pending') {
           setPendingCookie(req, res, await signPendingToken(result.pending));
-          const sep = postLoginPath.includes('?') ? '&' : '?';
-          res.redirect(`${config.baseUrl}${postLoginPath}${sep}aimeat_signup=1`);
+          res.redirect(`${config.baseUrl}${withQueryParam(postLoginPath, 'aimeat_signup', '1')}`);
           return;
         }
 

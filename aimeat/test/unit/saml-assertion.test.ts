@@ -9,6 +9,8 @@
  *   account, the domain-fenced email link, and the username-choice step for a brand-new user.
  * @usage cd aimeat && pnpm exec vitest run test/unit/saml-assertion.test.ts
  * @version-history
+ *   2026-11-10 — A brand-new user whose return address has a fragment gets the username-choice
+ *     marker before the fragment.
  *   2026-10-25 — A JIT account's address is verified only when it is in the connection's domains
  *     (secaudit2026oct22, sso-new-account-email-verified-outside-connection-domains).
  *   2026-10-15 — The refusals expect a redirect with ?auth_error= instead of JSON 401, plus a
@@ -141,6 +143,19 @@ describe('SAML organisation sign-in (saml-login router)', () => {
     expect(created).not.toBeNull();
     expect(created!.ownerName).toBe('ville');
     expect(created!.emailVerifiedAt).toBeTruthy();  // the organisation's IdP vouched for the address
+  });
+
+  it('a brand-new user from a page address with a fragment gets the marker before the fragment', async () => {
+    const authz = await rawGet(`${base}/v1/ghii/login/saml/${CONN}?redirect=${encodeURIComponent('/apps/o/turva.html#/')}`);
+    expect(authz.status).toBe(302);
+    const relayState = new URL(authz.location!).searchParams.get('RelayState')!;
+    const samlResponse = buildSamlResponse({
+      acsUrl: acsUrl(CONN), audience: audience(CONN), inResponseTo: requestIdFromAuthorizeUrl(authz.location!),
+      nameId: 'opaque-hash-1', email: 'hash@contoso.com', displayName: 'Hash H',
+    });
+    const res = await rawPost(acsUrl(CONN), { SAMLResponse: samlResponse, RelayState: relayState });
+    expect(res.status).toBe(302);
+    expect(res.location).toBe(`${base}/apps/o/turva.html?aimeat_signup=1#/`);
   });
 
   // secaudit2026oct22 (sso-new-account-email-verified-outside-connection-domains): the organisation's

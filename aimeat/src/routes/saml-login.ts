@@ -20,6 +20,8 @@
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-11-10 — The username-choice marker goes before the return address's fragment
+ *     (withQueryParam): appended after `#/`, the page never saw it and the first sign-in looped.
  *   2026-11-08 — A code key's first sign-in by SAML goes to the sign-in details screen first
  *     (secaudit2026nov08 round 14).
  *   2026-10-29 — The first sign-in into an account the directory adopted, when it has two-step sign-in,
@@ -66,7 +68,7 @@ import { twoStepArmed } from '../services/passkeys.js';
 import { tellSignedInPastCode, adoptionAsksCode } from '../services/sso-adoption-notice.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
-import { safeRedirectPath } from '../utils/same-origin-path.js';
+import { safeRedirectPath, withQueryParam } from '../utils/same-origin-path.js';
 
 /** How often lastLoginAt on the connection is worth a write — playbook evidence, not analytics. */
 const LOGIN_STAMP_THROTTLE_MS = 60_000;
@@ -251,8 +253,7 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
 
         if (result.outcome === 'pending') {
           setPendingCookie(req, res, await signPendingToken(result.pending));
-          const sep = postLoginPath.includes('?') ? '&' : '?';
-          res.redirect(`${config.baseUrl}${postLoginPath}${sep}aimeat_signup=1`);
+          res.redirect(`${config.baseUrl}${withQueryParam(postLoginPath, 'aimeat_signup', '1')}`);
           return;
         }
 
