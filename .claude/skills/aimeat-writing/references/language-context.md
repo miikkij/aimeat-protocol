@@ -206,7 +206,7 @@ everywhere at once, and say so in the Changes section.
 | a person's login name | the public half of a sign-in | username | käyttäjätunnus | nombre de usuario |
 | one thread in Messages | everything said between the same parties under one subject | conversation | keskustelu | conversación |
 | where a person puts conversations away | nothing is deleted; a conversation comes back when someone other than their own agents writes | archive / archive (verb) | arkisto / arkistoida | archivo / archivar |
-| the conversations whose last message came to the person | the top section of the Messages list and the Home band; a conversation leaves it when the person answers. Same rule on both: the last message came in, and not to one of their agents' own mailboxes | waiting for your answer | odottaa vastaustasi | esperan tu respuesta |
+| the conversations with messages the person has not opened yet | the top section of the Messages list and the count beside a heading; a conversation leaves the section when the person opens it | unread | lukematta | sin leer |
 | a rule for the Messages list | folds, groups or archives the conversations it matches; the first one that fits decides | rule | sääntö | regla |
 | a conversation of several people a person opened | named by its name; everybody in it is on this node; never *organism*, which is shared knowledge, nor *sharing group*, which is a list for consent | group chat; group (in a list) | ryhmäkeskustelu; ryhmä | conversación de grupo; grupo |
 | the one who adds and removes a group chat's members | whoever opened it, until they leave; then the next person in it | manages the group | ylläpitää ryhmää | administra el grupo |

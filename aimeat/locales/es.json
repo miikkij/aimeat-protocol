@@ -17426,7 +17426,7 @@
   "inbox.sentForYouByTitle": "Tu agente escribió y envió esto en tu nombre. Quien lo recibe ve qué agente lo envió.",
   "inbox.sentByTheirAgent": "Enviado por su agente {agent}",
   "inbox.sentByTheirAgentTitle": "El agente del remitente escribió y envió esto en nombre del remitente.",
-  "inbox.org.sectionWaiting": "Esperan tu respuesta",
+  "inbox.org.sectionUnread": "Sin leer",
   "inbox.org.sectionPeople": "Personas",
   "inbox.org.sectionAgents": "Tus agentes",
   "inbox.org.sectionArchive": "Archivo",
