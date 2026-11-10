@@ -5,6 +5,9 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.7.0 — 2026-11-10 — Files a page at a time from the server: the mount asks for the first 12
+ *     (files_limit, the content text files left out), "show more" reads 50 more (loadMoreFiles), and
+ *     a change reads again as many as are shown (loadFiles).
  *   v3.6.0 — 2026-11-10 — Key spaces, paged (Jouni's choice): the mount reads the cover's summary
  *     (GET /v1/memory/tab?summary=true), a key space its keys a page at a time and a record its own row
  *     (memory-tab/key-pages.js); the whole list is read once All as keys, Archived, one agent, every
@@ -118,7 +121,11 @@ import { useConfirm } from '/components/Modal.js';
 import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
 import { shortTok } from './memory-tab/helpers.js';
-import { fetchFileBytes, uploadFilesPresigned, userFiles } from './memory-tab/file-helpers.js';
+import { fetchFileBytes, uploadFilesPresigned, userFiles, CONTENT_TEXT_PREFIX } from './memory-tab/file-helpers.js';
+
+/** The files the mount reads, and how many more a press of "show more" adds. */
+const FILES_FIRST = 12;
+const FILES_MORE = 50;
 import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
 import { loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
 import { renderMemoryView } from './memory-tab/cover.js';
@@ -354,18 +361,19 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // (metadata-only) + files + consent + sharing-groups + organism names. loadMemories owns later
   // (dynamic) memory re-fetches on agent/archived change; on failure we fall back to the six loaders.
   async function loadTab() {
-    const ov = await apiGet(`/v1/memory/tab?summary=true&today_from=${encodeURIComponent(todayFrom())}`).then(r => r?.data).catch(err => { swallowed('memory-tab: loadTab', err); return null; });
+    const ov = await apiGet(`/v1/memory/tab?summary=true&today_from=${encodeURIComponent(todayFrom())}&files_limit=${FILES_FIRST}&files_exclude_prefix=${encodeURIComponent(CONTENT_TEXT_PREFIX)}`).then(r => r?.data).catch(err => { swallowed('memory-tab: loadTab', err); return null; });
     if (!ov) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadShares(); loadOrgNames(); return; }
     setAgents(Array.isArray(ov.agents) ? ov.agents : []);
     // memory: the cover's summary, not every key (memory-tab/key-pages.js)
     if (ov.memory?.summary) pages.applySummary(ov.memory);
     else pages.loadSummary();
     setValueCache({});
-    // files
+    // files: the first FILES_FIRST and the count of all of them; "show more" reads the next pages
     const fileList = userFiles(ov.files?.files);
     setFiles(fileList);
+    setFilesTotal(ov.files?.total ?? fileList.length);
     filesLoad.ok();
-    onStats?.({ files: fileList.length });
+    onStats?.({ files: ov.files?.total ?? fileList.length });
     const limitBytes = Number(ov.files?.max_file_size_bytes);
     if (Number.isFinite(limitBytes) && limitBytes > 0) setFileSizeLimitMb(Math.round(limitBytes / 1048576));
     // federation consents + the active-consent set (mirrors loadFedConsents)
@@ -536,17 +544,30 @@ export default function MemoryTab({ session, showToast, onStats }) {
     );
   }
 
+  // The files read again after a change: as many as the page shows, at least the first page.
   async function loadFiles() {
     try {
-      const list = userFiles(await memoryService.listFiles());
-      setFiles(Array.isArray(list) ? list : []);
+      const { files: list, total } = await memoryService.listFilesPage({ limit: Math.max(FILES_FIRST, files?.length || 0), excludePrefix: CONTENT_TEXT_PREFIX });
+      setFiles(userFiles(list));
+      setFilesTotal(total);
       filesLoad.ok();
-      onStats?.({ files: Array.isArray(list) ? list.length : 0 });
+      onStats?.({ files: total });
       // The form used to state a hardcoded "Max 10MB per file". Ask the node instead: an operator who
       // raises quota.storage_max_file_size_mb should see the new number, not be told a smaller lie.
       const mb = await memoryService.fileSizeLimitMb();
       if (mb) setFileSizeLimitMb(mb);
     } catch (err) { swallowed('memory-tab: loadFiles', err); filesLoad.fail(err); }
+  }
+
+  /** The next FILES_MORE files after those shown. */
+  async function loadMoreFiles() {
+    setFilesMoreLoading(true);
+    try {
+      const { files: more, total } = await memoryService.listFilesPage({ limit: FILES_MORE, offset: files?.length || 0, excludePrefix: CONTENT_TEXT_PREFIX });
+      setFiles(prev => [...(prev || []), ...userFiles(more)]);
+      setFilesTotal(total);
+    } catch (err) { swallowed('memory-tab: loadMoreFiles', err); }
+    setFilesMoreLoading(false);
   }
 
   async function handleCreateMemory(key, value, visibility, tags, groupId) {
@@ -722,7 +743,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   const [fileTagFilter, setFileTagFilter] = useState(new Set());
   const [fileFilterText, setFileFilterText] = useState('');
-  const [filesShown, setFilesShown] = useState(12);   // the cover's files, a page at a time (cover.js FILES_MORE)
+  const [filesTotal, setFilesTotal] = useState(null);   // every file, of which `files` holds the pages read
+  const [filesMoreLoading, setFilesMoreLoading] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);   // file being previewed in the lightbox modal
 
   async function doPull(key) {
@@ -794,7 +816,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     memArchived, setMemArchived, showMemForm, setShowMemForm, handleCreateMemory, bulkVis, setBulkVis, applyBulkVis,
     bulkDelete, collapsedGroups, toggleGroupCollapsed, groupLabel, orgNames, deleteGroup,
     // files
-    files, filesShown, setFilesShown, showFileForm, setShowFileForm, handleUploadFiles, fileFilterText, setFileFilterText, fileTagFilter,
+    files, filesTotal, loadMoreFiles, filesMoreLoading, showFileForm, setShowFileForm, handleUploadFiles, fileFilterText, setFileFilterText, fileTagFilter,
     setFileTagFilter, editingFileTags, setEditingFileTags, handleUpdateFileTags, handleUpdateFileVisibility,
     setPreviewFile, handleDownloadFile, handleDeleteFile, fileSizeLimitMb,
     // browse

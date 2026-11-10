@@ -28113,6 +28113,24 @@ paths:
           schema:
             type: boolean
           description: 'When true, return only `{ count }` (no file list) — cheap for stat displays.'
+        - name: exclude_prefix
+          in: query
+          schema:
+            type: string
+          description: Leave out the files whose key starts with this prefix, from the list, `total` and `count`.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: One page of this many files (with `offset`); `total` still counts every file. Echoed with `offset` when given.
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: Files to skip before the page.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -85821,6 +85839,16 @@ paths:
           required: false
           schema: { type: string, format: date-time }
           description: The reader's own start of today, for `summary.changed_today`.
+        - name: files_limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, maximum: 1000 }
+          description: Send only the first this many files; `files.total` counts them all (additive). GET /v1/memory/files pages the rest.
+        - name: files_exclude_prefix
+          in: query
+          required: false
+          schema: { type: string }
+          description: Leave out the files whose key starts with this prefix, from the list and from `files.total`.
       responses:
         '200':
           description: The Memory tab composite

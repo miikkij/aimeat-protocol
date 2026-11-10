@@ -13,6 +13,8 @@
  * @structure MemoryTabService.overview(reader, ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
  * @usage const m = await createMemoryTabService(config, storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.6.0 — 2026-11-10 — `filesLimit` and `filesExcludePrefix` (additive): the first files and the count
+ *     of all of them, not every file (365 kB of the page's 515 kB at 1 700 files).
  *   v1.5.0 — 2026-11-10 — `summary` (additive): the memory section carries the cover's summary
  *     (memory-tab-summary.ts) and no rows, 6.4 MB less at a heavy account's size; without it the answer
  *     is unchanged.
@@ -65,7 +67,7 @@ export class MemoryTabService {
    * (owner-scope: GHII + agents + eco apps, via MemoryDbService — the same set the standalone endpoint
    * returns), so a large keyspace never loads a single value.
    */
-  overview(reader: ContentReader, ownerName: string, ownerGhii: string, opts: { summary?: boolean; todayFrom?: string } = {}): Promise<MemoryTabOverview> {
+  overview(reader: ContentReader, ownerName: string, ownerGhii: string, opts: { summary?: boolean; todayFrom?: string; filesLimit?: number; filesExcludePrefix?: string } = {}): Promise<MemoryTabOverview> {
     return runInReadScope(async () => {
       // The scope's copy, which listOwnerScopeMeta's identity set reads too.
       const agents = await loadOwnerAgents(this.storage, ownerName);
@@ -133,7 +135,12 @@ export class MemoryTabService {
         memory,
         // The tab states the upload limit from this number. Hardcoding it in the form is how it
         // came to say "Max 10MB per file" on a node configured for 50.
-        files: { files: fileRows, total: fileRows.length, max_file_size_bytes: this.config.storageMaxFileSizeMb * 1024 * 1024 },
+        // filesExcludePrefix and filesLimit (additive) hand the page its first files and the count of
+        // all of them; GET /v1/memory/files pages the rest.
+        files: (() => {
+          const kept = opts.filesExcludePrefix ? fileRows.filter(f => !String(f.key).startsWith(opts.filesExcludePrefix!)) : fileRows;
+          return { files: opts.filesLimit !== undefined ? kept.slice(0, opts.filesLimit) : kept, total: kept.length, max_file_size_bytes: this.config.storageMaxFileSizeMb * 1024 * 1024 };
+        })(),
         consents: { consents: consentRows, total: consentRows.length },
         groups: { groups: groupList },
         organisms: { organisms },

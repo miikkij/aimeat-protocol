@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.34.0 -- 2026-11-10 -- Files counts every file (ctx.filesTotal) and "show N more" reads the next page from the server; the mount carries the first 12 files, not all of them.
  *   v1.33.0 -- 2026-11-10 -- The cover reads the server's summary until the page has the whole list (storeOf, classifySummary): the same words, without every key. A key space without the list shows its keys a page at a time with "show N more", in the server's order; a record finds its row through memory-tab/key-pages.js. Files shows its first 12 files and "show N more" adds 50 (FILES_MORE): every file at once was 25 507 of the cover's 26 121 elements at 1 700 files.
  *   v1.32.0 -- 2026-11-09 -- Sorting by time parses each key's date once (a WeakMap), and classify() reuses its last result for the same list: 1.6 s less main-thread time per render at 20 000 keys. Nothing on screen changes.
  *   v1.31.0 -- 2026-11-08 --The import's choice of what happens to a key that already exists has its
@@ -119,8 +120,9 @@ export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents',
 
 const STALE_DAYS = 90;
 const TABLE_ROWS = 12;   // a table shows this many key spaces before asking for the rest
-// The files on the cover: the first TABLE_ROWS, then this many more a press. Every file drawn at
-// once was 25 507 of the cover's 26 121 elements at 1 700 files (measured 2026-11-10).
+// The files on the cover: the first page the mount read, then this many more a press, read from the
+// server (memory-tab.js loadMoreFiles). Every file drawn at once was 25 507 of the cover's 26 121
+// elements at 1 700 files (measured 2026-11-10).
 const FILES_MORE = 50;
 const c = (key, fb) => tr('profile.memory.cover.' + key, fb);
 /** "1 key", "12 keys", in the language's plural form; `shown` is the number as written (num()). */
@@ -367,7 +369,9 @@ function renderCover(ctx) {
   const nOwn = sec('mp-own', c('own', 'Mine'), ownCount);
   const nOrg = sec('mp-org', c('orgs', 'Organisms’'), orgCount);
   const nSys = sec('mp-sys', c('sys', 'The machine’s bookkeeping'), sysCount, () => setSysOpen(true));
-  const nFiles = sec('mp-files', c('files', 'Files'), (files || []).length);
+  // Every file, of which the page has read the first pages (memory-tab.js loadMoreFiles).
+  const filesCount = ctx.filesTotal ?? (files || []).length;
+  const nFiles = sec('mp-files', c('files', 'Files'), filesCount);
   const nHist = sec('mp-history', c('happened', 'What has happened'), '→');
   const nStale = sec('mp-stale', c('stale', 'Stale'), stale.count);
   const nSeen = sec('mp-seen', c('seen', 'Who else sees'), seenRows.length);
@@ -442,11 +446,12 @@ function renderCover(ctx) {
         ${cls.sys.length ? spaceTable(ctx, cls.sys, { head: false, id: 'sys' }) : none()}
       <//>
 
-      <${Section} id="mp-files" num=${nFiles} title=${c('files', 'Files')} count=${(files || []).length}
+      <${Section} id="mp-files" num=${nFiles} title=${c('files', 'Files')} count=${filesCount}
         doors=${html`<${Action} small onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); setTimeout(() => scrollToSection('mp-files'), 30); }}>${c('upload', 'Upload a file')}<//>`}>
-        ${files ? fileRows(ctx, files.slice(0, ctx.filesShown)) : (ctx.filesFailed ? html`<${LoadFailed} onRetry=${ctx.loadFiles} />` : html`<${Note} kind="loading" />`)}
-        ${files && files.length > ctx.filesShown ? html`<${More} label=${c('showMoreFiles', 'show {n} more').replace('{n}', String(Math.min(FILES_MORE, files.length - ctx.filesShown)))}
-          onMore=${() => ctx.setFilesShown(k => k + FILES_MORE)} />` : null}
+        ${files ? fileRows(ctx, files) : (ctx.filesFailed ? html`<${LoadFailed} onRetry=${ctx.loadFiles} />` : html`<${Note} kind="loading" />`)}
+        ${files && files.length < filesCount ? html`<${More} disabled=${ctx.filesMoreLoading}
+          label=${ctx.filesMoreLoading ? (t('common.loading') || 'Loading…') : c('showMoreFiles', 'show {n} more').replace('{n}', String(Math.min(FILES_MORE, filesCount - files.length)))}
+          onMore=${() => ctx.loadMoreFiles()} />` : null}
       <//>
 
       <${Section} id="mp-history" num=${nHist} title=${c('happened', 'What has happened')}

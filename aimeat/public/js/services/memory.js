@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description AIMEAT Memory Service — key-value memory CRUD, search, file management.
  * @version-history
+ *   2026-11-10 — listFilesPage: one page of the stored files.
  *   2026-11-10 — listMemoriesMetaPage: one page of a key space (prefix, sort, offset, limit).
  *   v1.1.0 — 2026-06-10 — Add getMemory(key) single-entry read (GET /v1/memory/:key).
  *   v1.2.0 — 2026-06-21 — getMemory(key, { soft }) — optional ?soft=1 read returning 200/null
@@ -231,6 +232,20 @@ export async function listFiles() {
   const data = await apiGet('/v1/memory/files');
   const list = data?.data?.files || data?.data || [];
   return Array.isArray(list) ? list : [];
+}
+
+/**
+ * One page of the stored files: `limit` from `offset`, the files under `excludePrefix` left out.
+ * Returns the page and how many files there are in all.
+ * @param {{ limit: number, offset?: number, excludePrefix?: string }} opts
+ */
+export async function listFilesPage(opts) {
+  const q = new URLSearchParams({ limit: String(opts.limit) });
+  if (opts.offset) q.set('offset', String(opts.offset));
+  if (opts.excludePrefix) q.set('exclude_prefix', opts.excludePrefix);
+  const data = await apiGet('/v1/memory/files?' + q.toString());
+  const list = data?.data?.files;
+  return { files: Array.isArray(list) ? list : [], total: data?.data?.total ?? 0 };
 }
 
 /** The node's per-file limit in MB, so the upload form can state the real number instead of a

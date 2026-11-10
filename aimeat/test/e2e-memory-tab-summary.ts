@@ -10,6 +10,8 @@
  *   caller without a token is refused, and one owner's summary holds nothing of another's.
  *   At a heavy account's size the full answer was 6.4 MB on every mount (performance work 2026-11).
  * @version-history
+ *   v1.1.0 — 2026-11-10 — Files a page at a time: files_limit and files_exclude_prefix on the mount,
+ *     limit, offset and exclude_prefix on GET /v1/memory/files, paging reaches every file once.
  *   v1.0.0 — 2026-11-10 — Initial.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -136,6 +138,30 @@ await test('A key space a page at a time: sort and offset reach every key once',
   assert(times.every((t: string, i: number) => i === 0 || times[i - 1] >= t), 'newest change first');
 });
 
+await test('Files a page at a time: the mount carries the first ones and the count of all, the listing pages the rest', async () => {
+  for (const name of ['a', 'b', 'c']) {
+    const f = await json('/v1/memory/files', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${SPACE}/file-${name}.txt`, content: Buffer.from(`file ${name}`).toString('base64'), mime_type: 'text/plain', visibility: 'private' }) });
+    assert(f.status === 201, `upload ${name}: ${f.status} ${JSON.stringify(f.body.error ?? '')}`);
+  }
+  const hidden = await json('/v1/memory/files', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `contentclass-text/${SPACE}.txt`, content: Buffer.from('words').toString('base64'), mime_type: 'text/plain', visibility: 'private' }) });
+  assert(hidden.status === 201, `upload the excluded one: ${hidden.status}`);
+  const all = await json('/v1/memory/files', { headers: auth(A.token) });
+  const every: string[] = all.body.data.files.map((f: any) => f.key);
+  assert(all.body.data.total === every.length && every.includes(`contentclass-text/${SPACE}.txt`) && !('limit' in all.body.data), 'without the new parameters the answer is every file');
+  const wanted = every.filter(k => !k.startsWith('contentclass-text/'));
+  const mount = await json(`/v1/memory/tab?summary=true&files_limit=2&files_exclude_prefix=${encodeURIComponent('contentclass-text/')}`, { headers: auth(A.token) });
+  assert(mount.body.data.files.files.length === 2 && mount.body.data.files.total === wanted.length, `mount: ${mount.body.data.files.files.length} of ${mount.body.data.files.total}, want 2 of ${wanted.length}`);
+  const walked: string[] = mount.body.data.files.files.map((f: any) => f.key);
+  for (let offset = 2; offset < wanted.length; offset += 2) {
+    const page = await json(`/v1/memory/files?limit=2&offset=${offset}&exclude_prefix=${encodeURIComponent('contentclass-text/')}`, { headers: auth(A.token) });
+    assert(page.body.data.offset === offset && page.body.data.total === wanted.length, `page at ${offset}: ${JSON.stringify(page.body.data).slice(0, 200)}`);
+    walked.push(...page.body.data.files.map((f: any) => f.key));
+  }
+  assert(walked.join() === wanted.join(), `paging reaches every file once, in order: ${walked.join()} vs ${wanted.join()}`);
+  const other = await json(`/v1/memory/files?limit=50&exclude_prefix=${encodeURIComponent('contentclass-text/')}`, { headers: auth(B.token) });
+  assert(!other.body.data.files.some((f: any) => String(f.key).startsWith(`${SPACE}/`)), "another owner's page holds none of the owner's files");
+});
+
 await test('An unreadable today_from counts nothing as changed today, and the summary refuses without a token', async () => {
   const r = await json('/v1/memory/tab?summary=true&today_from=yesterday', { headers: auth(A.token) });
   assert(r.status === 200 && r.body.data.memory.summary.changed_today === 0, `changed_today ${r.body.data?.memory?.summary?.changed_today}`);
@@ -159,6 +185,10 @@ await test('Clean up: the written keys are deleted', async () => {
   for (const key of ['alpha', 'bravo', 'charlie', 'delta', 'echo'].map(k => `${SPACE}.${k}`).concat(`nodot${stamp}`)) {
     const r = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(A.token) });
     assert(r.status === 200 || r.status === 204, `delete ${key}: ${r.status}`);
+  }
+  for (const key of ['a', 'b', 'c'].map(n => `${SPACE}/file-${n}.txt`).concat(`contentclass-text/${SPACE}.txt`)) {
+    const r = await json(`/v1/memory/files/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(r.status === 200 || r.status === 204, `delete file ${key}: ${r.status}`);
   }
 });
 

@@ -7,6 +7,7 @@
  *   under src/routes/memory/ (crud, bulk, federation, files, key); this file wires
  *   them onto one router in registration order (Express matches top-to-bottom).
  * @version-history
+ *   v1.15.1 -- 2026-11-10 -- GET /v1/memory/tab takes files_limit and files_exclude_prefix (additive).
  *   v1.15.0 -- 2026-11-10 -- GET /v1/memory/tab takes summary=true and today_from (additive): the cover's
  *     summary instead of every key row (services/db/memory-tab-summary.ts).
  *   v1.14.0 -- 2026-11-09 -- GET /v1/memory/history/:key (routes/memory/history.ts): a record's kept
@@ -94,7 +95,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const todayFrom = typeof req.query.today_from === 'string' && Number.isFinite(Date.parse(req.query.today_from))
       ? new Date(Date.parse(req.query.today_from)).toISOString() : undefined;
     const data = await memoryTabDb.overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${config.nodeId}`,
-      { summary: req.query.summary === 'true', todayFrom });
+      {
+        summary: req.query.summary === 'true', todayFrom,
+        filesLimit: req.query.files_limit !== undefined ? Math.min(1000, Math.max(0, parseInt(req.query.files_limit as string, 10) || 0)) : undefined,
+        filesExcludePrefix: typeof req.query.files_exclude_prefix === 'string' && req.query.files_exclude_prefix ? req.query.files_exclude_prefix : undefined,
+      });
     res.json(success(config.nodeId, data));
   });
 

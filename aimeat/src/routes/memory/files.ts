@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 -- 2026-11-10 -- GET /v1/memory/files takes exclude_prefix, limit and offset (additive): the
+ *     Memory page reads its files a page at a time instead of all of them.
  *   v1.15.3 -- 2026-11-09 -- GET /v1/memory/files lists the owner's and every agent's files in one IN
  *     query (listStorageFilesForOwners), in the same order: 81 queries at 79 agents before.
  *   v1.15.2 -- 2026-11-08 -- GET /v1/memory/files/:key asks the labels a data package version keeps, as
@@ -361,6 +363,12 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       files = await storage.listStorageFiles(req.auth!.sub);
     }
 
+    // Additive, for the Memory page: exclude_prefix leaves out the files under one key prefix (the
+    // content class pipeline's own text files), and limit/offset hand out a page. `total` counts
+    // every file that matched; without the parameters the answer is what it was.
+    const excludePrefix = typeof req.query.exclude_prefix === 'string' ? req.query.exclude_prefix : '';
+    if (excludePrefix) files = files.filter(f => !f.key.startsWith(excludePrefix));
+
     if (req.query.count === 'true') {
       res.json(success(config.nodeId, {
         count: files.length,
@@ -369,8 +377,14 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    const total = files.length;
+    const limit = req.query.limit !== undefined ? Math.min(1000, Math.max(1, parseInt(req.query.limit as string, 10) || 1)) : undefined;
+    const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+    const page = limit !== undefined || offset ? files.slice(offset, limit !== undefined ? offset + limit : undefined) : files;
+
     res.json(success(config.nodeId, {
-      files: files.map(f => ({
+      ...(limit !== undefined || offset ? { limit: limit ?? null, offset } : {}),
+      files: page.map(f => ({
         key: f.key,
         owner_gaii: f.ownerGaii,
         size: f.size,
@@ -381,7 +395,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
         // Where the bytes are: `database`, `node:<name>` or `own:<name>`.
         store: choiceIdOf(parseBlobRef(f.blobRef)?.storeId),
       })),
-      total: files.length,
+      total,
       // So a client can state the REAL limit instead of a hardcoded one. The upload form said
       // "Max 10MB per file" on a node configured for 50, which is the same lie from the other side
       // as the 10 MB the MCP tool used to mint.

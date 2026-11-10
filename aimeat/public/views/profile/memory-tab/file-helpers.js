@@ -8,6 +8,7 @@
  * @version-history
  *   v1.3.0 — 2026-10-30 — uploadFilesPresigned(…, store): the store the person picked; a store refusal in
  *     their words (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
+ *   v1.3.0 — 2026-11-10 — CONTENT_TEXT_PREFIX, for the paged file reads that leave those files out.
  *   v1.2.0 — 2026-10-21 — userFiles(): the Files list leaves out the content class pipeline's text files.
  *   v1.1.0 — 2026-07-31 — uploadFilesPresigned(): the Files tab's upload loop, moved here whole.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
@@ -26,8 +27,11 @@ import { refusalWords } from '../storage/store-words.js';
  * @param {unknown} list @returns {any[]}
  */
 export function userFiles(list) {
-  return Array.isArray(list) ? list.filter((f) => !String(f?.key || f?.name || '').startsWith('contentclass-text/')) : [];
+  return Array.isArray(list) ? list.filter((f) => !String(f?.key || f?.name || '').startsWith(CONTENT_TEXT_PREFIX)) : [];
 }
+
+/** The key prefix of those text files, which the paged reads ask the server to leave out. */
+export const CONTENT_TEXT_PREFIX = 'contentclass-text/';
 
 export function fileIcon(type) {
   if (type?.startsWith('image')) return '\u{1F5BC}️';
