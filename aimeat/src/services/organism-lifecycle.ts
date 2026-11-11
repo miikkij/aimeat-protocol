@@ -31,6 +31,8 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-11-11 — releaseOrganismLinks unlinks the SSO connections with one scoped update
+ *     (storage.unlinkSsoConnectionsOfOrganism) and no longer reads every connection of the node.
  *   2026-11-11 — releaseOrganismLinks: an organism delete detaches the organism's own remote MCP
  *     servers with their personal sign-ins and unlinks the SSO connections that joined people to it.
  *   2026-10-18 — Create and update refuse a visibility wider than the organism's label allows with
@@ -621,11 +623,6 @@ export async function releaseOrganismLinks(
     await detachMcpServer(storage, server);
     mcpServers++;
   }
-  let ssoConnections = 0;
-  for (const conn of await storage.listSsoConnections()) {
-    if (conn.organismId !== organismId) continue;
-    await storage.updateSsoConnection(conn.id, { organismId: null });
-    ssoConnections++;
-  }
+  const ssoConnections = await storage.unlinkSsoConnectionsOfOrganism(organismId);
   return { mcpServers, ssoConnections };
 }

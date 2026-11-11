@@ -5,9 +5,11 @@
  * @description SQLite implementation of SsoConnectionRepository (BR-04): CRUD over
  *   `sso_connections` with JSON serialization of domains and the saml block, plus the SCIM
  *   bearer-hash auth read (unique partial index).
- * @structure ssoConnectionMethods — create / get / list / update / delete / getByScimTokenHash
+ * @structure ssoConnectionMethods — create / get / list / update / delete / unlinkOfOrganism /
+ *   getByScimTokenHash
  * @usage Object.assign(SqliteStorage.prototype, ssoConnectionMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-11 — unlinkSsoConnectionsOfOrganism.
  *   v1.0.0 — 2026-08-23 — Initial (BR-04 phase 1).
  */
 import type { SsoConnectionRecord, SsoConnectionSaml } from '../../../interface.js';
@@ -90,6 +92,11 @@ export const ssoConnectionMethods = {
 
   async deleteSsoConnection(this: SqliteStorage, id: string): Promise<boolean> {
     return this.db.prepare('DELETE FROM sso_connections WHERE id = ?').run(id).changes > 0;
+  },
+
+  async unlinkSsoConnectionsOfOrganism(this: SqliteStorage, organismId: string): Promise<number> {
+    return this.db.prepare('UPDATE sso_connections SET organismId = NULL, updatedAt = ? WHERE organismId = ?')
+      .run(new Date().toISOString(), organismId).changes;
   },
 
   async getSsoConnectionByScimTokenHash(this: SqliteStorage, hash: string): Promise<SsoConnectionRecord | null> {

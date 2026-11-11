@@ -18,12 +18,15 @@
  *     - another organism's rows, revisions, invitations and approvals stay;
  *     - deleteWorkspaceRowsOf(org, ws) removes one workspace's rows and revisions and keeps the
  *       organism's other workspace;
- *     - deleteWorkspaceRowsOf(org) with no workspace removes every workspace's rows of that organism.
+ *     - deleteWorkspaceRowsOf(org) with no workspace removes every workspace's rows of that organism;
+ *     - unlinkSsoConnectionsOfOrganism(org) clears the organism on the SSO connections that name it,
+ *       keeps the connections, and leaves another organism's connection and an unlinked one alone.
  *
  *   Runs SQLite always and Postgres when DATABASE_URL is set (AIMEAT_CONFORMANCE_REQUIRE_POSTGRES=true
  *   makes a missing DATABASE_URL a failure).
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance-organism-delete.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-11 — The SSO unlink of an organism delete, on both providers.
  *   v1.0.0 — 2026-11-11 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -31,7 +34,7 @@ import { randomUUID } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type {
-  Storage, OrganismRecord, WorkspaceRowRecord, WorkspaceRowRevision, PendingApprovalRecord,
+  Storage, OrganismRecord, WorkspaceRowRecord, WorkspaceRowRevision, PendingApprovalRecord, SsoConnectionRecord,
 } from '../../src/storage/interface.js';
 import type { InvitationRecord } from '../../src/storage/repositories/invitation.repository.js';
 
@@ -45,6 +48,8 @@ interface Provider { name: string; storage: Storage }
 const provs: Provider[] = [];
 /** The organisms this run made, removed at the end so a shared Postgres database keeps nothing. */
 const madeOrgs: string[] = [];
+/** The SSO connections this run made, removed at the end for the same reason. */
+const madeSso: string[] = [];
 
 beforeAll(async () => {
   if (REQUIRE_POSTGRES && !PG_URL) throw new Error('Postgres conformance requires DATABASE_URL.');
@@ -59,6 +64,7 @@ afterAll(async () => {
       await storage.deleteWorkspaceRowsOf(id).catch(() => undefined);
       await storage.deleteOrganism(id).catch(() => false);
     }
+    for (const id of madeSso) await storage.deleteSsoConnection(id).catch(() => false);
     await (storage as unknown as { close?: () => void | Promise<void> }).close?.();
   }
   for (const suffix of ['', '-wal', '-shm']) {
@@ -120,6 +126,18 @@ async function seedApproval(storage: Storage, organismId: string): Promise<strin
     id, organismId, actor: `bot#alice@${NODE}`, action: 'egress', arguments: { to: 'carol@example.com' },
     risk: 'medium', approverRole: 'owner', status: 'pending', createdAt: t, updatedAt: t,
   } as PendingApprovalRecord);
+  return id;
+}
+
+async function seedSso(storage: Storage, organismId: string | null): Promise<string> {
+  const id = `sso-${randomUUID()}`;
+  madeSso.push(id);
+  const t = now();
+  const rec: SsoConnectionRecord = {
+    id, name: 'Company sign-in', organismId, domains: ['example.com'], saml: null,
+    allowIdpInitiated: false, loginVisibility: 'listed', createdBy: `alice@${NODE}`, createdAt: t, updatedAt: t,
+  };
+  await storage.createSsoConnection(rec);
   return id;
 }
 
@@ -195,5 +213,29 @@ describe.each([['sqlite'], ['postgres-kysely']])('organism and workspace delete 
     expect(await rowCount(storage, org, 'ws-b')).toBe(0);
     expect(await rowCount(storage, other, 'ws-a')).toBe(1);
     expect(await revisionCount(storage, other, 'ws-a', 'o1')).toBe(1);
+  });
+
+  it('unlinkSsoConnectionsOfOrganism clears the link on that organism\'s connections, keeps them, and leaves every other connection as it was', async () => {
+    if (!p()) return;
+    const { storage } = p()!;
+    const gone = await makeOrganism(storage);
+    const kept = await makeOrganism(storage);
+    const first = await seedSso(storage, gone);
+    const second = await seedSso(storage, gone);
+    const other = await seedSso(storage, kept);
+    const unlinked = await seedSso(storage, null);
+
+    expect(await storage.unlinkSsoConnectionsOfOrganism(gone)).toBe(2);
+
+    for (const id of [first, second]) {
+      const after = await storage.getSsoConnection(id);
+      expect(after).not.toBeNull();
+      expect(after?.organismId ?? null).toBeNull();
+      expect(after?.domains).toEqual(['example.com']);
+    }
+    expect((await storage.getSsoConnection(other))?.organismId).toBe(kept);
+    expect((await storage.getSsoConnection(unlinked))?.organismId ?? null).toBeNull();
+    // A second call finds nothing left to change.
+    expect(await storage.unlinkSsoConnectionsOfOrganism(gone)).toBe(0);
   });
 });

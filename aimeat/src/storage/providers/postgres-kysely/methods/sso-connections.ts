@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Postgres implementation of SsoConnectionRepository (BR-04): CRUD over
  *   "SsoConnection" plus the SCIM bearer-hash auth read (unique partial index).
- * @structure ssoConnectionMethods — create / get / list / update / delete / getByScimTokenHash
+ * @structure ssoConnectionMethods — create / get / list / update / delete / unlinkOfOrganism /
+ *   getByScimTokenHash
  * @usage Object.assign(PostgresKyselyStorage.prototype, ssoConnectionMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-11 — unlinkSsoConnectionsOfOrganism.
  *   v1.0.0 — 2026-08-23 — Initial (BR-04 phase 1).
  */
 import type { Selectable } from 'kysely';
@@ -91,6 +93,13 @@ export const ssoConnectionMethods = {
   async deleteSsoConnection(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const result = await this.db.deleteFrom('SsoConnection').where('id', '=', id).executeTakeFirst();
     return Number(result.numDeletedRows ?? 0) > 0;
+  },
+
+  async unlinkSsoConnectionsOfOrganism(this: PostgresKyselyStorage, organismId: string): Promise<number> {
+    const result = await this.db.updateTable('SsoConnection')
+      .set({ organismId: null, updatedAt: new Date() })
+      .where('organismId', '=', organismId).executeTakeFirst();
+    return Number(result.numUpdatedRows ?? 0);
   },
 
   async getSsoConnectionByScimTokenHash(this: PostgresKyselyStorage, hash: string): Promise<SsoConnectionRecord | null> {
