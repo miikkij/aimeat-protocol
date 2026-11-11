@@ -20,6 +20,8 @@
  *   - the draft write's refusal carries the rule's own code and reason
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-attached-agent-access.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-11 — A member's agent that a "listed" organism does not admit hears the
+ *     organism's refusal on an extension's workspace read, not "Not an active member".
  *   v1.0.0 — 2026-11-10 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -163,6 +165,27 @@ describe('the doors an agent writes through', () => {
         });
         await expect(cap.workspace.write(ORG, WS, 'contact', 'c2', { id: 'c2', name: 'Bert' })).resolves.toBeTruthy();
         expect(cap.lastRefusal()).toBeNull();
+    });
+
+    it('an admin\'s agent that a "listed" organism does not admit is told so on an extension\'s workspace read, not "Not an active member"', async () => {
+        // 2026-11-11: an organism admin's own agent ran an extension action that reads the workspace
+        // (ctx.workspace.index) and heard "Not an active member of this organism", although its
+        // owner is an active admin; the agent was simply not on the organism's list.
+        const cap = () => buildExtensionWorkspace({
+            config, storage, extName: 'pipeline', actionId: 'status',
+            declaration: { read: true, write: true, rows: false }, installer: 'alice',
+            caller: { gaii: agentOf('alice', 'helper'), owner: 'alice', roles: ['agent'], scopes: ['memory:write', 'organism:read'] },
+            reachesModel: false,
+        });
+        await setAccess('listed');
+        const refused = cap();
+        const err = await refused.workspace.index(ORG, WS).then(() => null, (e: unknown) => String(e instanceof Error ? e.message : e));
+        expect(err).toContain('admits only the agents');
+        expect(err).not.toContain('Not an active member');
+        expect(refused.lastRefusal()?.status).toBe(403);
+        // Under "all" the same agent reads as its owner does.
+        await setAccess('all');
+        await expect(cap().workspace.index(ORG, WS)).resolves.toBeTruthy();
     });
 
     it('a refused draft write carries the rule\'s own code and reason', async () => {

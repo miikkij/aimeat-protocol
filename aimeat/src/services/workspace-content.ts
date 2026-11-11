@@ -21,6 +21,9 @@
  *   const got = await loadWorkspaceContent({ storage, config }, reader, { sub, ownerName, accessorGaii }, { organismId, ws });
  *   if (!got.ok) return refuse(got.status, got.code, got.message);
  * @version-history
+ *   2026-11-11 — An agent the organism does not admit hears the organism's own refusal
+ *     (agentBarredMessage), not "Not an active member of this organism": the admin's own agent was
+ *     refused an extension action's workspace read that way, and the owner is a member.
  *   2026-11-08 — Every value it hands out (`items` and `hydrate`) passes the credential mask
  *     (shownMemoryValue), as presentMemories does: the share record's password and calendar key hashes
  *     read as has_password and has_ics_key (secaudit2026nov08 round 14,
@@ -41,6 +44,7 @@ import type { Storage, MemoryRecord, OrganismRecord } from '../storage/interface
 import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
 import type { AimeatConfig } from '../config.js';
 import { decideWorkspaceRead } from './workspace-access.js';
+import { agentBarred, agentBarredMessage } from './organism-agent-access.js';
 import { workspaceMetaReader, type WorkspaceMetaReader } from './workspace-meta.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
@@ -142,7 +146,13 @@ export async function loadWorkspaceContent(
   const meta = ws ? workspaceMetaReader(storage, organism.id, config.nodeId) : null;
   const manifest = meta ? await whole(await meta.pick(ws!, 'meta.manifest', loaded)) : (loaded.find(r => r.key === `${root}meta.manifest`) ?? null);
   const decision = await decideWorkspaceRead(storage, config, organism, who.sub, who.ownerName, who.accessorGaii, ws, { manRec: manifest });
-  if (!decision.member) return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Not an active member of this organism' };
+  if (!decision.member) {
+    // An agent the organism does not admit (agentAccess 'listed', not on its list) is refused here as
+    // a non-member, and it hears why: its owner can be an active member, admin included, and "Not an
+    // active member" sent that owner looking at the wrong setting (2026-11-11).
+    const message = who.sub && agentBarred(organism, who.sub) ? agentBarredMessage(organism, who.sub) : 'Not an active member of this organism';
+    return { ok: false, status: 403, code: 'ACCESS_DENIED', message };
+  }
 
   const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
   const items = decision.canRead ? (await reader.show(loaded, target)).map(masked) : [];
