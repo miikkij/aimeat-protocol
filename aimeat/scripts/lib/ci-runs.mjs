@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description What GitHub Actions says about main: the CI workflow's state, the nightly sweep's
  *   state, and the runs of one commit. Read through the public REST API with fetch, so it needs no
- *   `gh` CLI and no token (a GH_TOKEN or GITHUB_TOKEN in the environment is used when present).
+ *   `gh` CLI and no token; a GH_TOKEN or GITHUB_TOKEN in the environment is used when present, and
+ *   otherwise the signed-in `gh` CLI's token (githubToken), so the reads count against the
+ *   account's 5 000 an hour instead of the IP address's shared 60.
  *
  *   WHY. CI on main ran after every push and its answer reached nobody: it was red on 236 runs in a
  *   row from 2026-10-02, across the 4.0.0 release, because the rule is never to wait for GitHub and
@@ -19,10 +21,12 @@
  *
  *   TESTS. AIMEAT_CI_API_FIXTURE names a JSON file whose keys are API paths (without the query) and
  *   whose values are the answers, so the hook's output is testable with no network.
- * @structure repoSlug() · cachePath() · apiGet() · summarise() · readCiState() · describeState() ·
- *   runsForCommit()
+ * @structure repoSlug() · cachePath() · githubToken() · apiGet() · summarise() · readCiState() ·
+ *   describeState() · runsForCommit()
  * @usage import { readCiState, describeState } from './lib/ci-runs.mjs';
  * @version-history
+ *   v1.1.0 -- 2026-11-11 -- githubToken: the `gh` CLI's token when the environment has none, after the
+ *     unauthenticated limit of 60 an hour refused a release check with 403.
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W07: P2-01, P4-01, P8-01, P2-03; W08: P2-02, P6-01, S9-04).
  */
 import { execFileSync } from 'node:child_process';
@@ -64,6 +68,27 @@ export function cachePath(cwd = process.cwd()) {
     }
 }
 
+/** @type {string | null | undefined} undefined until the first read; null when there is none. */
+let ghCliToken;
+
+/**
+ * The token for the REST API: GH_TOKEN or GITHUB_TOKEN, else the signed-in `gh` CLI's token, read
+ * once per process. Without one, GitHub allows 60 requests an hour per IP address, which every
+ * session start, `pnpm gate` and release check on the machine share; on 2026-11-11 that limit ran
+ * out and `npm publish` was refused with 403. Null when neither is there: the request goes
+ * unauthenticated as before.
+ */
+export function githubToken() {
+    const env = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+    if (env) return env;
+    if (ghCliToken === undefined) {
+        try {
+            ghCliToken = execFileSync('gh', ['auth', 'token'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).trim() || null;
+        } catch { ghCliToken = null; /* no gh, or not signed in: the request goes unauthenticated */ }
+    }
+    return ghCliToken;
+}
+
 /**
  * One GET against the REST API. Answers the parsed body, or throws with a short reason.
  * @param {string} path  e.g. /repos/o/r/actions/runs/1/jobs
@@ -79,7 +104,7 @@ export async function apiGet(path, query = '') {
     }
     /** @type {Record<string, string>} */
     const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'aimeat-ci-state', 'X-GitHub-Api-Version': '2022-11-28' };
-    const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+    const token = githubToken();
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`https://api.github.com${path}${query ? `?${query}` : ''}`, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`GitHub answered ${res.status} for ${path}`);
