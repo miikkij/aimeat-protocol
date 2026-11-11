@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-11 — DELETE /v1/organisms/:id/workspace also removes the rows and row revisions of the
+ *     workspace (all of the organism's without ?ws=) and answers how many (`rows`, `rowRevisions`).
  *   2026-11-04 — No per-key delete loop for a storage without deleteMemoryByPrefix: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.25.0 -- 2026-10-27 -- POST /v1/organisms/:id/workspaces checks its body with validateBody
@@ -680,7 +682,11 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const memoryKeys = await storage.deleteMemoryByPrefix(prefix);
     let schemas = 0;
     for (const s of await storage.listSchemas(prefix)) { if (await storage.deleteSchema(s.keyPattern)) schemas++; }
-    res.json(success(config.nodeId, { deleted: true, memoryKeys, schemas }));
+    // The rows of its row spaces and their kept revisions go too: they live outside memory, and
+    // every row route needs the manifest deleted above, so a row left here could never be read or
+    // deleted again and would show up in a later workspace with the same id (incident 2026-10-23).
+    const rows = await storage.deleteWorkspaceRowsOf(id, ws);
+    res.json(success(config.nodeId, { deleted: true, memoryKeys, schemas, rows: rows.rows, rowRevisions: rows.revisions }));
     emitChange('organisms');
     if (ws) void updateOrganismStructure(storage, config, id, { event: 'workspace deleted', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('DELETE /v1/organisms/:id/workspace: timeline best-effort', { error: String(err) }); });
   });

@@ -7,6 +7,7 @@
  * @structure workspaceRowMethods
  * @usage Object.assign(SqliteStorage.prototype, workspaceRowMethods) in ../index.ts
  * @version-history
+ *   v1.3.0 — 2026-11-11 — deleteWorkspaceRowsOf (the workspace delete route and the organism delete).
  *   v1.2.0 — 2026-10-22 — getWorkspaceRowsByIds and the row revision methods (secaudit 2026-10, v80).
  *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -86,5 +87,10 @@ export const workspaceRowMethods = {
     this: SqliteStorage, organismId: string, wsId: string, namespace: string, before: string, keepPerRow: number,
   ): Promise<number> {
     return revisionRepo.pruneWorkspaceRowRevisions(this.db, organismId, wsId, namespace, before, keepPerRow);
+  },
+  async deleteWorkspaceRowsOf(
+    this: SqliteStorage, organismId: string, wsId?: string,
+  ): Promise<{ rows: number; revisions: number }> {
+    return revisionRepo.deleteWorkspaceRowsOf(this.db, organismId, wsId);
   },
 };

@@ -48121,7 +48121,10 @@ paths:
       description: |
         Delete an organism. Only an owner of the organism can delete it.
         This removes all memberships, the associated board and every record keyed under the
-        organism, every member's included. Nothing goes to the deleted-memory bin, so an agent or
+        organism, every member's included, and the rows of its workspaces' row spaces with their
+        kept revisions, its invitations and its pending approvals. Its finance records and sent
+        mail keep their organism id, because bookkeeping and sent mail have retention duties of
+        their own. Nothing goes to the deleted-memory bin, so an agent or
         app token needs `memory:purge` beside `organism:write`: deleting an organism is consented
         separately from changing one.
       tags: [Organisms]
@@ -48535,6 +48538,9 @@ paths:
         "no workspace yet". Creator/admin only. The deliberate typed-confirmation lives in the UI.
         An agent needs `memory:purge` beside `organism:write`, because nothing of it can be
         restored; an agent holding `memory:purge` has every task wait for the owner.
+        The rows of the workspace's row spaces and their kept revisions are removed with it (every
+        workspace's rows of the organism when `ws` is omitted), so a later workspace with the same
+        id starts empty.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -48555,7 +48561,7 @@ paths:
             The client also removes the entry from `organism.{id}.meta.workspaces`.
       responses:
         '200':
-          description: Workspace deleted (counts of removed keys/schemas)
+          description: Workspace deleted (counts of removed keys, schemas, rows and row revisions)
           content:
             application/json:
               schema:
@@ -48572,6 +48578,12 @@ paths:
                             type: integer
                           schemas:
                             type: integer
+                          rows:
+                            type: integer
+                            description: Rows of the workspace's row spaces removed with it.
+                          rowRevisions:
+                            type: integer
+                            description: Kept earlier contents of those rows removed with them.
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':

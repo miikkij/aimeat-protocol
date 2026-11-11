@@ -8,6 +8,8 @@
  * @structure organismMethods
  * @usage Object.assign(SqliteStorage.prototype, organismMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-11 — deleteOrganism also removes the organism's workspace rows and their
+ *     revisions, its invitations and its pending approvals, which nothing could reach afterwards.
  *   v1.1.0 — 2026-11-09 — organismNames: many organisms' names in one query.
  *   v1.0.0 — 2026-10-05 — createOrganism, getOrganism, listOrganisms, updateOrganism, deleteOrganism,
  *     deserializeOrganism moved here from governance.ts; 20 methods (createMembership, getMembership,
@@ -20,6 +22,7 @@ import type {
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { logger } from '../../../../utils/logger.js';
+import * as revisionRepo from '../repos/workspace-row-revisions.js';
 
 /** The organism `owners` JSON array, or the single owner the row had before the column existed. */
 function parseOwners(raw: unknown, creatorGhii: string): string[] {
@@ -172,6 +175,14 @@ export const organismMethods = {
       this.db.prepare('DELETE FROM content_labels WHERE scope = ?').run(`organism:${id}`);
       // So does the classification audit log of that content (TARGET-082 V4).
       this.db.prepare('DELETE FROM classification_audit WHERE scope = ?').run(`organism:${id}`);
+      // The rows of its workspaces' row spaces and their kept revisions, its invitations (each holds
+      // the invitee's email) and its pending approvals. Every route that reaches them needs the
+      // organism or its workspace manifest, so once those go nothing could read or delete them
+      // (found on an organisation node, 2026-11-10). The finance tables and outbound_messages keep
+      // their organismId: bookkeeping and sent mail have retention duties of their own.
+      revisionRepo.deleteWorkspaceRowsOf(this.db, id);
+      this.db.prepare('DELETE FROM invitations WHERE organismId = ?').run(id);
+      this.db.prepare('DELETE FROM pending_approvals WHERE organismId = ?').run(id);
 
       const result = this.db.prepare('DELETE FROM organisms WHERE id = ?').run(id);
       return result.changes > 0;

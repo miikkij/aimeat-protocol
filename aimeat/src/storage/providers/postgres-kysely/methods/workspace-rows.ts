@@ -13,9 +13,11 @@
  *   character-for-character the condition the SQLite side runs. Two spellings of pagination is how
  *   two backends end up paginating differently, which passes every test on the fast local one.
  * @structure workspaceRowMethods — append / get / getByIds / list / delete / deleteBefore / trim /
- *   stats / usage, and the row revisions (append / list / get / deleteForRow / prune)
+ *   stats / usage, and the row revisions (append / list / get / deleteForRow / prune), and
+ *   deleteWorkspaceRowsOf (a deleted workspace's or organism's rows and revisions)
  * @usage Object.assign(PostgresKyselyStorage.prototype, workspaceRowMethods) in ../index.ts
  * @version-history
+ *   v1.3.0 — 2026-11-11 — deleteWorkspaceRowsOf (the workspace delete route and the organism delete).
  *   v1.2.0 — 2026-10-22 — updatedBy (migration 0113), getWorkspaceRowsByIds, and the row revisions:
  *     a row's earlier content kept when another writer family replaced it (secaudit 2026-10, v80).
  *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
@@ -306,6 +308,22 @@ export const workspaceRowMethods = {
       .where('rowId', '=', rowId)
       .executeTakeFirst();
     return Number(res?.numDeletedRows ?? 0);
+  },
+
+  async deleteWorkspaceRowsOf(
+    this: PostgresKyselyStorage, organismId: string, wsId?: string,
+  ): Promise<{ rows: number; revisions: number }> {
+    return this.transaction(async () => {
+      let rowsQ = this.db.deleteFrom('WorkspaceRow').where('organismId', '=', organismId);
+      let revQ = this.db.deleteFrom('WorkspaceRowRevision').where('organismId', '=', organismId);
+      if (wsId !== undefined) {
+        rowsQ = rowsQ.where('wsId', '=', wsId);
+        revQ = revQ.where('wsId', '=', wsId);
+      }
+      const rows = await rowsQ.executeTakeFirst();
+      const revisions = await revQ.executeTakeFirst();
+      return { rows: Number(rows?.numDeletedRows ?? 0), revisions: Number(revisions?.numDeletedRows ?? 0) };
+    });
   },
 
   async pruneWorkspaceRowRevisions(

@@ -6,6 +6,11 @@
  *   by the member who wrote it (creator GHII) and only KEYED `organism.{id}.…`, so it was orphaned
  *   and stayed findable via the (indexed) librarian/$text search. Now it deletes by key prefix.
  * @version-history
+ *   2026-11-11 — A workspace delete removes the rows of its row spaces: the answer counts them, and a
+ *     workspace made again with the same id has none (incident deleting-a-workspace-leaves-its-row-
+ *     space-rows-behind, 2026-10-23). The organism delete's rows, invitations and approvals are
+ *     proven at the storage layer in test/unit/storage-conformance-organism-delete.test.ts, because
+ *     no route can reach them once the organism is gone.
  *   2026-10-20 — The co-member case grants B the contributor role before B writes: a workspace role
  *     is the member's own permission, so membership alone no longer carries a content write in
  *     person (Core 2026-11 COL-09; secaudit 2026-10, defect 1). The setup changed, not the assertion
@@ -148,6 +153,46 @@ await test('With memory:purge beside organism:write the creator\'s agent deletes
     assert(r.status === 200, `delete ${r.status}: ${JSON.stringify(r.body?.error)}`);
     const gone = await json(`/v1/organisms/${doomed}`, { headers: auth() });
     assert(gone.status === 404, `the organism is gone: ${gone.status}`);
+});
+
+let rowsWs = '';
+const ROWS_NS = 'crm.mail';
+/** The row routes name the space by its object type name ('mail'), not by its namespace. */
+const rowsUrl = (suffix = '') => `/v1/organisms/${orgId}/workspace/rows/mail${suffix}?ws=${rowsWs}`;
+
+await test('A workspace delete removes the rows of its row spaces, and a workspace made again with the same id starts empty', async () => {
+    const w = await json(`/v1/organisms/${orgId}/workspaces`, {
+        method: 'POST', headers: auth(),
+        body: JSON.stringify({ name: 'Mail', manifest: { objectTypes: [
+            { name: 'mail', schemaRef: 'schema:mail@1', namespace: ROWS_NS, backing: 'rows', writeRole: 'member' },
+        ] } }),
+    });
+    assert(w.status === 201, `workspace ${w.status}: ${JSON.stringify(w.body.error ?? w.body)}`);
+    rowsWs = w.body.data.ws;
+    const manifestKey = `organism.${orgId}.w.${rowsWs}.meta.manifest`;
+    const manifest = (await json(`/v1/memory/${encodeURIComponent(manifestKey)}`, { headers: auth() })).body.data?.value;
+    assert(manifest && Array.isArray(manifest.objectTypes), `the manifest reads back: ${JSON.stringify(manifest)}`);
+
+    const add = await json(rowsUrl(), { method: 'POST', headers: auth(), body: JSON.stringify({ rows: [
+        { row_id: 'm1', body: { from: 'carol@example.com', subject: 'one' } },
+        { row_id: 'm2', body: { from: 'carol@example.com', subject: 'two' } },
+    ] }) });
+    assert(add.status === 200 || add.status === 201, `append ${add.status}: ${JSON.stringify(add.body.error ?? add.body)}`);
+    const before = await json(rowsUrl('/stats'), { headers: auth() });
+    assert(before.status === 200 && before.body.data.stats.rows === 2, `two rows before: ${JSON.stringify(before.body)}`);
+
+    const del = await json(`/v1/organisms/${orgId}/workspace?ws=${rowsWs}`, { method: 'DELETE', headers: auth() });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body.error ?? del.body)}`);
+    assert(del.body.data.rows === 2, `the answer counts the two rows: ${JSON.stringify(del.body.data)}`);
+
+    // The same workspace id again: before the fix the two rows came back with it.
+    const again = await json('/v1/memory', { method: 'POST', headers: auth(), body: JSON.stringify({ key: manifestKey, value: manifest, visibility: 'private' }) });
+    assert(again.status === 201 || again.status === 200, `manifest again ${again.status}`);
+    const after = await json(rowsUrl('/stats'), { headers: auth() });
+    assert(after.status === 200, `stats after ${after.status}: ${JSON.stringify(after.body.error ?? after.body)}`);
+    assert(after.body.data.stats.rows === 0, `the deleted rows came back: ${JSON.stringify(after.body.data.stats)}`);
+    const read = await json(rowsUrl('/m1'), { headers: auth() });
+    assert(read.status === 404, `row m1 is gone: ${read.status}`);
 });
 
 await test('Delete the organism', async () => {

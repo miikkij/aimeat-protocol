@@ -11,6 +11,8 @@
  *   are what the Postgres side runs.
  * @structure append / list / get / deleteForRow / prune
  * @version-history
+ *   v1.1.0 — 2026-11-11 — deleteWorkspaceRowsOf: the rows and revisions of a deleted workspace or
+ *     organism, kept here beside the revision SQL because it removes both tables in one transaction.
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v80; developer ruling 2026-10-22).
  */
 import type Database from 'better-sqlite3';
@@ -94,6 +96,21 @@ export function deleteWorkspaceRowRevisions(
 ): number {
   return db.prepare(`DELETE FROM workspace_row_revisions WHERE ${SPACE} AND rowId = ?`)
     .run(organismId, wsId, namespace, rowId).changes;
+}
+
+/**
+ * Every row and kept revision of one workspace, or of the whole organism when `wsId` is omitted, in
+ * one transaction (WorkspaceRowRepository.deleteWorkspaceRowsOf).
+ */
+export function deleteWorkspaceRowsOf(
+  db: Database.Database, organismId: string, wsId?: string,
+): { rows: number; revisions: number } {
+  const where = wsId === undefined ? 'organismId = ?' : 'organismId = ? AND wsId = ?';
+  const params = wsId === undefined ? [organismId] : [organismId, wsId];
+  return db.transaction(() => ({
+    rows: db.prepare(`DELETE FROM workspace_rows WHERE ${where}`).run(...params).changes,
+    revisions: db.prepare(`DELETE FROM workspace_row_revisions WHERE ${where}`).run(...params).changes,
+  }))();
 }
 
 export function pruneWorkspaceRowRevisions(

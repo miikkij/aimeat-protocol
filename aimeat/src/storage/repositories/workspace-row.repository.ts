@@ -24,8 +24,11 @@
  *   - workspaceRowUsage(scope)                -- what the quota gate reads
  *   - getWorkspaceRowsByIds(...)              -- the rows an append is about to replace
  *   - *WorkspaceRowRevision(s)                -- earlier contents kept on a cross-writer replacement
+ *   - deleteWorkspaceRowsOf(org, ws?)         -- a deleted workspace's or organism's rows and revisions
  * @usage import type { WorkspaceRowRepository } from './repositories/workspace-row.repository.js';
  * @version-history
+ *   v1.3.0 — 2026-11-11 — deleteWorkspaceRowsOf: a workspace delete removes its rows and revisions,
+ *     which no route could reach once the manifest was gone (incident 2026-10-23).
  *   v1.2.0 — 2026-10-22 — getWorkspaceRowsByIds and the revision methods: a replacement by another
  *     writer family keeps the old content (secaudit 2026-10, v80; developer ruling 2026-10-22).
  *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its own unit test.
@@ -115,4 +118,12 @@ export interface WorkspaceRowRepository {
   pruneWorkspaceRowRevisions(
     organismId: string, wsId: string, namespace: string, before: string, keepPerRow: number,
   ): Promise<number>;
+
+  /**
+   * Every row and kept revision of one workspace, or of every workspace of the organism when `wsId`
+   * is omitted, in one transaction. The workspace delete route calls it: once the manifest is gone no
+   * route can reach a row, so a row left here is unreachable and still counts against the quota.
+   * deleteOrganism removes the same rows inside its own transaction.
+   */
+  deleteWorkspaceRowsOf(organismId: string, wsId?: string): Promise<{ rows: number; revisions: number }>;
 }
