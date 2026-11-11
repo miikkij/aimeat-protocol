@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-11 — DELETE detaches the organism's own remote MCP servers (with their personal sign-ins)
+ *     and unlinks every SSO connection that joined people to it; both outlived the organism.
  *   2026-11-10 — PUT lets only the account holder in person widen agent_access back to "all"
  *     (isOwnerInPerson). isOwnerPrincipal also admitted a session holding account:security, which an
  *     agent can hold.
@@ -81,7 +83,7 @@ import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { showOrganismReadme } from '../../services/organism-readme.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../../services/organism-lifecycle.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism, releaseOrganismLinks } from '../../services/organism-lifecycle.js';
 import { publicShapes } from '../../data/organism-shapes.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
@@ -403,6 +405,9 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
+    // Its own MCP servers (with their sign-ins) and its SSO links go first: nothing could reach them
+    // once the organism is gone (services/organism-lifecycle.ts).
+    await releaseOrganismLinks(storage, id);
     await storage.deleteOrganism(id);
     // Unflushed classification audit rows of the organism would come back after the delete.
     purgeClassificationAudit({ scope: `organism:${id}` });

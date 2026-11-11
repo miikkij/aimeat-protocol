@@ -25,10 +25,14 @@
  *   - joinOrganism() — direct join or join request, with the approver notifications
  *   - leaveOrganism() — membership removal + roster/admin sync + the departed member's agents and
  *     workspace roles (revokeDepartedMemberAccess)
+ *   - releaseOrganismLinks() — before a delete: detach the organism's MCP servers, unlink its SSO
+ *     connections
  * @usage
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-11-11 — releaseOrganismLinks: an organism delete detaches the organism's own remote MCP
+ *     servers with their personal sign-ins and unlinks the SSO connections that joined people to it.
  *   2026-10-18 — Create and update refuse a visibility wider than the organism's label allows with
  *     409 LABEL_CAPS_AUDIENCE, before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — A created or renamed organism's name and description meet the detection rules
@@ -86,6 +90,7 @@ import { organismBoardVisibility, followOrganismVisibility } from './organism-bo
 import { classifyContainerAfterWrite } from './classify-on-write.js';
 import { organismTarget } from './classification/containers.js';
 import { audienceCapOf, audienceOfOrganism, capByOf, capRefusalOf } from './classification/audience-cap.js';
+import { detachMcpServer } from './mcp-client/registry-settings.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -597,4 +602,30 @@ export async function leaveOrganism(
     subject: id, data: { name: organism.name || id },
   }, config);
   return { ok: true };
+}
+
+/**
+ * What an organism delete releases outside the organism's own tables, called before
+ * storage.deleteOrganism. Its own remote MCP servers are detached as an owner's detach does (the
+ * pool closed first, then the row and every personal sign-in to it): with the organism gone nobody
+ * could see or remove them, and a stored credential would outlive the organism. An SSO connection
+ * that joined people to it stops doing so; the connection itself is the node's sign-in, which the
+ * operator keeps or removes, so only its link to the organism goes. Returns the counts.
+ */
+export async function releaseOrganismLinks(
+  storage: Storage, organismId: string,
+): Promise<{ mcpServers: number; ssoConnections: number }> {
+  let mcpServers = 0;
+  for (const server of await storage.listMcpServers({ organismId })) {
+    if (server.organismId !== organismId) continue;
+    await detachMcpServer(storage, server);
+    mcpServers++;
+  }
+  let ssoConnections = 0;
+  for (const conn of await storage.listSsoConnections()) {
+    if (conn.organismId !== organismId) continue;
+    await storage.updateSsoConnection(conn.id, { organismId: null });
+    ssoConnections++;
+  }
+  return { mcpServers, ssoConnections };
 }
