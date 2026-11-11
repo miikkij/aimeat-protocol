@@ -22,6 +22,8 @@
  * @structure relativeModulePaths(publicDir) · addModulesToImportmap(html, paths)
  * @usage html = addModulesToImportmap(html, relativeModulePaths(publicDir));
  * @version-history
+ *   2026-11-11 — addModulesToImportmap finds the map's closing line with one forward scan instead of
+ *     a lazy regex that was quadratic in a run of blank lines (CodeQL js/polynomial-redos); same output.
  *   2026-11-10 — Initial.
  */
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
@@ -55,11 +57,33 @@ export function relativeModulePaths(publicDir: string): string[] {
  * yet; stampAssets then tags every entry, these with the rest.
  */
 export function addModulesToImportmap(html: string, paths: readonly string[]): string {
-  return html.replace(/("imports"\s*:\s*\{)([\s\S]*?)(\n\s*\})/, (_match, prefix: string, entries: string, suffix: string) => {
-    const named = new Set([...entries.matchAll(/"([^"]+)"\s*:/g)].map(m => m[1]));
-    const extra = paths.filter(p => !named.has(p)).map(p => `      ${JSON.stringify(p)}: ${JSON.stringify(p)}`);
-    if (!extra.length) return prefix + entries + suffix;
-    const body = entries.replace(/\s*$/, '');
-    return `${prefix}${body}${body.trim() ? ',' : ''}\n${extra.join(',\n')}${suffix}`;
-  });
+  const head = /"imports"\s*:\s*\{/.exec(html);
+  if (!head) return html;
+  const start = head.index + head[0].length;
+  const end = closingLineOf(html, start);
+  if (end < 0) return html;
+  const entries = html.slice(start, end);
+  const named = new Set([...entries.matchAll(/"([^"]+)"\s*:/g)].map(m => m[1]));
+  const extra = paths.filter(p => !named.has(p)).map(p => `      ${JSON.stringify(p)}: ${JSON.stringify(p)}`);
+  if (!extra.length) return html;
+  const body = entries.trimEnd();
+  return `${html.slice(0, start)}${body}${body.trim() ? ',' : ''}\n${extra.join(',\n')}${html.slice(end)}`;
+}
+
+/**
+ * The index of the first newline at or after `from` that only whitespace separates from a `}`, or
+ * -1: where `[\s\S]*?(\n\s*\})` started its closing group. Written as one forward scan because the lazy
+ * pattern retried every newline and scanned the whitespace after each one, quadratic in a long run
+ * of blank lines (CodeQL js/polynomial-redos). A whitespace run that ends in anything but `}` is
+ * skipped whole: every newline inside it reaches the same character.
+ */
+function closingLineOf(text: string, from: number): number {
+  let i = text.indexOf('\n', from);
+  while (i !== -1) {
+    let j = i + 1;
+    while (j < text.length && /\s/.test(text[j])) j++;
+    if (text[j] === '}') return i;
+    i = text.indexOf('\n', j);
+  }
+  return -1;
 }

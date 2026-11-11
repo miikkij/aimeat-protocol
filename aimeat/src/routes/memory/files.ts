@@ -5,6 +5,10 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.2 -- 2026-11-11 -- GET /v1/memory/files names a caller other than the owner in person by
+ *     resolveIdentity, as the routes beside it do, not by raw `sub`. The value is the same for every
+ *     caller (verifyJWT already gives a visitor its home GHII as `sub`); the resolve-identity rules
+ *     flagged the raw read.
  *   v1.16.1 -- 2026-11-10 -- GET /v1/memory/files?count=true counts with one aggregate
  *     (sumStorageBytesForOwners, the same rows) instead of listing every file; with exclude_prefix it
  *     still lists and counts.
@@ -349,14 +353,15 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the owner NAME, and a session signed in from another node carries the local part of THEIR
     // name — so a visitor called `alice` listed the local alice's files and every one of her
     // agents'. requireExternalPrincipal admits the `owner` role and asks nothing about which node
-    // the session came from. A federated session falls to the else branch and sees its own `sub`,
-    // which is what a visitor should see. Found by the AI triage of 2026-09-13.
+    // the session came from. A federated session falls to the else branch and sees its own identity
+    // (its home GHII), which is what a visitor should see. Found by the AI triage of 2026-09-13.
     const isOwnerSession = isOwnerInPerson(req.auth);
     // The identities whose files are listed: the owner in person sees the GHII's and every agent's,
-    // anyone else their own `sub`.
+    // anyone else their own resolved identity, the one the upload, download and delete beside this
+    // route write and read under (resolveIdentity; for an agent, an app or a visitor it is `sub`).
     const holders = isOwnerSession
       ? [`${req.auth!.owner as string}@${config.nodeId}`, ...(await storage.getAgentsByOwner(req.auth!.owner as string)).map(a => a.gaii)]
-      : [req.auth!.sub];
+      : [resolve(req)];
     // Additive, for the Memory page: exclude_prefix leaves out the files under one key prefix (the
     // content class pipeline's own text files), and limit/offset hand out a page. `total` counts
     // every file that matched; without the parameters the answer is what it was.
@@ -380,7 +385,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const byOwner = await storage.listStorageFilesForOwners(holders);
       files = holders.flatMap(g => byOwner[g] ?? []);
     } else {
-      files = await storage.listStorageFiles(req.auth!.sub);
+      files = await storage.listStorageFiles(holders[0]);
     }
     if (excludePrefix) files = files.filter(f => !f.key.startsWith(excludePrefix));
 

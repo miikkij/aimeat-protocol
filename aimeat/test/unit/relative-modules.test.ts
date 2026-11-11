@@ -64,4 +64,18 @@ describe('addModulesToImportmap', () => {
     expect(addModulesToImportmap(html, ['/views/profile/shared.js'])).toBe(html);
     expect(addModulesToImportmap(html, [])).toBe(html);
   });
+
+  it('reads a shell with a long run of blank lines and no closing brace in linear time', () => {
+    // CodeQL js/polynomial-redos: the lazy `[\s\S]*?(\n\s*\})` tried every newline and scanned the
+    // whitespace after each one, quadratic in the length of the run.
+    const shell = '"imports": {' + '\n'.repeat(40_000) + 'x';
+    const started = performance.now();
+    expect(addModulesToImportmap(shell, ['/a.js'])).toBe(shell);
+    expect(performance.now() - started).toBeLessThan(100);
+  });
+
+  it('closes the map at the first newline that only whitespace separates from a closing brace', () => {
+    const shell = '{"imports": {\n  "a": "b"\n  \n\t}\n}';
+    expect(addModulesToImportmap(shell, ['/x.js'])).toBe('{"imports": {\n  "a": "b",\n      "/x.js": "/x.js"\n  \n\t}\n}');
+  });
 });
