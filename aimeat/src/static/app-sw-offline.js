@@ -14,10 +14,18 @@
  *   kept copy on the next load that reaches the node and answers nothing from then on.
  *
  *   WHAT IS KEPT. The app's document at "/", and every script, stylesheet, font, image and manifest
- *   the page loads with a plain GET: the page's own parts. Nothing the page asks for with fetch()
- *   or XHR is kept or answered, and no request that carries an Authorization or Range header, so no
- *   record, no API answer and no file behind a session is ever in the copy. The copy holds the
- *   app's code and its public pictures, which anyone with the app's address can read from the node.
+ *   the page loads with a plain GET FROM THE APP'S OWN ORIGIN: the page's own parts. Nothing the
+ *   page asks for with fetch() or XHR is kept or answered, and no request that carries an
+ *   Authorization or Range header, so no record, no API answer and no file behind a session is
+ *   ever in the copy. The copy holds the app's code and its public pictures, which anyone with the
+ *   app's address can read from the node.
+ *
+ *   A FILE OF ANOTHER ORIGIN IS NEVER TOUCHED: not answered, not kept. The node's cookie notice is
+ *   loaded from the node's own address, and an app may load a library from a CDN; the browser
+ *   fetches those as it does without a worker. This worker could not fetch them if it tried: it is
+ *   served with the node's content security policy, and connect-src 'self' governs a worker's
+ *   fetch(). So a page whose parts come from another origin opens with no connection without them;
+ *   an app that must open whole loads its parts from its own address (/lib/, /v1/libs/).
  *
  *   THE NODE'S ANSWER ALWAYS WINS. Every kept request goes to the network first, and the kept copy
  *   answers only when the network gives none (for the document, also when it gives none within four
@@ -35,6 +43,14 @@
  * @usage Served at /sw-offline.js on a published app's own origin (server-bootstrap/static-files.ts).
  *   Registered by /v1/libs/aimeat-offline.js: AIMEAT.offline.shell.enable().
  * @version-history
+ *   v1.0.1 — 2026-11-11 — A file of another origin is left to the browser, and an answer that
+ *     arrives after the kept copy was deleted no longer creates it again. Until now the worker
+ *     answered another origin's script, stylesheet and font; its own content security policy
+ *     refused the fetch, so on a node in production the cookie notice of an app that asked to be
+ *     kept did not start. The path that kept another origin's file never worked for the same reason.
+ *     The kept document follows the node again: the copy to keep was taken after the answer had
+ *     gone to the page, which the browser refuses, so the kept document stayed the one of the
+ *     first keep and a new version of the app did not reach it.
  *   v1.0.0 — 2026-11-10 — Initial (wish-teht-v-t-todoist-kind-task-app-on-aimeat-with-agents-app-too).
  */
 
@@ -80,18 +96,19 @@ async function drop() {
 function partOf(request, url) {
   if (request.method !== 'GET') return null;
   if (request.headers.has('authorization') || request.headers.has('range')) return null;
-  const own = url.origin === self.location.origin;
-  if (request.mode === 'navigate') return own && url.pathname === '/' ? 'document' : null;
+  // Another origin's file is never answered here. This worker is served with the node's content
+  // security policy, whose connect-src is 'self', so a fetch() of another origin from inside it is
+  // refused, and a request this worker answers has no other way to the network: the page gets a
+  // failed load while the node is reachable. Left alone, the browser fetches it as without a worker.
+  if (url.origin !== self.location.origin) return null;
+  if (request.mode === 'navigate') return url.pathname === '/' ? 'document' : null;
   if (PART_KINDS.indexOf(request.destination) < 0) return null;
-  // Another origin's part is a web font and its stylesheet, or a library from a CDN the app's CSP allows.
-  if (!own && request.destination === 'image') return null;
   return 'part';
 }
 
 /** Whether an answer is kept: a full answer, and for a picture one of a sane size. */
 function keepable(request, response) {
   if (!response) return false;
-  if (response.type === 'opaque') return true;   // another origin's font or stylesheet: the status is not readable
   if (response.status !== 200) return false;
   if (request.destination === 'image') {
     const size = Number(response.headers.get('content-length') || 0);
@@ -102,9 +119,14 @@ function keepable(request, response) {
 
 /** Keep one answer under its key; a failure to keep never fails the answer. */
 function keep(key, request, response) {
-  if (!keepable(request, response)) return;
+  // Opening a cache creates it, and a cache that exists is what "the app asked" means. An answer
+  // that arrives after the copy was deleted must not open it, or the next start reads the app as
+  // still asking.
+  if (!on || !keepable(request, response)) return;
   const copy = response.clone();
   caches.open(SHELL).then((cache) => cache.put(key, copy).then(() => trim(cache)))
+    // The copy can be deleted between the check above and the open: delete what the open created.
+    .then(() => (on ? undefined : caches.delete(SHELL)))
     .catch((err) => console.warn('[app-sw-offline] an answer was not kept:', say(err)));
 }
 
@@ -116,9 +138,13 @@ async function afterDocument(key, request, response) {
     return;
   }
   if (response.status !== 200) return;
-  const text = await response.clone().text();
+  // Both copies are taken now, before the first await: this runs while the answer is still on its
+  // way to the page, and once the page has the body the answer can be neither cloned nor read.
+  const toRead = response.clone();
+  const toKeep = response.clone();
+  const text = await toRead.text();
   if (!WISH.test(text)) { await drop(); return; }
-  keep(key, request, response);
+  keep(key, request, toKeep);
 }
 
 async function fromNetworkFirst(request, url, kind) {
@@ -175,12 +201,13 @@ async function warm(urls) {
       console.debug('[app-sw-offline] not an address, not kept:', String(raw), say(err));
       continue;
     }
-    const own = url.origin === self.location.origin;
-    const request = new Request(url.href, own ? { cache: 'no-cache', credentials: 'same-origin' } : { mode: 'no-cors', credentials: 'omit' });
+    // Only this origin's parts: the worker cannot fetch another origin (see partOf).
+    if (url.origin !== self.location.origin) continue;
+    const request = new Request(url.href, { cache: 'no-cache', credentials: 'same-origin' });
     try {
       const response = await fetch(request);
-      if (response.type !== 'opaque' && response.status !== 200) continue;
-      await cache.put(own && url.pathname === '/' ? new Request(url.origin + '/') : request, response);
+      if (response.status !== 200) continue;
+      await cache.put(url.pathname === '/' ? new Request(url.origin + '/') : request, response);
       keptNow += 1;
     } catch (err) {
       console.warn('[app-sw-offline] a part was not kept:', url.href, say(err));

@@ -40,6 +40,8 @@
  *   q.push({ record: 'p1', change });  q.on(() => paint(q.state()));
  *   AIMEAT.auth.on('offline', (who) => openCopyOf(who.owner));      // the node gives no answer
  * @version-history
+ *   v1.0.1 — 2026-11-11 — shell.enable() names only this origin's parts to the worker, which keeps
+ *     nothing else (app-sw-offline.js v1.0.1).
  *   v1.0.0 — 2026-11-10 — Initial (wish-teht-v-t-todoist-kind-task-app-on-aimeat-with-agents-app-too).
  */
 import { attach, namespace } from '../_core/namespace.js';
@@ -102,10 +104,8 @@ function partsOfPage() {
       if (['script', 'link', 'css', 'img'].indexOf(entry.initiatorType) >= 0) add(entry.name);
     });
   }
-  // Another origin's picture is never kept (the worker refuses it too).
-  return Object.keys(seen).filter(function (href) {
-    return href.indexOf(location.origin + '/') === 0 || !/\.(png|jpe?g|gif|webp|avif|svg)(\?|$)/i.test(href);
-  });
+  // Only this origin's parts are kept: the worker leaves another origin's file to the browser.
+  return Object.keys(seen).filter(function (href) { return href.indexOf(location.origin + '/') === 0; });
 }
 
 /**

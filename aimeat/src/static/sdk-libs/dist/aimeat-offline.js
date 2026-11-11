@@ -363,7 +363,7 @@
       });
     }
     return Object.keys(seen).filter(function(href) {
-      return href.indexOf(location.origin + "/") === 0 || !/\.(png|jpe?g|gif|webp|avif|svg)(\?|$)/i.test(href);
+      return href.indexOf(location.origin + "/") === 0;
     });
   }
   function ask(worker, message) {
