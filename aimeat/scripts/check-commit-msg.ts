@@ -24,14 +24,24 @@
  *   this file is. It runs on the real thing: the file git is about to commit from, whatever produced
  *   it, whichever shell, whether a person or an assistant typed it.
  *
- *   The checks are structural, never stylistic. A commit message is prose and this is not a style
- *   gate; it refuses only the shapes that mean something upstream mangled the text.
- * @structure lintCommitMessage(raw) → string[] of problems · main(): reads argv[2], exits 1 on any
+ *   For every commit the checks are structural, never stylistic: they refuse only the shapes that
+ *   mean something upstream mangled the text.
+ *
+ *   A CLAUDE CODE SESSION'S COMMIT gets three more (CLAUDECODE=1, the key every session-only rule
+ *   uses; a commit from VS Code or a terminal is never held to them): a subject of at most 72
+ *   characters, a body of at most 600, and no line that says who approved or asked for the change.
+ *   The written rule had asked for a 72-character subject since 2026-09-27 and 230 of the 300
+ *   subjects after it were longer; bodies ran to 3,400 characters and carried the developer's
+ *   one-word approvals as quotes. A rule nothing holds is not kept.
+ * @structure lintCommitMessage(raw, { session }) → string[] of problems · main(): reads argv[2],
+ *   passes session when CLAUDECODE=1, exits 1 on any
  * @usage
  *   pnpm check:commit-msg .git/COMMIT_EDITMSG    # what the hook runs
  *   Unit-tested in test/unit/commit-msg.test.ts — the validator is a pure function on purpose.
  * @version-history
  *   v1.0.0 — 2026-08-14 — Initial, after three `@`-titled commits reached main.
+ *   v1.1.0 -- 2026-11-11 -- A session's commit: subject at most 72 characters, body at most 600,
+ *     no approval line.
  */
 import { readFileSync } from 'node:fs';
 
@@ -52,13 +62,42 @@ const MAX_SUBJECT = 250;
  */
 const QUOTING_WRECKAGE = /^\s*(@['"]|['"]@|@|EOF|['"`]|\\)\s*$/;
 
+/** A session's subject: the length `git log --oneline`, commit lists and GitHub show uncut. */
+const SESSION_MAX_SUBJECT = 72;
+
+/**
+ * A session's body, trailers not counted: room for why the change exists, in four or five
+ * sentences. Test results, how the defect was found and the per-file list belong in the report and
+ * the development notes; the diff shows what changed.
+ */
+const SESSION_MAX_BODY = 600;
+
+/** A subject git wrote by itself is not the session's writing. */
+const GIT_WRITTEN_SUBJECT = /^(Merge |Revert "|fixup! |squash! |amend! )/;
+
+/** The trailers the hooks and the board read. They are not body text. */
+const TRAILER = /^(Session|Project|Wish|Red-CI|Red-Nightly|Signed-off-by): /;
+
+/**
+ * Who approved or asked for the change. That is on the wish or the decision record. The name is
+ * matched with its capital, so a session name in a path (cc-jouni-…) passes, and "approved by" is
+ * matched only with the developer after it, because an owner approving an agent is product
+ * vocabulary.
+ */
+const APPROVAL_LINE = /\bJouni\b|\b([Aa]pproved|[Aa]ccepted|[Rr]uled|[Rr]equested|[Oo]rdered|[Aa]sked for)\s+by\s+the\s+developer\b/;
+
+export interface LintOptions {
+    /** The commit is made by a Claude Code session (CLAUDECODE=1). */
+    session?: boolean;
+}
+
 /**
  * Read one commit message and list everything wrong with it.
  *
  * Comment lines (`#`) and everything from the scissors line down are dropped first, exactly as git
  * does, so a template or a verbose diff never counts as content.
  */
-export function lintCommitMessage(raw: string): string[] {
+export function lintCommitMessage(raw: string, opts: LintOptions = {}): string[] {
     const problems: string[] = [];
 
     const scissors = raw.indexOf('\n# ------------------------ >8 ------------------------');
@@ -104,6 +143,36 @@ export function lintCommitMessage(raw: string): string[] {
         problems.push('Remove the Co-Authored-By trailer — this project does not use it.');
     }
 
+    if (opts.session) problems.push(...lintSessionMessage(subject, lines.slice(firstIndex + 1)));
+
+    return problems;
+}
+
+/** The three checks a Claude Code session's commit gets on top of the structural ones. */
+function lintSessionMessage(subject: string, rest: string[]): string[] {
+    const problems: string[] = [];
+    const bodyLines = rest.map(l => l.trim()).filter(l => l !== '' && !TRAILER.test(l));
+
+    if (subject.length > SESSION_MAX_SUBJECT && !GIT_WRITTEN_SUBJECT.test(subject)) {
+        problems.push(
+            `The subject line is ${subject.length} characters; a session's subject is at most ${SESSION_MAX_SUBJECT}.\n` +
+            '    Name the one thing that changed. The reason goes in the body.');
+    }
+
+    const bodyLength = bodyLines.join(' ').length;
+    if (bodyLength > SESSION_MAX_BODY) {
+        problems.push(
+            `The body is ${bodyLength} characters; a session's body is at most ${SESSION_MAX_BODY}.\n` +
+            '    Say why the change exists. Test results, how the defect was found and the list of\n' +
+            '    files go to the report and the development notes; the diff shows what changed.');
+    }
+
+    if ([subject, ...bodyLines].some(l => APPROVAL_LINE.test(l))) {
+        problems.push(
+            'The message says who approved or asked for the change. Take that line out:\n' +
+            '    it is on the wish or the decision record, and a commit message does not repeat it.');
+    }
+
     return problems;
 }
 
@@ -113,7 +182,7 @@ function main(): void {
         console.error('usage: check-commit-msg <path to commit message file>');
         process.exit(2);
     }
-    const problems = lintCommitMessage(readFileSync(path, 'utf-8'));
+    const problems = lintCommitMessage(readFileSync(path, 'utf-8'), { session: process.env.CLAUDECODE === '1' });
     if (problems.length === 0) return;
 
     console.error('');

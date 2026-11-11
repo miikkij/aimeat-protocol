@@ -64,9 +64,14 @@ an assistant, either shell. It refuses:
 - a non-blank line 2, which is what glues a body onto the subject
 - an empty message, and the `Co-Authored-By` trailer this project does not use
 
-It is structural, not stylistic. It does not judge tone, length (below a runaway threshold), mood or
-wording: a gate that refuses the repo's own history gets bypassed, and then it protects nothing.
-The first version of this one rejected a real 131-character subject and was corrected.
+For a commit from VS Code or a terminal it is structural, not stylistic. It does not judge tone,
+length (below a runaway threshold), mood or wording: a gate that refuses the repo's own history gets
+bypassed, and then it protects nothing. The first version of this one rejected a real 131-character
+subject and was corrected.
+
+For a commit made by a Claude Code session it also holds the three rules under "How long, and what
+stays out" below (since 2026-11-11). The 72-character subject had been a written rule since
+2026-09-27, and 230 of the 300 subjects written after it were longer.
 
 The validator is a pure function (`lintCommitMessage`) with unit tests in
 `test/unit/commit-msg.test.ts`, so a new rule can be argued about against real examples.
@@ -97,6 +102,32 @@ refuse correct messages.
 Write the subject in the Conventional Commits form the history uses (`fix(scope): what changed`),
 in the imperative or as a plain statement, and say in the body why the change exists and what it
 costs.
+
+## How long, and what stays out
+
+Ruled by the developer on 2026-11-11. The bodies on `main` had grown to between 1,000 and 3,400
+characters, and three of the last 200 quoted his one-word approval of the work.
+
+A commit made by a Claude Code session (`CLAUDECODE=1`) has:
+
+- **a subject of at most 72 characters**, which names the one thing that changed;
+- **a body of at most 600 characters**, trailers not counted, which says why the change exists;
+- **no line that says who approved or asked for the change**, and no quote of the developer. The
+  wish or the decision record holds that. A `Wish: <id>` trailer is the pointer.
+
+These stay out of the body, and each has a home:
+
+| Not in the commit message | Where it goes |
+|---|---|
+| Test results, suite totals, "red first, green now" | the report to the developer |
+| How and where the defect was found | the incident or the Platform Development Notes document |
+| One bullet per changed file or function | nowhere; the diff shows it |
+| Who approved, and in which words | the wish or the decision record |
+| What was left undone | nothing is left; see CLAUDE.md, "A fix covers the whole defect" |
+
+`pnpm check:commit-msg` refuses a session's message that breaks one of the three rules. A subject
+git wrote by itself (`Merge …`, `Revert "…"`, `fixup! …`) is not measured. A commit from VS Code or
+a terminal is not held to them.
 
 ## Line length
 

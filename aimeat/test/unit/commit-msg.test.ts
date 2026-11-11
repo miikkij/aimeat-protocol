@@ -82,3 +82,65 @@ describe('commit message gate', () => {
         expect(lintCommitMessage(raw)).toEqual([]);
     });
 });
+
+describe('commit message gate, for a Claude Code session', () => {
+    const session = { session: true };
+    const TRAILERS = '\n\nSession: cc-jouni-example\nProject: aimeat-protocol\n';
+
+    it('refuses a subject over 72 characters', () => {
+        const subject = 'fix(apps): the sign-in library sends no AI-state request for a token without ai:use';
+        expect(subject.length).toBeGreaterThan(72);
+        const problems = lintCommitMessage(`${subject}\n`, session);
+        expect(problems).toHaveLength(1);
+        expect(problems[0]).toContain('72');
+        // The developer's own commit is not held to it.
+        expect(lintCommitMessage(`${subject}\n`)).toEqual([]);
+    });
+
+    it('refuses a body over 600 characters, and does not count the trailers', () => {
+        const sentence = 'The delete left rows behind because nothing read them afterwards. ';
+        const fits = sentence.repeat(9).trim();
+        const tooLong = sentence.repeat(10).trim();
+        expect(fits.length).toBeLessThanOrEqual(600);
+        expect(tooLong.length).toBeGreaterThan(600);
+
+        expect(lintCommitMessage(`fix(x): a subject\n\n${fits}${TRAILERS}`, session)).toEqual([]);
+        const problems = lintCommitMessage(`fix(x): a subject\n\n${tooLong}${TRAILERS}`, session);
+        expect(problems).toHaveLength(1);
+        expect(problems[0]).toContain('600');
+        expect(lintCommitMessage(`fix(x): a subject\n\n${tooLong}${TRAILERS}`)).toEqual([]);
+    });
+
+    it('refuses a line that says who approved the change', () => {
+        // The shape that reached main on 2026-11-11.
+        const raw = 'fix(apps): a subject\n\nApproved by Jouni ("Tee") on wish-example, after an app went out twice with defects.' + TRAILERS;
+        const problems = lintCommitMessage(raw, session);
+        expect(problems).toHaveLength(1);
+        expect(problems[0]).toContain('who approved');
+        expect(lintCommitMessage(raw)).toEqual([]);
+    });
+
+    it('refuses "approved by the developer" as well', () => {
+        const raw = 'fix(apps): a subject\n\nItems 2 and 3 of the audit, approved by the developer the same day.\n';
+        expect(lintCommitMessage(raw, session).some(p => p.includes('who approved'))).toBe(true);
+    });
+
+    it('accepts the session trailer, whose value carries the owner name in lower case', () => {
+        expect(lintCommitMessage('fix(x): a subject\n\nA body.' + TRAILERS, session)).toEqual([]);
+    });
+
+    it('accepts the product sense of approval', () => {
+        const raw = 'fix(agents): an agent approved by another agent of its owner keeps its scopes\n';
+        expect(lintCommitMessage(raw.slice(0, 72), session)).toEqual([]);
+        expect(lintCommitMessage('fix(agents): a subject\n\nAn agent approved by its owner keeps the scopes the owner picked.\n', session)).toEqual([]);
+    });
+
+    it('leaves the subjects git writes alone', () => {
+        const merge = "Merge remote-tracking branch 'origin/main' into a-branch-with-a-long-name-that-git-wrote-by-itself";
+        const revert = 'Revert "fix(organisms): deleting an organism or a workspace removes its rows and row revisions"';
+        expect(merge.length).toBeGreaterThan(72);
+        expect(revert.length).toBeGreaterThan(72);
+        expect(lintCommitMessage(`${merge}\n`, session)).toEqual([]);
+        expect(lintCommitMessage(`${revert}\n\nThis reverts commit 0123456789abcdef.\n`, session)).toEqual([]);
+    });
+});

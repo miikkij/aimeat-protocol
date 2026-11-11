@@ -60,7 +60,7 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 **Answer first, then the evidence.** The failure this prevents happens most turns otherwise: work gets reported in the order it was done rather than the order he decides in, so the answer to what he asked sits under six paragraphs of narration and he has to classify each sentence as finding, fix, leftover or suggestion. That classification is the job, and it does not belong to him.
 
 - A status question ("is it done", "what needs doing") is answered in the **first sentence**, in one of three shapes: **done, nothing needs you** · **done, except X, which needs your decision** · **not done, it is at X**. Everything after that is evidence for the first sentence.
-- **Do not hedge finished work.** Done is done. A related thing you noticed is not an exception to "done"; it is a separate note, and it earns a mention only if it needs a decision. "All done except…" about something that needs nothing turns a non-task into a debt he now has to carry.
+- **Do not hedge finished work.** Done is done. A related thing you noticed is not an exception to "done"; it is a separate note, and it earns a mention only if it needs a decision. "All done except…" about something that needs nothing turns a non-task into a debt he now has to carry. The rest of the same defect is not a related thing; it is the work.
 - **Label the register when a report mixes them.** Found, fixed, left, and suggested are four different things, and a reader should never have to work out which one a sentence is.
 - One term, one meaning, per conversation. Two senses of the same word (the node's Platform feedback versus a memory typed `feedback`) makes him check whether you are even discussing the same thing.
 - **Every place you mention comes with its URL**: production, or sandbox plus the account to sign in with and what to press. "On the Packages page" without a link makes him ask (Jouni, 2026-10-04).
@@ -77,6 +77,7 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 
 - **Ask before:** spending money or changing AI settings, importing data automatically, touching infrastructure (wsl/docker are off limits), building something not yet agreed. Not asked: your sandbox gets the developer's OpenRouter test key and model without a question; how, in `docs/internal/TESTING.md`, Model keys (Jouni, 2026-10-25: "I gave the key exactly for this").
 - **A locked plan gets finished**, not sliced, and not followed by "next we could".
+- **A fix covers the whole defect, not the reported symptom.** When a delete leaves data behind, check every table and store that carries the id, and remove each one or name the duty that keeps it (law, bookkeeping). "It needs its own change" is no reason, and "left" in a report is for what Jouni decided to leave. When the rest is too risky to do unasked, ask before you report (2026-11-11: an organism delete fix left the organism's MCP servers and SSO connections in the database).
 - **Name the exact scope of a deletion** before deleting.
 - **Evidence before assertions.** Verify with real content, not fixtures. Clean up test data fully. A test must fail first. The pass-criterion discipline is its own section below.
 - **Test at the size production actually has.** Ask of every change what grows with the user's data, and get the real number from prod rather than guessing. A green test proved the feature and not the failure: listing every app origin in a CSP header passed with 2 apps and took down every app subdomain at 76, because the header outgrew nginx's 4 kB buffer.
@@ -116,7 +117,7 @@ the subject. Seven commits in this history carry that damage and three of them s
 file and run `bash scripts/git-commit.sh <file>`. `-m` is fine for a single line. The `commit-msg`
 hook refuses the wreckage whichever way the commit was made. The message uses industry terms
 (endpoint, route, MCP tool, code path), never metaphors such as door, road or hand; body paragraphs
-are not hard-wrapped. →
+are not hard-wrapped. **A session's message is short: a subject of at most 72 characters and a body of at most 600 that says why the change exists.** It never says who approved or asked for the change and never quotes Jouni; that is on the wish. Test results, how the defect was found and the list of files go to the report and the development notes. The hook refuses the rest (Jouni, 2026-11-11). →
 `docs/coding-guidelines/shell-and-git.md`
 
 ## Ask the developer first
