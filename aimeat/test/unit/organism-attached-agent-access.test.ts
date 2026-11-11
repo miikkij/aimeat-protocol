@@ -20,6 +20,9 @@
  *   - the draft write's refusal carries the rule's own code and reason
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-attached-agent-access.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-11 — The organism's agent list through services/organism-agents/attach.ts, which
+ *     the route and aimeat_organism_agent_attach / _detach call: an agent acting for the person lists a
+ *     member's agent under "listed"; without account:security it is refused and told why.
  *   v1.1.0 — 2026-11-11 — A member's agent that a "listed" organism does not admit hears the
  *     organism's refusal on an extension's workspace read, not "Not an active member".
  *   v1.0.0 — 2026-11-10 — Initial.
@@ -29,9 +32,10 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { checkOrganismNamespaceAccess } from '../../src/services/organism-namespace-access.js';
-import { attachedAsParticipant } from '../../src/services/organism-agent-access.js';
+import { attachedAsParticipant, agentBarred } from '../../src/services/organism-agent-access.js';
 import { workspaceCallerOf, writeWorkspaceDraftsOp } from '../../src/services/workspace-tool-ops.js';
 import { buildExtensionWorkspace } from '../../src/services/extension-workspace.js';
+import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../../src/services/organism-agents/attach.js';
 
 const ORG = '7c2d9e41-3a5b-4c6d-8e7f-90a1b2c3d4e5';
 const WS = 'ws-attached1';
@@ -141,6 +145,50 @@ describe('the organism rule: attaching an agent takes no right away', () => {
         const unlisted = await checkOrganismNamespaceAccess({ storage, config }, asAgent('alice', 'helper'), CONTENT(), 'write');
         expect(unlisted?.code).toBe('ACCESS_DENIED');
         expect(unlisted?.message).toContain('admits only the agents');
+    });
+});
+
+describe('the organism\'s agent list, for an agent (aimeat_organism_agent_attach / _detach)', () => {
+    // 2026-11-11: the owner asked their AI to list an admin's agent under "listed", and no MCP tool
+    // reached the list. The service is what the route and both tools call.
+    const attach = (callerOwner: string, mayActAsPerson: boolean, agentGaii: string) =>
+        attachOrganismAgent(storage, config, { organismId: ORG, callerOwner, mayActAsPerson, agentGaii });
+    const makeAgent = async (owner: string) => {
+        if (await storage.getAgent(agentOf(owner, 'helper'))) return;
+        const now = new Date().toISOString();
+        await storage.createAgent({
+            name: 'helper', owner, gaii: agentOf(owner, 'helper'), publicKey: 'pk', trustScore: 50,
+            morselBalance: 0, capabilities: [], createdAt: now, lastSeen: now,
+        } as never);
+    };
+    const codeOf = (p: Promise<unknown>) => p.then(() => 'ok', (e: unknown) => (e instanceof AgentListError ? `${e.code}: ${e.message}` : String(e)));
+
+    it('under "listed", the owner\'s agent acting for the person lists a member\'s agent, which then gets in, and takes it off again', async () => {
+        await setAccess('listed');
+        await makeAgent('bob');
+        const barred = async () => agentBarred(await storage.getOrganism(ORG), agentOf('bob', 'helper'));
+        expect(await barred()).toBe(true);
+        expect(await codeOf(attach('alice', true, agentOf('bob', 'helper')))).toBe('ok');
+        expect(await barred()).toBe(false);
+        expect(await detachOrganismAgent(storage, { organismId: ORG, callerOwner: 'alice', agentGaii: agentOf('bob', 'helper') }))
+            .toEqual({ detached: agentOf('bob', 'helper') });
+        expect(await barred()).toBe(true);
+    });
+
+    it('under "listed", an agent without account:security is refused and told which permission lets it', async () => {
+        await setAccess('listed');
+        expect(await codeOf(attach('alice', false, agentOf('bob', 'helper')))).toMatch(/^ACCESS_DENIED: .*account:security/);
+    });
+
+    it('under "listed", a plain member\'s agent cannot list its own sibling, even acting for the person', async () => {
+        await setAccess('listed');
+        expect(await codeOf(attach('bob', true, agentOf('bob', 'helper')))).toMatch(/^ACCESS_DENIED: .*only its owner or an admin/);
+    });
+
+    it('an agent of a non-member is not listed', async () => {
+        await setAccess('listed');
+        await makeAgent('carol');
+        expect(await codeOf(attach('alice', true, agentOf('carol', 'helper')))).toMatch(/^NOT_MEMBER: /);
     });
 });
 

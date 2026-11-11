@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-11 — aimeat_organism_agent_attach → POST /v1/organisms/:id/agents and
+ *     aimeat_organism_agent_detach → DELETE /v1/organisms/:id/agents/:gaii.
  *   2026-10-22 — aimeat_workspace_rows_revisions → GET .../rows/:space/:rowId/revisions and
  *     aimeat_workspace_rows_restore → POST .../revisions/:revisionId/restore (secaudit 2026-10, v80).
  *   2026-10-16 — aimeat_workspace_share → PUT /v1/organisms/:id/workspace/share, its body built by
@@ -144,6 +146,19 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const workspaces = optionalArray(input, 'workspaces'); if (workspaces) body.workspaces = workspaces;
             return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/members`, body);
         },
+    },
+    {
+        name: 'aimeat_organism_agent_attach',
+        handler: ({ client }, input) => client.post(
+            `/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/agents`,
+            { agent_gaii: requiredString(input, 'agent_gaii') },
+        ),
+    },
+    {
+        name: 'aimeat_organism_agent_detach',
+        handler: ({ client }, input) => client.delete(
+            `/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/agents/${encodeURIComponent(requiredString(input, 'agent_gaii'))}`,
+        ),
     },
     {
         name: 'aimeat_organism_member_remove',

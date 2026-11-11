@@ -15,6 +15,8 @@
  *   itself. The last part checks return_url on aimeat_organism_invite_email.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-agent-access
  * @version-history
+ *   2026-11-11 — aimeat_organism_agent_attach exists over MCP and refuses, under "listed", an agent
+ *     whose owner did not give it account:security.
  *   2026-11-10 — Under "all", the creator's agent that is still on the list writes the workspace
  *     through aimeat_workspace_write and aimeat_memory_write (attaching an agent takes no right away).
  *   2026-10-21 — A record of an organism that no longer exists stays in an agent's owner-scope reads
@@ -406,6 +408,13 @@ async function run() {
             method: 'POST', headers: bearer(A.agent.token), body: JSON.stringify({ agent_gaii: a2.gaii }),
         });
         assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `a listed agent listed its sibling: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    });
+
+    await test('aimeat_organism_agent_attach reaches the list over MCP, and refuses an agent without account:security under "listed"', async () => {
+        // The list had no MCP tool until 2026-11-11, so the owner's AI could not add an agent at all.
+        const r = await callTool(A, 'aimeat_organism_agent_attach', { organism_id: orgId, agent_gaii: a2.gaii });
+        assert(r.isError && r.text.startsWith('ACCESS_DENIED') && r.text.includes('account:security'),
+            `expected the listed-mode refusal naming account:security: ${r.text.slice(0, 300)}`);
     });
 
     await test('a listed agent may not widen the setting back to "all"', async () => {

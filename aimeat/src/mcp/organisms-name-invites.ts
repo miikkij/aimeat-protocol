@@ -8,9 +8,13 @@
  *   direct add without the accept round-trip). Extracted from mcp/organisms.ts (max-file-lines).
  * @structure registerOrganismNameInviteTools() — registers aimeat_organism_invite,
  *   aimeat_organism_member_add, aimeat_organism_invitation_update, aimeat_organism_invitation_cancel,
- *   aimeat_organism_invitations, aimeat_organism_invitation_respond.
+ *   aimeat_organism_invitations, aimeat_organism_invitation_respond, aimeat_organism_agent_attach,
+ *   aimeat_organism_agent_detach.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-11-11 — aimeat_organism_agent_attach and aimeat_organism_agent_detach: the organism's agent
+ *     list reached the page and REST only, so an owner's AI could not add an admin's agent to an
+ *     organism that admits only listed agents. Same service as the route.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_organism_invitation_respond accepts only for the person in person (isOwnerPrincipal),
@@ -35,6 +39,7 @@ import {
     acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
 } from '../services/invitations.js';
 import { removeOrganismMember, MemberRemoveError } from '../services/organism-member-remove.js';
+import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../services/organism-agents/attach.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { isOwnerPrincipal } from '../auth/account-security.js';
@@ -134,6 +139,48 @@ export function registerOrganismNameInviteTools(
                 if (e instanceof MemberRemoveError) return { content: [{ type: 'text' as const, text: `${e.code}: ${e.message}` }], isError: true };
                 throw e;
             }
+        },
+    );
+
+    // ── Tools: aimeat_organism_agent_attach / aimeat_organism_agent_detach ──
+    // Mirror POST and DELETE /v1/organisms/:id/agents and call the same service
+    // (services/organism-agents/attach.ts). Under "listed", adding asks isOwnerPrincipal of the
+    // session, as the route does: an agent passes when its owner gave it account:security.
+    const agentListFail = (e: unknown) => {
+        if (e instanceof AgentListError) return { ...toolError(e.code, e.message) };
+        throw e;
+    };
+    mcp.registerTool(
+        'aimeat_organism_agent_attach',
+        {
+            description: descriptionFor('aimeat_organism_agent_attach'),
+            inputSchema: zodShapeFor('aimeat_organism_agent_attach'),
+            annotations: annotationsFor('aimeat_organism_agent_attach'),
+        },
+        async ({ organism_id, agent_gaii }) => {
+            try {
+                const out = await attachOrganismAgent(storage, config, {
+                    organismId: organism_id, callerOwner: getOwnerName(),
+                    mayActAsPerson: !!caller && isOwnerPrincipal(caller().auth), agentGaii: agent_gaii,
+                });
+                emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, ...out }, null, 2) }] };
+            } catch (e) { return agentListFail(e); }
+        },
+    );
+    mcp.registerTool(
+        'aimeat_organism_agent_detach',
+        {
+            description: descriptionFor('aimeat_organism_agent_detach'),
+            inputSchema: zodShapeFor('aimeat_organism_agent_detach'),
+            annotations: annotationsFor('aimeat_organism_agent_detach'),
+        },
+        async ({ organism_id, agent_gaii }) => {
+            try {
+                const out = await detachOrganismAgent(storage, { organismId: organism_id, callerOwner: getOwnerName(), agentGaii: agent_gaii });
+                emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, ...out }, null, 2) }] };
+            } catch (e) { return agentListFail(e); }
         },
     );
 

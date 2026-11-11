@@ -7,6 +7,9 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-11 — POST and DELETE /v1/organisms/:id/agents call services/organism-agents/attach.ts,
+ *     which the MCP tools aimeat_organism_agent_attach and _detach call too. The rules are unchanged;
+ *     the listed-mode refusal names account:security, the permission that lets an agent add one.
  *   2026-10-27 — GET /v1/organisms/:id/members answers a private organism's roster only to an active
  *     member (or an agent of one), an agent attached to it and the operator, and 404 to everyone else,
  *     as GET /v1/organisms/:id and aimeat_organism_members do (secaudit2026oct26,
@@ -47,7 +50,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
-import { parseGaiiLoose, localAccountName, resolveIdentity } from '../../utils/gaii.js';
+import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
@@ -58,6 +61,7 @@ import {
   acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
 } from '../../services/invitations.js';
 import { agentAccessOf, agentBarred } from '../../services/organism-agent-access.js';
+import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../../services/organism-agents/attach.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
@@ -656,91 +660,33 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
    * otherwise list itself and its siblings, and a member could admit their own agent alone. */
 
   /* POST /v1/organisms/:id/agents — attach an agent GAII (the agent's owner as a member, or an organism owner/admin) */
+  // The rules live in services/organism-agents/attach.ts, shared with aimeat_organism_agent_attach and
+  // aimeat_organism_agent_detach. `mayActAsPerson` is isOwnerPrincipal: the person signed in, or a
+  // session holding account:security.
   router.post('/v1/organisms/:id/agents', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
-    const callerGhii = req.auth!.owner as string;
-    const id = req.params.id as string;
-    const { agent_gaii } = req.body ?? {};
-    if (!agent_gaii || typeof agent_gaii !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "agent_gaii" is required'));
-      return;
+    try {
+      const out = await attachOrganismAgent(storage, config, {
+        organismId: req.params.id as string, callerOwner: req.auth!.owner as string,
+        mayActAsPerson: isOwnerPrincipal(req.auth), agentGaii: (req.body ?? {}).agent_gaii,
+      });
+      res.status(201).json(success(config.nodeId, out));
+    } catch (e) {
+      if (!(e instanceof AgentListError)) throw e;
+      res.status(e.status).json(error(config.nodeId, e.code, e.message));
     }
-    const parsed = parseGaiiLoose(agent_gaii);
-    if (!parsed.agent) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach an agent (name#owner@node)'));
-      return;
-    }
-
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
-    }
-    const agentOwner = localAccountName(agent_gaii);
-    const ownAgent = agentOwner === callerGhii;
-    const isManager = isOrganismOwner(organism, callerGhii) || organism.admins.includes(callerGhii);
-    if (!ownAgent && !isManager) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach your own agents'));
-      return;
-    }
-    // Where the list decides who gets in, adding to it is the organism's own decision: only its owner
-    // or an admin, signed in, adds an agent. A member listing their own agent admitted it by themselves
-    // until 2026-10-15 (feature-list audit #58).
-    if (agentAccessOf(organism) === 'listed' && !isManager) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'This organism admits only the agents on its list, and only its owner or an admin adds one. Ask one of them to add your agent.'));
-      return;
-    }
-    if (agentAccessOf(organism) === 'listed' && !isOwnerPrincipal(req.auth)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'This organism admits only the agents on its list, so adding one is done by a person signed in, in the Agents section of the organism\'s page.'));
-      return;
-    }
-    // The agent's owner must be an active member: an agent is admitted as its owner's, never alone.
-    const ownerMembership = await storage.getMembership(id, agentOwner);
-    const ownerIsMember = !!ownerMembership && ownerMembership.status === 'active';
-    if (!ownerIsMember && !(ownAgent && isOrganismOwner(organism, callerGhii))) {
-      res.status(403).json(error(config.nodeId, 'NOT_MEMBER', ownAgent
-        ? 'You must be a member to attach an agent'
-        : `${agentOwner} is not an active member of this organism, so their agent cannot be attached`));
-      return;
-    }
-    // An agent of this node must exist: listing a name nobody holds yet would admit whatever agent is
-    // later created under it, without anyone listing that one. An agent of another node cannot be
-    // looked up here, and is listed as given.
-    if (parsed.node === config.nodeId && !(await storage.getAgent(agent_gaii))) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No agent ${agent_gaii} on this node`));
-      return;
-    }
-    if (organism.agentGaiis.includes(agent_gaii)) {
-      res.status(409).json(error(config.nodeId, 'ALREADY_ATTACHED', 'That agent is already attached'));
-      return;
-    }
-    await storage.updateOrganism(id, { agentGaiis: [...organism.agentGaiis, agent_gaii], updatedAt: new Date().toISOString() });
-    res.status(201).json(success(config.nodeId, { attached: agent_gaii }));
-    emitChange('organisms');
   });
 
   /* DELETE /v1/organisms/:id/agents/:gaii — detach an agent (its owner, or creator/admin) */
   router.delete('/v1/organisms/:id/agents/:gaii', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
-    const callerGhii = req.auth!.owner as string;
-    const id = req.params.id as string;
-    const agentGaii = decodeURIComponent(req.params.gaii as string);
-
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
+    try {
+      const out = await detachOrganismAgent(storage, {
+        organismId: req.params.id as string, callerOwner: req.auth!.owner as string,
+        agentGaii: decodeURIComponent(req.params.gaii as string),
+      });
+      res.json(success(config.nodeId, out));
+    } catch (e) {
+      if (!(e instanceof AgentListError)) throw e;
+      res.status(e.status).json(error(config.nodeId, e.code, e.message));
     }
-    const ownsAgent = localAccountName(agentGaii) === callerGhii;
-    const isAdmin = isOrganismOwner(organism, callerGhii) || organism.admins.includes(callerGhii);
-    if (!ownsAgent && !isAdmin) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the agent owner or an organism admin can detach it'));
-      return;
-    }
-    if (!organism.agentGaiis.includes(agentGaii)) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'That agent is not attached'));
-      return;
-    }
-    await storage.updateOrganism(id, { agentGaiis: organism.agentGaiis.filter(g => g !== agentGaii), updatedAt: new Date().toISOString() });
-    res.json(success(config.nodeId, { detached: agentGaii }));
-    emitChange('organisms');
   });
 }

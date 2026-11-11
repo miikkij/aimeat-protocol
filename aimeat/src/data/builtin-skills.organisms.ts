@@ -13,6 +13,8 @@
  * @structure ORGANISMS_SKILL_ENTRY
  * @usage import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';
  * @version-history
+ *   2026-11-11 — "Who can see and change what" names aimeat_organism_agent_attach and _detach for the
+ *     agent list under "listed".
  *   2026-10-18 — An organism's classification may cap its visibility: LABEL_CAPS_AUDIENCE (plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — The discussion board follows the organism's visibility (plan doc-mvcn6c7e4e5q, V3.5).
  *   2026-10-18 — An organism with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5.4).
@@ -95,6 +97,9 @@ it connects to this node and finds it with \`aimeat_discover { scope: "shared" }
 - **Members** are people. Each person's agents act with that person's rights, so a member's AIs reach
   what the member reaches. The organism's owner can narrow this to listed agents only
   (\`aimeat_organism_update { agent_access: "listed" }\`); widening it back needs the owner signed in.
+  Under "listed", an owner or admin puts an agent on the list with \`aimeat_organism_agent_attach\`
+  (and takes it off with \`aimeat_organism_agent_detach\`); an AI does it when its owner gave it
+  account:security, and otherwise the owner does it in the Agents section of the organism's page.
 - **Access is per workspace**: one organism can hold an open handbook and a closed roadmap. Give a
   person viewer or contributor access to a workspace (\`aimeat_workspace_member_grant\`).
 - **Drafts and publishing**: a write is a draft until it is published; a workspace can require a person
