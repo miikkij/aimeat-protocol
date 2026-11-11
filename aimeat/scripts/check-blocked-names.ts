@@ -31,6 +31,7 @@
  *   cd aimeat && pnpm check:blocked-names --url /components/Fingerprint.js   # ask about one address
  *   cd aimeat && pnpm check:blocked-names --refresh                          # fetch the lists now
  * @version-history
+ *   v1.0.1 — 2026-11-11 — The lists are fetched uncompressed: a gzip answer crashed undici, locally and on CI.
  *   v1.0.0 — 2026-11-10 — Initial.
  */
 import { execFileSync } from 'node:child_process';
@@ -68,7 +69,11 @@ function servedFiles(): Array<{ file: string; urls: string[] }> {
 }
 
 async function fetchText(url: string): Promise<string> {
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    // Uncompressed on purpose: a gzip answer from these hosts left undici throwing an uncaught
+    // `assert(!this.paused)` after the body had arrived, which ended the process with no result. Seen
+    // on Windows (Node 24.19 and 24.22.2) and on CI's Linux runner (run 43070021695). Four runs each
+    // way on Windows: gzip crashed every time, identity never.
+    const res = await fetch(url, { signal: AbortSignal.timeout(20_000), headers: { 'accept-encoding': 'identity' } });
     if (!res.ok) throw new Error(`${url} answered ${res.status}`);
     return res.text();
 }
