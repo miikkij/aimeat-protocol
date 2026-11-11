@@ -475,6 +475,15 @@ async function run() {
         assert(!w.isError, `the memory write was refused under "all": ${w.text.slice(0, 300)}`);
     });
 
+    await test('under "all", an agent takes itself off the list and puts itself back over MCP', async () => {
+        const off = await callTool(A, 'aimeat_organism_agent_detach', { organism_id: orgId, agent_gaii: A.agent.gaii });
+        assert(!off.isError && JSON.parse(off.text).detached === A.agent.gaii, `detach failed: ${off.text.slice(0, 300)}`);
+        const again = await callTool(A, 'aimeat_organism_agent_detach', { organism_id: orgId, agent_gaii: A.agent.gaii });
+        assert(again.isError && again.text.startsWith('NOT_FOUND'), `a second detach found the agent: ${again.text.slice(0, 300)}`);
+        const on = await callTool(A, 'aimeat_organism_agent_attach', { organism_id: orgId, agent_gaii: A.agent.gaii });
+        assert(!on.isError && JSON.parse(on.text).attached === A.agent.gaii, `attach failed under "all": ${on.text.slice(0, 300)}`);
+    });
+
     await test('aimeat_organism_invite_email keeps a return_url on this node and drops a foreign one', async () => {
         const kept = await callTool(A, 'aimeat_organism_invite_email', {
             organism_id: orgId, email: `kept${Date.now()}@example.com`, return_url: `${BASE}/v1/profile`,
