@@ -15,6 +15,9 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   2026-11-11 — A deploy or undeploy that acted on the agent the caller already has answers 200
+ *     (kind present, updated, started or stopped); 201 stays for a new task or proposal. The status
+ *     route passes the caller's principal, so `scopes` is what this caller's proposal would ask for.
  *   2026-10-21 — callerOwner asks isAnonymousPrincipal, so the minted anonymous token names no owner
  *     (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.4.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -48,6 +51,8 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import {
     deployAppAgent, appAgentInstances, appAgentStatus, type AppAgentRefusal,
 } from '../../services/app-agent-deploy.js';
+import type { ProposerPrincipal } from '../../services/agent-proposals.js';
+import { callerOf } from '../../middleware/caller.js';
 
 /** Bare owner name of the authenticated principal (owner claim may carry an @node suffix). */
 function bareOwner(req: Request): string {
@@ -105,6 +110,13 @@ function authorizeAppAgentCaller(
 }
 
 export function registerAppAgentRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
+    /**
+     * Who is asking, as the proposal service takes it: the request's caller object in the shape
+     * services take (services/caller-context.ts `auth`), with `owner` as the caller's bare account
+     * name. `sub` is the exact principal that asked, which a proposal records as its proposer.
+     */
+    const principalOf = (req: Request, owner: string): ProposerPrincipal =>
+        ({ ...callerOf(req, config.nodeId, storage).auth, owner });
 
     /** Create the deploy/undeploy pointer task on the requester's own runner agent. */
     async function handleAction(req: Request, res: Response, kind: 'deploy-app-agent' | 'undeploy-app-agent'): Promise<void> {
@@ -120,10 +132,13 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
             organismId: typeof req.body?.organism_id === 'string' ? req.body.organism_id : undefined,
             undeploy: kind === 'undeploy-app-agent',
             // Lets a deploy with no runner become a proposal for the owner (app-agent-propose.ts).
-            principal: { sub: req.auth!.sub, owner, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [] },
+            principal: principalOf(req, owner),
         });
         if (!result.ok) { sendRefusal(res, config, result); return; }
-        res.status(201).json(success(config.nodeId, result.view, result.links));
+        // 201 when a task or a proposal was made; 200 when the request acted on the agent the caller
+        // already has (started, stopped, given the app's newer definition, or left as it is).
+        const made = result.view.kind === 'proposed' || 'task_id' in result.view;
+        res.status(made ? 201 : 200).json(success(config.nodeId, result.view, result.links));
     }
 
     // POST /v1/apps/:owner/:filename/agents/:agentName/deploy
@@ -160,6 +175,8 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
             filename: req.params.filename as string,
             agentName: req.params.agentName as string,
             runnerAgent: typeof req.query.runner_agent === 'string' ? req.query.runner_agent : undefined,
+            // So the permissions of an agent that does not exist yet are what this caller's proposal would ask for.
+            principal: principalOf(req, owner),
         });
         if (!result.ok) { sendRefusal(res, config, result); return; }
         res.json(success(config.nodeId, result.view));

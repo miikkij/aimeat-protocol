@@ -97,7 +97,7 @@ export const appPublishTools = [
             tags: { type: 'array', description: 'Tags for search and filtering.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             icon: { type: 'string', description: 'Emoji icon.' },
             version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
-            cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish in both modes. Omit on update to carry them forward; [] clears.', zod: z.array(z.record(z.string(), z.unknown())) },
+            cortex_agents: { type: 'array', description: 'The agents this app brings (manifest.cortex.agents), validated at publish in both modes. Usually omit it and declare them in the page instead, in a <script type="application/json" id="aimeat-crews"> block, which a package made from the app reads too. With neither, the previous version\'s agents carry forward; [] clears. The shape is in skill node:aimeat-app-agents.', zod: z.array(z.record(z.string(), z.unknown())) },
         },
     },
     {

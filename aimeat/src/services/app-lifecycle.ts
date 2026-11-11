@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.11.0 — 2026-11-11 — A staged draft reads its agents from the page's own aimeat-crews block
+ *     when it has a usable one, as a publish does; otherwise it keeps the live app's.
  *   v1.10.5 — 2026-10-29 — deleteOwnedApp removes the app's plan with the whole app
  *     (services/app-plan.ts), so the structure page does not list a deleted app as one being built.
  *   v1.10.4 — 2026-10-27 — A fork into another account keeps only the intake forms the forker manages
@@ -103,6 +105,7 @@ import { appQuotaRefusal } from './install-quotas.js';
 import { lintAppAiDisclosure } from './app-ai-posture.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { publishApp, type PublishAppRefusal, type PublishAppResult } from './app-publish.js';
+import { decideBundledCrews } from './app-bundled-crews.js';
 import { mintProvenance, type DeclaredProvenance } from './ai/provenance.js';
 import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from './dependency-map.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
@@ -260,9 +263,14 @@ export async function stageAppDraft(
   if (icon) manifest.icon = icon;
   const protection = requested.protection ?? base?.protection;
   if (protection && Object.values(protection).some(Boolean)) manifest.protection = protection;
-  // A draft that only changes HTML keeps the live app's bundled crew-defs; the promotion then
-  // carries them into the new version unchanged.
-  if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
+  // The draft's own aimeat-crews block declares its agents, as it does on a publish
+  // (services/app-bundled-crews.ts); a draft with no usable block keeps the live app's bundled
+  // crew-defs, and the promotion carries either into the new version unchanged.
+  const draftCrews = /html/i.test(requested.mimeType ?? live?.mimeType ?? 'text/html')
+    ? decideBundledCrews({ requested: undefined, html: input.data.toString('utf8') }).agents : undefined;
+  if (draftCrews !== undefined) {
+    if (draftCrews.length > 0) manifest.cortex = { agents: draftCrews };
+  } else if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
   // What the draft is changing stays with the slot until somebody states a new one or clears it.
   const notice = requested.draftNotice !== undefined
     ? requested.draftNotice

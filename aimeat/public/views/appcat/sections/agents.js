@@ -5,11 +5,13 @@
  * @description The Bundled agents section of the app detail view (F341), shown only when the
  *   published app's manifest declares crew definitions (`manifest.cortex.agents`, the listing row's
  *   manifest, as the old catalogue's app-agents.js appManifestAgents read it): the explanation, one
- *   mark per agent name, and "Inspect & deploy", which opens the Bundled agents dialog (F147: the
- *   inspector, the hosted instances with their prices, deploy your own).
+ *   mark per agent name, and "See the agents", which opens the Bundled agents dialog (F147: the
+ *   inspector, the permissions, the person's own copy, who else runs it with their prices).
  * @structure meta · agentsOf(app) · AgentsSection({ d })
  * @usage loaded by the detail view: import('./sections/agents.js')
  * @version-history
+ *   v1.1.1 — 2026-11-11 — The header names the dialog's parts as they are since its v2.0.0; the
+ *     section's own words changed in the locales only.
  *   v1.1.0 — 2026-09-27 — Parity with the old page (appcat sections-d): the explanation as the
  *     chapter's grey opening line (Note caption size="lead"), the names as the old chips side by side
  *     with a space between (Mark tone="name"), 8px over the door, the door in the chapter's row.

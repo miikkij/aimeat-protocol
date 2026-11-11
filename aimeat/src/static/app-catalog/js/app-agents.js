@@ -16,6 +16,10 @@
  *   v1.1.0 — 2026-09-13 — The modal opens through dialogs.js (the site's one dialog).
  *   v1.2.0 — 2026-10-11 — An offer's line is its money price (or Free) and its pacing amount; no
  *     morsel amount is shown as a price (ruling "morseli on tahdistus, ei hinta").
+ *   v1.3.0 — 2026-11-11 — The runner picker starts with no runner chosen, so a deploy reaches the
+ *     person as a proposal (or acts on the agent they already have) and no longer becomes a task for
+ *     the first agent in their list. The notice says when the agent waits for approval, and repeats
+ *     the node's own sentence when the request acted on an existing agent. The robot sign is gone.
  */
 import { escapeHtml, jsArg } from './util.js';
 import { openDlg } from './dialogs.js';
@@ -119,7 +123,7 @@ export function showAppAgentsModal(owner, filename) {
   for (var i = 0; i < defs.length; i++) {
     var def = defs[i];
     html += '<div class="aga-def">' +
-      '<h3>\u{1F916} ' + escapeHtml(def.agent_name || '') + '</h3>' +
+      '<h3>' + escapeHtml(def.agent_name || '') + '</h3>' +
       inspectorHtml(def) +
       '<div class="aga-label">' + t('agents.hostedTitle') + '</div>' +
       '<div id="aga-instances-' + i + '" class="aga-goal">' + t('agents.loading') + '</div>' +
@@ -168,13 +172,14 @@ export function showAppAgentsModal(owner, filename) {
           var rank = function(m) { return m === 'task-runner' ? 0 : m === 'autonomous' ? 1 : 2; };
           return rank(a.mode) - rank(b.mode);
         });
-        var opts = agents.length
-          ? agents.map(function(a) {
-              var label = a.name + (a.mode === 'task-runner' ? ' · task-runner' : a.mode ? ' · ' + a.mode : '');
-              var sel = a.name === 'crew-forge' ? ' selected' : '';
-              return '<option value="' + escapeHtml(a.name) + '"' + sel + '>' + escapeHtml(label) + '</option>';
-            }).join('')
-          : '<option value="">' + t('agents.noRunnerOption') + '</option>';
+        // No runner is chosen by default: the node then acts on the agent the person already has,
+        // gives the work to their crew-forge when they have one, and otherwise proposes the agent.
+        // Until 2026-11-11 the first agent in the list was chosen, and the deploy became a task for
+        // an agent that could not do it.
+        var opts = '<option value="" selected>—</option>' + agents.map(function(a) {
+          var label = a.name + (a.mode === 'task-runner' ? ' · task-runner' : a.mode ? ' · ' + a.mode : '');
+          return '<option value="' + escapeHtml(a.name) + '">' + escapeHtml(label) + '</option>';
+        }).join('');
         defs.forEach(function(_, i) {
           var el = document.getElementById('aga-runner-' + i);
           if (el) el.innerHTML = opts;
@@ -230,10 +235,15 @@ export function agentsDeploy(owner, filename, agentName, idx) {
   if (runnerEl && runnerEl.value) body.runner_agent = runnerEl.value;
   if (orgEl && orgEl.value) body.organism_id = orgEl.value;
   postAction(owner, filename, agentName, 'deploy', body, function(d) {
+    if (d.kind === 'proposed') return t('agents.saidProposed');
+    // The request acted on the agent the person already has: the node's own sentence says what it did.
+    if (!d.task_id && d.note) return d.note;
     return d.auto_activated ? t('agents.deployStarted') : t('agents.deployQueued');
   });
 }
 
 export function agentsUndeploy(owner, filename, agentName) {
-  postAction(owner, filename, agentName, 'undeploy', {}, function() { return t('agents.undeployQueued'); });
+  postAction(owner, filename, agentName, 'undeploy', {}, function(d) {
+    return !d.task_id && d.note ? d.note : t('agents.undeployQueued');
+  });
 }

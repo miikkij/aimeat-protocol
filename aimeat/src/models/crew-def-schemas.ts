@@ -16,11 +16,15 @@
  *   const check = validateCortexAgents(req.body.cortex?.agents);
  *   if (!check.ok) return res.status(400).json(error(..., check.errors.join('; ')));
  * @version-history
+ *   v1.2.0 — 2026-11-11 — `scopes` and `description` beside agent_name are validated (they passed
+ *     through unchecked), proposedAgentName() is the name an approved proposal gives the agent, and
+ *     crewDefHash() identifies one definition so a later version of the app can be told apart.
  *   v1.1.1 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-09-20 — A tool id may carry ONE ':' so a decision rule can be named
  *     (`decide:<rule>`). The charset refused it, and that form is what the Crew tab offers.
  *   v1.0.0 — 2026-07-16 — Initial creation (Agent-Bundled Apps Slice 1, node side)
  */
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { INPUT_LIMITS } from './input-limits.js';
 
@@ -66,6 +70,11 @@ const CrewTaskSchema = z.object({
 export const CrewDefSchema = z.object({
   agent_name: z.string().max(INPUT_LIMITS.id).regex(/^[a-z0-9][a-z0-9-]{2,31}$/,
     'agent_name must be 3-32 lowercase alphanumeric characters with hyphens'),
+  // What the agent is for, in one or two sentences. The owner reads it on the proposal.
+  description: z.string().max(2000).optional(),
+  // The permissions the agent's job needs. A proposal asks the owner for these, capped by what the
+  // proposer may grant; `*` and the exact-grant scopes are left out (services/app-agent-propose.ts).
+  scopes: z.array(z.string().min(1).max(64)).max(40).optional(),
   readme_md: z.string().max(20000).optional(),
   temperature: z.number().min(0).max(2).optional(),
   llm_profile: z.string().min(1).max(64).optional(),
@@ -162,4 +171,32 @@ export function slugifyAppId(appId: string): string {
  */
 export function deployedAgentName(agentName: string, appId: string): string {
   return `${agentName}-${slugifyAppId(appId)}`.slice(0, 64).replace(/-+$/g, '');
+}
+
+/**
+ * The name an agent gets when its owner approves it as a proposal: the deployed name, cut to the 40
+ * characters a proposal allows. It differs from deployedAgentName() whenever that one is longer
+ * than 40, so a reader that looks for an agent by name asks for both.
+ */
+export function proposedAgentName(agentName: string, appId: string): string {
+  return deployedAgentName(agentName, appId).slice(0, 40).replace(/-+$/g, '');
+}
+
+/** JSON with every object's keys in order, so two equal definitions give the same text. */
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    return `{${Object.keys(obj).sort().filter(k => obj[k] !== undefined)
+      .map(k => `${JSON.stringify(k)}:${stableJson(obj[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/**
+ * A short identifier of one crew-def as the app's manifest holds it. An agent made from the
+ * definition records it, and a different value later means the app now declares another version.
+ */
+export function crewDefHash(def: unknown): string {
+  return createHash('sha256').update(stableJson(def)).digest('hex').slice(0, 16);
 }

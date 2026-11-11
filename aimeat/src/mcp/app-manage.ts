@@ -23,6 +23,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-11-11 — action agent_status passes the caller's principal, so the permissions it answers for
+ *     an agent that does not exist yet are what this caller's proposal would ask for.
  *   2026-11-06 — action seo answers own_words and own_words_min, and switching search on below 150 words
  *     of the app's own text is refused with what to write (TARGET-093).
  *   2026-11-04 — action versions answers what the app read answers for the session: a hidden app is
@@ -348,6 +350,7 @@ export function registerAppManageTool(
             case 'agent_status': {
                 const out = await appAgentStatus(storage, config, {
                     callerOwner, appOwner, filename, agentName: String(args.bundled_agent), runnerAgent: str(args.runner_agent),
+                    principal: { sub: callerGaii, owner: callerOwner, roles: callerGaii.includes('#') ? ['agent'] : ['owner'], scopes },
                 });
                 return out.ok ? answer(out.view) : refusalText(out);
             }

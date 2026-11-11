@@ -30,6 +30,8 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
+ *   v1.2.5 -- 2026-11-11 -- Reads builtin-skills.app-agents.ts, the skill aimeat-app-agents (it names
+ *     aimeat_app_publish, aimeat_app_manage, aimeat_crew_menu and aimeat_skill_get).
  *   v1.2.4 -- 2026-11-07 -- Reads build-introduction-step.ts, the Atelier interview's introduction
  *     question and its build section (it names aimeat_skill_get, aimeat_image_generate and
  *     aimeat_app_list).
@@ -111,6 +113,7 @@ const SOURCES: string[] = [
     'aimeat/src/data/builtin-skills.workstation.ts',
     'aimeat/src/data/builtin-skills.app-builder.ts',
     'aimeat/src/data/builtin-skills.app-builder-atelier.ts',
+    'aimeat/src/data/builtin-skills.app-agents.ts',
     'aimeat/src/data/builtin-skills.ai-capabilities.ts',
     'aimeat/src/data/builtin-skills.workspace-contracts.ts',
     'aimeat/src/data/builtin-skills.extension-builder.ts',

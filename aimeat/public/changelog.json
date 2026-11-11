@@ -2,6 +2,29 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-11-11",
+      "kind": "feature",
+      "id": "2026-11-11-add-an-apps-agent-with-one-approval",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "Add an app's agent with one approval",
+        "fi": "Sovelluksen agentti käyttöön yhdellä hyväksynnällä"
+      },
+      "summary": {
+        "en": "An app's own agent shows what it does and may do, and you add it by approving it.",
+        "fi": "Näet, mitä sovelluksen agentti tekee ja saa tehdä, ja otat sen käyttöön hyväksymällä."
+      },
+      "body": {
+        "en": "An app can bring an agent of its own. The app's page in the App Catalog now shows what the agent does and what it may do on your account before you add it. Adding it makes a proposal, and the agent exists only after you approve it. In the same place you see whether your agent waits for approval, is in use or is stopped, and you update it when the app publishes a newer version. Your own AI does the same with the tool aimeat_app_manage. For builders: an app declares its agent in one block in its own page, and the skill aimeat-app-agents says how.",
+        "fi": "Sovellus voi tuoda mukanaan oman agentin. Sovelluksen sivu sovelluskatalogissa näyttää nyt ennen lisäämistä, mitä agentti tekee ja mitä se saa tehdä tililläsi. Lisääminen tekee ehdotuksen, ja agentti on olemassa vasta, kun hyväksyt sen. Samasta paikasta näet, odottaako agenttisi hyväksyntää, onko se käytössä vai pysäytetty, ja päivität sen, kun sovellus julkaisee uuden version. Oma tekoälysi tekee saman työkalulla aimeat_app_manage. Rakentajalle: sovellus kertoo agenttinsa yhdessä lohkossa omalla sivullaan, ja taito aimeat-app-agents neuvoo miten."
+      }
+    },
+    {
       "date": "2026-11-09",
       "kind": "feature",
       "id": "2026-11-09-explain-this-page-to-me",

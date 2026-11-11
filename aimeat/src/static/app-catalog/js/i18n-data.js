@@ -5,6 +5,8 @@
  *   stay in main.js and import this table. Keep en + fi keys in lockstep (Rule 4).
  * @usage import { I18N } from './i18n-data.js'
  * @version-history
+ *   v1.7.2 — 2026-11-11 — agents.deployDesc says what a deploy with no runner does, and
+ *     agents.saidProposed is the notice for an agent that waits for approval (en, fi).
  *   v1.7.1 — 2026-11-08 — pb.atelierFailed, pb.atelierRetry and pb.atelierAbsent (en, fi): the prompt
  *     builder says when the Atelier guide did not load, and when the node has none.
  *   v1.7.0 — 2026-10-11 — Price and pacing (en, fi): pacing.free and pacing.amount, the monetize editor's
@@ -522,7 +524,8 @@ export const I18N = {
       'agents.instant': 'instant',
       'agents.undeploy': 'Undeploy',
       'agents.deployTitle': 'Deploy your own',
-      'agents.deployDesc': 'Creates a deploy task on YOUR own runner agent (crew-forge). The fleet reads the crew definition from the app manifest and starts the agent under your account - it never runs on anyone else’s fleet.',
+      'agents.deployDesc': 'With no runner chosen, the agent reaches you as a proposal that you approve, or your crew-forge sets it up when you have one. It works on your account only.',
+      'agents.saidProposed': 'The agent now waits for your approval.',
       'agents.runner': 'Runner',
       'agents.organism': 'Organism',
       'agents.deployBtn': 'Deploy to my fleet',
@@ -1627,7 +1630,8 @@ export const I18N = {
       'agents.instant': 'välitön',
       'agents.undeploy': 'Poista käytöstä',
       'agents.deployTitle': 'Ota oma käyttöön',
-      'agents.deployDesc': 'Luo käyttöönottotehtävän OMALLE ajoagentillesi (crew-forge). Laivue lukee crew-määrityksen sovelluksen manifestista ja käynnistää agentin sinun tilisi alle - se ei koskaan aja kenenkään muun laivueessa.',
+      'agents.deployDesc': 'Kun et valitse ajoagenttia, agentti tulee sinulle ehdotuksena, jonka sinä hyväksyt. Jos sinulla on crew-forge, se ottaa agentin käyttöön. Agentti toimii vain sinun tililläsi.',
+      'agents.saidProposed': 'Agentti odottaa nyt hyväksyntääsi.',
       'agents.runner': 'Ajoagentti',
       'agents.organism': 'Organismi',
       'agents.deployBtn': 'Ota käyttöön laivueeseeni',

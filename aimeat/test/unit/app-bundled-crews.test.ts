@@ -10,15 +10,20 @@
  *   would be dropped on export/import. The app's own HTML is already where this node reads a
  *   declaration from (`<meta name="aimeat-ai">`, `<meta name="aimeat-scopes">`), and it is the one
  *   thing every install door and the ZIP all carry unchanged.
- * @structure parseBundledCrews: present · absent · malformed · not-an-array · anywhere in the document
+ * @structure parseBundledCrews: present · absent · malformed · not-an-array · anywhere in the document ·
+ *   decideBundledCrews: the block, the request, neither, a block that cannot be used ·
+ *   crewPermissionFindings · crewDefHash, proposedAgentName
  * @usage pnpm test -- app-bundled-crews
  * @version-history
+ *   v1.1.0 — 2026-11-11 — decideBundledCrews (a publish reads the page's block), the permissions
+ *     hint, the definition hash and the name an approved proposal gives the agent.
  *   v1.0.0 — 2026-08-23 — Initial (TARGET-070).
  */
 
 import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
-import { parseBundledCrews } from '../../src/services/app-bundled-crews.js';
+import { parseBundledCrews, decideBundledCrews, crewPermissionFindings } from '../../src/services/app-bundled-crews.js';
+import { crewDefHash, deployedAgentName, proposedAgentName } from '../../src/models/crew-def-schemas.js';
 
 const CREW = {
     agent_name: 'shopkeeper',
@@ -73,5 +78,89 @@ describe('parseBundledCrews', () => {
         const crews = parseBundledCrews(html);
         assert.ok(crews);
         assert.equal(crews.length, 1);
+    });
+});
+
+// A crew-def the publish gate accepts: one task takes {{ctx.prompt}} (CREW above is for the parser only).
+const VALID = {
+    agent_name: 'shopkeeper',
+    agents: [{ role: 'Interviewer', goal: 'Find out what they sell.', tools: ['memory'] }],
+    tasks: [{ id: 'interview', description: 'Interview the owner about: {{ctx.prompt}}', expected_output: 'What they said.', agent: 'Interviewer' }],
+};
+const block = (crews: unknown) => page(`<script type="application/json" id="aimeat-crews">${typeof crews === 'string' ? crews : JSON.stringify(crews)}</script>`);
+
+describe('decideBundledCrews: which crew-defs a version being published carries', () => {
+    it('reads the page\'s block when the request states none', () => {
+        const out = decideBundledCrews({ requested: undefined, html: block([VALID]) });
+        assert.equal(out.agents?.length, 1);
+        assert.equal((out.agents?.[0] as { agent_name: string }).agent_name, 'shopkeeper');
+        assert.deepEqual(out.findings, []);
+    });
+
+    it('answers undefined (carry the previous version forward) with no block and no request', () => {
+        assert.deepEqual(decideBundledCrews({ requested: undefined, html: page('') }), { agents: undefined, findings: [] });
+        assert.deepEqual(decideBundledCrews({ requested: undefined, html: null }), { agents: undefined, findings: [] });
+    });
+
+    it('never throws on a block it cannot use: it carries forward and names the block', () => {
+        for (const bad of ['[{ not json', '"shopkeeper"', JSON.stringify([CREW])]) {
+            const out = decideBundledCrews({ requested: undefined, html: block(bad) });
+            assert.equal(out.agents, undefined, `carried forward for: ${bad.slice(0, 20)}`);
+            assert.equal(out.findings.length, 1);
+            assert.equal(out.findings[0].pitfall, 'bundled-agent-block');
+            assert.equal(out.findings[0].severity, 'warn');
+        }
+        // The definition with no {{ctx.prompt}} says why.
+        assert.match(decideBundledCrews({ requested: undefined, html: block([CREW]) }).findings[0].message, /ctx\.prompt/);
+    });
+
+    it('lets the request win, and says so when the page declares something else', () => {
+        const other = { ...VALID, agent_name: 'bookkeeper' };
+        const same = decideBundledCrews({ requested: [VALID], html: block([VALID]) });
+        assert.deepEqual(same.findings, []);
+        const differs = decideBundledCrews({ requested: [other], html: block([VALID]) });
+        assert.equal((differs.agents?.[0] as { agent_name: string }).agent_name, 'bookkeeper');
+        assert.equal(differs.findings.length, 1);
+        assert.equal(differs.findings[0].pitfall, 'bundled-agent-block');
+        // An explicit empty list clears, whatever the page says.
+        assert.deepEqual(decideBundledCrews({ requested: [], html: page('') }).agents, []);
+    });
+});
+
+describe('crewPermissionFindings: tools named, no permissions asked for', () => {
+    it('names an agent whose crew uses a tool beyond memory and declares no scopes', () => {
+        const out = crewPermissionFindings([{ ...VALID, agents: [{ role: 'Interviewer', goal: 'g', tools: ['memory', 'web', 'decide:sort-a-message'] }] }]);
+        assert.equal(out.length, 1);
+        assert.equal(out[0].pitfall, 'bundled-agent-permissions');
+        assert.match(out[0].message, /"shopkeeper"/);
+        assert.match(out[0].message, /web, decide:sort-a-message/);
+        assert.doesNotMatch(out[0].message, /tools memory/);
+    });
+
+    it('says nothing for memory alone, for no tools, and when scopes are declared', () => {
+        assert.deepEqual(crewPermissionFindings([VALID]), []);
+        assert.deepEqual(crewPermissionFindings([{ ...VALID, agents: [{ role: 'Interviewer', goal: 'g' }] }]), []);
+        assert.deepEqual(crewPermissionFindings([{ ...VALID, scopes: ['organism:read'], agents: [{ role: 'Interviewer', goal: 'g', tools: ['web'] }] }]), []);
+    });
+});
+
+describe('the two names and the hash of a bundled agent', () => {
+    it('gives equal definitions one hash whatever the key order, and a changed one another', () => {
+        const a = { agent_name: 'x', agents: [{ role: 'r', goal: 'g' }], tasks: [] };
+        const b = { tasks: [], agents: [{ goal: 'g', role: 'r' }], agent_name: 'x' };
+        assert.equal(crewDefHash(a), crewDefHash(b));
+        assert.notEqual(crewDefHash(a), crewDefHash({ ...a, agents: [{ role: 'r', goal: 'another goal' }] }));
+        assert.match(crewDefHash(a), /^[0-9a-f]{16}$/);
+    });
+
+    it('cuts the proposed name at 40 characters, where the deployed name runs to 64', () => {
+        const appId = 'alice/a-rather-long-application-name.html';
+        const deployed = deployedAgentName('order-composer', appId);
+        const proposed = proposedAgentName('order-composer', appId);
+        assert.equal(deployed, 'order-composer-alice-a-rather-long-application-name-html');
+        assert.equal(proposed, 'order-composer-alice-a-rather-long-appli');
+        assert.ok(proposed.length <= 40 && deployed.startsWith(proposed));
+        // A short pair is one name.
+        assert.equal(proposedAgentName('scout', 'bob/n.html'), deployedAgentName('scout', 'bob/n.html'));
     });
 });

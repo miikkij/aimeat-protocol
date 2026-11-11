@@ -34,6 +34,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-11-11 — deployAgents records `present` when the owner already has the bundled agent, made by
+ *     an approval (the deploy then creates no task and no proposal).
  *   2026-10-31 — `owner.welcome: false` sends the owner no welcome mail, at any apply; the owner's sign-in
  *     link is still turned on (v28 #8).
  *   2026-10-31 — A real apply claims the set's record before the real prepare and ensureOwner, which
@@ -653,6 +655,9 @@ async function deployAgents(deps: ApplyDeps, bundle: InstallBundle, record: Appl
             record.agents[id] = { ...base, result: 'error', detail: `${out.code}: ${out.message}` };
         } else if (out.view.kind === 'proposed') {
             record.agents[id] = { ...base, result: 'proposed', proposal_id: out.view.proposal_id, detail: out.view.note };
+        } else if (!('task_id' in out.view)) {
+            // The owner already has this agent, made by an approval: nothing was created (app-agent-deploy.ts).
+            record.agents[id] = { ...base, result: 'present', detail: out.view.note };
         } else {
             // A runner took it now: an earlier proposal still waiting is withdrawn, so approving it
             // later does not make a second agent for the same job.

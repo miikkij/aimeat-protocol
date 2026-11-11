@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-11 -- +aimeat-app-agents (builtin-skills.app-agents.ts): how an app brings an agent of
+ *     its own, from the aimeat-crews block to the owner's approval.
  *   2026-11-08 -- install-skills-locally: other agents' skill folders (Codex, Goose, OpenHands), a
  *     copy kept as the node's text with local rules in a skill of their own, the update check
  *     before a new task and over HTTP by the discovery index's digest (instruction audit
@@ -266,6 +268,7 @@ import { WORKFLOW_DECISIONS_SKILL_ENTRY } from './builtin-skills.workflow-decisi
 import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
 import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
 import { AGENT_AVATAR_SKILL_ENTRY } from './builtin-skills.agent-avatar.js';
+import { APP_AGENTS_SKILL_ENTRY } from './builtin-skills.app-agents.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -287,6 +290,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,
+  APP_AGENTS_SKILL_ENTRY,
   DECIDE_SKILL_ENTRY,
   REFINERY_SKILL_ENTRY,
   CONTENT_CLASSES_SKILL_ENTRY,

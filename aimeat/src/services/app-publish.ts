@@ -40,6 +40,10 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-11 — A publish that states no cortex.agents reads the page's aimeat-crews block, the one a
+ *     package install reads; a block that cannot be used, a block that differs from the request, and
+ *     a definition that names tools and asks for no permissions are named in the publish hints
+ *     (services/app-bundled-crews.ts decideBundledCrews).
  *   2026-11-06 — A new version keeps the owner's `about`, the text about the app (TARGET-093).
  *   2026-11-06 — A publish announces the app to IndexNow only when it has a description of its own
  *     (appSeoListable, TARGET-089 Y2).
@@ -168,6 +172,7 @@ import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
 import { intakeDeclarationOf } from './app-intake-forms.js';
+import { decideBundledCrews } from './app-bundled-crews.js';
 import { onAppVersionPublished } from './internet-opening/opening-version.js';
 import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
 import { delegatedSettingsRefusal } from './app-publish-delegate.js';
@@ -431,9 +436,12 @@ export async function publishApp(
     .exec(html.slice(0, 4096))?.[1];
   const icon = requested.icon ?? prev?.icon;
   if (icon) manifest.icon = icon;
-  // An explicit `cortexAgents` replaces the section (send `[]` to clear it); omitted carries forward.
-  const cortex: AppManifestCortex | undefined = requested.cortexAgents !== undefined
-    ? (requested.cortexAgents.length > 0 ? { agents: requested.cortexAgents } : undefined)
+  // An explicit `cortexAgents` replaces the section (send `[]` to clear it). Without one, the page's
+  // own aimeat-crews block is the declaration, the same block a package install reads; with neither,
+  // the previous version's agents carry forward (services/app-bundled-crews.ts).
+  const crews = decideBundledCrews({ requested: requested.cortexAgents, html: isHtml ? html : null });
+  const cortex: AppManifestCortex | undefined = crews.agents !== undefined
+    ? (crews.agents.length > 0 ? { agents: crews.agents } : undefined)
     : (prev?.cortex?.agents?.length ? prev.cortex : undefined);
   if (cortex) manifest.cortex = cortex;
   // The config declaration is read from these bytes and never carried forward.
@@ -748,7 +756,9 @@ export async function publishApp(
       // Only a record minted from THIS declaration; an attached record was written elsewhere.
       ...(aiProvenanceId && !input.declaredProvenanceId ? provenanceModelFindings(input.declaredProvenance) : []),
       // A form the code submits to and the aimeat-intake meta leaves out.
-      ...(intakeDecl && 'warnings' in intakeDecl ? intakeDecl.warnings : [])],
+      ...(intakeDecl && 'warnings' in intakeDecl ? intakeDecl.warnings : []),
+      // The agents the app bundles: a block that was not used, and tools with no permissions asked for.
+      ...crews.findings],
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.

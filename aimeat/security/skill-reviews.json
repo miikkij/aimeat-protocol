@@ -1,6 +1,18 @@
 {
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
+    "node:aimeat-app-agents": {
+      "reviewedOn": "2026-11-11",
+      "watches": [
+        "aimeat/src/models/crew-def-schemas.ts",
+        "aimeat/src/services/app-bundled-crews.ts",
+        "aimeat/src/services/app-agent-propose.ts",
+        "aimeat/src/services/app-agent-deploy.ts",
+        "aimeat/src/services/app-agents/app-agent-link.ts",
+        "aimeat/src/data/crew-runtime-scopes.ts"
+      ],
+      "digest": "sha256:17b71f97ea82c239a935447f"
+    },
     "node:agent-avatar": {
       "reviewedOn": "2026-11-04",
       "watches": [
@@ -864,6 +876,14 @@
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
       "aimeat/src/services/context/check.ts": "8eae091c8256a410",
       "aimeat/src/services/memory-versions/history.ts": "1e7cb0431167c4d5"
+    },
+    "node:aimeat-app-agents": {
+      "aimeat/src/models/crew-def-schemas.ts": "c8a53abfb24f7d69",
+      "aimeat/src/services/app-bundled-crews.ts": "ad6e157bedd3ef36",
+      "aimeat/src/services/app-agent-propose.ts": "a0a3f66ac49863fa",
+      "aimeat/src/services/app-agent-deploy.ts": "710d638019bf46af",
+      "aimeat/src/services/app-agents/app-agent-link.ts": "3f96cebc8e16d710",
+      "aimeat/src/data/crew-runtime-scopes.ts": "f99e490b7d0358e2"
     }
   }
 }

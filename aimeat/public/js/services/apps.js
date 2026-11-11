@@ -10,10 +10,11 @@
  *   - uploadApp(filename, contentBase64, mimeType, opts): POST a new app + optional screenshot
  *   - deleteApp(filename): DELETE an app by filename
  *   - patchApp(filename, updates): PATCH app metadata (name/description/access_code/parked)
- *   - deployAppAgent / undeployAppAgent / appAgentStatus: Agent-Bundled Apps — deploy the
- *     crew-defs an app declares (manifest.cortex.agents) onto YOUR OWN fleet + read liveness
  *
  * @version-history
+ *   v1.4.0 — 2026-11-11 — deployAppAgent, undeployAppAgent and appAgentStatus are removed: no view
+ *     called them since the app catalogue's own dialog took the three calls over
+ *     (views/appcat/dialogs/agents.js).
  *   v1.3.0 — 2026-11-09 — listApps({ own: true }) asks the server for the caller's own apps
  *     (GET /v1/apps?own=true), so a page that shows only them no longer walks the whole catalogue
  *     of the node: 600 kB in two requests at 288 apps, on every Settings page and the Home.
@@ -70,29 +71,4 @@ export async function deleteApp(filename) {
 /** Update app metadata (name, description, access_code, parked). The URL never changes. */
 export async function patchApp(filename, updates) {
   return apiPatch('/v1/apps/' + encodeURIComponent(filename), updates);
-}
-
-const appAgentUrl = (owner, filename, agentName, tail) =>
-  '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename)
-  + '/agents/' + encodeURIComponent(agentName) + '/' + tail;
-
-/** Deploy an app's bundled agent onto YOUR OWN fleet (creates a deploy-app-agent task). */
-export async function deployAppAgent(owner, filename, agentName, opts = {}) {
-  return api(appAgentUrl(owner, filename, agentName, 'deploy'), {
-    method: 'POST',
-    body: JSON.stringify(opts),
-  });
-}
-
-/** Signal your fleet to stop + deregister an app's deployed agent. */
-export async function undeployAppAgent(owner, filename, agentName, opts = {}) {
-  return api(appAgentUrl(owner, filename, agentName, 'undeploy'), {
-    method: 'POST',
-    body: JSON.stringify(opts),
-  });
-}
-
-/** Liveness of an app's bundled agent on your fleet (registration + deploy memory key). */
-export async function appAgentStatus(owner, filename, agentName) {
-  return apiGet(appAgentUrl(owner, filename, agentName, 'status'));
 }

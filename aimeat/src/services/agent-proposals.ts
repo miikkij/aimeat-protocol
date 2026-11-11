@@ -27,10 +27,15 @@
  *   disagree), and no proposal may exceed what this node allows at all. Neither is re-implemented
  *   here.
  * @structure AgentProposal · RunModeCorrection · proposalApprovalUrl() · proposalNextStep() · proposalRunModeFor() ·
- *   proposalScopesFor() · proposerIsOwnerSession() · proposeAgent() · listProposals() · readProposal() · settleProposal()
+ *   proposalScopesFor() · proposerIsOwnerSession() · proposeAgent() · listProposals() · readProposal() ·
+ *   recordProposalDefinition() · settleProposal()
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.11.0 — 2026-11-11 — A proposal made from an app's bundled agent carries `source_app` (the app,
+ *     the agent's name in it and the definition's hash). Only the node's own code sets it, through
+ *     proposeAgent's fourth argument; a request body cannot. recordProposalDefinition() rewrites the
+ *     hash when a newer definition of the app is published to the agent.
  *   v1.10.0 — 2026-10-31 — A proposal may carry `schedule`, a five-field cron the proposal's page
  *     starts with, so the owner's one press creates the agent and its clock together (v31 K47).
  *   v1.9.0 — 2026-10-31 — proposalApprovalUrl(baseUrl, id) is the proposal's own page on the home,
@@ -75,6 +80,7 @@ import { offerSignalError } from './agent-default-offer.js';
 import { browserDomainsError } from './crew-browser-domains.js';
 import { withInvitesSentence } from './agent-invites.js';
 import { isValidCron } from './schedule-gate.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
@@ -108,6 +114,16 @@ export function proposalNextStep(
 }
 
 export type ProposalState = 'proposed' | 'approved' | 'declined';
+
+/**
+ * The app definition an agent was made from: the app (`<owner>/<filename>`), the agent's name inside
+ * the app's manifest, and the hash of that definition (models/crew-def-schemas.ts crewDefHash).
+ */
+export interface BundledAgentSource {
+  app_id: string;
+  agent_name: string;
+  definition_hash: string;
+}
 
 /** A run mode the proposer asked for and no connected connector of the owner's could run. */
 export interface RunModeCorrection {
@@ -188,6 +204,12 @@ export interface AgentProposal {
    * stored before 2026-10-11.
    */
   warnings?: CrewDefWarning[];
+  /**
+   * Set when the proposal was made from an agent an app bundles (services/app-agent-propose.ts).
+   * The app's status, its list of running copies and its stop action find the approved agent by
+   * this, never by the agent's name. Absent on any other proposal and on one stored before 2026-11-11.
+   */
+  source_app?: BundledAgentSource | null;
   /** Who asked. A GAII, or the owner's own name when a person drafted it in their session. */
   proposed_by: string;
   proposed_at: string;
@@ -243,6 +265,11 @@ export async function proposeAgent(
     /** A five-field cron the proposal's page starts with (AgentProposal.schedule). */
     schedule?: string | null;
   },
+  /**
+   * What the node's own code states about the proposal. Kept out of `input` because the REST route
+   * and the MCP tool pass a request body there, and a caller must not be able to claim an app.
+   */
+  stated?: { sourceApp?: BundledAgentSource },
 ): Promise<{ ok: true; proposal: AgentProposal; alreadyWaiting?: boolean } | Fail> {
   const { config, storage } = ctx;
   const schedule = typeof input.schedule === 'string' ? input.schedule.trim() : '';
@@ -396,6 +423,7 @@ export async function proposeAgent(
     crew_def: input.crew_def ?? null,
     ...(schedule ? { schedule } : {}),
     warnings: crewDefWarnings(input.crew_def),
+    ...(stated?.sourceApp ? { source_app: stated.sourceApp } : {}),
     proposed_by: principal.sub,
     proposed_at: now,
     state: 'proposed',
@@ -444,6 +472,25 @@ export async function readProposal(ctx: ProposalContext, owner: string, id: stri
   const ownerGhii = `${owner}@${ctx.config.nodeId}`;
   const row = await ctx.storage.getMemory(ownerGhii, proposalKey(id));
   return row ? (row.value as unknown as AgentProposal) : null;
+}
+
+/**
+ * Record that the agent made from an approved proposal now runs another definition of its app:
+ * `source_app.definition_hash` becomes `definitionHash`. Called after a newer definition of the
+ * app's bundled agent was published to the agent (services/app-agent-deploy.ts). A proposal with no
+ * `source_app` is left as it is. Written on the record's version, so a concurrent settle is not lost.
+ */
+export async function recordProposalDefinition(
+  ctx: ProposalContext, owner: string, proposalId: string, definitionHash: string,
+): Promise<void> {
+  await updateRecord<AgentProposal | null>(
+    ctx.storage, `${owner}@${ctx.config.nodeId}`, proposalKey(proposalId),
+    v => (v && typeof v === 'object' ? v as AgentProposal : null),
+    cur => (cur?.source_app && cur.source_app.definition_hash !== definitionHash
+      ? { ...cur, source_app: { ...cur.source_app, definition_hash: definitionHash } }
+      : UNCHANGED),
+    { tag: 'agent-proposal', visibility: 'owner' },
+  );
 }
 
 /** Record the owner's decision on the proposal and close the item it put on their list. */

@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-11 — "An agent that comes with the app": the aimeat-crews block, the approval, and the
+ *     skill aimeat-app-agents.
  *   2026-11-08 — Step 0 says the model rule by quality (MODEL_QUALITY_ADVICE), never by name, and
  *     step 2 scopes the genre fork to `fine` (Jouni's ruling and the MCP re-check).
  *   2026-11-08 — FINISH names the four owed items (it named two), and "just build it the usual way"
@@ -95,6 +97,12 @@ surface — MCP, the connector, and \`/local/call\`. Everything else about one a
 name), seo, marks, legal, audit, versions, lineage, screenshot, visitors, ui_get/ui_set, cost,
 preview_link, bundled agents, members and backup_export. A call with a missing or foreign field is refused
 with every problem named at once.
+
+**An agent that comes with the app.** An app whose work continues while nobody has it open brings
+its own agent: one \`aimeat-crews\` block in the page declares what the agent is for, the permissions
+its job needs, its crew and its tasks. A person adds it from the app's page or through their AI
+(\`aimeat_app_manage\` action \`agent_deploy\`), and it exists only after they approve it. Read the skill
+**\`aimeat-app-agents\`** (\`aimeat_skill_get\`) before you write the block.
 
 **Search engines.** A published app stays out of search until its owner switches it on
 (\`aimeat_app_manage\` action \`seo\`, \`index: true\`). The node refuses that switch while the app's page

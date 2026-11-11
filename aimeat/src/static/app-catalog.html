@@ -4472,7 +4472,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "agents.instant": "instant",
       "agents.undeploy": "Undeploy",
       "agents.deployTitle": "Deploy your own",
-      "agents.deployDesc": "Creates a deploy task on YOUR own runner agent (crew-forge). The fleet reads the crew definition from the app manifest and starts the agent under your account - it never runs on anyone else’s fleet.",
+      "agents.deployDesc": "With no runner chosen, the agent reaches you as a proposal that you approve, or your crew-forge sets it up when you have one. It works on your account only.",
+      "agents.saidProposed": "The agent now waits for your approval.",
       "agents.runner": "Runner",
       "agents.organism": "Organism",
       "agents.deployBtn": "Deploy to my fleet",
@@ -5577,7 +5578,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "agents.instant": "välitön",
       "agents.undeploy": "Poista käytöstä",
       "agents.deployTitle": "Ota oma käyttöön",
-      "agents.deployDesc": "Luo käyttöönottotehtävän OMALLE ajoagentillesi (crew-forge). Laivue lukee crew-määrityksen sovelluksen manifestista ja käynnistää agentin sinun tilisi alle - se ei koskaan aja kenenkään muun laivueessa.",
+      "agents.deployDesc": "Kun et valitse ajoagenttia, agentti tulee sinulle ehdotuksena, jonka sinä hyväksyt. Jos sinulla on crew-forge, se ottaa agentin käyttöön. Agentti toimii vain sinun tililläsi.",
+      "agents.saidProposed": "Agentti odottaa nyt hyväksyntääsi.",
       "agents.runner": "Ajoagentti",
       "agents.organism": "Organismi",
       "agents.deployBtn": "Ota käyttöön laivueeseeni",
@@ -10052,7 +10054,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var html = '<div class="aga-intro">' + t("agents.declares") + "</div>";
     for (var i = 0; i < defs.length; i++) {
       var def = defs[i];
-      html += '<div class="aga-def"><h3>🤖 ' + escapeHtml(def.agent_name || "") + "</h3>" + inspectorHtml(def) + '<div class="aga-label">' + t("agents.hostedTitle") + '</div><div id="aga-instances-' + i + '" class="aga-goal">' + t("agents.loading") + '</div><div class="aga-label">' + t("agents.deployTitle") + "</div>" + (token ? '<div class="aga-deploy-row"><label>' + t("agents.runner") + ' <select id="aga-runner-' + i + '" class="modal-input aga-select"><option value="">' + t("agents.loading") + "</option></select></label><label>" + t("agents.organism") + ' <select id="aga-organism-' + i + `" class="modal-input aga-select"><option value="">—</option></select></label><button class="modal-btn aga-deploy-btn" onclick="window._launcher.agentsDeploy('` + jsArg(owner) + "', '" + jsArg(filename) + "', '" + jsArg(def.agent_name) + "', " + i + ')">' + t("agents.deployBtn") + '</button></div><div class="aga-goal">' + t("agents.deployDesc") + "</div>" : '<div class="aga-goal">' + t("agents.needLogin") + "</div>") + "</div>";
+      html += '<div class="aga-def"><h3>' + escapeHtml(def.agent_name || "") + "</h3>" + inspectorHtml(def) + '<div class="aga-label">' + t("agents.hostedTitle") + '</div><div id="aga-instances-' + i + '" class="aga-goal">' + t("agents.loading") + '</div><div class="aga-label">' + t("agents.deployTitle") + "</div>" + (token ? '<div class="aga-deploy-row"><label>' + t("agents.runner") + ' <select id="aga-runner-' + i + '" class="modal-input aga-select"><option value="">' + t("agents.loading") + "</option></select></label><label>" + t("agents.organism") + ' <select id="aga-organism-' + i + `" class="modal-input aga-select"><option value="">—</option></select></label><button class="modal-btn aga-deploy-btn" onclick="window._launcher.agentsDeploy('` + jsArg(owner) + "', '" + jsArg(filename) + "', '" + jsArg(def.agent_name) + "', " + i + ')">' + t("agents.deployBtn") + '</button></div><div class="aga-goal">' + t("agents.deployDesc") + "</div>" : '<div class="aga-goal">' + t("agents.needLogin") + "</div>") + "</div>";
     }
     body.innerHTML = html;
     openDlg("agents-overlay");
@@ -10084,11 +10086,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
           };
           return rank(a.mode) - rank(b.mode);
         });
-        var opts = agents.length ? agents.map(function(a) {
+        var opts = '<option value="" selected>—</option>' + agents.map(function(a) {
           var label2 = a.name + (a.mode === "task-runner" ? " · task-runner" : a.mode ? " · " + a.mode : "");
-          var sel = a.name === "crew-forge" ? " selected" : "";
-          return '<option value="' + escapeHtml(a.name) + '"' + sel + ">" + escapeHtml(label2) + "</option>";
-        }).join("") : '<option value="">' + t("agents.noRunnerOption") + "</option>";
+          return '<option value="' + escapeHtml(a.name) + '">' + escapeHtml(label2) + "</option>";
+        }).join("");
         defs.forEach(function(_, i2) {
           var el = document.getElementById("aga-runner-" + i2);
           if (el) el.innerHTML = opts;
@@ -10147,12 +10148,14 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     if (runnerEl && runnerEl.value) body.runner_agent = runnerEl.value;
     if (orgEl && orgEl.value) body.organism_id = orgEl.value;
     postAction(owner, filename, agentName, "deploy", body, function(d) {
+      if (d.kind === "proposed") return t("agents.saidProposed");
+      if (!d.task_id && d.note) return d.note;
       return d.auto_activated ? t("agents.deployStarted") : t("agents.deployQueued");
     });
   }
   function agentsUndeploy(owner, filename, agentName) {
-    postAction(owner, filename, agentName, "undeploy", {}, function() {
-      return t("agents.undeployQueued");
+    postAction(owner, filename, agentName, "undeploy", {}, function(d) {
+      return !d.task_id && d.note ? d.note : t("agents.undeployQueued");
     });
   }
 

@@ -12,10 +12,14 @@
  *   (routes/agents-v2/agent-proposals.ts). So a new account had no runner, and every "deploy" ended
  *   in RUNNER_NOT_FOUND. This turns a bundled agent into that proposal, from an installed package and
  *   from the app's own "deploy" button alike.
- * @structure proposeBundledAgent(ctx, principal, app, agentName) · proposeBundledAgentsOfApps(...) ·
- *   bundledAgentScopes(declared, principal)
+ * @structure bundledCrewDef(declared) · proposeBundledAgent(ctx, principal, app, agentName) ·
+ *   proposeBundledAgentsOfApps(...) · bundledAgentScopes(declared, principal)
  * @usage const r = await proposeBundledAgent({ storage, config }, principal, app, 'researcher');
  * @version-history
+ *   v1.3.0 — 2026-11-11 — The proposal states the app, the agent's name in it and the definition's
+ *     hash (`source_app`), so the approved agent is found by that and not by its name. bundledCrewDef()
+ *     is the one reading of a manifest entry, shared with the publish of a newer definition
+ *     (app-agent-deploy.ts). The name comes from proposedAgentName() in models/crew-def-schemas.ts.
  *   v1.2.0 — 2026-10-02 — The crew runtime's own scopes are never left out, whoever proposes:
  *     proposeAgent adds them to every proposal (memory:read since today).
  *   v1.1.0 — 2026-10-02 — The proposal carries the scopes the definition declares, plus the crew
@@ -28,7 +32,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AppRecord } from '../storage/types/apps.js';
 import type { CrewDefDoc } from '../data/basic-agents.js';
 import { proposeAgent, proposerIsOwnerSession, type ProposerPrincipal } from './agent-proposals.js';
-import { deployedAgentName } from '../models/crew-def-schemas.js';
+import { proposedAgentName, crewDefHash } from '../models/crew-def-schemas.js';
 import { withCrewRuntimeScopes, CREW_RUNTIME_SCOPES } from '../data/crew-runtime-scopes.js';
 import { isOutsideWildcard, scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
@@ -43,9 +47,23 @@ export interface BundledAgentProposal {
 
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
-/** The proposal's name: the deployed-name convention, cut to the 40 characters a proposal allows. */
-function proposalName(agentName: string, appId: string): string {
-    return deployedAgentName(agentName, appId).slice(0, 40).replace(/-+$/g, '');
+/**
+ * One entry of `manifest.cortex.agents` read as the definition an agent runs. `description` and
+ * `scopes` are about the proposal and never go into the definition, `agent_name` is the app's name
+ * for it, and the two fields a seeded definition states and a bundled one may leave out get their
+ * defaults. The bundled crew-def is the flat shape the publish route validates
+ * (models/crew-def-schemas.ts).
+ */
+export function bundledCrewDef(declared: Record<string, unknown>): {
+    crewDef: CrewDefDoc; description: string; declaredScopes: unknown;
+} {
+    const { description, scopes: declaredScopes, ...rest } = declared;
+    delete rest.agent_name;
+    return {
+        crewDef: { tags: [], listen_for: ['tasks'], ...rest } as unknown as CrewDefDoc,
+        description: text(description),
+        declaredScopes,
+    };
 }
 
 /**
@@ -62,28 +80,22 @@ export async function proposeBundledAgent(
         return { ok: false, status: 404, code: 'AGENT_NOT_DECLARED', message: `The app ${app.filename} does not list an agent called "${agentName}".` };
     }
     const appId = `${app.ownerName}/${app.filename}`;
-    const { description, scopes: declaredScopes, ...rest } = declared;
-    delete rest.agent_name;
+    const { crewDef, description, declaredScopes } = bundledCrewDef(declared);
     const { scopes, dropped } = bundledAgentScopes(declaredScopes, principal);
     if (dropped.length > 0) {
         logger.info('proposeBundledAgent: declared scopes left out of the proposal', {
             app: app.filename, agent: agentName, by: principal.sub, dropped,
         });
     }
-    // The bundled crew-def is the flat shape the publish route validates (models/crew-def-schemas.ts);
-    // the two fields a seeded definition states and a bundled one may leave out get their defaults.
-    const crewDef = {
-        tags: [], listen_for: ['tasks'], ...rest,
-    } as unknown as CrewDefDoc;
     const readmeLine = text(crewDef.readme_md).split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#')) ?? '';
-    const purpose = text(description) || readmeLine || `Works for the app ${app.filename}, which it came with.`;
+    const purpose = description || readmeLine || `Works for the app ${app.filename}, which it came with.`;
     const r = await proposeAgent(ctx, principal, {
-        name: proposalName(agentName, appId),
+        name: proposedAgentName(agentName, appId),
         // The app's own name where it has one: an installed copy's filename carries the instance id.
         display_name: `${agentName} (${text((app.manifest as { name?: unknown } | undefined)?.name) || app.filename})`,
         purpose: purpose.length >= 10 ? purpose : `${purpose}: the agent that came with the app ${app.filename}.`,
         mode: 'task-runner', run_mode: 'spawn', crew_def: crewDef, scopes,
-    });
+    }, { sourceApp: { app_id: appId, agent_name: agentName, definition_hash: crewDefHash(declared) } });
     if (!r.ok) return r;
     return {
         ok: true,

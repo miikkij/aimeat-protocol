@@ -152,6 +152,26 @@ the data SDK has no cross-owner enumeration at all, so the per-entry split buys 
 
 Background and the numbers: **MEMORY KEY SHAPE AUDIT** in Platform Development Notes.
 
+## An agent that comes with the app
+
+An app whose work continues while nobody has it open brings an agent of its own. The app declares
+it in one `<script type="application/json" id="aimeat-crews">` block in its HTML: what the agent is
+for (`description`), the permissions its job needs (`scopes`), its crew and its tasks. Every publish
+route reads that block, and so does a package made from the app. A person adds the agent from the
+app's page in the App Catalog or through their AI (`aimeat_app_manage`, action `agent_deploy`), and
+it exists only after they approve it.
+
+The node skill **`aimeat-app-agents`** (`aimeat_skill_get`) has the shape, a whole example and the
+check to run after the publish. Two things go wrong most often, and the publish answer names both
+in `app_hints`: a block the node could not use (`bundled-agent-block`), and an agent that names
+tools and asks for no permissions (`bundled-agent-permissions`). An agent approved without the
+permissions its tools need does the work and then has it refused: measured 2026-11-11, with the
+marketplace tools on an agent that held only the memory permissions.
+
+When the code behind this changes, the facts live in `aimeat/src/models/crew-def-schemas.ts`,
+`aimeat/src/services/app-bundled-crews.ts`, `app-agent-propose.ts`, `app-agent-deploy.ts` and
+`app-agents/app-agent-link.ts`, and the skill text in `aimeat/src/data/builtin-skills.app-agents.ts`.
+
 ## Served browser SDK libs
 
 Loading them is app work; **authoring or fixing one is platform work** and has its own rules (ESM

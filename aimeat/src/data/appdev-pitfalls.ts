@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-11 — +bundled-agent-block, +bundled-agent-permissions: how an app declares the agent it
+ *     brings, and which permissions that agent gets (services/app-bundled-crews.ts names both in the publish hints).
  *   (2026-11-08) hand-rolled names 390×844 and 1280×900, the skill's size matrix, where it said 390 and 1440.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-25 — intake-form-undeclared: the forms a page submits to are named in <meta name="aimeat-intake"> (services/app-intake-forms.ts).
@@ -575,6 +577,32 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     updatedAt: '2026-10-20',
     ...CHECKED,
+  }),
+
+  // ---- an agent the app brings with it ---------------------------------------
+  E({
+    id: 'bundled-agent-block',
+    title: 'An app declares the agent it brings in one aimeat-crews block in its own HTML',
+    symptom: 'The app publishes and shows no agent, a package made from it installs with no agent, or the publish answer carries an app_hints entry about the aimeat-crews block. The usual causes: the definition was sent only in the publish request (a package reads only the page), the block is not valid JSON, or a task has no {{ctx.prompt}}.',
+    fix: 'Put `<script type="application/json" id="aimeat-crews">[ ... ]</script>` in the page, a list of at most five definitions. One definition: `agent_name` (3 to 32 lowercase letters, digits and hyphens, starting with a letter), `description` (one or two sentences the owner reads before approving), `scopes` (the permissions the job needs), `agents` (the crew: each with `role`, `goal`, optional `backstory`, `tools`, `skills`) and `tasks` (each with `description`, `expected_output` and `agent`, the role that does it). At least one task description contains {{ctx.prompt}}, which is replaced by the request the agent was given. Publish without cortex_agents and the block is the declaration on every route: a plain publish, a draft and a package. The definition is data: the node validates it and never runs code from the app. A person adds the agent from the app\'s page in the App Catalog, or their AI does with aimeat_app_manage { action: "agent_deploy" }; it reaches them as a proposal, and nothing exists until they approve it. Read the node skill node:aimeat-app-agents for a whole example.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-11',
+    verifiedAt: '2026-11-11',
+    verifiedVersion: '4.3.0',
+  }),
+  E({
+    id: 'bundled-agent-permissions',
+    title: 'A bundled agent holds only the permissions its definition asks for',
+    symptom: 'The owner approved the agent, its first task ends as refused, and the agent\'s refusals name a permission. Or the publish answer carries an app_hints entry saying the agent names tools and asks for no permissions.',
+    fix: 'List what the job needs in `scopes` beside `agent_name`, for example ["organism:read", "task:write"]. A proposal asks the owner for exactly those, plus memory:read and memory:write, which the crew runtime needs for itself. `*` and the permissions an owner grants one by one (account:security and the like) are never taken from an app; the answer names them in scopes_left_out and the owner can grant them on the agent\'s page. Ask for the smallest list that does the job: the owner reads it before approving. aimeat_app_manage { action: "agent_status" } shows the permissions a proposal would ask for.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-11-11',
+    verifiedAt: '2026-11-11',
+    verifiedVersion: '4.3.0',
   }),
 ];
 

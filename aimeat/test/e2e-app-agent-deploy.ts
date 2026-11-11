@@ -9,6 +9,13 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.6.0 — 2026-11-11 — Phase 7: a publish with no cortex field reads the page's aimeat-crews block
+ *     (an unreadable block and a definition with tools and no permissions are named in app_hints);
+ *     the approval path for an app whose derived agent name is over 40 characters: status none,
+ *     waiting, running and stopped by the app link, the list of running copies, deploy answering
+ *     present, started and updated (the last against a runtime on the tunnel), undeploy stopping the
+ *     agent, a sibling without agent:write refused (403) with its positive control, and no reach
+ *     across owners. Every test of the phase was red on the source before the change.
  *   v1.5.0 — 2026-10-20 — Phase 2b: a deploy task asks the shared start decision. A task:write-only
  *     sibling's deploy onto a task-runner holding connections:use, and onto one set to taskStart
  *     'confirm', each gets a queued task (the first notifies the owner); onto a plain task-runner it
@@ -39,6 +46,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { TunnelClient } from './helpers/tunnel-harness.js';
 import { removedOn } from './helpers/node-release.js';
 import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -722,6 +730,194 @@ async function main() {
         const list = await json('/v1/apps?limit=200', { headers: { Authorization: `Bearer ${owner1Token}` } });
         const app = list.body.data.apps.find((x: any) => x.filename === FILENAME && x.owner === owner1);
         assert(!app.manifest.cortex, `section removed: ${JSON.stringify(app.manifest.cortex)}`);
+    });
+
+    // ── Phase 7: the page declares the agent, and the approved agent is found by its app link ──
+    // Until 2026-11-11 a publish read only the request's cortex.agents (a package read only the page's
+    // aimeat-crews block), and the status, the list of running copies and the undeploy looked for an
+    // agent named <agent_name>-<slug(app_id)> cut to 64 characters, while an approved proposal names
+    // it with the cut at 40. This app's derived name is over 40, so each test below was red before.
+    console.log('\nPhase 7: aimeat-crews block at publish; the approval path by app link (name over 40 characters)');
+    const LONG_FILE = 'a-rather-long-joker-application.html';
+    const LONG_AGENT = 'demo-joker-assistant';
+    const LONG_APP_ID = () => `${owner1}/${LONG_FILE}`;
+    const LONG_SLUG = () => LONG_APP_ID().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const LONG_DEPLOYED = () => `${LONG_AGENT}-${LONG_SLUG()}`.slice(0, 64).replace(/-+$/g, '');
+    const LONG_PROPOSED = () => LONG_DEPLOYED().slice(0, 40).replace(/-+$/g, '');
+    const pageWith = (block: string) => b64(`<!DOCTYPE html><html><body>long joker<script type="application/json" id="aimeat-crews">${block}</script></body></html>`);
+    const longDef = (goal = 'Tell one excellent joke') => {
+        const d = crewDef(LONG_AGENT) as any;
+        d.description = 'Tells a joke about whatever you name.';
+        d.scopes = ['organism:read', '*'];
+        d.agents[0].goal = goal;
+        return d;
+    };
+    const longUrl = (tail: string) => `/v1/apps/${owner1}/${LONG_FILE}/agents/${LONG_AGENT}/${tail}`;
+    const owner3 = `bundler${(Date.now() + 13) % 100000}c`;
+    let owner3Token = '';
+    let longProposalId = '';
+    const status3 = async () => (await json(longUrl('status'), { headers: { Authorization: `Bearer ${owner3Token}` } })).body.data;
+
+    await test('a publish with NO cortex field reads the page\'s aimeat-crews block', async () => {
+        owner3Token = (await registerOwner(BASE, owner3)).token;
+        assert(LONG_DEPLOYED() !== LONG_PROPOSED(), `the test needs a derived name over 40 characters: ${LONG_DEPLOYED()}`);
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: publishBody({ filename: LONG_FILE, name: 'Long Joker', content: pageWith(JSON.stringify([longDef()])) }),
+        });
+        assert(r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body)}`);
+        const agents = r.body.data?.manifest?.cortex?.agents;
+        assert(Array.isArray(agents) && agents.length === 1 && agents[0].agent_name === LONG_AGENT, `the block became manifest.cortex.agents: ${JSON.stringify(r.body.data?.manifest?.cortex)}`);
+    });
+
+    await test('a block that is not valid JSON never refuses the publish: the hint names it and the agents stay', async () => {
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: publishBody({ filename: LONG_FILE, name: 'Long Joker', content: pageWith('[{ not json') }),
+        });
+        assert(r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body)}`);
+        assert((r.body.data.app_hints ?? []).some((h: any) => h.pitfall === 'bundled-agent-block'), `hint: ${JSON.stringify(r.body.data.app_hints)}`);
+        assert(r.body.data.manifest?.cortex?.agents?.[0]?.agent_name === LONG_AGENT, 'the previous version\'s agents carried forward');
+    });
+
+    await test('a definition that names tools and asks for no permissions is named in the publish hints', async () => {
+        const bare = crewDef('bare-tools') as any; delete bare.scopes; bare.agents[0].tools = ['memory', 'web'];
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: publishBody({ filename: 'bare-tools.html', name: 'Bare tools', content: pageWith(JSON.stringify([bare])) }),
+        });
+        assert(r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body)}`);
+        const hint = (r.body.data.app_hints ?? []).find((h: any) => h.pitfall === 'bundled-agent-permissions');
+        assert(!!hint && String(hint.message).includes('web') && !/\bmemory,/.test(String(hint.message)), `hint: ${JSON.stringify(r.body.data.app_hints)}`);
+        // The declared scopes of LONG_AGENT's definition make no such hint.
+        const ok = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: publishBody({ filename: LONG_FILE, name: 'Long Joker', content: pageWith(JSON.stringify([longDef()])) }),
+        });
+        assert(!(ok.body.data.app_hints ?? []).some((h: any) => String(h.pitfall).startsWith('bundled-agent-')), `no hint for a definition with scopes: ${JSON.stringify(ok.body.data.app_hints)}`);
+    });
+
+    await test('status with no agent: state none, and the permissions a proposal would ask for', async () => {
+        const s = await status3();
+        assert(s.state === 'none' && s.agent === null && s.registered === false, `state: ${JSON.stringify(s)}`);
+        assert(['organism:read', 'memory:read', 'memory:write'].every(x => s.scopes.includes(x)) && !s.scopes.includes('*'), `scopes: ${JSON.stringify(s.scopes)}`);
+        assert(JSON.stringify(s.scopes_left_out) === JSON.stringify(['*']), `left out: ${JSON.stringify(s.scopes_left_out)}`);
+    });
+
+    await test('deploy with no runner → a proposal; status says waiting and where to approve', async () => {
+        const r = await json(longUrl('deploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({}) });
+        assert(r.status === 201 && r.body.data.kind === 'proposed' && r.body.data.proposed_name === LONG_PROPOSED(), `deploy: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+        longProposalId = r.body.data.proposal_id;
+        const s = await status3();
+        assert(s.state === 'waiting' && s.proposal_id === longProposalId, `waiting: ${JSON.stringify(s)}`);
+        assert(typeof s.approval_url === 'string' && s.approval_url.includes(longProposalId), `approval_url: ${s.approval_url}`);
+        // A second ask makes no second proposal.
+        const again = await json(longUrl('deploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({}) });
+        assert(again.body.data?.proposal_id === longProposalId, `the standing proposal comes back: ${JSON.stringify(again.body.data ?? again.body.error)}`);
+        // A request body cannot claim an app for a proposal of its own.
+        const forged = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` },
+            body: JSON.stringify({ name: 'forged-link', purpose: 'Claims to come from an app it does not.', source_app: { app_id: LONG_APP_ID(), agent_name: 'bare-tools', definition_hash: 'x' } }),
+        });
+        assert(forged.status === 201 && !forged.body.data.proposal.source_app, `SECURITY: source_app is never taken from a request: ${JSON.stringify(forged.body.data?.proposal?.source_app)}`);
+    });
+
+    await test('the owner approves → status finds the agent by its link: running, registered, the current definition', async () => {
+        const a = await json(`/v1/agents/v2/agent-proposals/${longProposalId}/approve`, {
+            method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({ first_run: false }),
+        });
+        assert(a.status === 200 && a.body.data.created === true, `approve: ${a.status} ${JSON.stringify(a.body)}`);
+        const s = await status3();
+        assert(s.state === 'running' && s.agent === LONG_PROPOSED() && s.registered === true && s.live === true, `running: ${JSON.stringify(s)}`);
+        assert(s.via === 'proposal' && s.definition_current === true, `via and definition: ${JSON.stringify(s)}`);
+        assert(s.scopes.includes('organism:read') && !s.scopes.includes('*'), `the agent's own scopes: ${JSON.stringify(s.scopes)}`);
+    });
+
+    await test('the list of running copies shows the approved agent as the viewer\'s own', async () => {
+        const r = await json(longUrl('instances'), { headers: { Authorization: `Bearer ${owner3Token}` } });
+        const mine = (r.body.data?.instances ?? []).find((x: any) => x.is_yours);
+        assert(!!mine && mine.name === LONG_PROPOSED() && mine.source === 'deployed', `instances: ${JSON.stringify(r.body.data?.instances)}`);
+        // And to a signed-out reader, by the same name.
+        const pub = await json(longUrl('instances'));
+        assert((pub.body.data?.instances ?? []).some((x: any) => x.name === LONG_PROPOSED() && x.owner === owner3), `public: ${JSON.stringify(pub.body.data?.instances)}`);
+    });
+
+    await test('deploy again → 200 present: no second proposal and no task', async () => {
+        const r = await json(longUrl('deploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({}) });
+        assert(r.status === 200 && r.body.data.kind === 'present' && r.body.data.agent === LONG_PROPOSED() && r.body.data.changed === false, `present: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+        const waiting = ((await json('/v1/agents/v2/agent-proposals', { headers: { Authorization: `Bearer ${owner3Token}` } })).body.data?.proposals ?? [])
+            .filter((p: any) => p.state === 'proposed' && p.name === LONG_PROPOSED());
+        assert(waiting.length === 0, 'nothing new waits');
+    });
+
+    let sib3Narrow = '', sib3Wide = '';
+    await test('SECURITY: a sibling without agent:write cannot stop it through undeploy (403); the agent keeps running', async () => {
+        sib3Narrow = (await registerAgent(owner3Token, owner3, 'narrow-helper', 'interactive', ['task:read', 'task:write'])).token;
+        sib3Wide = (await registerAgent(owner3Token, owner3, 'wide-helper', 'interactive', ['task:read', 'task:write', 'agent:write'])).token;
+        const r = await json(longUrl('undeploy'), { method: 'POST', headers: { Authorization: `Bearer ${sib3Narrow}` }, body: JSON.stringify({}) });
+        assert(r.status === 403 && r.body.error?.code === 'ACCESS_DENIED', `expected 403 ACCESS_DENIED: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        assert((await status3()).state === 'running', 'still running');
+    });
+
+    await test('undeploy stops the agent (owner in person, and a sibling holding agent:write); deploy starts it again', async () => {
+        const stop = await json(longUrl('undeploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({}) });
+        assert(stop.status === 200 && stop.body.data.kind === 'stopped' && stop.body.data.changed === true, `stop: ${stop.status} ${JSON.stringify(stop.body.data ?? stop.body.error)}`);
+        let s = await status3();
+        assert(s.state === 'stopped' && s.live === false && s.registered === true, `stopped: ${JSON.stringify(s)}`);
+        const start = await json(longUrl('deploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({}) });
+        assert(start.status === 200 && start.body.data.kind === 'started', `start: ${start.status} ${JSON.stringify(start.body.data ?? start.body.error)}`);
+        s = await status3();
+        assert(s.state === 'running' && s.live === true, `running again: ${JSON.stringify(s)}`);
+        // POSITIVE CONTROL for the 403 above: the same call from a sibling that holds agent:write works.
+        const wide = await json(longUrl('undeploy'), { method: 'POST', headers: { Authorization: `Bearer ${sib3Wide}` }, body: JSON.stringify({}) });
+        assert(wide.status === 200 && wide.body.data.kind === 'stopped', `a sibling with agent:write stops it: ${wide.status} ${JSON.stringify(wide.body.data ?? wide.body.error)}`);
+        const back = await json(longUrl('deploy'), { method: 'POST', headers: { Authorization: `Bearer ${sib3Wide}` }, body: JSON.stringify({}) });
+        assert(back.status === 200 && back.body.data.kind === 'started', `and starts it: ${back.status} ${JSON.stringify(back.body.data ?? back.body.error)}`);
+    });
+
+    await test('SECURITY: another owner\'s status and undeploy never reach this agent', async () => {
+        const s = await json(longUrl('status'), { headers: { Authorization: `Bearer ${owner2Token}` } });
+        assert(s.status === 200 && s.body.data.state === 'none' && s.body.data.agent === null, `owner2 sees no agent of their own: ${JSON.stringify(s.body.data ?? s.body.error)}`);
+        const u = await json(longUrl('undeploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` }, body: JSON.stringify({}) });
+        assert(u.body.data?.kind !== 'stopped', `owner1's undeploy acts on owner1's own fleet only: ${JSON.stringify(u.body.data ?? u.body.error)}`);
+        assert((await status3()).state === 'running', 'owner3\'s agent is untouched');
+    });
+
+    await test('the app publishes a newer definition → status says so; with the runtime offline the deploy answers why', async () => {
+        const p = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: publishBody({ filename: LONG_FILE, name: 'Long Joker', content: pageWith(JSON.stringify([longDef('Tell two excellent jokes')])) }),
+        });
+        assert(p.status === 201, `republish: ${p.status}`);
+        assert((await status3()).definition_current === false, 'the agent runs an older definition than the app declares');
+        const r = await json(longUrl('deploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({}) });
+        assert(r.status === 409 && r.body.error?.code === 'AGENT_OFFLINE', `the publish's own refusal comes back: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        assert((await status3()).definition_current === false, 'nothing was recorded as published');
+    });
+
+    await test('with the runtime connected the deploy publishes the newer definition, validated by the runtime', async () => {
+        // The owner in person reconnects the agent, as a runtime does at its first start.
+        const auth = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` },
+            body: JSON.stringify({ owner: owner3, agent_name: LONG_PROPOSED(), mode: 'task-runner' }),
+        });
+        assert(auth.status === 200 && auth.body.data.status === 'approved', `device-authorize: ${auth.status} ${JSON.stringify(auth.body.data ?? auth.body.error)}`);
+        const cred = await poll(auth.body.data.device_code);
+        assert(cred.status === 200 && !!cred.body.access_token, `token: ${cred.status} ${JSON.stringify(cred.body).slice(0, 200)}`);
+        const tunnel = await TunnelClient.connect(BASE, cred.body.access_token);
+        try {
+            await tunnel.waitForBacklog(1000);
+            let asked: any = null;
+            tunnel.onInvoke((f: any) => { if (f.capability === 'crew.validate') asked = f.input?.doc; return { ok: true, result: { errors: [] } }; });
+            const r = await json(longUrl('deploy'), { method: 'POST', headers: { Authorization: `Bearer ${owner3Token}` }, body: JSON.stringify({}) });
+            assert(r.status === 200 && r.body.data.kind === 'updated', `updated: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+            assert(asked?.agents?.[0]?.goal === 'Tell two excellent jokes', `the runtime validated the app's new definition: ${JSON.stringify(asked?.agents?.[0])}`);
+            assert(!('scopes' in (asked ?? {})) && !('description' in (asked ?? {})), 'scopes and description never ride into the definition');
+            assert(Array.isArray(asked?.offers) && asked.offers.length === 1, 'the published definition keeps one offer');
+            assert((await status3()).definition_current === true, 'the agent now runs the app\'s current definition');
+        } finally {
+            await tunnel.close();
+        }
     });
 
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

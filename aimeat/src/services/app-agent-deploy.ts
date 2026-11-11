@@ -22,6 +22,13 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-11 — The caller's own agent is found by the app link on its proposal
+ *     (services/app-agents/app-agent-link.ts), not by a derived name. A deploy that names no runner acts on
+ *     that agent when it exists: it starts a stopped one, publishes the app's newer definition to
+ *     it, or answers that it is present; an undeploy stops it. The status answers `state`
+ *     (none, waiting, running, stopped), the proposal waiting, whether the definition is the app's
+ *     current one, and the permissions the agent holds or would ask for. The list of running copies
+ *     finds an agent under either derived name.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-28 — The start decision reads the runner's record as it is: the node no longer narrows an
@@ -53,13 +60,20 @@ import type { Storage, AgentRecord, AgentTaskRecord, AgentTaskScope, AppRecord }
 import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from './resource-events.js';
 import { nodeContext } from './node-context.js';
-import { deployedAgentName } from '../models/crew-def-schemas.js';
+import { deployedAgentName, proposedAgentName, crewDefHash } from '../models/crew-def-schemas.js';
 import { presentOfferPacing, type Offer } from '../models/offer-schemas.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { buildGAII, validateAgentName, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { proposeBundledAgent } from './app-agent-propose.js';
-import { proposerIsOwnerSession, type ProposerPrincipal } from './agent-proposals.js';
+import { proposeBundledAgent, bundledCrewDef, bundledAgentScopes } from './app-agent-propose.js';
+import {
+  proposerIsOwnerSession, proposalScopesFor, proposalApprovalUrl, recordProposalDefinition, type ProposerPrincipal,
+} from './agent-proposals.js';
+import { findOwnBundledAgent, type OwnBundledAgent } from './app-agents/app-agent-link.js';
+import { setAgentStopped } from './agent-stop.js';
+import { crewPublish, type CrewCaller } from './crew-ops.js';
+import { withDefaultOffer } from './agent-default-offer.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { decideTaskStart, resolveAutoActivation, autoStartEvent, taskWakeId, type TaskStartDecision } from './agent-task-rules.js';
 import { notifyTaskWaiting, waitReason } from './task-start-notice.js';
 
@@ -73,9 +87,13 @@ export const DEFAULT_APP_AGENT_RUNNER = 'crew-forge';
  */
 export interface AppAgentRefusal {
   ok: false;
-  /** 403 and 409 come from the proposal service (an app may not propose; the name is taken). */
-  status: 400 | 403 | 404 | 409;
-  code: 'NOT_FOUND' | 'AGENT_NOT_DECLARED' | 'INVALID_INPUT' | 'RUNNER_NOT_FOUND' | 'ACCESS_DENIED' | 'NAME_TAKEN';
+  /**
+   * 400, 403, 404 and 409 are this service's and the proposal service's (an app may not propose; the
+   * name is taken). A stop, a start or a publish of a newer definition answers with the status and
+   * the code of the service that refused it (agent-stop.ts, crew-ops.ts), unchanged.
+   */
+  status: number;
+  code: string;
   message: string;
 }
 
@@ -203,7 +221,7 @@ export async function createAppAgentTask(
 async function resolveDeclaredAppAgent(
   storage: Storage,
   args: { viewer: string | null; appOwner: string; filename: string; agentName: string },
-): Promise<{ ok: true; app: AppRecord; appId: string } | AppAgentRefusal> {
+): Promise<{ ok: true; app: AppRecord; appId: string; declared: Record<string, unknown> } | AppAgentRefusal> {
   const app = await storage.getAppByOwnerName(
     localAccountName(args.appOwner), args.filename);
   if (!app || (app.ownerName !== args.viewer && (app.parked || app.operatorHidden || app.accessCode))) {
@@ -219,7 +237,121 @@ async function resolveDeclaredAppAgent(
     };
   }
 
-  return { ok: true, app, appId: `${app.ownerName}/${app.filename}` };
+  return { ok: true, app, appId: `${app.ownerName}/${app.filename}`, declared: declared as Record<string, unknown> };
+}
+
+/**
+ * What a deploy or undeploy answers when the caller already has this agent, made by a proposal
+ * they approved: nothing new is created, and the answer says what was done to the agent.
+ */
+export interface AppAgentOwnView {
+  /** present: nothing to do. started / stopped: its state changed. updated: it now runs the app's current definition. */
+  kind: 'present' | 'updated' | 'started' | 'stopped';
+  app_id: string;
+  agent_name: string;
+  /** The agent's own name on the caller's account. */
+  agent: string;
+  changed: boolean;
+  note: string;
+}
+
+type OwnAgent = Extract<OwnBundledAgent, { state: 'running' | 'stopped' }>;
+
+/**
+ * Deploy or undeploy for a caller who already has the agent, made by their approval. An undeploy
+ * stops it. A deploy starts a stopped one and publishes the app's definition to it when the app
+ * declares a newer one than it runs. Each step asks the permission its own endpoint asks: stop and
+ * start take agent:write (routes/agents/stop-start.ts), a publish takes memory:write
+ * (routes/agent-crew.ts), and the owner in person needs neither.
+ */
+async function actOnOwnAgent(
+  storage: Storage, config: AimeatConfig,
+  args: {
+    own: OwnAgent; appId: string; agentName: string; declared: Record<string, unknown>;
+    callerOwner: string; undeploy: boolean; principal?: ProposerPrincipal;
+  },
+): Promise<{ ok: true; view: AppAgentOwnView; links: AppAgentLink[] } | AppAgentRefusal> {
+  const { own, appId, agentName, declared, callerOwner, principal } = args;
+  const deps = { storage, config };
+  const agent = own.agent;
+  const shown = agent.displayName || agent.name;
+  const inPerson = principal ? proposerIsOwnerSession(principal) : false;
+  const may = (scope: string) => inPerson || (principal ? scopeIsCovered(principal.scopes, scope) : false);
+  const callerPrincipal = !principal || inPerson ? `${callerOwner}@${config.nodeId}` : principal.sub;
+  const links: AppAgentLink[] = [
+    { description: 'Status of this agent', method: 'GET', url: `/v1/apps/${appId.split('/').map(encodeURIComponent).join('/')}/agents/${encodeURIComponent(agentName)}/status` },
+  ];
+  const answer = (kind: AppAgentOwnView['kind'], changed: boolean, note: string) => ({
+    ok: true as const, links,
+    view: { kind, app_id: appId, agent_name: agentName, agent: agent.name, changed, note },
+  });
+  const current = crewDefHash(declared);
+  const stopOrStart = async (stop: boolean): Promise<AppAgentRefusal | null> => {
+    if (!may('agent:write')) {
+      return {
+        ok: false, status: 403, code: 'ACCESS_DENIED',
+        message: `${stop ? 'Stopping' : 'Starting'} ${shown} takes the agent:write permission. Ask the owner to do it, here or on the Agents page.`,
+      };
+    }
+    const out = await setAgentStopped(deps, callerOwner, callerPrincipal, agent.name, stop);
+    if (!out.ok) {
+      return { ok: false, status: out.code === 'AGENT_NOT_FOUND' ? 404 : out.code === 'ACCESS_DENIED' ? 403 : 400, code: out.code, message: out.message };
+    }
+    return null;
+  };
+
+  if (args.undeploy) {
+    if (own.state === 'stopped') return answer('stopped', false, `${shown} is already stopped.`);
+    const refused = await stopOrStart(true);
+    if (refused) return refused;
+    return answer('stopped', true, `${shown} is stopped. It takes no new work until it is started again; the agent and what it wrote stay.`);
+  }
+
+  let started = false;
+  if (own.state === 'stopped') {
+    const refused = await stopOrStart(false);
+    if (refused) return refused;
+    started = true;
+  }
+  const startedNote = `${shown} is started again.`;
+  if (own.definitionHash === null || own.definitionHash === current) {
+    return started ? answer('started', true, startedNote) : answer('present', false, `You already have ${shown}, and it runs the app's current definition.`);
+  }
+
+  // The app declares a newer definition than the agent runs: publish it, validated by the agent's
+  // own runtime as every publish is (services/crew-ops.ts crewPublish).
+  const publishRefusal = async (): Promise<AppAgentRefusal | null> => {
+    if (!principal || !may('memory:write')) {
+      return {
+        ok: false, status: 403, code: 'ACCESS_DENIED',
+        message: `The app has a newer definition for ${shown}. Publishing it takes the memory:write permission.`,
+      };
+    }
+    const caller: CrewCaller = {
+      principal: callerPrincipal, owner: callerOwner, scopes: principal.scopes, roles: principal.roles,
+      pipeline: 'app-agent.update',
+    };
+    const definition = withDefaultOffer(bundledCrewDef(declared).crewDef as unknown as Record<string, unknown>, {
+      name: agent.name, displayName: shown, purpose: agent.description ?? '',
+    });
+    const out = await crewPublish(deps, caller, agent.name, definition);
+    if (!out.ok) return { ok: false, status: out.status, code: out.code, message: out.message };
+    // The proposal the agent came from now says which definition it runs (services/app-agents/app-agent-link.ts).
+    // The definition is published either way, so a failure here is logged and the status offers the update again.
+    if (own.proposal) {
+      await recordProposalDefinition(deps, callerOwner, own.proposal.id, current)
+        .catch(err => logger.warn('app agent: the published definition was not recorded on its proposal', { agent: agent.name, error: String(err) }));
+    }
+    return null;
+  };
+  const refused = await publishRefusal();
+  if (refused) {
+    return started
+      ? answer('started', true, `${startedNote} The app's newer definition was not published: ${refused.message}`)
+      : refused;
+  }
+  emitChange('agents');
+  return answer('updated', true, `${shown} now runs the app's current definition.`);
 }
 
 /** What a deploy answers when it became a proposal for the owner (no runner to give it to). */
@@ -278,7 +410,7 @@ export async function deployAppAgent(
      */
     principal?: ProposerPrincipal;
   },
-): Promise<{ ok: true; view: AppAgentDeployView | AppAgentProposalView; links: AppAgentLink[] } | AppAgentRefusal> {
+): Promise<{ ok: true; view: AppAgentDeployView | AppAgentProposalView | AppAgentOwnView; links: AppAgentLink[] } | AppAgentRefusal> {
   const kind = args.undeploy ? 'undeploy-app-agent' as const : 'deploy-app-agent' as const;
   const ctx = await resolveDeclaredAppAgent(storage, {
     viewer: args.callerOwner, appOwner: args.appOwner, filename: args.filename, agentName: args.agentName,
@@ -291,6 +423,20 @@ export async function deployAppAgent(
   if (nameError) {
     return { ok: false, status: 400, code: 'INVALID_INPUT', message: `runner_agent: ${nameError}` };
   }
+
+  // The caller already has this agent, made by a proposal they approved: the request acts on that
+  // agent. A caller who names a runner asks for a deployment on their own fleet, and gets one.
+  let waitingProposal = false;
+  if (!args.runnerAgent) {
+    const own = await findOwnBundledAgent({ storage, config }, args.callerOwner, ctx.appId, args.agentName);
+    if ((own.state === 'running' || own.state === 'stopped') && own.via === 'proposal') {
+      return actOnOwnAgent(storage, config, {
+        own, appId: ctx.appId, agentName: args.agentName, declared: ctx.declared,
+        callerOwner: args.callerOwner, undeploy: args.undeploy, principal: args.principal,
+      });
+    }
+    waitingProposal = own.state === 'waiting';
+  }
   // The runner is looked up under the REQUESTER's owner only — a foreign fleet is
   // unreachable by construction (there is no way to name another owner's agent here).
   const runner = await storage.getAgent(buildGAII(runnerName, args.callerOwner, config.nodeId));
@@ -299,6 +445,8 @@ export async function deployAppAgent(
   if (!runner && !args.undeploy && !args.runnerAgent && args.principal) {
     const proposed = await proposeBundledAgent({ storage, config }, args.principal, ctx.app, args.agentName);
     if (!proposed.ok) return proposed as AppAgentRefusal;
+    // The owner's open pages learn that something waits for them, as after POST /v1/agents/v2/agent-proposals.
+    if (!proposed.proposal.already_waiting) emitChange('open-items');
     return {
       ok: true,
       view: {
@@ -312,10 +460,21 @@ export async function deployAppAgent(
       links: [{ description: 'Waiting proposals', method: 'GET', url: '/v1/agents/v2/agent-proposals' }],
     };
   }
+  if (!runner && args.undeploy && !args.runnerAgent) {
+    // Nothing of the caller's was made from this definition, so there is nothing to stop.
+    return {
+      ok: false, status: 404, code: 'NOT_DEPLOYED',
+      message: waitingProposal
+        ? `"${args.agentName}" waits for your approval and does not exist yet, so there is nothing to stop. Decline the proposal on your open items if you do not want it.`
+        : `You have no agent made from "${args.agentName}" of this app, so there is nothing to stop.`,
+    };
+  }
   if (!runner) {
     return {
       ok: false, status: 404, code: 'RUNNER_NOT_FOUND',
-      message: `You have no agent named "${runnerName}" to run this deployment. Connect your crew-forge / task-runner first, or pass its name as runner_agent.`,
+      message: args.runnerAgent
+        ? `You have no agent named "${runnerName}". Leave runner_agent out, and the agent reaches you as a proposal to approve.`
+        : `This agent could not be proposed to you from here. Ask the owner to add it from the app's page.`,
     };
   }
 
@@ -402,12 +561,18 @@ export async function appAgentInstances(
   const { app, appId } = ctx;
 
   const deployedName = deployedAgentName(agentName, appId);
+  // An agent made by approving a proposal has the derived name cut to 40 characters, so both are
+  // asked for. The viewer's own is added from its app link, whatever it is called and listed or not.
+  const proposedName = proposedAgentName(agentName, appId);
+  const own = viewer ? await findOwnBundledAgent({ storage, config: _config }, viewer, appId, agentName) : null;
+  const ownGaii = own && (own.state === 'running' || own.state === 'stopped') ? own.agent.gaii : null;
   const all = await storage.listAgents();
   const now = Date.now();
   const tunnels = nodeContext().tunnel;
-  const candidates = all.filter(a =>
-    (a.name === deployedName || (a.name === agentName && a.owner === app.ownerName))
-    && !(a.tags ?? []).includes('unlisted'));
+  const derived = (a: AgentRecord) => a.name === deployedName || a.name === proposedName;
+  const candidates = all.filter(a => a.gaii === ownGaii
+    || ((derived(a) || (a.name === agentName && a.owner === app.ownerName))
+      && !(a.tags ?? []).includes('unlisted')));
 
   const instances = await Promise.all(candidates.map(async (a): Promise<AppAgentInstance> => {
     const rec = await storage.getMemory(a.gaii, `agents.${a.name}.offers`);
@@ -441,7 +606,7 @@ export async function appAgentInstances(
       // per owner, because a shelf lists agents of more than one owner.
       online: tunnels?.isConnected(a.gaii)
         || !!(a.lastSeen && (now - new Date(a.lastSeen).getTime()) < 10 * 60 * 1000),
-      source: a.name === deployedName ? 'deployed' as const : 'author' as const,
+      source: derived(a) || a.gaii === ownGaii ? 'deployed' as const : 'author' as const,
       is_yours: viewer !== null && a.owner === viewer,
       offers,
     };
@@ -471,43 +636,110 @@ export async function appAgentInstances(
 export async function appAgentStatus(
   storage: Storage,
   config: AimeatConfig,
-  args: { callerOwner: string; appOwner: string; filename: string; agentName: string; runnerAgent?: string },
-): Promise<{
-  ok: true;
-  view: {
-    app_id: string; agent_name: string; deployed_agent_name: string; registered: boolean;
-    last_seen: string | null; deploy_state: unknown; live: boolean;
-  };
-} | AppAgentRefusal> {
+  args: {
+    callerOwner: string; appOwner: string; filename: string; agentName: string; runnerAgent?: string;
+    /** Who is asking. With it, `scopes` for an agent that does not exist yet is what THIS caller's proposal would ask for. */
+    principal?: ProposerPrincipal;
+  },
+): Promise<{ ok: true; view: AppAgentStatusView } | AppAgentRefusal> {
   const ctx = await resolveDeclaredAppAgent(storage, {
     viewer: args.callerOwner, appOwner: args.appOwner, filename: args.filename, agentName: args.agentName,
   });
   if (!ctx.ok) return ctx;
+  const deps = { storage, config };
 
   const runnerName = typeof args.runnerAgent === 'string' && args.runnerAgent.length > 0
     ? args.runnerAgent : DEFAULT_APP_AGENT_RUNNER;
   const deployedName = deployedAgentName(args.agentName, ctx.appId);
-  const deployedGaii = buildGAII(deployedName, args.callerOwner, config.nodeId);
-  const registered = await storage.getAgent(deployedGaii);
+  // The caller's agent by its app link (services/app-agents/app-agent-link.ts); the derived name is the answer
+  // only while none exists.
+  const own = await findOwnBundledAgent(deps, args.callerOwner, ctx.appId, args.agentName);
+  const mine = own.state === 'running' || own.state === 'stopped' ? own : null;
+  const registered = mine?.agent ?? null;
+  const recordName = registered?.name ?? deployedName;
 
-  const key = `agents.${deployedName}.deploy`;
+  const key = `agents.${recordName}.deploy`;
   let deployState: unknown = null;
-  for (const ns of [deployedGaii, buildGAII(runnerName, args.callerOwner, config.nodeId), `${args.callerOwner}@${config.nodeId}`]) {
+  for (const ns of [buildGAII(recordName, args.callerOwner, config.nodeId), buildGAII(runnerName, args.callerOwner, config.nodeId), `${args.callerOwner}@${config.nodeId}`]) {
     const rec = await storage.getMemory(ns, key);
     if (rec) { deployState = rec.value; break; }
   }
-
   const stateStatus = (deployState as { status?: unknown } | null)?.status;
+  // A fleet marks an agent it took down in its record and may leave the registration standing.
+  const state: AppAgentStatusView['state'] = mine?.state === 'running' && mine.via === 'fleet' && stateStatus === 'undeployed'
+    ? 'stopped' : own.state;
+
+  // The permissions: the agent's own when it exists, the waiting proposal's, or what a proposal
+  // from this caller would ask for (the definition's, capped, plus the crew runtime's).
+  let scopes: string[];
+  let leftOut: string[] = [];
+  if (registered) scopes = registered.defaultScopes ?? [];
+  else if (own.state === 'waiting') scopes = own.proposal.scopes;
+  else {
+    const asked = bundledAgentScopes(bundledCrewDef(ctx.declared).declaredScopes,
+      args.principal ?? { sub: args.callerOwner, owner: args.callerOwner, roles: ['owner'], scopes: [] });
+    scopes = await proposalScopesFor(deps, args.callerOwner, asked.scopes);
+    leftOut = asked.dropped;
+  }
+
+  const tunnels = nodeContext().tunnel;
+  const recorded = mine?.definitionHash ?? null;
   return {
     ok: true,
     view: {
       app_id: ctx.appId,
       agent_name: args.agentName,
-      deployed_agent_name: deployedName,
+      deployed_agent_name: recordName,
       registered: !!registered,
       last_seen: registered?.lastSeen ?? null,
       deploy_state: deployState,
-      live: stateStatus === 'live' || (stateStatus === undefined && !!registered),
+      live: mine?.via === 'proposal'
+        ? state === 'running'
+        : stateStatus === 'live' || (stateStatus === undefined && !!registered),
+      state,
+      agent: registered?.name ?? null,
+      agent_display_name: registered ? registered.displayName ?? registered.name : null,
+      via: mine?.via ?? null,
+      online: !!registered && (!!tunnels?.isConnected(registered.gaii)
+        || !!(registered.lastSeen && (Date.now() - new Date(registered.lastSeen).getTime()) < 10 * 60 * 1000)),
+      proposal_id: own.state === 'waiting' ? own.proposal.id : null,
+      approval_url: own.state === 'waiting' ? proposalApprovalUrl(config.baseUrl, own.proposal.id) : null,
+      definition_current: registered && recorded ? recorded === crewDefHash(ctx.declared) : null,
+      scopes,
+      scopes_left_out: leftOut,
     },
   };
+}
+
+/** What GET .../agents/:agentName/status answers: the caller's own copy of an app's bundled agent. */
+export interface AppAgentStatusView {
+  app_id: string;
+  agent_name: string;
+  /** The caller's agent's name when it exists; otherwise the name a fleet deployment would give it. */
+  deployed_agent_name: string;
+  registered: boolean;
+  last_seen: string | null;
+  /** The record `agents.<name>.deploy`, as its writer left it. */
+  deploy_state: unknown;
+  live: boolean;
+  /**
+   * none: the caller has no such agent. waiting: a proposal for it waits for the owner's approval.
+   * running / stopped: the agent exists, and takes work or does not.
+   */
+  state: 'none' | 'waiting' | 'running' | 'stopped';
+  agent: string | null;
+  agent_display_name: string | null;
+  /** proposal: made by the owner's approval. fleet: registered by the owner's own runtime. */
+  via: 'proposal' | 'fleet' | null;
+  /** Work sent to the agent arrives now: its runtime holds a connection, or it was seen in the last ten minutes. */
+  online: boolean;
+  proposal_id: string | null;
+  /** Where the owner approves the waiting proposal. */
+  approval_url: string | null;
+  /** Whether the agent runs the definition the app declares now; null when it is not known or no agent exists. */
+  definition_current: boolean | null;
+  /** The permissions the agent holds, the waiting proposal asks for, or a new proposal would ask for. */
+  scopes: string[];
+  /** Declared by the app and never asked for from here: beyond the caller, or never granted from an app. */
+  scopes_left_out: string[];
 }

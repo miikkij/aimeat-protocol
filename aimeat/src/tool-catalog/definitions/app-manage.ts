@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-11 — The four agent_* actions say what they do since the approval path: a proposal, the
+ *     agent the caller already has, the states of agent_status (services/app-agent-deploy.ts).
  *   2026-11-06 — settings takes `about` and `about_lang`: the owner's longer text about the app, shown on
  *     the app page under the description (TARGET-093).
  *   2026-11-01 — party_stop and party_resume: the owner stops a registered person and lets it in again (WP9d).
@@ -146,7 +148,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     origin: { type: 'string', enum: ['operator', 'publisher'], description: 'For subdomain_set on an existing entry: who the label belongs to. operator: your own site, served at <label>.<apex> and at its app address. publisher: a label a publish gave an app, served only at its app address. Set it for an entry the Security page lists as undecided.' },
     // bundled agents
     bundled_agent: { type: 'string', description: 'For agent_*: the name of an agent the app declares in its manifest.' },
-    runner_agent: { type: 'string', description: 'For agent_deploy, agent_undeploy and agent_status: which of your agents runs it. Omit to use your task runner.' },
+    runner_agent: { type: 'string', description: 'For agent_deploy, agent_undeploy and agent_status: one of your own agents that sets agents up on its computer (a crew-forge). Omit it: the agent then reaches the owner as a proposal to approve, or the request acts on the agent you already have.' },
     organism_id: { type: 'string', description: 'For agent_deploy: the organism the deployed agent works in, when the app needs one.' },
     // config
     values: { type: 'object', description: 'For config_set: the fields to change, { "<field>": value }. A null puts a field back to its default; fields not named keep their values.' },
@@ -341,13 +343,13 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     cost: { fields: F(['filename'], ['owner']), scope: 'exchange:read',
         summary: 'what the app\'s contracts for other people\'s tools cost: per contract, and totals' },
     agent_deploy: { fields: F(['filename', 'bundled_agent'], ['owner', 'runner_agent', 'organism_id']), scope: 'task:write',
-        summary: 'start an agent the app declares, as a task on your runner' },
+        summary: 'add an agent the app declares to your account: it becomes a proposal the owner approves (kind "proposed"; nothing exists before the approval). When you already have it, this starts it if it is stopped and publishes the app\'s newer definition to it (kind present, started or updated). With runner_agent, or when you have a crew-forge, it is a task for that runner instead' },
     agent_undeploy: { fields: F(['filename', 'bundled_agent'], ['owner', 'runner_agent']), scope: 'task:write',
-        summary: 'stop it' },
+        summary: 'stop your agent made from it (kind "stopped"; needs agent:write unless the owner asks in person); the agent and what it wrote stay. With a runner it is a task for the runner' },
     agent_instances: { fields: F(['filename', 'bundled_agent'], ['owner']), scope: null,
-        summary: 'the deployed instances of an agent the app declares' },
+        summary: 'who runs an agent the app declares, with their public offers' },
     agent_status: { fields: F(['filename', 'bundled_agent'], ['owner', 'runner_agent']), scope: null,
-        summary: 'whether it is registered, when it was last seen, and its deploy state' },
+        summary: 'your own copy: state (none, waiting, running, stopped), approval_url while it waits, whether it runs the app\'s current definition, and the permissions it holds or a proposal would ask for' },
     ...MEMBER_ACTION_SPECS,
     ...BUILDER_ACTION_SPECS,
     ...SPEC_ACTION_SPECS,
