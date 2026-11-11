@@ -10,6 +10,7 @@
  *   AUTH_PROVIDERS · PROVIDER_ICONS.
  * @usage import { NODE_URL, APEX_URL, AUTH_PROVIDERS, appDeclaredScopes } from './config.js';
  * @version-history
+ *   v1.4.0 — 2026-11-11 — signInText(kind, lang): the operator's sign-in headline and line per language, from the auth prelude.
  *   v1.3.0 — 2026-11-02 — PASSWORD_SIGN_IN: the node's password sign-in policy, read from the auth prelude.
  *   v1.2.0 — 2026-10-31 — LINK_FIRST: the sign-in dialog opens on the emailed link on a store-bought node (v28 #7).
  *   v1.1.0 — 2026-09-29 — EMAIL_LOGIN: whether the node sends mail, read from the auth prelude.
@@ -68,6 +69,16 @@ export const PASSWORD_SIGN_IN = (function () {
   var v = window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.passwordSignIn;
   return v === 'off' || v === 'operators' ? v : 'on';
 })();
+
+// The operator's own headline and line for the dialog's sign-in side (auth.sign_in_title_* and
+// auth.sign_in_line_*), per language. signInText('title', 'fi') is the Finnish headline, or '' when the
+// operator set none for that language: the dialog then shows its built-in text.
+export function signInText(kind, lang) {
+  var texts = window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.signInTexts;
+  var byLang = texts && texts[kind];
+  var v = byLang && byLang[String(lang || '').slice(0, 2).toLowerCase()];
+  return typeof v === 'string' ? v : '';
+}
 
 // Per-provider button glyphs (inline SVG — no external fetch).
 export const PROVIDER_ICONS = {

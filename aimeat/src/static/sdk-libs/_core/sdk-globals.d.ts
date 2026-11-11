@@ -10,6 +10,7 @@
  *   casts, and is shared by every lib (e.g. audio also needs webkitAudioContext).
  * @usage Picked up by tsconfig.sdk.json (its include globs the sdk-libs .d.ts files). No runtime effect.
  * @version-history
+ *   v1.5.0 — 2026-11-11 — __AIMEAT_AUTH_CFG__.signInTexts: the operator's sign-in dialog texts per language.
  *   v1.4.0 — 2026-11-02 — __AIMEAT_AUTH_CFG__.passwordSignIn and twoStepRequired: the sign-in policy.
  *   v1.3.0 — 2026-10-31 — __AIMEAT_SDK_CFG__.defaultLocale: the node's own language (site.default_locale).
  *   v1.2.0 — 2026-10-31 — __AIMEAT_AUTH_CFG__.linkFirst (v28 #7).
@@ -41,6 +42,8 @@ interface Window {
     passwordSignIn?: string;
     /** Whose sign-in must be two-step: 'off', 'operators' or 'everyone'. */
     twoStepRequired?: string;
+    /** The operator's sign-in dialog headline and line per language (auth.sign_in_title_*, auth.sign_in_line_*). */
+    signInTexts?: { title?: Record<string, string>; line?: Record<string, string> };
   };
   /** aimeat-header's idempotency guard (mounts the canonical nav at most once). */
   __AIMEAT_HEADER_MOUNTED__?: boolean;

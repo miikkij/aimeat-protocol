@@ -13,6 +13,8 @@
  *   openEmailCompletion (modal-email-step.js), showView, capture/restoreInputs, keep/resumeView }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.24.0 — 2026-11-11 — The sign-in side's headline and line take the operator's own words for the
+ *     dialog's language when it set them (auth.sign_in_title_*, auth.sign_in_line_*; signInText in config.js).
  *   v1.23.0 — 2026-11-10 — Another node's full address (`name@node-id`) that this node cannot sign in
  *     with gets a sentence naming what to type instead of "Cannot reach home node" (foreignAddressText).
  *   v1.22.0 -- 2026-11-08 -- The language switch keeps the view on screen and what it holds (modal-view-keep.js):
@@ -100,7 +102,7 @@ import { auth, api, restoreSessionFromCookie } from './session.js';
 import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANGS } from './i18n.js';
 import { writeLang } from '../_core/lang.js';
-import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED, LINK_FIRST, PASSWORD_SIGN_IN } from './config.js';
+import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED, LINK_FIRST, PASSWORD_SIGN_IN, signInText } from './config.js';
 import { MODAL_CSS, HEART_SVG, RULE_MARKS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
@@ -256,13 +258,16 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       // The masthead: one sentence in the poster face, and the line under it. Which tab is open
       // decides both.
       + '<h2 class="aimeat-headline">'
-      // A buyer (signInOnly) is signing in to the AIMEAT they bought, with the address they bought it with.
-      + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : (((signInOnly || linkFirst) && i.loginLinkTitleFirst) || i.headlineReturning || 'Welcome back.'))
+      // The operator's own words for this language come first (auth.sign_in_title_*, signInText): a
+      // node such as a store says what is signed in to. A buyer (signInOnly) is otherwise signing in to
+      // the AIMEAT they bought, with the address they bought it with. A caller's opts.line, the reason
+      // for this one dialog, still wins over the operator's line.
+      + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : (signInText('title', lang) || ((signInOnly || linkFirst) && i.loginLinkTitleFirst) || i.headlineReturning || 'Welcome back.'))
       + '</h2>'
       + '<p class="aimeat-line">'
       + escHtml(opts.line || (isReg
         ? (i.lineNew || 'Pick a username and password.')
-        : (((signInOnly || linkFirst) && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.')))
+        : (signInText('line', lang) || ((signInOnly || linkFirst) && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.')))
       + '</p>'
       // Two tabs, two jobs. Which one is showing decides what the body asks for.
       + (noRegister ? '' : '<div class="aimeat-tabs" role="tablist">'
@@ -340,7 +345,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + '</div>'
       // The forgot-password, forgot-username and complete-account sub-views (all hidden here).
       + recoveryViewsHtml(i, field)
-      + loginLinkViewHtml(i, field, linkFirst)
+      + loginLinkViewHtml(i, field, linkFirst, lang)
       // Second-factor sub-view (hidden) — opened when the login answers TOTP_REQUIRED.
       + totpViewHtml(i, field)
       // Two-step enrolment (hidden): the operator requires two-step sign-in (modal-two-step.js).

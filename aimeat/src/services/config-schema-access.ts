@@ -15,6 +15,8 @@
  *   switching it off makes every agent's scopes advisory, which whoever runs the node decides.
  * @structure ACCESS_CONFIG_FIELDS
  * @version-history
+ *   v1.5.0 — 2026-11-11 — auth.sign_in_title_{en,fi,es} and auth.sign_in_line_{en,fi,es}, mutable: the
+ *     sign-in dialog's headline and line per language, read on every load of /v1/libs/aimeat-auth.js.
  *   2026-11-04 — The sign-in policy rows and mcp.capability_use_approval carry `aiMayOnlyTighten`: the order
  *     of their values and the refusal an AI gets for a looser one, worded as before (codebase analysis
  *     2026-11-03, item B4).
@@ -72,7 +74,22 @@ type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' 
   | 'entraOAuthEnabled' | 'entraOAuthTenant' | 'entraOAuthClientId' | 'entraOAuthClientSecret' | 'entraOAuthRedirectUri'
   | 'casdoorOAuthEnabled' | 'casdoorOAuthEndpoint' | 'casdoorOAuthClientId' | 'casdoorOAuthClientSecret' | 'casdoorOAuthRedirectUri'
   | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes' | 'mcpTaskAfterMs'
-  | 'mcpCapabilityUseApproval' | 'twoStepRequired' | 'passwordSignIn' | 'signInLockout';
+  | 'mcpCapabilityUseApproval' | 'twoStepRequired' | 'passwordSignIn' | 'signInLockout'
+  | 'signInTitleEn' | 'signInTitleFi' | 'signInTitleEs' | 'signInLineEn' | 'signInLineFi' | 'signInLineEs';
+
+/** A sign-in dialog text: plain text on one line, at most 200 characters; empty keeps the built-in one. */
+const dialogText = (v: unknown): boolean => typeof v === 'string' && v.length <= 200 && !/[\r\n]/.test(v);
+/** The six dialog-text rows: the headline and its line, per language the node ships. */
+const DIALOG_TEXT_ROWS = (['En', 'Fi', 'Es'] as const).flatMap((lang) => {
+  const name = { En: 'English', Fi: 'Finnish', Es: 'Spanish' }[lang];
+  const tag = lang.toLowerCase();
+  return [
+    { key: `signInTitle${lang}` as AccessKey, dotPath: `auth.sign_in_title_${tag}`, envVar: `AIMEAT_SIGN_IN_TITLE_${lang.toUpperCase()}`, type: 'string' as const, validate: dialogText, immutable: false,
+      description: `The ${name} headline of the sign-in dialog when it opens to sign in, for example "Sign in to the store". Empty shows the built-in headline. At most 200 characters` },
+    { key: `signInLine${lang}` as AccessKey, dotPath: `auth.sign_in_line_${tag}`, envVar: `AIMEAT_SIGN_IN_LINE_${lang.toUpperCase()}`, type: 'string' as const, validate: dialogText, immutable: false,
+      description: `The ${name} line under that headline, for example "Write the email address you ordered with". Empty shows the built-in line. At most 200 characters` },
+  ];
+});
 
 export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Token lifetimes ──
@@ -87,6 +104,9 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   { key: 'twoStepRequired', dotPath: 'auth.two_step_required', envVar: 'AIMEAT_TWO_STEP_REQUIRED', type: 'string', ...oneOf(...TWO_STEP_REQUIRED_VALUES), aiMayOnlyTighten: signInPolicy('auth.two_step_required', TWO_STEP_REQUIRED_VALUES), immutable: false, description: 'Who must use two-step sign-in: off (nobody is made to), operators (accounts with the operator role) or everyone. A password or emailed-link sign-in of such an account without a code app set up asks the person to set one up before it opens. A passkey and a sign-in through an identity provider count as two-step. A signed-in session of such an account with no code app, passkey or identity provider link ends at its next renewal, so the person signs in again and sets it up. An AI cannot lower it' },
   { key: 'passwordSignIn', dotPath: 'auth.password_sign_in', envVar: 'AIMEAT_PASSWORD_SIGN_IN', type: 'string', ...oneOf(...PASSWORD_SIGN_IN_VALUES), aiMayOnlyTighten: signInPolicy('auth.password_sign_in', PASSWORD_SIGN_IN_VALUES), immutable: false, description: 'Who may sign in with a password: on (everyone), operators (only accounts with the operator role, as a way in when other ways fail) or off (nobody: people use a passkey, the organisation\'s sign-in or an emailed sign-in link). Off and operators also refuse a new password: password registration, invitations with a password, and password reset. Off is refused while no operator has a passkey or an identity provider link. An AI cannot open it wider' },
   { key: 'signInLockout', dotPath: 'auth.sign_in_lockout', envVar: 'AIMEAT_SIGN_IN_LOCKOUT', type: 'string', ...oneOf(...SIGN_IN_LOCKOUT_VALUES), aiMayOnlyTighten: signInPolicy('auth.sign_in_lockout', SIGN_IN_LOCKOUT_VALUES), immutable: false, description: 'Whether wrong passwords and wrong two-step codes lock an account for a while: off (default, nothing is counted and nobody is locked out) or on (AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS and _MINUTES, AIMEAT_TOTP_MAX_FAILED and AIMEAT_TOTP_LOCKOUT_SECONDS then decide when and how long). A lock also lets anyone who knows a username keep its owner out; with it off, the per-address delay and the login rate limit bound guessing. An AI cannot switch it off' },
+
+  // ── What the sign-in dialog says (sdk-libs/auth/modal.js, carried in the aimeat-auth prelude) ──
+  ...DIALOG_TEXT_ROWS,
 
   // ── Sign in with Google ──
   { key: 'googleOAuthEnabled', dotPath: 'auth.google_enabled', envVar: 'AIMEAT_GOOGLE_OAUTH_ENABLED', type: 'boolean', validate: bool, immutable: false, applies: 'restart', description: 'Offer "Sign in with Google"' },

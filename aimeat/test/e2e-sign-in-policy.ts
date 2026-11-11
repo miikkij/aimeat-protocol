@@ -33,6 +33,9 @@
  *   The setup token's expiry is proven in test/unit/sign-in-policy.test.ts, which can move time.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=sign-in-policy
  * @version-history
+ *   2026-11-11 — The sign-in dialog's own words (auth.sign_in_title_*, auth.sign_in_line_*): the
+ *     operator sets them per language and the auth prelude carries them; a non-operator, a text on two
+ *     lines and one over 200 characters are refused.
  *   2026-11-04 — The operator's access token is the person and loosens the policy (Jouni, 2026-11-04;
  *     codebase analysis 2026-11-03, PAT ruling). The DENIAL case that refused it is replaced by that
  *     case, and so is the case that refused it switching the lockout off; the AI refusal is proven in
@@ -116,6 +119,8 @@ async function startNode(): Promise<ChildProcess> {
         AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         // The suite's subject starts at its defaults, whatever the developer's environment says.
         AIMEAT_TWO_STEP_REQUIRED: 'off', AIMEAT_PASSWORD_SIGN_IN: 'on', AIMEAT_SIGN_IN_LOCKOUT: 'off',
+        AIMEAT_SIGN_IN_TITLE_EN: '', AIMEAT_SIGN_IN_TITLE_FI: '', AIMEAT_SIGN_IN_TITLE_ES: '',
+        AIMEAT_SIGN_IN_LINE_EN: '', AIMEAT_SIGN_IN_LINE_FI: '', AIMEAT_SIGN_IN_LINE_ES: '',
     };
     const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the sign-in policy node' });
@@ -161,6 +166,51 @@ async function main() {
             const res = await fetch(`${BASE}/v1/libs/aimeat-auth.js`);
             const src = await res.text();
             assert(src.includes('"passwordSignIn":"on"') && src.includes('"twoStepRequired":"off"'), 'the prelude names both values');
+        });
+
+        // ── What the sign-in dialog says (auth.sign_in_title_*, auth.sign_in_line_*) ──
+        const dialogTexts = async () => {
+            const src = await (await fetch(`${BASE}/v1/libs/aimeat-auth.js`)).text();
+            const m = src.match(/window\.__AIMEAT_AUTH_CFG__=(\{.*\});/);
+            assert(!!m, 'the auth prelude is in the library');
+            return JSON.parse(m![1]).signInTexts as { title: Record<string, string>; line: Record<string, string> };
+        };
+        await test('DIALOG TEXTS: by default the prelude carries none, so the dialog keeps its built-in words', async () => {
+            const t = await dialogTexts();
+            assert(JSON.stringify(t) === '{"title":{},"line":{}}', `defaults: ${JSON.stringify(t)}`);
+        });
+
+        await test('DIALOG TEXTS: the operator sets the Finnish headline and line and the English headline; the prelude carries them, Spanish stays built-in', async () => {
+            const r = await setPolicy(op.token, [
+                { path: 'auth.sign_in_title_fi', value: 'Kirjaudu AIMEAT-kauppaan' },
+                { path: 'auth.sign_in_line_fi', value: 'Kirjoita sähköposti, jolla tilasit.' },
+                { path: 'auth.sign_in_title_en', value: 'Sign in to the AIMEAT store' },
+            ]);
+            assert(r.status === 200, `set: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            const t = await dialogTexts();
+            assert(t.title.fi === 'Kirjaudu AIMEAT-kauppaan' && t.line.fi === 'Kirjoita sähköposti, jolla tilasit.', `fi: ${JSON.stringify(t)}`);
+            assert(t.title.en === 'Sign in to the AIMEAT store' && !('en' in t.line), `en: ${JSON.stringify(t)}`);
+            assert(!('es' in t.title) && !('es' in t.line), `es stays built-in: ${JSON.stringify(t)}`);
+        });
+
+        await test('DIALOG TEXTS refused: an account without the operator role sets none, and a text on two lines or over 200 characters is refused', async () => {
+            const alicesTry = await setPolicy(alice.token, [{ path: 'auth.sign_in_title_es', value: 'Entra en la tienda AIMEAT' }]);
+            assert(alicesTry.status === 403, `alice: ${alicesTry.status} ${JSON.stringify(alicesTry.body?.error)}`);
+            const twoLines = await setPolicy(op.token, [{ path: 'auth.sign_in_title_es', value: 'Entra\nen la tienda' }]);
+            assert(twoLines.status === 400, `two lines: ${twoLines.status} ${JSON.stringify(twoLines.body?.error)}`);
+            const long = await setPolicy(op.token, [{ path: 'auth.sign_in_line_es', value: 'x'.repeat(201) }]);
+            assert(long.status === 400, `201 characters: ${long.status} ${JSON.stringify(long.body?.error)}`);
+            const t = await dialogTexts();
+            assert(!('es' in t.title) && !('es' in t.line), `nothing Spanish was saved: ${JSON.stringify(t)}`);
+        });
+
+        await test('DIALOG TEXTS: emptied again, the prelude carries none', async () => {
+            const r = await setPolicy(op.token, [
+                { path: 'auth.sign_in_title_fi', value: '' }, { path: 'auth.sign_in_line_fi', value: '' }, { path: 'auth.sign_in_title_en', value: '' },
+            ]);
+            assert(r.status === 200, `empty: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            const t = await dialogTexts();
+            assert(JSON.stringify(t) === '{"title":{},"line":{}}', `emptied: ${JSON.stringify(t)}`);
         });
 
         // ── Who changes it ──

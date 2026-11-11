@@ -1,6 +1,6 @@
 # 00 Go-live checklist
 
-> Checked against AIMEAT node 4.2.0 (commit 5171a1fdc) on 2026-11-09. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.0 (commit 99fe2f68f) on 2026-11-11. Maintained with the code: see the README for how.
 
 Everything to do when an AIMEAT node goes online, in the order it must be done. It is for the person who runs the installation and for the people who supply what the installation needs: the DNS admin, the identity provider (IdP) admin, the mail admin and the data protection officer (DPO). Each item says what to do, why, which setting or tool does it, what goes wrong if it is skipped, and who provides it. The detail lives in the linked guides; this page is the order.
 

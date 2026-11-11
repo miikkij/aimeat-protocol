@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.3.0 (commit 5cf1901e0) on 2026-11-10. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.0 (commit 99fe2f68f) on 2026-11-11. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -157,6 +157,8 @@ Two settings decide the sign-in policy. Both can be changed while the node runs:
 |---|---|---|---|
 | `AIMEAT_TWO_STEP_REQUIRED` (Config `auth.two_step_required`) | `off` (default), `operators`, `everyone` | Who must use two-step sign-in: nobody, accounts with the operator role, or every account | `aimeat/src/services/sign-in-policy.ts` |
 | `AIMEAT_PASSWORD_SIGN_IN` (Config `auth.password_sign_in`) | `on` (default), `operators`, `off` | Who may sign in with a password: everyone, operator accounts only, or nobody | `aimeat/src/services/sign-in-policy.ts` |
+
+The sign-in dialog's headline and the line under it can be the operator's own words per language (`AIMEAT_SIGN_IN_TITLE_EN|FI|ES` and `AIMEAT_SIGN_IN_LINE_EN|FI|ES`, Config `auth.sign_in_title_*` and `auth.sign_in_line_*`; empty by default). They are display text only: plain text of one line, at most 200 characters, escaped before display, and they change no sign-in rule (`aimeat/src/services/config-schema-access.ts`, `aimeat/src/static/sdk-libs/auth/modal.js`).
 
 **Required two-step sign-in.**
 

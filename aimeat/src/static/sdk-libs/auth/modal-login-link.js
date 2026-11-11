@@ -22,9 +22,11 @@
  *   IT IS NOT RENDERED WHERE IT CANNOT WORK. On a node that sends no mail (EMAIL_LOGIN false) there
  *   is no link, because the request would answer 200 and nothing would ever arrive.
  *
- * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open, keep, resume }
+ * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst, lang) · hereAddress() · wireLoginLinkStep(ctx) → { open, keep, resume }
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.9.0 — 2026-11-11 — loginLinkViewHtml takes the dialog's language: opened first under the
+ *     operator's own headline (signInText), the step does not repeat a title of its own.
  *   v1.8.0 — 2026-11-10 — Only an email address is sent. An AIMEAT address (`name@node-id`), which a
  *     password manager fills in, is refused under the field with a sentence that says what to write,
  *     and it no longer comes along from the sign-in field.
@@ -49,7 +51,7 @@
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install sign in by link).
  */
 import { escHtml } from './theme.js';
-import { EMAIL_LOGIN, APEX_URL, NODE_URL } from './config.js';
+import { EMAIL_LOGIN, APEX_URL, NODE_URL, signInText } from './config.js';
 import { inIsolatedFrame } from './app-frame.js';
 import { currentModalLang } from './i18n.js';
 import { EMAIL_RE } from './modal-constants.js';
@@ -65,16 +67,16 @@ export function loginLinkAskHtml(i) {
  * @param {Record<string, string>} i Modal strings.
  * @param {(label: string, input: string, hint?: string, opt?: string) => string} field The modal's field wrapper.
  */
-export function loginLinkViewHtml(i, field, linkFirst) {
+export function loginLinkViewHtml(i, field, linkFirst, lang) {
   if (!EMAIL_LOGIN) return '';
   // Opened first, the way back is the password form, offered as "other ways to sign in".
   var back = linkFirst ? (i.loginLinkOtherWays || i.loginLinkUsePassword || 'Other ways to sign in') : (i.backToLogin || 'Back to Login');
   // Opened first (a node the store sold), it speaks to the buyer: their own AIMEAT, the address
   // they bought with, how long the link lasts and that no password is needed (v31 K24).
   var first = function (key, plain, fallback) { return (linkFirst && i[key]) || i[plain] || fallback; };
-  // With the buyer's words the dialog's own heading already says them (modal.js), so the step does
-  // not repeat its title and line under it.
-  var said = linkFirst && i.loginLinkTitleFirst;
+  // With the buyer's words, or the operator's own headline for this language (signInText), the
+  // dialog's own heading already says them (modal.js), so the step does not repeat its title and line.
+  var said = linkFirst && (signInText('title', lang) || i.loginLinkTitleFirst);
   return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">'
     + (said ? '' : '<h3 class="aimeat-sub-title">' + escHtml(first('loginLinkTitleFirst', 'loginLinkTitle', 'Sign in with an emailed link')) + '</h3>'
       + '<p class="aimeat-sub-desc">' + escHtml(first('loginLinkDescFirst', 'loginLinkDesc', 'Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.')) + '</p>')

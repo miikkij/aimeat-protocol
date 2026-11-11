@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.18.0 - 2026-11-11 - The aimeat-auth prelude carries the operator's sign-in dialog texts per language (signInTexts: auth.sign_in_title_*, auth.sign_in_line_*).
  * v2.17.0 - 2026-11-10 - Serves aimeat-offline.js (an app opens and keeps working with no connection).
  * v2.16.0 - 2026-11-01 - Serves aimeat-parties.js, which answered 404 since D4 shipped it (WP9d).
  * v2.16.0 - 2026-11-02 - The aimeat-auth prelude carries the sign-in policy (passwordSignIn, twoStepRequired), which the sign-in dialog reads.
@@ -243,6 +244,22 @@ function sendJavascriptLibrary(res: Response, source: string): void {
 }
 
 /**
+ * The operator's sign-in dialog texts (auth.sign_in_title_* and auth.sign_in_line_*), as
+ * { title: { fi: '…' }, line: { fi: '…' } } with only the languages that have one.
+ */
+function dialogTexts(config: AimeatConfig): { title: Record<string, string>; line: Record<string, string> } {
+  const pick = (en: string, fi: string, es: string): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const [lang, text] of [['en', en], ['fi', fi], ['es', es]] as const) if (text && text.trim()) out[lang] = text.trim();
+    return out;
+  };
+  return {
+    title: pick(config.signInTitleEn, config.signInTitleFi, config.signInTitleEs),
+    line: pick(config.signInLineEn, config.signInLineFi, config.signInLineEs),
+  };
+}
+
+/**
  * Serves helper JavaScript libraries at /v1/libs/*
  * These are self-contained scripts that AI-generated apps include via <script> tag.
  * The app files are served from the AIMEAT node itself — zero CORS issues.
@@ -298,6 +315,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
       // whether a sign-in may stop at the two-step enrolment step.
       passwordSignIn: config.passwordSignIn,
       twoStepRequired: config.twoStepRequired,
+      // The operator's own headline and line for the dialog's sign-in side, per language
+      // (auth.sign_in_title_* and auth.sign_in_line_*). A language left empty is left out, and the
+      // dialog shows its built-in text for it.
+      signInTexts: dialogTexts(config),
     })};
 `;
     sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));
