@@ -618,8 +618,24 @@
   function keyOf(session) {
     return session && session.jwt ? session.jwt + "|" + (session._app || "") : null;
   }
+  function tokenReadsAiState(session) {
+    var p = parseJwt(session && session.jwt || "") || {};
+    if (!Array.isArray(p.scopes)) return true;
+    var roles = Array.isArray(p.roles) ? p.roles : [];
+    if (roles.indexOf("owner") >= 0 && roles.indexOf("agent") < 0 && roles.indexOf("ecosystem") < 0) return true;
+    return p.scopes.indexOf("ai:use") >= 0 || p.scopes.indexOf("ai:*") >= 0 || p.scopes.indexOf("*") >= 0;
+  }
   function fetchState(session) {
     var key = keyOf(session);
+    if (!tokenReadsAiState(session)) {
+      cache.data = { unavailable: true, reason: "SCOPE_DENIED", refused: true };
+      cache.pending = null;
+      return Promise.resolve().then(function() {
+        if (cache.key === key) cache.listeners.forEach(function(fn) {
+          fn();
+        });
+      });
+    }
     var path = "/v1/ai/capabilities" + (session._app ? "?app_id=" + encodeURIComponent(session._app) : "");
     cache.pending = authApi(path, session.jwt).then(function(r) {
       if (cache.key === key) cache.data = r.data || { unavailable: true, reason: "empty answer" };

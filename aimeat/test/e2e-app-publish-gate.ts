@@ -613,6 +613,12 @@ const publish = (token: string, body: Record<string, unknown>) =>
             `the acceptance must address the genre this app forked: ${line}`);
         assert(/would this pass beside the genre/i.test(line!),
             `the acceptance must carry the question asked while looking: ${line}`);
+        // Since 2026-11-11: an app went out twice with what its owner then found, a WebGL warning
+        // that counted up in the console and frames of 59 ms in a browser without its JIT.
+        assert(line!.includes("the browser's own warnings"),
+            `the acceptance must have the console read with the browser's own warnings: ${line}`);
+        assert(line!.includes('--js-flags=--jitless') && line!.includes('no task over 50 ms'),
+            `the acceptance must name the run with the JavaScript compiler off and its measure: ${line}`);
     });
 
     await test('an Atelier app on a register of its own is sent to the genre SHELF instead', async () => {

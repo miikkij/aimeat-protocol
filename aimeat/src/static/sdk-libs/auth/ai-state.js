@@ -23,6 +23,11 @@
  *   pillHtml += aiStatusHtml(st, i, 'led') + name + aiStatusHtml(st, i, 'bolt');
  *   wireAiState(container);
  * @version-history
+ *   v1.0.2 — 2026-11-11 — A session whose token does not carry ai:use is not asked for at all. The
+ *     request was made, refused with 403 and the refusal kept, which drew the pill correctly, but
+ *     the browser writes every refused request into the console as an error, so every signed-in
+ *     app that uses no AI showed a red line its builder could not remove. The token says which
+ *     scopes it carries; the state is set to the refused one from that, with no request.
  *   v1.0.1 — 2026-11-10 — On an app page the served live library names the changed domains in a Set,
  *     which the filter read as "no list", so every live event of the app asked /v1/ai/capabilities
  *     again; and a refused read (a grant without ai:use) was asked again on each of them. The filter
@@ -34,6 +39,7 @@ import { NODE_URL } from './config.js';
 import { escHtml } from './theme.js';
 import { clampPopover } from './cluster.js';
 import { money } from '../_core/format.js';
+import { parseJwt } from './crypto.js';
 
 /** @type {{ key: string|null, data: any, pending: Promise<any>|null, session: any, listeners: Set<() => void> }} */
 var cache = { key: null, data: null, pending: null, session: null, listeners: new Set() };
@@ -43,8 +49,35 @@ var DOMAINS = ['ai-usage', 'ai-providers', 'agents'];
 
 function keyOf(session) { return session && session.jwt ? session.jwt + '|' + (session._app || '') : null; }
 
+/**
+ * Whether the node would answer GET /v1/ai/capabilities for this session's token. The route asks
+ * for the scope ai:use. An owner's own session passes without scopes; an app grant, an agent and an
+ * ecosystem token pass when their scopes hold the exact word, ai:* or * (the rule of
+ * src/utils/scope-coverage.ts). A token that cannot be read, or that names no scopes, is asked
+ * for: the node then decides, as before.
+ * @param {any} session
+ * @returns {boolean}
+ */
+export function tokenReadsAiState(session) {
+  var p = parseJwt((session && session.jwt) || '') || {};
+  if (!Array.isArray(p.scopes)) return true;
+  var roles = Array.isArray(p.roles) ? p.roles : [];
+  if (roles.indexOf('owner') >= 0 && roles.indexOf('agent') < 0 && roles.indexOf('ecosystem') < 0) return true;
+  return p.scopes.indexOf('ai:use') >= 0 || p.scopes.indexOf('ai:*') >= 0 || p.scopes.indexOf('*') >= 0;
+}
+
 function fetchState(session) {
   var key = keyOf(session);
+  if (!tokenReadsAiState(session)) {
+    // No request: the node would refuse it, and the browser writes a refused request into the
+    // console as an error. The state is the one a refusal gives, and the pill is told as after
+    // an answer.
+    cache.data = { unavailable: true, reason: 'SCOPE_DENIED', refused: true };
+    cache.pending = null;
+    return Promise.resolve().then(function () {
+      if (cache.key === key) cache.listeners.forEach(function (fn) { fn(); });
+    });
+  }
   var path = '/v1/ai/capabilities' + (session._app ? '?app_id=' + encodeURIComponent(session._app) : '');
   cache.pending = authApi(path, session.jwt)
     .then(function (r) { if (cache.key === key) cache.data = r.data || { unavailable: true, reason: 'empty answer' }; })

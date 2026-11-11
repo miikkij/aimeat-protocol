@@ -28,6 +28,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.46.0 — 2026-11-11 — ADDITIVE (Jouni approved it: "Tee"): Finishing gains one paragraph with
+ *     two checks. The console is read with the browser's own warnings while the app works, and an
+ *     app that computes every frame is run with the JavaScript compiler off. An app built from this
+ *     spec went out with frames of 59 ms in a browser without its JIT and then with a WebGL warning
+ *     that counted to 256; both times "no console errors" had been checked and was true.
  *   v1.45.0 — 2026-11-08 — Jouni asked for it (B): the level is the interview's question 0 and decides
  *     the rest (a prototype asks three questions, draws no layouts, no introduction, the data map only
  *     for shared data, reads `libraries` and `patterns`; an ordinary page skips the introduction and
@@ -769,6 +774,18 @@ function composeBody(config: AimeatConfig): string {
     + 'of the skill). Report published, '
     + 'checked and accepted as three separate things: a check you could not run is said, never '
     + 'counted as passed.\n\n';
+  body += '**Two checks a screenshot does not make.** Read the console with the browser\'s own '
+    + 'warnings as well as its errors, for several seconds while the app does its work: a WebGL, '
+    + 'deprecation or policy warning is written by the browser (`Log.entryAdded` over the DevTools '
+    + 'protocol, levels `error` and `warning`) and is no console call, so a check of console calls '
+    + 'alone reports a clean console while the owner watches a warning count up. An app that '
+    + 'computes every frame (a simulation, particles, a game, image work) is also run once with '
+    + 'the browser\'s JavaScript compiler off, Chrome or Edge started with `--js-flags=--jitless`: a '
+    + 'browser may run a site that way, and the arithmetic is then ten to twenty times slower. The '
+    + 'app passes when it keeps the screen\'s frame rate at its full size, with no task over 50 ms '
+    + 'while it works. Arithmetic that cannot pass in JavaScript goes to the graphics card (WebGL '
+    + 'shaders run at the same speed either way), and work done once goes in slices of a few '
+    + 'milliseconds. The app solves this itself and leaves the person\'s browser settings alone.\n\n';
 
   body += ATELIER_REVIEW_SECTION;
 

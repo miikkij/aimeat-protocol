@@ -156,4 +156,40 @@ describe('the pill AI state on an app page', () => {
         await settle(); await settle();
         expect(asks()).toBe(2);
     });
+
+    // A token as the node signs it for an app: three parts, the payload in base64url.
+    const token = (payload: object) => 'h.' + Buffer.from(JSON.stringify(payload)).toString('base64url') + '.s';
+
+    it('an app whose token does not carry ai:use is never asked for: no request, so no 403 in its console', async () => {
+        world.capabilities = 'refused';
+        aiState.forgetAiState();
+        let told = 0;
+        const st = aiState.readAiState({ jwt: token({ roles: ['app'], scopes: ['memory:read', 'memory:write'] }), _app: 'alice/app.html' }, () => { told++; });
+        await settle(); await settle();
+        expect(asks()).toBe(0);
+        // The state is the one a refusal gives, known at once: the pill draws neither the light nor the bolt.
+        expect(st).toMatchObject({ unavailable: true, refused: true });
+        expect(told).toBe(1);
+        live(new Set(['ai-usage']));
+        await settle(); await settle();
+        expect(asks()).toBe(0);
+    });
+
+    it('a token that carries ai:use, ai:* or *, and an owner session, are asked as before', async () => {
+        world.capabilities = 'ok';
+        const sessions = [
+            { roles: ['app'], scopes: ['memory:read', 'ai:use'] },
+            { roles: ['app'], scopes: ['ai:*'] },
+            { roles: ['agent'], scopes: ['*'] },
+            { roles: ['owner'], scopes: [] },
+            { roles: ['owner'] },
+        ];
+        for (const [n, payload] of sessions.entries()) {
+            aiState.forgetAiState();
+            const before = asks();
+            aiState.readAiState({ jwt: token({ ...payload, n }), _app: 'alice/app.html' }, () => undefined);
+            await settle(); await settle();
+            expect(asks() - before, JSON.stringify(payload)).toBe(1);
+        }
+    });
 });

@@ -18,6 +18,11 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './app-publish-next-steps.js';
  * @version-history
+ *   v1.3.2 — 2026-11-11 — `acceptance` says how the console is read (with the browser's own
+ *     warnings, while the app works) and names the run with the JavaScript compiler off for an app
+ *     that computes every frame. An app was published twice with "a clean console" checked: once
+ *     with frames of 59 ms in a browser that ran it without its JIT, once with a WebGL warning that
+ *     counted to 256, which a check of console calls and errors does not collect.
  *   v1.3.1 — 2026-11-08 — `acceptance` names the one size matrix (390×844, 1280×900, 1280×460) the
  *     skill and the spec name; it said 390 and 1440, which a real build met as a contradiction.
  *     `legal_pages` says which recommended legal pages are missing and how to write them (the
@@ -150,7 +155,12 @@ export async function buildPublishNextSteps(
           + 'of the skill and the spec): page width equal to the viewport, nothing '
           + 'past the viewport edge (including inside a box that clips), no text under 11 px, no '
           + 'control under 40 px at 390, contrast 4.5 for body text, no animation still running '
-          + 'under reduced motion, and a clean console.',
+          + 'under reduced motion, and a clean console. Read the console with the browser\'s own '
+          + 'warnings (a WebGL, deprecation or policy warning is written by the browser and is no '
+          + 'console call), for several seconds while the app does its work. An app that computes '
+          + 'every frame (a simulation, particles, a game) is also run once with the browser\'s '
+          + 'JavaScript compiler off, Chrome or Edge started with --js-flags=--jitless: it keeps the '
+          + 'screen\'s frame rate at its full size, with no task over 50 ms while it works.',
       } : {}),
       // What this app made for itself, and the Design Book it belongs in (app-genre-fork.ts).
       // Owed on the finest level only, where hand-made parts are the level's own work.

@@ -137,12 +137,12 @@
       "digest": "sha256:06cfafdc03527b2a0174f9f7"
     },
     "node:aimeat-app-workstation": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-11",
       "watches": [
         "aimeat/src/services/app-size-health.ts",
         "aimeat/src/services/app-publish-next-steps.ts"
       ],
-      "digest": "sha256:a0bed1e1a9483bbcc5abdeb8"
+      "digest": "sha256:966d85ea81f545a85bf211bb"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-04",
@@ -155,14 +155,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-11",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:47212b151b23ed0ef409953c"
+      "digest": "sha256:22f366498e691277325d78a3"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -582,7 +582,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app-size-health.ts": "b0683f91995656e0",
-      "aimeat/src/services/app-publish-next-steps.ts": "17597f25d428f122"
+      "aimeat/src/services/app-publish-next-steps.ts": "b0a61cd9f04308fa"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
@@ -590,7 +590,7 @@
       "aimeat/src/services/app-spec-gate.ts": "1c415a82078c0a0f"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "df377e110e185adf",
+      "aimeat/src/services/build-atelier-prompt.ts": "fb3c48380d28da4f",
       "aimeat/src/services/build-atelier-layers.ts": "44f4b6e45a9d8b9a",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "eb3ec036ab55c7ac",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"

@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-11 — Step 7 names the two checks the specification's Finishing gained: the console read
+ *     with the browser's own warnings while the app works, and an app that computes every frame run
+ *     with the JavaScript compiler off (Jouni approved the change to the specification).
  *   2026-11-09 — Step 3: one top bar. On a genre fork the genre's masthead is the only top bar, with
  *     the node's pill in it as it comes, restyled only when the owner asks (Jouni). A real build met
  *     "the shell's bar is the only top bar" and "the genre is the frame, no app shell" side by side,
@@ -470,7 +473,10 @@ moved under you says so.
    (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
 7. **Verify** — 390×844, 1280×900 and 1280×460, both themes, no horizontal scroll, every state
-   reachable, no console errors. LOOK FOR A BROWSER BEFORE YOU SAY YOU HAVE NONE: list the tools
+   reachable, no console errors. Read the console with the browser's own warnings as well, for
+   several seconds while the app works, and run an app that computes every frame once with the
+   JavaScript compiler off (\`--js-flags=--jitless\`): the specification's "Finishing" says how
+   and what passes. LOOK FOR A BROWSER BEFORE YOU SAY YOU HAVE NONE: list the tools
    you were given and search them for \`playwright\`, \`browser\` and \`chrome\`. A Playwright MCP
    server driving the machine's own Chrome is the usual one, and a session that has it and does
    not look is the common failure. If there is none, say so once and suggest it by name
