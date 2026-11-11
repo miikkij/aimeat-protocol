@@ -144,6 +144,7 @@
     "check:imports-tracked": "cd aimeat && pnpm check:imports-tracked",
     "boot:smoke": "cd aimeat && pnpm boot:smoke",
     "test:env:init": "cd aimeat && pnpm test:env:init",
+    "test:db:prune": "cd aimeat && pnpm test:db:prune",
     "test:e2e:guards:sqlite": "cd aimeat && pnpm test:e2e:guards:sqlite",
     "test:e2e:guards:postgres-kysely": "cd aimeat && pnpm test:e2e:guards:postgres-kysely",
     "check:scope-parity": "cd aimeat && pnpm check:scope-parity",

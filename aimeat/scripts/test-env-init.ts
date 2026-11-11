@@ -27,6 +27,8 @@
  *        AIMEAT_TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/x pnpm test:env:init --force
  *                                                  (your PostgreSQL account instead of the CI one)
  * @version-history
+ *   v1.2.0 — 2026-11-11 — After its own database is there, drops the E2E databases of worktrees that
+ *     no longer exist (scripts/test-db-prune.ts); the slug rule lives in lib/e2e-databases.ts.
  *   v1.1.0 — 2026-10-16 — Takes the PostgreSQL account from AIMEAT_TEST_DATABASE_URL (the examples carry
  *     the CI service's appuser:devpassword123, which a developer's server does not have); creates the
  *     database the env file NAMES, so a run over existing files creates a missing one even when the file
@@ -38,6 +40,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { portConflicts } from './lib/worktree-ports.js';
+import { worktreeSlug } from './lib/e2e-databases.js';
+import { pruneE2eDatabases } from './test-db-prune.js';
 
 const FORCE = process.argv.includes('--force');
 const AIMEAT_DIR = process.cwd();
@@ -49,9 +53,8 @@ const AIMEAT_DIR = process.cwd();
  * other and wants its own database as much as the rest.
  */
 function slugOf(): string {
-  const worktree = basename(dirname(AIMEAT_DIR));
-  const slug = worktree.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  return slug.slice(0, 40) || 'default';
+  // One rule in one place: the prune (lib/e2e-databases.ts) reads a worktree's database name from it.
+  return worktreeSlug(basename(dirname(AIMEAT_DIR)));
 }
 
 /**
@@ -212,6 +215,18 @@ async function main(): Promise<void> {
     }
     process.exitCode = 1;
     return;
+  }
+
+  // Every new worktree clears the E2E databases of the worktrees that are gone, so the server holds
+  // about one set per live worktree (2143 had piled up by 2026-11-11). A failure here never stops
+  // the setup: the worktree's own database is already there.
+  try {
+    const pruned = await pruneE2eDatabases(AIMEAT_DIR, { log: (l) => console.log(l) });
+    if (pruned && pruned.dropped.length > 0) console.log(`  dropped ${pruned.dropped.length} E2E database(s) of worktrees that are gone`);
+    for (const f of pruned?.failed ?? []) console.warn(`  could not drop ${f.name}: ${f.reason}`);
+  } catch (err) {
+    const e = err as { code?: string; message?: string };
+    console.warn(`  the prune of old E2E databases did not run: ${e.code ? `${e.code} ` : ''}${e.message ?? String(err)}`);
   }
 
   console.log(wrote > 0

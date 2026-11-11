@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-11 -- A Postgres run drops the lane and own-node databases it made at its end (scripts/lib/e2e-databases.ts).
  *   2026-11-10 -- e2e-live-catchup.ts joins the list (not the guard tier): a reopened live stream gets the domains that changed while it was away, and only its owner's.
  *   2026-11-10 -- e2e-query-budget.ts joins GUARD_SUITES (145 → 146), Jouni's decision: three consecutive 6/6 runs alone on each backend in the production-settings lane.
  *   2026-11-10 -- e2e-memory-tab-summary.ts joins the list (not the guard tier): the Memory page's summary says what the full answer gives, and a key space's pages reach every key once.
@@ -539,6 +540,7 @@ import { classify, formatHeader, formatRow } from '../scripts/lib/e2e-results.js
 import { githubAnnotations, githubSummary } from '../scripts/lib/e2e-github-report.js';
 import { runLane, type SuiteResult } from './run-e2e-lane.js';
 import { clearNodeLogs, nodeLogDir } from './helpers/runner-node-log.js';
+import { adminUrlOf, dropDatabases, listE2eDatabases, liveBases, runDatabasesOf } from '../scripts/lib/e2e-databases.js';
 
 /** The worktree this run belongs to, and who it is for the port lock's record: the session, or the worktree's name when it has none. */
 const RUN_WORKTREE = fileURLToPath(new URL('../..', import.meta.url));
@@ -2653,6 +2655,24 @@ async function main() {
         for (const line of githubAnnotations(red, TARGET.dbType)) console.log(line);
         const summaryFile = process.env.GITHUB_STEP_SUMMARY;
         if (summaryFile) appendFileSync(summaryFile, githubSummary(red, TARGET.dbType, { passed: totalPassed, failed: totalFailed, total: totalTests }));
+    }
+
+    // The lane and own-node databases this run made go now; the base stays for the next run of this
+    // worktree. Nothing dropped them before, and 2143 had piled up on one server by 2026-11-11
+    // (scripts/lib/e2e-databases.ts). Without a worktree list nothing is dropped.
+    if (!TARGET.external && TARGET.dbType === 'postgres-kysely' && TARGET.dbUrl) {
+        try {
+            const base = new URL(TARGET.dbUrl).pathname.replace(/^\//, '');
+            const live = liveBases(process.cwd());
+            if (live) {
+                const admin = adminUrlOf(TARGET.dbUrl);
+                const { dropped, failed } = await dropDatabases(admin, runDatabasesOf(base, await listE2eDatabases(admin), live));
+                if (dropped.length > 0) console.log(`  Dropped ${dropped.length} lane and own-node database(s) this run made.`);
+                for (const f of failed) console.warn(`  Could not drop ${f.name}: ${f.reason}`);
+            }
+        } catch (e) {
+            console.warn(`  The run's lane databases were not dropped: ${(e as Error).message}`);
+        }
     }
 
     process.exit(anyFailed ? 1 : 0);
