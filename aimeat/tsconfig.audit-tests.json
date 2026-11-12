@@ -20,5 +20,5 @@
     "test/unit/recovery-boundaries.test.ts",
     "test/fixtures/tally-crash-child.ts"
   ],
-  "exclude": ["node_modules", "dist", "src/generated/prisma-postgres"]
+  "exclude": ["node_modules", "dist"]
 }
