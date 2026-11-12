@@ -29,6 +29,8 @@
  *   const jws = await signCompact(card, key.privateKey, key.kid);
  *   const token = await resolveToken(agent, owner, nodeUrl);
  * @version-history
+ *   2026-11-13 — getConfigDir comes from home-dir.ts, not config.ts, which imports this file
+ *     (structure programme 2026-11, unit 4).
  *   v1.3.0 — 2026-10-11 — A key the node refuses as not pinned (`key_not_pinned`) is `KeyRefusedError`,
  *     resolveToken answers null for it, and the refusal is remembered for the life of the process:
  *     one request and one log line, however many calls name the agent. It was read as a failed
@@ -44,11 +46,10 @@
  */
 import { readFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { writePrivateFile, ensurePrivateDir } from '../../utils/private-file.js';
-import { prepareConnectorHome } from './home-dir.js';
+import { getConfigDir, prepareConnectorHome } from './home-dir.js';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { CompactSign, importJWK, calculateJwkThumbprint, generateKeyPair, exportJWK } from 'jose';
-import { getConfigDir } from './config.js';
 import { getToken } from './keychain.js';
 import { parseTokenFilename } from './keychain.js';
 import { logger } from '../../utils/logger.js';

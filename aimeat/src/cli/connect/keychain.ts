@@ -8,6 +8,8 @@
  * @structure One file per agent. `listAllTokens()` scans the directory and parses
  *   filenames so the multi-agent serve loop can load every credential at once.
  * @version-history
+ *   2026-11-13 -- getConfigDir comes from home-dir.ts, not config.ts, which imports this file
+ *                 (structure programme 2026-11, unit 4).
  *   v1.4.0 -- 2026-10-25 -- storeAgentKey / getAgentKey: the agent's private key from its last approval,
  *     `{agent}@{owner}.key` at 0600, for the proof that a reconnect is the agent coming back; deleteToken
  *     removes it too (secaudit2026oct22, unbound-reapproval-of-existing-agent).
@@ -23,10 +25,9 @@
  */
 import { readFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { getConfigDir } from './config.js';
 import { logger } from '../../utils/logger.js';
 import { writePrivateFile, ensurePrivateDir } from '../../utils/private-file.js';
-import { prepareConnectorHome } from './home-dir.js';
+import { getConfigDir, prepareConnectorHome } from './home-dir.js';
 
 function tokensDir(): string {
   const dir = join(getConfigDir(), 'tokens');

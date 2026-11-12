@@ -22,6 +22,9 @@
  *     config (or synthesize one from the global config for legacy installs)
  *
  * @version-history
+ *   2026-11-13 -- getConfigDir and the launch directory moved unchanged to home-dir.ts and are
+ *     re-exported here, so keychain.ts and agent-key.ts no longer import this file and the three
+ *     form no import cycle (structure programme 2026-11, unit 4).
  *   2026-10-25 -- loadAllAgents adopts once the commands an install already had, and takes a runner or
  *     wake command nobody connected through the connector out of the agent's config, saying so in
  *     `heldCommands`; saveConnectedAgentConfig records what the connect flow writes as trusted
@@ -57,7 +60,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { resolveConnectorHome, prepareConnectorHome } from './home-dir.js';
+import { getConfigDir, prepareConnectorHome } from './home-dir.js';
 import { parse, stringify } from 'yaml';
 import { listAllTokens, parseTokenFilename } from './keychain.js';
 import { listAllAgentKeys } from './agent-key.js';
@@ -72,16 +75,11 @@ import { logger } from '../../utils/logger.js';
 //      so running `aimeat connect serve` from two projects on one machine no
 //      longer fights over a single global ~/.aimeat (last-writer / refused
 //      daemon / wrong-agent routing). Set AIMEAT_HOME=~/.aimeat for the old
-//      global behaviour. The launch directory is captured once at module load.
-// AIMEAT_HOME is read on every call, not at module load: `aimeat connect client` sets it after
-// this module may already be loaded, and a value captured at load time sent the token to
-// <cwd>/.aimeat while the command looked for it in the client's home, so it ended with "No
-// credential was stored" after the agent had been created on the node (feature-list audit #6).
+//      global behaviour. getConfigDir() lives in home-dir.ts, with the launch directory it reads,
+//      and is re-exported here for every importer of this file.
 // Every write into it goes through prepareConnectorHome(), which keeps the folder out of the
 // project's git (secrets audit 2026-10-09, S4).
-const LAUNCH_CWD = process.cwd();
-
-export function getConfigDir(): string { return resolveConnectorHome(process.env, LAUNCH_CWD).dir; }
+export { getConfigDir };
 const configFile = (): string => join(getConfigDir(), 'config.yaml');
 
 /* ───────── Global config (legacy single-agent) ───────── */
