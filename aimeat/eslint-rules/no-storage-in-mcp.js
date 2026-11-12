@@ -72,7 +72,6 @@ const EXEMPT = new Set([
   'src/mcp/agent-schedules.ts',
   'src/mcp/agent-tasks.ts',
   'src/mcp/agent-telemetry.ts',
-  'src/mcp/app-template-proposals.ts',
   'src/mcp/apps.ts',
   'src/mcp/apps-fork.ts',              // pure extraction out of apps.ts (max-file-lines), same backlog
   'src/mcp/boards.ts',

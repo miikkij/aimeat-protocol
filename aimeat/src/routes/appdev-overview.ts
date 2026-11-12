@@ -40,12 +40,12 @@ import { buildAppdevOverview } from '../services/appdev-overview.js';
 import { readerFor } from '../services/classification/reader.js';
 import { callerOf } from '../middleware/caller.js';
 import { readsAsOwner } from '../services/owner-scope-read.js';
-import { logger } from '../utils/logger.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate,
   type ProposeTemplateInput,
 } from '../services/app-template-proposals.js';
 import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
+import { templateSourceApp } from '../services/appdev/template-source.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** The body POST /v1/appdev/templates takes: the MCP tool's input, from its catalog entry. */
@@ -123,8 +123,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
     const m = found.manifest;
-    const sourceOwnerGhii = `${m.derivedFrom.owner}@${config.nodeId}`;
-    const app = await storage.getApp(sourceOwnerGhii, m.derivedFrom.filename).catch(err => { logger.warn('GET /v1/appdev/templates/:id: continuing after a suppressed failure', { error: String(err) }); return null; });
+    const app = await templateSourceApp(storage, config.nodeId, m.derivedFrom, 'GET /v1/appdev/templates/:id');
     res.json(success(config.nodeId, {
       template: m,
       source_app: app ? {

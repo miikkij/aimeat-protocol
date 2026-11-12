@@ -32,7 +32,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { logger } from '../utils/logger.js';
 import {
     proposeTemplate, listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
@@ -40,6 +39,7 @@ import { templateAnswer, templateIndex, unknownTemplateMessage } from '../servic
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { appToll } from '../services/app-pacing.js';
+import { templateSourceApp } from '../services/appdev/template-source.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
@@ -115,8 +115,7 @@ export function registerAppTemplateProposalTools(
             const m = found.manifest;
 
             // Live commerce/fork state of the source app so the next builder knows how to start.
-            const sourceOwnerGhii = `${m.derivedFrom.owner}@${config.nodeId}`;
-            const app = await storage.getApp(sourceOwnerGhii, m.derivedFrom.filename).catch(err => { logger.warn('proofs: continuing after a suppressed failure', { error: String(err) }); return null; });
+            const app = await templateSourceApp(storage, config.nodeId, m.derivedFrom, 'proofs');
             // The source's pacing amount: morsels taking the app once moves, never a price.
             const tollMorsels = appToll(app?.manifest);
             const source_app = app ? {
