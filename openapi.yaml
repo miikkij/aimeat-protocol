@@ -17658,6 +17658,17 @@ paths:
         - Portal
       security:
         - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_code:
+                  type: string
+                  maxLength: 256
+                  description: The code of the approval just given. Without it the account's first agent is recorded.
       responses:
         '200':
           description: >-
@@ -27042,6 +27053,17 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
         - { name: bidId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cap_units:
+                  type: number
+                  minimum: 0
+                  description: Overrides the need's budget cap. Rounded down to a whole number of units.
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/AimeatError' }
@@ -32273,6 +32295,27 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                callback_url:
+                  type: [string, 'null']
+                  maxLength: 2048
+                  description: The address a notice of a new post is sent to.
+                filters:
+                  type: [object, 'null']
+                  description: Which posts to be told about. Every post when it is left out.
+                  properties:
+                    categories:
+                      type: array
+                      items: { type: string, maxLength: 200 }
+                    tags:
+                      type: array
+                      items: { type: string, maxLength: 200 }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -42110,6 +42153,23 @@ paths:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
         - { name: account, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                level:
+                  description: The rung, as its name (`full`, `publisher`, `drafter`) or its number (0, 10, 20).
+                  oneOf:
+                    - { type: integer, enum: [0, 10, 20] }
+                    - { type: string, maxLength: 256 }
+                note:
+                  type: string
+                  maxLength: 2048
+                  description: A line for the owner's own list. Kept to its first 400 characters.
       responses:
         '200':
           description: OK
@@ -42182,6 +42242,27 @@ paths:
         - BearerAuth: []
       parameters:
         - { name: account, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                level:
+                  description: The rung, as its name (`full`, `publisher`, `drafter`) or its number (0, 10, 20).
+                  oneOf:
+                    - { type: integer, enum: [0, 10, 20] }
+                    - { type: string, maxLength: 256 }
+                note:
+                  type: string
+                  maxLength: 2048
+                  description: A line for the owner's own list. Kept to its first 400 characters.
+                expires_at:
+                  type: string
+                  maxLength: 256
+                  description: When the right ends by itself. Stored as sent.
       responses:
         '200':
           description: OK
@@ -57178,6 +57259,19 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entries:
+                  type: array
+                  description: >-
+                    The entries to copy, each by the last segment of its key. Every public entry when
+                    it is left out.
+                  items: { type: string, maxLength: 1024 }
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -62102,6 +62196,19 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [components]
+              properties:
+                components:
+                  type: array
+                  minItems: 1
+                  description: The ids of the customized components to write a prompt for.
+                  items: { type: string, maxLength: 256 }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -63545,6 +63652,55 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: >-
+                Some fields of the record, or the whole stored record sent back. The fields the node
+                writes itself are dropped (see the description).
+              properties:
+                name: { type: string, maxLength: 200 }
+                summary: { type: string, maxLength: 10000 }
+                visibility:
+                  type: string
+                  maxLength: 256
+                  description: private, owner or public. The stored word sent back unchanged passes.
+                status: { type: string, maxLength: 256 }
+                source:
+                  type: object
+                  description: >-
+                    Checked as POST checks it when it differs from the stored source. The stored
+                    source sent back unchanged passes, whatever its type.
+                  properties:
+                    type: { type: string, maxLength: 256 }
+                    ref: { type: string, maxLength: 1024 }
+                    version: { type: string, maxLength: 256 }
+                authRequired: { type: string, maxLength: 256 }
+                callable: { type: boolean }
+                inputSchema: { type: [object, 'null'] }
+                outputSchema: { type: [object, 'null'] }
+                exports: { type: [array, 'null'] }
+                usage: { type: string, maxLength: 100000 }
+                whenToUse: { type: string, maxLength: 100000 }
+                whenNotToUse: { type: string, maxLength: 100000 }
+                examples: { type: array }
+                dependencies: { type: array }
+                webhookUrl: { type: [string, 'null'], maxLength: 2048 }
+                cost:
+                  type: [object, 'null']
+                  description: The pacing amount per use, as on POST.
+                  properties:
+                    toll_morsels: { type: number, minimum: 0 }
+                    morsels: { type: number, minimum: 0, deprecated: true }
+                    perUnit: { type: string, maxLength: 200 }
+                trustRequired: { type: [number, 'null'] }
+                redactedFields: { type: array, items: { type: string, maxLength: 1024 } }
+                tags: { type: array, items: { type: string, maxLength: 200 } }
+                deprecationMessage: { type: [string, 'null'], maxLength: 2048 }
+                replacedBy: { type: [string, 'null'], maxLength: 256 }
       responses:
         '200':
           description: Updated
@@ -63648,6 +63804,25 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                duration_ms:
+                  type: number
+                  minimum: 0
+                  description: How long the call took. Kept to at most one hour.
+                status:
+                  type: string
+                  maxLength: 256
+                  description: '`success` counts as a success; any other word, or none, counts as an error.'
+                error:
+                  type: string
+                  maxLength: 2048
+                  description: The error text. Kept to its first 500 characters, and only from the capability's owner.
       responses:
         '204':
           description: Recorded
@@ -63679,6 +63854,20 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: The whole override, stored as sent. A request with no body clears it.
+              properties:
+                disabled:
+                  type: boolean
+                  description: True switches the capability off for invocation and leaves it out of aggregation.
+                summary: { type: string, maxLength: 10000 }
+                visibility: { type: string, enum: [private, owner, public] }
+                notes: { type: string, maxLength: 2048 }
       responses:
         '200':
           description: Updated with override
@@ -71562,6 +71751,17 @@ paths:
       tags: [MCP Servers]
       security:
         - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 500 }
+                description: { type: string, maxLength: 10000 }
+                exposure: { type: string, enum: [gateway, flatten] }
+                enabled: { type: boolean }
       responses:
         '200':
           description: The updated server
@@ -80748,6 +80948,14 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment: { type: string, maxLength: 2048 }
       responses:
         '200':
           description: New vouch count
