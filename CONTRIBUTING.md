@@ -31,6 +31,10 @@ and a Postgres database name of this checkout's own. Do not copy the example fil
 all name the same port and database, and the test runner empties that database between suites.
 When no PostgreSQL server is running, the command says so and the SQLite file still works.
 
+The root `package.json` holds the commands people run most, and most of them run the script of
+the same name in `aimeat/`. Every other script of the node runs from the root with
+`pnpm -C aimeat <name>`, or with `pnpm <name>` from `aimeat/`.
+
 ## See your change on a node of your own
 
 ```bash
