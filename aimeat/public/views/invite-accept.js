@@ -39,6 +39,11 @@
  *     "no free place" (status app_waiting) is shown on the page instead of leaving it.
  *   v1.4.1 — 2026-10-05 — Comments only: the account made here keeps the invited address unverified
  *     until its code comes back (secaudit 2026-10, APP-2).
+ *   v1.5.0 — 2026-11-12 — After a new account, the page asks for the address code the accept mailed
+ *     (POST /v1/ghii/email/confirm with the new session), with "send a new code" and "confirm later".
+ *     It went straight on before, so most invited people never typed the code, and a forgotten
+ *     password later found no proven address to send a reset code to (reported from an organisation
+ *     node on 4.3.0).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -74,6 +79,11 @@ export default function InviteAccept() {
   const [formError, setFormError] = useState('');
   const [mismatch, setMismatch] = useState(false); // server said EMAIL_MISMATCH on POST (fallback path)
   const [providers, setProviders] = useState([]);
+  // The address code step after a new account: { verificationId, token, after }. `after` is where the
+  // page goes once the code is confirmed or put off: { url } or { waiting } (an app with no free place).
+  const [confirmStep, setConfirmStep] = useState(null);
+  const [code, setCode] = useState('');
+  const [confirmNote, setConfirmNote] = useState('');
 
   // Social sign-in providers, rendered as co-equal buttons — an invited first-timer should not
   // conclude a password is mandatory when the node offers Google & co.
@@ -114,23 +124,78 @@ export default function InviteAccept() {
       const res = await api('/v1/invitations/' + encodeURIComponent(token) + '/accept', {
         method: 'POST', body: JSON.stringify(body || {}),
       });
+      const data = (res && res.data) || {};
       // An app with no free place: the account exists and is signed in, the invitation stays open.
       // Say so here, where Accept can be pressed again later, instead of leaving for the app.
-      if (res && res.data && res.data.status === 'app_waiting') {
-        setFormError(tr('invite.appWaiting', res.data.reason || 'The app has no free place for a member right now. Open the invitation again later.'));
+      // Otherwise the fallback mirrors the server default: land INSIDE the organism, flagged as a fresh join.
+      const orgId = data.organism_id;
+      const after = data.status === 'app_waiting'
+        ? { waiting: tr('invite.appWaiting', data.reason || 'The app has no free place for a member right now. Open the invitation again later.') }
+        : { url: data.redirect || (orgId ? `/v1/profile?tab=organisms&org=${encodeURIComponent(orgId)}&joined=1` : '/v1/profile#organisms') };
+      // A new account was mailed the code that confirms its address: ask for it now. A person who
+      // left without it could not reset a forgotten password later.
+      const step = data.email_verification;
+      if (data.created_account && data.token && step && step.sent && step.verification_id) {
+        setConfirmStep({ verificationId: step.verification_id, token: data.token, after });
         setSubmitting(false);
         return;
       }
-      // Fallback mirrors the server default: land INSIDE the organism, flagged as a fresh join.
-      const orgId = res && res.data && res.data.organism_id;
-      window.location.href = (res && res.data && res.data.redirect)
-        || (orgId ? `/v1/profile?tab=organisms&org=${encodeURIComponent(orgId)}&joined=1` : '/v1/profile#organisms');
+      leave(after);
     } catch (e) {
       if (e && e.code === 'EMAIL_MISMATCH') { setMismatch(true); setSubmitting(false); return; }
       setFormError(e.message || tr('invite.acceptFailed', 'Could not accept the invitation.'));
       setSubmitting(false);
     }
   }, [token]);
+
+  // Where the page goes after the accept (and after the code step): the app-waiting message on this
+  // page, or a full navigation that boots the SPA or the app signed in.
+  function leave(after) {
+    if (after.waiting) {
+      setConfirmStep(null);
+      setFormError(after.waiting);
+      setSubmitting(false);
+      return;
+    }
+    window.location.href = after.url;
+  }
+
+  // The new account's own session, from the accept answer: the page has no SPA session yet.
+  const confirmHeaders = () => ({ Authorization: 'Bearer ' + confirmStep.token });
+
+  async function confirmCode() {
+    const typed = code.trim();
+    if (!typed) { setFormError(tr('invite.confirmCodeRequired', 'Type the code from the email.')); return; }
+    setSubmitting(true); setFormError(''); setConfirmNote('');
+    try {
+      await api('/v1/ghii/email/confirm', {
+        method: 'POST', headers: confirmHeaders(),
+        body: JSON.stringify({ verification_id: confirmStep.verificationId, code: typed }),
+      });
+      leave(confirmStep.after);
+    } catch (e) {
+      const ended = e && ['EXPIRED', 'NOT_FOUND', 'TOO_MANY_ATTEMPTS'].includes(e.code);
+      setFormError(e && e.code === 'INVALID_CODE' ? tr('invite.confirmFailed', 'The code is wrong. Check it and try again.')
+        : ended ? tr('invite.confirmExpired', 'This code no longer works. Send a new code.')
+          : (e && e.message) || tr('invite.confirmFailed', 'The code is wrong. Check it and try again.'));
+      setSubmitting(false);
+    }
+  }
+
+  async function resendCode() {
+    setSubmitting(true); setFormError(''); setConfirmNote('');
+    try {
+      const res = await api('/v1/ghii/email/verify', {
+        method: 'POST', headers: confirmHeaders(), body: JSON.stringify({ email: state.inv.email }),
+      });
+      setConfirmStep((s) => ({ ...s, verificationId: res.data.verification_id }));
+      setCode('');
+      setConfirmNote(tr('invite.confirmResent', 'We sent a new code.'));
+    } catch (e) {
+      setFormError((e && e.message) || tr('invite.acceptFailed', 'Could not accept the invitation.'));
+    }
+    setSubmitting(false);
+  }
 
   function acceptAsNew() {
     const username = form.username.trim();
@@ -179,6 +244,30 @@ export default function InviteAccept() {
         <//>` : null}
       ${inv.message ? html`<${Note} kind="quiet">“${inv.message}”<//>` : null}
     <//>`;
+
+  // The account was just made here: confirm the invited address with the code mailed to it. Asked
+  // before anything else, because the session the accept set may already flip `authed`.
+  if (confirmStep) {
+    return html`
+      <${AskPage} tag=${tag} title=${tr('invite.confirmTitle', 'Confirm your email address')}
+        doors=${html`
+          <${Loud} onClick=${confirmCode} disabled=${submitting}>
+            ${submitting ? tr('invite.confirming', 'Confirming…') : tr('invite.confirmCta', 'Confirm')}
+          <//>`}
+        or=${tr('invite.or', 'OR')}
+        ways=${html`
+          <${Action} onClick=${resendCode} disabled=${submitting}>${tr('invite.confirmResend', 'Send a new code')}<//>
+          <${Action} onClick=${() => leave(confirmStep.after)} disabled=${submitting}>${tr('invite.confirmLater', 'Confirm later')}<//>`}>
+        <${Note} kind="lead">${fill(tr('invite.confirmBody', 'We sent a six-digit code to {email}. Type it here. With a confirmed address you can reset your password if you forget it.'), { email: inv.email || '' })}<//>
+        <${Fields}>
+          <${TextField} label=${tr('invite.confirmCodeLabel', 'Code')} autoFocus inputMode="numeric" autoComplete="one-time-code"
+            maxLength=${6} value=${code} onInput=${(v) => setCode(v)} onEnter=${confirmCode} />
+        <//>
+        ${confirmNote ? html`<${Note} kind="message">${confirmNote}<//>` : null}
+        ${formError ? html`<${Note} kind="message" error>${formError}<//>` : null}
+        <${Note} kind="quiet">${tr('invite.confirmLaterNote', 'You can also confirm the address later in Profile → Email.')}<//>
+      <//>`;
+  }
 
   // Signed in, but this account is NOT the invited party (verified email doesn't match) — OR the
   // server refused a POST with EMAIL_MISMATCH. Never let a wrong account absorb an operator-curated

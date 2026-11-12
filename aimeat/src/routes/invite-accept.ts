@@ -16,14 +16,19 @@
  *       invitation it was sent for is open, checked before any account is made.
  *
  *   Everything up to the account is identical between them: the token, the expiry, the single-use
- *   check, the recipient binding, and provisionOwner with the invited address already verified —
- *   which is what makes "no code to type" true, since the link itself proves the address.
+ *   check, the recipient binding, and provisionOwner with the invited address kept unproven until the
+ *   code mailed to it comes back (APP-2: the inviter can be handed the link, so the link proves
+ *   nothing about who opened it).
  *
  *   It lives here rather than under routes/organisms/ because it stopped being organism-only the
  *   day the node-level variant joined it, and because that file passed its size cap.
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-11-12 — An account made here gets `email_verification` { verification_id, sent } in the answer:
+ *     the address code it was mailed, which the accept page now asks for before it leaves. The page
+ *     never asked, so the invited address stayed unproven and a forgotten password locked the person
+ *     out (reported from an organisation node on 4.3.0; the reset side is ghii/recovery.ts).
  *   2026-11-04 — createEmailService gets storage, so the code mail's retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-02 — Accepting with a new account and a password answers 403 PASSWORD_SIGN_IN_OFF when the
  *     password sign-in policy refuses a new password (services/sign-in-policy.ts; IT review); the
@@ -229,6 +234,10 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     const authed = req.auth && !isAnonymousPrincipal(req.auth) ? (req.auth.owner as string) : null;
     let ownerName: string;
     let createdAccount = false;
+    // The address code mailed to a new account, named in the answer so the page asks for it at once
+    // (views/invite-accept.js). Without that step most people never typed it, and their address
+    // stayed unproven until a forgotten password showed it.
+    let emailVerification: { verification_id: string; sent: boolean } | undefined;
     if (authed) {
       ownerName = authed;
       // THE PERSON, NOT THEIR MACHINES. Accepting joins this account to an organism and takes the
@@ -321,6 +330,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       await storage.updateGHII(`${ownerName}@${config.nodeId}`, { notificationEmail: inv.email.toLowerCase().trim() });
       await startRegistrationEmailVerification(storage, createEmailService(config, storage), ownerName, inv.email,
         typeof locale === 'string' ? locale : undefined)
+        .then(({ verificationId, emailSent }) => { emailVerification = { verification_id: verificationId, sent: emailSent }; })
         .catch(err => logger.warn('invite accept: the verification code could not be sent', { error: String(err) }));
     }
 
@@ -331,11 +341,13 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     // here would hand them an owner session with the account record's roles: wider than what asked,
     // operator included on an operator's account, and outliving the PAT or the agent. The SPA accept
     // page keeps its own session and follows `redirect` (secaudit2026oct22).
-    async function newAccountSession(owner: string): Promise<{ token?: string; expires_in?: number }> {
+    // The answer for an account made here also names the address code it was mailed
+    // (email_verification), which the new session confirms at POST /v1/ghii/email/confirm.
+    async function newAccountSession(owner: string): Promise<{ token?: string; expires_in?: number; email_verification?: { verification_id: string; sent: boolean } }> {
       if (!createdAccount) return {};
       const record = await storage.getOwner(owner);
       const s = await establishOwnerSession(storage, config, req, res, { owner, roles: record?.roles ?? ['owner'] });
-      return { token: s.token, expires_in: s.expiresIn };
+      return { token: s.token, expires_in: s.expiresIn, ...(emailVerification ? { email_verification: emailVerification } : {}) };
     }
 
     // ── APP invitation: the membership comes from the app invitation itself. When the approval

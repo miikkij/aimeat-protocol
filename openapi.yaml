@@ -58546,7 +58546,9 @@ paths:
         account ONLY when that account's verified email matches the invited address (recipient
         binding — otherwise 403 EMAIL_MISMATCH and the invite is NOT consumed); a wrong signed-in
         session can never absorb the grant. Otherwise creates a new account from { username, password,
-        display_name } (the invited email is recorded as verified). Applies organism membership + the
+        display_name }. The invited email is recorded unconfirmed and a six-digit code is mailed to it;
+        the answer names it as `email_verification` { verification_id, sent }, and the new session
+        confirms it at POST /v1/ghii/email/confirm with that verification_id. Applies organism membership + the
         workspace grants and marks the invitation accepted (single-use). Only an account created here
         gets a login session (`token`, `expires_in` and the refresh cookie); a signed-in accept keeps
         the caller's own session and gets none. The success response `redirect` is the inviter's allowlisted return target
@@ -80497,7 +80499,10 @@ paths:
       tags: [GHII]
       summary: Request a password reset code
       description: |
-        Sends a password reset code to the account's verified email (no auth). Always returns the
+        Sends a password reset code to the account's verified email (no auth). An account made from
+        an emailed invitation whose invited address was never confirmed gets the code at that address
+        instead, and the reset made with it confirms the address; no other unconfirmed address gets a
+        code. Always returns the
         same response regardless of whether the account exists, to avoid account enumeration.
         The code is valid for 10 minutes, and only the newest code works: a new request expires
         the codes sent before it, and the new code keeps their failed attempts, so asking again does
@@ -80533,7 +80538,8 @@ paths:
       summary: Reset password with a code
       description: >-
         Resets the account password using a valid reset code (no auth). The new password is
-        strength-validated. Five failed attempts end the code (429 TOO_MANY_ATTEMPTS), counted across
+        strength-validated. A code that went to an invited address the account never confirmed
+        confirms that address too. Five failed attempts end the code (429 TOO_MANY_ATTEMPTS), counted across
         the codes a new request replaces. Three requests per ten minutes per client address, whatever
         token the request carries (429 RATE_LIMITED).
       requestBody:
@@ -80572,7 +80578,9 @@ paths:
       tags: [GHII]
       summary: Recover a forgotten username
       description: |
-        Emails the account's username to its verified notification email (no auth). Always returns
+        Emails the account's username to its verified notification email (no auth). When no account
+        has confirmed the address, each account an emailed invitation to it made, and which never
+        confirmed it, gets its username there. Always returns
         the same response regardless of whether the email matches an account, to avoid enumeration.
         Three requests per ten minutes per client address.
       requestBody:

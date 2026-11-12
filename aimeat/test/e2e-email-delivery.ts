@@ -119,6 +119,9 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
     return { status: res.status, body };
 }
 const bearer = (t: string): Record<string, string> => ({ Authorization: `Bearer ${t}` });
+/** A client address of its own, so a case does not spend the per-address limit of the cases before it. */
+let clientSeq = 0;
+const client = (): Record<string, string> => ({ 'X-Forwarded-For': `203.0.113.${++clientSeq}` });
 const short = (v: unknown): string => JSON.stringify(v).slice(0, 300);
 
 /**
@@ -180,6 +183,8 @@ async function startNode(): Promise<void> {
             AIMEAT_SMTP_USER: 'aimeat-test',
             AIMEAT_SMTP_PASS: 'aimeat-test-secret',
             AIMEAT_SMTP_FROM: 'AIMEAT Test <noreply@aimeat.test>',
+            // The per-address limits read X-Forwarded-For from this process only (helper client()).
+            AIMEAT_TRUST_PROXY: 'loopback',
             AIMEAT_LOGIN_TARPIT_ENABLED: 'false',
             AIMEAT_LOGIN_RATE_LIMIT_MAX: '1000',
             AIMEAT_OUTBOUND_DAILY_LIMIT: '200',
@@ -217,6 +222,11 @@ const recName = `edrec${STAMP}`;
 const recEmail = `${recName}@aimeat.test`;
 const recPassword = 'RecoverMe9x';
 const inviteeEmail = `edinv${STAMP}@aimeat.test`;
+const invitedName = `edivr${STAMP}`;
+const invitedEmail = `${invitedName}@aimeat.test`;
+const confirmName = `edivc${STAMP}`;
+const confirmEmail = `${confirmName}@aimeat.test`;
+const strangerEmail = `edstr${STAMP}@aimeat.test`;
 const keyName = `edkey${STAMP}`;
 const keyEmail = `${keyName}@aimeat.test`;
 const KEY_CODE = 'KeyAccess9x';
@@ -565,6 +575,117 @@ async function run(): Promise<void> {
             'a refused invitation must not be stored');
         await sleep(300);
         assert(smtp!.mailTo(xxEmail).length === 0, 'a refused invitation must not send mail');
+    });
+
+    // Reported from an organisation node on 4.3.0 (2026-11-12): a person who joined from an emailed
+    // invitation never typed the address code, forgot the password, and the reset sent nothing,
+    // because the address an invitation link makes stays unconfirmed (APP-2) and the reset mails only
+    // a confirmed address. The accept answer now carries the code step, and the reset and the
+    // username reminder reach the address an invitation that made this account was sent to.
+    // The limits of the reset doors are per client address; each case below comes from an address
+    // of its own (X-Forwarded-For, trusted from loopback on this node) so the cases above keep theirs.
+    let invitedToken = '';
+    await test('an account made from an emailed invitation is sent the address code, and the accept answer says so', async () => {
+        smtp!.clear();
+        const invite = await json(`/v1/organisms/${organismId}/invitations/email`, {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ email: invitedEmail, orgRole: 'member' }),
+        });
+        assert(invite.status === 201, `email invitation ${invite.status}: ${short(invite.body)}`);
+        const link = await smtp!.waitForMail(invitedEmail, /v1\/invite\?token=/);
+        const token = /v1\/invite\?token=([a-f0-9]{64})/.exec(link.text)![1];
+        const accept = await json(`/v1/invitations/${token}/accept`, {
+            method: 'POST', headers: client(),
+            body: JSON.stringify({ username: invitedName, password: 'Invited-Join-9x' }),
+        });
+        assert(accept.status === 200 && accept.body.data?.created_account === true && typeof accept.body.data.token === 'string',
+            `accept ${accept.status}: ${short(accept.body)}`);
+        const step = accept.body.data.email_verification;
+        assert(step && step.sent === true && typeof step.verification_id === 'string',
+            `the accept answer must name the code it mailed: ${short(accept.body.data)}`);
+        await smtp!.waitForMail(invitedEmail, /\b\d{6}\b/);
+        invitedToken = accept.body.data.token as string;
+        const me = await json('/v1/ghii/me', { headers: bearer(invitedToken) });
+        assert(me.status === 200 && me.body.data.email_verified_at === null,
+            `the code is not typed yet, so the address is unconfirmed: ${short(me.body.data)}`);
+    });
+
+    await test('the username reminder reaches the invited address the account never confirmed', async () => {
+        smtp!.clear();
+        const r = await json('/v1/ghii/account/recover', { method: 'POST', headers: client(), body: JSON.stringify({ email: invitedEmail }) });
+        assert(r.status === 200, `account/recover ${r.status}: ${short(r.body)}`);
+        const mail = await smtp!.waitForMail(invitedEmail, new RegExp(invitedName));
+        assert(mail.text.includes(`Your username is: ${invitedName}`), `the message must name the account: ${mail.text.slice(0, 300)}`);
+    });
+
+    // The failure mode, and the reason the reset does not simply mail any unconfirmed address: an
+    // address written onto the account (an agent may write it through PUT /v1/ghii) is not one an
+    // invitation went to, so no code goes there.
+    await test('an address written onto an invited account after it joined gets no reset code', async () => {
+        const moved = await json('/v1/ghii', { method: 'PUT', headers: bearer(invitedToken), body: JSON.stringify({ notification_email: strangerEmail }) });
+        assert(moved.status === 200, `PUT /v1/ghii ${moved.status}: ${short(moved.body)}`);
+        smtp!.clear();
+        const ask = await json('/v1/ghii/password/reset-request', { method: 'POST', headers: client(), body: JSON.stringify({ username: invitedName }) });
+        assert(ask.status === 200, `reset-request ${ask.status}: ${short(ask.body)}`);
+        await sleep(1500);
+        assert(smtp!.mailTo(strangerEmail).length === 0, 'no reset code may go to an address no invitation was sent to');
+        assert(smtp!.mailTo(invitedEmail).length === 0, 'the account no longer names the invited address, so nothing goes there either');
+        const back = await json('/v1/ghii', { method: 'PUT', headers: bearer(invitedToken), body: JSON.stringify({ notification_email: invitedEmail }) });
+        assert(back.status === 200, `PUT /v1/ghii back ${back.status}: ${short(back.body)}`);
+    });
+
+    await test('an unconfirmed address the account was registered with gets no reset code', async () => {
+        const name = `edself${STAMP}`;
+        const email = `${name}@aimeat.test`;
+        const reg = await json('/v1/ghii', { method: 'POST', headers: client(), body: JSON.stringify({ username: name, display_name: 'Self Registered', password: 'SelfMade-9x', email }) });
+        assert(reg.status === 201, `register ${reg.status}: ${short(reg.body)}`);
+        await sleep(500);
+        smtp!.clear();
+        const ask = await json('/v1/ghii/password/reset-request', { method: 'POST', headers: client(), body: JSON.stringify({ username: name }) });
+        assert(ask.status === 200, `reset-request ${ask.status}: ${short(ask.body)}`);
+        await sleep(1500);
+        assert(smtp!.mailTo(email).length === 0, 'an address no code or invitation proved gets no reset code');
+    });
+
+    await test('a password reset reaches the invited address, and the code it mails confirms that address', async () => {
+        smtp!.clear();
+        const ip = client();
+        const ask = await json('/v1/ghii/password/reset-request', { method: 'POST', headers: ip, body: JSON.stringify({ username: invitedName }) });
+        assert(ask.status === 200, `reset-request ${ask.status}: ${short(ask.body)}`);
+        const mail = await smtp!.waitForMail(invitedEmail, /\b\d{6}\b/);
+        assert(mail.subject === 'Your AIMEAT password reset code', `the reset mail must say it is a reset code: ${mail.subject}`);
+        const reset = await json('/v1/ghii/password/reset', {
+            method: 'POST', headers: ip, body: JSON.stringify({ username: invitedName, code: sixDigits(mail), newPassword: 'Invited-Reset-9x' }),
+        });
+        assert(reset.status === 200, `password/reset ${reset.status}: ${short(reset.body)}`);
+        const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: invitedName, password: 'Invited-Reset-9x' }) });
+        assert(login.status === 200, `the new password must sign in: ${login.status} ${short(login.body)}`);
+        const me = await json('/v1/ghii/me', { headers: bearer(login.body.data.token) });
+        assert(me.status === 200 && typeof me.body.data.email_verified_at === 'string' && me.body.data.verification_level === 1,
+            `the code came back from the address, so the address is confirmed: ${short(me.body.data)}`);
+    });
+
+    await test('the code mailed at acceptance confirms the address from the new account\'s own session', async () => {
+        smtp!.clear();
+        const invite = await json(`/v1/organisms/${organismId}/invitations/email`, {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ email: confirmEmail, orgRole: 'member' }),
+        });
+        assert(invite.status === 201, `email invitation ${invite.status}: ${short(invite.body)}`);
+        const link = await smtp!.waitForMail(confirmEmail, /v1\/invite\?token=/);
+        const token = /v1\/invite\?token=([a-f0-9]{64})/.exec(link.text)![1];
+        smtp!.clear();
+        const accept = await json(`/v1/invitations/${token}/accept`, {
+            method: 'POST', headers: client(),
+            body: JSON.stringify({ username: confirmName, password: 'Invited-Join-9x' }),
+        });
+        assert(accept.status === 200 && accept.body.data?.email_verification?.verification_id, `accept ${accept.status}: ${short(accept.body)}`);
+        const code = sixDigits(await smtp!.waitForMail(confirmEmail, /\b\d{6}\b/));
+        const confirm = await json('/v1/ghii/email/confirm', {
+            method: 'POST', headers: bearer(accept.body.data.token),
+            body: JSON.stringify({ verification_id: accept.body.data.email_verification.verification_id, code }),
+        });
+        assert(confirm.status === 200 && confirm.body.data.verified === true, `email/confirm ${confirm.status}: ${short(confirm.body)}`);
     });
 
     await test('an access key mails a code that is the password the account signs in with', async () => {

@@ -6,6 +6,11 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-12 — An account made from an emailed invitation, whose invited address was never proven,
+ *     gets the reset code and the username reminder at that address, and a reset made with that code
+ *     proves the address (services/recovery-address.ts invitedRecoveryAddress). Such an account had no
+ *     way back in after a forgotten password (reported from an organisation node on 4.3.0).
+ *     bindProvenAddress is the one place a returned code marks an address proven in this file.
  *   2026-11-08 — The held first sign-in credentials go only to an address whose code was asked for after
  *     that sign-in (secaudit2026nov08 round 14, attach-email:pending-code-key-accepts-any-address).
  *   2026-11-05 — A verified address receives the first sign-in's credentials that waited for it
@@ -57,7 +62,7 @@
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import { sendMail } from '../../services/mail-gate.js';
 import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
@@ -81,7 +86,8 @@ import { recordAuthFailure } from '../../services/auth-audit.js';
 import { auditContext } from '../../auth/deny.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
 import { endPersonSessionsAfterPasswordChange } from '../../services/owner-session.js';
-import { recoveryAddressIs, provenRecoveryAddress, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
+import { recoveryAddressIs, provenRecoveryAddress, invitedRecoveryAddress, accountsInvitedAt, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
+import { emailHashOf } from '../../services/owner-provisioning.js';
 import { tellOwnerTokensKept } from '../../services/owner-tokens-kept-notice.js';
 import { passwordSignInRefusal, newPasswordRefusal } from '../../services/sign-in-policy.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
@@ -94,6 +100,31 @@ import { isOperatorAccount } from '../../utils/operator-account.js';
 async function replaceOwnerSigningKey(storage: Storage, ownerName: string): Promise<void> {
     const { publicKey } = await generateKeyPair();
     await storage.updateOwner(ownerName, { publicKey });
+}
+
+/**
+ * Mark the address with hash `emailHash` as the account's proven recovery address, after a code
+ * mailed to it came back, and do what a proven address unlocks: address-book entries that named it
+ * become this person (TARGET-063), app roster invitations to it become memberships, and a code key's
+ * held first sign-in credentials go out. Those three are best-effort; recovery never fails on them.
+ * Writes nothing and answers false when the address is verified on another account
+ * (one email per account per node, ahead of the DB partial-unique index).
+ */
+async function bindProvenAddress(storage: Storage, config: AimeatConfig, ghii: string, emailHash: string, codeAskedAt: string): Promise<boolean> {
+    const emailOwner = await storage.getGHIIByEmailHash(emailHash);
+    if (emailOwner && emailOwner.ghii !== ghii) return false;
+    await storage.updateGHII(ghii, {
+        emailHash,
+        emailVerifiedAt: new Date().toISOString(),
+        verificationLevel: 1,
+        verificationMethod: 'email',
+    });
+    await promoteContactsForVerifiedEmail(storage, emailHash, ghii)
+        .catch(err => { logger.warn('recovery: contact promotion is best-effort', { error: String(err) }); });
+    await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii)
+        .catch(err => { logger.warn('recovery: app invitations are best-effort', { error: String(err) }); });
+    await sendHeldKeyCredentials(storage, config, ghii, codeAskedAt);
+    return true;
 }
 
 export function registerRecoveryRoutes(
@@ -243,31 +274,12 @@ export function registerRecoveryRoutes(
             verifiedAt: now,
         });
 
-        // Update GHII with verified email info
-        // One-email-per-account-per-node: don't claim an email hash already verified on another account
-        // (clean 409 ahead of the DB partial-unique index backstop).
-        const emailOwner = await storage.getGHIIByEmailHash(record.emailHash);
-        if (emailOwner && emailOwner.ghii !== ghii) {
+        // The address becomes the proven one, with what that unlocks (bindProvenAddress); an address
+        // verified on another account stays that account's.
+        if (!(await bindProvenAddress(storage, config, ghii, record.emailHash, record.createdAt))) {
             res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email is already verified on another account.'));
             return;
         }
-        // Find the email from the verification record's emailHash
-        // We store the notificationEmail separately to keep it accessible
-        await storage.updateGHII(ghii, {
-            emailHash: record.emailHash,
-            emailVerifiedAt: now,
-            verificationLevel: 1,
-            verificationMethod: 'email',
-        });
-        // Same binding, same consequence as the signup path: address-book entries that named this
-        // address become this person (TARGET-063). Best-effort — recovery must never fail on it.
-        await promoteContactsForVerifiedEmail(storage, record.emailHash, ghii)
-            .catch(err => { logger.warn('recovery: contact promotion is best-effort', { error: String(err) }); });
-        // An app roster invitation sent to this address becomes a membership (services/app-member-invites.ts).
-        await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
-            .catch(err => { logger.warn('recovery: app invitations are best-effort', { error: String(err) }); });
-        // A code key's first sign-in credentials that waited for a proven address go now (never throws).
-        await sendHeldKeyCredentials(storage, config, ghii, record.createdAt);
 
         res.json(success(config.nodeId, {
             ok: true,
@@ -307,8 +319,13 @@ export function registerRecoveryRoutes(
         const ghiiRecord = await storage.getGHII(ghii);
 
         // Only to the address that was proven: notificationEmail whose hash is the proven emailHash
-        // (secaudit2026oct26).
-        const resetTo = ghiiRecord?.emailVerifiedAt ? provenRecoveryAddress(ghiiRecord) : null;
+        // (secaudit2026oct26). An account made from an invitation, whose invited address was never
+        // proven, gets the code at that address: it reaches the invited mailbox, and the code coming
+        // back proves the address (services/recovery-address.ts invitedRecoveryAddress). Before this
+        // such an account had no way back in after a forgotten password.
+        const provenTo = ghiiRecord?.emailVerifiedAt ? provenRecoveryAddress(ghiiRecord) : null;
+        const invitedTo = !provenTo && ghiiRecord ? await invitedRecoveryAddress(storage, ghiiRecord) : null;
+        const resetTo = provenTo ?? invitedTo;
         if (ghiiRecord && resetTo && emailService?.enabled) {
             const code = sixDigitCode();
             const codeHash = createHash('sha256').update(code).digest('hex');
@@ -334,7 +351,8 @@ export function registerRecoveryRoutes(
             await storage.createEmailVerification({
                 id: verId,
                 ownerName: username,
-                emailHash: ghiiRecord.emailHash ?? '',
+                // The address the code goes to; the reset proves it when it was the invited one.
+                emailHash: emailHashOf(resetTo),
                 code: codeHash,
                 purpose: 'password_reset',
                 status: 'pending',
@@ -347,7 +365,7 @@ export function registerRecoveryRoutes(
             // The reset template, not the email-verification one: that mail said "verify your email
             // address" under the same subject as the sign-up code (email-template-reset.ts).
             const m = passwordResetEmail(code, ghiiRecord.locale);
-            const sent = await sendMail(emailService, { kind: 'sign-in', to: resetTo, why: 'The reset code, to the address the account proved (provenRecoveryAddress).' },
+            const sent = await sendMail(emailService, { kind: 'sign-in', to: resetTo, why: 'The reset code, to the address the account proved (provenRecoveryAddress) or the invitation that made it was sent to (invitedRecoveryAddress).' },
                 { form: 'html', subject: m.subject, html: m.html, text: m.text }) === 'sent';
             if (sent) {
                 await appendMailLog(storage, ghiiRecord.ghii, { kind: 'password_reset', subject: 'password reset code' });
@@ -356,7 +374,7 @@ export function registerRecoveryRoutes(
                 logger.warn('Password reset code email failed to send');
             }
         } else if (ghiiRecord) {
-            logger.info(`Password reset skipped: email=${!!ghiiRecord.notificationEmail} verified=${!!ghiiRecord.emailVerifiedAt} proven=${!!resetTo} service=${!!emailService?.enabled}`);
+            logger.info(`Password reset skipped: email=${!!ghiiRecord.notificationEmail} verified=${!!ghiiRecord.emailVerifiedAt} proven=${!!provenTo} invited=${!!invitedTo} service=${!!emailService?.enabled}`);
         }
 
         // Always return same response to not reveal if account exists
@@ -460,6 +478,16 @@ export function registerRecoveryRoutes(
         // person is told which ones still act as them (secaudit2026oct26).
         void tellOwnerTokensKept(storage, config, username);
 
+        // A code mailed to the invited address that was never proven came back, so the address is
+        // proven now (invitedRecoveryAddress). Only while it is still the account's recovery address:
+        // one written since then is proven by its own code.
+        const after = await storage.getGHII(ghii);
+        const wasProven = !!(after?.emailVerifiedAt && provenRecoveryAddress(after));
+        if (after?.notificationEmail && !wasProven && emailHashOf(after.notificationEmail) === record.emailHash) {
+            const bound = await bindProvenAddress(storage, config, ghii, record.emailHash, record.createdAt);
+            logger.info(bound ? 'Password reset proved the invited address' : 'Password reset: the invited address is verified on another account', { account: ghii });
+        }
+
         // A change to how this account is entered is always news (storage/types/account-events.ts):
         // the person reads it on their account feed, and the operator has a line to search.
         logger.info('Password reset with an emailed code', { account: ghii });
@@ -560,20 +588,24 @@ export function registerRecoveryRoutes(
         if (email && typeof email === 'string') {
             const normalizedEmail = email.toLowerCase().trim();
             const emailHash = createHash('sha256').update(normalizedEmail).digest('hex');
-            const ghiiRecord = await storage.getGHIIByEmailHash(emailHash);
+            const provenHolder = await storage.getGHIIByEmailHash(emailHash);
 
             // The username goes to the address that was proven, never to one written since
-            // (secaudit2026oct26).
-            const recoverTo = provenRecoveryAddress(ghiiRecord);
-            if (ghiiRecord && recoverTo && emailService?.enabled) {
-                const locale = ghiiRecord.locale;
+            // (secaudit2026oct26). With no account proving it, the accounts an invitation to this
+            // address made and which never proved it get theirs there (invitedRecoveryAddress).
+            const provenTo = provenRecoveryAddress(provenHolder);
+            const recipients: Array<{ rec: GHIIRecord; to: string }> = provenHolder && provenTo
+                ? [{ rec: provenHolder, to: provenTo }]
+                : provenHolder ? [] : (await accountsInvitedAt(storage, config.nodeId, normalizedEmail)).map(rec => ({ rec, to: rec.notificationEmail! }));
+            for (const { rec, to } of emailService?.enabled ? recipients : []) {
+                const locale = rec.locale;
                 const subject = locale === 'fi' ? 'AIMEAT-tilisi käyttäjätunnus' : 'Your AIMEAT Username';
                 const body = locale === 'fi'
-                    ? `Käyttäjätunnuksesi on: ${ghiiRecord.username}\n\nJos et pyytänyt tätä, voit ohittaa tämän viestin.`
-                    : `Your username is: ${ghiiRecord.username}\n\nIf you did not request this, you can safely ignore this email.`;
-                const sent = await sendMail(emailService, { kind: 'sign-in', to: recoverTo, why: 'The username reminder, to the address the account proved (provenRecoveryAddress).' },
+                    ? `Käyttäjätunnuksesi on: ${rec.username}\n\nJos et pyytänyt tätä, voit ohittaa tämän viestin.`
+                    : `Your username is: ${rec.username}\n\nIf you did not request this, you can safely ignore this email.`;
+                const sent = await sendMail(emailService!, { kind: 'sign-in', to, why: 'The username reminder, to the address the account proved (provenRecoveryAddress) or the invitation that made it was sent to (invitedRecoveryAddress).' },
                     { form: 'notification', subject, body }) === 'sent';
-                if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'username', subject });
+                if (sent) await appendMailLog(storage, rec.ghii, { kind: 'username', subject });
             }
         }
 
