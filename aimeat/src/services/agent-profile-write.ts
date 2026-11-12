@@ -33,6 +33,8 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   2026-11-13 — VALID_MODES comes from models/agent-onboarding-schemas.ts, not from a route file
+ *     (structure programme 2026-11, unit 4).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-27 — setAgentMode takes the caller's principal; when an agent changes an agent's mode, or
@@ -75,10 +77,9 @@ import { requireUsableServer } from './mcp-client/registry.js';
 import { emitChange } from './event-bus.js';
 import { nodeContext } from './node-context.js';
 import { emitToolListChanged } from './resource-events.js';
-import { deriveStepsForMode } from '../models/agent-onboarding-schemas.js';
+import { deriveStepsForMode, VALID_MODES } from '../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
 import { inferModeFromPlatform } from './platform-detector.js';
-import { VALID_MODES } from '../routes/agents/constants.js';
 import { logger } from '../utils/logger.js';
 import { exceedsCeiling } from '../utils/scope-coverage.js';
 import { notify } from './notify.js';

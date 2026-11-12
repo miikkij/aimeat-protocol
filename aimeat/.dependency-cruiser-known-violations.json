@@ -496,20 +496,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/agent-profile-write.ts",
-    "to": "src/routes/agents/constants.ts",
-    "unresolvedTo": "../routes/agents/constants.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/agent-task-fanout.ts",
     "to": "src/routes/agent-tasks/helpers.ts",
     "unresolvedTo": "../routes/agent-tasks/helpers.js",

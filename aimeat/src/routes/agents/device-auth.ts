@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-11-13 — VALID_MODES comes from models/agent-onboarding-schemas.ts (structure programme 2026-11, unit 4).
  *   2026-11-04 — user_instructions names the approval address and says the person signs in only in their browser.
  *   2026-11-01 — An approval on POST /v1/agents/verify writes the trail line with event agent.approved
  *     (services/place-trail.ts), which the store's fleet service keys its first-build gift on.
@@ -138,7 +139,8 @@ import { rateLimit, ipRateKey } from '../../middleware/rate-limit.js';
 import { rateBuckets } from '../../services/rate-buckets.js';
 import { emitChange } from '../../services/event-bus.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
-import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
+import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS } from './constants.js';
+import { VALID_MODES } from '../../models/agent-onboarding-schemas.js';
 import { uncoveredScopes, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
 import { proofVerifies, spendReturnProof, markReturnProven, returnProven } from '../../services/device-return-proof.js';

@@ -2,8 +2,10 @@
  * @file src/routes/agents/constants.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Shared constants for the agents route modules (mode enum, device-auth TTL). Extracted from agents.ts to satisfy max-file-lines.
+ * @description Shared constants for the agents route modules (device-auth TTL). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — VALID_MODES moved to models/agent-onboarding-schemas.ts, beside AgentMode, so the agent
+ *     profile service no longer imports a route file (structure programme 2026-11, unit 4).
  *   v1.1.0 — 2026-08-13 — Device-auth window 30 min -> 2 h, and DEVICE_AUTH_EXPIRY_SECONDS beside
  *     it: the response's `expires_in` was a second literal, which is how two numbers for one
  *     window eventually disagree.
@@ -26,5 +28,3 @@ export const DEVICE_AUTH_EXPIRY_MS = 7_200_000;
 
 /** The same window in seconds, for the RFC 8628 `expires_in` field. */
 export const DEVICE_AUTH_EXPIRY_SECONDS = DEVICE_AUTH_EXPIRY_MS / 1000;
-
-export const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'] as const;

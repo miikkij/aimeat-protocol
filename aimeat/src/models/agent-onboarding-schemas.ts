@@ -9,6 +9,8 @@
  *   - Step-specific confirmation schemas (IdentifyPlatformSchema, etc.)
  *   - createDefaultSteps() -- factory for fresh onboarding step list
  * @version-history
+ *   2026-11-13 — VALID_MODES moved here unchanged from routes/agents/constants.ts, beside AgentMode, so
+ *     the agent profile service no longer imports a route file (structure programme 2026-11, unit 4).
  *   Avatar — 2026-10-19 — set_avatar, an optional step in every flow: the agent writes its own picture
  *     at agent.avatar (services/agent-avatar.ts). The full flow has 17 steps, task-runner 8, workstation 5.
  *   Pacing — 2026-10-11 — The price_offer how-to example sets priceMoney and tollMorsels, not the
@@ -324,6 +326,8 @@ const WORKSTATION_STEP_IDS: ReadonlyArray<OnboardingStepId> = [
 ];
 
 export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
+
+export const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'] as const;
 
 /**
  * Build the Hello Integration step list for a new onboarding record. The
