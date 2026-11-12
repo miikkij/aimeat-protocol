@@ -12,6 +12,8 @@
  * @structure NotebookService.overview(reader, ownerName, ownerGhii) → { inbox, settings, organisms }
  * @usage const nb = await createNotebookService(storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   2026-11-13 — visibilityToZone is imported from utils/visibility-words.ts, where it lives, and not
+ *     through the re-export in routes/memory/shared.ts (structure programme 2026-11, unit 4).
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: takes the caller's ContentReader; the inbox records pass
  *     presentMemories before their values are returned. The settings record is the tab's own
  *     configuration and is read as it was.
@@ -19,7 +21,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { visibilityToZone } from '../../routes/memory/shared.js';
+import { visibilityToZone } from '../../utils/visibility-words.js';
 import type { ContentReader } from '../classification/reader.js';
 import { presentMemories } from '../classification/present-memory.js';
 

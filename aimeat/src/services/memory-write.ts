@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-13 — memoryContentBytes and isAnonymousGaii are imported from utils/, where they live, and
+ *     not through the re-export in routes/memory/shared.ts (structure programme 2026-11, unit 4).
  *   2026-11-09 — An update that names no tags keeps the record's tags (`tags: []` clears them), as
  *     PUT /v1/memory/:key and PATCH already did; POST /v1/memory and aimeat_memory_write had wiped them.
  *   2026-11-09 — A write to a context or ontology key (`context.`, `vocab.ctx.`) is trackable, so the
@@ -152,7 +154,8 @@ import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 import { isKeyArchived } from './archive.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance } from './ai/provenance.js';
 import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
-import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
+import { memoryContentBytes } from '../utils/memory-content.js';
+import { isAnonymousGaii } from '../utils/visibility-words.js';
 import { emitChange, emitRecordChange } from './event-bus.js';
 import { enqueueMemoryReplication } from './memory-replication.js';
 import { emitMemoryWritten } from './event-bus.js';

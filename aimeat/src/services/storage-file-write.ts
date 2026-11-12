@@ -40,6 +40,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-13 — isAnonymousGaii is imported from utils/visibility-words.ts, where it lives, and not
+ *     through the re-export in routes/memory/shared.ts (structure programme 2026-11, unit 4).
  *   2026-11-08 — A direct upload the store does not take moves to the database only within the
  *     per-file ceiling storageMaxFileSizeMb; a larger one stays in its store (secaudit2026nov08b round 15).
  *   2026-11-08 — The storage quota is asked with the file's media type, because a person's store takes
@@ -125,7 +127,7 @@ import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../stora
 import { checkStorageQuota, chargeOverage } from './quota.js';
 import { generateUploadToken, buildUploadMeta } from './upload-token.js';
 import { emitRecordChange, emitRecordChangePriorUnknown } from './event-bus.js';
-import { isAnonymousGaii } from '../routes/memory/shared.js';
+import { isAnonymousGaii } from '../utils/visibility-words.js';
 import { storeHeldProvenance } from './ai/provenance.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
