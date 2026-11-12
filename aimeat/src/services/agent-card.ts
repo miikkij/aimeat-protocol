@@ -21,6 +21,7 @@
  *   and a signature is over bytes.
  *
  * @structure
+ *   - cardUri / jwksUri / nodeKeyUri — where this node serves a card, its key set and the node key
  *   - jwkThumbprint / ed25519Jwk / base64KeyToJwkX — key shapes
  *   - readCardJws — parse a compact JWS without trusting it
  *   - verifyCardJws — verify against a NAMED key
@@ -30,6 +31,8 @@
  *   const read = readCardJws(jws);
  *   const ok = await verifyCardJws(jws, read.card.publicKey);
  * @version-history
+ *   2026-11-13 — cardUri, jwksUri and nodeKeyUri moved here unchanged from routes/agents-v2/card.ts, so
+ *     the enrolment offer service no longer imports a route file (structure programme 2026-11, unit 4).
  *   v1.2.0 — 2026-10-19 — The public projection carries `iconUrl`, the absolute address of the agent's
  *     avatar, when the caller passes one (services/agent-avatar.ts; the avatar is public by design).
  *   v1.1.0 — 2026-08-31 — The public projection and its signer. Two documents, two authors: the
@@ -39,6 +42,18 @@
  */
 import { CompactSign, compactVerify, importJWK, calculateJwkThumbprint, decodeProtectedHeader, type JWK } from 'jose';
 import { validateAgentCard, type AgentCard, type AgentCardKey, type CardDefect, type RunMode } from '../models/agent-card.js';
+
+/** Where this node serves an agent's card and key set. Used by the routes and by the enrolment offer. */
+export function cardUri(baseUrl: string, gaii: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/v1/agents/${encodeURIComponent(gaii)}/card`;
+}
+export function jwksUri(baseUrl: string, gaii: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/v1/agents/${encodeURIComponent(gaii)}/jwks.json`;
+}
+/** Where the key that signs the PUBLIC projection is published. Already served, not a new endpoint. */
+export function nodeKeyUri(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/.well-known/aimeat`;
+}
 
 /** The RFC 7638 thumbprint of an Ed25519 public key given as raw base64url. */
 export async function jwkThumbprint(xBase64Url: string): Promise<string> {

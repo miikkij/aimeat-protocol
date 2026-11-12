@@ -35,6 +35,8 @@
  *   const out = await offerEnrolment({ config, storage }, owner, candidates, { installId });
  *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   2026-11-13 — cardUri and jwksUri come from services/agent-card.ts, not from a route file
+ *     (structure programme 2026-11, unit 4).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.4.0 — 2026-10-13 — enrolTarget: the offer goes to a daemon principal that holds agent:write when
@@ -59,7 +61,7 @@ import { connectedDaemons } from './basic-agents.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { nodeContext } from './node-context.js';
 import { recordPlacement } from './connector-registry.js';
-import { cardUri, jwksUri } from '../routes/agents-v2/card.js';
+import { cardUri, jwksUri } from './agent-card.js';
 import { logger } from '../utils/logger.js';
 
 /** The capability name the enrolment offer travels under, on the tunnel's existing `invoke` frame. */

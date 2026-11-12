@@ -32,9 +32,11 @@
  *   sometimes hands out the wrong person's agent. Nobody has to build the string by hand: the card
  *   carries its own `cardUri` and `jwksUri`.
  *
- * @structure cardUri / jwksUri / nodeKeyUri · registerAgentCardRoutes(router, config, storage)
+ * @structure registerAgentCardRoutes(router, config, storage)
  * @usage registerAgentCardRoutes(router, config, storage);
  * @version-history
+ *   2026-11-13 — cardUri, jwksUri and nodeKeyUri moved to services/agent-card.ts, so the enrolment
+ *     offer service no longer imports a route file (structure programme 2026-11, unit 4).
  *   2026-10-21 — isSameOwnerReader asks isAnonymousPrincipal, so the minted anonymous token (which
  *     carries no anonymous claim) never reads an extended card (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.2.0 — 2026-10-19 — The public card (and /card/info's public half) carries `iconUrl`, the absolute
@@ -54,7 +56,7 @@ import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isValidGAII, isForeignPrincipal } from '../../utils/gaii.js';
 import {
   readCardJws, verifyCardJws, publicCardProjection, signWithNodeKey, jwkThumbprint, base64KeyToJwkX,
-  type PublicAgentCard,
+  cardUri, jwksUri, nodeKeyUri, type PublicAgentCard,
 } from '../../services/agent-card.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -62,18 +64,6 @@ import { getNodeCryptoKeys } from '../../auth/jwt.js';
 import type { AgentCard } from '../../models/agent-card.js';
 import { logger } from '../../utils/logger.js';
 import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
-
-/** Where this node serves an agent's card and key set. Used by the routes and by the enrolment offer. */
-export function cardUri(baseUrl: string, gaii: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}/v1/agents/${encodeURIComponent(gaii)}/card`;
-}
-export function jwksUri(baseUrl: string, gaii: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}/v1/agents/${encodeURIComponent(gaii)}/jwks.json`;
-}
-/** Where the key that signs the PUBLIC projection is published. Already served, not a new endpoint. */
-export function nodeKeyUri(baseUrl: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}/.well-known/aimeat`;
-}
 
 /**
  * Is this reader on the same side of the fence as the agent's owner?

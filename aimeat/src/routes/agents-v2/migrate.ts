@@ -31,6 +31,8 @@
  * @structure registerAgentV2MigrateRoutes(router, config, storage)
  * @usage registerAgentV2MigrateRoutes(router, config, storage);
  * @version-history
+ *   2026-11-13 — cardUri and jwksUri come from services/agent-card.ts, where they moved from ./card.ts
+ *     (structure programme 2026-11, unit 4).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-10-13 — The move is forwarded by a daemon principal that holds agent:write when the
@@ -54,7 +56,7 @@ import { nodeContext } from '../../services/node-context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ENROL_CAPABILITY } from './basic-agents.js';
 import { MAX_CARDS_PER_SUBMIT } from './enrolment.js';
-import { cardUri, jwksUri } from './card.js';
+import { cardUri, jwksUri } from '../../services/agent-card.js';
 import { logger } from '../../utils/logger.js';
 
 /** The same wait the basic-agents button allows: keypairs, signatures and one round trip. */

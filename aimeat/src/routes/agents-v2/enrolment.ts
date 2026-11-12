@@ -34,6 +34,8 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   2026-11-13 — cardUri and jwksUri come from services/agent-card.ts, where they moved from ./card.ts
+ *     (structure programme 2026-11, unit 4).
  *   2026-11-05 — The enrolled credential copies the record and adds nothing: a store place's default is given at
  *     approval (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
@@ -53,12 +55,11 @@ import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
-import { readCardJws, verifyCardJws } from '../../services/agent-card.js';
+import { readCardJws, verifyCardJws, cardUri, jwksUri } from '../../services/agent-card.js';
 import type { CardDefect } from '../../models/agent-card.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
 import { nodeContext } from '../../services/node-context.js';
 import { emitChange } from '../../services/event-bus.js';
-import { cardUri, jwksUri } from './card.js';
 import { logger } from '../../utils/logger.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
