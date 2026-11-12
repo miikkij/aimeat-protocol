@@ -13,6 +13,9 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-11-12 — GET and POST /v1/companies/:id/access-request: a person the front page refuses
+ *     because it is opened to one organism's members asks that organism's owners for access
+ *     (routes/access-request.ts).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-18 — Who may open the front page (plan doc-mvcn6c7e4e5q, V3.10): PUT /v1/companies/:id/front-page
  *     takes `access` (anyone, signed-in, organism:<id>; `kind` may be left out to change only that), a
@@ -62,6 +65,10 @@ import { safeFetch } from '../utils/url-validator.js';
 import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
 import { answerPageOpen } from './page-open.js';
+import { answerAccessRequest, answerAccessRequestState, type AccessRequestTarget } from './access-request.js';
+import { companyAccessTarget } from '../services/organism-join-requests/access-targets.js';
+import { validateBody } from '../models/schemas.js';
+import { AccessRequestBody } from '../models/write-body-schemas.js';
 
 const IdentitySchema = {
   description: z.string().max(500).nullish(),
@@ -370,6 +377,24 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
       ref: { kind: 'company', id: company.id }, access: company.frontPageAccess,
       ownerName: localAccountName(company.ownerGhii), url: address ? `${address}/` : null,
     });
+  });
+
+  /* GET and POST /v1/companies/:id/access-request — a person the front page refuses because it is
+   * opened to one organism's members asks that organism's owners for access; GET says what the
+   * refusal page shows them (routes/access-request.ts). The same 404 as the open route.
+   */
+  const frontPageAccessTarget = async (req: Request, res: Response): Promise<AccessRequestTarget | null> => {
+    const target = await companyAccessTarget(storage, req.params.id as string);
+    if (!target) res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No page here.'));
+    return target;
+  };
+  router.get('/v1/companies/:id/access-request', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
+    const target = await frontPageAccessTarget(req, res);
+    if (target) await answerAccessRequestState(req, res, config, storage, target);
+  });
+  router.post('/v1/companies/:id/access-request', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(AccessRequestBody, config.nodeId), async (req, res) => {
+    const target = await frontPageAccessTarget(req, res);
+    if (target) await answerAccessRequest(req, res, config, storage, target);
   });
 
   /* GET /v1/companies/:id/front-page/check — does the public face answer?

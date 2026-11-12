@@ -18,6 +18,11 @@
  * @structure targetOf() · AppOpen()
  * @usage '/v1/app-open': () => import('/views/app-open.js' + B)   // spa.html ROUTES
  * @version-history
+ *   v1.3.0 — 2026-11-12 — A person the target refuses because it is opened to one shared place's
+ *     members asks for access here (GET and POST …/access-request, beside each open route): a
+ *     message and a button when a request can be made, the day it was asked while it waits, the day
+ *     a new one is taken after a decline, and the old words when the owner takes no requests. While
+ *     a request waits the page holds the live stream and opens the target when it is approved.
  *   v1.2.0 — 2026-10-18 — A refusal in words of the page language: NOT_FOUND says the page's own
  *     "cannot be opened", and SIGN_IN_REQUIRED (a session that ran out on the way) asks for the sign-in
  *     again. The denial names a shared place, the word a person reads for an organism.
@@ -30,13 +35,15 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
-import { showLoginModal, getNodeUrl } from '/js/services/auth.js';
+import { showLoginModal, getNodeUrl, getSession } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate } from '/js/format.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { AskPage } from '/components/AskPage.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
-import { TextField } from '/components/TextField.js';
+import { TextField, TextArea } from '/components/TextField.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback, vars) => {
@@ -73,10 +80,17 @@ export default function AppOpen() {
   const w = (key, appFallback, pageFallback, vars) => (isPage
     ? tr(`appOpen.page.${key}`, pageFallback, vars)
     : tr(`appOpen.${key}`, appFallback, vars));
-  const authed = !!useSession();
+  const session = useSession();
+  const authed = !!session;
   const loginOpened = useRef(false);
   const [state, setState] = useState({ status: 'loading', error: '' });
   const [code, setCode] = useState('');
+  // The refused person's access request (GET …/access-request): null until it has answered.
+  const requestRoute = route.replace(/\/open$/, '/access-request');
+  const [request, setRequest] = useState(null);
+  const [message, setMessage] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState('');
 
   function doLogin() {
     // Back to this page after signing in, so the app or page opens without a second click.
@@ -93,13 +107,62 @@ export default function AppOpen() {
     } catch (e) {
       const codeName = e?.response?.error?.code || e?.code || '';
       if (codeName === 'ACCESS_CODE_REQUIRED' && !isPage) { setState({ status: 'code', error: withCode ? tr('appOpen.codeWrong', 'That code does not open this app.') : '' }); return; }
-      if (codeName === 'ACCESS_DENIED') { setState({ status: 'denied', error: '' }); return; }
+      if (codeName === 'ACCESS_DENIED') { setState({ status: 'denied', error: '' }); loadRequest(); return; }
       // The session ran out between the page load and this call: the same sign-in as a visitor's.
       if (codeName === 'SIGN_IN_REQUIRED' || e?.status === 401) { setState({ status: 'login', error: '' }); return; }
       const notFound = w('notFound', 'This app cannot be opened.', 'This page cannot be opened.');
       setState({ status: 'error', error: codeName === 'NOT_FOUND' ? notFound : (e?.message || notFound) });
     }
   }
+
+  /** What the refused person may do: ask, wait for the answer, or nothing (the owner takes no requests). */
+  async function loadRequest() {
+    try {
+      const res = await api(requestRoute);
+      setRequest(res.data || { requestable: false, state: 'none' });
+    } catch (err) {
+      swallowed('app-open: access request state', err);
+      setRequest({ requestable: false, state: 'none' });
+    }
+  }
+
+  async function ask() {
+    setAsking(true);
+    setAskError('');
+    try {
+      const res = await api(requestRoute, { method: 'POST', body: JSON.stringify(message.trim() ? { message: message.trim() } : {}) });
+      setRequest({ requestable: false, state: 'pending', asked_at: res.data?.asked_at || new Date().toISOString() });
+    } catch (e) {
+      const codeName = e?.response?.error?.code || e?.code || '';
+      // Decided or asked meanwhile (another tab, the person's AI): show what the node says now.
+      if (codeName === 'ALREADY_OPEN') { open('').catch((err) => swallowed('app-open: open', err)); return; }
+      if (['ALREADY_PENDING', 'ASKED_RECENTLY', 'REQUESTS_OFF', 'NOT_REQUESTABLE', 'ALREADY_INVITED'].includes(codeName)) { await loadRequest(); return; }
+      setAskError(tr('appOpen.requestFailed', 'The request could not be sent. Try again.'));
+    } finally { setAsking(false); }
+  }
+
+  // While a request waits, the page opens the stream and tries the open route again when the node
+  // says something changed: an approval then opens the app here with no reload. Nothing is polled.
+  const waiting = state.status === 'denied' && request?.state === 'pending';
+  useEffect(() => (session && waiting ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session, waiting]);
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const retry = async (ev) => {
+      const domains = ev?.detail?.domains;
+      if (Array.isArray(domains) && !domains.includes('notifications') && !domains.includes('organisms')) return;
+      try {
+        const res = await api(route, { method: 'POST', body: '{}' });
+        window.location.replace(res.data.url);
+      } catch (err) {
+        // Still refused: a decline shows its own words, anything else leaves the page as it is.
+        if ((err?.response?.error?.code || err?.code) === 'ACCESS_DENIED') loadRequest();
+      }
+    };
+    window.addEventListener('aimeat-live-update', retry);
+    return () => window.removeEventListener('aimeat-live-update', retry);
+    // retry() reads only the route, which is listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting, route]);
 
   useEffect(() => {
     if (!route) { setState({ status: 'error', error: tr('appOpen.missing', 'No app was named.') }); return; }
@@ -138,9 +201,50 @@ export default function AppOpen() {
   }
 
   if (state.status === 'denied') {
+    const back = html`<${Action} onClick=${() => { window.location.href = '/v1/home'; }}>${tr('common.back', 'Back')}<//>`;
+    const deniedTitle = w('deniedTitle', 'This app is not open to you', 'This page is not open to you');
+    // The request state has not answered yet: the page says nothing it may have to take back.
+    if (!request) return html`<${AskPage} message=${w('opening', 'Opening the app…', 'Opening the page…')} />`;
+    if (request.state === 'pending') {
+      return html`
+        <${AskPage} title=${w('pendingTitle', 'Your request waits for an answer', 'Your request waits for an answer')} doors=${back}>
+          <${Note} kind="lead">${w('pendingBody',
+            'You asked for access on {date}. You get a notification when it is decided, and after an approval this app opens for you.',
+            'You asked for access on {date}. You get a notification when it is decided, and after an approval this page opens for you.',
+            { date: fmtDate(request.asked_at) })}<//>
+        <//>`;
+    }
+    if (request.state === 'declined') {
+      return html`
+        <${AskPage} title=${deniedTitle} doors=${back}>
+          <${Note} kind="lead">${w('declinedBody',
+            'Your request for access was declined. You can ask again after {date}.',
+            'Your request for access was declined. You can ask again after {date}.',
+            { date: fmtDate(request.ask_again_at) })}<//>
+        <//>`;
+    }
+    if (request.state === 'invited') {
+      return html`
+        <${AskPage} title=${deniedTitle}
+          doors=${html`<${Loud} onClick=${() => { window.location.href = '/v1/profile?tab=notifications'; }}>${tr('appOpen.invitedCta', 'Open notifications')}<//>${back}`}>
+          <${Note} kind="lead">${w('invitedBody',
+            'An invitation waits in your notifications. Accept it, and this app opens for you.',
+            'An invitation waits in your notifications. Accept it, and this page opens for you.')}<//>
+        <//>`;
+    }
+    if (request.requestable) {
+      return html`
+        <${AskPage} title=${deniedTitle}
+          doors=${html`<${Loud} onClick=${ask} disabled=${asking}>${tr('appOpen.requestCta', 'Ask for access')}<//>${back}`}>
+          <${Note} kind="lead">${w('requestBody',
+            'Its owner opened it to the members of one shared place. You can ask for access here. The people who decide get your request, and you get a notification when they answer.',
+            'Its owner opened it to the members of one shared place. You can ask for access here. The people who decide get your request, and you get a notification when they answer.')}<//>
+          <${TextArea} label=${tr('appOpen.requestMessageLabel', 'Message to them (optional)')} rows=${3} maxLength=${1000}
+            value=${message} onInput=${setMessage} message=${askError} />
+        <//>`;
+    }
     return html`
-      <${AskPage} title=${w('deniedTitle', 'This app is not open to you', 'This page is not open to you')}
-        doors=${html`<${Action} onClick=${() => { window.location.href = '/v1/home'; }}>${tr('common.back', 'Back')}<//>`}>
+      <${AskPage} title=${deniedTitle} doors=${back}>
         <${Note} kind="lead">${w('deniedBody',
           'Its owner opened it to the members of one shared place. Ask the owner to add you, and open it again.',
           'Its owner opened it to the members of one shared place. Ask the owner to add you, and open it again.')}<//>

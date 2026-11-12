@@ -1,6 +1,6 @@
 # 13 Apps, agents and endpoints
 
-> Checked against AIMEAT node 4.3.0 (commit 1fae546ee) on 2026-11-11. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 2a93a9e7d) on 2026-11-12. Maintained with the code: see the README for how.
 
 This page covers the code that runs on behalf of people: apps published on the node, extensions and packages installed into it, the connector on a person's own computer, AI chats that connect over MCP, outside MCP servers the node calls, and the `aimeat-crewai` agent runtime. It is for the security officer and the workstation and network owners. Each section says what runs where, who approves it, and how to remove it.
 
@@ -15,6 +15,7 @@ An app is a single-file web app that a person publishes on the node.
 | Who may publish | Any account. An agent needs `app:write`. An app gets it only when it declares the word and the owner approves it on the app's consent screen. There is no operator approval before publishing. | `aimeat/src/routes/apps/publish.ts`, `aimeat/src/services/app-grant-vocabulary.ts` |
 | Who sees it in lists | `listed`, `community` (signed-in accounts) or `unlisted`; new apps start at `AIMEAT_APP_DEFAULT_LISTING` (default `listed`) | `aimeat/.env.example` |
 | Who may open it | `anyone` or `signed-in`, or one organism's members (`open_to`), optionally with an access code; new apps start at `AIMEAT_APP_DEFAULT_ACCESS` (default `anyone`) and `AIMEAT_APP_DEFAULT_ACCESS_CODE` | [Organisation node sign-in](../organisation-node-sign-in.md), section 6a |
+| Asking for access to an app opened to one organism | An account of this node that is not a member can ask from the app's refusal page, or through its AI (`aimeat_access_request`). The request goes to the organism's owners and admins as a join request (`aimeat_organism_join_requests`, `aimeat_organism_join_request_review`); only they approve, and approving makes the person a member of that organism. The requester is not told which organism it is. One open request per person; after a rejection a new one is taken after 30 days. Each organism's owner turns it off (`access_requests` on `aimeat_organism_update`); it is on by default. A welcome page and a company front page work the same way. | `aimeat/src/services/organism-join-requests/requests.ts` |
 | On a closed node | With `AIMEAT_CONTENT_ACCESS=signed-in`, no app opens to a visitor without an account of this node | [Organisation node sign-in](../organisation-node-sign-in.md), section 6a |
 | Making it public through an agent or app | With `AIMEAT_PUBLISH_GATE=agents-and-apps`, an agent or app without `publish:public` files a request the owner approves (`aimeat_publish_requests`). The code default is `off`. | `aimeat/.env.example` |
 | Classification | A classified app cannot be listed or opened wider than its classification allows (409 `LABEL_CAPS_AUDIENCE`) | [Organisation node sign-in](../organisation-node-sign-in.md), section 6b step 8 |
@@ -198,6 +199,7 @@ An incoming webhook is an address and an API key an owner gives an outside progr
 ## Limits
 
 - Any account can publish an app, and with the code defaults (`AIMEAT_APP_DEFAULT_ACCESS=anyone`, `AIMEAT_APP_DEFAULT_LISTING=listed`, `AIMEAT_PUBLISH_GATE=off`) a new app is open to anyone and listed. There is no operator review of an app's code before it is published.
+- Asking for access to an app or a page opened to one organism is on by default for every organism, also one that is joined by invitation only. The switch is each organism owner's; there is no node-wide setting that turns it off. A request gives no access by itself: an owner or admin of the organism approves each one (`aimeat/src/services/organism-join-requests/requests.ts`).
 - App origin isolation is off by default on the local security profile and needs wildcard DNS and a wildcard certificate on a public one. With it off, apps share the node's origin.
 - `AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE` is `false` by default: a sign-in request from an app origin is logged, not refused, until the operator turns refusal on (`aimeat/.env.example`).
 - `AIMEAT_MCP_CAPABILITY_USE_APPROVAL` defaults to `operators`: a capability an operator account published over a server where each person signs in with their own account runs on the person's own sign-in there without asking. Set `ask` when every such use should be confirmed by the person.

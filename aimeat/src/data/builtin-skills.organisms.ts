@@ -13,6 +13,8 @@
  * @structure ORGANISMS_SKILL_ENTRY
  * @usage import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';
  * @version-history
+ *   2026-11-12 — "Who can see and change what" has asking for access: aimeat_access_request,
+ *     aimeat_organism_join_requests, aimeat_organism_join_request_review and access_requests.
  *   2026-11-11 — "Who can see and change what" names aimeat_organism_agent_attach and _detach for the
  *     agent list under "listed".
  *   2026-10-18 — An organism's classification may cap its visibility: LABEL_CAPS_AUDIENCE (plan doc-mvdipuyqraas, L3.5).
@@ -106,6 +108,12 @@ it connects to this node and finds it with \`aimeat_discover { scope: "shared" }
   to publish. Approvals and anything that spends money wait for a person.
 - **Inviting** another person happens with \`aimeat_organism_invite\` or by email
   (\`aimeat_organism_invite_email\`); the invited person accepts on their own page.
+- **Asking for access**: an app or a page can be opened to one organism's members only. A person it
+  refuses asks from that page, or their AI asks with \`aimeat_access_request\`. The organism's owners
+  and admins read the requests with \`aimeat_organism_join_requests\` (each says which app or page it
+  came from) and decide with \`aimeat_organism_join_request_review\`. Approving makes the person a
+  member of the organism, so ask your owner before you approve unless they told you whom to let in.
+  The owner turns requests off with \`aimeat_organism_update { access_requests: "off" }\`.
 - **Public** means anyone can find and read the organism without joining. An organism made with no
   visibility and no shape gets the level this node gives a new organism: public unless its operator
   chose private, so name the level when it matters. When the node asks the person before making something public, it is

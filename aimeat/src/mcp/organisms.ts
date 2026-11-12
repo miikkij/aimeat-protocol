@@ -50,6 +50,8 @@
  *   2026-09-29 — aimeat_workspace_comments passes the agent's classification reader to listComments
  *     (TARGET-082 V4).
  *   2026-09-29 — aimeat_organism_search passes the agent's classification reader (TARGET-082).
+ *   2026-11-12 — aimeat_organism_update takes access_requests; registers the join-request tools
+ *     (mcp/organism-join-requests.ts).
  *   2026-09-28 — aimeat_organism_update takes agent_access; an agent can narrow it, never widen it.
  *     aimeat_organism_members names only the agents the organism admits.
  *   v1.8.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -110,6 +112,7 @@ import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { resourceRefusal } from './resource-refusal.js';
+import { registerOrganismJoinRequestTools } from './organism-join-requests.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -438,6 +441,10 @@ export function registerOrganismsTools(
     // registered here to preserve tool order.
     registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated, caller);
 
+    // ── Join-request tools (access_request, join_requests, join_request_review) ──
+    // In organism-join-requests.ts (max-file-lines).
+    registerOrganismJoinRequestTools(mcp, config, storage, getOwnerName, agentGaii, emitResourceUpdated, caller);
+
     // ── Email-invitation tools (invite_email, invitations_email, invitation_email_cancel) ──
     // Extracted to organisms-email-invites.ts; registered here to preserve tool order.
     registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
@@ -624,7 +631,7 @@ export function registerOrganismsTools(
             inputSchema: zodShapeFor('aimeat_organism_update'),
             annotations: annotationsFor('aimeat_organism_update'),
         },
-        async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access }) => {
+        async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access, access_requests }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = getOwnerName();
@@ -638,6 +645,7 @@ export function registerOrganismsTools(
                 name, description, readme, interests, joinPolicy: join_policy, visibility,
                 // An MCP session is always an agent, never the person in person.
                 agentAccess: agent_access, callerIsPerson: false,
+                accessRequests: access_requests,
                 // Making it public asks the node's publish gate, as PUT /v1/organisms/:id does.
                 publishGate: { caller: caller() },
             });

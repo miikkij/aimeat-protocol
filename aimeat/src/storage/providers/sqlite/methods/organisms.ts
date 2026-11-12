@@ -8,6 +8,8 @@
  * @structure organismMethods
  * @usage Object.assign(SqliteStorage.prototype, organismMethods) in ../index.ts
  * @version-history
+ *   v1.3.0 — 2026-11-12 — organisms.accessRequests and join_requests.via (migration 0129): read and
+ *     written; `via` is a JSON object in a TEXT column, read by storage/join-request-via.ts.
  *   v1.2.0 — 2026-11-11 — deleteOrganism also removes the organism's workspace rows and their
  *     revisions, its invitations and its pending approvals, which nothing could reach afterwards.
  *   v1.1.0 — 2026-11-09 — organismNames: many organisms' names in one query.
@@ -23,6 +25,7 @@ import type {
 import type { SqliteStorage } from '../index.js';
 import { logger } from '../../../../utils/logger.js';
 import * as revisionRepo from '../repos/workspace-row-revisions.js';
+import { parseJoinRequestVia } from '../../../join-request-via.js';
 
 /** The organism `owners` JSON array, or the single owner the row had before the column existed. */
 function parseOwners(raw: unknown, creatorGhii: string): string[] {
@@ -53,9 +56,9 @@ export const organismMethods = {
   async createOrganism(this: SqliteStorage, record: OrganismRecord): Promise<OrganismRecord> {
     this.db.prepare(
       `INSERT INTO organisms (id, name, description, type, location, interests, creatorGhii, createdBy, owners, admins,
-       members, agentGaiis, boardId, joinPolicy, maxMembers, visibility, memberVisibility, agentAccess, moderationConfig,
+       members, agentGaiis, boardId, joinPolicy, maxMembers, visibility, memberVisibility, agentAccess, accessRequests, moderationConfig,
        memoryNamespace, semantic, createdAt, updatedAt, archived, archivedAt, archivedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.name, record.description, record.type,
       record.location ? JSON.stringify(record.location) : null,
@@ -67,6 +70,7 @@ export const organismMethods = {
       record.joinPolicy, record.maxMembers, record.visibility,
       record.memberVisibility ?? null,
       record.agentAccess ?? null,
+      record.accessRequests ?? null,
       JSON.stringify(record.moderationConfig), record.memoryNamespace,
       record.semantic ? JSON.stringify(record.semantic) : null,
       record.createdAt, record.updatedAt,
@@ -120,7 +124,7 @@ export const organismMethods = {
     this.db.prepare(
       `UPDATE organisms SET name = ?, description = ?, type = ?, location = ?, interests = ?,
        creatorGhii = ?, createdBy = ?, owners = ?, admins = ?, members = ?, agentGaiis = ?, boardId = ?,
-       joinPolicy = ?, maxMembers = ?, visibility = ?, memberVisibility = ?, agentAccess = ?, moderationConfig = ?,
+       joinPolicy = ?, maxMembers = ?, visibility = ?, memberVisibility = ?, agentAccess = ?, accessRequests = ?, moderationConfig = ?,
        memoryNamespace = ?, semantic = ?, createdAt = ?, updatedAt = ?,
        archived = ?, archivedAt = ?, archivedBy = ? WHERE id = ?`
     ).run(
@@ -134,6 +138,7 @@ export const organismMethods = {
       updated.joinPolicy, updated.maxMembers, updated.visibility,
       updated.memberVisibility ?? null,
       updated.agentAccess ?? null,
+      updated.accessRequests ?? null,
       JSON.stringify(updated.moderationConfig), updated.memoryNamespace,
       updated.semantic ? JSON.stringify(updated.semantic) : null,
       updated.createdAt, updated.updatedAt,
@@ -213,6 +218,7 @@ export const organismMethods = {
       visibility: row.visibility as OrganismRecord['visibility'],
       memberVisibility: (row.memberVisibility as OrganismRecord['memberVisibility'] | null) ?? undefined,
       agentAccess: (row.agentAccess as OrganismRecord['agentAccess'] | null) ?? undefined,
+      accessRequests: (row.accessRequests as OrganismRecord['accessRequests'] | null) ?? undefined,
       moderationConfig: JSON.parse(row.moderationConfig as string),
       memoryNamespace: row.memoryNamespace as string,
       createdAt: row.createdAt as string,
@@ -307,11 +313,12 @@ export const organismMethods = {
 
   async createJoinRequest(this: SqliteStorage, record: JoinRequestRecord): Promise<JoinRequestRecord> {
     this.db.prepare(
-      `INSERT INTO join_requests (id, organismId, ghii, message, status, reviewedBy, createdAt, reviewedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO join_requests (id, organismId, ghii, message, status, reviewedBy, createdAt, reviewedAt, via)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.organismId, record.ghii, record.message ?? null,
       record.status, record.reviewedBy ?? null, record.createdAt, record.reviewedAt ?? null,
+      record.via ? JSON.stringify(record.via) : null,
     );
     return record;
   },
@@ -344,6 +351,13 @@ export const organismMethods = {
     return updated;
   },
 
+  async eraseJoinRequestsOfAccount(this: SqliteStorage, spellings: readonly string[]): Promise<number> {
+    if (spellings.length === 0) return 0;
+    const marks = spellings.map(() => '?').join(', ');
+    this.db.prepare(`UPDATE join_requests SET reviewedBy = NULL WHERE reviewedBy IN (${marks})`).run(...spellings);
+    return this.db.prepare(`DELETE FROM join_requests WHERE ghii IN (${marks})`).run(...spellings).changes;
+  },
+
   deserializeJoinRequest(this: SqliteStorage, row: Record<string, unknown>): JoinRequestRecord {
     const record: JoinRequestRecord = {
       id: row.id as string,
@@ -355,6 +369,8 @@ export const organismMethods = {
     if (row.message) record.message = row.message as string;
     if (row.reviewedBy) record.reviewedBy = row.reviewedBy as string;
     if (row.reviewedAt) record.reviewedAt = row.reviewedAt as string;
+    const via = parseJoinRequestVia(row.via);
+    if (via) record.via = via;
     return record;
   },
 

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 — 2026-11-12 — OrganismRecord.accessRequests ('on' | 'off', unset reads 'on') and
+ *     JoinRequestRecord.via (JoinRequestVia): the app or page a join request was asked from
+ *     (migration 0129; services/organism-join-requests/requests.ts).
  *   v1.16.0 — 2026-11-01 — An extension action's `commercial` takes `deliversData`, the provider's
  *     statement that its EXCHANGE listing delivers data (plan doc-mvwxcas3dom3, D5.5).
  *   v1.15.0 — 2026-11-01 — ScheduledJobRecord and ExecutionLogEntry take the type 'dataproduct': one data
@@ -124,6 +127,12 @@ export interface OrganismRecord {
    *  member's agents act with their owner's rights. 'listed': only the agents on `agentGaiis` do, and
    *  any other agent is treated as a non-member (services/organism-agent-access.ts). */
   agentAccess?: 'all' | 'listed';
+  /** Whether a person refused by an app or a page opened to this organism's members may ask for
+   *  access from the refusal page. 'on' (the default when unset): the request is filed as a join
+   *  request the owners and admins decide. 'off': nothing can be asked, and the refusal page offers
+   *  nothing (services/organism-join-requests/requests.ts). Separate from `joinPolicy`, which governs joining
+   *  by the organism's own id. */
+  accessRequests?: 'on' | 'off';
   moderationConfig: {
     flagsEnabled: boolean;
     autoHideThreshold: number;
@@ -167,6 +176,18 @@ export interface InvitedWorkspaceGrant {
   role: 'viewer' | 'contributor';
 }
 
+/**
+ * What a join request was made from, when it was not made by the organism's own id: an app, a welcome
+ * page or a company front page opened to the organism's members, whose refusal page the person asked
+ * from. `ref` addresses it (`<owner>/<filename>`, the welcome page's account name, the company id)
+ * and `label` is its name when the request was made, which the approver reads.
+ */
+export interface JoinRequestVia {
+  kind: 'app' | 'portfolio' | 'company';
+  ref: string;
+  label: string;
+}
+
 export interface JoinRequestRecord {
   id: string;
   organismId: string;
@@ -176,6 +197,8 @@ export interface JoinRequestRecord {
   reviewedBy?: string;
   createdAt: string;
   reviewedAt?: string;
+  /** Present on an access request (services/organism-join-requests/requests.ts requestAccess). */
+  via?: JoinRequestVia;
 }
 
 /**

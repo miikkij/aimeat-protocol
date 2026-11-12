@@ -40,6 +40,12 @@ export interface OrganismRepository {
   getJoinRequest(id: string): Promise<JoinRequestRecord | null>;
   listJoinRequests(organismId: string, opts?: { status?: string }): Promise<JoinRequestRecord[]>;
   updateJoinRequest(id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null>;
+  /**
+   * An erased account's join requests: every request the account made is deleted, and its name is
+   * taken off the requests it decided for other people. `spellings` are the forms a row may name the
+   * account by (the bare account name and the GHII). Answers how many requests were deleted.
+   */
+  eraseJoinRequestsOfAccount(spellings: readonly string[]): Promise<number>;
   setOrganismReputation(record: OrganismReputationRecord): Promise<OrganismReputationRecord>;
   // Phase 4 — Gate primitive (PendingApproval)
   createPendingApproval(record: PendingApprovalRecord): Promise<PendingApprovalRecord>;

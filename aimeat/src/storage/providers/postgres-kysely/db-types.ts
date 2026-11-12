@@ -1691,6 +1691,7 @@ export interface JoinRequest {
   reviewedAt: Timestamp | null;
   reviewedBy: string | null;
   status: Generated<string>;
+  via: string | null;
 }
 
 export interface KnowledgeLink {
@@ -1888,6 +1889,7 @@ export interface Organism {
   owners: string[] | null;
   memberVisibility: string | null;
   agentAccess: string | null;
+  accessRequests: string | null;
   memoryNamespace: string;
   moderationConfig: Json;
   name: string;

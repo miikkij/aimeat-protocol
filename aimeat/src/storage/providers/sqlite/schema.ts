@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-11-12 — organisms.accessRequests and join_requests.via (migration 0129).
  *   2026-10-29 — One ledger row per federation settlement (schema-settlement-once.ts, migration 0122).
  *   2026-10-29 — storage_files.blobRef (migration 0121); the storage_files utf8Verified and
  *     aiProvenanceId lines move to schema-columns-files.ts unchanged (max-file-lines).
@@ -130,6 +131,10 @@ export function initializeSchema(db: Database.Database): void {
   // Organism member-roster visibility (privacy fix 2026-07-03: rosters were world-readable).
   safeAddColumn('organisms', 'memberVisibility', 'TEXT');
   safeAddColumn('organisms', 'agentAccess', 'TEXT');
+  // Asking for access from a refusal page (mirrors Postgres migration 0129): the organism's switch,
+  // and the app or page a join request was asked from.
+  safeAddColumn('organisms', 'accessRequests', 'TEXT');
+  safeAddColumn('join_requests', 'via', 'TEXT');
   // Ownership split in two (mirrors Postgres migration 0038): `createdBy` is history and never moves,
   // `owners` is the authority and is plural. `creatorGhii` used to be both, so a handover rewrote who
   // made the organism, and a single owner had no way back once that account went unreachable. Both

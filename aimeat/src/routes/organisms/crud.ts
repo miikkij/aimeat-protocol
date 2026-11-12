@@ -8,6 +8,8 @@
  * @version-history
  *   2026-11-11 — DELETE detaches the organism's own remote MCP servers (with their personal sign-ins)
  *     and unlinks every SSO connection that joined people to it; both outlived the organism.
+ *   2026-11-12 — PUT takes access_requests ('on' | 'off'): whether a person an app or page of the
+ *     organism refused may ask for access (services/organism-join-requests/requests.ts).
  *   2026-11-10 — PUT lets only the account holder in person widen agent_access back to "all"
  *     (isOwnerInPerson). isOwnerPrincipal also admitted a session holding account:security, which an
  *     agent can hold.
@@ -87,6 +89,7 @@ import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism
 import { publicShapes } from '../../data/organism-shapes.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
+import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
 import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { agentBarred } from '../../services/organism-agent-access.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
@@ -276,7 +279,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // Join requests only for orgs the caller manages (creator/admin) — kept per-org (typically few managed).
     const managed = orgs.filter(org => isOrganismOwner(org, owner) || (org.admins ?? []).includes(owner));
     await Promise.all(managed.map(async (org) => {
-      const jr = await storage.listJoinRequests(org.id, { status: 'pending' });
+      const jr = await openJoinRequests({ storage, config }, org);
       if (jr.length) joinRequests.push({ kind: 'join', n: jr.length, orgId: org.id, orgName: org.name });
     }));
     const invited = (await storage.listMembershipsByGhii(owner)).filter(m => m.status === 'invited');
@@ -361,7 +364,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility, agent_access } = req.body ?? {};
+    const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility, agent_access, access_requests } = req.body ?? {};
 
     // Field validation, the update itself and the README memory key live in
     // services/organism-lifecycle.ts, shared with aimeat_organism_update.
@@ -369,6 +372,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       name, description, type, location, interests, readme,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
       agentAccess: agent_access, callerIsPerson: isOwnerInPerson(req.auth),
+      accessRequests: access_requests,
       // Making it public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
       publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) },
     });

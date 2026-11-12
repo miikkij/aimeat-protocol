@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-12 -- definitions/organism-join-requests.ts: aimeat_access_request,
+ *     aimeat_organism_join_requests and aimeat_organism_join_request_review.
  *   v1.x -- 2026-11-11 -- definitions/organism-agents.ts: aimeat_organism_agent_attach and _detach.
  *   v1.x -- 2026-11-07 -- definitions/receivers.ts: aimeat_receiver and aimeat_admin_receivers.
  *   v1.x -- 2026-11-07 -- definitions/csm.ts: aimeat_csm, the account's data descriptions (CSM) in one tool.
@@ -118,6 +120,7 @@ import { fileStoreTools } from './definitions/file-store.js';
 import { dmGroupTools } from './definitions/dm-groups.js';
 import { dmReactionTools } from './definitions/dm-reactions.js';
 import { organismAgentTools } from './definitions/organism-agents.js';
+import { organismJoinRequestTools } from './definitions/organism-join-requests.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
@@ -176,6 +179,7 @@ const CATALOG = [
     ...dmGroupTools,
     ...dmReactionTools,
     ...organismAgentTools,
+    ...organismJoinRequestTools,
     ...publishRequestTools,
     ...accountRightsTools,
     ...secretAddressTools,

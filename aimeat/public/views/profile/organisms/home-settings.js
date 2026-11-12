@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.14.0 -- 2026-11-12 -- "Who gets in" has the Access requests choice (access_requests, on or off) with its question mark, organism.access_requests. Sent only when changed.
  *   v1.13.1 -- 2026-11-10 -- Fresher org data replaces each untouched field on its own. It replaced the whole form or nothing, so with one field touched, an Agents setting changed elsewhere stayed at its old value and the save sent it back.
  *   v1.13.0 -- 2026-10-27 -- A refused save shows each field's message under the name, description or type field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.12.0 -- 2026-10-24 -- "Records of processing" (compliance-records.js, plan doc-mvlftkh9zmc9
@@ -78,6 +79,7 @@ const JOIN = ['open', 'approval_required', 'invite_only'];
 const VIS = ['public', 'listed', 'private'];
 const MEMBER_VIS = ['authenticated', 'members', 'admins', 'public'];
 const AGENT_ACCESS = ['all', 'listed'];
+const ACCESS_REQUESTS = ['on', 'off'];
 
 export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast, confirm, onBack, onChanged, onLeave, onDeleted }) {
   const baseline = useMemo(() => ({
@@ -85,6 +87,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
     join_policy: org.joinPolicy || 'open', visibility: org.visibility || 'public',
     member_visibility: org.memberVisibility || 'authenticated',
     agent_access: org.agentAccess === 'listed' ? 'listed' : 'all',
+    access_requests: org.accessRequests === 'off' ? 'off' : 'on',
     interests: [...(org.interests || [])],
   }), [org]);
   const [form, setForm] = useState(baseline);
@@ -109,6 +112,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
     || form.visibility !== baseline.visibility
     || form.member_visibility !== baseline.member_visibility
     || form.agent_access !== baseline.agent_access
+    || form.access_requests !== baseline.access_requests
     || form.interests.join(' ') !== baseline.interests.join(' ');
 
   const saveEdit = async () => {
@@ -123,6 +127,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
         member_visibility: form.member_visibility, interests: form.interests,
         // Sent only when changed: an unchanged setting is no request to change it.
         ...(form.agent_access !== baseline.agent_access ? { agent_access: form.agent_access } : {}),
+        ...(form.access_requests !== baseline.access_requests ? { access_requests: form.access_requests } : {}),
       });
       if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); onChanged?.(); }
       else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
@@ -270,6 +275,9 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
           <${Choice} label=${label('setAgentAccess', 'Agents')} value=${form.agent_access} onChange=${(id) => setForm(f => ({ ...f, agent_access: id }))}
             help="organism.agent_access"
             options=${AGENT_ACCESS.map(id => ({ value: id, label: t(`organisms.agentAccess.${id}`) || id }))} />
+          <${Choice} label=${label('setAccessRequests', 'Access requests')} value=${form.access_requests} onChange=${(id) => setForm(f => ({ ...f, access_requests: id }))}
+            help="organism.access_requests"
+            options=${ACCESS_REQUESTS.map(id => ({ value: id, label: t(`organisms.accessRequests.${id}`) || id }))} />
           <//>
         <//>
 

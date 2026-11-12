@@ -9,6 +9,10 @@
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  *   (both in services/portfolio-config.ts, re-exported here)
  * @version-history
+ *   2026-11-12 — GET and POST /v1/portfolio/:username/access-request: a person the page refuses
+ *     because it is opened to one organism's members asks that organism's owners for access
+ *     (routes/access-request.ts). resolvePublishedPortfolio and PortfolioResolution move unchanged
+ *     to services/portfolio/published.ts and are re-exported here.
  *   2026-10-31 — PUT /v1/portfolio/upload by a writer without memory:read files the owner's question
  *     whether the page may read their memory, and answers it as memory_read; GET /v1/portfolio/data
  *     tells the owner viewer_reads_memory and memory_read_request (services/portfolio-read-hold.ts; audit H-9).
@@ -79,9 +83,9 @@
  *     can compose anonymous public-read URLs (/v1/memory/:gaii/:key) into the prompt.
  *   v1.0.0 — 2026-03-06 — Initial portfolio API.
  */
-import { Router, type Request } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, GHIIRecord, AgentRecord, AiProvenanceRecordRow } from '../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
@@ -96,6 +100,11 @@ import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { isNodeAccount } from '../services/audience.js';
 import { parsePageAccessInput, pageAccessOf, pageNeedsSignIn, mayOpenPage } from '../services/page-access.js';
 import { answerPageOpen } from './page-open.js';
+import { answerAccessRequest, answerAccessRequestState, type AccessRequestTarget } from './access-request.js';
+import { portfolioAccessTarget } from '../services/organism-join-requests/access-targets.js';
+import { resolvePublishedPortfolio } from '../services/portfolio/published.js';
+import { validateBody } from '../models/schemas.js';
+import { AccessRequestBody } from '../models/write-body-schemas.js';
 import {
   PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii, portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff,
   mergePortfolioConfig,
@@ -105,12 +114,7 @@ import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publi
 import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
 import { notePortfolioWriter, portfolioReadHold } from '../services/portfolio-read-hold.js';
 
-/** Result of resolving a username to their published portfolio. */
-export type PortfolioResolution =
-  | { ok: true; html: string | null; ghii: GHIIRecord; agents: AgentRecord[]; portfolioConfig: Record<string, unknown>;
-      /** The page's AI-provenance record, when it has one: the serve path sends its marks. */
-      aiProvenanceId?: string }
-  | { ok: false; reason: 'user_not_found' | 'not_enabled' };
+export { resolvePublishedPortfolio, type PortfolioResolution } from '../services/portfolio/published.js';
 
 // The keys, the identities and the switch writes live in services/portfolio-config.ts (a service
 // switches the page on too); re-exported here for every importer of this file.
@@ -163,41 +167,9 @@ export async function writePortfolioHtml(
   return target;
 }
 
-/**
- * Shared resolver: username → published portfolio HTML + owner identities.
- * Used by both the apex JSON route (GET /v1/portfolio/data/:username, which maps
- * reasons to granular 404 messages and tolerates html:null) and the
- * portfolio-origin serve route (<username>.portfolio.<apex>, which returns a
- * uniform 404 for every failure INCLUDING html:null).
- *
- * `no_agent` is gone as a reason: a welcome mat exists before its owner has an agent, and
- * refusing to serve it would make the first thing anyone builds here invisible.
- */
-export async function resolvePublishedPortfolio(
-  storage: Storage, username: string,
-): Promise<PortfolioResolution> {
-  const ghii = await storage.getGHIIByOwner(username);
-  if (!ghii) return { ok: false, reason: 'user_not_found' };
-
-  const agents = await storage.getAgentsByOwner(username);
-  const candidates = [...agents.map(a => a.gaii), ghii.ghii];
-
-  let portfolioConfig: Record<string, unknown> | null = null;
-  for (const gaii of candidates) {
-    const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
-    const val = (mem?.value ?? null) as Record<string, unknown> | null;
-    if (val?.enabled) { portfolioConfig = val; break; }
-  }
-  if (!portfolioConfig) return { ok: false, reason: 'not_enabled' };
-
-  let html: string | null = null;
-  let aiProvenanceId: string | undefined;
-  for (const gaii of candidates) {
-    const file = await storage.getStorageFile(gaii, PORTFOLIO_HTML_KEY);
-    if (file) { html = file.data.toString('utf-8'); aiProvenanceId = file.aiProvenanceId; break; }
-  }
-  return { ok: true, html, ghii, agents, portfolioConfig, ...(aiProvenanceId ? { aiProvenanceId } : {}) };
-}
+// resolvePublishedPortfolio (username → published page and owner identities) lives in
+// services/portfolio/published.ts since 2026-11-12, so a service reads it without importing this
+// route file; it is re-exported above for every importer of this file.
 
 /** Valid DNS label for a portfolio subdomain (same shape as SUBDOMAIN_RE; kept local
  *  to avoid a portfolio ↔ subdomains import cycle). */
@@ -603,6 +575,26 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       url: portfolioStandaloneUrl(config, ownerName),
       apexUrl: `${config.baseUrl.replace(/\/+$/, '')}/v1/portfolio/${encodeURIComponent(ownerName)}`,
     });
+  });
+
+  /**
+   * GET and POST /v1/portfolio/:username/access-request
+   * A person the welcome page refuses because it is opened to one organism's members asks that
+   * organism's owners for access; GET says what the refusal page shows them (routes/access-request.ts).
+   * The label the approver reads is the page owner's account name.
+   */
+  const pageAccessTarget = async (req: Request, res: Response): Promise<AccessRequestTarget | null> => {
+    const target = await portfolioAccessTarget(storage, req.params.username as string);
+    if (!target) res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No page here.'));
+    return target;
+  };
+  router.get('/v1/portfolio/:username/access-request', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
+    const target = await pageAccessTarget(req, res);
+    if (target) await answerAccessRequestState(req, res, config, storage, target);
+  });
+  router.post('/v1/portfolio/:username/access-request', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(AccessRequestBody, config.nodeId), async (req, res) => {
+    const target = await pageAccessTarget(req, res);
+    if (target) await answerAccessRequest(req, res, config, storage, target);
   });
 
   return router;

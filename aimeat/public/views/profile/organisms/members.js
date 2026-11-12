@@ -263,7 +263,9 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
           ${pending.map(r => html`
             <${ListRow} key=${r.id} rail="warn">
               <${Lead} text=${'🙋'} />
-              <${Name} meta=${`${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}`}
+              <${Name} meta=${`${r.via?.label
+                  ? t('organisms.asksAccessTo', { label: r.via.label })
+                  : (t('organisms.wantsToJoin') || 'wants to join')}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}`}
                 desc=${r.message ? (r.message) : null}>${(r.ghii)}<//>
               <${Doors}>
                 <${Action} small disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}<//>

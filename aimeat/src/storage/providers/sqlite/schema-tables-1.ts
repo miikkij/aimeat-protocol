@@ -6,6 +6,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.7.0 — 2026-11-12 — organisms.accessRequests and join_requests.via (migration 0129).
  *   v1.6.0 — 2026-10-11 — Comments only: actions.pricing and work.cost hold pacing amounts, not prices
  *     (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). No schema change.
  *   v1.5.0 — 2026-08-30 — boards.rules (migration 0057): the board's own rules as JSON.
@@ -496,6 +497,7 @@ export function applySchemaTables1(db: Database.Database): void {
       visibility       TEXT NOT NULL DEFAULT 'public',
       memberVisibility TEXT,
       agentAccess TEXT,
+      accessRequests TEXT,
       moderationConfig TEXT NOT NULL DEFAULT '{}',
       memoryNamespace  TEXT NOT NULL,
       semantic         TEXT,
@@ -527,7 +529,8 @@ export function applySchemaTables1(db: Database.Database): void {
       status         TEXT NOT NULL DEFAULT 'pending',
       reviewedBy     TEXT,
       createdAt      TEXT NOT NULL,
-      reviewedAt     TEXT
+      reviewedAt     TEXT,
+      via            TEXT
     );
 
     -- ── Pending Approvals (Phase 4 — Gate primitive) ──

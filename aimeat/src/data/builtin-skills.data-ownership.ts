@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-12 — Section 6: erasure also removes the requests the person made to join a group or to
+ *     get access to an app or a page (services/owner-erasure.ts step join_requests).
  *   2026-11-08 — Sections 4 and 5: archived keys have a limit of their own; an archive past it, and a
  *     restore from the bin of an archived record past it, answer QUOTA_EXCEEDED (secaudit2026nov08b
  *     round 15b, services/memory-ceilings.ts archiveWithinCeiling).
@@ -334,7 +336,8 @@ let knowledge age, and you should offer them, not wait to be asked:
 - **The node.** First the account export (section 1), the apps backup, and an export of each organism
   they want to keep. Then erasure: \`DELETE /v1/owners/{name}\` from their own signed-in session,
   which no MCP tool and no page offers today. **It is immediate and has no window.** It removes the
-  account, every agent, all their memory and files, consents, memberships, schedules, connections,
+  account, every agent, all their memory and files, consents, memberships, the requests they made
+  to join a group or to get access to an app or a page, schedules, connections,
   their own MCP servers and their own sign-ins on servers the node or a group shares, and apps. When a group's access key made the account and that key is still open, the erasure closes it, so it can never act on someone who takes the name later. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents, an accountant role a client gave them
   and the operator's check that they may be paid as a beneficiary included. What stays, under a

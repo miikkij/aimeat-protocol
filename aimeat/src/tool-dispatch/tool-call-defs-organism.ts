@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-12 — aimeat_access_request → GET or POST …/access-request of the app, welcome page or
+ *     company it names; aimeat_organism_join_requests → GET /v1/organisms/:id/join-requests;
+ *     aimeat_organism_join_request_review → POST …/join-requests/:requestId/review;
+ *     aimeat_organism_update passes access_requests.
  *   2026-11-11 — aimeat_organism_agent_attach → POST /v1/organisms/:id/agents and
  *     aimeat_organism_agent_detach → DELETE /v1/organisms/:id/agents/:gaii.
  *   2026-10-22 — aimeat_workspace_rows_revisions → GET .../rows/:space/:rowId/revisions and
@@ -88,8 +92,50 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const joinPolicy = optionalString(input, 'join_policy'); if (joinPolicy) body.join_policy = joinPolicy;
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
             const agentAccess = optionalString(input, 'agent_access'); if (agentAccess) body.agent_access = agentAccess;
+            const accessRequests = optionalString(input, 'access_requests'); if (accessRequests) body.access_requests = accessRequests;
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}`, body);
         },
+    },
+    {
+        name: 'aimeat_access_request',
+        // `kind` picks the route and `ref` names the target on it; `check` reads the state and files nothing.
+        handler: ({ client }, input) => {
+            const kind = requiredString(input, 'kind');
+            const ref = requiredString(input, 'ref');
+            const check = optionalBoolean(input, 'check');
+            const body: JsonObject = {};
+            const message = optionalString(input, 'message'); if (message !== undefined) body.message = message;
+            // Each branch names its route in full, so a reader (and the field-reach check) sees which
+            // REST route this tool is the twin of.
+            if (kind === 'app') {
+                const slash = ref.indexOf('/');
+                if (slash <= 0 || slash === ref.length - 1) throw new Error('INVALID_INPUT: for an app, ref is <owner>/<filename>');
+                const owner = encodeURIComponent(ref.slice(0, slash)), filename = encodeURIComponent(ref.slice(slash + 1));
+                return check ? client.get(`/v1/apps/${owner}/${filename}/access-request`) : client.post(`/v1/apps/${owner}/${filename}/access-request`, body);
+            }
+            if (kind === 'portfolio') {
+                return check
+                    ? client.get(`/v1/portfolio/${encodeURIComponent(ref)}/access-request`)
+                    : client.post(`/v1/portfolio/${encodeURIComponent(ref)}/access-request`, body);
+            }
+            if (kind !== 'company') throw new Error('INVALID_INPUT: kind is app, portfolio or company');
+            return check
+                ? client.get(`/v1/companies/${encodeURIComponent(ref)}/access-request`)
+                : client.post(`/v1/companies/${encodeURIComponent(ref)}/access-request`, body);
+        },
+    },
+    {
+        name: 'aimeat_organism_join_requests',
+        handler: ({ client }, input) => client.get(
+            `/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/join-requests${query({ status: optionalString(input, 'status') })}`,
+        ),
+    },
+    {
+        name: 'aimeat_organism_join_request_review',
+        handler: ({ client }, input) => client.post(
+            `/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/join-requests/${encodeURIComponent(requiredString(input, 'request_id'))}/review`,
+            { decision: requiredString(input, 'decision') },
+        ),
     },
     {
         name: 'aimeat_organism_join',

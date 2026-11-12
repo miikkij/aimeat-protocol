@@ -45,6 +45,7 @@
  *     expected_version and aimeat_workspace_update apps, as the node's MCP always did; the loose
  *     update fields keep z.any(), because both surfaces accept them as a JSON string too
  *     (secaudit 2026-10 follow-up, Part B).
+ *   2026-11-12 — aimeat_organism_update takes `access_requests` (on | off).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-10-01 — aimeat_organism_create takes `shape` and `lang` (starting shapes with their workspaces).
@@ -621,6 +622,7 @@ export const organismsWorkspacesAppsTools = [
             join_policy: { type: 'string', required: false, description: 'open | approval_required | invite_only.' },
             visibility: { type: 'string', required: false, description: 'public | listed | private.' },
             agent_access: { type: 'string', required: false, enum: ['all', 'listed'], description: 'Which members\' agents may act here: "all" (every member\'s agents, the default) or "listed" (only the agents in the Agents section of the organism\'s page; any other agent is refused as a non-member). An agent can set "listed"; only the owner signed in can set "all" again.' },
+            access_requests: { type: 'string', required: false, enum: ['on', 'off'], description: 'Whether a person refused by an app or a page that is opened to this organism\'s members may ask for access from the refusal page: "on" (the default; each request comes to the owners and admins to decide, see aimeat_organism_join_requests) or "off" (nothing can be asked, and the refusal page offers nothing). Separate from join_policy.' },
         },
     },
     {

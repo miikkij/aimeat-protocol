@@ -21,6 +21,8 @@
  *   gate set to `agents`.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-page-access
  * @version-history
+ *   v1.2.0 — 2026-11-12 — A refused person asks for access from the welcome page or the company front
+ *     page (GET and POST …/access-request): one join request carrying `via`, which the owner declines.
  *   v1.1.0 — 2026-10-18 — The grant leaves the address: the first request with ?access= answers 302
  *     without it and a host-only HttpOnly SameSite=Lax cookie; the cookie serves this page and no
  *     other; a tampered cookie serves nothing and is cleared; the grant names its viewer.
@@ -211,6 +213,35 @@ async function main() {
             memberCompanyGrant = new URL(mc.body.data.url).searchParams.get('access')!;
             const own = await open(`/v1/portfolio/${owner}/open`, ownerTok);
             assert(own.status === 200, `the owner always opens it: ${own.status}`);
+        });
+
+        await test('organism: the refused person asks for access from either page, as one join request the owner declines', async () => {
+            const portfolioRoute = `/v1/portfolio/${owner}/access-request`, companyRoute = `/v1/companies/${companyId}/access-request`;
+            for (const route of [portfolioRoute, companyRoute]) {
+                const s = await json(route, { headers: auth(outsiderTok) });
+                assert(s.status === 200 && s.body.data.requestable === true && s.body.data.state === 'none' && !JSON.stringify(s.body).includes(orgId), `${route} state ${s.status} ${JSON.stringify(s.body.data)}`);
+            }
+            const asked = await json(portfolioRoute, { method: 'POST', headers: auth(outsiderTok), body: JSON.stringify({ message: 'let me read it' }) });
+            assert(asked.status === 202 && asked.body.data.status === 'pending' && !JSON.stringify(asked.body).includes(orgId), `portfolio ask ${asked.status} ${JSON.stringify(asked.body)}`);
+            // Both pages are opened to the same organism, so the company page reads the same open request.
+            const viaCompany = await json(companyRoute, { method: 'POST', headers: auth(outsiderTok), body: '{}' });
+            assert(viaCompany.status === 409 && viaCompany.body.error?.code === 'ALREADY_PENDING', `company ask ${viaCompany.status} ${JSON.stringify(viaCompany.body.error)}`);
+            const cs = await json(companyRoute, { headers: auth(outsiderTok) });
+            assert(cs.body.data.state === 'pending', `company state ${JSON.stringify(cs.body.data)}`);
+            const member = await json(portfolioRoute, { method: 'POST', headers: auth(memberTok), body: '{}' });
+            assert(member.status === 409 && member.body.error?.code === 'ALREADY_OPEN', `member ask ${member.status}`);
+            const missing = await json(`/v1/companies/no-such-company/access-request`, { method: 'POST', headers: auth(outsiderTok), body: '{}' });
+            assert(missing.status === 404, `missing company ${missing.status}`);
+            const anon = await json(`/v1/portfolio/${owner}/access-request`, { method: 'POST', body: '{}' });
+            assert(anon.status === 401, `portfolio ask without a session ${anon.status}`);
+            const list = await json(`/v1/organisms/${orgId}/join-requests`, { headers: auth(ownerTok) });
+            const r = (list.body.data.join_requests ?? []).find((x: any) => x.ghii === outsider);
+            assert(r?.via?.kind === 'portfolio' && r.via.ref === owner && r.message === 'let me read it', `request ${JSON.stringify(r)}`);
+            // Declined, so the outsider stays outside for the tests that follow.
+            const d = await json(`/v1/organisms/${orgId}/join-requests/${r.id}/review`, { method: 'POST', headers: auth(ownerTok), body: JSON.stringify({ decision: 'rejected' }) });
+            assert(d.status === 200, `decline ${d.status}`);
+            const still = await json(`/v1/portfolio/${owner}/open`, { method: 'POST', headers: auth(outsiderTok), body: '{}' });
+            assert(still.status === 403, `a declined person opened the page: ${still.status}`);
         });
 
         await test('FAILURE: an owner naming an organism they are not in is refused, and the access stays', async () => {

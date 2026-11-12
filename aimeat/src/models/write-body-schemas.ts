@@ -17,10 +17,11 @@
  *
  *   `.nullable()` where the handler treats null as "not given" or "clear it", so a form that sends
  *   null for an empty field is not refused.
- * @structure OrganismCreateBody · OrganismUpdateBody · WorkspaceCreateBody · CommentCreateBody ·
- *   CONTACT_LIMITS · ContactAddBody · ContactUpdateBody · ProfileUpdateBody
+ * @structure OrganismCreateBody · OrganismUpdateBody · AccessRequestBody · WorkspaceCreateBody ·
+ *   CommentCreateBody · CONTACT_LIMITS · ContactAddBody · ContactUpdateBody · ProfileUpdateBody
  * @usage router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), validateBody(OrganismCreateBody, config.nodeId), …)
  * @version-history
+ *   v1.1.0 — 2026-11-12 — AccessRequestBody: the optional message of an access request.
  *   v1.0.0 — 2026-10-27 — Initial (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 import { z } from 'zod';
@@ -55,6 +56,15 @@ export const OrganismUpdateBody = z.looseObject({
     ...organismFields,
     readme: documentText().nullable().optional(),
 });
+
+/**
+ * POST …/access-request (an app, a welcome page, a company front page): an optional note to the
+ * people who decide. The whole body may be absent. The limit is the service's
+ * JOIN_REQUEST_MESSAGE_MAX (services/organism-join-requests/requests.ts).
+ */
+export const AccessRequestBody = z.looseObject({
+    message: safeText(1000).nullable().optional(),
+}).nullish();
 
 /** POST /v1/organisms/:id/workspaces. `manifest` and `schemas` are checked by provisionWorkspace. */
 export const WorkspaceCreateBody = z.looseObject({

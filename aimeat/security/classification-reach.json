@@ -521,9 +521,9 @@
     },
     "src/routes/memory/files.ts": {
       "reads": {
+        "listStorageFilesForOwners": 1,
         "listStorageFiles": 1,
-        "getStorageFile": 1,
-        "listStorageFilesForOwners": 1
+        "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file. 2026-11-09 (performance round 2): GET /v1/memory/files lists the owner's and their agents' file metadata, to the owner in person, in one IN query (listStorageFilesForOwners) where it read listStorageFiles once per identity; the same rows, the same metadata, no bytes."
     },
@@ -615,10 +615,9 @@
     },
     "src/routes/portfolio.ts": {
       "reads": {
-        "getMemory": 2,
-        "getStorageFile": 1,
         "listStorageFilesForOwners": 1,
         "listMemoryForOwners": 1,
+        "getMemory": 1,
         "getStorageFileMeta": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings. 2026-10-03: the two reads added for `enable` on the upload read the same portfolio config record (PORTFOLIO_CONFIG_KEY), to switch the page on unless the owner switched it off. 2026-10-18: the switch and the config merge moved to services/portfolio-config.ts."
@@ -1092,8 +1091,8 @@
     "src/services/archive.ts": {
       "reads": {
         "listAllMemory": 2,
-        "getMemory": 1,
-        "listAllMemoryMeta": 1
+        "listAllMemoryMeta": 1,
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index and a record's archived flag. 2026-11-08 (secaudit2026nov08 round 14): archivedOwnersUnder reads value-free meta rows of archived records only for their ownerGaii, so an unarchive can ask each holder's memory limits; no value or content leaves the function."
     },
@@ -1127,6 +1126,12 @@
         "listAllMemory": 1
       },
       "why": "Written 2026-10-27 (secaudit2026oct26), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUILTIN_EXTENSION_NAME_HELD incident twice. No content."
+    },
+    "src/services/bus-relay.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-08 (secaudit2026nov08 round 14), the node's own read: the registry marks under bus.registry-version.*, owned by the node's system identity (a random id and a time per registry); no person's content is read and nothing read here reaches a caller."
     },
     "src/services/cache-cleanup.ts": {
       "reads": {
@@ -1346,31 +1351,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, each entry gated by canReadWorkspace."
     },
-    "src/services/context/index-line.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-11-08 (wish-oma-konteksti): the person's own context records (context.*), listed to write their names and summaries into the MCP instructions and the handbook of that person's own connecting AI. Both callers pass the connecting principal's classification reader (readerForAgent), and the rows go through presentMemories before a line is written, so a context classified away from AI is not named; private contexts are left out for an agent, and a session without memory:read gets no index."
-    },
-    "src/services/context/check.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the machine check of one context reads each record it names (references, module parts, source records) under the caller's own principal or, through the same-owner view (ownerScopeView with readsAsOwner), under the caller's person; the organism read rule applies, and every record goes through presentMemory with the caller's classification reader before a single string of it is compared. A record the reader may not see is reported as 'not found or not open to you', the same finding as a missing one."
-    },
-    "src/services/memory-patch/patch.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Moved unchanged from routes/memory/patch.ts on 2026-11-09 with its review: Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader (the echoed value goes through presentMemory with the caller's reader); the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the first reads the record's visibility, for the audience cap before the write; the second is the merge loop's re-read."
-    },
-    "src/services/memory-versions/history.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemoryHistory": 1
-      },
-      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the earlier versions of one record, read only by the record's own principal or the same person in person or through memory:read-as-owner; the organism read rule applies, and the current value and every archived version go through presentMemories with the caller's classification reader (and the credential mask) under the record's own target before anything is shown or compared."
-    },
     "src/services/content/classes.ts": {
       "reads": {
         "getMemory": 2
@@ -1433,6 +1413,18 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-11-03 (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan), the node's own read: the shared fingerprint records of a workspace (organism.<org>.w.<ws>.meta.fingerprint.*), held by the node's own system@ identity and kept only when that identity owns the row. They are read after the document they describe passed the reader: openWorkspaceDoc asks decideWorkspaceRead and then reader.show on the document's record, and listSharedProfiles keeps only the documents loadWorkspaceContent's reader showed, answering a fingerprint only beside its shown document."
+    },
+    "src/services/context/check.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the machine check of one context reads each record it names (references, module parts, source records) under the caller's own principal or, through the same-owner view (ownerScopeView with readsAsOwner), under the caller's person; the organism read rule applies, and every record goes through presentMemory with the caller's classification reader before a single string of it is compared. A record the reader may not see is reported as 'not found or not open to you', the same finding as a missing one."
+    },
+    "src/services/context/index-line.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-08 (wish-oma-konteksti): the person's own context records (context.*), listed to write their names and summaries into the MCP instructions and the handbook of that person's own connecting AI. Both callers pass the connecting principal's classification reader (readerForAgent), and the rows go through presentMemories before a line is written, so a context classified away from AI is not named; private contexts are left out for an agent, and a session without memory:read gets no index."
     },
     "src/services/contribution-proofs.ts": {
       "reads": {
@@ -2355,13 +2347,19 @@
       },
       "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, item C1): the values of one page of GET /v1/memory?limit=N, read by key for rows the route has already passed through the classification reader (reader.show on the meta rows, the same reader presentMemories applies), with the credential mask applied to each value; the byte sum reads the values of the masked keys only to measure them, and returns no content."
     },
+    "src/services/memory-patch/patch.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Moved unchanged from routes/memory/patch.ts on 2026-11-09 with its review: Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader (the echoed value goes through presentMemory with the caller's reader); the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the first reads the record's visibility, for the audience cap before the write; the second is the merge loop's re-read."
+    },
     "src/services/memory-query.ts": {
       "reads": {
         "memoryDb.searchOwnerScope": 1,
         "searchText": 1,
+        "listMemoryMetaForOwners": 1,
         "memoryDb.listOwnerScopeMeta": 1,
-        "listMemoryMeta": 1,
-        "listMemoryMetaForOwners": 1
+        "listMemoryMeta": 1
       },
       "why": "Reviewed 2026-10-16 (QA audit D2-06): the search and the metadata listing that GET /v1/memory, GET /v1/memory/search, aimeat_memory_list and aimeat_memory_search share, moved here from those four files; every caller passes the rows through the classification reader (reader.show, presentMemories) before any reaches the caller, as those files did. 2026-11-10: listMemoryMetaPage reads a cursor page with listMemoryMetaForOwners and hands each batch to the caller's `keep`, which is the same chain: GET /v1/memory runs reader.show, the owner-scope view and the organism rule, aimeat_memory_list the owner-scope view, the organism rule and readerForAgent.show; no row leaves the function without passing it."
     },
@@ -2371,6 +2369,13 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/services/memory-versions/history.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemoryHistory": 1
+      },
+      "why": "Reviewed 2026-11-09 (wish-oma-konteksti): the earlier versions of one record, read only by the record's own principal or the same person in person or through memory:read-as-owner; the organism read rule applies, and the current value and every archived version go through presentMemories with the caller's classification reader (and the credential mask) under the record's own target before anything is shown or compared."
     },
     "src/services/memory-write.ts": {
       "reads": {
@@ -2733,6 +2738,13 @@
       },
       "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. 2026-11-01 (secaudit2026oct31w2 round 11): the same record read again by the generic write's note and the once-only step, and the finished record of that step under system@<node>. Nothing of the page or the records is shown to anyone or sent to a model."
     },
+    "src/services/portfolio/published.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-11-12, moved from src/routes/portfolio.ts by extraction (resolvePublishedPortfolio): the owner's own portfolio config record (portfolio.config) and the owner's own published page file, read under the owner's own identities to serve that owner's welcome page and to tell who may open it. The page is the owner's published page; its `access` decides who reads it."
+    },
     "src/services/presence.ts": {
       "reads": {
         "getMemory": 2
@@ -2757,12 +2769,6 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-11-04 (codebase analysis wave 3, HA stage 2), the node's own read: the process leases and the held and sweep leases under lease.*, owned by the node's system identity; no person's content is read and nothing read here reaches a caller."
-    },
-    "src/services/bus-relay.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-11-08 (secaudit2026nov08 round 14), the node's own read: the registry marks under bus.registry-version.*, owned by the node's system identity (a random id and a time per registry); no person's content is read and nothing read here reaches a caller."
     },
     "src/services/provenance-embed/index.ts": {
       "reads": {

@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-11-12 — PROBE_SETUP for aimeat_access_request (an app ref, <owner>/<filename>).
  *   2026-11-09 — PROBE_SETUP for aimeat_memory_write (a value), whose value is optional now that the
  *     tool also takes a patch.
  *   2026-11-01 — PROBE_SETUP for aimeat_datapackage_sell (a package ref; plan D5.1).
@@ -104,6 +105,8 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   // A document's SHA-256 is 64 hex characters on the catalog schema; the generic 'probe' is not one.
   aimeat_docsign_lookup: { sha256: 'a'.repeat(64) },
   aimeat_datamap_get: { app: 'someone/thing.html' },
+  // For an app the ref is <owner>/<filename>, which picks the route; the generic 'probe' has no slash.
+  aimeat_access_request: { kind: 'app', ref: 'someone/thing.html' },
   aimeat_app_agent_tie: { app: 'someone/thing.html', target_agent_name: 'some-agent' },
   aimeat_app_agent_untie: { app: 'someone/thing.html', target_agent_name: 'some-agent' },
   aimeat_datamap_set: { app: 'someone/thing.html', data_map: { spec: 'aimeat.datamap/1' } },

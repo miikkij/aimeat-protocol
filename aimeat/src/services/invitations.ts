@@ -21,6 +21,9 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-11-12 — addOrganismMember and acceptNameInvitation close the new member's open join
+ *     requests (services/organism-join-requests/requests.ts closeJoinRequestsOnMembership), so a request
+ *     answered by a direct add leaves the approvers' list and its notices lose their buttons.
  *   2026-11-09 — membershipAfterGrant: what a direct workspace-role grant does about the grantee's
  *     organism membership. A role granted to an account outside the organism opened nothing; the
  *     grant now sends that account the name invitation when the granter may invite, and says where
@@ -86,6 +89,7 @@ import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
 import { isOrganismOwner } from './organism-ownership.js';
+import { closeJoinRequestsOnMembership } from './organism-join-requests/requests.js';
 import { localAccountName } from '../utils/gaii.js';
 import { findWorkspaceRegistration, workspaceRegistrations } from './workspace-meta-read.js';
 import { isValidEmail } from '../utils/email-validator.js';
@@ -669,6 +673,9 @@ export async function acceptNameInvitation(
     orgId: organism.id, grants: membership.invitedWorkspaces ?? [],
     grantee: invitee, invitedBy: membership.invitedBy ?? invitee,
   });
+  // A join request the invitee had open is decided by the invitation they accepted.
+  await closeJoinRequestsOnMembership({ storage, config }, organism, invitee,
+    { owner: invitee, principal: invitee.includes('@') ? invitee : `${invitee}@${config.nodeId}` });
   if (membership.invitedBy) {
     await notify(storage, `${membership.invitedBy}@${config.nodeId}`, {
       type: 'organism_invitation_accepted',
@@ -756,6 +763,9 @@ export async function addOrganismMember(
   const grantedWorkspaces = await applyInvitationWorkspaceGrants(storage, config, {
     orgId: input.organism.id, grants, grantee: invitee, invitedBy: input.inviterGhii,
   });
+  // The person had asked to join (or asked for access to an app here): that request is decided now.
+  await closeJoinRequestsOnMembership({ storage, config }, input.organism, invitee,
+    { owner: input.inviterGhii, principal: input.inviterGhii.includes('@') ? input.inviterGhii : `${input.inviterGhii}@${config.nodeId}` });
   await notify(storage, `${invitee}@${config.nodeId}`, {
     type: 'organism_member_added',
     title: `${input.inviterGhii} added you to "${input.organism.name}" as ${role}`,

@@ -7,6 +7,8 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.10.0 — 2026-11-12 — Organism.accessRequests and JoinRequest.via (migration 0129): read and
+ *     written; `via` is a JSON object in a TEXT column, read by storage/join-request-via.ts.
  *   v1.9.0 — 2026-11-11 — deleteOrganism also removes the organism's workspace rows and their
  *     revisions, its invitations and its pending approvals, which nothing could reach afterwards.
  *   v1.8.0 — 2026-11-09 — organismNames: many organisms' names in one query.
@@ -30,6 +32,7 @@ import type {
 import type { JoinRequest, Organism, OrganismMembership, PendingApproval } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError } from '../helpers.js';
+import { parseJoinRequestVia } from '../../../join-request-via.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -48,6 +51,7 @@ function toOrg(r: Selectable<Organism>): OrganismRecord {
     boardId: r.boardId, joinPolicy: r.joinPolicy as OrganismRecord['joinPolicy'], maxMembers: r.maxMembers,
     visibility: r.visibility as OrganismRecord['visibility'], memberVisibility: (r.memberVisibility ?? undefined) as OrganismRecord['memberVisibility'],
     agentAccess: (r.agentAccess ?? undefined) as OrganismRecord['agentAccess'],
+    accessRequests: (r.accessRequests ?? undefined) as OrganismRecord['accessRequests'],
     moderationConfig: r.moderationConfig as OrganismRecord['moderationConfig'], memoryNamespace: r.memoryNamespace,
     semantic: (r.semantic ?? undefined) as OrganismRecord['semantic'], archived: r.archived ? true : undefined,
     archivedAt: isoOpt(r.archivedAt), archivedBy: r.archivedBy ?? undefined, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
@@ -60,7 +64,8 @@ function toMember(r: Selectable<OrganismMembership>): OrganismMembershipRecord {
   };
 }
 function toJoin(r: Selectable<JoinRequest>): JoinRequestRecord {
-  return { id: r.id, organismId: r.organismId, ghii: r.ghii, message: r.message ?? undefined, status: r.status as JoinRequestRecord['status'], reviewedBy: r.reviewedBy ?? undefined, createdAt: iso(r.createdAt), reviewedAt: isoOpt(r.reviewedAt) };
+  const via = parseJoinRequestVia(r.via);
+  return { id: r.id, organismId: r.organismId, ghii: r.ghii, message: r.message ?? undefined, status: r.status as JoinRequestRecord['status'], reviewedBy: r.reviewedBy ?? undefined, createdAt: iso(r.createdAt), reviewedAt: isoOpt(r.reviewedAt), ...(via ? { via } : {}) };
 }
 function toApproval(r: Selectable<PendingApproval>): PendingApprovalRecord {
   return {
@@ -81,6 +86,7 @@ export const organismMethods = {
       admins: r.admins, members: r.members, agentGaiis: r.agentGaiis, boardId: r.boardId,
       joinPolicy: r.joinPolicy, maxMembers: r.maxMembers, visibility: r.visibility, memberVisibility: r.memberVisibility ?? null,
       agentAccess: r.agentAccess ?? null,
+      accessRequests: r.accessRequests ?? null,
       moderationConfig: jsonb(r.moderationConfig), memoryNamespace: r.memoryNamespace, semantic: jsonb(r.semantic ?? null),
       archived: r.archived ?? false, archivedAt: r.archivedAt ? new Date(r.archivedAt) : null, archivedBy: r.archivedBy ?? null,
       createdAt: new Date(r.createdAt), updatedAt: new Date(r.updatedAt ?? r.createdAt),
@@ -204,7 +210,7 @@ export const organismMethods = {
   },
 
   async createJoinRequest(this: PostgresKyselyStorage, r: JoinRequestRecord): Promise<JoinRequestRecord> {
-    await this.db.insertInto('JoinRequest').values({ id: r.id, organismId: r.organismId, ghii: r.ghii, message: r.message ?? null, status: r.status, reviewedBy: r.reviewedBy ?? null, createdAt: new Date(r.createdAt), reviewedAt: r.reviewedAt ? new Date(r.reviewedAt) : null }).execute();
+    await this.db.insertInto('JoinRequest').values({ id: r.id, organismId: r.organismId, ghii: r.ghii, message: r.message ?? null, status: r.status, reviewedBy: r.reviewedBy ?? null, createdAt: new Date(r.createdAt), reviewedAt: r.reviewedAt ? new Date(r.reviewedAt) : null, via: r.via ? JSON.stringify(r.via) : null }).execute();
     return r;
   },
   async getJoinRequest(this: PostgresKyselyStorage, id: string): Promise<JoinRequestRecord | null> {
@@ -223,6 +229,13 @@ export const organismMethods = {
     if (updates.reviewedAt) data.reviewedAt = new Date(updates.reviewedAt);
     const rows = await this.db.updateTable('JoinRequest').set(data as never).where('id', '=', id).returningAll().execute();
     return rows[0] ? toJoin(rows[0]) : null;
+  },
+
+  async eraseJoinRequestsOfAccount(this: PostgresKyselyStorage, spellings: readonly string[]): Promise<number> {
+    if (spellings.length === 0) return 0;
+    await this.db.updateTable('JoinRequest').set({ reviewedBy: null }).where('reviewedBy', 'in', [...spellings]).execute();
+    const r = await this.db.deleteFrom('JoinRequest').where('ghii', 'in', [...spellings]).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
 
   async setOrganismReputation(this: PostgresKyselyStorage, r: OrganismReputationRecord): Promise<OrganismReputationRecord> {

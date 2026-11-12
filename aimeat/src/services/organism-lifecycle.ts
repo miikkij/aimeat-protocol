@@ -31,6 +31,9 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-11-12 — joinOrganism asks membershipRefusal and files through fileJoinRequest
+ *     (services/organism-join-requests/requests.ts): one open request per person, and a wait after a declined
+ *     one. updateOrganismRecord takes accessRequests ('on' | 'off').
  *   2026-11-11 — releaseOrganismLinks unlinks the SSO connections with one scoped update
  *     (storage.unlinkSsoConnectionsOfOrganism) and no longer reads every connection of the node.
  *   2026-11-11 — releaseOrganismLinks: an organism delete detaches the organism's own remote MCP
@@ -72,7 +75,6 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
-import { notify } from './notify.js';
 import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
@@ -83,6 +85,7 @@ import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isOrganismOwner } from './organism-ownership.js';
 import { AGENT_ACCESS_VALUES, agentAccessOf, type AgentAccess } from './organism-agent-access.js';
+import { ACCESS_REQUESTS_VALUES, membershipRefusal, fileJoinRequest, type AccessRequests } from './organism-join-requests/requests.js';
 import { revokeDepartedMemberAccess } from './invitations.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
@@ -325,6 +328,8 @@ export interface UpdateOrganismInput {
   visibility?: unknown;
   memberVisibility?: unknown;
   agentAccess?: unknown;
+  /** 'on' | 'off': whether a person an app or page of this organism refused may ask for access. */
+  accessRequests?: unknown;
   readme?: unknown;
   /** The caller is the person in person (isOwnerPrincipal), not an agent: needed to widen agentAccess. */
   callerIsPerson?: boolean;
@@ -406,6 +411,12 @@ export async function updateOrganismRecord(
     }
     updates.agentAccess = input.agentAccess as AgentAccess;
   }
+  if (input.accessRequests !== undefined) {
+    if (!ACCESS_REQUESTS_VALUES.includes(input.accessRequests as AccessRequests)) {
+      return refuse(400, 'INVALID_INPUT', `access_requests must be one of: ${ACCESS_REQUESTS_VALUES.join(', ')}`);
+    }
+    updates.accessRequests = input.accessRequests as AccessRequests;
+  }
   if (input.maxMembers !== undefined) {
     const n = Number(input.maxMembers);
     if (!Number.isFinite(n) || n < 1) return refuse(400, 'INVALID_INPUT', 'max_members must be a positive number');
@@ -466,24 +477,9 @@ export async function joinOrganism(
   const { storage, config } = deps;
   const id = organism.id;
 
-  const existing = await storage.getMembership(id, joinerOwner);
-  if (existing && existing.status === 'banned') {
-    return refuse(403, 'BANNED', 'You have been blocked from this organism');
-  }
-  if (existing && existing.status === 'active') {
-    return refuse(409, 'ALREADY_MEMBER', 'You are already a member');
-  }
-  if (existing && existing.status === 'pending') {
-    return refuse(409, 'ALREADY_PENDING', 'You already have a pending join request');
-  }
-  if (existing && existing.status === 'invited') {
-    return refuse(409, 'ALREADY_INVITED', 'You have a pending invitation — accept it instead of requesting to join');
-  }
-
-  const members = await storage.listMembers(id, { status: 'active' });
-  if (members.length >= organism.maxMembers) {
-    return refuse(409, 'CAPACITY_FULL', 'Organism has reached maximum members');
-  }
+  // Blocked, already a member, already invited, or full: the same answers an access request gets.
+  const refused = await membershipRefusal(storage, organism, joinerOwner);
+  if (refused) return refused;
 
   const now = new Date().toISOString();
 
@@ -521,36 +517,11 @@ export async function joinOrganism(
   }
 
   if (organism.joinPolicy === 'approval_required') {
-    const joinRequest = await storage.createJoinRequest({
-      id: uuidv4(),
-      organismId: id,
-      ghii: joinerOwner,
-      message: typeof message === 'string' && message ? message : undefined,
-      status: 'pending',
-      createdAt: now,
-    });
-
-    // Tell the creator + admins, or the request waits until someone opens the list. admins includes
-    // the creator, so dedupe.
-    const approvers = [...new Set([organism.creatorGhii, ...organism.admins])];
-    const reviewEndpoint = `/v1/organisms/${id}/join-requests/${joinRequest.id}/review`;
-    for (const approver of approvers) {
-      await notify(storage, `${approver}@${config.nodeId}`, {
-        type: 'organism_join_request',
-        title: `${joinerOwner} requested to join "${organism.name}"`,
-        body: typeof message === 'string' ? message : '',
-        link: '/v1/profile#organisms',
-        // Approve/Reject post the review endpoint as the admin. Once one admin decides, the others'
-        // clicks return 409 ALREADY_REVIEWED — the bell surfaces that and refreshes.
-        actions: [
-          { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'approved' }, style: 'primary' },
-          { id: 'reject', label: 'Reject', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'rejected' }, style: 'danger', confirm: true },
-        ],
-      });
-    }
-    emitChange('notifications');
-    emitChange('organisms');
-    return { ok: true, outcome: 'pending', joinRequest };
+    // The record, the one-open-request rule, the wait after a declined request and the approvers'
+    // notices are services/organism-join-requests/requests.ts, which an access request files through too.
+    const filed = await fileJoinRequest(deps, organism, joinerOwner, { message });
+    if (!filed.ok) return filed;
+    return { ok: true, outcome: 'pending', joinRequest: filed.joinRequest };
   }
 
   return refuse(403, 'INVITE_ONLY', 'This organism requires an invitation to join');

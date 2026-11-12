@@ -7,6 +7,11 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-12 — GET /v1/organisms/:id/join-requests and POST …/join-requests/:requestId/review call
+ *     readJoinRequests and decideJoinRequest (services/organism-join-requests/requests.ts), which
+ *     the MCP tools call too: the open list leaves out a request whose person is a member by now, a person who became a member
+ *     in the meantime is approved without a second membership, an access request's answer names the
+ *     app or page, and every approver's notice is marked answered.
  *   2026-11-11 — POST and DELETE /v1/organisms/:id/agents call services/organism-agents/attach.ts,
  *     which the MCP tools aimeat_organism_agent_attach and _detach call too. The rules are unchanged;
  *     the listed-mode refusal names account:security, the permission that lets an agent add one.
@@ -45,14 +50,12 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
 import type { Router, Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
 import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism-ownership.js';
 import { removeOrganismMember, MemberRemoveError } from '../../services/organism-member-remove.js';
@@ -65,6 +68,7 @@ import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../../
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { readJoinRequests, decideJoinRequest } from '../../services/organism-join-requests/requests.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -143,21 +147,15 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   router.get('/v1/organisms/:id/join-requests', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
-    const { status } = req.query;
-
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    // Who may read them and which ones are open: services/organism-join-requests/requests.ts
+    // readJoinRequests, which aimeat_organism_join_requests calls too. Each request carries `via`
+    // when it was asked from an app's or a page's refusal.
+    const result = await readJoinRequests({ storage, config }, id, ghii, req.query.status);
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
-
-    if (!isOrganismOwner(organism, ghii) && !organism.admins.includes(ghii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only admins can view join requests'));
-      return;
-    }
-
-    const requests = await storage.listJoinRequests(id, { status: (status as string) || 'pending' });
-    res.json(success(config.nodeId, { join_requests: requests, total: requests.length }));
+    res.json(success(config.nodeId, { join_requests: result.requests, total: result.requests.length }));
   });
 
   /* ── POST /v1/organisms/:id/join-requests/:requestId/review — Approve/reject ── */
@@ -167,72 +165,16 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const requestId = req.params.requestId as string;
     const { decision } = req.body ?? {};
 
-    if (!['approved', 'rejected'].includes(decision)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Decision must be "approved" or "rejected"'));
+    // Who may decide, the verdict, the membership, the answer to the requester and the approvers'
+    // answered notices are services/organism-join-requests/requests.ts, which
+    // aimeat_organism_join_request_review calls too.
+    const result = await decideJoinRequest({ storage, config }, id, requestId, decision,
+      { owner: ghii, principal: resolveIdentity(req.auth!, config.nodeId) });
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
-
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
-    }
-
-    if (!isOrganismOwner(organism, ghii) && !organism.admins.includes(ghii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only admins can review join requests'));
-      return;
-    }
-
-    const request = await storage.getJoinRequest(requestId);
-    if (!request || request.organismId !== id) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Join request not found'));
-      return;
-    }
-
-    if (request.status !== 'pending') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_REVIEWED', 'This request has already been reviewed'));
-      return;
-    }
-
-    const now = new Date().toISOString();
-    // One decision, three rows: the request's verdict, the membership it creates and the organism's
-    // member list. A failure between them left a request marked approved with no membership, or a
-    // membership the organism did not list.
-    await storage.transaction(async () => {
-      await storage.updateJoinRequest(requestId, {
-        status: decision,
-        reviewedBy: ghii,
-        reviewedAt: now,
-      });
-
-      if (decision === 'approved') {
-        await storage.createMembership({
-          id: uuidv4(),
-          organismId: id,
-          ghii: request.ghii,
-          role: 'member',
-          status: 'active',
-          joinedAt: now,
-        });
-        await storage.updateOrganism(id, {
-          members: [...organism.members, request.ghii],
-          updatedAt: now,
-        });
-      }
-    });
-
-    // Notify the requester of the decision so it surfaces in their bell.
-    await notify(storage, `${request.ghii}@${config.nodeId}`, {
-      type: decision === 'approved' ? 'organism_join_approved' : 'organism_join_rejected',
-      title: decision === 'approved'
-        ? `You were approved to join "${organism.name}"`
-        : `Your request to join "${organism.name}" was declined`,
-      link: '/v1/profile#organisms',
-    });
-    emitChange('notifications');
-
-    res.json(success(config.nodeId, { decision, request_id: requestId }));
-    emitChange('organisms');
+    res.json(success(config.nodeId, { decision: result.decision, request_id: requestId }));
   });
 
   /* ── POST /v1/organisms/:id/admins — Add an admin ── */

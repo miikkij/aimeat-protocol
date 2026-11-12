@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-12 -- e2e-app-access-request.ts joins the list (not the guard tier), and e2e-purpose-access-request.ts joins PURPOSE_SUITES: three consecutive 2/2 runs alone on each backend in the production-settings lane, and both tests red with the use disabled in source.
  *   2026-11-11 -- A Postgres run drops the lane and own-node databases it made at its end (scripts/lib/e2e-databases.ts).
  *   2026-11-10 -- e2e-live-catchup.ts joins the list (not the guard tier): a reopened live stream gets the domains that changed while it was away, and only its owner's.
  *   2026-11-10 -- e2e-query-budget.ts joins GUARD_SUITES (145 → 146), Jouni's decision: three consecutive 6/6 runs alone on each backend in the production-settings lane.
@@ -1340,6 +1341,9 @@ const ALL_SUITES = [
     // members_hidden arm, review, promote/demote, unban, transfer, the additive owner pair with its
     // last-owner refusal, the shared invitation gate, direct add, and agent attach/detach.
     'test/e2e-organism-membership-doors.ts',
+    // A person an app refuses asks the organism's owners for access: the request, the decision, the
+    // organism's switch, and the same over MCP.
+    'test/e2e-app-access-request.ts',
     'test/e2e-organism-member-visibility.ts',
     // A board and a skill at organism:<id>: the members read, an outsider and anonymous do not.
     'test/e2e-audience-boards-skills.ts',
@@ -1908,6 +1912,7 @@ const ALL_SUITES = [
     'test/e2e-purpose-visitors.ts',
     'test/e2e-purpose-update-keeps.ts',
     'test/e2e-purpose-agent-work.ts',
+    'test/e2e-purpose-access-request.ts',
 ];
 
 /**
@@ -2180,6 +2185,7 @@ const PURPOSE_SUITES = [
     'test/e2e-purpose-visitors.ts',          // visitors without registration, and anonymous mode on a node of its own
     'test/e2e-purpose-update-keeps.ts',      // a published app that reads data packages keeps working after the update's keep step
     'test/e2e-purpose-agent-work.ts',        // an agent's schedule, workflow and delegated task do their work
+    'test/e2e-purpose-access-request.ts',    // a person an app refuses asks for access; the owner approves from the notification, or the owner's AI over MCP
     // Existing suites chosen because they prove a designed use end to end, each green on this lane.
     'test/e2e-secrets-approvals.ts',         // the owner's apps, chat AI and unattended runs make a key's first use; one press for another account's extension; old code keeps its first use (23 to 25)
     'test/e2e-scheduled-ext-files.ts',       // a schedule's extension writes the owner's file; one press re-allows a refused agent; an app schedule made before the update keeps firing (23b to 23d)

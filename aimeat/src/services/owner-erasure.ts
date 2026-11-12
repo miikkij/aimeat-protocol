@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-12 — Step join_requests: every join request the account made is deleted and its name
+ *     comes off the requests it decided for others (storage.eraseJoinRequestsOfAccount). An open
+ *     request under a released name made its next holder a member on approval.
  *   2026-11-08 — After the transaction the account's live AI jobs are let go in the runner, with nothing
  *     written under the erased identity, and the log names `ai_jobs:<n>` when there were some
  *     (secaudit2026nov08b round 15, runGate:erased-account-runs-as-active).
@@ -266,6 +269,15 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
         counts.orphaned ? `organisms_orphaned:${counts.orphaned}` : null,
       ].filter(Boolean).join(',');
       return entry || null;
+    }, deletionLog, storage);
+
+    // Join requests. A request names its person by the account name, as a membership row does, so a
+    // request left open would make the next holder of the released name a member the moment an
+    // owner approved it. Every request this account made goes, open or decided, with its message;
+    // its name comes off the requests it decided for other people, which stay as theirs.
+    await step('join_requests', async () => {
+      const n = await storage.eraseJoinRequestsOfAccount([name, ghii]);
+      return n ? `join_requests:${n}` : null;
     }, deletionLog, storage);
 
     // Grants other parties made TO this account, which no owner column can find: a consent whose

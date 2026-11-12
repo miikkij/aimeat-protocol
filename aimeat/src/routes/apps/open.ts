@@ -18,6 +18,9 @@
  * @structure signInGateRefused() · appReaderOf() · screenshotFollowsAccess() · screenshotGateRefused() · listedScreenshotUrl() · registerAppOpenRoutes()
  * @usage registerAppOpenRoutes(router, config, storage, canonicalOwner)   // from appsRouter
  * @version-history
+ *   2026-11-12 — GET and POST /v1/apps/:owner/:filename/access-request: a person the app refuses
+ *     because it is opened to one organism's members asks that organism's owners for access
+ *     (routes/access-request.ts).
  *   2026-11-04 — signInGateRefused() asks signInGateOf() (services/app-read-gate.ts), the same decision
  *     moved unchanged, so the version list answers as the app read does; appReaderOf() builds its
  *     caller (codebase analysis 2026-11-03, item A1).
@@ -34,13 +37,17 @@ import type { Router, Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { answerAccessRequest, answerAccessRequestState, type AccessRequestTarget } from '../access-request.js';
 import { appNeedsSignIn, mayOpenApp } from '../../services/app-access.js';
 import { signInGateOf, SIGN_IN_REFUSAL, type AppReader } from '../../services/app-read-gate.js';
 import { isNodeAccount } from '../../services/audience.js';
 import { appIsPaced } from '../../services/app-pacing.js';
 import { appAccessGranted, appShotGranted, generateAppAccessToken, generateAppShotToken } from '../../services/app-access-token.js';
 import { operatorOverride } from '../../services/operator-override.js';
+import { appAccessTarget } from '../../services/organism-join-requests/access-targets.js';
+import { validateBody } from '../../models/schemas.js';
+import { AccessRequestBody } from '../../models/write-body-schemas.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { resolveAppTarget } from '../subdomain-app-gate.js';
@@ -174,5 +181,27 @@ export function registerAppOpenRoutes(router: Router, config: AimeatConfig, stor
     const sep = target.includes('?') ? '&' : '?';
     res.setHeader('Cache-Control', 'no-store');
     res.json(success(config.nodeId, { url: `${target}${sep}access=${encodeURIComponent(grant)}`, expires_in: 3600 }));
+  });
+
+  /** The route's target, or null after answering the 404 a missing or hidden app gets. */
+  const requestedTarget = async (req: Request, res: Response): Promise<AccessRequestTarget | null> => {
+    const target = await appAccessTarget(storage, config, req.auth, `${req.params.owner as string}/${req.params.filename as string}`);
+    if (!target) res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No app here.'));
+    return target;
+  };
+
+  /* ── GET /v1/apps/:owner/:filename/access-request — what the refusal page shows this person ── */
+  // `social:write` on the read too: it says whether THIS caller may file a request, so it asks the
+  // permission the request asks, and the one tool that does both (aimeat_access_request) holds one word.
+  router.get('/v1/apps/:owner/:filename/access-request', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req: Request, res: Response) => {
+    const target = await requestedTarget(req, res);
+    if (target) await answerAccessRequestState(req, res, config, storage, target);
+  });
+
+  /* ── POST /v1/apps/:owner/:filename/access-request — ask the organism's owners for access ── */
+  // `social:write`, the permission POST /v1/organisms/:id/join asks: both file a join request.
+  router.post('/v1/apps/:owner/:filename/access-request', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(AccessRequestBody, config.nodeId), async (req: Request, res: Response) => {
+    const target = await requestedTarget(req, res);
+    if (target) await answerAccessRequest(req, res, config, storage, target);
   });
 }
