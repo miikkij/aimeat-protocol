@@ -7,13 +7,16 @@
  *   decides to call. The node has served these from the DB since long before this file; the only way
  *   into them over MCP was aimeat_handbook_get, which the model has to think of. Now the person picks.
  * @structure
- *   - personPickable() — the seed's own `usedIn` decides which prompts a person gets to choose from
+ *   - listPickablePrompts() (services/prompts/prompt-read.ts) — the seed's own `usedIn` decides which
+ *     prompts a person gets to choose from
  *   - NODE_FILLED — the variables a session already knows, so the person is never asked for them
  *   - registerManagedPrompts() — one MCP prompt per active record a person may pick
  * @usage
  *   import { registerManagedPrompts } from './prompts-managed.js';
  *   await registerManagedPrompts(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-11-13 — The pickable-prompt list moved to services/prompts/prompt-read.ts and the cortex list
+ *     to services/cortex/cortex-list.ts, unchanged (structure programme unit 2).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -33,26 +36,8 @@ import type { Storage, SystemPromptRecord } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
-import { visibleCortexes } from '../services/cortex-lifecycle.js';
-
-/**
- * A managed prompt is offered to a person when its own `usedIn` says the portal's prompt-package
- * picker serves it. That field is the node's record of who consumes each prompt, so this reads a
- * decision the seeds already made instead of inventing a second list beside them.
- *
- * The group is the wrong signal here, and expensively so: `builders` holds both the eleven packages
- * the portal offers a person AND four templates the librarian and living-document services feed to
- * an LLM (`notebook-classify`, `notebook-plan`, `notebook-distribute`, `living-author`, each with
- * `usedIn: ['/v1/librarian/…']`). Those take a `structure` and a `note` from a service and mean
- * nothing as a slash command. `tiers` is excluded by the same rule and belongs excluded: those are
- * agent operating handbooks, which aimeat_handbook_get already serves to the model.
- */
-const PICKER_ROUTE = '/v1/portal/prompts/';
-
-/** True when the node's own seed says this prompt is one a person picks from the portal. */
-function personPickable(p: SystemPromptRecord): boolean {
-    return (p.usedIn ?? []).some(u => u.startsWith(PICKER_ROUTE));
-}
+import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
+import { listPickablePrompts } from '../services/prompts/prompt-read.js';
 
 /**
  * Variables a session can answer by itself. Anything a prompt declares beyond these becomes an
@@ -60,14 +45,6 @@ function personPickable(p: SystemPromptRecord): boolean {
  * `cortex_extensions` costs a query, so it is resolved only for a prompt that asks for it.
  */
 const NODE_FILLED = new Set(['node_url', 'node_id', 'gaii', 'owner_name', 'agent_name', 'cortex_extensions']);
-
-/** The active records a person may pick, in a stable order so a client can cache the list. */
-async function pickableRecords(storage: Storage): Promise<SystemPromptRecord[]> {
-    const all = await storage.listSystemPrompts();
-    return all
-        .filter(p => p.active && personPickable(p))
-        .sort((a, b) => a.id.localeCompare(b.id));
-}
 
 /**
  * Register one MCP prompt per managed prompt a person may pick. Returns how many were registered.
@@ -85,7 +62,7 @@ export async function registerManagedPrompts(
 ): Promise<number> {
     let records: SystemPromptRecord[];
     try {
-        records = await pickableRecords(storage);
+        records = await listPickablePrompts(storage);
     } catch (err) {
         // A prompt list the node cannot read costs the person a picker, and costs the session
         // nothing else: the tools are registered either way.
@@ -133,10 +110,8 @@ export async function registerManagedPrompts(
                         // Names and descriptions only, but of EVERY active cortex on the node until
                         // 2026-09-05 — another owner's private one included. The same fence the two
                         // list doors apply; operator-ness is unknown on this surface, so it is not claimed.
-                        const extensions = visibleCortexes(
-                            { ownerName, isOperator: false },
-                            await storage.listCortexExtensions({ status: 'active' }),
-                            config.nodeId,
+                        const extensions = await listVisibleCortexes(
+                            storage, { ownerName, isOperator: false }, config.nodeId, { status: 'active' },
                         );
                         known.cortex_extensions = (extensions ?? []).map(e => `- ${e.name}: ${e.description}`).join('\n');
                     } catch (err) {

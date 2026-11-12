@@ -51,7 +51,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
-import { visibleCortexes } from '../services/cortex-lifecycle.js';
+import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { sendPlainText } from '../middleware/plain-text.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
@@ -719,7 +719,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         ownerName: req.auth && !isAnonymousPrincipal(req.auth) ? String(req.auth.owner ?? '') : '',
         isOperator: await isOperatorCaller(storage, req.auth),
       };
-      const extensions = visibleCortexes(caller, await storage.listCortexExtensions({ status: 'active' }), config.nodeId);
+      const extensions = await listVisibleCortexes(storage, caller, config.nodeId, { status: 'active' });
       if (extensions && extensions.length > 0) {
         cortexExtDescriptions = extensions.map((ext) =>
           `- ${ext.name}: ${ext.description}`

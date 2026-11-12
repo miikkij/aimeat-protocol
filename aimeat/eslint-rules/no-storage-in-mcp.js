@@ -57,9 +57,10 @@
  * Files that talked to storage before this rule existed. Delete a line when its tools move onto a
  * shared service; never add one.
  *
- * Two of these are not tool surfaces and stay: oauth.ts is the OAuth server, and prompts-managed.ts
- * serves stored prompt text. They implement the protocol rather than a capability. index.ts, the
- * transport layer, was the third, until its reads moved to services on 2026-10-20.
+ * One of these is not a tool surface and stays: oauth.ts is the OAuth server, which implements the
+ * protocol rather than a capability. index.ts, the transport layer, was another until its reads moved
+ * to services on 2026-10-20, and prompts-managed.ts, which serves stored prompt text, a third until its
+ * reads moved to services/prompts/prompt-read.ts on 2026-11-13.
  *
  * A file that is a PURE EXTRACTION out of one already on this list inherits its line rather than
  * counting as a new offender — the code did not change and the backlog did not grow. Say which file
@@ -93,7 +94,6 @@ const EXEMPT = new Set([
   'src/mcp/organisms-email-invites.ts',
   'src/mcp/organisms-name-invites.ts',
   'src/mcp/organisms.ts',
-  'src/mcp/prompts-managed.ts',
   'src/mcp/prompts.ts',
   'src/mcp/sharing-groups.ts',
   'src/mcp/skills.ts',
