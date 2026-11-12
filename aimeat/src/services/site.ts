@@ -504,7 +504,24 @@ export class SiteService {
             node_id: this.config.nodeId,
             node_name: (this.config as unknown as Record<string, unknown>).nodeName as string ?? this.config.nodeId,
             node_url: this.config.baseUrl,
+            template_state: await this.templateState(),
         });
+    }
+
+    /**
+     * One line for the prompt: whether this node has its own HTML page, the default page's
+     * language and the language versions. An AI asked to add a language reads from it which
+     * pages exist, so it adds a version and does not write a second default page.
+     */
+    private async templateState(): Promise<string> {
+        const versions = await this.templateVersions();
+        if (!versions) return 'none yet; the front page is the one the node ships with';
+        const stated = versions.defaultLang
+            ? `default page in "${versions.defaultLang}"`
+            : 'default page with no <html lang> stated';
+        return versions.languages.length > 0
+            ? `yes; ${stated}; language versions: ${versions.languages.join(', ')}`
+            : `yes; ${stated}; no language versions`;
     }
 
     /** List memory keys under portal/* namespace. */

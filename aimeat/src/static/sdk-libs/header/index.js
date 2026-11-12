@@ -13,6 +13,9 @@
  *   modalI18n/buildMarkup/wire/refreshSession/init — runs init() on DOM ready.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.4.0 — 2026-11-12 — A language button asks for the page again without ?lang= in the address,
+ *     which would otherwise win over the button, and the press carries the pick mark (writeLang),
+ *     so the node's front page follows it.
  *   v1.3.2 — 2026-11-04 — The name in the pill links to the home's settings dialog, as in the SPA.
  *   v1.3.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.3.0 — 2026-09-30 — An operator sees the new-version tag (GET /v1/admin/node-update) beside the
@@ -199,6 +202,14 @@ function main() {
       if (b.getAttribute('data-lang') === lang) b.classList.add('active');
       b.addEventListener('click', function () {
         writeLang(b.getAttribute('data-lang'));
+        // A ?lang= left in the address would win over the button just pressed, here and on the
+        // server, so the page is asked for again without it.
+        var u = new URL(location.href);
+        if (u.searchParams.has('lang')) {
+          u.searchParams.delete('lang');
+          location.replace(u.pathname + u.search + u.hash);
+          return;
+        }
         location.reload();
       });
     });

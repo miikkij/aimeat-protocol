@@ -24,6 +24,8 @@
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-11-12 — The AI paste takes a bundle that holds only language versions (`templates`), and
+ *     its message counts every HTML page stored. The HTML page's section copies the site prompt.
  *   2026-11-12 — The HTML page has language versions: the editor opens the default page or one
  *     language's page, and saves, downloads and deletes the one it shows.
  *   2026-09-28 — The change log reads the list GET /v1/site/changelog answers; it read `.entries` and was always empty.
@@ -414,12 +416,15 @@ export default function PortalTab({ data, reload }) {
       if (bundle.layout) {
         await importSurfaceLayout(bundle);
         await loadLayout();
-      } else if (bundle.template || bundle.memory || bundle.kv) {
+      } else if (bundle.template || bundle.templates || bundle.memory || bundle.kv) {
+        // `templates` alone adds or replaces language versions of the page the node already has.
         const res = await importSiteBundle(bundle);
         const d = res.data || {};
+        // The editor shows the default page again, with what the node now holds.
+        setTemplateLang('');
         if (typeof bundle.template === 'string') setTemplate(bundle.template);
         showOk(P('ai.appliedBundle', {
-          template: d.template_stored ? 1 : 0,
+          template: (d.template_stored ? 1 : 0) + (d.template_versions_stored || 0),
           memory: d.memory_keys_written || 0,
           kv: d.kv_pairs_updated || 0,
         }));
@@ -549,7 +554,7 @@ export default function PortalTab({ data, reload }) {
         <${OwnHtml} hasCustom=${hasCustom} updatedAt=${tmpl.updated_at} template=${template}
           lang=${templateLang} langs=${templateLangs} baseUrl=${meta.base_url || ''} onPage=${openTemplatePage}
           onTemplate=${setTemplate} onSave=${saveTemplate} onLoadCurrent=${loadCurrentAsTemplate}
-          onDownload=${downloadTemplate} onDelete=${deleteTemplate} number=${n()} />
+          onDownload=${downloadTemplate} onDelete=${deleteTemplate} onCopyAi=${copySitePrompt} number=${n()} />
         <${SavedTexts} memKeys=${memKeys} kv=${meta.kv} newKey=${newKey} newVal=${newVal}
           onKey=${setNewKey} onVal=${setNewVal} onAdd=${addText} onDelete=${deleteText} number=${n()} />`}
 

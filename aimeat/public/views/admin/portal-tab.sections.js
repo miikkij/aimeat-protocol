@@ -16,6 +16,8 @@
  * @structure WhichVersion · MenuLinks · OwnHtml · SavedTexts · AskAi · WhatChanged
  * @usage html`<${WhichVersion} hasCustom=${false} source="default" parts=${9} />`
  * @version-history
+ *   2026-11-12 — OwnHtml: the action that copies the instructions for the person's AI, and the
+ *     line that says where its answer goes.
  *   2026-11-12 — OwnHtml: the row that names the page's language versions, the tabs that choose the
  *     page in the editor (the default page or one language), and the field that adds a language.
  *   2026-09-28 — What changed names each action once, in words (admin.portal.log.action.*); the raw id badge beside the name is gone.
@@ -99,7 +101,7 @@ export function MenuLinks({ links, labels, saving, onToggle, onMove, onSave, num
  * Section 05: the operator's own HTML page. The warning comes BEFORE the editor, because the
  * decision it warns about is made by pressing Save in the editor.
  */
-export function OwnHtml({ hasCustom, updatedAt, template, lang = '', langs = [], baseUrl = '', onPage, onTemplate, onSave, onLoadCurrent, onDownload, onDelete, number }) {
+export function OwnHtml({ hasCustom, updatedAt, template, lang = '', langs = [], baseUrl = '', onPage, onTemplate, onSave, onLoadCurrent, onDownload, onDelete, onCopyAi, number }) {
   const [open, setOpen] = useState(hasCustom);
   const [newLang, setNewLang] = useState('');
   const [badLang, setBadLang] = useState(false);
@@ -118,7 +120,8 @@ export function OwnHtml({ hasCustom, updatedAt, template, lang = '', langs = [],
     <${Section} id="adm-pt-html" num=${number} title=${P('html.title')}
       doors=${html`
         ${!open && html`<${Action} small soft onClick=${() => setOpen(true)}>${P('html.write')}<//>`}
-        <${Action} small soft onClick=${() => { setOpen(true); onLoadCurrent(); }}>${P('html.loadCurrent')}<//>`}>
+        <${Action} small soft onClick=${() => { setOpen(true); onLoadCurrent(); }}>${P('html.loadCurrent')}<//>
+        <${Action} small soft onClick=${onCopyAi}>${P('html.aiCopy')}<//>`}>
       <${Reading} last=${!hasCustom} name=${P('html.state')} why=${hasCustom ? P('html.stateYours') : P('html.stateNone')}
         mark=${hasCustom
           ? html`<${Badge} type="healthy" label=${P('html.badgeYours')} />`
@@ -128,6 +131,7 @@ export function OwnHtml({ hasCustom, updatedAt, template, lang = '', langs = [],
         <${Reading} last name=${P('html.langs')} why=${langs.length ? P('html.langsSome') : P('html.langsNone')}
           value=${langs.length ? langs.map(l => l.toUpperCase()).join(' · ') : P('html.badgeNone')} />`}
       <${SettingBox} label=${P('html.warnLabel')}>${P('html.warn')}<//>
+      <${Note} kind="hint">${P('html.aiHint')}<//>
       ${open && html`
         <${Space} above="large">
           ${hasCustom && html`

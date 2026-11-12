@@ -16,6 +16,9 @@
  *     stored blob and never restored it, so the page claimed a session no call had.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-auth-pill.test.ts
  * @version-history
+ *   2026-11-12 — The setup names the browser's language (en-US). It had left Node's own
+ *     navigator.language in place, so on a machine whose locale is Finnish the pill drew Finnish
+ *     titles and the English assertion failed: the setup was wrong, the library was not.
  *   v1.1.0 — 2026-09-13 — The developer's onLogin decision: a restore that lands calls onLogin once with
  *     { restored: true }, a second login event about the same person does not call it again, and
  *     Sign In hands signIn() the pill's options without onLogin. All three failed on the lib before
@@ -66,6 +69,9 @@ let events: any;
 
 beforeAll(async () => {
   g.location = { origin: APEX, protocol: 'https:', host: 'node.test', hostname: 'node.test', search: '', href: `${APEX}/` };
+  // Node's own navigator.language is the machine's locale, and the pill's texts follow it
+  // (_core/lang.js): on a Finnish machine the English titles asserted below came out in Finnish.
+  Object.defineProperty(g, 'navigator', { value: { language: 'en-US' }, configurable: true, writable: true });
   g.localStorage = {
     getItem: (k: string) => (store.has(k) ? store.get(k) : null),
     setItem: (k: string, v: string) => { store.set(k, String(v)); },

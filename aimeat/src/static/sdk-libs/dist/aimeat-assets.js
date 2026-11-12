@@ -335,6 +335,15 @@
     }
     return out.length > 1 ? out : [];
   }
+  function servedPageLang() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
+    const m = (
+      /** @type {HTMLMetaElement|null} */
+      document.querySelector('meta[name="aimeat-page-lang"]')
+    );
+    const code = m && m.content ? m.content.trim().toLowerCase() : "";
+    return /^[a-z]{2}$/.test(code) ? code : null;
+  }
   function readLang(locales) {
     const list = Array.isArray(locales) ? locales : null;
     const pick = list ? function(v) {
@@ -342,6 +351,8 @@
     } : function(v) {
       return v ? String(v).slice(0, 2) : null;
     };
+    const served = pick(servedPageLang());
+    if (served) return served;
     try {
       const u = pick(new URLSearchParams(location.search).get("lang"));
       if (u) return u;

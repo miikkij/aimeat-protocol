@@ -164,6 +164,17 @@ await test('The operator template has language versions: one page and one addres
             const langs = [...reply.head.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">/g)].map(m => `${m[1]} ${new URL(m[2]!.replace(/&amp;/g, '&')).search}`);
             assert(JSON.stringify(langs) === '["en ?lang=en","es ?lang=es","fi ","x-default "]', `hreflang: ${JSON.stringify(langs)}`);
         }
+        // The page names the language the node picked, for the header and the sign-in dialog on it.
+        assert(en.head.includes('<meta name="aimeat-page-lang" content="en">') && fi.head.includes('<meta name="aimeat-page-lang" content="fi">'), 'each page names its picked language');
+        // A press on the header's language button writes these two cookies (_core/lang.js writeLang),
+        // and the address it then asks for carries no ?lang.
+        const pressedFi = await read('', { 'Accept-Language': 'en-GB,en;q=0.9', Cookie: 'aimeat-lang=fi; aimeat-lang-chosen=1' });
+        assert(pressedFi.html.includes('<h1>Leipää perjantaisin</h1>'), 'picking the default page\'s language gives the default page to an English browser');
+        const unmarked = await read('', { 'Accept-Language': 'en-GB,en;q=0.9', Cookie: 'aimeat-lang=fi' });
+        assert(unmarked.html.includes('<h1>Bread on Fridays</h1>'), 'a stored language without the pick mark is a detected one, and the browser decides');
+        const prompt = await (await fetch(`${BASE}/v1/site/prompt`)).json();
+        assert(prompt.data.prompt.includes('- Own HTML page: yes; default page in "fi"; language versions: en, es'), 'the AI prompt names the pages this node has');
+        assert(prompt.data.prompt.includes('aimeat-lang-chosen=1'), 'the AI prompt carries the script that keeps a visitor\'s choice');
 
         const xml = await (await fetch(`${BASE}/sitemap.xml`)).text();
         assert(/<loc>[^<]+\/\?lang=en<\/loc>/.test(xml) && /<loc>[^<]+\/\?lang=es<\/loc>/.test(xml), 'the sitemap lists each language address');

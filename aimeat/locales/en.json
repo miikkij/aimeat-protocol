@@ -1646,6 +1646,8 @@
         "delete": "Delete it",
         "deleteAsk": "Delete your HTML page? Visitors go back to the parts above.",
         "deleted": "Deleted. Visitors get the parts above again.",
+        "aiCopy": "Copy the instructions for your AI",
+        "aiHint": "Your AI writes this page, one whole page for each language you want. Press \"Copy the instructions for your AI\", give them to your AI, and paste its answer under \"Let your AI do this\" on this page.",
         "langs": "Languages",
         "langsNone": "The page has one version, and every visitor gets it.",
         "langsSome": "A visitor who reads one of these languages gets that version. Everyone else gets the default page.",
@@ -1697,7 +1699,7 @@
         "applyNote": "Nothing is applied until you press this.",
         "invalid": "That is not something this page can read. It should be the whole answer your AI gave, starting with a curly bracket.",
         "applied": "Applied. The page shows this now.",
-        "appliedBundle": "Applied: {template} HTML page, {memory} texts, {kv} values."
+        "appliedBundle": "Applied. HTML pages: {template}, texts: {memory}, values: {kv}."
       },
       "log": {
         "title": "What changed",

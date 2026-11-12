@@ -173,6 +173,7 @@
 
   // src/static/sdk-libs/_core/lang.js
   var LANG_KEY = "aimeat-lang";
+  var LANG_CHOSEN_KEY = "aimeat-lang-chosen";
   var COOKIE_MAX_AGE = 31536e3;
   function readLocales(opts) {
     let list = opts && Array.isArray(opts.locales) ? opts.locales : null;
@@ -198,6 +199,15 @@
     }
     return out.length > 1 ? out : [];
   }
+  function servedPageLang() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
+    const m = (
+      /** @type {HTMLMetaElement|null} */
+      document.querySelector('meta[name="aimeat-page-lang"]')
+    );
+    const code = m && m.content ? m.content.trim().toLowerCase() : "";
+    return /^[a-z]{2}$/.test(code) ? code : null;
+  }
   function readLang(locales) {
     const list = Array.isArray(locales) ? locales : null;
     const pick = list ? function(v) {
@@ -205,6 +215,8 @@
     } : function(v) {
       return v ? String(v).slice(0, 2) : null;
     };
+    const served = pick(servedPageLang());
+    if (served) return served;
     try {
       const u = pick(new URLSearchParams(location.search).get("lang"));
       if (u) return u;
@@ -234,9 +246,12 @@
     );
   }
   function writeLang(lang) {
+    const keep = ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
     try {
+      document.cookie = LANG_KEY + "=" + lang + keep;
+      document.cookie = LANG_CHOSEN_KEY + "=1" + keep;
       localStorage.setItem(LANG_KEY, lang);
-      document.cookie = LANG_KEY + "=" + lang + ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
+      localStorage.setItem(LANG_CHOSEN_KEY, "1");
     } catch {
     }
   }

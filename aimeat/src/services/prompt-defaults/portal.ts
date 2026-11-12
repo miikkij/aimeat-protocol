@@ -6,6 +6,10 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   2026-11-12 — site-portal says how a visitor's language choice is kept (the standard header's
+ *     buttons, or one script on a page without it), tells the AI to split a page that holds
+ *     several languages in one file, and names the node's own HTML page and its languages in the
+ *     context (\`{{template_state}}\`, filled by SiteService.getPrompt). Additive.
  *   2026-11-12 — site-portal gains "A page in several languages": one whole page per language
  *     (\`templates\` in the bundle, \`?lang=\` on the template routes). Additive.
  *   2026-10-15 — Step 3 of the portal prompt: no nonce is fetched, and the token lasts the node's token lifetime, not 24 hours (feature-list audit 33).
@@ -71,6 +75,7 @@ Templates use \`{{type:key}}\` tags that resolve at serve-time:
 - Node Name: {{node_name}}
 - Base URL: {{node_url}}
 - Node Type: (auto-detected)
+- Own HTML page: {{template_state}}
 
 ## Output Format
 
@@ -109,6 +114,39 @@ The node sends each visitor the page for their language and writes the canonical
 \`hreflang\` links into every page, so leave those two out of the HTML. Ask the person which language
 is the default page: visitors with no version of their own, and search engines that name no
 language, get that one.
+
+Write one link per language on every page, the default page's language included:
+\`<a href="/?lang=fi">\`, \`<a href="/?lang=en">\`. An address with \`?lang=\` always gives that
+language's page.
+
+When the page has the standard AIMEAT header (the next section), its language buttons are the
+language choice. A press is remembered on the visitor's device, the node sends that language's page
+from then on, and the rest of the site follows. Write no language script of your own then.
+
+A page without the header keeps the visitor's choice with this script and nothing more. Without
+it a link still opens the right page, and the visitor's next visit to \`/\` follows their browser
+again:
+
+\`\`\`html
+<script>
+document.querySelectorAll('a[href^="/?lang="]').forEach(function (a) {
+  a.addEventListener('click', function () {
+    var keep = ';path=/;max-age=31536000;SameSite=Lax';
+    document.cookie = 'aimeat-lang=' + a.getAttribute('href').slice(-2) + keep;
+    document.cookie = 'aimeat-lang-chosen=1' + keep;
+  });
+});
+</script>
+\`\`\`
+
+Keep each language in its own document. If the person's page today holds several languages in one
+file and a script shows one of them, split it: one whole document per language, each with only its
+own language's text, with the script and the wrappers around each language removed.
+
+To change pages this node already has, ask the person for them first: in Admin → Portal, under
+their own HTML page, each page (the default page and every language version) can be downloaded.
+Send back every page you changed. A bundle with only \`templates\` adds or replaces language
+versions and leaves the default page as it is.
 
 ## Header & Navigation (IMPORTANT — ask first)
 
@@ -179,7 +217,7 @@ hex values stop matching the first time it does.
 - \`DELETE /v1/site/template\` — Revert to default portal (deletes the language versions too)
 - \`DELETE /v1/site/template?lang=<code>\` — Delete one language version
 - \`POST /v1/site/cache-invalidate\` — Force cache refresh after changes`,
-    variables: ['node_id', 'node_name', 'node_url'],
+    variables: ['node_id', 'node_name', 'node_url', 'template_state'],
     usedIn: ['/v1/site'],
   },
 

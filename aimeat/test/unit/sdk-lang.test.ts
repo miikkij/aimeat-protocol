@@ -7,24 +7,32 @@
  *   fallback. With a list a source counts only when it names a listed language; without one any
  *   source counts. Each case removes the source above it to show the next one answers.
  * @version-history
+ *   v1.2.0 — 2026-11-12 — The language of a page the node picked comes first, and writeLang sets
+ *     the pick mark the server's front page reads.
  *   v1.1.0 — 2026-10-31 — The node's own language (the prelude's defaultLocale) after the cookie and
  *     before the browser.
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M7).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LANG_KEY, readLang, pageLang, readLocales, storedLang, writeLang } from '../../src/static/sdk-libs/_core/lang.js';
+import { LANG_KEY, LANG_CHOSEN_KEY, readLang, pageLang, readLocales, servedPageLang, storedLang, writeLang } from '../../src/static/sdk-libs/_core/lang.js';
+import { pickedLocale } from '../../src/i18n.js';
 
 const g = globalThis as any;
 const saved: Record<string, any> = {};
 
 /** The page sources the resolver reads: address, storage, cookie, browser, and the locales meta. */
-function page(opts: { search?: string; stored?: string; cookie?: string; navigator?: string; locales?: string; blocked?: boolean }) {
+function page(opts: { search?: string; stored?: string; cookie?: string; navigator?: string; locales?: string; served?: string; blocked?: boolean }) {
   const store = new Map<string, string>();
   if (opts.stored) store.set('aimeat-lang', opts.stored);
   const meta = opts.locales == null ? null : { content: opts.locales };
+  const servedMeta = opts.served == null ? null : { content: opts.served };
+  /** Every cookie the code wrote, in order; reading `cookie` gives the page's own string. */
+  const written: string[] = [];
   const doc = {
-    cookie: opts.cookie ?? '',
-    querySelector: (sel: string) => (sel.includes('aimeat-locales') ? meta : null),
+    written,
+    get cookie() { return opts.cookie ?? ''; },
+    set cookie(v: string) { written.push(v); },
+    querySelector: (sel: string) => (sel.includes('aimeat-locales') ? meta : sel.includes('aimeat-page-lang') ? servedMeta : null),
   };
   g.document = doc;
   g.localStorage = opts.blocked
@@ -157,11 +165,46 @@ describe('readLocales, storedLang and writeLang', () => {
     expect(storedLang()).toBeNull();
   });
 
-  it('writes the stored key and the cookie together', () => {
+  it('writes the stored key, the cookie and the pick mark together', () => {
     const { store, doc } = page({});
     writeLang('es');
     expect(store.get(LANG_KEY)).toBe('es');
-    expect(doc.cookie).toBe('aimeat-lang=es;path=/;max-age=31536000;SameSite=Lax');
+    // The mark is what the server's front page asks for (src/i18n.ts pickedLocale): without it a
+    // press on the header's language button was not followed.
+    expect(store.get(LANG_CHOSEN_KEY)).toBe('1');
+    expect(doc.written).toEqual([
+      'aimeat-lang=es;path=/;max-age=31536000;SameSite=Lax',
+      'aimeat-lang-chosen=1;path=/;max-age=31536000;SameSite=Lax',
+    ]);
     expect(readLang(['en', 'es'])).toBe('es');
+  });
+
+  it('still writes both cookies when storage is blocked', () => {
+    const { doc } = page({ blocked: true });
+    writeLang('fi');
+    expect(doc.written).toHaveLength(2);
+    expect(pickedLocale(doc.written.map(c => c.split(';')[0]).join('; '))).toBe('fi');
+  });
+});
+
+describe('a page the node picked by language (meta aimeat-page-lang)', () => {
+  it('is the first source: the libraries speak the language of the page they are on', () => {
+    page({ ...ALL, served: 'fi' });
+    expect(servedPageLang()).toBe('fi');
+    expect(readLang(['en', 'fi', 'es'])).toBe('fi');
+    expect(readLang()).toBe('fi');
+  });
+
+  it('is passed over when the library does not carry that language', () => {
+    page({ search: '', stored: 'es', served: 'de' });
+    expect(readLang(['en', 'fi', 'es'])).toBe('es');
+  });
+
+  it('is absent on every other page, and a malformed value counts as absent', () => {
+    page({ stored: 'fi' });
+    expect(servedPageLang()).toBeNull();
+    page({ stored: 'fi', served: 'english' });
+    expect(servedPageLang()).toBeNull();
+    expect(readLang(['en', 'fi'])).toBe('fi');
   });
 });

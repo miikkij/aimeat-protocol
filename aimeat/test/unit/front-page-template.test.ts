@@ -28,6 +28,7 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { bootstrapRouter } from '../../src/routes/bootstrap.js';
 import { SiteService } from '../../src/services/site.js';
+import { seedSystemPrompts } from '../../src/services/prompt-seeder.js';
 
 let storage: Storage;
 let config: AimeatConfig;
@@ -60,6 +61,8 @@ beforeAll(async () => {
         seoOgImage: '/og-image.png',
     };
     site = new SiteService(config, storage);
+    // The AI prompt (site-portal) is read from storage, as on a node that has started once.
+    await seedSystemPrompts(storage);
     const app = express();
     app.use(bootstrapRouter(config, storage, undefined, site));
     server = http.createServer(app);
@@ -179,6 +182,9 @@ describe('the operator template in several languages', () => {
         expect(res.headers.get('vary') ?? '').not.toMatch(/Accept-Language/i);
         expect(res.headers.get('content-language')).toBe('fi');
         expect(head).toContain('"inLanguage":"fi"');
+        // No page was picked, so the libraries on it follow the reader's own choice as elsewhere.
+        expect(head).not.toContain('aimeat-page-lang');
+        expect(await site.getPrompt()).toContain('- Own HTML page: yes; default page in "fi"; no language versions');
     });
 
     it('serves each reader one language, with one h1 and the address of that language', async () => {
@@ -211,6 +217,13 @@ describe('the operator template in several languages', () => {
             expect(count(reply.head, /hreflang=/g)).toBe(4);
             expect(count(reply.head, /rel="canonical"/g)).toBe(1);
         }
+
+        // Each page names the language the node picked, which the served libraries on it read
+        // first (_core/lang.js): the header on the English page speaks English.
+        expect(en.head).toContain('<meta name="aimeat-page-lang" content="en">');
+        expect(fi.head).toContain('<meta name="aimeat-page-lang" content="fi">');
+        expect(es.head).toContain('<meta name="aimeat-page-lang" content="es">');
+        expect(await site.getPrompt()).toContain('- Own HTML page: yes; default page in "fi"; language versions: en, es');
 
         // Finnish anywhere in the browser's list is the default page, at the root address.
         expect(fi.html).toContain('<h1>Leipää perjantaisin</h1>');

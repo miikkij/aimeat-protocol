@@ -377,7 +377,8 @@ const OWN_HEAD_TAGS: ReadonlyArray<readonly ['meta' | 'link', string, string, st
  * `languages` describes a front page stored as one page per language (services/site.ts): the
  * language of this page, its own address when it is a language version, and the hreflang set. The
  * address becomes the canonical link, og:url and the WebPage url unless the template states a
- * canonical link; the hreflang links are written unless the template states any itself.
+ * canonical link; the hreflang links are written unless the template states any itself. A page of
+ * such a front page also names its language in `<meta name="aimeat-page-lang">`.
  */
 export function injectTemplatePageHead(
   html: string,
@@ -451,6 +452,15 @@ export function injectTemplatePageHead(
     const links = languages.alternates
       .map(a => `<link rel="alternate" hreflang="${esc(a.hreflang)}" href="${esc(a.href)}">`).join('\n');
     out = beforeHeadEnd(out, links);
+  }
+
+  // The language of the page the node picked, for the served libraries on it (the drop-in header,
+  // the sign-in dialog): _core/lang.js reads it first, so they speak the language of the text
+  // around them. Written only when the front page has language versions; a page in one language
+  // was not picked, and its libraries follow the reader's own choice as on any other page.
+  const statesPageLang = spans.meta.some(s => (s.attrs.name ?? '').trim().toLowerCase() === 'aimeat-page-lang');
+  if (languages?.lang && languages.alternates.length > 0 && !statesPageLang) {
+    out = beforeHeadEnd(out, `<meta name="aimeat-page-lang" content="${esc(languages.lang)}">`);
   }
   return out;
 }
