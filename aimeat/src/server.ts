@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-13 — openapiBodyGuard() is given hasSession (auth/middleware.ts): on an enforced route a
+ *     caller without a session is passed on to the route's sign-in check. No route is enforced yet.
  *   2026-11-04 — createServer registers the app for its port with services/request-injector.ts, so the
  *     node's requests to itself reach it in process (codebase analysis 2026-11-03, item D-j).
  *   2026-11-04 — createServer marks the process ready (services/node-lifecycle.ts) after the routes are mounted, for GET /v1/health/ready (HA stage 1).
@@ -71,7 +73,7 @@ import type { AimeatConfig } from './config.js';
 import type { StartSettingFallback } from './config-start-check.js';
 import type { Storage } from './storage/interface.js';
 import { corsMiddleware } from './middleware/cors.js';
-import { optionalAuth } from './auth/middleware.js';
+import { hasSession, optionalAuth } from './auth/middleware.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { inputJunkGuard } from './middleware/input-junk.js';
@@ -347,8 +349,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // The JSON body of a route openapi.yaml gives a body schema is compared with that schema. Every
   // route observes: a mismatch is logged and counted and the request goes on unchanged; a route in
   // data/openapi-body-modes.ts (none today) would be answered 400 (middleware/openapi-body-guard.ts).
-  // After the junk guard, so the body it reads is one the node keeps as sent.
-  app.use(openapiBodyGuard(config.nodeId));
+  // After the junk guard, so the body it reads is one the node keeps as sent. After optionalAuth(),
+  // whose reading of the session it takes: an enforced route refuses a body only from a caller with
+  // a session, and a caller without one goes on to the route's own sign-in check.
+  app.use(openapiBodyGuard(config.nodeId, { hasSession }));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency(config.nodeId));

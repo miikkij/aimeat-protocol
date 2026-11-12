@@ -11,6 +11,12 @@
  *     the route accepted the body (the contract disagrees with a working client) or refused it too.
  *   - enforce (the routes in data/openapi-body-modes.ts, none today): the same mismatch is answered
  *     400 VALIDATION_ERROR with the field named, as validateBody answers (models/validation-issues.ts).
+ *     Only a caller with a session is refused. The guard runs before the route, so before the route's
+ *     sign-in check: a caller without a session is passed on and gets the route's own answer (401),
+ *     as before the route was enforced, and the mismatch is observed. What a session is comes from
+ *     the option `hasSession`, which server.ts sets to the question requireAuth() asks
+ *     (auth/middleware.ts). A route that admits a caller without a session therefore has that
+ *     caller's body unchecked, and is not a candidate for the mode table.
  *
  *   WHY OBSERVE FIRST. 612 writing routes read their body without a schema, and the contract that
  *   describes most of them was never held against a real request (codebase analysis 2026-11-03,
@@ -35,6 +41,8 @@
  * @structure openapiBodyGuard(nodeId, opts) → middleware with observations() and ready()
  * @usage app.use(openapiBodyGuard(config.nodeId));
  * @version-history
+ *   v1.1.0 — 2026-11-13 — Option hasSession: an enforced route refuses a body only from a caller with
+ *     a session, so a caller without one keeps the route's 401 (structure programme 2026-11, unit 1).
  *   v1.0.0 — 2026-11-04 — Initial, observe mode only (codebase analysis 2026-11-03, item B5).
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -75,6 +83,14 @@ export interface OpenApiBodyGuardOptions {
      */
     loadNow?: boolean;
     logLinesPerMinute?: number;
+    /**
+     * Whether the request carries a session, as the routes' own sign-in check reads it
+     * (auth/middleware.ts hasSession, which server.ts passes). With it, an enforced route refuses a
+     * body only from a caller with a session: a caller without one is passed on, so the route's
+     * sign-in check answers it as before, and the mismatch is observed. Without it every caller of
+     * an enforced route is refused.
+     */
+    hasSession?: (req: Request) => boolean;
 }
 
 export interface OpenApiBodyGuard {
@@ -178,7 +194,9 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
                 if (validate && !validate(body)) issue = firstIssue(validate.errors);
             }
             if (!issue) return undefined;
-            if (enforced.has(op.key)) return issue;
+            // A caller without a session is the route's to answer (401), whatever its body: refusing
+            // the body first would change that answer to 400. Its mismatch is observed instead.
+            if (enforced.has(op.key) && (!opts.hasSession || opts.hasSession(req))) return issue;
             observe(op.route, issue, res);
         } catch (err) {
             logger.warn('openapi body guard: check failed; the request goes on unchecked', { error: String(err) });

@@ -16,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-11-13 — hasSession(req): the question requireAuth() asks of a request optionalAuth() has
+ *     read, exported so the request-body guard asks the same one (middleware/openapi-body-guard.ts).
+ *     requireAuth() calls it; its answers are unchanged.
  *   2026-11-08 — The refusal of a receiver key off its address says incoming webhook and API key
  *     (secaudit2026nov08b round 15b).
  *   2026-11-07 — optionalAuth recognises a receiver key by its prefix (aimeat_rcv_) and never turns it
@@ -424,6 +427,16 @@ export function optionalAuth(opts: OptionalAuthOptions = {}) {
 }
 
 /**
+ * The request carries a session: optionalAuth() ahead of it set an identity, and that identity is
+ * not the shared anonymous one. This is the question requireAuth() asks of a request optionalAuth()
+ * has read, so a middleware between the two (middleware/openapi-body-guard.ts) that asks it gets
+ * the answer the route's own sign-in check will give.
+ */
+export function hasSession(req: Request): boolean {
+  return req.auth !== undefined && !req.auth.anonymous;
+}
+
+/**
  * Require authentication. Returns 401 if no valid JWT.
  * If req.auth is already set (e.g. by optionalAuth() in anonymous mode), skips token check.
  */
@@ -433,7 +446,7 @@ export function requireAuth() {
     if (req.auth) {
       touchAgentLastSeen(req.auth);
       // SECURITY: Reject anonymous credentials — requireAuth() requires real authentication
-      if (req.auth.anonymous) {
+      if (!hasSession(req)) {
         deny401(req, res, 'This endpoint requires authentication');
         return;
       }
