@@ -221,12 +221,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's self-reported metric counters."
     },
-    "src/routes/agent-tasks/lifecycle.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them on task delete."
-    },
     "src/routes/agents/avatar.ts": {
       "reads": {
         "getMemory": 1
@@ -758,6 +752,12 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-10-11, the node's own read: the workplace record (reserved prefix) to update it, and a completed task's result records to change their visibility from private to the workspace the owner named. The value is written back untouched and shown to nobody here; who may read it afterwards is still decided per reader by the record's own classification label at read time."
+    },
+    "src/services/agents/remove-task.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them on task delete. Moved here from routes/agent-tasks/lifecycle.ts on 2026-11-12 unchanged."
     },
     "src/services/ai-jobs/result-precheck.ts": {
       "reads": {

@@ -13,6 +13,7 @@
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
  *   2026-11-13 -- e2e-capability-update-fields.ts joins the list (not the guard tier): PUT /v1/capabilities/{id} takes the fields a capability's writer may set and no other key, on both backends, and the webhook policy reads the normalised source.
+ *   2026-11-12 -- e2e-owner-ai-removal.ts joins the list (not the guard tier): the person's own AI removes an agent it registered, another agent's task and a skill.
  *   2026-11-12 -- e2e-app-access-request.ts joins the list (not the guard tier), and e2e-purpose-access-request.ts joins PURPOSE_SUITES: three consecutive 2/2 runs alone on each backend in the production-settings lane, and both tests red with the use disabled in source.
  *   2026-11-11 -- A Postgres run drops the lane and own-node databases it made at its end (scripts/lib/e2e-databases.ts).
  *   2026-11-10 -- e2e-live-catchup.ts joins the list (not the guard tier): a reopened live stream gets the domains that changed while it was away, and only its owner's.
@@ -1655,6 +1656,9 @@ const ALL_SUITES = [
     // The owner stops an agent and starts it again: new work waits and nobody can start it, a
     // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
     'test/e2e-agent-stop.ts',
+    // The person's own AI clears away what it set up: it reads and removes another agent's task,
+    // removes an agent it registered, and removes a skill; a schedule whose agent is gone fails.
+    'test/e2e-owner-ai-removal.ts',
     'test/e2e-connect-tunnel-records.ts',
     'test/e2e-agent-crew.ts',
     'test/e2e-connect-serve-loopback.ts',

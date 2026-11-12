@@ -12,11 +12,15 @@
  *   Tasks view would find. The chat is where the task was given, so the chat hears first; the
  *   notification (the bell and a web push, with a Start button that runs with the owner's own
  *   session) is for the moment the plan arrives and the person has gone.
- * @structure startAnswer() · waitReason() · notifyTaskWaiting()
+ * @structure startAnswer() · waitReason() · alreadyWaitingWithPlan() · notifyTaskWaiting()
  * @usage
  *   res.json(success(nodeId, { task, start: startAnswer(decision, task.status) }));
- *   void notifyTaskWaiting(storage, task, decision);
+ *   if (!alreadyWaitingWithPlan(taskBefore)) void notifyTaskWaiting(storage, task, decision);
  * @version-history
+ *   v1.4.0 — 2026-11-12 — alreadyWaitingWithPlan(): a plan proposed again on a task that still
+ *     waits is not announced again. On aimeat.io one waiting task was announced four times in 78
+ *     minutes, once per start of the agent's worker
+ *     (incident-a-task-that-waits-for-the-owner-s-ok-notifies-the-owner-agai-mwdwa9bo).
  *   v1.3.1 — 2026-10-28 — The `*` sentence is gone: `*` no longer holds a task, and the node no
  *     longer narrows an agent by itself (Jouni 2026-10-28).
  *   v1.3.0 — 2026-10-18 — The `*` sentence is for a narrowing that failed: a ready `*` agent is
@@ -86,6 +90,17 @@ export function startAnswer(agentName: string, decision: TaskStartDecision, stat
         // A task of a stopped agent is started by nobody: the agent is started, and the task follows.
         who_can_start: starts === 'now' || decision.waitsBecause === 'stopped' ? null : held ? 'owner_in_person' : 'owner_or_their_ai',
     };
+}
+
+/**
+ * Was the owner already told that this task waits? A queued task that carries a live plan got that
+ * plan from an earlier proposal, and that proposal is what told them. `task` is the record as it
+ * was BEFORE the proposal being applied. A task whose changes the owner asked for is
+ * `revision_requested`, and one the node started is `active`: the plan that sends either back to
+ * wait is news, and this answers false for both.
+ */
+export function alreadyWaitingWithPlan(task: Pick<AgentTaskRecord, 'status' | 'todos'>): boolean {
+    return task.status === 'queued' && (task.todos ?? []).some(t => t.status !== 'outdated');
 }
 
 /**

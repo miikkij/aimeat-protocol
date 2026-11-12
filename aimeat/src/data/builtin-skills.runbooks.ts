@@ -12,6 +12,10 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-12 -- manage-my-agents: another agent's waiting tasks (aimeat_task_list target_agent_name,
+ *     aimeat_task_delete), removing an agent the AI registered (aimeat_agent_delete), and which
+ *     permissions make a proposed agent's tasks wait for the owner
+ *     (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   2026-11-05 -- aimeat-node-operations: replacing the data key, with aimeat_admin_key_reencrypt
  *     (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-02 -- aimeat-node-operations: the go-live walk names auth.sign_in_lockout, off by default.
@@ -243,7 +247,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     \`schedule\` when it works on a clock); the owner approves it at the \`approval_url\` the answer
     gives (the proposal's own page, also in their open items), and approving creates it, on its
     clock when the proposal named one. This node makes and runs it, so an outside agent builder is
-    never the answer. When they have more than one connector (a home computer and a server, say),
+    never the answer. Ask only the permissions the work needs: one that can spend money, or send or
+    delete in their name, makes every task of the agent wait for their OK, on each scheduled run too,
+    and the proposal's \`warnings\` say so. To call app tools or capabilities they already accepted,
+    ask \`exchange:invoke\` or \`work:request\`, which hold nothing. When they have more than one connector (a home computer and a server, say),
     \`aimeat_connector_list\` names the computers and says which are connected; pass the one they
     mean as \`connector\`, and say its name to them, never its id. \`aimeat_connector_rename\` gives
     a computer the name they use for it. Each computer's \`programs\` says which programs it may
@@ -271,8 +278,14 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   and messages it is given wait until it is started. Its key and permissions stay, so a start is
   one call. \`aimeat_agents_list\` shows \`stopped\` for each agent, and a task created for a stopped
   agent answers \`waits_because: stopped\`: say that the agent is stopped and offer to start it. To
-  end one task that is running, the owner cancels that task on the agent's Tasks tab. To remove an
-  agent for good, that is a different act: the owner deletes it on the Agents page.
+  end one task that is running, the owner cancels that task on the agent's Tasks tab.
+- **See and clear what an agent has waiting:** \`aimeat_task_list\` with \`target_agent_name\` lists
+  another agent's tasks, and \`aimeat_task_delete\` removes one that is not running, when the owner
+  says so (both need \`agent:write\` beside the task permission).
+- **Remove an agent for good** is a different act from stopping it. \`aimeat_agent_delete\` removes
+  an agent you registered yourself (one you proposed and they approved), on their word: name the
+  agent and say what stops with it before you call it, and read them the answer (the schedules that
+  gave it work are turned off and listed). Any other agent the owner deletes on the Agents page.
 - **All permissions (\`*\`)** means the agent may do anything, and it keeps that: the owner gave it,
   and the node never narrows it by itself. Its tasks start as its own setting says. The node notes
   which permissions such an agent uses, and \`aimeat_agents_list\` shows them

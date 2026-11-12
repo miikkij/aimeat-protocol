@@ -23,6 +23,16 @@
  *   A field the door takes and no twin declares is REST-only. A door that takes record fields and has
  *   no twin at all is reported as a door, once, rather than as each of its fields.
  *
+ *   WRITING ROUTES THAT READ NO RECORD FIELD (v2.2, 2026-11-12). Until then a route was measured only
+ *   when its handler read a record field, so DELETE /v1/agents/:name, DELETE /v1/skills/:name and a
+ *   POST that stops something were never compared with any tool: on 2026-11-12 the owner's AI could
+ *   not remove an agent, delete another agent's task or delete a skill over MCP, and no gate said so.
+ *   Now every POST, PUT, PATCH or DELETE route that no handler makes a door gets its twins by the
+ *   same two rules, and one with none is a `no-twin-write` finding. These routes are a separate list
+ *   (`writes`), not part of `doors`, so the door counts and every existing finding key are what they
+ *   were. "Reads no record field" includes a handler that reads only a common key (`id`, `name`) or
+ *   a key no record declares.
+ *
  *   WHAT v1 MEASURED, AND WHY IT COULD NOT HAVE CAUGHT organism_id. v1 counted MENTIONS: a surface
  *   "reached" a field when any file of it named the field. A name-level join was tried in between on
  *   2026-09-14 and failed the same way: organism_id is a parameter of dozens of workspace tools, so
@@ -46,9 +56,11 @@
  *   - Twins, strict: a node tool that reaches the route's service one call deeper than the route
  *     does is not a twin, so the door is reported. That is the safe direction.
  * @structure recordFields(files) · canonical(name) · isPlumbing(callee) · pathMatches(toolPath, routePath) ·
- *   doorReach(fields, facts, declared)
+ *   WRITE_METHODS · doorReach(fields, facts, declared)
  * @usage const m = doorReach(recordFields(files), loadFacts({ build: true }).facts, declaredInputs);
  * @version-history
+ *   v2.2.0 — 2026-11-12 — A writing route that reads no record field is measured too: its twins by the
+ *     same two rules, `no-twin-write:<route>` when it has none, in `Measurement.writes` beside `doors`.
  *   v2.1.0 — 2026-09-14 — A service lookup (`require*`, `get*`, `resolve*` …) no longer pairs a route
  *     with a tool: requireOwnCompany had made aimeat_company_update the "twin" of the invoice routes,
  *     so its new organism_id parameter silently cleared two invoice findings. The callee id carries
@@ -175,10 +187,19 @@ export interface Door {
     reads: Map<string, { field: string; at: string }>;
 }
 
+/**
+ * The methods that change state. A writing route that reads no record field is still measured for
+ * twins; GET, and the ALL and USE registrations, are not.
+ */
+export const WRITE_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 export interface Finding {
-    /** The exemption key: `rest-only:<field> <route>` or `no-twin:<route>`. */
+    /**
+     * The exemption key: `rest-only:<field> <route>`, `no-twin:<route>`, or `no-twin-write:<route>`
+     * for a writing route that reads no record field and has no twin.
+     */
     key: string;
-    kind: 'rest-only' | 'no-twin';
+    kind: 'rest-only' | 'no-twin' | 'no-twin-write';
     route: string;
     /** For rest-only: the field as read, the record types declaring it, and where it is read. */
     field?: string;
@@ -190,7 +211,13 @@ export interface Finding {
 }
 
 export interface Measurement {
+    /** Routes whose handler reads at least one record field. */
     doors: Door[];
+    /**
+     * Writing routes (WRITE_METHODS) that no handler of theirs makes a door, one per route, each
+     * with an empty `reads`. Kept apart from `doors` so the door counts stay what they were.
+     */
+    writes: Door[];
     findings: Finding[];
     /** Reads the measurement cannot place, per file: key not nameable, or request not on a route. */
     blind: { unnamed: Map<string, string[]>; unrouted: Map<string, string[]> };
@@ -239,24 +266,8 @@ export function doorReach(
         .map(([callee, s]): [string, number] => [callee, s.size]).sort((a, b) => b[1] - a[1]);
     const genericSet = new Set(generic.map(([c]) => c));
 
-    // ── Doors ──
-    const readsOf = new Map<string, Map<string, { field: string; at: string }>>();
-    for (const r of facts.reads) {
-        if (r.naming === 'unnamed' || r.handler.startsWith('unrouted:')) continue;
-        const k = canonical(r.field);
-        if (!vocabulary.has(k)) continue;
-        const m = readsOf.get(r.handler) ?? new Map();
-        if (!m.has(k)) m.set(k, { field: r.field, at: `${r.file}:${r.line}` });
-        readsOf.set(r.handler, m);
-    }
-    const doors: Door[] = [];
-    const seenRoute = new Set<string>();
-    for (const route of [...facts.routes].sort((a, b) => `${a.path} ${a.method}`.localeCompare(`${b.path} ${b.method}`))) {
-        const reads = readsOf.get(route.handler);
-        if (!reads || reads.size === 0) continue;
-        const name = `${route.method} ${route.path}`;
-        if (seenRoute.has(`${name} ${route.handler}`)) continue;
-        seenRoute.add(`${name} ${route.handler}`);
+    // ── Twins: the two rules, one place, for doors and fieldless writes alike ──
+    const twinsOf = (route: Facts['routes'][number]): Set<string> => {
         const twins = new Set<string>();
         const shared = [...(callsOf.get(route.handler) ?? [])].filter(c => !genericSet.has(c) && !isPlumbing(c));
         for (const t of facts.tools) {
@@ -270,8 +281,47 @@ export function doorReach(
             if (!methodOk || !pathMatches(h.path, route.path)) continue;
             for (const tool of toolUnits.get(h.unit) ?? []) if (!tool.startsWith('mcp.node:')) twins.add(tool);
         }
-        doors.push({ route: name, handler: route.handler, twins: [...twins].sort(), reads });
+        return twins;
+    };
+
+    // ── Doors ──
+    const readsOf = new Map<string, Map<string, { field: string; at: string }>>();
+    for (const r of facts.reads) {
+        if (r.naming === 'unnamed' || r.handler.startsWith('unrouted:')) continue;
+        const k = canonical(r.field);
+        if (!vocabulary.has(k)) continue;
+        const m = readsOf.get(r.handler) ?? new Map();
+        if (!m.has(k)) m.set(k, { field: r.field, at: `${r.file}:${r.line}` });
+        readsOf.set(r.handler, m);
     }
+    const routes = [...facts.routes].sort((a, b) => `${a.path} ${a.method}`.localeCompare(`${b.path} ${b.method}`));
+    const doors: Door[] = [];
+    const seenRoute = new Set<string>();
+    for (const route of routes) {
+        const reads = readsOf.get(route.handler);
+        if (!reads || reads.size === 0) continue;
+        const name = `${route.method} ${route.path}`;
+        if (seenRoute.has(`${name} ${route.handler}`)) continue;
+        seenRoute.add(`${name} ${route.handler}`);
+        doors.push({ route: name, handler: route.handler, twins: [...twinsOf(route)].sort(), reads });
+    }
+
+    // ── Writing routes that read no record field (2026-11-12) ──
+    // A route already measured as a door, through any of its handlers, is left to the door. The
+    // rest are grouped by route, so a route registered with several handler functions is one entry
+    // whose twins are the union of each handler's.
+    const asDoor = new Set(doors.map(d => d.route));
+    const writeRows = new Map<string, Facts['routes'][number][]>();
+    for (const route of routes) {
+        if (!WRITE_METHODS.has(route.method)) continue;
+        const name = `${route.method} ${route.path}`;
+        if (asDoor.has(name)) continue;
+        writeRows.set(name, [...(writeRows.get(name) ?? []), route]);
+    }
+    const writes: Door[] = [...writeRows].map(([name, rows]) => ({
+        route: name, handler: rows[0].handler, reads: new Map(),
+        twins: [...new Set(rows.flatMap(r => [...twinsOf(r)]))].sort(),
+    }));
 
     // ── Findings ──
     const declaredOf = (twin: string): Set<string> => {
@@ -297,9 +347,14 @@ export function doorReach(
             });
         }
     }
+    for (const write of writes) {
+        if (write.twins.length === 0) {
+            findings.push({ key: `no-twin-write:${write.route}`, kind: 'no-twin-write', route: write.route });
+        }
+    }
     const byKey = new Map(findings.map(f => [f.key, f]));
     return {
-        doors, blind, generic,
+        doors, writes, blind, generic,
         findings: [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key)),
     };
 }

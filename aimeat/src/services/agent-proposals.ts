@@ -26,12 +26,14 @@
  *   (`uncoveredScopes`, the same helper the device-auth escalation check uses, so the two cannot
  *   disagree), and no proposal may exceed what this node allows at all. Neither is re-implemented
  *   here.
- * @structure AgentProposal · RunModeCorrection · proposalApprovalUrl() · proposalNextStep() · proposalRunModeFor() ·
+ * @structure AgentProposal · RunModeCorrection · heldTaskWarnings() · proposalApprovalUrl() · proposalNextStep() · proposalRunModeFor() ·
  *   proposalScopesFor() · proposerIsOwnerSession() · proposeAgent() · listProposals() · readProposal() ·
  *   recordProposalDefinition() · settleProposal()
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.12.0 — 2026-11-12 — A proposal's `warnings` name a permission that holds every task of the
+ *     agent for the owner's OK (heldTaskWarnings, code TASKS_WAIT_FOR_OWNER).
  *   v1.11.0 — 2026-11-11 — A proposal made from an app's bundled agent carries `source_app` (the app,
  *     the agent's name in it and the definition's hash). Only the node's own code sets it, through
  *     proposeAgent's fourth argument; a request body cannot. recordProposalDefinition() rewrites the
@@ -76,11 +78,30 @@ import { ownerDefaultIsNode } from './crew-menu.js';
 import { findConnector, listConnectors } from './connector-registry.js';
 import { logger } from '../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
+import { TASK_START_FLOOR } from './agent-task-rules.js';
 import { offerSignalError } from './agent-default-offer.js';
 import { browserDomainsError } from './crew-browser-domains.js';
 import { withInvitesSentence } from './agent-invites.js';
 import { isValidCron } from './schedule-gate.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
+
+/**
+ * The warning for a proposal whose permissions hold every task of the agent for the owner's OK
+ * (services/agent-task-rules.ts TASK_START_FLOOR). The proposer learns it before the owner
+ * approves, and can leave the permission out or say in the purpose that each task waits. Measured
+ * on aimeat.io on 2026-11-12: an agent proposed for a daily run with exchange:write, where
+ * exchange:invoke was enough for the app tools it calls, waited for the owner on every run.
+ */
+export function heldTaskWarnings(scopes: readonly string[]): CrewDefWarning[] {
+  const held = TASK_START_FLOOR.filter(f => scopes.includes(f.scope)).map(f => f.scope);
+  if (held.length === 0) return [];
+  return [{
+    code: 'TASKS_WAIT_FOR_OWNER',
+    message: `With ${held.join(', ')} every task of this agent waits for the owner's OK, on each run of a schedule too, because the agent could spend money, or send or delete in the owner's name. `
+      + 'Leave the permission out when the work does not need it: calling an app tool or a capability under what the owner already accepted needs exchange:invoke or work:request, and neither holds a task. '
+      + 'When the work does need it, say in the purpose that the owner starts each task.',
+  }];
+}
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
@@ -422,7 +443,7 @@ export async function proposeAgent(
     connector_name: connectorName,
     crew_def: input.crew_def ?? null,
     ...(schedule ? { schedule } : {}),
-    warnings: crewDefWarnings(input.crew_def),
+    warnings: [...crewDefWarnings(input.crew_def), ...heldTaskWarnings(scopes)],
     ...(stated?.sourceApp ? { source_app: stated.sourceApp } : {}),
     proposed_by: principal.sub,
     proposed_at: now,

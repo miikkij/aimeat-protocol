@@ -19,11 +19,17 @@
  *   the gate fails on a NEW one and the backlog is countable:
  *   - `rest-only:<field> <METHOD> <path>`: the door reads the field and no twin declares it.
  *   - `no-twin:<METHOD> <path>`: the door reads record fields and no agent tool does its job at all.
+ *   - `no-twin-write:<METHOD> <path>`: a POST, PUT, PATCH or DELETE route that reads no record field
+ *     (DELETE /v1/agents/:name) and no agent tool does its job. Until 2026-11-12 such a route was
+ *     never measured, which is how removing an agent, an agent's task or a skill had a REST route
+ *     and no MCP tool with no gate saying so.
  *   - `unnamed:<file>#<n>` and `unrouted:<file>#<n>`: reads the measurement cannot place (a key
  *     CodeQL cannot name; a request no route registration names). A file gaining one fails too,
  *     because a field read that way is a field this gate cannot see.
  *   An entry is either an ANSWER or the seeding's placeholder, `NOT YET REVIEWED`. Re-seeding
- *   forgives the whole backlog, so it is a decision.
+ *   forgives the whole backlog, so it is a decision. It keeps every entry already in the file as
+ *   written, writes the placeholder only for a key the file does not hold, and drops entries no
+ *   longer measured.
  *
  *   WHEN CODEQL IS NOT HERE. CI measures in its own step before check:fast and fails this gate if it
  *   cannot. On a workstation without the CLI the gate says NOT MEASURED, in those words, and under
@@ -37,6 +43,9 @@
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts          # report only, never fails
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts --seed   # rewrite the exemption file
  * @version-history
+ *   v2.2.0 — 2026-11-12 — `no-twin-write:` joins the ratchet, with its own report line. --seed keeps
+ *     every entry already in the file instead of rewriting all of them to the placeholder, which
+ *     would have erased the answered entries; a new key's placeholder carries the day it was seeded.
  *   v2.1.0 — 2026-09-24 — NOT MEASURED refuses under --strict (pnpm gate, CI) instead of passing, and
  *     names `pnpm codeql:install`. The pass was what let a session push over a finding only CI could
  *     see: eight red CI periods from 2026-09-16 to 2026-09-23, all of them field-reach findings.
@@ -66,9 +75,18 @@ function blindKeys(kind: 'unnamed' | 'unrouted', byFile: Map<string, string[]>):
 }
 
 function describe(f: Finding): string {
-    return f.kind === 'rest-only'
-        ? `the door reads ${f.field} (${f.at}; declared on ${f.records!.join(', ')}) and none of its twins declares it: ${f.twins!.join(', ')}`
-        : `the door reads record fields (${f.fields!.join(', ')}) and no agent tool does the same job`;
+    if (f.kind === 'rest-only') {
+        return `the door reads ${f.field} (${f.at}; declared on ${f.records!.join(', ')}) and none of its twins declares it: ${f.twins!.join(', ')}`;
+    }
+    return f.kind === 'no-twin'
+        ? `the door reads record fields (${f.fields!.join(', ')}) and no agent tool does the same job`
+        : 'the writing route reads no record field and no agent tool does the same job';
+}
+
+function readExemptions(): Record<string, string> {
+    return existsSync(EXEMPTIONS)
+        ? (JSON.parse(readFileSync(EXEMPTIONS, 'utf-8')) as ExemptionFile).exempt
+        : {};
 }
 
 function main(): void {
@@ -121,26 +139,35 @@ function main(): void {
     ];
 
     if (seed) {
+        // An entry already in the file keeps its text, answer or placeholder, and its place; only a
+        // key the file does not hold gets the placeholder, dated today, after the kept ones. Entries
+        // no longer measured are dropped. The kept entries go first in the file's own order, so a
+        // seed's diff shows what it added and dropped and nothing else.
+        const before = readExemptions();
+        const today = new Date().toISOString().slice(0, 10);
+        const measured = new Map(current);
         const exempt: Record<string, string> = {};
+        for (const key of Object.keys(before)) if (measured.has(key)) exempt[key] = before[key];
         for (const [key, why] of current) {
-            exempt[key] = `${PLACEHOLDER}. Seeded 2026-09-14: ${why}.`;
+            if (!(key in exempt)) exempt[key] = `${PLACEHOLDER}. Seeded ${today}: ${why}.`;
         }
         writeFileSync(EXEMPTIONS, JSON.stringify({
             note: 'REST doors against their agent twins, door by door (scripts/inventory/field-reach.ts). '
                 + '`rest-only:<field> <route>`: the route reads the record field and no twin tool declares it. '
                 + '`no-twin:<route>`: the route reads record fields and no agent tool does the same job. '
+                + '`no-twin-write:<route>`: a POST, PUT, PATCH or DELETE route that reads no record field, '
+                + 'and no agent tool does the same job. '
                 + '`unnamed:` and `unrouted:` hold, per file, the reads the measurement cannot place. Seeded so '
                 + `the gate fails only on a NEW entry. "${PLACEHOLDER}" is a question nobody has answered, `
                 + 'not a clearance; an answered entry says why only a person with a browser is meant to reach it.',
             exempt,
         } satisfies ExemptionFile, null, 2) + '\n');
-        console.log(`Seeded ${current.length} entries into ${relative(AIMEAT, EXEMPTIONS)}`);
+        const added = current.filter(([k]) => !before[k]).length;
+        console.log(`Seeded ${current.length} entries into ${relative(AIMEAT, EXEMPTIONS)} (${added} new, ${current.length - added} kept as written, ${Object.keys(before).filter(k => !exempt[k]).length} dropped)`);
         return;
     }
 
-    const exempt = existsSync(EXEMPTIONS)
-        ? (JSON.parse(readFileSync(EXEMPTIONS, 'utf-8')) as ExemptionFile).exempt
-        : {};
+    const exempt = readExemptions();
     const fresh = current.filter(([k]) => !exempt[k]);
     const currentKeys = new Set(current.map(([k]) => k));
     const stale = Object.keys(exempt).filter(k => !currentKeys.has(k));
@@ -154,6 +181,7 @@ function main(): void {
     console.log(`  of those, with an agent twin            ${String(m.doors.filter(d => d.twins.length).length).padStart(4)}`);
     console.log(`  fields a door takes and no twin does    ${String(count('rest-only:')).padStart(4)}`);
     console.log(`  doors with no agent twin                ${String(count('no-twin:')).padStart(4)}`);
+    console.log(`  writing routes with no agent tool       ${String(count('no-twin-write:')).padStart(4)}   (of ${m.writes.length} that read no record field)`);
     console.log(`  reads CodeQL could not name             ${String(count('unnamed:')).padStart(4)}`);
     console.log(`  reads on no known route                 ${String(count('unrouted:')).padStart(4)}`);
     console.log(`  exempt, not yet reviewed                ${String(unreviewed).padStart(4)}`);
@@ -167,7 +195,7 @@ function main(): void {
         console.log('');
         console.log('  A field a door takes and its agent twin does not is dropped in silence when an agent');
         console.log('  passes it: the call answers ok and the field is gone. Declare it on the twin and forward');
-        console.log('  it; give a door without a twin its tool; or add an entry to');
+        console.log('  it; give a door or a writing route without a twin its tool; or add an entry to');
         console.log(`  ${relative(AIMEAT, EXEMPTIONS)} saying why only a person may reach it.`);
         console.log('');
     }

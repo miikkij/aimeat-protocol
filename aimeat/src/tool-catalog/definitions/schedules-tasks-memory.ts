@@ -25,6 +25,8 @@
  *     starts carries, and coalesce.
  *   2026-10-12 — aimeat_task_request_changes declares connectorOnly: it is on both connector interfaces
  *     and not on the node MCP (V2_EXCLUDED), and it declared the node MCP.
+ *   2026-11-12 — aimeat_agent_delete, aimeat_task_delete and aimeat_task_list's target_agent_name
+ *     (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   2026-10-11 — aimeat_agent_workplace_set: where an agent's finished work goes.
  *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start, beside aimeat_agent_task_start_set.
  *   2026-10-06 — aimeat_memory_write carries the bounds the node's MCP wrote by hand (value, tags,
@@ -270,6 +272,7 @@ export const schedulesTasksMemoryTools = [
             status: { type: 'string', description: 'Optional task status filter.', zod: z.enum(['draft', 'queued', 'active', 'stalled', 'done', 'failed', 'declined']) },
             page: { type: 'number', description: 'Page number (default 1).' },
             per_page: { type: 'number', description: 'Results per page (default 20, max 100).' },
+            target_agent_name: { type: 'string', description: "Another agent of the same owner whose tasks to list instead of your own, when the person asks what that agent is working on or why it does nothing. Needs the permissions task:read and agent:write. Leave it out for your own tasks.", zod: z.string().min(1).max(200) },
         },
     },
     {
@@ -338,6 +341,18 @@ export const schedulesTasksMemoryTools = [
         input: { task_id: { type: 'string', required: true, description: 'The waiting task to start.' } },
     },
     {
+        name: 'aimeat_task_delete',
+        description: "Remove a task that is not running: one of your own, or one of another agent of the same owner when the person tells you to (\"get rid of that waiting task\", \"clear what the news agent has queued\"). Find the task with aimeat_task_list (target_agent_name for another agent's). The task and its event history are removed for good; what the agent already produced stays in its memory. A task of another agent needs the permissions task:write and agent:write. An ACTIVE task is refused with INVALID_STATE: a running task is paused by the person in their Tasks view, or it finishes, and it is removed after that. To refuse your own task and keep it in the list with your reason, use aimeat_task_decline.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Remove a Task', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        // Ends work that was queued: the word that creates and starts a task.
+        scope: 'task:write',
+        // On `agent`: the person's own AI clearing away work that waits, on their word.
+        surfaces: ['agent'],
+        input: { task_id: { type: 'string', required: true, description: 'The task to remove, from aimeat_task_list.', zod: z.string().min(1).max(256) } },
+    },
+    {
         name: 'aimeat_agent_scope_narrow',
         description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it only when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal) and told them what it takes away: everything the agent has not used so far. The node never makes this narrowing by itself; the agent keeps all permissions until the person decides. Refused when nothing it used is on record yet. Needs agent:permissions.",
         caller: 'agent',
@@ -383,6 +398,17 @@ export const schedulesTasksMemoryTools = [
         scope: 'agent:write',
         surfaces: ['agent'],
         input: { target_agent_name: { type: 'string', required: true, description: 'The agent to start (same owner as you, never yourself).' } },
+    },
+    {
+        name: 'aimeat_agent_delete',
+        description: "Remove an agent you registered yourself, when the person tells you to: an agent you proposed with aimeat_agent_propose and they approved, or one you set up for them. The agent is signed out first and then removed: its credentials stop working at once, its open connections close, and the schedules and saved workflows it made stop until a new agent of that name runs them (the answer lists them in standing_work). It cannot be taken back; to pause an agent, use aimeat_agent_stop. An agent somebody else registered is refused with ACCESS_DENIED: the person removes it on their Agents page (Profile, Agents), and you say so. Never for yourself. Name the agent and what stops with it, and let the person say yes, before you call this.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Remove an Agent', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        // Ends another principal: the word DELETE /v1/agents/:name asks of an agent caller.
+        scope: 'agent:delete',
+        surfaces: ['agent'],
+        input: { target_agent_name: { type: 'string', required: true, description: 'The agent to remove (same owner as you, registered by you, never yourself).', zod: z.string().min(1).max(200) } },
     },
     {
         name: 'aimeat_agent_workplace_set',

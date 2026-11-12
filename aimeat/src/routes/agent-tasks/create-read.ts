@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-11-12 — GET /v1/agents/:name/tasks admits another of the owner's agents holding
+ *     task:read and agent:write (mayManageSiblingTasks), which is what aimeat_task_list's
+ *     target_agent_name reads (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   v1.8.1 — 2026-10-16 — POST and GET /v1/agents/:name/tasks refuse an owner in person whose path names
  *     another account's agent by its whole GAII (mayActOnAgent); owner B could queue a task on A's
  *     agent and read its task list (QA audit S2-03, the class of S2-01).
@@ -39,11 +42,11 @@ import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
-import { isOwnerInPerson, mayActOnAgent } from '../../utils/gaii.js';
+import { isOwnerInPerson, mayActOnAgent, ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
 import { createTask } from '../../services/agent-task-write.js';
-import { mayLoosenStart } from '../../services/agent-task-rules.js';
+import { mayLoosenStart, mayManageSiblingTasks } from '../../services/agent-task-rules.js';
 import { startAnswer } from '../../services/task-start-notice.js';
 import { taskWithFileHandles } from '../../services/task-files.js';
 import { taskOutcome } from '../../services/task-outcome.js';
@@ -183,7 +186,15 @@ export function registerTaskCreateReadRoutes(
     // An H-2 app grant with task:read reads its OWN owner's tasks, so it takes the owner-scoped
     // path (listAgentTasksByOwner filters by the app's owner GHII — never another owner's tasks).
     const isAppReading = req.auth!.roles.includes('app') && tokenHasScope(req, 'task:read');
-    const actAsOwner = isOwnerSession || isAppReading;
+    // Another of the owner's agents holding task:read and agent:write reads a sibling's list (the
+    // person's own AI answering "what is that agent working on"; services/agent-task-rules.ts
+    // mayManageSiblingTasks). It takes the owner-scoped path too, fenced by the owner's GHII.
+    const agentGaii = resolveAgentGaii(req, agentName);
+    const isSiblingReading = !isOwnerSession && !isAppReading
+      && mayManageSiblingTasks(startCallerOf(req.auth!, resolve(req)), agentGaii, 'task:read');
+    const actAsOwner = isOwnerSession || isAppReading || isSiblingReading;
+    // The owner's GHII the owner-scoped read is fenced by: an agent's own identity is its GAII.
+    const ownerKey = isSiblingReading ? ownerGhiiOf(req.auth!.sub) : resolve(req);
 
     const status = req.query.status as string | undefined;
     const bucket = req.query.bucket as string | undefined;
@@ -199,9 +210,8 @@ export function registerTaskCreateReadRoutes(
       return;
     }
 
-    // Authorize + resolve the target agent. An agent reads only its own list: the resolved name must
-    // be its own identity, so the storage key is the resolved value on both branches.
-    const agentGaii = resolveAgentGaii(req, agentName);
+    // Authorize the target agent. An agent reads its own list (the resolved name must be its own
+    // identity), or a sibling's under the rule above.
     if (!actAsOwner && req.auth!.sub !== agentGaii) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agents can only access their own tasks'));
       return;
@@ -234,7 +244,7 @@ export function registerTaskCreateReadRoutes(
         return;
       }
       const r = actAsOwner
-        ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, status, page, perPage })
+        ? await storage.listAgentTasksByOwner(ownerKey, { agentGaii, status, page, perPage })
         : await storage.listAgentTasks(agentGaii, { status, page, perPage });
       res.json(success(config.nodeId, { tasks: r.tasks, total: r.total, counts: { recent: 0, keep: 0, archive: 0 }, page, per_page: perPage }));
       return;
@@ -245,7 +255,7 @@ export function registerTaskCreateReadRoutes(
     const all: AgentTaskRecord[] = [];
     for (let p = 1; ; p++) {
       const r = actAsOwner
-        ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, page: p, perPage: 200 })
+        ? await storage.listAgentTasksByOwner(ownerKey, { agentGaii, page: p, perPage: 200 })
         : await storage.listAgentTasks(agentGaii, { page: p, perPage: 200 });
       // The same rule as the status poll above: a stopped agent's own list carries no waiting task.
       all.push(...(stoppedSelf ? r.tasks.filter(t => t.status !== 'queued') : r.tasks));

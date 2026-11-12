@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-12 — aimeat_skill_delete: DELETE /v1/skills/:name had no tool, so an AI could publish a
+ *     skill and hide it and never remove it (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   2026-11-01 — aimeat_skill_list and aimeat_skill_get read the shared anonymous principal as a reader
  *     with no account, as GET /v1/skills and GET /v1/skills/:name do: no skill at 'members' is listed
  *     or returned to it, and an unscoped name is looked up in the node library only
@@ -65,7 +67,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import {
-  publishSkill, listSkills, listSkillLibrary, resolveSkillRef, setSkillVisibility,
+  publishSkill, listSkills, listSkillLibrary, resolveSkillRef, setSkillVisibility, deleteSkill,
   listSkillsByBinding, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
 import { readSkillFileInput } from '../services/skill-files.js';
@@ -380,6 +382,44 @@ export function registerSkillsTools(
             if (!summary) return err(`Skill not found: ${name}`);
             emitChange('skills');
             return ok({ updated: true, skill: summary, ...closedNodeWarnings(closed.warning) });
+        },
+    );
+
+    // ── aimeat_skill_delete: the same implementation as DELETE /v1/skills/:name (deleteSkill) ──
+    mcp.registerTool(
+        'aimeat_skill_delete',
+        {
+            description: descriptionFor('aimeat_skill_delete'),
+            inputSchema: zodShapeFor('aimeat_skill_delete'),
+            annotations: annotationsFor('aimeat_skill_delete'),
+        },
+        async ({ name, scope, organism_id, workspace_id }) => {
+            if (!ownerName) return toolError('UNAUTHORIZED', 'Could not resolve the calling agent\'s owner');
+            if (refusesAnonymous) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
+            const acc = await accessor();
+            const targetScope: SkillScope = scope === 'node' ? 'node' : scope === 'workspace' ? 'workspace' : 'user';
+            if (targetScope === 'node' && !acc.isOperator) {
+                return toolError('FORBIDDEN', `Node-scope skills are operator-managed. ${OPERATOR_AGENT_REFUSAL}`);
+            }
+            if (targetScope === 'workspace' && (!organism_id || !workspace_id)) {
+                return toolError('INVALID_INPUT', 'A workspace skill is named with organism_id and workspace_id beside its name.');
+            }
+            let deleted: boolean;
+            try {
+                // The owner comes from the session, never from the input: a user-scope skill under
+                // another name is not this principal's to remove.
+                deleted = await deleteSkill(storage, config, targetScope, name, {
+                    owner: ownerName,
+                    ...(targetScope === 'workspace' ? { org: organism_id, ws: workspace_id, accessor: acc } : {}),
+                });
+            } catch (e) {
+                // A workspace the agent's owner may not write, refused before any record goes.
+                if (e instanceof SkillAccessError) return withCaughtError(toolError(e.code, e.message), e);
+                throw e;
+            }
+            if (!deleted) return toolError('NOT_FOUND', `Skill not found: ${name}`);
+            emitChange('skills');
+            return ok({ deleted: true, name, scope: targetScope });
         },
     );
 }

@@ -10,8 +10,15 @@
  *   workspace tools take a parameter of that name. The case below keeps that condition
  *   (aimeat_workspace_read declares organism_id) and asserts the door join still reports the field
  *   on PUT /v1/companies/:id, which is Kalle's report.
+ *
+ *   The writing-route cases (2026-11-12) were run against the unchanged doorReach first: six of the
+ *   seven failed, because the function skipped every route that reads no record field (no
+ *   no-twin-write finding, no `writes` list). The seventh, a writing route that reads a field, pins
+ *   the behaviour that did not change and passed before and after.
  * @usage cd aimeat && pnpm exec vitest run test/unit/field-reach.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-12 — A writing route that reads no record field is measured: no-twin-write when
+ *     no agent tool does its job, by the same two twin rules; a GET is not measured.
  *   v1.1.0 — 2026-09-14 — A service lookup by name is plumbing (requireOwnCompany).
  *   v1.0.0 — 2026-09-14 — Written with field-reach.ts v2 (wish-kenttien-tavoitettavuus-portiksi).
  */
@@ -110,6 +117,101 @@ describe('field reach, door by door', () => {
     it('holds a read it cannot name as a blind spot of its file', () => {
         const m = doorReach(FIELDS, facts(), declared([]));
         expect([...m.blind.unnamed.keys()]).toEqual(['src/routes/organisms/intake.ts']);
+    });
+});
+
+// A writing route that reads no record field: before 2026-11-12 doorReach skipped it, so the owner's
+// AI could not remove an agent over MCP and no finding said so.
+const ROUTE_AGENT_DELETE = 'src/routes/agents.ts:500:40';
+const ROUTE_AGENT_GET = 'src/routes/agents.ts:100:40';
+const ROUTE_AGENT_STOP = 'src/routes/agents.ts:600:40';
+const TOOL_AGENT_REMOVE = 'src/mcp/agents.ts:300:9';
+const CLI_AGENT_REMOVE = 'src/cli/dispatch/agents.ts:10:5';
+const SERVICE_REMOVE = 'src/services/agents/agent-service.ts#200#removeAgent';
+
+function writeFacts(extra: { calls?: string[][]; tools?: string[][]; http?: string[][] } = {}) {
+    return factsFromCsv({
+        reads: csv('"kind","field","naming","file","line","handler"', [
+            ['body', 'stop_reason', 'constant', 'src/routes/agents.ts', '602', ROUTE_AGENT_STOP],
+        ]),
+        routes: csv('"handler","method","path"', [
+            [ROUTE_AGENT_DELETE, 'DELETE', '/v1/agents/:name'],
+            [ROUTE_AGENT_GET, 'GET', '/v1/agents/:name'],
+            [ROUTE_AGENT_STOP, 'POST', '/v1/agents/:name/stop'],
+        ]),
+        tools: csv('"surface","name","handler"', extra.tools ?? []),
+        calls: csv('"unitName","callee"', [
+            [ROUTE_AGENT_DELETE, SERVICE_REMOVE],
+            [ROUTE_AGENT_DELETE, 'storage.getAgent'],
+            ...(extra.calls ?? []),
+        ]),
+        http: csv('"unitName","method","path"', extra.http ?? []),
+    });
+}
+
+const WRITE_FIELDS = new Map([['stopReason', ['AgentRecord']]]);
+const noDeclared = () => ({
+    'mcp.node': new Map<string, string[]>(),
+    'mcp.connector': new Map<string, string[]>(),
+    'cli.dispatch': new Map<string, string[]>(),
+});
+
+describe('field reach, writing routes that read no record field', () => {
+    it('reports a DELETE route with no reads and no agent tool as no-twin-write, outside the doors', () => {
+        const m = doorReach(WRITE_FIELDS, writeFacts(), noDeclared());
+        const twinless = m.findings.filter(f => f.kind === 'no-twin-write');
+        expect(twinless.map(f => f.key)).toEqual(['no-twin-write:DELETE /v1/agents/:name']);
+        expect(m.doors.map(d => d.route)).not.toContain('DELETE /v1/agents/:name');
+        expect(m.writes.map(d => d.route)).toEqual(['DELETE /v1/agents/:name']);
+        expect(m.writes[0].reads.size).toBe(0);
+    });
+
+    it('takes a CLI tool whose REST call matches the method and path as its twin', () => {
+        const m = doorReach(WRITE_FIELDS, writeFacts({
+            tools: [['cli.dispatch', 'agent_remove', CLI_AGENT_REMOVE]],
+            http: [[CLI_AGENT_REMOVE, 'DELETE', '/v1/agents/*']],
+        }), noDeclared());
+        expect(m.findings.filter(f => f.kind === 'no-twin-write')).toEqual([]);
+        expect(m.writes.find(d => d.route === 'DELETE /v1/agents/:name')!.twins).toEqual(['cli.dispatch:agent_remove']);
+    });
+
+    it('does not take a CLI call with another method as a twin', () => {
+        const m = doorReach(WRITE_FIELDS, writeFacts({
+            tools: [['cli.dispatch', 'agent_show', CLI_AGENT_REMOVE]],
+            http: [[CLI_AGENT_REMOVE, 'GET', '/v1/agents/*']],
+        }), noDeclared());
+        expect(m.findings.map(f => f.key)).toContain('no-twin-write:DELETE /v1/agents/:name');
+    });
+
+    it('takes a node MCP tool that shares a non-plumbing function with the handler as its twin', () => {
+        const m = doorReach(WRITE_FIELDS, writeFacts({
+            tools: [['mcp.node', 'aimeat_agent_remove', TOOL_AGENT_REMOVE]],
+            calls: [[TOOL_AGENT_REMOVE, SERVICE_REMOVE]],
+        }), noDeclared());
+        expect(m.findings.filter(f => f.kind === 'no-twin-write')).toEqual([]);
+        expect(m.writes.find(d => d.route === 'DELETE /v1/agents/:name')!.twins).toEqual(['mcp.node:aimeat_agent_remove']);
+    });
+
+    it('does not take a node MCP tool that shares only a lookup with the handler as its twin', () => {
+        const m = doorReach(WRITE_FIELDS, writeFacts({
+            tools: [['mcp.node', 'aimeat_agent_get', TOOL_AGENT_REMOVE]],
+            calls: [[TOOL_AGENT_REMOVE, 'storage.getAgent']],
+        }), noDeclared());
+        expect(m.findings.map(f => f.key)).toContain('no-twin-write:DELETE /v1/agents/:name');
+    });
+
+    it('does not measure a GET route that reads nothing and has no twin', () => {
+        const m = doorReach(WRITE_FIELDS, writeFacts(), noDeclared());
+        expect(m.findings.map(f => f.route)).not.toContain('GET /v1/agents/:name');
+        expect(m.writes.map(d => d.route)).not.toContain('GET /v1/agents/:name');
+    });
+
+    it('keeps a writing route that reads a record field on no-twin, never no-twin-write', () => {
+        const m = doorReach(WRITE_FIELDS, writeFacts(), noDeclared());
+        const keys = m.findings.map(f => f.key);
+        expect(keys).toContain('no-twin:POST /v1/agents/:name/stop');
+        expect(keys).not.toContain('no-twin-write:POST /v1/agents/:name/stop');
+        expect(m.doors.map(d => d.route)).toEqual(['POST /v1/agents/:name/stop']);
     });
 });
 

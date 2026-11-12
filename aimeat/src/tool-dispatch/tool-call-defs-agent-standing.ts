@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The part of the shell / local-call dispatch that sets a standing fact about one of
- *   the owner's agents: whether it takes new work at all (stop, start), and where its finished
- *   work goes.
+ *   the owner's agents: whether it takes new work at all (stop, start), where its finished
+ *   work goes, and removing it or a task that waits.
  *
  *   Extracted from tool-call-defs-agent.ts when aimeat_agent_workplace_set pushed that file past
  *   the 800-line ceiling. A pure move for stop and start: same definitions, same handlers, spread
@@ -12,6 +12,8 @@
  * @structure agentStandingCliTools[] — the handler table, spread by tool-call-defs-agent.ts
  * @usage import { agentStandingCliTools } from './tool-call-defs-agent-standing.js';
  * @version-history
+ *   v1.1.0 — 2026-11-12 — aimeat_agent_delete → DELETE /v1/agents/:name and aimeat_task_delete →
+ *     DELETE /v1/agents/:name/tasks/:id (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   v1.0.0 — 2026-10-11 — Extracted from tool-call-defs-agent.ts (max-file-lines), with
  *     aimeat_agent_workplace_set → PUT or DELETE /v1/agents/:name/workplace.
  */
@@ -48,5 +50,18 @@ export const agentStandingCliTools: ConnectCliToolDefinition[] = [
             if (!organismId && !workspaceId) return client.delete(`/v1/agents/${name}/workplace`);
             return client.put(`/v1/agents/${name}/workplace`, { organism_id: organismId, workspace_id: workspaceId });
         },
+    },
+    {
+        name: 'aimeat_agent_delete',
+        description: "Remove an agent you registered yourself (one you proposed and the owner approved, or one you set up), on the owner's word. It is signed out and removed, what it made on a schedule stops, and it cannot be taken back; aimeat_agent_stop pauses instead. Never for yourself. Needs agent:delete.",
+        input: { target_agent_name: { type: 'string', required: true, description: 'The agent to remove (registered by you).' } },
+        handler: ({ client }, input) => client.delete(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}`),
+    },
+    {
+        name: 'aimeat_task_delete',
+        description: "Remove a task that is not running: your own, or one of another agent of the same owner on the owner's word (task:write and agent:write). The task and its event history go; what the agent produced stays. An active task is refused.",
+        input: { task_id: { type: 'string', required: true, description: 'The task to remove, from aimeat_task_list.' } },
+        // The route reads the task by id; the name segment is the caller's own and decides nothing.
+        handler: ({ client, agentPath }, input) => client.delete(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}`),
     },
 ];

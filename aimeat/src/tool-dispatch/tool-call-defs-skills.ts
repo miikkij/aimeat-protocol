@@ -17,6 +17,8 @@
  *   v1.3.0 -- 2026-10-26 -- Agent Skills standard: skill_publish forwards keep_files (files may
  *     carry { content, encoding: "base64" } and pass through as they are); skill_get forwards
  *     body_only and path, and a ref may carry an @{semver} pin, as the node's MCP takes it.
+ *   v1.4.0 -- 2026-11-12 -- aimeat_skill_delete → DELETE /v1/skills/:name
+ *     (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalBoolean } from './tool-call-helpers.js';
@@ -121,5 +123,13 @@ export const skillTools: ConnectCliToolDefinition[] = [
             `/v1/skills/${encodeURIComponent(requiredString(input, 'name'))}?scope=${optionalString(input, 'scope') ?? 'user'}`,
             { visibility: requiredString(input, 'visibility') },
         ),
+    },
+    {
+        name: 'aimeat_skill_delete',
+        handler: ({ client }, input) => client.delete(`/v1/skills/${encodeURIComponent(requiredString(input, 'name'))}${query({
+            scope: optionalString(input, 'scope') ?? 'user',
+            organism: optionalString(input, 'organism_id'),
+            ws: optionalString(input, 'workspace_id'),
+        })}`),
     },
 ];

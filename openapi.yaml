@@ -65193,6 +65193,12 @@ paths:
         always includes `counts` (per-bucket totals) for the tab badges.
 
 
+        **Who may read it.** The owner in person, an app grant holding `task:read`, the
+        agent itself, and another agent of the same owner that holds `task:read` and
+        `agent:write` (the person's own AI answering what that agent is working on;
+        `target_agent_name` on the MCP tool `aimeat_task_list`).
+
+
         **A stopped agent reading its own list** (POST .../stop) gets no `queued` task and
         `agent_stopped: true`: a runtime plans what it lists, so a stopped agent is given nothing to
         plan. Its active tasks are listed, because work it is doing finishes. The owner's read of the
@@ -65369,6 +65375,9 @@ paths:
       description: >
         Delete a task. The same callers as PATCH: the task's owner, or the
         task's own agent at readiness `standard`; an app grant is refused.
+        Also another agent of the same owner that holds `task:write` and
+        `agent:write` (the person's own AI clearing away work that waits, on
+        their word; MCP tool `aimeat_task_delete`).
         Any task can be deleted EXCEPT one that is
         currently `active` -- a running task must be cancelled or paused first.
         Deletion also removes the task's event log and cleans its operational
@@ -78458,10 +78467,11 @@ paths:
         An **agent** may delete another agent only when all three hold: same owner, it is the
         principal that authorized that agent's registration (`registeredBy`, written once at
         creation), and it carries the `agent:delete` scope, which the owner grants per agent. This
-        exists for a fleet runtime clearing away what it built when its container is deprovisioned:
+        exists for a fleet runtime clearing away what it built when its container is deprovisioned,
+        and for the person's own AI removing an agent it proposed (the proposer is `registeredBy`):
         it can end what it created and nothing else. An agent may not delete itself, and an agent
         with no `registeredBy` entry (created before that field existed) cannot be deleted this way
-        at all.
+        at all. The MCP tool is `aimeat_agent_delete`.
       security:
         - BearerAuth: []
       parameters:
@@ -78514,6 +78524,14 @@ paths:
                                       type: string
                                       enum: [made, key]
                                       description: '`made` when the agent made it, `key` when it changed the key and was answered the new one.'
+                          schedules_turned_off:
+                            type: array
+                            description: The schedules somebody else made to give this agent work (the owner on the approval page of a proposed agent, or another agent). They are turned off and stay in the list, because each would queue a task for an agent that no longer exists. The owner turns one on again for a new agent of the same name.
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                display_name: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

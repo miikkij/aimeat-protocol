@@ -513,19 +513,23 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_task_list',
-        description: 'List tasks for the connected agent.',
+        description: 'List tasks for the connected agent, or with target_agent_name for another agent of the same owner (task:read and agent:write).',
         input: {
             status: { type: 'string', description: 'Optional task status filter.' },
             page: { type: 'number', description: 'Page number (default 1).' },
             per_page: { type: 'number', description: 'Results per page (default 20, max 100).' },
+            target_agent_name: { type: 'string', description: 'Another agent of the same owner whose tasks to list instead of your own.' },
         },
         // Without page/per_page a fleet with more than one page of history could not reach the rest
         // of it from this door at all: the first 20 were the only 20 that existed.
-        handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/tasks${query({
-            status: optionalString(input, 'status'),
-            page: optionalNumber(input, 'page'),
-            per_page: optionalNumber(input, 'per_page'),
-        })}`),
+        handler: ({ client, agentPath }, input) => {
+            const target = optionalString(input, 'target_agent_name');
+            return client.get(`/v1/agents/${target ? encodeURIComponent(target) : agentPath}/tasks${query({
+                status: optionalString(input, 'status'),
+                page: optionalNumber(input, 'page'),
+                per_page: optionalNumber(input, 'per_page'),
+            })}`);
+        },
     },
     {
         name: 'aimeat_task_create',

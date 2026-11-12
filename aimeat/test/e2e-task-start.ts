@@ -200,6 +200,31 @@ await test('2a. A plan on a waiting task notifies the owner, with a Start button
   assert(go.status === 200 && go.body.data.task.status === 'active', `button press ${go.status}`);
 });
 
+await test('2b. A plan proposed again on a task that still waits tells the owner once; the plan after requested changes tells them again', async () => {
+  const r = await createTask(owner.token, 'worker', 'Plan twice');
+  const id = r.body.data.task.id;
+  const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
+  const countAfter = async (want: number) => {
+    let notices: any[] = [];
+    for (let i = 0; i < 10 && notices.length < want; i++) { notices = await noticesFor(owner.token, id); if (notices.length < want) await wait(100); }
+    return notices.length;
+  };
+  await propose(worker, id, [{ title: 'First wording' }, { title: 'Report' }]);
+  assert(await countAfter(1) === 1, 'the first plan tells the owner');
+  // A runtime that plans every queued task it lists proposes again at each of its starts, in
+  // other words each time. The task waited before and waits still: there is nothing new to say.
+  const again = await propose(worker, id, [{ title: 'Second wording' }, { title: 'Report' }, { title: 'One more step' }]);
+  assert(again.status === 200 && again.body.data.task.status === 'queued', `second proposal ${again.status}: ${again.body?.data?.task?.status}`);
+  assert((again.body.data.task.todos ?? []).filter((t: any) => t.status === 'pending').length === 3, 'the second plan replaced the first');
+  await wait(500);
+  const afterSecond = (await noticesFor(owner.token, id)).length;
+  assert(afterSecond === 1, `still one notice after the plan was proposed again, got ${afterSecond}`);
+  const rc = await json(`/v1/agents/worker/tasks/${id}/request-changes`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ message: 'Shorter, please.' }) });
+  assert(rc.status === 200 && rc.body.data.task.status === 'revision_requested', `request changes ${rc.status}`);
+  await propose(worker, id, [{ title: 'Short plan' }]);
+  assert(await countAfter(2) === 2, 'the plan that answers the requested changes tells the owner');
+});
+
 console.log('\n3. The person\'s own AI starts a task on their word');
 await test('3a. The chat AI starts a task that waits only because of the setting', async () => {
   const r = await createTask(owner.token, 'worker', 'Go ahead');

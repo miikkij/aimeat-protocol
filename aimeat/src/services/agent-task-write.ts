@@ -44,6 +44,8 @@
  * @version-history
  *   2026-11-13 — commissionFingerprint and isUniqueViolation come from services/agent-tasks/commission-dedupe.ts,
  *     not from a route file (structure programme 2026-11, unit 4).
+ *   2026-11-12 — applyProposedPlan tells the owner once that a task waits: a plan proposed again on a
+ *     task that already waited with a plan sends no second notice (task-start-notice.ts).
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-10-28 — createTask and applyProposedPlan decide on the agent record as it is: the node no
@@ -76,7 +78,7 @@ import {
     resolveAutoActivation, canProposeTodos, todoProposeRefusal, statusAfterProposal,
     decideTaskStart, taskWakeId, autoStartEvent, startedOnItsOwn, TASK_EFFECTS, type TaskStartDecision, type TaskEffect,
 } from './agent-task-rules.js';
-import { notifyTaskWaiting } from './task-start-notice.js';
+import { notifyTaskWaiting, alreadyWaitingWithPlan } from './task-start-notice.js';
 import { commissionFingerprint, isUniqueViolation } from './agent-tasks/commission-dedupe.js';
 import { resumeIfStalled } from './task-resume.js';
 import { resolveTaskFileInputs } from './task-files.js';
@@ -509,7 +511,12 @@ export async function applyProposedPlan(
     // An owner who wrote the plan themselves is not told about it. Neither is the owner of a stopped
     // agent: the notice offers a Start button for the task, and a stopped agent's task does not
     // start until the agent does, so the button would answer AGENT_STOPPED.
-    if (waits && updated && actor !== task.ownerGaii && decision?.waitsBecause !== 'stopped') void notifyTaskWaiting(storage, updated, decision);
+    // And the owner is told ONCE that a task waits. A runtime plans every queued task it lists, so a
+    // task that waits for the owner gets its plan proposed again each time the agent's worker
+    // starts; the task waited before that proposal and waits after it (alreadyWaitingWithPlan).
+    if (waits && updated && actor !== task.ownerGaii && decision?.waitsBecause !== 'stopped' && !alreadyWaitingWithPlan(task)) {
+        void notifyTaskWaiting(storage, updated, decision);
+    }
 
     deps.webhook?.dispatchWebhookEvent(task.agentGaii, 'task.updated', {
         task_id: task.id,

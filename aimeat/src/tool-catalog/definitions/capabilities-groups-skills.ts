@@ -20,6 +20,8 @@
  *   2026-10-26 — Agent Skills standard: aimeat_skill_publish takes any file of the skill folder,
  *     a binary file as { content, encoding: "base64" }, and keep_files, and says a new skill must
  *     follow the standard (NOT_STANDARD); aimeat_skill_get takes body_only and path.
+ *   2026-11-12 — aimeat_skill_delete: the tool for DELETE /v1/skills/:name, which no AI could call
+ *     (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take visibility `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9).
  *   2026-10-17 — aimeat_skill_publish's description: a SKILL.md description with a colon is folded or quoted, or BAD_YAML (pitfall-list round).
@@ -765,6 +767,22 @@ export const capabilitiesGroupsSkillsTools = [
             name: { type: 'string', required: true, description: 'The skill name (the bare name from its frontmatter).' },
             visibility: { type: 'string', required: true, description: 'Who may read it from now on: owner, members, public, or organism:<organism id> (user scope only: the active members of one organisation your owner is a member of).', zod: z.union([z.enum(['owner', 'members', 'public']), organismAudienceInput]) },
             scope: { type: 'string', enum: ['user', 'node'], description: 'Which registry the skill is in (default user, your owner\'s own).' },
+        },
+    },
+    {
+        name: 'aimeat_skill_delete',
+        description: 'Remove a skill from the registry, when the person tells you to: one of your owner\'s own user-scope skills (the default), a workspace skill of a workspace your owner may write (scope workspace with organism_id and workspace_id), or a node-scope skill when you act for an operator. The skill, its files and its kept versions are removed and it cannot be taken back; an agent or an app that still names it finds nothing. To hide a skill and keep it, use aimeat_skill_update with visibility owner. Name the skill and let the person say yes before you call this.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Remove a Skill', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        // The word DELETE /v1/skills/:name asks.
+        scope: 'memory:write',
+        surfaces: ['appdev', 'agent', 'service'],
+        input: {
+            name: { type: 'string', required: true, description: 'The skill name (the bare name from its frontmatter).', zod: z.string().min(1).max(200) },
+            scope: { type: 'string', enum: ['user', 'node', 'workspace'], description: 'Which registry the skill is in (default user, your owner\'s own).' },
+            organism_id: { type: 'string', description: 'Workspace scope: the organism id.', zod: z.string().min(1).max(256) },
+            workspace_id: { type: 'string', description: 'Workspace scope: the workspace id.', zod: z.string().min(1).max(256) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

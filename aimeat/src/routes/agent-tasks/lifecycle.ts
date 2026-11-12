@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-12 — DELETE /v1/agents/:name/tasks/:id runs services/agents/remove-task.ts, which also admits
+ *     another of the owner's agents holding task:write and agent:write, and which aimeat_task_delete runs.
  *   2026-11-05 — DELETE /v1/agents/:name/tasks/:id admits the callers PATCH admits: the task's owner,
  *     or the task's own agent at readiness 'standard', which may now delete its task when it is not
  *     active (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
@@ -50,6 +52,7 @@ import {
   resolveAutoActivation, autoStartEvent, decideTaskStart, taskWakeId,
 } from '../../services/agent-task-rules.js';
 import { startWaitingTask } from '../../services/task-start-op.js';
+import { removeTask } from '../../services/agents/remove-task.js';
 import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
@@ -180,9 +183,10 @@ export function registerTaskLifecycleRoutes(
 
   /* ── DELETE /v1/agents/:name/tasks/:id -- Delete a task + clean its traces ──
    *
-   * WHO. As PATCH above: the owner of the task, or the task's own agent at readiness 'standard'
-   * (canAccessTask); never an app grant. It was the owner only until 2026-11-05, when Jouni ruled that
-   * the looser of a path's verbs decides (codebase analysis 2026-11-03, decision 13a).
+   * WHO. As PATCH above: the owner of the task, or the task's own agent at readiness 'standard';
+   * never an app grant. It was the owner only until 2026-11-05, when Jouni ruled that
+   * the looser of a path's verbs decides (codebase analysis 2026-11-03, decision 13a). And another
+   * of the owner's agents holding task:write and agent:write (services/agents/remove-task.ts).
    * Deletable in any state EXCEPT 'active' -- a running task must be
    * cancelled or paused first so we don't orphan a live runner mid-execution.
    * Everything else (draft/queued/revision_requested/paused/stalled/done/failed)
@@ -196,48 +200,19 @@ export function registerTaskLifecycleRoutes(
    * The agent's actual deliverable/output memory is intentionally preserved.
    */
   router.delete('/v1/agents/:name/tasks/:id', requireAuth(), requireReadiness('standard', config, storage), async (req, res) => {
-    const id = req.params.id as string;
-    const agentName = req.params.name as string;
-
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    // Who may, the active-task refusal and the trace cleanup are services/agents/remove-task.ts, shared
+    // with aimeat_task_delete. Since 2026-11-12 another of the owner's agents holding task:write and
+    // agent:write removes a sibling's task too (the person's own AI, on their word).
+    const out = await removeTask({ storage, config }, startCallerOf(req.auth!, resolve(req)), req.auth!.owner as string, req.params.id as string);
+    if (!out.ok) {
+      if (out.code === 'FORBIDDEN') {
+        res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
+        return;
+      }
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-
-    if (!canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
-
-    if (task.status === 'active') {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        'Active tasks cannot be deleted -- cancel or pause the task first, then delete it'));
-      return;
-    }
-
-    const deleted = await storage.deleteAgentTask(id);
-    if (!deleted) {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        'Task could not be deleted (it may have just become active)'));
-      return;
-    }
-
-    // Clean the task's operational memory traces so a leftover doesn't confuse
-    // the runner or the per-task memory view. Best-effort: a cleanup failure
-    // must not fail the delete (the task itself is already gone).
-    try {
-      const livePrefix = `agents.${agentName}.tasks.${id}.`;
-      const liveEntries = await storage.listMemory(task.agentGaii, { prefix: livePrefix });
-      for (const m of liveEntries) await storage.deleteMemory(task.agentGaii, m.key);
-    } catch (err) { logger.warn('DELETE /v1/agents/:name/tasks/:id: best-effort trace cleanup', { error: String(err) }); }
-    try {
-      await storage.deleteMemory(task.ownerGaii, `agents.cancel.task.${id}`);
-    } catch (err) { logger.warn('DELETE /v1/agents/:name/tasks/:id: best-effort trace cleanup', { error: String(err) }); }
-
     res.json(success(config.nodeId, { deleted: true }));
-    emitChange('agent-tasks', resolve(req));
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('DELETE /v1/agents/:name/tasks/:id: MCP not connected', { error: String(err) }); }
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/queue -- Release a draft to the agent (draft -> queued) ──

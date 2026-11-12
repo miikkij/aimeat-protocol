@@ -11,6 +11,10 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-11-12 — aimeat_agent_delete (services/agents/remove-agent.ts), aimeat_task_delete
+ *     (services/agents/remove-task.ts) and aimeat_task_list's target_agent_name: the person's own AI
+ *     removes an agent it registered and reads or removes another agent's task
+ *     (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   2026-10-11 — aimeat_agent_workplace_set (services/agent-workplace.ts); aimeat_task_get's outcome
  *     says which workspaces the result is shared with.
  *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start (services/agent-stop.ts).
@@ -90,8 +94,12 @@ import { readerForAgent } from '../services/classification/reader.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
 import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent-task-write.js';
 import { mayLoosenStart, type StartCaller } from '../services/agent-task-rules.js';
+import { listSiblingTasks } from '../services/agents/sibling-tasks.js';
 import { startAnswer } from '../services/task-start-notice.js';
 import { startWaitingTask } from '../services/task-start-op.js';
+import { removeTask } from '../services/agents/remove-task.js';
+import { removeAgent } from '../services/agents/remove-agent.js';
+import { closeMcpSessionsForGaii } from './session-registry.js';
 import { setAgentTaskStart, taskStartView } from '../services/agent-task-start-write.js';
 import { narrowAgent } from '../services/scope-narrowing.js';
 import { setAgentStopped } from '../services/agent-stop.js';
@@ -237,11 +245,18 @@ export function registerAgentTaskTools(
             inputSchema: zodShapeFor('aimeat_task_list'),
             annotations: annotationsFor('aimeat_task_list'),
         },
-        async ({ status, page, per_page }) => {
+        async ({ status, page, per_page, target_agent_name }) => {
             const pageNum = Math.max(1, page ?? 1);
             const perPage = Math.min(100, Math.max(1, per_page ?? 20));
 
-            const result = await storage.listAgentTasks(agentGaii, {
+            // The tasks of ANOTHER agent of the same owner, for the person's own AI ("what is that
+            // agent working on"): task:read and agent:write, the rule GET /v1/agents/:name/tasks
+            // applies to a sibling (services/agents/sibling-tasks.ts).
+            const sibling = !!target_agent_name && buildGAII(target_agent_name, localAccountName(agentGaii), config.nodeId) !== agentGaii;
+            const ofSibling = sibling ? await listSiblingTasks({ storage, config }, startCaller, target_agent_name, { status, page: pageNum, perPage }) : null;
+            if (ofSibling && !ofSibling.ok) return { ...toolError(ofSibling.code, ofSibling.message) };
+
+            const result = ofSibling ?? await storage.listAgentTasks(agentGaii, {
                 status,
                 page: pageNum,
                 perPage,
@@ -251,6 +266,7 @@ export function registerAgentTaskTools(
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
+                        ...(sibling ? { agent: target_agent_name } : {}),
                         tasks: result.tasks.map(t => ({
                             id: t.id,
                             title: t.title,
@@ -419,6 +435,48 @@ export function registerAgentTaskTools(
             if (!out.ok) return { ...toolError(out.code, out.message) };
             emitResourceUpdated(out.task.agentGaii, `aimeat://agents/${out.task.agentGaii.split('#')[0]}/tasks`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ started: true, task_id: out.task.id, status: out.task.status }, null, 2) }] };
+        },
+    );
+
+    // ── Tool 3a-2: aimeat_task_delete ──
+    // Removing a task that is not active: the caller's own, or one of another agent of the same
+    // owner on the person's word (task:write and agent:write). Same implementation as
+    // DELETE /v1/agents/:name/tasks/:id (services/agents/remove-task.ts).
+    mcp.registerTool(
+        'aimeat_task_delete',
+        {
+            description: descriptionFor('aimeat_task_delete'),
+            inputSchema: zodShapeFor('aimeat_task_delete'),
+            annotations: annotationsFor('aimeat_task_delete'),
+        },
+        async ({ task_id }) => {
+            // The readiness bar DELETE /v1/agents/:name/tasks/:id asks of an agent.
+            const notReady = await readinessRefusal(storage, agentGaii, 'standard');
+            if (notReady) return { ...toolError('READINESS_INSUFFICIENT', notReady) };
+            const out = await removeTask({ storage, config }, startCaller, localAccountName(agentGaii), task_id);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({
+                deleted: true, task_id: out.task.id, title: out.task.title, agent: out.task.agentGaii.split('#')[0], status_was: out.task.status,
+            }, null, 2) }] };
+        },
+    );
+
+    // ── Tool 3a-3: aimeat_agent_delete ──
+    // Removing an agent this session registered (one it proposed, or one a fleet concierge built),
+    // on the person's word. Same implementation as DELETE /v1/agents/:name
+    // (services/agents/remove-agent.ts): an agent caller removes only what it registered itself.
+    mcp.registerTool(
+        'aimeat_agent_delete',
+        {
+            description: descriptionFor('aimeat_agent_delete'),
+            inputSchema: zodShapeFor('aimeat_agent_delete'),
+            annotations: annotationsFor('aimeat_agent_delete'),
+        },
+        async ({ target_agent_name }) => {
+            const out = await removeAgent({ storage, config, closeMcpSessions: closeMcpSessionsForGaii },
+                { owner: localAccountName(agentGaii), principal: agentGaii, ownerInPerson: false }, target_agent_name);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] };
         },
     );
 

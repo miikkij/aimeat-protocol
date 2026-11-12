@@ -11,6 +11,8 @@
  * @structure TaskWake · runAgentTaskJob(storage, wake, job, trigger) · materialiseAgentTask(storage, wake, args)
  * @usage import { runAgentTaskJob, materialiseAgentTask } from './scheduler-agent-task.js';
  * @version-history
+ *   v1.5.0 — 2026-11-12 — runAgentTaskJob fails with its reason when the agent it gives work to no
+ *     longer exists; it queued a task under the removed agent's identity before.
  *   v1.4.0 — 2026-11-02 — A template with deliver: "owner" gives the task the delivery scope entry, and
  *     the node then hands the result to the owner on completion (services/task-result-delivery.ts). *   v1.3.1 — 2026-10-28 — Both paths decide on the agent record as it is: the node no longer narrows
  *     an agent holding `*` by itself (Jouni, 2026-10-28).
@@ -91,6 +93,13 @@ export async function runAgentTaskJob(
   // an hourly schedule must not find 168 runs waiting when it is started. Before the overlap guard,
   // so a "Run now" on a stopped agent says the agent is stopped and not that a run is still going.
   const agent = await storage.getAgent(agentGaii);
+  // AN AGENT THAT NO LONGER EXISTS IS GIVEN NO TASK. The run fails with its reason, so the owner is
+  // told once and the schedule is paused by the failure rule (services/scheduler-failures.ts).
+  // Until 2026-11-12 the run queued a task under the removed agent's identity, where nothing could
+  // ever take it, and the overlap guard below then skipped every later fire without a word.
+  if (!agent) {
+    throw new Error(`The agent ${agentName} no longer exists, so this schedule gave it no task. Approve a new agent named ${agentName} and turn the schedule on again, or delete this schedule.`);
+  }
   if (isStopped(agent)) {
     return { reads: [], writes: [], skipped: true, skipCode: 'stopped',
       skipReason: `${agent?.displayName ?? agentName} is stopped, so this run was skipped. Start the agent, and the next run happens at its time.` };

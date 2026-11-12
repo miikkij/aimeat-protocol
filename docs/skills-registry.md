@@ -92,6 +92,11 @@ pin can name. Visibility changes **without a republish**: `PATCH /v1/skills/{nam
 with `{ visibility }` (node scope for operators; `aimeat_skill_update` over MCP) — the version
 stays and no snapshot is written. Publishing is still the only way to change the text.
 
+**Removing a skill:** `DELETE /v1/skills/{name}?scope=user` removes the skill, its files and its
+kept versions (`aimeat_skill_delete` over MCP; node scope for operators, and a workspace skill
+with `scope=workspace&organism=&ws=`). It cannot be taken back. To hide a skill and keep it, set
+its visibility to `owner`.
+
 **Retiring a skill:** name the successor in the frontmatter, `metadata.superseded_by: user:alice/new-name`
 (a ref or a bare name); the registry mirrors it to `supersededBy`, and the Skills page lists
 the skill as replaced instead of leaving the fact in the description.

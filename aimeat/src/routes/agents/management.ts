@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-12 — DELETE /v1/agents/:name runs services/agents/remove-agent.ts (extracted unchanged), which
+ *     the aimeat_agent_remove MCP tool runs too.
  *   2026-11-08 — DELETE /v1/agents/:name answers `receivers_kept` (the receivers the agent made, which
  *     keep working) and tells the owner (secaudit2026nov08 round 14, maker-lifecycle-not-surfaced).
  *   2026-11-05 — POST /v1/agents/import marks the imported agent as having had a store place's default (`*` covers
@@ -94,20 +96,16 @@ import { narrowAgent } from '../../services/scope-narrowing.js';
 import { putPortRedirect } from '../../services/agent-port-redirect.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
-import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
-import { receiversMadeBy, noticeReceiversKept } from '../../services/receivers/makers.js';
+import { removeAgent } from '../../services/agents/remove-agent.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { checkScopeAddition, recordScopeAddition } from '../../services/agent-scope-add.js';
-import { forgetAgentAccess } from '../../services/agent-refusals.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { executeHooks } from '../../services/hooks.js';
 import { emitChange } from '../../services/event-bus.js';
-import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
-import { nodeContext } from '../../services/node-context.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { announceScopes } from './announce-scopes.js';
 import { registerRekeyRoute } from './rekey.js';
@@ -619,94 +617,16 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     const isOwnerSession = (roles.includes('owner') || roles.includes('operator'))
       && !roles.includes('agent') && !roles.includes('ecosystem');
 
-    const agents = await storage.getAgentsByOwner(ownerName);
-    const agent = agents.find(a => a.name === agentName);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under owner "${ownerName}"`));
+    // The second condition for an agent caller (it registered this agent), the order the sign-out
+    // and the delete run in, and what the answer says are services/agents/remove-agent.ts, shared with
+    // the aimeat_agent_remove MCP tool.
+    const out = await removeAgent({ storage, config, closeMcpSessions: closeMcpSessionsForGaii },
+      { owner: ownerName, principal: req.auth!.sub, ownerInPerson: isOwnerSession }, agentName);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-
-    if (!isOwnerSession) {
-      // The scope was already required at the door (requireRoleOrScope above, which is also what
-      // makes the gate visible to check:route-scopes). This is the second condition, and the reason
-      // the scope alone is not enough. `registeredBy` is written once, at
-      // creation, so it names the principal that actually asked for this agent — not whoever
-      // reconnected it last. An agent with no entry (created before this field existed) is not
-      // deletable this way at all, which is the safe direction: absence is not evidence of parentage.
-      // It is also what keeps an agent from deleting itself: registeredBy holds the owner's name or
-      // the approving sibling's GAII, never the agent's own, so a self-delete is refused here.
-      if (agent.registeredBy !== req.auth!.sub) {
-        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
-          `You may only delete agents you registered yourself. "${agentName}" was not registered under your authorization.`));
-        return;
-      }
-    }
-
-    // Sign it out BEFORE the record goes. An agent JWT lives 90 days, carries its own signature and
-    // is checked against the agent table by nothing at all, so a deleted agent used to keep acting:
-    // storage.getAgent returned null while the bearer authenticated perfectly. The owner pressing
-    // Delete cannot revoke by token hash — they never see the string — so the session id inside the
-    // token is the only handle, and it is only a handle while the row is still findable by GAII.
-    //
-    // Order matters: revoke, then delete. The other way round, a failure here would leave a live
-    // credential for a record nobody can look up any more.
-    const endedSessions = await storage.revokeSessionsByGaii(agent.gaii);
-    // What the agent made that keeps standing: it stops with the agent, and a new agent under the
-    // same name runs it again; the owner is told both (services/agent-standing-work.ts).
-    const standing = await standingWorkOf(storage, ownerGhiiOf(agent.gaii), agent.gaii);
-    // The receivers it made are the owner's and keep working; the answer and a notice say so (ruling 3, 2026-11-08).
-    const receiversKept = await receiversMadeBy(storage, ownerGhiiOf(agent.gaii), agent.gaii);
-
-    const deleted = await storage.deleteAgent(agent.gaii);
-    if (!deleted) {
-      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to delete agent'));
-      return;
-    }
-    evictAgentTelemetry(agent.gaii);
-    await forgetAgentAccess(storage, ownerGhiiOf(agent.gaii), agent.name);
-
-    // The MCP connection rows are per TOOL, upserted by every session, and each keeps the agent
-    // that opened the tool's first session. Left behind, a row would go on naming an agent that no
-    // longer exists (aimeat.io's Claude row did, for months). Best effort after the agent is gone:
-    // a row that survives a failure here shows as a stale tool row, which the page can carry.
-    try {
-      const rows = await storage.listChatInstances({ ownerName });
-      const mine = rows.filter(r => r.agentGaii === agent.gaii);
-      for (const r of mine) await storage.deleteChatInstance(r.id);
-      if (mine.length) emitChange('chat');
-    } catch (err) {
-      logger.warn('deleteAgent: connection rows not removed', { gaii: agent.gaii, error: String(err) });
-    }
-
-    // Revoking the sessions made the node refuse this agent; it did not tell the connector holding
-    // its socket. A tunnel verifies its bearer once, at upgrade, so without this the deleted agent
-    // kept a live socket reading `online` on `/local/status` until something happened to make a
-    // call. Same shape as deactivating an account (owner-lifecycle.ts §7), and outside any
-    // transaction for the same reason: closing a socket is not a storage write and cannot roll back.
-    try {
-      nodeContext().tunnel?.closeForGaii(agent.gaii);
-    } catch (err) {
-      logger.warn('deleteAgent: tunnel close failed', { gaii: agent.gaii, error: String(err) });
-    }
-
-    // An open MCP session held the same kind of live socket and was left standing. Its bearer is
-    // refused from the next request on (auth/agent-alive.ts, the agent question credentialRevoked
-    // asks), and an MCP OAuth access token carries no session row for revokeSessionsByGaii above to
-    // reach at all, so this is what takes the socket itself down (mcp/session-registry.ts).
-    const closedMcp = closeMcpSessionsForGaii(agent.gaii);
-    await noticeStandingWork(storage, ownerGhiiOf(agent.gaii), agent.name, standing, 'stopped');
-    await noticeReceiversKept(storage, ownerGhiiOf(agent.gaii), agent.name, receiversKept);
-
-    res.json(success(config.nodeId, {
-      deleted: true, name: agentName, gaii: agent.gaii,
-      // Say how many credentials this ended. "Deleted" and "and it can no longer act" are different
-      // claims, and the owner is entitled to the second one.
-      sessions_revoked: endedSessions,
-      mcp_sessions_closed: closedMcp,
-      standing_work: standing,
-      receivers_kept: receiversKept,
-    }));
-    emitChange('agents');
+    res.json(success(config.nodeId, out.data));
   });
 
   // ── CORS per-agent management ──

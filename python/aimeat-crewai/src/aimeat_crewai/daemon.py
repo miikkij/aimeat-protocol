@@ -14,6 +14,10 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  unreleased -- 2026-11-12 -- PROPOSE plans a queued task only when it carries no live plan
+    (`_tasks_needing_plan`). A queued task with a plan waits for the owner's OK; a spawned worker
+    starts with an empty `proposed_ids`, so it planned such a task again at every start: a model
+    call each time, and on a node built before 2026-11-12 a repeated notice to the owner.
   unreleased -- 2026-11-08 -- secaudit2026nov08b round 15: both liaisons get `agent_identity`, so
     the offers publish tool picks its credential by the agent's full identity. A bare name another
     owner's agent carries in the same home no longer picks that owner's stored token.
@@ -739,6 +743,24 @@ def _has_no_live_plan(task: dict[str, Any]) -> bool:
         isinstance(t, dict) and t.get("status") != "outdated"
         for t in todos
     )
+
+
+def _tasks_needing_plan(
+    queued: list[dict[str, Any]], active: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """The tasks the PROPOSE phase plans: every queued or active task with no live plan.
+
+    A queued task that already carries a plan waits for the owner's OK. Planning it again is a
+    model call that changes nothing, and on a node built before 2026-11-12 each such proposal also
+    sent the owner the "waits for your OK" notice again. Measured on aimeat.io on 2026-11-12: one waiting task of
+    a spawned agent was planned at every start of its worker, four times in 78 minutes, because
+    the set of already planned ids lives in the worker's memory and a new worker starts with none.
+
+    Pure, so it is unit-testable without a node.
+    """
+    return [t for t in queued if _has_no_live_plan(t)] + [
+        t for t in active if _has_no_live_plan(t)
+    ]
 
 
 def _fetch_max_concurrent(api: _Api) -> int:
@@ -2251,9 +2273,13 @@ def run_crew_daemon(
                     #
                     # EXECUTE re-polls below, so a task planned in this cycle is
                     # picked up in the SAME cycle with its todos already on it.
-                    plan_needed = _poll_tasks(api, status="queued") + [
-                        t for t in _poll_tasks(api, status="active") if _has_no_live_plan(t)
-                    ]
+                    #
+                    # A QUEUED task that already carries a plan is not planned again: it
+                    # waits for the owner's OK, and `proposed_ids` is this process's own
+                    # memory, empty at each start of a spawned worker (_tasks_needing_plan).
+                    plan_needed = _tasks_needing_plan(
+                        _poll_tasks(api, status="queued"), _poll_tasks(api, status="active")
+                    )
                     for task in plan_needed:
                         if stop["flag"]:
                             break

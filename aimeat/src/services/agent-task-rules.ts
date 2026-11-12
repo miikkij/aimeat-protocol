@@ -40,6 +40,7 @@
  *   - agentStartDefault() — the agent's own answer, or the mode-derived one
  *   - decideTaskStart() — does this task start now, and if not, why
  *   - mayLoosenStart() / mayStartWaitingTask() — who may set `automatic`, who may lift a wait
+ *   - mayManageSiblingTasks() — who may read or remove the tasks of another agent of the same owner
  *   - resolveAutoActivation() — the create-time status, from decideTaskStart
  *   - autoStartEvent() / startedOnItsOwn() — the marked 'started' event of a task the node started
  *   - canProposeTodos() — may a plan be proposed on this task right now
@@ -49,6 +50,9 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.6.0 — 2026-11-12 — mayManageSiblingTasks(): another agent of the same owner reads or removes
+ *     an agent's tasks with the task word and agent:write (services/agents/remove-task.ts,
+ *     wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
  *   v2.5.1 — 2026-11-02 — The floor's note names exchange:invoke, which is not on it. A store place's default for an
  *     agent leaves every floor word out (services/place-agent-scopes.ts).
  *   v2.5.0 — 2026-10-28 — `*` never reaches the floor and `wildcardReady` is gone: the node no longer
@@ -75,6 +79,7 @@
  */
 import type { AgentTaskRecord, AgentRecord, AgentTaskTodo } from '../storage/interface.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isValidGAII, isSameOwner } from '../utils/gaii.js';
 
 /** Starts on its own, or waits for the owner's OK. */
 export type TaskStartPolicy = 'automatic' | 'confirm';
@@ -246,6 +251,22 @@ export function mayStartWaitingTask(caller: StartCaller, targetGaii: string, dec
     if (caller.ownerInPerson || caller.app) return true;
     if (caller.principal === targetGaii || !scopeIsCovered(caller.scopes, 'task:write')) return false;
     return !isHeldForOwner(decision);
+}
+
+/**
+ * May this caller read (`task:read`) or remove (`task:write`) the tasks of ANOTHER agent of the
+ * same owner? Only with `agent:write` beside the task word: the word that already stops, starts
+ * and re-routes that agent (mayLoosenStart), so seeing what it works on and ending work it has not
+ * started widens nothing. The task word alone is not enough: every crew holds task:read for its own
+ * list, and a sibling's task titles are the owner's, not the fleet's. An agent's OWN tasks are not
+ * this question (its own routes answer it), and neither are the owner in person or an app grant.
+ * The caller is an AGENT of the same account: an ecosystem app, which is a consented third party,
+ * and a visitor from another node are neither, whatever words they hold.
+ */
+export function mayManageSiblingTasks(caller: StartCaller, targetGaii: string, word: 'task:read' | 'task:write'): boolean {
+    if (caller.ownerInPerson || caller.app || caller.principal === targetGaii) return false;
+    if (!isValidGAII(caller.principal) || !isSameOwner(caller.principal, targetGaii)) return false;
+    return scopeIsCovered(caller.scopes, word) && scopeIsCovered(caller.scopes, 'agent:write');
 }
 
 /**
