@@ -21,6 +21,8 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   2026-11-13 — listOwnCompanies: the page read GET /v1/companies and aimeat_company_list both call
+ *     (structure programme unit 2, pure extraction).
  *   2026-10-18 — setFrontPage also writes `frontPageAccess`, who may open the front page, and keeps what
  *     the address serves when `front` is null; a new company is open to anyone (V3.10).
  *   2026-10-18 — setFrontPage's checks are resolveFrontPage (pure extraction), which the publish gate
@@ -90,6 +92,20 @@ export async function requireOwnCompany(storage: Storage, ownerGhii: string, id:
   const company = await storage.getCompany(id);
   if (!company || company.ownerGhii !== ownerGhii) throw new CompanyError('NOT_FOUND', 404, 'Company not found');
   return company;
+}
+
+/**
+ * One page of the owner's companies and the owner's total. GET /v1/companies and aimeat_company_list
+ * both read through it; each surface clamps its own page and page size before the call.
+ */
+export async function listOwnCompanies(
+  storage: Storage, ownerGhii: string, page: number, perPage: number,
+): Promise<{ rows: CompanyRecord[]; total: number }> {
+  const [rows, total] = await Promise.all([
+    storage.listCompanies({ ownerGhii, limit: perPage, offset: (page - 1) * perPage }),
+    storage.countCompanies({ ownerGhii }),
+  ]);
+  return { rows, total };
 }
 
 /** Advisory availability check — the insert is what actually arbitrates. */

@@ -41,7 +41,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
-    CompanyError, createCompany, updateCompany, requireOwnCompany, companyAddress,
+    CompanyError, createCompany, updateCompany, requireOwnCompany, companyAddress, listOwnCompanies,
     type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
 import { toDeclaredProvenance, type AiProvenanceToolInput } from '../services/ai/provenance-input.js';
@@ -129,11 +129,7 @@ export function registerCompanyTools(
         async ({ page, per_page }) => {
             const p = Math.max(1, page ?? 1);
             const pp = Math.min(100, Math.max(1, per_page ?? 50));
-            const owner = ownerGhii();
-            const [rows, total] = await Promise.all([
-                storage.listCompanies({ ownerGhii: owner, limit: pp, offset: (p - 1) * pp }),
-                storage.countCompanies({ ownerGhii: owner }),
-            ]);
+            const { rows, total } = await listOwnCompanies(storage, ownerGhii(), p, pp);
             return ok({ companies: rows.map(wire), total, page: p, per_page: pp });
         },
     );

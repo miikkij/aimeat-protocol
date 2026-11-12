@@ -47,7 +47,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 import {
   CompanyError, createCompany, updateCompany, deleteCompany,
-  requireOwnCompany, checkSlugAvailable, companyAddress, slugify, type CompanyProvenanceInput,
+  requireOwnCompany, checkSlugAvailable, companyAddress, slugify, listOwnCompanies, type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
 import { setCompanyFrontPageGated, publishCompanyPortfolioGated } from '../services/company/company-publish-gate.js';
 import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
@@ -269,10 +269,7 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
     const owner = resolve(req);
     const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10) || 1);
     const perPage = Math.min(100, Math.max(1, parseInt((req.query.per_page as string) ?? '50', 10) || 50));
-    const [rows, total] = await Promise.all([
-      storage.listCompanies({ ownerGhii: owner, limit: perPage, offset: (page - 1) * perPage }),
-      storage.countCompanies({ ownerGhii: owner }),
-    ]);
+    const { rows, total } = await listOwnCompanies(storage, owner, page, perPage);
     res.json(success(config.nodeId, {
       companies: rows.map((c) => withAddress(config, c)), total,
     }, undefined, { page, per_page: perPage, total }));

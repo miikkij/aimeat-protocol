@@ -41,6 +41,8 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.2.0 — 2026-11-13 — Structure programme unit 2: a file leaves EXEMPT when its reads call the
+ *     service function its REST route calls.
  *   v1.1.2 — 2026-10-20 — src/mcp/index.ts leaves EXEMPT: its storage reads moved to
  *     services/mcp-agent-admission.ts and services/mcp-build-inputs.ts (MCP SDK v2 migration step 5).
  *   v1.1.1 — 2026-10-20 — src/mcp/core-work.ts inherits core.ts's line (pure extraction).
@@ -78,7 +80,6 @@ const EXEMPT = new Set([
   'src/mcp/catalogue.ts',
   'src/mcp/chat-instances.ts',
   'src/mcp/commerce.ts',
-  'src/mcp/companies.ts',
   'src/mcp/consent.ts',
   'src/mcp/core-boards.ts',            // pure extraction out of core.ts (max-file-lines), same backlog
   'src/mcp/core-work.ts',              // pure extraction out of core.ts (max-file-lines, 2026-10-20), same backlog
