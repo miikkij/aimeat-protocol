@@ -97,7 +97,9 @@ pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci
 pnpm gate --postgres
 ```
 
-`--test=<name>` matches a suite by its file name without `test/` and `.ts`, with or without the `e2e-` prefix (`--test=model-suite` runs `test/e2e-model-suite.ts`). An exact name wins over a substring, and a substring that matches more than one suite is an error.
+`--test=<name>` matches a suite by its file name without `test/` and `.ts`, with or without the `e2e-` prefix (`--test=model-suite` runs `test/e2e-model-suite.ts`). An exact name wins over a substring, and a substring that matches more than one suite is an error. Every suite runs this way, so `package.json` has no per-suite script.
+
+The Docker runner builds a fresh container and runs suites against it: `pnpm test:e2e:docker` runs every `test/e2e-*.ts`, and `bash test/docker/e2e-runner.sh <suite file>` from `aimeat/` runs one (`bash test/docker/e2e-runner.sh test/e2e-mcp.ts`). The runner takes the suite file as its only argument; it reads no `--test=`.
 
 ### E2E Test Suites
 
