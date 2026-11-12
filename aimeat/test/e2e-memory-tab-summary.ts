@@ -10,6 +10,8 @@
  *   caller without a token is refused, and one owner's summary holds nothing of another's.
  *   At a heavy account's size the full answer was 6.4 MB on every mount (performance work 2026-11).
  * @version-history
+ *   v1.1.1 — 2026-11-12 — The owner's content pipeline reads nothing on arrival, so a text file it
+ *     stores in the background no longer lands between the file listing and the file count.
  *   v1.1.0 — 2026-11-10 — Files a page at a time: files_limit and files_exclude_prefix on the mount,
  *     limit, offset and exclude_prefix on GET /v1/memory/files, paging reaches every file once.
  *   v1.0.0 — 2026-11-10 — Initial.
@@ -63,6 +65,12 @@ await test('Two owners register and log in', async () => {
     who.token = login.body.data?.token;
     assert(typeof who.token === 'string' && who.token.length > 0, 'missing token');
   }
+  // The content pipeline reads what arrives in the background and stores its own text files
+  // (contentclass-text/) and records. One landing between two reads of this suite made the file count
+  // and the listing differ by one (7 vs 6, nightly sweep on postgres-kysely, 2026-11-12), so this
+  // suite, which is about the Memory page, runs with reading on arrival off.
+  const off = await json('/v1/content/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ onArrival: false }) });
+  assert(off.status === 200, `reading on arrival off: ${off.status} ${JSON.stringify(off.body.error ?? '')}`);
 });
 
 await test('The owner writes five keys in one key space (one public, one for members) and one key without a dot', async () => {
