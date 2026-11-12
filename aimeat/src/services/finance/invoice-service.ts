@@ -18,10 +18,12 @@
  *   - 'overdue' is a lazy transition applied on read, same discipline as checkout
  *     session expiry.
  *
- * @structure computeTotals · fiscal-year resolution · draft CRUD · send · markPaid ·
- *   credit notes · lazy overdue
+ * @structure computeTotals · draft CRUD · send · markPaid · credit notes · lazy overdue (the fiscal
+ *   year a date falls in is resolved in fiscal-years.ts)
  * @usage const svc = financeInvoiceService(storage); await svc.send(ownerGhii, id, ...);
  * @version-history
+ *   2026-11-13 — fiscalYearForDate moved unchanged to fiscal-years.ts, which both this file and
+ *     vouchers.ts import; that ends the import cycle between the two (structure programme 2026-11, unit 4).
  *   v1.1.0 — 2026-08-23 — A fiscal year belongs to ONE set of books, and the invoice number a
  *     company shows is its own (TARGET-072). fiscalYearForDate took organismId and used it only
  *     when creating a year, so a second company's booking found the first company's year for the
@@ -35,12 +37,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type {
-  InvoiceRecord, InvoiceLine, InvoiceParty, VatBreakdownEntry, FiscalYearRecord,
+  InvoiceRecord, InvoiceLine, InvoiceParty, VatBreakdownEntry,
 } from '../../models/finance-schemas.js';
 import { FinanceError } from './errors.js';
 import { requireVatCode } from './vat-codes.js';
 import { finnishReference, rfReference } from './reference-number.js';
 import { bookVoucher } from './vouchers.js';
+import { fiscalYearForDate } from './fiscal-years.js';
 
 /** Line input from the API: amounts are computed here, never trusted from the caller. */
 export interface LineInput {
@@ -103,36 +106,6 @@ async function computeLines(storage: Storage, lines: LineInput[], rateDate: stri
   const totalNetMinor = out.reduce((s, l) => s + l.netMinor, 0);
   const totalVatMinor = out.reduce((s, l) => s + l.vatMinor, 0);
   return { lines: out, totalNetMinor, totalVatMinor, totalGrossMinor: totalNetMinor + totalVatMinor, vatBreakdown: [...byCode.values()] };
-}
-
-/**
- * Finds the fiscal year containing the date, auto-creating a calendar year when none
- * exists (removing setup friction — the accountant can adjust boundaries later, before
- * anything is locked). A LOCKED year is returned as-is; the caller decides whether the
- * operation is one a locked year must reject.
- */
-export async function fiscalYearForDate(storage: Storage, ownerGhii: string, isoDate: string, organismId: string | null): Promise<FiscalYearRecord> {
-  const years = await storage.listFiscalYears(ownerGhii);
-  // A FISCAL YEAR BELONGS TO ONE SET OF BOOKS. This function has taken organismId since the day it
-  // was written and used it only when CREATING a year; the lookup matched on dates alone. So a
-  // second company's booking found the FIRST company's year for the same dates and inherited its
-  // lock: close one company's books and the other company could no longer invoice, with an error
-  // naming a year that is not theirs. Nobody met it because organismId was null on every company
-  // until the company brain started writing it.
-  //
-  // Records made before this are `organismId: null` and keep matching each other, so an owner who
-  // never split their companies sees no change at all.
-  const hit = years.find((y) => (y.organismId ?? null) === organismId && y.startDate <= isoDate && isoDate <= y.endDate);
-  if (hit) return hit;
-  const now = new Date().toISOString();
-  const year = isoDate.slice(0, 4);
-  const record: FiscalYearRecord = {
-    id: randomUUID(), ownerGhii, organismId, label: year,
-    startDate: `${year}-01-01`, endDate: `${year}-12-31`,
-    locked: false, lockedAt: null, createdAt: now, updatedAt: now,
-  };
-  await storage.createFiscalYear(record);
-  return record;
 }
 
 function todayIso(): string {

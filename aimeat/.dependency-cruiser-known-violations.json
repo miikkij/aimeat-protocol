@@ -249,36 +249,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/finance/invoice-service.ts",
-    "to": "src/services/finance/vouchers.ts",
-    "unresolvedTo": "./vouchers.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/services/finance/vouchers.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/finance/invoice-service.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/services/home-state.ts",
     "to": "src/services/onboarding-funnel.ts",
     "unresolvedTo": "./onboarding-funnel.js",

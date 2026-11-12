@@ -9,13 +9,15 @@
  * @structure bookVoucher · reverseVoucher · attachEvidence
  * @usage await bookVoucher(storage, ownerGhii, { date, description, direction, ... });
  * @version-history
+ *   2026-11-13 — fiscalYearForDate comes from fiscal-years.ts, not from invoice-service.ts, which imports
+ *     this file (structure programme 2026-11, unit 4).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type { VoucherRecord, VoucherSource, VoucherDirection, VatBreakdownEntry } from '../../models/finance-schemas.js';
 import { FinanceError } from './errors.js';
-import { fiscalYearForDate } from './invoice-service.js';
+import { fiscalYearForDate } from './fiscal-years.js';
 
 export interface VoucherInput {
   organismId?: string | null;
