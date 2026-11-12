@@ -13,10 +13,12 @@
  *   (routes/unfurl.ts) and the welcome-mat reader (services/welcome-mat-parse.ts). Their patterns ran
  *   `[^>]+` or `[^>]*?` from each `<meta`, so a page of many openers cost the square of its size per
  *   pattern (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-1).
- * @structure tagAttributes(html, name) · metaTags(html) · metaContentOf(tags, attrs, key) · titleText(html)
+ * @structure tagAttributes(html, name) · metaTags(html) · tagSpans(html, name) · metaContentOf(tags, attrs, key) · titleText(html)
  * @usage for (const attrs of tagAttributes(html, 'link')) { ... }
  *   const title = metaContentOf(metaTags(head), ['property', 'name'], 'og:title');
  * @version-history
+ *   2026-11-12 — tagSpans: a `<meta>` or `<link>` tag with its place in the text, for the head stamp of
+ *     an operator template (utils/page-head.ts), which rewrites a tag where it stands.
  *   2026-10-31 — metaTags, metaContentOf and titleText: one linear pass over a page's `<meta>` tags and
  *     its `<title>` (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-1).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
@@ -88,12 +90,23 @@ function readTagAttributes(html: string, i: number): { attrs: MetaAttributes; en
  * after the tag it read, so no character is read twice however many openers the page holds.
  */
 export function metaTags(html: string): MetaAttributes[] {
-  const out: MetaAttributes[] = [];
-  const opener = /<meta\b/gi;
+  return tagSpans(html, 'meta').map(span => span.attrs);
+}
+
+/** One tag as read: its quoted attributes, where it starts and the index after its closing `>`. */
+export interface TagSpan { attrs: MetaAttributes; start: number; end: number }
+
+/**
+ * Every `<meta ...>` or `<link ...>` tag with its place in the text, in document order, in the same
+ * linear pass as metaTags. A caller that rewrites a tag slices the text at `start` and `end`.
+ */
+export function tagSpans(html: string, name: 'meta' | 'link'): TagSpan[] {
+  const out: TagSpan[] = [];
+  const opener = name === 'meta' ? /<meta\b/gi : /<link\b/gi;
   let m: RegExpExecArray | null;
   while ((m = opener.exec(html)) !== null) {
     const { attrs, end } = readTagAttributes(html, m.index + m[0].length);
-    out.push(attrs);
+    out.push({ attrs, start: m.index, end: Math.min(end + 1, html.length) });
     if (end >= html.length) break;
     opener.lastIndex = end + 1;
   }

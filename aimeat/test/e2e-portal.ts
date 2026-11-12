@@ -1,5 +1,6 @@
 // E2E test for AIMEAT Onboarding Portal
 // Run: cd aimeat && npx tsx test/e2e-portal.ts
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -57,6 +58,48 @@ await test('GET /v1/site/template — refused without an operator session', asyn
     assert(anon.status === 401 || anon.status === 403, `anonymous: status ${anon.status}`);
     const bogus = await fetch(`${BASE}/v1/site/template`, { headers: { Authorization: 'Bearer not-a-token' } });
     assert(bogus.status === 401 || bogus.status === 403, `bogus token: status ${bogus.status}`);
+});
+
+// The operator's template at `/` (2026-11-12). It was sent as stored, so a node whose front page is a
+// template had no canonical link, no og:* and no JSON-LD. The head is the node's, the body the
+// template's, and removing the template gives the SPA shell back. A second owner cannot store one.
+await test('The operator template at / carries the node head metadata; a second owner cannot store one', async () => {
+    const stamp = Date.now().toString(36);
+    const op = await registerOwner(BASE, `portalop${stamp}`);
+    assert(op.roles.includes('operator'), `the first owner of the suite is the operator, got ${op.roles.join(',')}`);
+    const other = await registerOwner(BASE, `portalother${stamp}`);
+    const template = '<!doctype html><html lang="en"><head><title>Alice\'s bakery</title>'
+        + '<meta name="description" content="Sourdough from the oven of Alice, baked every Friday morning.">'
+        + '</head><body><h1>Alice bakes bread</h1></body></html>';
+    const post = (token: string) => fetch(`${BASE}/v1/site/template`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ template }),
+    });
+    const refused = await post(other.token);
+    assert(refused.status === 403, `a second owner: status ${refused.status}`);
+    const stored = await post(op.token);
+    assert(stored.status === 200, `the operator: status ${stored.status} ${await stored.text()}`);
+    try {
+        const refusedDelete = await fetch(`${BASE}/v1/site/template`, { method: 'DELETE', headers: { Authorization: `Bearer ${other.token}` } });
+        assert(refusedDelete.status === 403, `a second owner's delete: status ${refusedDelete.status}`);
+        const html = await (await fetch(`${BASE}/`, { headers: { Accept: 'text/html' } })).text();
+        const head = html.slice(0, html.search(/<\/head\s*>/i));
+        const canonical = /<link rel="canonical" href="([^"]+)">/.exec(head)?.[1];
+        assert(canonical !== undefined && new URL(canonical).pathname === '/', `canonical: ${canonical}`);
+        assert(head.includes('<meta property="og:title" content="Alice&#39;s bakery">'), 'og:title is the template\'s title');
+        assert(head.includes('<meta property="og:description" content="Sourdough from the oven of Alice, baked every Friday morning.">'), 'og:description is the template\'s description');
+        assert(head.includes(`<meta property="og:url" content="${canonical}">`), 'og:url is the canonical address');
+        for (const type of ['SoftwareApplication', 'Organization', 'WebPage']) {
+            assert(head.includes(`"@type":"${type}"`), `JSON-LD ${type} is in the head`);
+        }
+        assert((head.match(/<title>/g) ?? []).length === 1, 'one title');
+        assert(html.includes('<h1>Alice bakes bread</h1>'), 'the template body is served');
+    } finally {
+        const del = await fetch(`${BASE}/v1/site/template`, { method: 'DELETE', headers: { Authorization: `Bearer ${op.token}` } });
+        assert(del.status === 200, `delete: status ${del.status}`);
+    }
+    const back = await (await fetch(`${BASE}/`, { headers: { Accept: 'text/html' } })).text();
+    assert(back.includes('<div id="app"') && !back.includes('Alice bakes bread'), 'the SPA shell is back at /');
 });
 
 await test('GET /sitemap.xml — lists the two new pages and not the pricing page', async () => {

@@ -21,11 +21,19 @@
  *   - injectPageHead(html, page, config) — returns the transformed document
  *   - injectStaticPageHead(html, path, registryPage, config) — both, for a static file that keeps
  *     its own title and description
+ *   - injectTemplatePageHead(html, path, registryPage, config) — both, for the operator's portal
+ *     template: a tag the template states stays, the node writes the ones it lacks
  * @usage
  *   html = injectSiteHead(html, config, nonceAttr);
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
  *   html = injectStaticPageHead(html, '/', findPublicPage('/'), config, nonceAttr);
+ *   html = injectTemplatePageHead(templateHtml, '/', findPublicPage('/'), config);
  * @version-history
+ *   2026-11-12 - injectTemplatePageHead: the operator's portal template at `/` is stamped too. It was
+ *     sent as stored, so a node whose front page is a template had no canonical link, no og:* and
+ *     no JSON-LD (AGENTSCAN S10, S12, S13), the defect the static front pages had until 2026-10-27.
+ *     A tag is inserted before the head's end tag however that tag is cased, a `$` sequence in a
+ *     value is written as it stands, and the canonical address is HTML-escaped in its attributes.
  *   2026-11-09 - The canonical link, og:url and the WebPage url come from canonicalPageUrl: the main
  *     node's address for a page this node repeats, the original's for a copied data package (TARGET-094).
  *   2026-11-01 - A page's own `jsonLd` (the public dataset page's schema.org Dataset) is written beside
@@ -62,6 +70,7 @@
 import type { AimeatConfig } from '../config.js';
 import { canonicalPageUrl, type PublicPage } from '../data/public-pages.js';
 import { escapeHtml as esc } from './html-escape.js';
+import { tagSpans } from './html-tag-scan.js';
 
 /**
  * Escape a serialized-JSON string for embedding inside a `<script type="application/ld+json">`.
@@ -78,7 +87,16 @@ function jsonLdSafe(json: string): string {
  * `</head>`. Returns the new document and whether it still needs inserting.
  */
 function upsert(html: string, find: RegExp, tag: string): string {
-  return find.test(html) ? html.replace(find, tag) : html.replace('</head>', `${tag}\n</head>`);
+  return find.test(html) ? html.replace(find, () => tag) : beforeHeadEnd(html, tag);
+}
+
+/**
+ * Insert `tag` before the head's end tag, however that tag is written (`</head>`, `</HEAD>`). The
+ * replacement is a function, so a `$` sequence in a value (`$$`, `$&`) is written as it stands
+ * and is not read as a replacement pattern.
+ */
+function beforeHeadEnd(html: string, tag: string): string {
+  return html.replace(/<\/head\s*>/i, (end) => `${tag}\n${end}`);
 }
 
 /** Absolutise a configured URL that may be root-relative. A crawler needs og:image absolute. */
@@ -173,7 +191,7 @@ export function injectSiteHead(html: string, config: AimeatConfig, nonceAttr = '
       operatingSystem: 'Any',
       ...(config.seoSameAs.length ? { sameAs: config.seoSameAs } : {}),
     });
-    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(software)}</script>\n</head>`);
+    out = beforeHeadEnd(out, `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(software)}</script>`);
   }
   if (!/"@type"\s*:\s*"Organization"/.test(out)) {
     const organization = JSON.stringify({
@@ -185,7 +203,7 @@ export function injectSiteHead(html: string, config: AimeatConfig, nonceAttr = '
       description: config.seoSiteDescription,
       ...(config.seoSameAs.length ? { sameAs: config.seoSameAs } : {}),
     });
-    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(organization)}</script>\n</head>`);
+    out = beforeHeadEnd(out, `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(organization)}</script>`);
   }
 
   return out;
@@ -219,7 +237,7 @@ export function injectPageHead(
   out = upsert(out, /<meta property="og:description" content="[^"]*"\s*\/?>/i,
     `<meta property="og:description" content="${desc}">`);
   out = upsert(out, /<meta property="og:url" content="[^"]*"\s*\/?>/i,
-    `<meta property="og:url" content="${url}">`);
+    `<meta property="og:url" content="${esc(url)}">`);
   // The twitter pair follows the page for the same reason og: does. Left out, a shared link to
   // /v1/business unfurled on X with the node's generic name and blurb while the same link on every
   // other platform showed the page's own — one link, two different claims about what it is.
@@ -227,7 +245,7 @@ export function injectPageHead(
     `<meta name="twitter:title" content="${title}">`);
   out = upsert(out, /<meta name="twitter:description" content="[^"]*"\s*\/?>/i,
     `<meta name="twitter:description" content="${desc}">`);
-  out = upsert(out, /<link rel="canonical"[^>]{0,512}>/i, `<link rel="canonical" href="${url}">`);
+  out = upsert(out, /<link rel="canonical"[^>]{0,512}>/i, `<link rel="canonical" href="${esc(url)}">`);
   // A page with its own picture overrides the node-wide one injectSiteHead just stamped. Without
   // this, every page on the node shares one social card, which is what happened for a year.
   if (page.image) {
@@ -263,12 +281,12 @@ export function injectPageHead(
       dateModified: new Date().toISOString().split('T')[0],
       isPartOf: { '@type': 'WebSite', name: config.seoSiteName, url: `${b}/` },
     });
-    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(jsonLd)}</script>\n</head>`);
+    out = beforeHeadEnd(out, `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(jsonLd)}</script>`);
   }
   // A page that is about one thing carries that thing's own structured data beside the WebPage block:
   // the public dataset page its schema.org Dataset (services/datapackage/landing-page.ts).
   if (page.jsonLd) {
-    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(JSON.stringify(page.jsonLd))}</script>\n</head>`);
+    out = beforeHeadEnd(out, `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(JSON.stringify(page.jsonLd))}</script>`);
   }
   return out;
 }
@@ -305,4 +323,104 @@ export function injectStaticPageHead(
     description: description || registryPage?.description || config.seoSiteDescription,
   };
   return injectPageHead(out, page, config, nonceAttr);
+}
+
+/**
+ * The head tags an operator's template may state for itself: the tag, the attribute that names it,
+ * the name, and the attribute that holds its value.
+ */
+const OWN_HEAD_TAGS: ReadonlyArray<readonly ['meta' | 'link', string, string, string]> = [
+  ['meta', 'name', 'description', 'content'],
+  ['meta', 'property', 'og:title', 'content'],
+  ['meta', 'property', 'og:description', 'content'],
+  ['meta', 'property', 'og:image', 'content'],
+  ['meta', 'property', 'og:url', 'content'],
+  ['meta', 'property', 'og:site_name', 'content'],
+  ['meta', 'name', 'twitter:card', 'content'],
+  ['meta', 'name', 'twitter:title', 'content'],
+  ['meta', 'name', 'twitter:description', 'content'],
+  ['meta', 'name', 'twitter:image', 'content'],
+  ['meta', 'name', 'twitter:site', 'content'],
+  ['link', 'rel', 'canonical', 'href'],
+];
+
+/**
+ * Stamp the operator's portal template, served at `path`, with the head metadata every other front
+ * page carries. The template is the operator's own page, so a tag it states stays as written and
+ * the node writes only the tags it lacks: the canonical link, og:*, twitter:* and the JSON-LD
+ * blocks, described by the template's own title and description.
+ *
+ * A stated tag is first rewritten where it stands into the attribute order injectSiteHead and
+ * injectPageHead find (`<meta property="og:title" content="…">`), its value untouched. Those two
+ * then replace it instead of writing a second tag beside it, and the stated tag is put back last.
+ * A canonical link the template states is also the address og:url and the WebPage block name, and
+ * an og:title, og:description or og:image it states is also the twitter:* value of that name.
+ * The robots tag is the node's setting (`seo.indexing`) and is not the template's to state.
+ *
+ * No markdown alternate link is written: the registry's mirror (`/index.md`) holds the classic
+ * front page's text, a different document, and the head names no second address for this page.
+ */
+export function injectTemplatePageHead(
+  html: string,
+  path: string,
+  registryPage: PublicPage | undefined,
+  config: AimeatConfig,
+  nonceAttr = '',
+): string {
+  const headEnd = html.search(/<\/head\s*>/i);
+  if (headEnd < 0) return html;
+  const head = html.slice(0, headEnd);
+  const spans = { meta: tagSpans(head, 'meta'), link: tagSpans(head, 'link') };
+
+  const stated: Array<{ key: string; value: string; start: number; end: number; text: string; pattern: RegExp }> = [];
+  for (const [tag, keyAttr, key, valueAttr] of OWN_HEAD_TAGS) {
+    const span = spans[tag].find(s => (s.attrs[keyAttr] ?? '').trim().toLowerCase() === key && (s.attrs[valueAttr] ?? '').trim() !== '');
+    if (!span) continue;
+    const value = span.attrs[valueAttr]!;
+    stated.push({
+      key,
+      value,
+      start: span.start,
+      end: span.end,
+      text: `<${tag} ${keyAttr}="${key}" ${valueAttr}="${value.replace(/"/g, '&quot;')}">`,
+      pattern: tag === 'link'
+        ? /<link rel="canonical"[^>]{0,512}>/i
+        : new RegExp(`<meta ${keyAttr}="${key}" content="[^"]*"\\s*/?>`, 'i'),
+    });
+  }
+
+  // Rewritten from the last tag to the first, so the places read above still hold.
+  let out = html;
+  for (const tag of [...stated].sort((a, b) => b.start - a.start)) {
+    out = out.slice(0, tag.start) + tag.text + out.slice(tag.end);
+  }
+
+  // A social title, description or picture stated for Open Graph only is the template's word for
+  // the twitter:* tag of the same name too, so one link does not unfurl as two different pages.
+  for (const name of ['title', 'description', 'image']) {
+    const og = stated.find(t => t.key === `og:${name}`);
+    if (!og || stated.some(t => t.key === `twitter:${name}`)) continue;
+    stated.push({
+      ...og,
+      key: `twitter:${name}`,
+      text: `<meta name="twitter:${name}" content="${og.value.replace(/"/g, '&quot;')}">`,
+      pattern: new RegExp(`<meta name="twitter:${name}" content="[^"]*"\\s*/?>`, 'i'),
+    });
+  }
+
+  const statedCanonical = unescapeHtml(stated.find(t => t.key === 'canonical')?.value ?? '').trim();
+  const page: PublicPage = {
+    path,
+    title: '',
+    description: '',
+    changefreq: 'weekly',
+    priority: '1.0',
+    ...registryPage,
+    markdown: undefined,
+    ...(/^https?:\/\/[^\s"'<>]+$/i.test(statedCanonical) ? { canonical: statedCanonical } : {}),
+  };
+  out = injectStaticPageHead(out, path, page, config, nonceAttr);
+
+  for (const tag of stated) out = out.replace(tag.pattern, () => tag.text);
+  return out;
 }

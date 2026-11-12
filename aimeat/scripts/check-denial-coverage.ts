@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-11-12 -- ROUTE_CEILING 442: POST and DELETE /v1/site/template are refused to an owner who is
+ *     not the operator by test/e2e-portal.ts.
  *   2026-11-07 -- ROUTE_CEILING 447: DELETE /v1/csm/{name} is refused to another owner and to an agent
  *     of another account by test/e2e-csm.ts (CSM ruling of 2026-11-07).
  *   2026-11-05 -- ROUTE_CEILING 448: DELETE /v1/agents/{name}/tasks/{id} is refused to another agent of
@@ -132,7 +134,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 444;
+export const ROUTE_CEILING = 442;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-12 — GET / stamps the operator's portal template with the node head metadata
+ *     (injectTemplatePageHead): it was sent as stored, with no canonical link, og:* or JSON-LD.
  *   2026-11-07 — this_node.description is the story's one line, read from aimeatStory.oneLine in
  *     the English locale (one source; docs/AIMEAT-Story.md), and this_node.story names that file.
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
@@ -109,7 +111,7 @@ import { substituteVariables, resolvePromptContent } from '../services/prompt-va
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 import { buildLlmsHumanPages, buildLlmsOptionalPages, findPublicPage } from '../data/public-pages.js';
-import { injectStaticPageHead } from '../utils/page-head.js';
+import { injectStaticPageHead, injectTemplatePageHead } from '../utils/page-head.js';
 import { buildGettingStarted } from '../data/getting-started.js';
 import { nodeContext } from '../services/node-context.js';
 import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
@@ -289,9 +291,13 @@ export function bootstrapRouter(
           _req.headers['accept-language'] as string | undefined,
         );
         res.set('Cache-Control', `public, max-age=${config.siteCacheTtlSeconds}`);
+        // The template gets the head metadata the SPA shell and the static front pages get: the
+        // canonical link, og:* and JSON-LD, with the template's own tags left as written.
         // Operator templates are trusted and may include inline <script>; stamp the
-        // per-request CSP nonce so they pass script-src 'self' 'nonce-...'.
-        res.type('text/html').send(injectCspNonce(customHtml, res.locals.cspNonce as string | undefined));
+        // per-request CSP nonce so they pass script-src 'self' 'nonce-...'. It runs last, so the
+        // JSON-LD blocks written here carry the nonce too.
+        const stamped = injectTemplatePageHead(customHtml, '/', findPublicPage('/'), config);
+        res.type('text/html').send(injectCspNonce(stamped, res.locals.cspNonce as string | undefined));
         return;
       }
       // The static front pages, behind one switch (AIMEAT_FRONT_PAGE=demo|os|start). Finnish
