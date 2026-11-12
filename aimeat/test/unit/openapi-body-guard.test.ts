@@ -9,6 +9,8 @@
  *   schema ajv cannot compile are listed, so a new one is seen.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-guard.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-13 — The list of body schemas that do not compile is empty: the five contract
+ *     entries it named were corrected (structure programme 2026-11, unit 1, decision 2).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B5).
  */
 import { describe, it, afterEach, vi } from 'vitest';
@@ -285,12 +287,6 @@ describe('the real openapi.yaml', () => {
         // Each of these uses a keyword the way OpenAPI 3.0 did, which a 3.1 document's JSON Schema
         // refuses (exclusiveMinimum as a boolean, nullable without a type). They are observed as not
         // checkable until the contract entry is corrected; then delete the line here.
-        assert.deepEqual(notCompiled, [
-            'PATCH /v1/boards/{boardId}/posts/{postId}',
-            'PATCH /v1/boards/{boardId}/rules',
-            'POST /v1/boards',
-            'PUT /v1/federation/peers/{nodeId}',
-            'PUT /v1/federation/peers/{nodeId}/settlement-ceiling',
-        ]);
+        assert.deepEqual(notCompiled, []);
     }, 60_000);
 });
