@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-12 — GET / serves the language version of the operator's template that fits the reader
+ *     (SiteService.getTemplatePage), with its own canonical address and the hreflang links.
  *   2026-11-12 — GET / stamps the operator's portal template with the node head metadata
  *     (injectTemplatePageHead): it was sent as stored, with no canonical link, og:* or JSON-LD.
  *   2026-11-07 — this_node.description is the story's one line, read from aimeatStory.oneLine in
@@ -118,6 +120,7 @@ import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
 import { buildFirstSteps } from '../services/first-steps.js';
 import { apexOnly } from './agent-docs.js';
 import { mountSitemapRoutes } from './sitemaps.js';
+import { templateAddress, templateAlternates } from '../services/site/template-languages.js';
 import { mountHealthRoute } from './health.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
 import { livePageMarkdown } from '../services/page-body-live.js';
@@ -171,7 +174,7 @@ export function bootstrapRouter(
 
   // The two sitemaps live in ./sitemaps.ts — a pure extraction when this file hit the line
   // ceiling. Nothing about them changed in the move.
-  mountSitemapRoutes(router, config, storage);
+  mountSitemapRoutes(router, config, storage, siteService);
 
   router.get('/favicon.ico', (_req, res) => {
     res.type('image/svg+xml').send(FAVICON_SVG);
@@ -284,19 +287,29 @@ export function bootstrapRouter(
     // served AT the root with the root's own head metadata. It used to 302 to /v1/portal, which
     // cost the front door its canonical URL and made the root a redirect in every report.
     if (!wantsJson) {
-      if (!closed && siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
-        const customHtml = await siteService.getPortalHtml(
-          _req.query.lang as string | undefined,
-          _req.headers.cookie,
-          _req.headers['accept-language'] as string | undefined,
-        );
+      const templatePage = !closed && siteService && config.siteEnabled
+        ? await siteService.getTemplatePage({ lang: _req.query.lang, cookie: _req.headers.cookie, acceptLanguage: _req.headers['accept-language'] as string | undefined })
+        : null;
+      if (templatePage) {
+        // One page per language: the reader's page is picked from ?lang, the language chosen on
+        // this device and the browser's list, so the answer varies by those two headers.
+        if (templatePage.versions.languages.length > 0) {
+          res.vary('Accept-Language');
+          res.vary('Cookie');
+        }
+        if (templatePage.lang) res.set('Content-Language', templatePage.lang);
         res.set('Cache-Control', `public, max-age=${config.siteCacheTtlSeconds}`);
         // The template gets the head metadata the SPA shell and the static front pages get: the
-        // canonical link, og:* and JSON-LD, with the template's own tags left as written.
+        // canonical link, og:* and JSON-LD, with the template's own tags left as written, and the
+        // address of each language the front page has.
         // Operator templates are trusted and may include inline <script>; stamp the
         // per-request CSP nonce so they pass script-src 'self' 'nonce-...'. It runs last, so the
         // JSON-LD blocks written here carry the nonce too.
-        const stamped = injectTemplatePageHead(customHtml, '/', findPublicPage('/'), config);
+        const stamped = injectTemplatePageHead(templatePage.html, '/', findPublicPage('/'), config, '', {
+          lang: templatePage.lang,
+          address: templatePage.version ? templateAddress(config.baseUrl, templatePage.version) : undefined,
+          alternates: templateAlternates(config.baseUrl, templatePage.versions),
+        });
         res.type('text/html').send(injectCspNonce(stamped, res.locals.cspNonce as string | undefined));
         return;
       }

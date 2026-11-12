@@ -34,6 +34,7 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-11-12 - `language` on PublicPage: the language of a page served in one known language.
  *   2026-11-09 - TARGET-094: `ownContent` marks the three pages that show this node's own content (/,
  *     /v1/app-store, /v1/members). With `seo.primary_node_url` set, every other page names the main
  *     node's address as canonical (canonicalPageUrl) and leaves this node's sitemap and IndexNow
@@ -140,6 +141,8 @@ export interface PublicPage {
    * it as the canonical address.
    */
   canonical?: string;
+  /** The language of the page, when it is served in one known language: the WebPage block's `inLanguage`. */
+  language?: string;
   /**
    * Body text for a built page that has no `.md` mirror: what the shell sends a crawler under the
    * title. Never a mirror and never an alternate link, because no address serves it on its own.

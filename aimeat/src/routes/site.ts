@@ -7,6 +7,9 @@
  *              the operator-authored portal template).
  * @usage Mounted in server.ts via siteRouter(config, storage).
  * @version-history
+ *   v1.9.0 — 2026-11-12 — The template routes take `lang`: GET, POST and DELETE /v1/site/template
+ *            reach a language version, GET lists the versions, POST /v1/site/import takes
+ *            `templates`, and GET /v1/site/sync carries the versions to a copy.
  *   v1.8.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.7.0 — 2026-09-24 — Mounts themesRouter (/v1/themes*, Themes & Styles) behind the same LB guard,
  *            with the config provenance (who chooses is saved like any setting).
@@ -24,7 +27,7 @@
  *   v1.5.0 — 2026-07-14 — Markdown for Agents: GET / converts the portal HTML to markdown
  *            when Accept prefers text/markdown; Vary: Accept.
  */
-import { Router, type RequestHandler } from 'express';
+import { Router, type RequestHandler, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
@@ -56,6 +59,17 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         next();
     };
 
+    /** The language a request names: a code, undefined when it names none, false when the value is no code. */
+    const namedLanguage = (value: unknown): string | undefined | false => {
+        if (value === undefined || value === null || value === '') return undefined;
+        const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+        return /^[a-z]{2}$/.test(text) ? text : false;
+    };
+    const refuseLanguage = (res: Response): void => {
+        res.status(422).json(error(config.nodeId, 'TEMPLATE_LANG_INVALID',
+            'Write the language as a two-letter code, such as "fi" or "en", then send it again. Leave it out for the default page.'));
+    };
+
     // The surface layouts live in their own file but on this router, so they inherit the LB guard
     // and the whole site family answers from one mount.
     router.use(siteLayoutRouter(config, storage, requireNotLb));
@@ -76,36 +90,39 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     // GET /v1/site/template — Download current template (operator)
     // No custom template is a normal state (default portal active), NOT an error:
     // return 200 with template:null so clients don't log a spurious 404 on every poll.
-    router.get('/v1/site/template', requireAuth(), requireOperator(storage), async (_req, res) => {
-        const result = await site.getTemplate();
-        if (!result) {
-            res.json(success(config.nodeId, {
-                template: null,
-                size_bytes: 0,
-                updated_at: null,
-                tags_found: [],
-            }));
-            return;
-        }
+    // `?lang=<code>` names a language version of the template; without it the route means the
+    // default page. A value that is not a language code is refused, never read as "no language":
+    // a mistyped code on DELETE would otherwise delete the whole front page.
+    router.get('/v1/site/template', requireAuth(), requireOperator(storage), async (req, res) => {
+        const lang = namedLanguage(req.query.lang);
+        if (lang === false) { refuseLanguage(res); return; }
+        const [result, pages] = await Promise.all([site.getTemplate(lang), site.listTemplates()]);
+        const languages = pages.filter(p => p.lang !== null)
+            .map(p => ({ lang: p.lang, size_bytes: p.sizeBytes, updated_at: p.updatedAt }));
         res.json(success(config.nodeId, {
-            template: result.template,
-            size_bytes: result.sizeBytes,
-            updated_at: result.updatedAt,
-            tags_found: result.tagsFound,
+            template: result?.template ?? null,
+            lang: lang ?? null,
+            size_bytes: result?.sizeBytes ?? 0,
+            updated_at: result?.updatedAt ?? null,
+            tags_found: result?.tagsFound ?? [],
+            languages,
         }));
     });
 
-    // POST /v1/site/template — Upload new template (operator)
+    // POST /v1/site/template — Upload the default page, or with `lang` a language version (operator)
     router.post('/v1/site/template', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         const { template } = req.body ?? {};
         if (!template || typeof template !== 'string') {
             res.status(422).json(error(config.nodeId, 'TEMPLATE_INVALID', 'Name the template you want to use, then send it again.'));
             return;
         }
+        const lang = namedLanguage(req.body?.lang ?? req.query.lang);
+        if (lang === false) { refuseLanguage(res); return; }
         try {
-            const result = await site.uploadTemplate(template, req.auth!.sub);
+            const result = await site.uploadTemplate(template, req.auth!.sub, lang);
             res.json(success(config.nodeId, {
                 stored: true,
+                lang: lang ?? null,
                 size_bytes: Buffer.byteLength(template, 'utf-8'),
                 tags_found: result.tagsFound,
                 unresolvable_tags: result.unresolvableTags,
@@ -120,19 +137,36 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         }
     });
 
-    // DELETE /v1/site/template — Revert to default (operator)
+    // DELETE /v1/site/template — Revert to default: the default page and its language versions.
+    // With `lang`, that language version only (operator)
     router.delete('/v1/site/template', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
-        await site.deleteTemplate(req.auth!.sub);
-        res.json(success(config.nodeId, { deleted: true, reverted_to: 'default' }));
+        const lang = namedLanguage(req.query.lang);
+        if (lang === false) { refuseLanguage(res); return; }
+        const deleted = await site.deleteTemplate(req.auth!.sub, lang);
+        if (lang && !deleted) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `The front page has no ${lang} version.`));
+            return;
+        }
+        res.json(success(config.nodeId, lang ? { deleted: true, lang } : { deleted: true, reverted_to: 'default' }));
         emitChange('site');
     });
 
     // POST /v1/site/import — Import portal bundle (operator)
     router.post('/v1/site/import', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         const body = req.body ?? {};
-        if (!body.template && !body.memory && !body.kv) {
-            res.status(422).json(error(config.nodeId, 'IMPORT_INVALID', 'Bundle must include at least one of: template, memory, kv'));
+        if (!body.template && !body.templates && !body.memory && !body.kv) {
+            res.status(422).json(error(config.nodeId, 'IMPORT_INVALID', 'Bundle must include at least one of: template, templates, memory, kv'));
             return;
+        }
+        // The language versions of the template: { "<code>": "<html>" }, each a whole page.
+        if (body.templates !== undefined) {
+            const entries = body.templates && typeof body.templates === 'object' && !Array.isArray(body.templates)
+                ? Object.entries(body.templates as Record<string, unknown>) : null;
+            if (!entries || entries.some(([lang, page]) => !/^[a-z]{2}$/.test(lang) || typeof page !== 'string' || !page)) {
+                res.status(422).json(error(config.nodeId, 'IMPORT_INVALID',
+                    '"templates" is an object of language versions: a two-letter language code to that page\'s HTML.'));
+                return;
+            }
         }
         // Validate memory keys are under portal/* namespace
         if (body.memory && typeof body.memory === 'object') {
@@ -165,6 +199,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
             const result = await site.importBundle(
                 {
                     template: typeof body.template === 'string' ? body.template : undefined,
+                    templates: body.templates as Record<string, string> | undefined,
                     memory: body.memory as Record<string, string> | undefined,
                     kv: body.kv as Record<string, string> | undefined,
                 },
@@ -172,6 +207,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
             );
             res.json(success(config.nodeId, {
                 template_stored: result.templateStored,
+                template_versions_stored: result.templateVersionsStored,
                 memory_keys_written: result.memoryKeysWritten,
                 kv_pairs_updated: result.kvPairsUpdated,
                 changelog_entry_id: result.changelogEntryId,
@@ -349,6 +385,16 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
             }
         }
 
+        // The template's language versions: the ones changed since, and the codes of all that
+        // exist, so a copy drops a version the origin no longer has.
+        const pages = (await site.listTemplates()).filter(p => p.lang !== null);
+        const templateVersions: Array<{ lang: string; html: string; updated_at: string }> = [];
+        for (const page of pages) {
+            if (!(new Date(page.updatedAt) > sinceDate)) continue;
+            const version = await site.getTemplate(page.lang!);
+            if (version) templateVersions.push({ lang: page.lang!, html: version.template, updated_at: version.updatedAt });
+        }
+
         // Portal memory keys
         const allMemory = await storage.listMemory('__site__', { prefix: 'portal/' });
         const memoryKeys = allMemory
@@ -370,6 +416,8 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         res.json(success(config.nodeId, {
             sync_timestamp: new Date().toISOString(),
             template,
+            template_versions: templateVersions,
+            template_languages: pages.map(p => p.lang),
             memory_keys: memoryKeys,
             deleted_memory_keys: [],
             kv: config.siteKv,

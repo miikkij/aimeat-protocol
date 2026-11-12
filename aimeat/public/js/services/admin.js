@@ -263,9 +263,11 @@ export const setGhiiCors     = (ghii, origins) => apiPut(`/v1/admin/ghii/${encod
 
 // ── Portal / Site ──
 export const getSiteMeta      = ()      => apiGet('/v1/site');
-export const getSiteTemplate  = ()      => apiGet('/v1/site/template');
-export const saveSiteTemplate = (tmpl)  => apiPost('/v1/site/template', { template: tmpl });
-export const deleteSiteTemplate = ()    => apiDelete('/v1/site/template');
+// `lang` names a language version of the HTML page; without it the call means the default page.
+const templateLangQuery = (lang) => (lang ? `?lang=${encodeURIComponent(lang)}` : '');
+export const getSiteTemplate  = (lang)        => apiGet('/v1/site/template' + templateLangQuery(lang));
+export const saveSiteTemplate = (tmpl, lang)  => apiPost('/v1/site/template' + templateLangQuery(lang), { template: tmpl });
+export const deleteSiteTemplate = (lang)      => apiDelete('/v1/site/template' + templateLangQuery(lang));
 export const getSiteChangelog = ()      => apiGet('/v1/site/changelog');
 export const getSiteMemoryKeys = ()     => apiGet('/v1/site/memory-keys');
 export const setSiteMemory    = (key, value) => apiPost('/v1/site/memory', { key, value });

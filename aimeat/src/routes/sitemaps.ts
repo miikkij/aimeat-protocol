@@ -11,9 +11,11 @@
  *   still do.
  *
  * @structure
- *   - mountSitemapRoutes(router, config, storage) — registers the sitemap GET endpoints
- * @usage mountSitemapRoutes(router, config, storage);
+ *   - mountSitemapRoutes(router, config, storage, siteService?) — registers the sitemap GET endpoints
+ * @usage mountSitemapRoutes(router, config, storage, siteService);
  * @version-history
+ *   v1.5.0 — 2026-11-12 — sitemap.xml lists each language version of the operator's front page
+ *     template at its own address, with the hreflang set on each.
  *   v1.0.0 — 2026-08-16 — Extracted from bootstrap.ts (line ceiling), sitemap-index.xml included
  *   v1.0.1 — 2026-09-26 — The app owner comes from localAccountName (utils/gaii.ts), which keeps an
  *     identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -37,9 +39,12 @@ import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/port
 import { localAccountName } from '../utils/gaii.js';
 import { indexedDatasetPages } from '../services/datapackage/copy-origin.js';
 import { escapeHtml } from '../utils/html-escape.js';
+import { signedInOnly } from '../config-visibility.js';
+import type { SiteService } from '../services/site.js';
+import { templateAddress, templateAlternates } from '../services/site/template-languages.js';
 
 /** Register `/sitemap.xml` and `/sitemap-index.xml` on the given router. */
-export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
+export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage: Storage, siteService?: SiteService): void {
   // Indexable HTML pages only, from the shared registry (src/data/public-pages.ts). The API
   // endpoints this list used to carry — /v1/spec (YAML), /v1/catalogue and /v1/health (JSON) —
   // are discoverable through the RFC 9727 API catalog, the Link headers on every GET, llms.txt
@@ -51,16 +56,29 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
   // it, which no app origin's does — so the document was both wrong and useless. It also swallowed
   // the app origin's own refusal: an app whose owner has not asked to be found returns 404 here,
   // and without this guard that 404 fell through and answered with the node's list instead.
-  router.get('/sitemap.xml', apexOnly, (_req, res) => {
+  router.get('/sitemap.xml', apexOnly, async (_req, res) => {
     const b = config.baseUrl;
     const now = new Date().toISOString().split('T')[0];
+    // A front page the operator stored as one page per language: every language's address is
+    // listed, each with the whole hreflang set, which is how sitemaps.org pairs translations.
+    const versions = siteService && config.siteEnabled && !signedInOnly(config)
+      ? await siteService.templateVersions() : null;
+    const alternates = versions ? templateAlternates(b, versions) : [];
+    const links = alternates
+      .map(a => `<xhtml:link rel="alternate" hreflang="${escapeHtml(a.hreflang)}" href="${escapeHtml(a.href)}"/>`).join('');
     const xml = [
       '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${links ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : ''}>`,
       // The pages handed to the main node (seo.primary_node_url) are its to list, not this node's.
-      ...indexedPages(config).map(p =>
-        `  <url><loc>${b}${p.path === '/' ? '/' : p.path}</loc><lastmod>${now}</lastmod><changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`
-      ),
+      ...indexedPages(config).flatMap(p => {
+        const tail = `<lastmod>${now}</lastmod><changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority>`;
+        if (p.path !== '/') return [`  <url><loc>${b}${p.path}</loc>${tail}</url>`];
+        return [
+          `  <url><loc>${b}/</loc>${tail}${links}</url>`,
+          ...(versions?.languages ?? []).map(lang =>
+            `  <url><loc>${escapeHtml(templateAddress(b, lang))}</loc>${tail}${links}</url>`),
+        ];
+      }),
       '</urlset>',
     ].join('\n');
     res.type('application/xml').send(xml);

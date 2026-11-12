@@ -2985,11 +2985,12 @@
     },
     "src/services/site.ts": {
       "reads": {
-        "getStorageFile": 3,
+        "getStorageFile": 4,
+        "listStorageFiles": 2,
         "listMemory": 2,
         "getMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's site template, portal keys and header navigation."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's site template, portal keys and header navigation. Reviewed 2026-11-12: the template's language versions, the operator's own __site__ files, listed and read like the default page."
     },
     "src/services/skill-agent-link-records.ts": {
       "reads": {

@@ -6,6 +6,8 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   2026-11-12 — site-portal gains "A page in several languages": one whole page per language
+ *     (\`templates\` in the bundle, \`?lang=\` on the template routes). Additive.
  *   2026-10-15 — Step 3 of the portal prompt: no nonce is fetched, and the token lasts the node's token lifetime, not 24 hours (feature-list audit 33).
  *   v1.1.0 — 2026-08-31 — site-portal gains the two things an operator had to find out by trying:
  *     the front page is normally BLOCKS arranged with the layout editor and a template replaces all
@@ -88,6 +90,26 @@ Generate a JSON bundle matching the \`POST /v1/site/import\` body schema:
 }
 \`\`\`
 
+## A page in several languages
+
+Write one whole page per language. The \`template\` is the default page, served at \`/\`. Each other
+language is a complete HTML document of its own in \`templates\`, keyed by its two-letter code, and is
+served at \`/?lang=<code>\`:
+
+\`\`\`json
+{
+  "template": "<html lang=\\"fi\\">...</html>",
+  "templates": { "en": "<html lang=\\"en\\">...</html>", "es": "<html lang=\\"es\\">...</html>" }
+}
+\`\`\`
+
+Give every page its own \`<html lang>\`, \`<title>\`, meta description and exactly one \`<h1>\`, in
+that page's language. Link the languages to each other with plain links (\`<a href="/?lang=en">\`).
+The node sends each visitor the page for their language and writes the canonical address and the
+\`hreflang\` links into every page, so leave those two out of the HTML. Ask the person which language
+is the default page: visitors with no version of their own, and search engines that name no
+language, get that one.
+
 ## Header & Navigation (IMPORTANT — ask first)
 
 A custom template REPLACES the entire landing page, including the default AIMEAT
@@ -151,8 +173,11 @@ hex values stop matching the first time it does.
 
 - \`GET /v1/site\` — Portal metadata
 - \`POST /v1/site/template\` — Upload template (operator auth required)
+- \`POST /v1/site/template?lang=<code>\` — Upload one language version, after the default page
+- \`GET /v1/site/template\` — The default page and the list of language versions (\`?lang=<code>\` for one)
 - \`POST /v1/site/import\` — Import full bundle (operator auth required)
-- \`DELETE /v1/site/template\` — Revert to default portal
+- \`DELETE /v1/site/template\` — Revert to default portal (deletes the language versions too)
+- \`DELETE /v1/site/template?lang=<code>\` — Delete one language version
 - \`POST /v1/site/cache-invalidate\` — Force cache refresh after changes`,
     variables: ['node_id', 'node_name', 'node_url'],
     usedIn: ['/v1/site'],

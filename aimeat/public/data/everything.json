@@ -3651,6 +3651,15 @@
      "plain": "Blocks you arrange An operator picks, orders and hides the parts of the front page and of the members' home, and writes text between them, by hand or by telling their AI. Every change keeps the one before it. /v1/site/layout, aimeat_surface_layout_get"
     },
     {
+     "slug": "g-16-your-own-front-page-in-each-language-you-write",
+     "cells": [
+      "<strong>Your own front page, in each language you write</strong>",
+      "An operator replaces the front page with an HTML page of their own, and can store one whole page per language beside it. Each visitor gets the page in their language: the address's <code>?lang</code>, then the language chosen on the device, then the browser's list. Each language has an address of its own (<code>/</code> for the default page, <code>/?lang=en</code> for the English one), and the node writes the canonical address, the links between the languages (<code>hreflang</code>), the social tags and the structured data into every page, and lists every address in the sitemap, so a search engine files each language on its own. A visitor whose language has no page gets the English one when there is one, and the default page otherwise. Not available: one address path per language (<code>/en/</code>), and a language picked by country.",
+      "Admin Portal page, <code>POST /v1/site/template?lang=</code>, <code>POST /v1/site/import</code>"
+     ],
+     "plain": "Your own front page, in each language you write An operator replaces the front page with an HTML page of their own, and can store one whole page per language beside it. Each visitor gets the page in their language: the address's ?lang, then the language chosen on the device, then the browser's list. Each language has an address of its own (/ for the default page, /?lang=en for the English one), and the node writes the canonical address, the links between the languages (hreflang), the social tags and the structured data into every page, and lists every address in the sitemap, so a search engine files each language on its own. A visitor whose language has no page gets the English one when there is one, and the default page otherwise. Not available: one address path per language (/en/), and a language picked by country. Admin Portal page, POST /v1/site/template?lang=, POST /v1/site/import"
+    },
+    {
      "slug": "g-16-home",
      "cells": [
       "<strong>Home</strong>",
@@ -5000,6 +5009,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 512
+  "rows": 513
  }
 }

@@ -8,10 +8,17 @@
  *
  * @structure
  *   - SiteService.getPortalHtml(): returns portal HTML with tag substitution and TTL caching
+ *   - SiteService.getTemplatePage(reader): the stored page a reader gets (the default page or a
+ *     language version), with the languages the front page has
+ *   - uploadTemplate / getTemplate / deleteTemplate take an optional language; listTemplates()
  *   - HeaderNavConfig / PUBLIC_NAV_LINK_IDS: operator-configurable public header link order/visibility
  *   - validateTemplate(): the refusals an uploaded template must survive, script-tag rule included
  *
  * @version-history
+ *   v1.6.0 — 2026-11-12 — The template has language versions: one whole page per language, stored
+ *     beside the default page under `__site_template__.<code>`. getTemplatePage picks the reader's
+ *     page (site/template-languages.ts); the resolved HTML is cached per page. Deleting the default
+ *     page deletes its language versions.
  *   v1.5.0 — 2026-08-29 — PUBLIC_NAV_LINK_IDS drops `exchange`: the EXCHANGE app is a site-footer link
  *     now, like the store. A stored order or hidden list naming it is filtered out on read.
  *   v1.4.0 — 2026-08-26 — Pure extraction: the tag grammar (CONFIG_WHITELIST, TAG_REGEX, escapeHtml)
@@ -40,6 +47,7 @@ import { getSiteSyncState } from './site-sync.js';
 import { substituteVariables, resolvePromptContent } from './prompt-variables.js';
 import { extractTags, findUnresolvableTags, resolveTags, type TagDeps } from './site-tags.js';
 import { isReservedSurfaceKey } from './surface-layout/keys.js';
+import { documentLanguage, pickTemplateVersion, type TemplateReader, type TemplateVersions } from './site/template-languages.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname_site = dirname(fileURLToPath(import.meta.url));
@@ -60,6 +68,34 @@ const SPA_HTML_PATH = resolveSpaHtmlPath();
 
 // Reserved storage key for the portal template
 const SITE_TEMPLATE_KEY = '__site_template__';
+/** The storage key of the default page, or of the language version `lang` stored beside it. */
+export function siteTemplateKey(lang?: string): string {
+    return lang ? `${SITE_TEMPLATE_KEY}.${lang}` : SITE_TEMPLATE_KEY;
+}
+/** The language of a language version's storage key; undefined for any other key. */
+function versionOfKey(key: string): string | undefined {
+    return key.match(/^__site_template__\.([a-z]{2})$/)?.[1];
+}
+
+/** The stored page a reader gets. */
+export interface TemplatePage {
+    /** The resolved HTML, tags substituted. */
+    html: string;
+    /** The language version served; undefined when it is the default page. */
+    version?: string;
+    /** The language of the served page: the version's, or the one the default page states. */
+    lang?: string;
+    /** Every page the front page has, for the hreflang links. */
+    versions: TemplateVersions;
+}
+
+/** One stored page of the front page, without its bytes. */
+export interface TemplateListing {
+    /** null for the default page. */
+    lang: string | null;
+    sizeBytes: number;
+    updatedAt: string;
+}
 /**
  * System owner GAII used for site template storage, and for every other piece of node-level content
  * that belongs to nobody in particular: the `portal/*` records, the email templates, and the surface
@@ -91,7 +127,10 @@ export interface HeaderNavConfig {
 }
 
 export class SiteService {
-    private cache: { html: string; expiresAt: number } | null = null;
+    /** Resolved HTML per stored page; the default page is under the empty key. */
+    private cache = new Map<string, { html: string; expiresAt: number }>();
+    /** Which pages are stored, held as long as the HTML. */
+    private versionsCache: { versions: TemplateVersions | null; expiresAt: number } | null = null;
 
     constructor(
         private config: AimeatConfig,
@@ -123,27 +162,52 @@ export class SiteService {
         cookieHeader: string | undefined,
         acceptLang: string | undefined,
     ): Promise<string> {
-        // Check cache first
-        if (this.cache && Date.now() < this.cache.expiresAt) {
-            return this.cache.html;
-        }
+        const page = await this.getTemplatePage({ lang: langParam, cookie: cookieHeader, acceptLanguage: acceptLang });
+        if (page) return page.html;
+        // No custom template — use default portal
+        return this.withWebmcpTag(await this.renderDefault(langParam, cookieHeader, acceptLang));
+    }
 
-        // Check for custom template
-        const templateRecord = await this.storage.getStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
-        if (!templateRecord) {
-            // No custom template — use default portal
-            return this.withWebmcpTag(await this.renderDefault(langParam, cookieHeader, acceptLang));
-        }
+    /**
+     * The custom front page a reader gets: the language version that fits them, or the default
+     * page. null when the operator has stored no page. The pick is pickTemplateVersion's; a version
+     * that was deleted while its name was still cached falls back to the default page.
+     */
+    async getTemplatePage(reader: TemplateReader): Promise<TemplatePage | null> {
+        const versions = await this.templateVersions();
+        if (!versions) return null;
+        const version = pickTemplateVersion(versions, reader);
+        const versionHtml = version ? await this.resolvedPage(version) : null;
+        const html = versionHtml ?? await this.resolvedPage(undefined);
+        if (html === null) return null;
+        const served = versionHtml !== null ? version : undefined;
+        return { html, version: served, lang: served ?? versions.defaultLang, versions };
+    }
 
-        const raw = templateRecord.data.toString('utf-8');
-        const html = this.withWebmcpTag(await resolveTags(raw, this.tagDeps));
-
-        // Cache resolved HTML
-        this.cache = {
-            html,
-            expiresAt: Date.now() + this.config.siteCacheTtlSeconds * 1000,
-        };
+    /** The resolved HTML of one stored page, from the cache or from storage; null when it is not stored. */
+    private async resolvedPage(lang: string | undefined): Promise<string | null> {
+        const cacheKey = lang ?? '';
+        const hit = this.cache.get(cacheKey);
+        if (hit && Date.now() < hit.expiresAt) return hit.html;
+        const record = await this.storage.getStorageFile(SITE_OWNER_GAII, siteTemplateKey(lang));
+        if (!record) { this.cache.delete(cacheKey); return null; }
+        const html = this.withWebmcpTag(await resolveTags(record.data.toString('utf-8'), this.tagDeps));
+        this.cache.set(cacheKey, { html, expiresAt: Date.now() + this.config.siteCacheTtlSeconds * 1000 });
         return html;
+    }
+
+    /** Which pages the custom front page has; null when there is no default page. */
+    async templateVersions(): Promise<TemplateVersions | null> {
+        if (this.versionsCache && Date.now() < this.versionsCache.expiresAt) return this.versionsCache.versions;
+        const record = await this.storage.getStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
+        let versions: TemplateVersions | null = null;
+        if (record) {
+            const files = await this.storage.listStorageFiles(SITE_OWNER_GAII);
+            const languages = files.map(f => versionOfKey(f.key)).filter((l): l is string => !!l).sort();
+            versions = { defaultLang: documentLanguage(record.data.toString('utf-8')), languages };
+        }
+        this.versionsCache = { versions, expiresAt: Date.now() + this.config.siteCacheTtlSeconds * 1000 };
+        return versions;
     }
 
     /** Check if a custom template exists. */
@@ -152,9 +216,21 @@ export class SiteService {
         return record !== null;
     }
 
-    /** Get the raw template HTML (unresolved tags). */
-    async getTemplate(): Promise<{ template: string; sizeBytes: number; updatedAt: string; tagsFound: string[] } | null> {
-        const record = await this.storage.getStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
+    /** The stored pages of the front page, the default page first, without their bytes. */
+    async listTemplates(): Promise<TemplateListing[]> {
+        const files = await this.storage.listStorageFiles(SITE_OWNER_GAII);
+        const out: TemplateListing[] = [];
+        for (const f of files) {
+            const lang = f.key === SITE_TEMPLATE_KEY ? null : versionOfKey(f.key);
+            if (lang === undefined) continue;
+            out.push({ lang, sizeBytes: f.size, updatedAt: f.createdAt });
+        }
+        return out.sort((a, b) => (a.lang ?? '').localeCompare(b.lang ?? ''));
+    }
+
+    /** Get the raw template HTML (unresolved tags): the default page, or the language version `lang`. */
+    async getTemplate(lang?: string): Promise<{ template: string; sizeBytes: number; updatedAt: string; tagsFound: string[] } | null> {
+        const record = await this.storage.getStorageFile(SITE_OWNER_GAII, siteTemplateKey(lang));
         if (!record) return null;
         const template = record.data.toString('utf-8');
         const tags = extractTags(template);
@@ -166,15 +242,40 @@ export class SiteService {
         };
     }
 
-    /** Upload a new template. Returns tags found and any unresolvable tags. */
-    async uploadTemplate(template: string, changedBy: string): Promise<{ tagsFound: string[]; unresolvableTags: string[] }> {
+    /**
+     * Upload the default page, or with `lang` the language version stored beside it. Returns tags
+     * found and any unresolvable tags. A language version needs the default page, which every
+     * reader without a version of their own gets, and its own `<html lang>` must not name another
+     * language: the page would be served and announced under the wrong one.
+     */
+    async uploadTemplate(template: string, changedBy: string, lang?: string): Promise<{ tagsFound: string[]; unresolvableTags: string[] }> {
         this.validateTemplate(template);
+        if (lang) {
+            this.validateVersion(template, lang);
+            if (!await this.hasCustomTemplate()) {
+                throw new SiteError('TEMPLATE_DEFAULT_MISSING',
+                    'Save the default page first. A language version is served beside it, to the readers of that language.', 409);
+            }
+        }
 
+        const size = await this.storeTemplate(template, lang);
+        const tags = extractTags(template);
+        const unresolvable = await findUnresolvableTags(tags, this.tagDeps);
+        this.invalidateCache();
+
+        await this.addChangeLog('template_upload',
+            `Updated portal template${lang ? ` in ${lang}` : ''} (${(size / 1024).toFixed(1)} KB)`, changedBy);
+
+        return { tagsFound: tags, unresolvableTags: unresolvable };
+    }
+
+    /** Write one page of the front page over the stored one. Returns its size in bytes. */
+    private async storeTemplate(template: string, lang: string | undefined): Promise<number> {
         const data = Buffer.from(template, 'utf-8');
         // Delete existing template first (createStorageFile uses unique constraint)
-        await this.storage.deleteStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
+        await this.storage.deleteStorageFile(SITE_OWNER_GAII, siteTemplateKey(lang));
         await this.storage.createStorageFile({
-            key: SITE_TEMPLATE_KEY,
+            key: siteTemplateKey(lang),
             ownerGaii: SITE_OWNER_GAII,
             visibility: 'public',
             mimeType: 'text/html',
@@ -182,47 +283,94 @@ export class SiteService {
             data,
             createdAt: new Date().toISOString(),
         });
-
-        const tags = extractTags(template);
-        const unresolvable = await findUnresolvableTags(tags, this.tagDeps);
-        this.invalidateCache();
-
-        await this.addChangeLog('template_upload', `Updated portal template (${(data.length / 1024).toFixed(1)} KB)`, changedBy);
-
-        return { tagsFound: tags, unresolvableTags: unresolvable };
+        return data.length;
     }
 
-    /** Delete the custom template. Portal reverts to default. */
-    async deleteTemplate(changedBy: string): Promise<void> {
-        await this.storage.deleteStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
+    /**
+     * Delete the custom template: with `lang` that language version only, and without it the default
+     * page and every language version, so the portal reverts to the default. Returns false when the
+     * named language version did not exist.
+     */
+    async deleteTemplate(changedBy: string, lang?: string): Promise<boolean> {
+        if (lang) {
+            const deleted = await this.storage.deleteStorageFile(SITE_OWNER_GAII, siteTemplateKey(lang));
+            this.invalidateCache();
+            if (deleted) await this.addChangeLog('template_delete', `Deleted the ${lang} version of the custom template`, changedBy);
+            return deleted;
+        }
+        for (const page of await this.listTemplates()) {
+            await this.storage.deleteStorageFile(SITE_OWNER_GAII, siteTemplateKey(page.lang ?? undefined));
+        }
         this.invalidateCache();
         await this.addChangeLog('template_delete', 'Deleted custom template, reverted to default', changedBy);
+        return true;
     }
 
-    /** Import a portal bundle: template + memory keys + KV pairs. */
-    async importBundle(
-        bundle: { template?: string; memory?: Record<string, string>; kv?: Record<string, string> },
-        changedBy: string,
-    ): Promise<{ templateStored: boolean; memoryKeysWritten: number; kvPairsUpdated: number; changelogEntryId: string }> {
-        let templateStored = false;
-        let memoryKeysWritten = 0;
-        let kvPairsUpdated = 0;
-
-        // 1. Template
-        if (bundle.template) {
-            this.validateTemplate(bundle.template);
-            const data = Buffer.from(bundle.template, 'utf-8');
-            await this.storage.deleteStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
+    /**
+     * A copy's side of the origin sync (services/site-sync.ts): store the language versions the
+     * origin changed, and drop the ones it no longer has. `existing` is the origin's whole list; an
+     * origin that sends none (an older node) leaves this copy's versions as they are.
+     */
+    async applySyncedVersions(
+        changed: ReadonlyArray<{ lang: string; html: string; updated_at: string }>,
+        existing: readonly string[] | undefined,
+    ): Promise<number> {
+        let stored = 0;
+        for (const version of changed) {
+            if (!/^[a-z]{2}$/.test(version.lang) || typeof version.html !== 'string') continue;
+            const data = Buffer.from(version.html, 'utf-8');
             await this.storage.createStorageFile({
-                key: SITE_TEMPLATE_KEY,
+                key: siteTemplateKey(version.lang),
                 ownerGaii: SITE_OWNER_GAII,
                 visibility: 'public',
                 mimeType: 'text/html',
                 size: data.length,
                 data,
-                createdAt: new Date().toISOString(),
+                createdAt: version.updated_at,
             });
+            stored++;
+        }
+        if (existing) {
+            for (const page of await this.listTemplates()) {
+                if (page.lang && !existing.includes(page.lang)) {
+                    await this.storage.deleteStorageFile(SITE_OWNER_GAII, siteTemplateKey(page.lang));
+                }
+            }
+        }
+        this.invalidateCache();
+        return stored;
+    }
+
+    /** Import a portal bundle: template + language versions + memory keys + KV pairs. */
+    async importBundle(
+        bundle: { template?: string; templates?: Record<string, string>; memory?: Record<string, string>; kv?: Record<string, string> },
+        changedBy: string,
+    ): Promise<{ templateStored: boolean; templateVersionsStored: number; memoryKeysWritten: number; kvPairsUpdated: number; changelogEntryId: string }> {
+        let templateStored = false;
+        let templateVersionsStored = 0;
+        let memoryKeysWritten = 0;
+        let kvPairsUpdated = 0;
+
+        // Every page is checked before the first one is written.
+        const versions = Object.entries(bundle.templates ?? {});
+        if (bundle.template) this.validateTemplate(bundle.template);
+        for (const [lang, page] of versions) {
+            this.validateTemplate(page);
+            this.validateVersion(page, lang);
+        }
+        if (versions.length > 0 && !bundle.template && !await this.hasCustomTemplate()) {
+            throw new SiteError('TEMPLATE_DEFAULT_MISSING',
+                'Send the default page as "template" with the language versions, or save it first.', 409);
+        }
+
+        // 1. Template, then its language versions
+        if (bundle.template) {
+            await this.storeTemplate(bundle.template, undefined);
             templateStored = true;
+        }
+        for (const [lang, page] of versions) {
+            await this.storeTemplate(page, lang);
+            templateVersionsStored++;
         }
 
         // 2. Memory keys (portal/* namespace)
@@ -255,11 +403,12 @@ export class SiteService {
 
         const parts: string[] = [];
         if (templateStored) parts.push('template');
+        if (templateVersionsStored > 0) parts.push(`${templateVersionsStored} language versions`);
         if (memoryKeysWritten > 0) parts.push(`${memoryKeysWritten} memory keys`);
         if (kvPairsUpdated > 0) parts.push(`${kvPairsUpdated} KV pairs`);
         const entryId = await this.addChangeLog('import', `Imported portal bundle: ${parts.join(' + ')}`, changedBy);
 
-        return { templateStored, memoryKeysWritten, kvPairsUpdated, changelogEntryId: entryId };
+        return { templateStored, templateVersionsStored, memoryKeysWritten, kvPairsUpdated, changelogEntryId: entryId };
     }
 
     /** Set a single portal memory key (portal/* namespace, public). Used by the admin Portal Memory Keys editor. */
@@ -315,7 +464,8 @@ export class SiteService {
     }
 
     invalidateCache(): void {
-        this.cache = null;
+        this.cache.clear();
+        this.versionsCache = null;
     }
 
     /** Get portal metadata for API clients. */
@@ -327,6 +477,7 @@ export class SiteService {
             node_type: this.config.nodeType,
             base_url: this.config.baseUrl,
             has_custom_template: hasTemplate,
+            template_languages: hasTemplate ? (await this.templateVersions())?.languages ?? [] : [],
             kv: this.config.siteKv,
             template_updated_at: templateInfo?.updatedAt ?? null,
             cache_ttl_seconds: this.config.siteCacheTtlSeconds,
@@ -469,6 +620,18 @@ export class SiteService {
             if (/\{\{memory:[^}]+\}\}/.test(block)) {
                 throw new SiteError('TEMPLATE_INVALID', 'Template must not contain {{memory:*}} tags inside <script> blocks', 422);
             }
+        }
+    }
+
+    /** A language version says, when it says anything, that it is in the language it is stored under. */
+    private validateVersion(template: string, lang: string): void {
+        if (!/^[a-z]{2}$/.test(lang)) {
+            throw new SiteError('TEMPLATE_LANG_INVALID', `"${lang}" is not a language code. Use two letters, such as "fi" or "en".`, 422);
+        }
+        const stated = documentLanguage(template);
+        if (stated && stated !== lang) {
+            throw new SiteError('TEMPLATE_LANG_MISMATCH',
+                `The page states <html lang="${stated}"> and you are saving it as the ${lang} version. Save it as the ${stated} version, or change the page's lang attribute.`, 422);
         }
     }
 

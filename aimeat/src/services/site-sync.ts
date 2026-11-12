@@ -12,6 +12,8 @@
  *   - doSync(config, storage, siteService): fetch origin /v1/site/sync?since=... and apply template/memory/KV/posts
  *
  * @version-history
+ *   v1.1.0 — 2026-11-12 — The template's language versions are synced: changed ones stored, and one
+ *     the origin no longer has dropped (SiteService.applySyncedVersions).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { AimeatConfig } from '../config.js';
@@ -46,6 +48,8 @@ async function doSync(config: AimeatConfig, storage: Storage, siteService: SiteS
         data: {
             sync_timestamp: string;
             template: { html: string; updated_at: string } | null;
+            template_versions?: Array<{ lang: string; html: string; updated_at: string }>;
+            template_languages?: string[];
             memory_keys: Array<{ key: string; value: unknown; updated_at: string }>;
             deleted_memory_keys: string[];
             kv: Record<string, string>;
@@ -72,6 +76,13 @@ async function doSync(config: AimeatConfig, storage: Storage, siteService: SiteS
         });
         templateUpdated = true;
     }
+    // The template's language versions: the changed ones are stored, and one the origin no longer
+    // lists is dropped.
+    const versionsStored = await siteService.applySyncedVersions(
+        Array.isArray(data.template_versions) ? data.template_versions : [],
+        Array.isArray(data.template_languages) ? data.template_languages : undefined,
+    );
+    if (versionsStored > 0) templateUpdated = true;
 
     // Sync portal memory keys
     for (const mem of data.memory_keys) {

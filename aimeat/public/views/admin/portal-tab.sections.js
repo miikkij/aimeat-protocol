@@ -16,6 +16,8 @@
  * @structure WhichVersion · MenuLinks · OwnHtml · SavedTexts · AskAi · WhatChanged
  * @usage html`<${WhichVersion} hasCustom=${false} source="default" parts=${9} />`
  * @version-history
+ *   2026-11-12 — OwnHtml: the row that names the page's language versions, the tabs that choose the
+ *     page in the editor (the default page or one language), and the field that adds a language.
  *   2026-09-28 — What changed names each action once, in words (admin.portal.log.action.*); the raw id badge beside the name is gone.
  *   2026-09-28 — What changed shows an entry's `summary`, the field the change log carries.
  *   v2.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
@@ -47,6 +49,7 @@ import { SettingBox } from '/components/Box.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Fields } from '/components/Field.js';
 import { MoveButtons } from '/components/MoveButtons.js';
+import { Tabs } from '/components/Tabs.js';
 import { Columns, Space } from '/components/Layout.js';
 
 const html = htm.bind(h);
@@ -96,28 +99,53 @@ export function MenuLinks({ links, labels, saving, onToggle, onMove, onSave, num
  * Section 05: the operator's own HTML page. The warning comes BEFORE the editor, because the
  * decision it warns about is made by pressing Save in the editor.
  */
-export function OwnHtml({ hasCustom, updatedAt, template, onTemplate, onSave, onLoadCurrent, onDownload, onDelete, number }) {
+export function OwnHtml({ hasCustom, updatedAt, template, lang = '', langs = [], baseUrl = '', onPage, onTemplate, onSave, onLoadCurrent, onDownload, onDelete, number }) {
   const [open, setOpen] = useState(hasCustom);
+  const [newLang, setNewLang] = useState('');
+  const [badLang, setBadLang] = useState(false);
+  // The pages the editor can open: the default page, the stored language versions, and a version
+  // that is being written and is not stored yet.
+  const pages = ['', ...langs, ...(lang && !langs.includes(lang) ? [lang] : [])];
+  const addLanguage = () => {
+    const code = newLang.trim().toLowerCase();
+    if (!/^[a-z]{2}$/.test(code)) { setBadLang(true); return; }
+    setBadLang(false);
+    setNewLang('');
+    onPage(code);
+  };
+  const address = `${baseUrl}/${lang ? `?lang=${lang}` : ''}`;
   return html`
     <${Section} id="adm-pt-html" num=${number} title=${P('html.title')}
       doors=${html`
         ${!open && html`<${Action} small soft onClick=${() => setOpen(true)}>${P('html.write')}<//>`}
         <${Action} small soft onClick=${() => { setOpen(true); onLoadCurrent(); }}>${P('html.loadCurrent')}<//>`}>
-      <${Reading} last name=${P('html.state')} why=${hasCustom ? P('html.stateYours') : P('html.stateNone')}
+      <${Reading} last=${!hasCustom} name=${P('html.state')} why=${hasCustom ? P('html.stateYours') : P('html.stateNone')}
         mark=${hasCustom
           ? html`<${Badge} type="healthy" label=${P('html.badgeYours')} />`
           : html`<${Badge} type="muted" label=${P('html.badgeNone')} />`}
         value=${hasCustom && updatedAt ? dt(updatedAt) : '__site_template__'} />
+      ${hasCustom && html`
+        <${Reading} last name=${P('html.langs')} why=${langs.length ? P('html.langsSome') : P('html.langsNone')}
+          value=${langs.length ? langs.map(l => l.toUpperCase()).join(' · ') : P('html.badgeNone')} />`}
       <${SettingBox} label=${P('html.warnLabel')}>${P('html.warn')}<//>
       ${open && html`
         <${Space} above="large">
+          ${hasCustom && html`
+            <${Tabs} kind="view" value=${lang} label=${P('html.pageLabel')} onSelect=${onPage}
+              items=${pages.map(p => ({ value: p, label: p ? p.toUpperCase() : P('html.pageDefault') }))}>
+              <${TextField} code size="short" value=${newLang} placeholder=${P('html.addPh')} ariaLabel=${P('html.addLabel')}
+                invalid=${badLang} onInput=${(v) => { setNewLang(v); setBadLang(false); }} onEnter=${addLanguage}
+                actions=${html`<${Action} small soft onClick=${addLanguage}>${P('html.add')}<//>`} />
+            <//>
+            <${Note} kind="hint">${badLang ? P('html.addBad') : P(lang ? 'html.langHint' : 'html.defaultHint', { url: address })}<//>`}
           <${TextArea} code rows=${18} value=${template} placeholder=${P('html.editorPh')} ariaLabel=${P('html.title')}
             onInput=${(v) => onTemplate(v)} />
           <${Space} above="medium">
             <${Actions}>
-              <${Loud} control onClick=${onSave}>${P('html.save')}<//>
+              <${Loud} control onClick=${onSave}>${lang ? P('html.saveLang', { lang: lang.toUpperCase() }) : P('html.save')}<//>
               <${Action} small soft onClick=${onDownload}>${P('html.download')}<//>
-              ${hasCustom && html`<${Action} small soft tone="danger" onClick=${onDelete}>${P('html.delete')}<//>`}
+              ${(lang ? langs.includes(lang) : hasCustom) && html`
+                <${Action} small soft tone="danger" onClick=${onDelete}>${lang ? P('html.deleteLang') : P('html.delete')}<//>`}
             <//>
           <//>
         <//>`}

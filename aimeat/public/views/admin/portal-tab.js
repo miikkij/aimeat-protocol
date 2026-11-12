@@ -24,6 +24,8 @@
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-11-12 — The HTML page has language versions: the editor opens the default page or one
+ *     language's page, and saves, downloads and deletes the one it shows.
  *   2026-09-28 — The change log reads the list GET /v1/site/changelog answers; it read `.entries` and was always empty.
  *   v3.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a load-balancer origin URL with an ampersand (a query string) showed as &amp;.
@@ -63,7 +65,7 @@ import { SaveBar } from '/components/SaveBar.js';
 import { Beside, Stack, Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import {
-  saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
+  getSiteTemplate, saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
   getSiteMemoryKeys, getSitePrompt, setSiteMemory, deleteSiteMemory,
   importSiteBundle, triggerLbSync, getHeaderNav, saveHeaderNav,
   getSurfaceLayout, saveSurfaceLayout, revertSurfaceLayout, resetSurfaceLayout,
@@ -183,6 +185,9 @@ export default function PortalTab({ data, reload }) {
   const [versions, setVersions] = useState(null);
 
   const [template, setTemplate] = useState(tmpl.template || '');
+  // The page in the editor: '' is the default page, a two-letter code one of its language versions.
+  const [templateLang, setTemplateLang] = useState('');
+  const templateLangs = (tmpl.languages || []).map(l => l.lang);
   const [memKeys, setMemKeys] = useState(null);
   const [newKey, setNewKey] = useState('');
   const [newVal, setNewVal] = useState('');
@@ -323,13 +328,27 @@ export default function PortalTab({ data, reload }) {
     // The AI paste produces a JSON bundle, not raw HTML. If that was pasted here, the template
     // route would answer 422 — point at the section that takes it instead.
     if (template.trimStart().startsWith('{')) { showErr(P('html.looksLikeJson')); return; }
-    try { await saveSiteTemplate(template); bumpPreview(); reload(); showOk(P('html.saved')); }
+    try {
+      await saveSiteTemplate(template, templateLang);
+      bumpPreview(); reload();
+      showOk(templateLang ? P('html.savedLang', { lang: templateLang.toUpperCase() }) : P('html.saved'));
+    }
     catch (e) { showErr(e.message); }
+  }
+  // Another page into the editor: the default page or a language version, as the node stores it.
+  // A language with no stored version yet opens an empty editor.
+  async function openTemplatePage(lang) {
+    try {
+      const resp = await getSiteTemplate(lang);
+      setTemplate(resp.data?.template || '');
+      setTemplateLang(lang);
+    } catch (e) { showErr(e.message); }
   }
   async function loadCurrentAsTemplate() {
     const run = async () => {
       try {
-        const resp = await fetch('/', { headers: { Accept: 'text/html' }, cache: 'no-store' });
+        const address = templateLang ? `/?lang=${encodeURIComponent(templateLang)}` : '/';
+        const resp = await fetch(address, { headers: { Accept: 'text/html' }, cache: 'no-store' });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         setTemplate(await resp.text());
         showOk(P('html.loaded'));
@@ -342,13 +361,22 @@ export default function PortalTab({ data, reload }) {
     const blob = new Blob([template], { type: 'text/html' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'portal-template.html';
+    a.download = templateLang ? `portal-template.${templateLang}.html` : 'portal-template.html';
     a.click();
   }
-  const deleteTemplate = () => confirm(P('html.deleteAsk'), async () => {
-    try { await deleteSiteTemplate(); setTemplate(''); bumpPreview(); reload(); showOk(P('html.deleted')); }
-    catch (e) { showErr(e.message); }
-  }, { danger: true });
+  // Deleting the default page deletes its language versions with it, and the question says so.
+  const deleteTemplate = () => confirm(
+    templateLang ? P('html.deleteLangAsk', { lang: templateLang.toUpperCase() })
+      : templateLangs.length > 0 ? P('html.deleteAllAsk', { langs: templateLangs.map(l => l.toUpperCase()).join(', ') }) : P('html.deleteAsk'),
+    async () => {
+      try {
+        await deleteSiteTemplate(templateLang);
+        bumpPreview(); reload();
+        if (templateLang) { showOk(P('html.deletedLang')); await openTemplatePage(''); }
+        else { setTemplate(''); showOk(P('html.deleted')); }
+      }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
 
   // ── the saved texts ──
   async function addText() {
@@ -519,6 +547,7 @@ export default function PortalTab({ data, reload }) {
         <${MenuLinks} links=${navLinks} labels=${HEADER_LINK_LABELS} saving=${navSaving}
           onToggle=${toggleNav} onMove=${moveNav} onSave=${saveNav} number=${n()} />
         <${OwnHtml} hasCustom=${hasCustom} updatedAt=${tmpl.updated_at} template=${template}
+          lang=${templateLang} langs=${templateLangs} baseUrl=${meta.base_url || ''} onPage=${openTemplatePage}
           onTemplate=${setTemplate} onSave=${saveTemplate} onLoadCurrent=${loadCurrentAsTemplate}
           onDownload=${downloadTemplate} onDelete=${deleteTemplate} number=${n()} />
         <${SavedTexts} memKeys=${memKeys} kv=${meta.kv} newKey=${newKey} newVal=${newVal}

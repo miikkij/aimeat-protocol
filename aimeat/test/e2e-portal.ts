@@ -63,11 +63,15 @@ await test('GET /v1/site/template — refused without an operator session', asyn
 // The operator's template at `/` (2026-11-12). It was sent as stored, so a node whose front page is a
 // template had no canonical link, no og:* and no JSON-LD. The head is the node's, the body the
 // template's, and removing the template gives the SPA shell back. A second owner cannot store one.
+let opToken = '';
+let otherToken = '';
 await test('The operator template at / carries the node head metadata; a second owner cannot store one', async () => {
     const stamp = Date.now().toString(36);
     const op = await registerOwner(BASE, `portalop${stamp}`);
     assert(op.roles.includes('operator'), `the first owner of the suite is the operator, got ${op.roles.join(',')}`);
     const other = await registerOwner(BASE, `portalother${stamp}`);
+    opToken = op.token;
+    otherToken = other.token;
     const template = '<!doctype html><html lang="en"><head><title>Alice\'s bakery</title>'
         + '<meta name="description" content="Sourdough from the oven of Alice, baked every Friday morning.">'
         + '</head><body><h1>Alice bakes bread</h1></body></html>';
@@ -100,6 +104,83 @@ await test('The operator template at / carries the node head metadata; a second 
     }
     const back = await (await fetch(`${BASE}/`, { headers: { Accept: 'text/html' } })).text();
     assert(back.includes('<div id="app"') && !back.includes('Alice bakes bread'), 'the SPA shell is back at /');
+});
+
+// The template in several languages (2026-11-12): one whole page per language beside the default
+// page. Each reader gets one language with one h1, each language has its own address, and every
+// page names the others. A version the node could not serve is refused, and so is a second owner.
+await test('The operator template has language versions: one page and one address per language', async () => {
+    const page = (lang: string, h1: string) => `<!doctype html><html lang="${lang}"><head><title>${h1}</title>`
+        + `<meta name="description" content="${h1}, from the oven of Alice every Friday morning."></head><body><h1>${h1}</h1></body></html>`;
+    const send = (token: string, body: Record<string, unknown>, query = '') => fetch(`${BASE}/v1/site/template${query}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body),
+    });
+    const remove = (token: string, query = '') => fetch(`${BASE}/v1/site/template${query}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    const read = async (query: string, headers: Record<string, string> = {}) => {
+        const res = await fetch(`${BASE}/${query}`, { headers: { Accept: 'text/html', ...headers } });
+        const html = await res.text();
+        const head = html.slice(0, html.search(/<\/head\s*>/i));
+        const canonical = new URL(/<link rel="canonical" href="([^"]+)">/.exec(head)?.[1]?.replace(/&amp;/g, '&') ?? 'http://missing.invalid/none');
+        return { res, html, head, canonical };
+    };
+
+    const early = await send(opToken, { template: page('en', 'Bread on Fridays'), lang: 'en' });
+    assert(early.status === 409 && (await early.json()).error?.code === 'TEMPLATE_DEFAULT_MISSING', `a version before the default page: status ${early.status}`);
+    assert((await send(opToken, { template: page('fi', 'Leipää perjantaisin') })).status === 200, 'the default page is stored');
+    try {
+        assert((await send(otherToken, { template: page('en', 'Bread on Fridays'), lang: 'en' })).status === 403, 'a second owner cannot store a version');
+        const mismatch = await send(opToken, { template: page('es', 'Pan los viernes'), lang: 'en' });
+        assert(mismatch.status === 422 && (await mismatch.json()).error?.code === 'TEMPLATE_LANG_MISMATCH', `a page in another language: status ${mismatch.status}`);
+        const noCode = await send(opToken, { template: page('en', 'Bread on Fridays'), lang: 'english' });
+        assert(noCode.status === 422 && (await noCode.json()).error?.code === 'TEMPLATE_LANG_INVALID', `a value that is no code: status ${noCode.status}`);
+        // A mistyped code on DELETE is refused; read as "no language" it would delete the whole front page.
+        assert((await remove(opToken, '?lang=english')).status === 422, 'DELETE with a value that is no code is refused');
+        assert((await read('')).html.includes('<h1>Leipää perjantaisin</h1>'), 'the default page is still served');
+
+        assert((await send(opToken, { template: page('en', 'Bread on Fridays'), lang: 'en' })).status === 200, 'the en version is stored');
+        assert((await send(opToken, { template: page('es', 'Pan los viernes') }, '?lang=es')).status === 200, 'the es version is stored by ?lang');
+        assert((await remove(otherToken, '?lang=en')).status === 403, 'a second owner cannot delete a version');
+
+        const listing = await (await fetch(`${BASE}/v1/site/template?lang=en`, { headers: { Authorization: `Bearer ${opToken}` } })).json();
+        assert(listing.data.lang === 'en' && listing.data.template.includes('Bread on Fridays'), 'GET ?lang=en returns the en version');
+        assert(JSON.stringify(listing.data.languages.map((l: { lang: string }) => l.lang)) === '["en","es"]', `languages: ${JSON.stringify(listing.data.languages)}`);
+        const meta = await (await fetch(`${BASE}/v1/site`)).json();
+        assert(JSON.stringify(meta.data.template_languages) === '["en","es"]', `template_languages: ${JSON.stringify(meta.data.template_languages)}`);
+
+        const en = await read('', { 'Accept-Language': 'en-GB,en;q=0.9' });
+        assert((en.html.match(/<h1[\s>]/g) ?? []).length === 1 && en.html.includes('<h1>Bread on Fridays</h1>'), 'an English reader gets the en page, with one h1');
+        assert(en.canonical.pathname === '/' && en.canonical.search === '?lang=en', `en canonical: ${en.canonical.href}`);
+        assert(en.res.headers.get('content-language') === 'en', `Content-Language: ${en.res.headers.get('content-language')}`);
+        assert(/Accept-Language/i.test(en.res.headers.get('vary') ?? '') && /Cookie/i.test(en.res.headers.get('vary') ?? ''), `Vary: ${en.res.headers.get('vary')}`);
+        assert(en.head.includes('<meta property="og:title" content="Bread on Fridays">'), 'og:title is the en page\'s title');
+
+        const fi = await read('', { 'Accept-Language': 'en-US,en;q=0.9,fi;q=0.8' });
+        assert(fi.html.includes('<h1>Leipää perjantaisin</h1>') && fi.canonical.search === '', 'Finnish anywhere in the list gets the default page at the root address');
+        const es = await read('?lang=es', { 'Accept-Language': 'fi' });
+        assert(es.html.includes('<h1>Pan los viernes</h1>') && es.canonical.search === '?lang=es', '?lang beats the browser');
+        const picked = await read('', { 'Accept-Language': 'fi', Cookie: 'aimeat-lang=en; aimeat-lang-chosen=1' });
+        assert(picked.html.includes('<h1>Bread on Fridays</h1>'), 'a language picked on this device beats the browser');
+        for (const reply of [en, fi, es]) {
+            const langs = [...reply.head.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)">/g)].map(m => `${m[1]} ${new URL(m[2]!.replace(/&amp;/g, '&')).search}`);
+            assert(JSON.stringify(langs) === '["en ?lang=en","es ?lang=es","fi ","x-default "]', `hreflang: ${JSON.stringify(langs)}`);
+        }
+
+        const xml = await (await fetch(`${BASE}/sitemap.xml`)).text();
+        assert(/<loc>[^<]+\/\?lang=en<\/loc>/.test(xml) && /<loc>[^<]+\/\?lang=es<\/loc>/.test(xml), 'the sitemap lists each language address');
+        assert((xml.match(/<xhtml:link rel="alternate" hreflang="x-default"/g) ?? []).length === 3, 'each of the three addresses carries the hreflang set');
+        const md = await (await fetch(`${BASE}/?format=md&lang=es`)).text();
+        assert(md.includes('Pan los viernes'), 'the markdown of / follows the language');
+
+        assert((await remove(opToken, '?lang=es')).status === 200, 'the es version is deleted');
+        assert((await remove(opToken, '?lang=es')).status === 404, 'deleting it again answers 404');
+        assert((await read('?lang=es')).html.includes('<h1>Leipää perjantaisin</h1>'), 'a language with no version gets the default page');
+    } finally {
+        assert((await remove(opToken)).status === 200, 'the whole front page is deleted');
+    }
+    const after = await (await fetch(`${BASE}/v1/site/template`, { headers: { Authorization: `Bearer ${opToken}` } })).json();
+    assert(after.data.template === null && after.data.languages.length === 0, 'deleting the default page deletes its language versions');
+    const xml = await (await fetch(`${BASE}/sitemap.xml`)).text();
+    assert(!xml.includes('?lang=') && !xml.includes('xhtml:link'), 'the sitemap is the page registry again');
 });
 
 await test('GET /sitemap.xml — lists the two new pages and not the pricing page', async () => {

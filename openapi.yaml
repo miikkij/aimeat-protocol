@@ -8154,6 +8154,17 @@ components:
                         example: FEATURE_DISABLED
 
   parameters:
+    SiteTemplateLang:
+      name: lang
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: '^[a-z]{2}$'
+      description: >
+        The language version of the front page template to act on, as a two-letter language code
+        such as `fi` or `en`. Leave it out for the default page. A value that is not a two-letter
+        code is refused with 422 `TEMPLATE_LANG_INVALID`, never read as the default page.
     RelayClaim:
       name: X-Relay-Claim
       in: header
@@ -53633,6 +53644,11 @@ paths:
                         properties:
                           custom_template:
                             type: boolean
+                          template_languages:
+                            type: array
+                            description: The language versions of the custom template, as two-letter codes
+                            items:
+                              type: string
                           tag_types:
                             type: array
                             items:
@@ -53650,10 +53666,14 @@ paths:
         Download the current custom HTML template.
         When no custom template is set (the built-in default portal is active),
         returns `200` with `template: null` — this is a normal state, not an error.
+        With `lang`, returns that language version instead of the default page. `languages`
+        lists the language versions stored beside the default page, whichever page was asked for.
         Operator-only (Tier 2).
       tags: [Site]
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SiteTemplateLang'
       responses:
         '200':
           description: Current template content (template is null when the default portal is active)
@@ -53671,6 +53691,10 @@ paths:
                             type: string
                             nullable: true
                             description: HTML template, or null when no custom template is set
+                          lang:
+                            type: string
+                            nullable: true
+                            description: The language version returned, or null for the default page
                           size_bytes:
                             type: integer
                           updated_at:
@@ -53681,6 +53705,17 @@ paths:
                             type: array
                             items:
                               type: string
+                          languages:
+                            type: array
+                            description: The language versions stored beside the default page
+                            items:
+                              type: object
+                              properties:
+                                lang: { type: string }
+                                size_bytes: { type: integer }
+                                updated_at: { type: string, format: date-time }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
     post:
       operationId: uploadSiteTemplate
@@ -53690,10 +53725,22 @@ paths:
         Supported tag types: `config`, `memory`, `storage`, `kv`, `board`.
         The `board` tag (e.g. `{{board:announcements}}`) renders recent posts from a system/public board.
         Validates HTML safety (blocks raw `<script>` injections via memory tags).
+
+        Without `lang` this stores the default page, served at `/`. With `lang` it stores a
+        language version beside it: a whole page in that language, served at `/?lang=<code>` and
+        to readers of that language at `/`. The reader's page is picked from `?lang`, the language
+        chosen on the device, then the browser's list, where the default page's own language wins
+        wherever it stands; a request that names no language gets the default page. Every page of
+        the front page carries its own canonical address and one `hreflang` link per language, and
+        `/sitemap.xml` lists each address. A language version needs the default page first
+        (409 `TEMPLATE_DEFAULT_MISSING`), and its `<html lang>` must not name another language
+        (422 `TEMPLATE_LANG_MISMATCH`).
         Operator-only (Tier 2).
       tags: [Site]
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SiteTemplateLang'
       requestBody:
         required: true
         content:
@@ -53705,6 +53752,10 @@ paths:
                 template:
                   type: string
                   description: HTML template content with optional {{type:key}} tags
+                lang:
+                  type: string
+                  pattern: '^[a-z]{2}$'
+                  description: The language version to store, as the query parameter of the same name. Leave out for the default page.
       responses:
         '200':
           description: Template uploaded
@@ -53720,6 +53771,10 @@ paths:
                         properties:
                           stored:
                             type: boolean
+                          lang:
+                            type: string
+                            nullable: true
+                            description: The language version stored, or null for the default page
                           size_bytes:
                             type: integer
                           tags_found:
@@ -53730,6 +53785,8 @@ paths:
                             type: array
                             items:
                               type: string
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -53737,11 +53794,15 @@ paths:
       operationId: deleteSiteTemplate
       summary: Revert to default portal
       description: |
-        Delete the custom template and revert to the built-in default portal.
+        Delete the custom template and revert to the built-in default portal: the default page
+        and every language version stored beside it. With `lang`, delete that language version
+        only; its readers then get the default page.
         Operator-only (Tier 2).
       tags: [Site]
       security:
         - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SiteTemplateLang'
       responses:
         '200':
           description: Template deleted
@@ -53759,14 +53820,24 @@ paths:
                             type: boolean
                           reverted_to:
                             type: string
+                            description: Present when the whole template was deleted.
+                          lang:
+                            type: string
+                            description: Present when one language version was deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /v1/site/import:
     post:
       operationId: importSiteBundle
       summary: Import portal bundle
       description: |
-        Import a complete portal bundle containing template HTML,
-        memory keys (under `portal/*` namespace), and KV pairs.
+        Import a complete portal bundle containing template HTML, its language versions,
+        memory keys (under `portal/*` namespace), and KV pairs. Every page is checked before the
+        first one is stored. `templates` without `template` needs a default page already stored
+        (409 `TEMPLATE_DEFAULT_MISSING`).
         Operator-only (Tier 2).
       tags: [Site]
       security:
@@ -53781,6 +53852,11 @@ paths:
                 template:
                   type: string
                   description: HTML template content
+                templates:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: The language versions, a two-letter language code to that page's whole HTML
                 memory:
                   type: object
                   additionalProperties:
@@ -53806,12 +53882,16 @@ paths:
                         properties:
                           template_stored:
                             type: boolean
+                          template_versions_stored:
+                            type: integer
                           memory_keys_written:
                             type: integer
                           kv_pairs_updated:
                             type: integer
                           changelog_entry_id:
                             type: string
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
@@ -81387,8 +81467,8 @@ paths:
       summary: Origin sync feed for load-balancer nodes
       description: |
         Return portal content changed since `?since=` (ISO timestamp) for LB nodes to mirror: the
-        site template, portal memory keys, node KV, and system board posts. No auth — portal content
-        is public.
+        site template and its language versions, portal memory keys, node KV, and system board
+        posts. No auth — portal content is public.
       parameters:
         - name: since
           in: query
@@ -81410,6 +81490,19 @@ paths:
                         properties:
                           sync_timestamp: { type: string, format: date-time }
                           template: { type: object, nullable: true }
+                          template_versions:
+                            type: array
+                            description: The language versions of the template changed since `since`.
+                            items:
+                              type: object
+                              properties:
+                                lang: { type: string }
+                                html: { type: string }
+                                updated_at: { type: string, format: date-time }
+                          template_languages:
+                            type: array
+                            description: The language code of every version that exists, so a copy drops one the origin no longer has.
+                            items: { type: string }
                           memory_keys: { type: array, items: { type: object } }
                           deleted_memory_keys: { type: array, items: { type: string } }
                           kv: { type: object }

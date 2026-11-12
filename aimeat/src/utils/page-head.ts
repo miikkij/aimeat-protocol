@@ -29,6 +29,9 @@
  *   html = injectStaticPageHead(html, '/', findPublicPage('/'), config, nonceAttr);
  *   html = injectTemplatePageHead(templateHtml, '/', findPublicPage('/'), config);
  * @version-history
+ *   2026-11-12 - injectTemplatePageHead takes the template's languages: a language version's own
+ *     address is its canonical link, every page carries the hreflang set, and the WebPage block
+ *     states `inLanguage`.
  *   2026-11-12 - injectTemplatePageHead: the operator's portal template at `/` is stamped too. It was
  *     sent as stored, so a node whose front page is a template had no canonical link, no og:* and
  *     no JSON-LD (AGENTSCAN S10, S12, S13), the defect the static front pages had until 2026-10-27.
@@ -278,6 +281,7 @@ export function injectPageHead(
       name: page.title,
       description: page.description,
       url,
+      ...(page.language ? { inLanguage: page.language } : {}),
       dateModified: new Date().toISOString().split('T')[0],
       isPartOf: { '@type': 'WebSite', name: config.seoSiteName, url: `${b}/` },
     });
@@ -325,6 +329,16 @@ export function injectStaticPageHead(
   return injectPageHead(out, page, config, nonceAttr);
 }
 
+/** What a front page stored as one page per language tells its head. */
+export interface TemplateLanguages {
+  /** The language of the page being served, when it is known. */
+  lang?: string;
+  /** The page's own address when it is a language version; the default page keeps the path's. */
+  address?: string;
+  /** The hreflang set: every language's address, and `x-default`. Empty for a page in one language. */
+  alternates: ReadonlyArray<{ hreflang: string; href: string }>;
+}
+
 /**
  * The head tags an operator's template may state for itself: the tag, the attribute that names it,
  * the name, and the attribute that holds its value.
@@ -359,6 +373,11 @@ const OWN_HEAD_TAGS: ReadonlyArray<readonly ['meta' | 'link', string, string, st
  *
  * No markdown alternate link is written: the registry's mirror (`/index.md`) holds the classic
  * front page's text, a different document, and the head names no second address for this page.
+ *
+ * `languages` describes a front page stored as one page per language (services/site.ts): the
+ * language of this page, its own address when it is a language version, and the hreflang set. The
+ * address becomes the canonical link, og:url and the WebPage url unless the template states a
+ * canonical link; the hreflang links are written unless the template states any itself.
  */
 export function injectTemplatePageHead(
   html: string,
@@ -366,6 +385,7 @@ export function injectTemplatePageHead(
   registryPage: PublicPage | undefined,
   config: AimeatConfig,
   nonceAttr = '',
+  languages?: TemplateLanguages,
 ): string {
   const headEnd = html.search(/<\/head\s*>/i);
   if (headEnd < 0) return html;
@@ -417,10 +437,20 @@ export function injectTemplatePageHead(
     priority: '1.0',
     ...registryPage,
     markdown: undefined,
+    ...(languages?.lang ? { language: languages.lang } : {}),
+    ...(languages?.address ? { canonical: languages.address } : {}),
     ...(/^https?:\/\/[^\s"'<>]+$/i.test(statedCanonical) ? { canonical: statedCanonical } : {}),
   };
   out = injectStaticPageHead(out, path, page, config, nonceAttr);
 
   for (const tag of stated) out = out.replace(tag.pattern, () => tag.text);
+
+  // One link per language the front page has, the same set on every one of its pages.
+  const statesHreflang = spans.link.some(s => (s.attrs.hreflang ?? '').trim() !== '');
+  if (languages && languages.alternates.length > 0 && !statesHreflang) {
+    const links = languages.alternates
+      .map(a => `<link rel="alternate" hreflang="${esc(a.hreflang)}" href="${esc(a.href)}">`).join('\n');
+    out = beforeHeadEnd(out, links);
+  }
   return out;
 }
