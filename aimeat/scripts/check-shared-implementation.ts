@@ -148,7 +148,6 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/sharing-groups.ts': 4,
     'src/mcp/skills.ts': 1,
     'src/mcp/wallet-extended.ts': 2,
-    'src/mcp/workspace-members.ts': 1,
     'src/mcp/workspaces.ts': 6,
 };
 

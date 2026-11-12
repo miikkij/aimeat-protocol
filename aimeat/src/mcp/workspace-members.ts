@@ -33,6 +33,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { granteeOwner, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
 import { decideAccessRequest, requestStatus } from '../services/workspace-access-decision.js';
+import { listWorkspaceAccessRequests } from '../services/organism-read/workspace-access-requests.js';
 import { membershipAfterGrant } from '../services/invitations.js';
 import type { Storage } from '../storage/interface.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -92,7 +93,7 @@ export function registerWorkspaceMemberTools(
                 if (!(await isManager())) return fail('Only the workspace creator or an org admin can see access requests.');
                 const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
                 const roles = await listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: organism_id, ws });
-                const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
+                const items = await listWorkspaceAccessRequests(storage, organism_id, ws);
                 const requests = items.map(r => {
                     const v = r.value as { requester?: string; message?: string; createdAt?: string; status?: string };
                     const req = v.requester ?? bareOwner(r.ownerGaii);

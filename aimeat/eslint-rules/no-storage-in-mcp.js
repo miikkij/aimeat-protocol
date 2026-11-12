@@ -99,7 +99,6 @@ const EXEMPT = new Set([
   'src/mcp/sharing-groups.ts',
   'src/mcp/skills.ts',
   'src/mcp/wallet-extended.ts',
-  'src/mcp/workspace-members.ts',
   'src/mcp/workspaces.ts',
 ]);
 

@@ -109,6 +109,7 @@ import { workspaceMetaReader } from '../../services/workspace-meta.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { decideAccessRequest, requestStatus } from '../../services/workspace-access-decision.js';
+import { listWorkspaceAccessRequests } from '../../services/organism-read/workspace-access-requests.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, membershipAfterGrant, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
@@ -345,7 +346,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       const workspaces = await Promise.all(manageable.map(async (w) => {
         // Grants are OWNED by each workspace's creator — resolve roles via that creator, not the caller.
         const roles = await memberRolesForWs(`${w.createdBy}@${config.nodeId}`, id, w.id);
-        const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${w.id}.access.request.`, limit: 1000 });
+        const items = await listWorkspaceAccessRequests(storage, id, w.id);
         const requests = items.map(r => {
           const v = r.value as { requester?: string; message?: string; createdAt?: string; status?: string };
           const requester = v.requester ?? bareOwner(r.ownerGaii);
@@ -367,7 +368,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     }
     const creatorGhii = `${createdBy}@${config.nodeId}`;
     const roles = await memberRolesForWs(creatorGhii, id, ws);   // owner → 'viewer' | 'contributor'
-    const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${ws}.access.request.`, limit: 1000 });
+    const items = await listWorkspaceAccessRequests(storage, id, ws);
     const requests = items.map(r => {
       const v = r.value as { requester?: string; message?: string; createdAt?: string; status?: string };
       const requester = v.requester ?? bareOwner(r.ownerGaii);
