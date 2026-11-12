@@ -7,8 +7,10 @@
  *   telemetry_events table). Raw telemetry is no longer written by the server (see
  *   services/telemetry-buffer.ts), so any existing rows are legacy backlog that only takes
  *   up space — this script reports the size and lets you clear it or trim by age.
- *   Detects the configured storage provider from .env (sqlite). Read-only by
- *   default: it prints stats and mutates ONLY when given --clear or --older-than.
+ *   Detects the configured storage provider from .env (sqlite). The command's name decides
+ *   the action (scripts/lib/prune-mode.ts): telemetry:stats only reads and refuses a delete
+ *   flag; telemetry:prune deletes, and without --clear or --older-than it prints its usage
+ *   and exits 2.
  * @usage
  *   pnpm telemetry:stats                  # report count + size only (no changes)
  *   pnpm telemetry:prune --older-than=7   # delete events older than 7 days
@@ -16,6 +18,7 @@
  *   pnpm telemetry:prune --clear --force  # skip the confirmation prompt
  *   (sqlite only) add --vacuum to reclaim file space after a delete
  * @version-history
+ *   v2.1.0 -- 2026-11-13 -- The name decides: :stats refuses a delete flag, :prune without one exits 2 with usage
  *   v2.0.0 -- 2026-07-16 -- Drop the MongoDB path (backend removed); sqlite only
  *   v1.0.0 -- 2026-06-21 -- Initial: stats + clear/older-than prune for sqlite & mongodb.
  */
@@ -24,6 +27,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
+import { readPruneArgs } from './lib/prune-mode.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -44,13 +48,8 @@ function loadEnv(): Record<string, string> {
 
 const env = { ...loadEnv(), ...process.env };
 const provider = env.AIMEAT_STORAGE ?? 'memory';
-const argv = process.argv.slice(2);
-const force = argv.includes('--force') || argv.includes('-f');
-const clear = argv.includes('--clear');
-const vacuum = argv.includes('--vacuum');
-const olderThanArg = argv.find(a => a.startsWith('--older-than='));
-const olderThanDays = olderThanArg ? Number(olderThanArg.split('=')[1]) : null;
-const willMutate = clear || olderThanDays !== null;
+// package.json passes `stats` or `prune` first; the word decides, and a wrong flag exits 2.
+const { force, vacuum, olderThanDays, willMutate } = readPruneArgs(process.argv.slice(2), 'telemetry');
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;

@@ -8,8 +8,10 @@
  *   grew without bound (1.2M+ rows in prod). The server now only writes denials + consent
  *   mutations and a core job prunes past the retention window — but this script lets you
  *   inspect the size, see the breakdown by action, and clear the legacy backlog now.
- *   Detects the storage provider from .env. Read-only by default: mutates only with
- *   --clear or --older-than=<days>.
+ *   Detects the storage provider from .env. The command's name decides the action
+ *   (scripts/lib/prune-mode.ts): consent-audit:stats only reads and refuses a delete flag;
+ *   consent-audit:prune deletes, and without --clear or --older-than=<days> it prints its
+ *   usage and exits 2.
  * @usage
  *   pnpm consent-audit:stats                  # count + size + per-action breakdown
  *   pnpm consent-audit:prune --older-than=90   # delete entries older than 90 days
@@ -17,6 +19,7 @@
  *   pnpm consent-audit:prune --clear --force   # skip the confirmation prompt
  *   (sqlite only) add --vacuum to reclaim file space after a delete
  * @version-history
+ *   v1.1.0 -- 2026-11-13 -- The name decides: :stats refuses a delete flag, :prune without one exits 2 with usage
  *   v1.0.0 -- 2026-06-21 -- Initial: stats (with per-action breakdown) + prune for sqlite & mongodb.
  */
 
@@ -24,6 +27,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
+import { readPruneArgs } from './lib/prune-mode.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -42,13 +46,8 @@ function loadEnv(): Record<string, string> {
 
 const env = { ...loadEnv(), ...process.env };
 const provider = env.AIMEAT_STORAGE ?? 'memory';
-const argv = process.argv.slice(2);
-const force = argv.includes('--force') || argv.includes('-f');
-const clear = argv.includes('--clear');
-const vacuum = argv.includes('--vacuum');
-const olderThanArg = argv.find(a => a.startsWith('--older-than='));
-const olderThanDays = olderThanArg ? Number(olderThanArg.split('=')[1]) : null;
-const willMutate = clear || olderThanDays !== null;
+// package.json passes `stats` or `prune` first; the word decides, and a wrong flag exits 2.
+const { force, vacuum, olderThanDays, willMutate } = readPruneArgs(process.argv.slice(2), 'consent-audit');
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
