@@ -73,6 +73,7 @@ import {
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { offeringExtAction } from '../services/exchange/offering-action.js';
 import { findExtension, addressSegment } from '../services/component-address.js';
 
 function ownerOf(gaii: string): string {
@@ -183,8 +184,7 @@ export function registerExchangeTools(
                 });
             }
 
-            const extRec = await storage.getExtension(o.ext);
-            const act = extRec?.actions.find(a => a.id === o.action);
+            const act = await offeringExtAction(storage, o);
             return ok({
                 // A raw ext offering paces at the action's live toll, as the REST detail states it.
                 offering: presentOffering(config, o, { declaredToll: act ? extActionDeclaredToll(act) : o.tollMorsels }),

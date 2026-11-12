@@ -78,6 +78,7 @@ import { proposeDeliversData, packageIfaceApp, DATAPACKAGE_ACTION } from '../ser
 import { logger } from '../utils/logger.js';
 import { findExtension, addressSegment } from '../services/component-address.js';
 import { dataListingRefusal } from '../services/data-intermediation/gate.js';
+import { offeringExtAction } from '../services/exchange/offering-action.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -460,8 +461,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     }
 
     // ext-action: schema comes live from the provider's extension action.
-    const extRec = await storage.getExtension(o.ext);
-    const act = extRec?.actions.find(a => a.id === o.action);
+    const act = await offeringExtAction(storage, o);
     return {
       capability: act ? {
         input_schema: act.inputSchema ?? {},

@@ -88,7 +88,6 @@ const EXEMPT = new Set([
   'src/mcp/core.ts',
   'src/mcp/cortex.ts',
   'src/mcp/exchange-run.ts',
-  'src/mcp/exchange.ts',
   'src/mcp/extensions.ts',
   'src/mcp/knowledge.ts',
   'src/mcp/memory-extended.ts',
