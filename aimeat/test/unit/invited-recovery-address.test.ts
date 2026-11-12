@@ -6,7 +6,7 @@
  *   unproven address an account made from an invitation may recover through. The designed use: the
  *   account an accepted invitation made gets its invited address. The refusals: no invitation, an
  *   invitation another account accepted, one accepted before this account existed (a name taken
- *   again after an erasure), one not accepted, and an address another account holds. The mail paths
+ *   again after an erasure), one not accepted, a code key, and an address another account holds. The mail paths
  *   themselves are proven in test/e2e-email-delivery.ts.
  * @usage pnpm exec vitest run test/unit/invited-recovery-address.test.ts
  * @version-history
@@ -25,8 +25,8 @@ function account(name: string, email: string | undefined, extra: Partial<GHIIRec
   return { username: name, ghii: `${name}@${NODE}`, ownerName: name, createdAt: MADE, notificationEmail: email, ...extra } as GHIIRecord;
 }
 
-function invitation(email: string, acceptedBy: string | null, acceptedAt: string | null, status: InvitationRecord['status'] = 'accepted'): InvitationRecord {
-  return { emailHash: emailHashOf(email), acceptedBy, acceptedAt, status } as InvitationRecord;
+function invitation(email: string, acceptedBy: string | null, acceptedAt: string | null, status: InvitationRecord['status'] = 'accepted', type: InvitationRecord['type'] = 'link'): InvitationRecord {
+  return { emailHash: emailHashOf(email), acceptedBy, acceptedAt, status, type } as InvitationRecord;
 }
 
 function store(invitations: InvitationRecord[], accounts: GHIIRecord[]) {
@@ -65,6 +65,11 @@ describe('invitedRecoveryAddress', () => {
   it('names nothing for an invitation that was not accepted', async () => {
     const carol = account('carol', EMAIL);
     expect(await invitedRecoveryAddress(store([invitation(EMAIL, 'carol', LATER, 'cancelled')], [carol]), carol)).toBeNull();
+  });
+
+  it('names nothing for a code key, whose minter chose the address and knows the key', async () => {
+    const carol = account('carol', EMAIL);
+    expect(await invitedRecoveryAddress(store([invitation(EMAIL, 'carol', LATER, 'accepted', 'code')], [carol]), carol)).toBeNull();
   });
 
   it('names nothing when another account holds the address', async () => {

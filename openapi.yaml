@@ -80500,7 +80500,7 @@ paths:
       summary: Request a password reset code
       description: |
         Sends a password reset code to the account's verified email (no auth). An account made from
-        an emailed invitation whose invited address was never confirmed gets the code at that address
+        an emailed invitation link (not an organism code key) whose invited address was never confirmed gets the code at that address
         instead, and the reset made with it confirms the address; no other unconfirmed address gets a
         code. Always returns the
         same response regardless of whether the account exists, to avoid account enumeration.

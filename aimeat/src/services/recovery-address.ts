@@ -59,12 +59,20 @@ export function provenRecoveryAddress(rec: Pick<GHIIRecord, 'notificationEmail' 
 type InvitationReads = Pick<Storage, 'listInvitationsByEmailHash' | 'getGHIIByEmailHash'>;
 
 /**
- * The recovery address when an invitation that made this account was sent to it, or null. The
- * evidence is an invitation to exactly this address, accepted by this account no earlier than the
- * account was made. Nothing else writes that record: an existing account accepts only with this
- * address already proven, and an address written onto the account later (PUT /v1/ghii takes one
- * from any principal of the owner) has no such invitation, so it never qualifies. Null too when
- * another account holds the address, which stays that account's.
+ * The recovery address when an emailed invitation link that made this account was sent to it, or
+ * null. The evidence is a link invitation to exactly this address, accepted by this account no
+ * earlier than the account was made. Nothing else writes that record: an existing account accepts
+ * only with this address already proven, and an address written onto the account later (PUT /v1/ghii
+ * takes one from any principal of the owner) has no such invitation, so it never qualifies. Null too
+ * when another account holds the address, which stays that account's.
+ *
+ * A code key never qualifies: its minter chose the address and knows the key, and the holder's own
+ * credentials must not be reachable from the minter's side (secaudit2026nov08,
+ * attach-email:pending-code-key-accepts-any-address).
+ *
+ * ACCEPTED RISK (Jouni, 2026-11-12): an inviter who invites an address of their own and hands the
+ * link to someone else can reset the account that person makes, while its address stays unproven.
+ * The accept page shows the invited address, and asks for its code before it leaves.
  */
 export async function invitedRecoveryAddress(
   storage: InvitationReads,
@@ -76,7 +84,8 @@ export async function invitedRecoveryAddress(
   // The account's own invitation: a name freed by an erased account and taken again does not
   // inherit the invitation the erased account accepted.
   const madeAt = Date.parse(rec.createdAt);
-  const madeBy = invitations.some(inv => inv.acceptedBy === rec.username && !!inv.acceptedAt && Date.parse(inv.acceptedAt) >= madeAt);
+  const madeBy = invitations.some(inv => inv.type !== 'code' && inv.acceptedBy === rec.username
+    && !!inv.acceptedAt && Date.parse(inv.acceptedAt) >= madeAt);
   if (!madeBy) return null;
   const holder = await storage.getGHIIByEmailHash(hash);
   if (holder && holder.ghii !== rec.ghii) return null;
