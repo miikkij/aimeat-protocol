@@ -33,6 +33,8 @@
  *   v2.3.0 — 2026-09-03 — getServerAppRow(owner, filename): the server's own row for one app, for the detail's Needs section.
  *   v2.4.0 — 2026-09-24 — The consents dialog's Close is the library's action link and Revoke the
  *     loud action's danger tone (Jouni's decision "Dialog actions").
+ *   v2.4.1 — 2026-11-12 — A community or favourite row marks an app that brings an agent with the
+ *     word (card.agent) in the AI marker's box, in place of the robot emoji.
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
@@ -1032,7 +1034,7 @@ function publishedRowHtml(sa, aimeatUrl, index) {
   var metaParts = [author];
   if (sa.version_number) metaParts.push('v' + sa.version_number);
   var when = fmtDate(sa.created_at); if (when) metaParts.push(when);
-  var nameExtra = (shipsAgent ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
+  var nameExtra = (shipsAgent ? ' <span class="pcb-ai-gen pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">' + escapeHtml(t('card.agent')) + '</span>' : '') +
     ((sa.forks && sa.forks > 0)
       ? ' <span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="event.stopPropagation(); window._launcher.showLineageModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')">⑂ ' + sa.forks + '</span>'
       : '');

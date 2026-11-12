@@ -32,6 +32,8 @@
  *     numbered index that opens in place, the header sticker becomes the band with the numbers
  *     (plus the opens total) and the masthead's mono line, and the foot carries the count.
  *   v3.2.0 — 2026-09-13 — The source editor opens through dialogs.js (the site's one dialog).
+ *   v3.2.1 — 2026-11-12 — An app that brings an agent is marked with the word (card.agent) in the
+ *     AI marker's box, in place of the robot emoji.
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl, currentOwnerName } from './util.js';
 import { openPreview, previewTarget, clearPreview } from './preview-host.js';
@@ -432,7 +434,7 @@ function buildLibraryEntries(localApps, serverApps) {
     var sa = serverApps[s];
     var fn = sa.filename || '';
     var prot = (sa.manifest && sa.manifest.protection) || {};
-    // Agent-Bundled Apps: the card gets a 🤖 marker when the manifest declares crew-defs.
+    // Agent-Bundled Apps: the card gets the word marker (card.agent) when the manifest declares crew-defs.
     var shipsAgent = !!(sa.manifest && sa.manifest.cortex && sa.manifest.cortex.agents && sa.manifest.cortex.agents.length);
     var m = fn ? byFilename[fn] : null;
     if (m) {
@@ -614,7 +616,7 @@ function libraryRowHtml(e, i) {
   var when = fmtDate(e.createdAt); if (when) metaParts.push(when);
   var kb = fmtKb(e.size); if (kb) metaParts.push(kb);
   var nameExtra = (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
-    (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
+    (e.hasAgents ? ' <span class="pcb-ai-gen pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">' + escapeHtml(t('card.agent')) + '</span>' : '') +
     aiPostureMarkers(e);
   // The one line in the panel: where the work is.
   var line = e.hasDraft ? t('row.lineDraft')
@@ -675,7 +677,7 @@ function libraryCardHtml(e, i) {
       '<div class="app-icon">' + escapeHtml(e.icon || '\u{1F4DD}') + '</div>' +
       '<div class="app-name">' + escapeHtml(e.name) +
         (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
-        (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
+        (e.hasAgents ? ' <span class="pcb-ai-gen pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">' + escapeHtml(t('card.agent')) + '</span>' : '') +
         aiPostureMarkers(e) + '</div>' +
       (function () {
         // Show the description in the current UI language, falling back to the canonical one.

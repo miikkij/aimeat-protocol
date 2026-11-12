@@ -13950,7 +13950,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     if (sa.version_number) metaParts.push("v" + sa.version_number);
     var when = fmtDate(sa.created_at);
     if (when) metaParts.push(when);
-    var nameExtra = (shipsAgent ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + (sa.forks && sa.forks > 0 ? ' <span class="pcb-forks" title="' + escapeHtml(t("card.forksHint")) + `" onclick="event.stopPropagation(); window._launcher.showLineageModal('` + jsArg(owner) + "', '" + jsArg(fn) + `')">⑂ ` + sa.forks + "</span>" : "");
+    var nameExtra = (shipsAgent ? ' <span class="pcb-ai-gen pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">' + escapeHtml(t("card.agent")) + "</span>" : "") + (sa.forks && sa.forks > 0 ? ' <span class="pcb-forks" title="' + escapeHtml(t("card.forksHint")) + `" onclick="event.stopPropagation(); window._launcher.showLineageModal('` + jsArg(owner) + "', '" + jsArg(fn) + `')">⑂ ` + sa.forks + "</span>" : "");
     return rowHtml2({
       n: index + 1,
       icon: sa.icon || m.icon || "📝",
@@ -14615,7 +14615,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     if (when) metaParts.push(when);
     var kb = fmtKb(e.size);
     if (kb) metaParts.push(kb);
-    var nameExtra = (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + aiPostureMarkers(e);
+    var nameExtra = (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-ai-gen pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">' + escapeHtml(t("card.agent")) + "</span>" : "") + aiPostureMarkers(e);
     var line = e.hasDraft ? t("row.lineDraft") : e.parked ? t("row.lineUnlisted") : e.published ? t("row.linePublished").replace("{v}", e.versionNumber ? "v" + e.versionNumber : "").replace("{date}", when || "") : t("row.lineLocal");
     return rowHtml2({
       n: i,

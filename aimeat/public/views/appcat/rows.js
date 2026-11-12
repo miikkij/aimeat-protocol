@@ -12,6 +12,8 @@
  * @structure AppRow({ sa, i, own, open, onToggle, starred }) · openApp(sa) · openDraft(sa)
  * @usage html`<${AppRow} key=${ref} sa=${sa} i=${i} own open=${ref === openRef} onToggle=${…} starred=${favs.has(ref)} />`
  * @version-history
+ *   v1.3.0 — 2026-11-12 — An app that brings an agent is marked with the word (card.agent) in the
+ *     tag the AI marker uses, in place of the robot emoji.
  *   v1.2.0 — 2026-10-12 — A community app's row is List `members`: its icon has a double edge.
  *   v1.1.0 — 2026-10-12 — The state column and the line say Community for an app listed to signed-in
  *     members only, on the owner's row and on another person's; only an unlisted row is faded.
@@ -52,7 +54,7 @@ export function openDraft(sa) {
  *  and the forks (other people's rows). */
 function markers(sa, own) {
   const out = [];
-  if (shipsAgents(sa)) out.push(html`<span key="agent" title=${x('card.agentHint')}> 🤖</span>`);
+  if (shipsAgents(sa)) out.push(html`<${Fragment} key="agent"> <${Mark} tone="dim" title=${x('card.agentHint')}>${x('card.agent')}<//><//>`);
   // The AI markers are the own list's only: the old community and favourites rows
   // (server-io.js publishedRowHtml) never drew them.
   const p = own ? sa.ai_posture : null;
