@@ -95,6 +95,7 @@ import { emitChange } from '../services/event-bus.js';
 import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
 import { refreshTrustScore } from '../services/trust.js';
 import { identitiesActingFor } from '../services/db/owner-identity.js';
+import { listPendingWork } from '../services/work/work-inbox.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 
 // The webhook log kept its address here when fireWebhook moved to the shared service.
@@ -438,15 +439,11 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // visitor from another node is the local part of their own name and names the local namesake.
     const isOwnerSession = isOwnerInPerson(req.auth);
     const me = resolveIdentity(req.auth!, config.nodeId);
-    let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
-    if (isOwnerSession) {
-      // The person's own work (their GHII), their agents' and their ecosystem apps' — ONE
-      // providerGaii IN (…) query over services/db/owner-identity.ts identitiesActingFor.
-      items = await storage.listWorkByProviders(await identitiesActingFor(storage, req.auth!.owner as string, me));
-    } else {
-      items = await storage.listWorkByProvider(me);
-    }
-    const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
+    // In person: the person's own work (their GHII), their agents' and their ecosystem apps', in
+    // one query (services/work/work-inbox.ts). Otherwise the caller's own work.
+    const pending = await listPendingWork(storage, isOwnerSession
+      ? { principal: me, actingFor: req.auth!.owner as string }
+      : { principal: me });
 
     res.json(success(config.nodeId, {
       items: pending.map(w => ({

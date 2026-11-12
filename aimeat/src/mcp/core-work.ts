@@ -22,6 +22,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { genericListOutput } from '../tool-catalog/output-schemas.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
+import { listPendingWork } from '../services/work/work-inbox.js';
 
 export interface CoreWorkToolDeps {
     storage: Storage;
@@ -38,8 +39,7 @@ export function registerCoreWorkTools(mcp: McpServer, deps: CoreWorkToolDeps): v
         'aimeat_work_inbox',
         { description: descriptionFor('aimeat_work_inbox'), inputSchema: zodShapeFor('aimeat_work_inbox'), outputSchema: genericListOutput, annotations: annotationsFor('aimeat_work_inbox') },
         async ({ response_format }) => {
-            const items = await storage.listWorkByProvider(agentGaii);
-            const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
+            const pending = await listPendingWork(storage, { principal: agentGaii });
             return structuredResult('aimeat_work_inbox', response_format, pending.map(w => ({
                 tracking_code: w.trackingCode,
                 status: w.status,

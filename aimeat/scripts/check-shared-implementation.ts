@@ -132,7 +132,6 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/commerce.ts': 5,
     'src/mcp/consent.ts': 1,
     'src/mcp/core-boards.ts': 2,
-    'src/mcp/core-work.ts': 1,
     'src/mcp/core-admin.ts': 9,
     'src/mcp/core-resources.ts': 4,
     'src/mcp/core.ts': 9,
