@@ -13,6 +13,12 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   2026-11-13 — GET /v1/boards asks services/boards/board-list.ts and PATCH /v1/boards/:boardId/rules
+ *     services/boards/board-rules.ts, which the MCP board tools call too; the answers are unchanged
+ *     (structure programme 2026-11, unit 2b).
+ *   2026-11-13 — GET /v1/boards/:boardId/posts reads the board, its gate and the page through
+ *     services/boards/posts-page.ts, which aimeat_board_read calls too; the answers are unchanged
+ *     (structure programme 2026-11, unit 2b).
  *   2026-10-21 — The board list and the three read routes ask isAnonymousPrincipal: the minted anonymous
  *     token carries no anonymous claim, so it was handed the member roster (owner_gaii, allowed_gaiis)
  *     and a 403 in place of the 401 (secaudit 2026-10, anonymous-claim-not-signed).
@@ -98,16 +104,19 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { BoardCreateSchema, BoardPostSchema, BoardPostUpdateSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost, createBoardReply, updateBoardPost } from '../services/board-post.js';
-import { boardReadRefusal, boardOrganismAudience, organismBoardAdmits, classifiedBoardPosts } from '../services/board-read-access.js';
+import { boardReadRefusal, classifiedBoardPosts } from '../services/board-read-access.js';
 import { readerFor } from '../services/classification/reader.js';
 import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
+import { boardPostsPage } from '../services/boards/posts-page.js';
+import { boardsVisibleTo } from '../services/boards/board-list.js';
+import { setBoardRulesAs } from '../services/boards/board-rules.js';
 import {
-  createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
+  createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, deleteBoardById, boardRulesBlock,
 } from '../services/board-write.js';
 import { setBoardVisibility } from '../services/board-visibility.js';
 import { callerOf } from '../middleware/caller.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator-override.js';
-import { resolveIdentity, isSameOwner, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai/provenance-marks.js';
@@ -162,24 +171,14 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // GET /v1/boards — list boards (public boards no auth, private/shared need auth)
   router.get('/v1/boards', async (req, res) => {
-    const boards = await storage.listBoards();
     // The shared anonymous identity (global optionalAuth in anonymous mode) is NOT a real
     // principal — treat it as anonymous so the owner_gaii/allowed_gaiis (board member roster)
     // fields below are never handed to the anon internet.
     const gaii = (req.auth && !isAnonymousPrincipal(req.auth)) ? resolveIdentity(req.auth, config.nodeId) : undefined;
 
-    // An organism board is listed to whoever may read it (services/board-read-access.ts), which is a
-    // membership lookup; every other level is decided from the record alone.
-    const seen = await Promise.all(boards.map(async b => {
-      if (b.visibility === 'public' || b.visibility === 'system') return true;
-      if (!gaii) return false;
-      if (boardOrganismAudience(b.visibility)) return organismBoardAdmits(storage, b, gaii, req.auth);
-      if (b.ownerGaii === gaii) return true;
-      if (b.visibility === 'shared' && isSameOwner(b.ownerGaii, gaii)) return true;
-      if (b.allowedGaiis.includes(gaii)) return true;
-      return false;
-    }));
-    const visible = boards.filter((_, i) => seen[i]);
+    // Which boards this caller sees is services/boards/board-list.ts, which aimeat_board_list asks
+    // too: an organism board by membership, every other level from the record alone.
+    const visible = await boardsVisibleTo(storage, { gaii, auth: req.auth });
 
     // Whether anyone has ever used a board is the first thing a listing is asked, and answering it
     // per board meant one request each — 57 of them on this installation. One grouped query.
@@ -206,18 +205,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // PATCH /v1/boards/:boardId/rules — the board's own rules (keeper only)
   router.patch('/v1/boards/:boardId/rules', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
     const boardId = req.params.boardId as string;
-    const gaii = resolve(req);
-    const board = await storage.getBoard(boardId);
-    if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
-      return;
-    }
-    if (board.ownerGaii !== gaii && !(await operatorOverride(storage, config, req.auth,
-      { ownerOf: board.ownerGaii, area: 'board', action: 'rules', subject: board.name }))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the keeper of this board sets its rules. Ask them, or open a board of your own.'));
-      return;
-    }
-    const out = await setBoardRules({ storage, config }, board, (req.body ?? {}).rules ?? null);
+    // The board read, the keeper rule and the write are services/boards/board-rules.ts, which
+    // aimeat_board_rules_set calls too.
+    const out = await setBoardRulesAs({ storage, config }, { gaii: resolve(req), auth: req.auth }, boardId, (req.body ?? {}).rules ?? null);
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
@@ -392,36 +382,28 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
   router.get('/v1/boards/:boardId/posts', async (req, res) => {
     const boardId = req.params.boardId as string;
-    const board = await storage.getBoard(boardId);
-    if (!board) {
-      // Board doesn't exist yet — return empty posts, not 404
-      res.json(success(config.nodeId, { posts: [], total: 0 }));
-      return;
-    }
-
-    // Who may read this board is services/board-read-access.ts, the same rule aimeat_board_read
-    // answers to. It used to live only here, and that tool listed the posts without ever loading the
-    // board — so a private board was readable over MCP and there was no denial row to show it.
     // The anonymous-mode shared identity is not a principal here, the same rule GET /v1/boards
     // applies: with it, a private board answered 403 instead of 401 and consent was consulted on
     // behalf of a pseudo-identity.
     const gaii = (req.auth && !isAnonymousPrincipal(req.auth)) ? resolveIdentity(req.auth, config.nodeId) : undefined;
-    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
-    if (readRefusal) {
-      res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
-      return;
-    }
-
     const category = req.query.category as string | undefined;
     const cursor = req.query.cursor as string | undefined;
     const limit = Math.min(parseInt(req.query.limit as string ?? '20', 10), 100);
 
-    // A page is `limit` live posts; the cursor for the next page is the last of them. A post flags
-    // have hidden is dropped AFTER the page is cut, so the cursor still walks the whole board.
-    const page = await storage.listPosts(boardId, { category, cursor, limit });
-    // A post reads as its board's classification (plan doc-mvdipuyqraas, L1.3), after the flags.
-    const posts = await classifiedBoardPosts(readerFor({ storage, config }, req.auth), board,
-      await withoutHiddenPosts({ storage, config }, board, gaii, page));
+    // The board read, who may read it (services/board-read-access.ts), the page, the flags and the
+    // classification are services/boards/posts-page.ts, which aimeat_board_read calls too. A page is
+    // `limit` live posts; the cursor for the next page is the last of them, cut before the flags.
+    const read = await boardPostsPage({ storage, config }, { reader: gaii, viewer: gaii, auth: req.auth }, boardId, { category, cursor, limit });
+    if ('missing' in read) {
+      // Board doesn't exist yet — return empty posts, not 404
+      res.json(success(config.nodeId, { posts: [], total: 0 }));
+      return;
+    }
+    if ('refusal' in read) {
+      res.status(read.refusal.status).json(error(config.nodeId, read.refusal.code, read.refusal.message));
+      return;
+    }
+    const { page, posts } = read;
     // Who the posters are, for the reader deciding whom to trust: notices published, thanks received,
     // since when. One grouped query for the page's distinct authors.
     const authors = await storage.boardAuthorStanding([...new Set(posts.map(p => p.authorGaii))]);

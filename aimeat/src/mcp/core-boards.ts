@@ -12,6 +12,8 @@
  * @structure registerCoreBoardTools(mcp, deps, caller)
  * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
  * @version-history
+ *   2026-11-13 — aimeat_board_read calls services/boards/posts-page.ts, the board read, the gate and
+ *     the page GET /v1/boards/:boardId/posts runs (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_board_post hands ttl_hours to createBoardPost, as the route does (unit 3b).
  *   2026-11-01 — aimeat_board_read asks boardReadRefusal with no reader for the shared anonymous
  *     principal, as the REST read routes do, so a private board naming it is refused (secaudit2026oct31w2 round 11).
@@ -35,9 +37,7 @@ import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
 import { createBoardPost } from '../services/board-post.js';
-import { boardReadRefusal, classifiedBoardPosts } from '../services/board-read-access.js';
-import { readerFor } from '../services/classification/reader.js';
-import { withoutHiddenPosts } from '../services/board-moderation.js';
+import { boardPostsPage } from '../services/boards/posts-page.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
@@ -61,20 +61,17 @@ mcp.registerTool(
         // it never had a visibility to rule on: any MCP session read another owner's PRIVATE
         // board, and no consent-denial row existed to show it happened. The MCP RESOURCE for the
         // same board filtered on visibility, so the two doors to one board disagreed.
-        const board = await storage.getBoard(board_id);
-        if (!board) return { content: [{ type: 'text' as const, text: `Board not found: ${board_id}` }], isError: true };
         // The shared anonymous principal is not a principal here, as on the REST read routes
         // (routes/boards.ts): a private board answers it AUTH_REQUIRED, whatever its allowed list says.
         const reader = isAnonymousPrincipal({ sub: agentGaii }) ? undefined : agentGaii;
-        const refusal = await boardReadRefusal({ storage, config }, reader, board, caller().auth);
-        if (refusal) return { content: [{ type: 'text' as const, text: `${refusal.code}: ${refusal.message}` }], isError: true };
-
-        // The same hiding rule GET /v1/boards/:id/posts applies: a post flags have hidden is
-        // left out for everyone but its author and the board's owner.
-        // A post reads as its board's classification (plan doc-mvdipuyqraas, L1.3), after the flags.
-        const posts = await classifiedBoardPosts(readerFor({ storage, config }, caller().auth), board,
-            await withoutHiddenPosts({ storage, config }, board, agentGaii,
-                await storage.listPosts(board_id, { category, limit: limit ?? 20 })));
+        // The board read, its gate (boardReadRefusal), the page, the hiding rule (a post flags have
+        // hidden is left out for everyone but its author and the board's owner) and the board's
+        // classification are services/boards/posts-page.ts, which GET /v1/boards/:id/posts calls.
+        const read = await boardPostsPage({ storage, config }, { reader, viewer: agentGaii, auth: caller().auth },
+            board_id, { category, limit: limit ?? 20 });
+        if ('missing' in read) return { content: [{ type: 'text' as const, text: `Board not found: ${board_id}` }], isError: true };
+        if ('refusal' in read) return { content: [{ type: 'text' as const, text: `${read.refusal.code}: ${read.refusal.message}` }], isError: true };
+        const posts = read.posts;
         // TARGET-058: an agent asked to summarise a board has to be able to say which posts a
         // model wrote. One query for the page — see readProvenanceMany's N+1 note.
         const provFor = await readProvenanceMany(storage, config, posts.map(p => p.aiProvenanceId));

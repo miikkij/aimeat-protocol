@@ -7,6 +7,10 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — The invite-admin gate, the two owner routes, GET /invitations/mine and POST
+ *     /:id/invitations/accept read through services/organism-read/manager.ts and name-invitations.ts,
+ *     which the name invitation tools ask too; the answers are unchanged (structure programme 2026-11,
+ *     unit 2b).
  *   2026-11-13 — GET /v1/organisms/:id/members takes the agents it names from rosterAgentsFor
  *     (services/organism-privacy.ts), the rule aimeat_organism_members asks too; its answer is
  *     unchanged (structure programme 2026-11, unit 7).
@@ -61,6 +65,8 @@ import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { canSeeMembers, rosterAgentsFor, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism-ownership.js';
+import { organismForManager, organismForOwner } from '../../services/organism-read/manager.js';
+import { nameInvitationsOf, nameInvitationTo } from '../../services/organism-read/name-invitations.js';
 import { removeOrganismMember, MemberRemoveError } from '../../services/organism-member-remove.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
@@ -381,15 +387,14 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "ghii" (an active member) is required'));
       return;
     }
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    // The read and the owner rule are services/organism-read/manager.ts, which aimeat_organism_owner_add asks too.
+    const gate = await organismForOwner(storage, id, { owner: callerGhii });
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can add an owner'));
       return;
     }
-    if (!isOrganismOwner(organism, callerGhii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can add an owner'));
-      return;
-    }
+    const organism = gate.organism;
     const outcome = await addOrganismOwner(storage, config, organism, ghii, { performedBy: callerGhii });
     if (!outcome.ok) {
       res.status(outcome.status).json(error(config.nodeId, outcome.code, outcome.message));
@@ -407,15 +412,14 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const id = req.params.id as string;
     const callerGhii = req.auth!.owner as string;
     const targetGhii = req.params.ghii as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    // The read and the owner rule are services/organism-read/manager.ts, which aimeat_organism_owner_remove asks too.
+    const gate = await organismForOwner(storage, id, { owner: callerGhii });
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can remove an owner'));
       return;
     }
-    if (!isOrganismOwner(organism, callerGhii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can remove an owner'));
-      return;
-    }
+    const organism = gate.organism;
     const outcome = await removeOrganismOwner(storage, config, organism, targetGhii, { performedBy: callerGhii });
     if (!outcome.ok) {
       res.status(outcome.status).json(error(config.nodeId, outcome.code, outcome.message));
@@ -434,13 +438,12 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   const requireInviteAdmin = async (req: Request, res: Response) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
-    if (!isOrganismOwner(organism, callerGhii) && !organism.admins.includes(callerGhii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage members and invitations'));
-      return null;
-    }
-    return organism;
+    // The read and the owner-or-admin rule are services/organism-read/manager.ts, which the invite tools ask too.
+    const gate = await organismForManager(storage, id, { owner: callerGhii });
+    if (gate.ok) return gate.organism;
+    if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage members and invitations'));
+    return null;
   };
 
   /* POST /v1/organisms/:id/invitations — invite an owner, optionally with an org role and
@@ -543,12 +546,9 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   /* GET /v1/organisms/invitations/mine — the caller's own pending invitations (across organisms) */
   router.get('/v1/organisms/invitations/mine', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
-    const memberships = (await storage.listMembershipsByGhii(callerGhii)).filter(m => m.status === 'invited');
-    const invitations = [];
-    for (const m of memberships) {
-      const org = await storage.getOrganism(m.organismId);
-      if (org) invitations.push({ membership: m, organism: { id: org.id, name: org.name, description: org.description, type: org.type, visibility: org.visibility } });
-    }
+    // services/organism-read/name-invitations.ts, which aimeat_organism_invitations asks too.
+    const invitations = (await nameInvitationsOf(storage, { owner: callerGhii })).map(({ membership: m, organism: org }) =>
+      ({ membership: m, organism: { id: org.id, name: org.name, description: org.description, type: org.type, visibility: org.visibility } }));
     res.json(success(config.nodeId, { invitations, total: invitations.length }));
   });
 
@@ -556,16 +556,15 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   router.post('/v1/organisms/:id/invitations/accept', requireAuth(), requireRestScope('organism:write'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    // The organism and the pending invitation: services/organism-read/name-invitations.ts, which
+    // aimeat_organism_invitation_respond asks too.
+    const inv = await nameInvitationTo(storage, id, { owner: callerGhii });
+    if (!inv.ok) {
+      if (inv.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have not been invited to this space. Ask somebody who is already in it to invite you.'));
       return;
     }
-    const membership = await storage.getMembership(id, callerGhii);
-    if (!membership || membership.status !== 'invited') {
-      res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have not been invited to this space. Ask somebody who is already in it to invite you.'));
-      return;
-    }
+    const { organism, membership } = inv;
     // The person accepts in person, as on the emailed link (routes/invite-accept.ts) and the MCP tool:
     // an agent, an app grant or an ecosystem token acts in the account's name and is refused here.
     // Checked after the invitation lookup, so a refusal says nothing a 404 would not (feature-list audit #57).

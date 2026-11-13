@@ -11,6 +11,9 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_board_list and the resource's list ask services/boards/board-list.ts, and
+ *     aimeat_board_rules_set calls services/boards/board-rules.ts, as GET /v1/boards and PATCH
+ *     /v1/boards/:id/rules do (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_board_create hands federate to createBoard, as POST /v1/boards does (unit 3b).
  *   2026-11-01 — aimeat_board_list and the board-posts resource treat the shared anonymous principal as
  *     GET /v1/boards and the board read routes do: public and system boards only, and no owner_gaii or
@@ -65,7 +68,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
-import { operatorOverride } from '../services/operator-override.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
@@ -73,9 +75,11 @@ import { withoutHiddenPosts } from '../services/board-moderation.js';
 import { classifiedBoardPosts } from '../services/board-read-access.js';
 import { readerFor } from '../services/classification/reader.js';
 import {
-    boardVisibleToCaller, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules,
+    boardVisibleToCaller, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
 } from '../services/board-write.js';
+import { boardsVisibleTo } from '../services/boards/board-list.js';
+import { setBoardRulesAs } from '../services/boards/board-rules.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -153,10 +157,10 @@ export function registerBoardsTools(
         if (anonymous) return Promise.resolve(board.visibility === 'public' || board.visibility === 'system');
         return boardVisibleToCaller(storage, board, { gaii: agentGaii, auth: caller().auth });
     }
-    /** The boards of `boards` this agent can see, in order. */
-    async function seenBoards(boards: BoardRecord[]): Promise<BoardRecord[]> {
-        const seen = await Promise.all(boards.map(b => canSeeBoard(b)));
-        return boards.filter((_, i) => seen[i]);
+    /** The boards this agent can see, in order: services/boards/board-list.ts, which GET /v1/boards
+     *  asks too. The anonymous principal is asked as a caller with no identity. */
+    function visibleBoards(): Promise<BoardRecord[]> {
+        return boardsVisibleTo(storage, { gaii: anonymous ? undefined : agentGaii, auth: caller().auth });
     }
 
     /**
@@ -174,7 +178,7 @@ export function registerBoardsTools(
         'board-posts',
         new ResourceTemplate('aimeat://boards/{boardId}', {
             list: async () => {
-                const visible = await seenBoards(await storage.listBoards());
+                const visible = await visibleBoards();
                 return {
                     resources: visible.map(b => ({
                         uri: `aimeat://boards/${encodeURIComponent(b.id)}`,
@@ -225,7 +229,7 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_list'),
         },
         async () => {
-            const visible = await seenBoards(await storage.listBoards());
+            const visible = await visibleBoards();
             return {
                 content: [{
                     type: 'text' as const,
@@ -297,22 +301,10 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_rules_set'),
         },
         async ({ board_id, rules }) => {
-            const board = await storage.getBoard(board_id);
-            if (!board) return { content: [{ type: 'text' as const, text: `NOT_FOUND: Board not found: ${board_id}` }], isError: true };
-
-            // The keeper rule PATCH /v1/boards/:id/rules applies, word for word: the exact identity
-            // that created the board, or an operator. Another agent of the same owner is refused on
-            // both doors. Whether a same-owner principal should pass is open; until it is decided the
-            // two doors give the same answer. The operator's pass on another person's board is
-            // operatorOverride, as on the route, so it writes the operator trail on both surfaces.
-            if (board.ownerGaii !== agentGaii && !(await operatorOverride(storage, config,
-                caller().auth,
-                { ownerOf: board.ownerGaii, area: 'board', action: 'rules', subject: board.name }))) {
-                return { content: [{ type: 'text' as const, text: 'ACCESS_DENIED: Only the keeper of this board sets its rules. Ask them, or open a board of your own.' }], isError: true };
-            }
-
-            // The shape check, the write and the change event are services/board-write.ts.
-            const out = await setBoardRules({ storage, config }, board, rules);
+            // The board read, the keeper rule (the exact identity that created the board, or an
+            // operator through operatorOverride, which writes the operator trail) and the write are
+            // services/boards/board-rules.ts, which PATCH /v1/boards/:id/rules calls too.
+            const out = await setBoardRulesAs({ storage, config }, { gaii: agentGaii, auth: caller().auth }, board_id, rules);
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
 
             const effective = effectiveBoardRules(out.board, config);

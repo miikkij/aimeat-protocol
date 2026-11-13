@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — POST /v1/organisms/:id/workspaces asks requireMember (services/organism-read/member.ts),
+ *     the organism read and the role aimeat_workspace_create asks; the answers are unchanged (structure
+ *     programme 2026-11, unit 2b).
  *   2026-11-11 — DELETE /v1/organisms/:id/workspace also removes the rows and row revisions of the
  *     workspace (all of the organism's without ?ws=) and answers how many (`rows`, `rowRevisions`).
  *   2026-11-04 — No per-key delete loop for a storage without deleteMemoryByPrefix: it is required on
@@ -431,10 +434,9 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
      POST /v1/organisms in crud.ts. Owner/operator sessions bypass scopes; membership is unchanged. ── */
   router.post('/v1/organisms/:id/workspaces', requireAuth(), requireScope('organism:write'), validateBody(WorkspaceCreateBody, config.nodeId), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const role = await memberRole(req, organism, id);
-    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    // The organism and the caller's role: services/organism-read/member.ts, which
+    // aimeat_workspace_create asks too (denyReason).
+    if (!(await H.requireMember(req, res, id))) return;
     const name = req.body?.name;
     if (!name || typeof name !== 'string' || !name.trim()) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name is required')); return; }
     const ownerName = req.auth!.owner as string;

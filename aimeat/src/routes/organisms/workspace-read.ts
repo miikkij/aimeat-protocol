@@ -6,6 +6,11 @@
  *   OKF overviews, structure graphs, dangling-refs scan, structure timeline, content search, and the
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — GET /v1/organisms/:id/overview and GET /v1/organisms/:id/search ask
+ *     services/organism-read/member.ts, the organism read and the membership rule
+ *     aimeat_organism_overview and aimeat_organism_search ask; POST, GET and DELETE /:id/comments ask
+ *     services/organism-read/comments.ts, as the comment tools do. The answers are unchanged
+ *     (structure programme 2026-11, unit 2b).
  *   2026-11-04 — GET /v1/organisms/:id/workspace answers `truncated: true` when the workspace holds
  *     more rows than one read loads (5 000); those rows were left out with nothing to say so (codebase
  *     analysis 2026-11-03, item C7).
@@ -78,7 +83,8 @@ import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js'
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
 import { scanOrganismDanglingRefs } from '../../services/dangling-refs.js';
-import { canAccessWorkspaceComments, addComment, listComments, deleteComment, type WorkspaceComment } from '../../services/organism-comments.js';
+import { canAccessWorkspaceComments, addComment, listComments, type WorkspaceComment } from '../../services/organism-comments.js';
+import { commentWorkspace, deleteCommentIn } from '../../services/organism-read/comments.js';
 import { buildOrganismOverview, buildWorkspaceOverview, listWorkspaces, collectWorkspaceSummary } from '../../services/structure-overview.js';
 import { buildInstructionBlocks } from '../../services/hello-mcp.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
@@ -95,6 +101,7 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { logger } from '../../utils/logger.js';
 import { readOpened } from '../../services/workspace/opened.js';
+import { organismMemberGate } from '../../services/organism-read/member.js';
 
 export function registerOrganismWorkspaceReadRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
@@ -298,13 +305,14 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * the returned Markdown. ?format=md returns raw text/markdown; default returns the envelope. */
   router.get('/v1/organisms/:id/overview', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const callerSub = req.auth!.sub;
-    const ownerName = req.auth!.owner;
-    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
-    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
-    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    // The organism and the membership rule: services/organism-read/member.ts, which
+    // aimeat_organism_overview asks too.
+    const gate = await organismMemberGate(storage, id, { sub: req.auth!.sub, owner: req.auth!.owner });
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+      return;
+    }
 
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     const includeArchived = req.query.includeArchived === 'true';
@@ -504,24 +512,15 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       return;
     }
 
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    // The organism and the membership gate (same as workspace read: an org agent or an active
+    // member): services/organism-read/member.ts, which aimeat_organism_search asks too.
+    const gate = await organismMemberGate(storage, id, { sub: req.auth!.sub, owner: req.auth!.owner });
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
       return;
     }
-
-    // Membership gate (same as workspace read): an org agent or an active member.
-    const callerSub = req.auth!.sub;
-    const ownerName = req.auth!.owner;
-    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
-    if (!isMember && ownerName) {
-      const m = await storage.getMembership(id, ownerName);
-      isMember = !!m && m.status === 'active';
-    }
-    if (!isMember) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
-      return;
-    }
+    const organism = gate.organism;
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     // Default excludes archived; ?archived=only is "archive search"; ?includeArchived=true searches both.
     const archived = req.query.archived === 'only' ? 'only' : (req.query.includeArchived === 'true' ? 'include' : undefined);
@@ -557,11 +556,13 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws, space, instance_id and a non-empty body are required'));
       return;
     }
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot comment in this workspace')); return;
+    // The organism and the comment gate: services/organism-read/comments.ts, which aimeat_workspace_comment asks too.
+    const gate = await commentWorkspace({ storage, config }, id, { sub: req.auth!.sub, owner: req.auth!.owner, gaii: callerGaii }, ws);
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot comment in this workspace'));
+      return;
     }
     // How the comment was made: the caller's declaration or an id from the body, else the node's
     // stamp for an agent writer (an owner is not stamped). The body is stored truncated to 10 000
@@ -602,11 +603,13 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws, space and instance_id query params are required'));
       return;
     }
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot read this workspace')); return;
+    // The organism and the comment gate: services/organism-read/comments.ts, which aimeat_workspace_comments asks too.
+    const gate = await commentWorkspace({ storage, config }, id, { sub: req.auth!.sub, owner: req.auth!.owner, gaii: callerGaii }, ws);
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot read this workspace'));
+      return;
     }
     const comments = await listComments(storage, readerFor({ storage, config }, req.auth), id, ws, space, instanceId);
     res.json(success(config.nodeId, { comments, total: comments.length }));
@@ -678,9 +681,9 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws, space and instance_id query params are required'));
       return;
     }
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const result = await deleteComment(storage, config, organism,
+    // The organism read, the gate and the author rule: services/organism-read/comments.ts, which
+    // aimeat_workspace_comment_delete calls too.
+    const result = await deleteCommentIn({ storage, config }, id,
       { sub: req.auth!.sub, owner: req.auth!.owner, gaii: resolveIdentity(req.auth!, config.nodeId) },
       { ws, space, instanceId, commentId });
     if (!result.ok) { res.status(result.status).json(error(config.nodeId, result.code, result.message)); return; }

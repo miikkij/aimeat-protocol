@@ -30,6 +30,10 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.6.1 — 2026-11-13 — Structure programme unit 2b, batch 3: 58 lines in 22 files. The agent, app,
+ *     task and operator tools (25 lines) and the organism, workspace and board tools (29 lines) read
+ *     through service functions that hold the check both surfaces put around the read; agent-capabilities,
+ *     agent-onboarding, core-boards, organisms-email-invites and organisms-name-invites leave the list.
  *   v1.6.0 — 2026-11-13 — Structure programme unit 2b: a read moves with the gate both surfaces put
  *     around it into one service function the tool and the route call, one MCP file per commit.
  *     agent-telemetry.ts 1 → none (services/agent/telemetry-append.ts); prompts.ts 1 → none
@@ -132,12 +136,11 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/agent-tasks.ts': 2,
     'src/mcp/apps.ts': 6,
     'src/mcp/apps-fork.ts': 2,
-    'src/mcp/boards.ts': 6,
+    'src/mcp/boards.ts': 3,
     'src/mcp/capabilities.ts': 3,
     'src/mcp/chat-instances.ts': 4,
     'src/mcp/commerce.ts': 4,
     'src/mcp/consent.ts': 1,
-    'src/mcp/core-boards.ts': 2,
     'src/mcp/core-admin.ts': 3,
     'src/mcp/core-resources.ts': 3,
     'src/mcp/core.ts': 7,
@@ -146,12 +149,10 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/knowledge.ts': 1,
     'src/mcp/memory-extended.ts': 1,
     'src/mcp/operator-config.ts': 1,
-    'src/mcp/organisms-email-invites.ts': 2,
-    'src/mcp/organisms-name-invites.ts': 7,
-    'src/mcp/organisms.ts': 19,
+    'src/mcp/organisms.ts': 8,
     'src/mcp/skills.ts': 1,
     'src/mcp/wallet-extended.ts': 2,
-    'src/mcp/workspaces.ts': 5,
+    'src/mcp/workspaces.ts': 1,
 };
 
 /** A direct storage call: the bare `storage` or a member receiver (`deps.storage`, `this.storage`). */

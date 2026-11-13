@@ -9,6 +9,8 @@
  *   aimeat_organism_invitations_email, aimeat_organism_invitation_email_cancel.
  * @usage registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
  * @version-history
+ *   2026-11-13 — The manager gate and the pending list ask services/organism-read/manager.ts, as the
+ *     REST email invitation routes do (structure programme 2026-11, unit 2b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -25,12 +27,12 @@
 
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, OrganismRecord } from '../storage/interface.js';
+import { organismForManager, pendingEmailInvitationsFor } from '../services/organism-read/manager.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
 import { emitChange } from '../services/event-bus.js';
-import { isOrganismOwner } from '../services/organism-ownership.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerOrganismEmailInviteTools(
@@ -40,14 +42,15 @@ export function registerOrganismEmailInviteTools(
     getOwnerName: () => string,
 ): void {
     /** Creator/admin gate shared by the email-invitation tools. Returns the organism or an error result. */
-    async function orgForAdmin(organism_id: string): Promise<{ organism: Awaited<ReturnType<typeof storage.getOrganism>> } | { error: string }> {
-        const organism = await storage.getOrganism(organism_id);
-        if (!organism) return { error: 'Organism not found' };
-        const ownerName = getOwnerName();
-        if (!isOrganismOwner(organism, ownerName) && !organism.admins.includes(ownerName)) {
-            return { error: 'Only the creator or an admin can manage invitations' };
-        }
-        return { organism };
+    async function orgForAdmin(organism_id: string): Promise<{ organism: OrganismRecord } | { error: string }> {
+        // The read and the owner-or-admin rule are services/organism-read/manager.ts, which the
+        // REST email invitation routes ask too (requireOrgAdmin).
+        const gate = await organismForManager(storage, organism_id, { owner: getOwnerName() });
+        return gate.ok ? { organism: gate.organism } : { error: adminRefusal(gate.code) };
+    }
+    /** The sentence each refusal of the manager rule reads, as on the REST routes. */
+    function adminRefusal(code: 'NOT_FOUND' | 'ACCESS_DENIED'): string {
+        return code === 'NOT_FOUND' ? 'Organism not found' : 'Only the creator or an admin can manage invitations';
     }
 
     // ── Tool: aimeat_organism_invite_email ── (invite an external email into an organism + workspaces)
@@ -95,9 +98,11 @@ export function registerOrganismEmailInviteTools(
             annotations: annotationsFor('aimeat_organism_invitations_email'),
         },
         async ({ organism_id }) => {
-            const gate = await orgForAdmin(organism_id);
-            if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };
-            const invitations = (await storage.listInvitationsByOrganism(organism_id, { status: 'pending' })).map(invitePublic);
+            // The manager rule and the read are services/organism-read/manager.ts, which
+            // GET /v1/organisms/:id/invitations/email asks too.
+            const out = await pendingEmailInvitationsFor(storage, organism_id, { owner: getOwnerName() });
+            if (!out.ok) return { content: [{ type: 'text' as const, text: adminRefusal(out.code) }], isError: true };
+            const invitations = out.invitations;
             return { content: [{ type: 'text' as const, text: JSON.stringify(invitations, null, 2) }] };
         },
     );

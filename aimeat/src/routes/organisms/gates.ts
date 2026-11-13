@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.3 — 2026-11-13 — POST /revert asks requireMember (services/organism-read/member.ts), the
+ *     organism read and the role aimeat_workspace_revert_to_draft asks; the answers are unchanged
+ *     (structure programme 2026-11, unit 2b).
  *   v1.7.2 — 2026-11-13 — POST /approvals takes approverRole from a caller not in person only through a
  *     manifest flow gate it names, else the default, as risk is floored for it (services/gate-policy.ts
  *     approverRoleFor; structure programme 2026-11, unit 7).
@@ -87,7 +90,7 @@ function mergeWorkspaceGatePolicy(org: GatePolicy, ws: GatePolicy): GatePolicy {
 }
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
+  const { memberRole, requireMember, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
   /** The session as the suggestion service takes it: its full identity, owner and roles. */
   const suggestionCaller = (req: Request) => ({
     principal: resolveIdentity(req.auth!, config.nodeId), owner: (req.auth!.owner as string) ?? '', roles: req.auth!.roles ?? [],
@@ -395,16 +398,11 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // Same write access as publish; not gated (creating a private draft is not a publish).
   router.post('/v1/organisms/:id/revert', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
-    }
-    const role = await memberRole(req, organism, id);
-    if (!role) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
-      return;
-    }
+    // The organism and the caller's role: services/organism-read/member.ts, which
+    // aimeat_workspace_revert_to_draft asks too.
+    const member = await requireMember(req, res, id);
+    if (!member) return;
+    const { organism, role } = member;
     const { namespace: given, id: instance, ws } = req.body ?? {};
     const wsId = typeof ws === 'string' ? ws : undefined;
     if (!given || typeof given !== 'string' || !instance || typeof instance !== 'string') {

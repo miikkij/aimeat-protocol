@@ -11,6 +11,9 @@
  *   import { registerOrganismWorkspaceTransferRoutes } from './organisms/workspace-transfer.js';
  *   registerOrganismWorkspaceTransferRoutes(router, config, storage, H);
  * @version-history
+ *   2026-11-13 -- GET /v1/organisms/:id/export asks services/organism-read/member.ts
+ *     organismForActiveMember, the read and the rule aimeat_organism_export asks; the answers are
+ *     unchanged (structure programme 2026-11, unit 2b).
  *   2026-10-20 -- Both exports carry the CALLER's resolved principal (`callerSub`), so an ecosystem
  *     app is held to its owner-granted read data-areas even where the bundle reads as the member's
  *     owner GHII; both imports carry the session's own facts (`caller`), so the restore can apply
@@ -40,6 +43,7 @@ import { ZipSecurityError } from '../../services/safe-zip.js';
 import { recordSecurityIncident } from '../../services/security-incident.js';
 import type { ImportCaller } from '../../services/workspace/import-gates.js';
 import type { OrganismHelpers } from './shared.js';
+import { organismForActiveMember } from '../../services/organism-read/member.js';
 
 export function registerOrganismWorkspaceTransferRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, findWsEntry, bareOwner } = H;
@@ -131,11 +135,14 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
    * ?format=base64 for a size-capped JSON payload. ── */
   router.get('/v1/organisms/:id/export', requireAuth(), requireScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
     const ownerName = req.auth!.owner as string | undefined;
-    const m = ownerName ? await storage.getMembership(id, ownerName) : null;
-    if (!m || m.status !== 'active') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an active member of the organism can export it')); return; }
+    // The read and the active-member rule: services/organism-read/member.ts, which aimeat_organism_export asks too.
+    const gate = await organismForActiveMember(storage, id, { owner: ownerName });
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an active member of the organism can export it'));
+      return;
+    }
     // Export as the member's owner GHII — a member reads the whole organism live, and the per-creator
     // registry + records are GHII-owned (an agent-session GAII used to yield a near-empty bundle).
     // `callerSub` is who is actually asking: the owner identity above is the READ identity, and
