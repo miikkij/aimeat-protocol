@@ -59,7 +59,7 @@
         "count": 1,
         "why": "The command line's seed command reads this node's own admin answer over localhost. Backup and restore moved to cli/backup-restore.ts, which reads under a ceiling (2026-10-16)."
       },
-      "src/routes/admin-seo.ts": {
+      "src/services/seo/seo-status.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

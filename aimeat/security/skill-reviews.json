@@ -113,11 +113,11 @@
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/mcp/portfolio.ts"
       ],
-      "digest": "sha256:b9755961555e53f28bd56934"
+      "digest": "sha256:f1547bf85d9105b93fe26e78"
     },
     "node:aimeat-activating-a-person": {
       "reviewedOn": "2026-09-19",
@@ -285,12 +285,12 @@
       "digest": "sha256:9bfa24f196e06f9aaa163a0b"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-10",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:ade72f0cc8e2a338a0b79a31"
+      "digest": "sha256:65a872ee16fdd50906cecd56"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -369,7 +369,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:8ace9ad999e1aaf6d5611b53"
+      "digest": "sha256:096d68880e98ae603bd7ae41"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-05",
@@ -580,7 +580,7 @@
       "aimeat/src/services/model-recommendation.ts": "6fcabd4bfc91255b"
     },
     "node:aimeat-welcome-pages": {
-      "aimeat/src/mcp/portfolio.ts": "604995ccbf786988"
+      "aimeat/src/mcp/portfolio.ts": "1a68b4e024b8fe69"
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
@@ -675,7 +675,7 @@
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "3e29a8cf62a57986",
+      "aimeat/src/mcp/core.ts": "b8dfc8d3da73cb3d",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "66f1803515078196"
     },
     "node:manage-my-profile-data": {
@@ -787,8 +787,8 @@
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
       "aimeat/src/routes/organisms/workspace-ops.ts": "ec02e0022926955d",
-      "aimeat/src/routes/organisms/workspace-access.ts": "1d6f6c1b54f87409",
-      "aimeat/src/services/agent-profile-write.ts": "68cd3967df5f91e4",
+      "aimeat/src/routes/organisms/workspace-access.ts": "6236668b81ff8b1f",
+      "aimeat/src/services/agent-profile-write.ts": "f4b8dc498018fa1a",
       "aimeat/src/services/agent-task-rules.ts": "207afa09788c8a11"
     },
     "node:aimeat-extension-builder": {

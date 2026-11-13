@@ -102,9 +102,6 @@
     "src/config-overrides.ts": {
       "getAllConfigValues": 1
     },
-    "src/mcp/catalogue.ts": {
-      "listAgents": 1
-    },
     "src/mcp/core-admin.ts": {
       "listAgents": 2
     },
@@ -237,6 +234,9 @@
     },
     "src/services/apps-backup-export.ts": {
       "listSubdomainSites": 1
+    },
+    "src/services/catalogue/catalogue-read.ts": {
+      "listAgents": 1
     },
     "src/services/capability-aggregator.ts": {
       "listOwners": 1,

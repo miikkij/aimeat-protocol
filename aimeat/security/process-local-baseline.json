@@ -185,7 +185,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/routes/admin-seo.ts :: let :: keyCheck": {
+    "src/services/seo/seo-status.ts :: let :: keyCheck": {
       "count": 1,
       "reason": "DEBT"
     },
