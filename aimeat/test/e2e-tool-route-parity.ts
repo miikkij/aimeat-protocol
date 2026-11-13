@@ -44,6 +44,11 @@
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.9.0 — 2026-11-14 — Unit 2b part 2, phase B, the other seventeen rows: B11, B13, B10, B9, B7 and
+ *     B3 assert the rule both surfaces now share (operator pass and trail, fork gates, the anonymous
+ *     own/building refusal, the account's escrow); B13b, B16, B17, B8, B12, B14, B15, B18, B2 and B4
+ *     record today's two answers and name the open question; B5 shows the two lists agree. Two phase B
+ *     owners, deleted at the end.
  *   v1.8.0 — 2026-11-14 — Unit 2b part 2, phase B: B6, aimeat_admin_agents against GET /v1/admin/agents
  *     with a negative limit, recorded as an open question.
  *   v1.7.0 — 2026-11-14 — MEMBER-LIST.
@@ -1070,6 +1075,88 @@ await test('B3 FIXED: another of alice\'s agents sees the escrow of the shared w
         `tool ${JSON.stringify(tool.data)} / route escrow ${rest.body.data.in_escrow} available ${rest.body.data.available}`);
 });
 
+// B18: alice's transactions on aimeat_wallet_transactions and GET /v1/wallet/transactions (the route the
+// connector's copy of the tool calls, with `limit`).
+await test('Setup (B18): the operator mints alice 25 single morsels, so her ledger holds more than either default page', async () => {
+    for (let i = 0; i < 25; i++) {
+        const mint = await call('POST', '/v1/admin/mint', op.token, { gaii: pbWorker.gaii, amount: 1 });
+        assert(mint.status === 200, `mint ${i}: ${show(mint)}`);
+    }
+});
+
+await test('B18 USE KEPT: the tool and the route list the same newest transactions for the worker agent', async () => {
+    const rest = await call('GET', '/v1/wallet/transactions?per_page=10', pbWorker.token);
+    assert(rest.status === 200 && rest.body.data.transactions.length === 10, `route: ${show(rest)}`);
+    const tool = await callTool(pbWorkerMcp, 'aimeat_wallet_transactions', { limit: 10 });
+    assert(!tool.isError && Array.isArray(tool.data) && tool.data.length === 10, `tool: ${tool.text.slice(0, 200)}`);
+    const ids = (xs: Body[]) => xs.map(t => t.id as string).sort().join(',');
+    assert(ids(tool.data) === ids(rest.body.data.transactions), 'the two pages hold different transactions');
+});
+
+await test('B18 RECORDED DIFFERENCE (question: one default page, and should the route read `limit`): the tool lists 20 by default and honours limit=5; the route lists 50 by default and ignores limit=5', async () => {
+    const tool = await callTool(pbWorkerMcp, 'aimeat_wallet_transactions', {});
+    assert(!tool.isError && tool.data.length === 20, `tool default: ${tool.data.length}`);
+    const tool5 = await callTool(pbWorkerMcp, 'aimeat_wallet_transactions', { limit: 5 });
+    assert(!tool5.isError && tool5.data.length === 5, `tool limit 5: ${tool5.data.length}`);
+    const rest = await call('GET', '/v1/wallet/transactions', pbWorker.token);
+    const total = rest.body.data.total as number;
+    assert(rest.status === 200 && total > 25 && rest.body.data.transactions.length === Math.min(50, total), `route default: ${show(rest)}`);
+    const rest5 = await call('GET', '/v1/wallet/transactions?limit=5', pbWorker.token);
+    assert(rest5.status === 200 && rest5.body.data.transactions.length === Math.min(50, total), `route limit 5: ${rest5.body.data.transactions.length}`);
+});
+
+// B2: alice's agent reads its own message history, GET /v1/agents/:name/messages and aimeat_message_history.
+await test('B2 USE KEPT: per_page=5 is answered on the route and the tool', async () => {
+    const rest = await call('GET', `/v1/agents/${pbAliceAg.name}/messages?per_page=5`, pbAliceAg.token);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_message_history', { per_page: 5 });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B2 RECORDED DIFFERENCE (question: is a page past 100 clamped or refused): per_page=150, the route answers with at most 100 and the tool refuses the input', async () => {
+    const rest = await call('GET', `/v1/agents/${pbAliceAg.name}/messages?per_page=150`, pbAliceAg.token);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_message_history', { per_page: 150 });
+    assert(tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
+// B4: an agent's profile, GET /v1/agents/:gaii and aimeat_agent_profile.
+await test('B4 RECORDED DIFFERENCE (question: should reading a profile recompute and store the trust score): bob\'s agent reads alice\'s worker; the route recomputes and writes the score, the tool reads the stored one, and only the tool lists skills, only the route counts published actions', async () => {
+    const before = await callTool(pbBobMcp, 'aimeat_agent_profile', { gaii: pbWorker.gaii });
+    assert(!before.isError && before.data.gaii === pbWorker.gaii && Array.isArray(before.data.skills), `tool: ${before.text.slice(0, 200)}`);
+    const rest = await call('GET', `/v1/agents/${encodeURIComponent(pbWorker.gaii)}`, pbBobAg.token);
+    assert(rest.status === 200 && rest.body.data.gaii === pbWorker.gaii, `route: ${show(rest)}`);
+    assert(typeof rest.body.data.trust?.score === 'number' && !('skills' in rest.body.data), `route shape: ${show(rest)}`);
+    const after = await callTool(pbBobMcp, 'aimeat_agent_profile', { gaii: pbWorker.gaii });
+    // A fresh agent's stored score is the default; the route's computed one differs, and the tool shows
+    // that only after a route read has stored it.
+    assert(before.data.trust_score !== rest.body.data.trust.score, `the tool's stored score before the route read: ${before.data.trust_score} / ${rest.body.data.trust.score}`);
+    assert(after.data.trust_score === rest.body.data.trust.score, `the tool reads what the route stored: ${after.data.trust_score} / ${rest.body.data.trust.score}`);
+});
+
+await test('B4 USE KEPT: an agent that does not exist is not found on both', async () => {
+    const missing = `nobody#${pbAlice.name}@${pbAlice.ghii.split('@')[1]}`;
+    const rest = await call('GET', `/v1/agents/${encodeURIComponent(missing)}`, pbBobAg.token);
+    assert(rest.status === 404, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_agent_profile', { gaii: missing });
+    assert(tool.isError && tool.text === 'Agent not found', `tool: ${tool.text.slice(0, 200)}`);
+});
+
+// B5: the worker agent's own memory keys on the agent-memory resource list and GET /v1/memory.
+await test('B5 USE KEPT: the worker agent\'s own records are listed alike on the resource and the route', async () => {
+    for (const k of ['a', 'b', 'c']) {
+        const w = await call('POST', '/v1/memory', pbWorker.token, { key: `${N('pbown')}.${k}`, value: { k }, visibility: 'private' });
+        assert(w.status === 201 || w.status === 200, `write ${k}: ${show(w)}`);
+    }
+    const list = await mcpRpc(pbWorkerMcp, 'resources/list', {});
+    const fromResource = ((list?.result?.resources ?? []) as Body[]).map(r => r.name as string).filter(n => n.startsWith(N('pbown'))).sort();
+    const rest = await call('GET', `/v1/memory?${q({ prefix: N('pbown') })}`, pbWorker.token);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const entries = rest.body.data.items as Body[];
+    const fromRoute = entries.map(e => e.key as string).sort();
+    assert(fromResource.length === 3 && JSON.stringify(fromResource) === JSON.stringify(fromRoute), `resource ${fromResource} / route ${fromRoute} (${show(rest)})`);
+});
+
 // B8: one app read by GET /v1/apps/:owner/:filename (serves the app) and aimeat_app_get (its detail).
 const PB_CODED = `${N('pbcode')}.html`, PB_CODE = 'pb-parity-code-42';
 const appRoute = (filename: string, token: string, code?: string) =>
@@ -1118,6 +1205,16 @@ await test('B7 USE KEPT: the anonymous credential lists the catalogue on the rou
     assert(rest.status === 200, `route: ${show(rest)}`);
     const tool = await callTool(pbAnonMcp!, 'aimeat_app_list', {});
     assert(!tool.isError && Array.isArray(tool.data.apps), `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('Cleanup (phase B): alice\'s and bob\'s accounts deleted', async () => {
+    const left: string[] = [];
+    for (const who of [pbAlice, pbBob]) {
+        if (!who) continue;
+        const gone = await call('DELETE', `/v1/owners/${who.name}`, who.token);
+        if (gone.body?.ok !== true) left.push(`${who.name}: ${gone.status}`);
+    }
+    assert(left.length === 0, `accounts not deleted: ${left.join(', ')}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
