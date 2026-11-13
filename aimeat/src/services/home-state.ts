@@ -19,6 +19,9 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   2026-11-13 — The onboarding marker keys and recordOnboardingEvent come from onboarding/markers.ts,
+ *     not from onboarding-funnel.ts, which loads this file in its rescue pass; portfolioStandaloneUrl
+ *     comes from portfolio/standalone-url.ts, not from a route file (structure programme 2026-11, unit 4).
  *   2026-11-09 — The welcome page is looked for under every identity in one query
  *     (storage.storageFileHolders), and the agents' onboarding records are one shared query
  *     (loadOwnerOnboardings): 161 single reads at 79 agents, one round trip each on PostgreSQL.
@@ -50,7 +53,7 @@ import { hasHelloMcpProof } from './node-resident-agent.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingTrack, type OnboardingBranch,
     type OnboardingRoom,
-} from './onboarding-funnel.js';
+} from './onboarding/markers.js';
 import { resolveAiClient, decideBranch } from './ai/tool-branch.js';
 import { portfolioStandaloneUrl } from './portfolio/standalone-url.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';

@@ -2456,7 +2456,7 @@
     },
     "src/services/onboarding-funnel.ts": {
       "reads": {
-        "getMemory": 5,
+        "getMemory": 4,
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker and track records."
@@ -2467,6 +2467,12 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Agent commands, config and offers checked for onboarding."
+    },
+    "src/services/onboarding/markers.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Moved unchanged from src/services/onboarding-funnel.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: writeMarkerOnce reads a marker key only to learn whether it exists before it writes it."
     },
     "src/services/once-only-step.ts": {
       "reads": {

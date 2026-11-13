@@ -152,66 +152,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/home-state.ts",
-    "to": "src/services/onboarding-funnel.ts",
-    "unresolvedTo": "./onboarding-funnel.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/services/onboarding-funnel.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/home-state.ts",
-        "dependencyTypes": [
-          "local",
-          "dynamic-import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
-    "from": "src/services/inactivity-nudge.ts",
-    "to": "src/services/onboarding-funnel.ts",
-    "unresolvedTo": "./onboarding-funnel.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/services/onboarding-funnel.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/inactivity-nudge.ts",
-        "dependencyTypes": [
-          "local",
-          "dynamic-import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/static/sdk-libs/auth/modal.js",
     "to": "src/static/sdk-libs/auth/session.js",
     "unresolvedTo": "./session.js",
