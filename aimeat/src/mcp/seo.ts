@@ -40,7 +40,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { buildSeoStatus, announceNote } from '../routes/admin-seo.js';
+import { buildSeoStatus, announceNote } from '../services/seo/seo-status.js';
 import { planAnnouncement, announceEverything } from '../services/indexnow-site.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';

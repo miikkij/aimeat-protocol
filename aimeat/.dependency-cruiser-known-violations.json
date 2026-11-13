@@ -14,20 +14,6 @@
     }
   },
   {
-    "type": "dependency",
-    "from": "src/mcp/seo.ts",
-    "to": "src/routes/admin-seo.ts",
-    "unresolvedTo": "../routes/admin-seo.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
     "type": "cycle",
     "from": "src/mcp/core.ts",
     "to": "src/mcp/index.ts",
