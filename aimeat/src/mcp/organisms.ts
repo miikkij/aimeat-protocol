@@ -11,6 +11,10 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_organism_get and the organism resource read through services/organism-read/
+ *     member.ts organismShownTo, the visibility rule GET /v1/organisms/:id asks: a private organism by
+ *     an active membership row in place of the organism's members list, one answer per caller
+ *     (parity section ORG-READ; structure programme 2026-11, unit 2b phase B).
  *   2026-11-13 — aimeat_organism_search, the three comment tools, aimeat_organism_update and
  *     aimeat_organism_export read the organism through services/organism-read/ (member.ts,
  *     comments.ts, manager.ts), the gate their REST routes ask (structure programme 2026-11, unit 2b).
@@ -111,7 +115,7 @@ import { searchOrganismContent } from '../services/organism-search.js';
 import { organismArchiveOp } from '../services/organism-archive-op.js';
 import { addComment, listComments } from '../services/organism-comments.js';
 import { commentWorkspace, deleteCommentIn } from '../services/organism-read/comments.js';
-import { organismMemberGate, organismForActiveMember } from '../services/organism-read/member.js';
+import { organismMemberGate, organismForActiveMember, organismShownTo } from '../services/organism-read/member.js';
 import { organismForManager } from '../services/organism-read/manager.js';
 import { listedOrganisms } from '../services/organism-read/list.js';
 import { leaveOrganismAs } from '../services/organism-read/leave.js';
@@ -191,13 +195,15 @@ export function registerOrganismsTools(
         { mimeType: 'application/json', description: 'Organism details and members' },
         async (uri, variables) => {
             const id = decodeURIComponent(variables.id as string);
-            const organism = await storage.getOrganism(id);
-            if (!organism) return { contents: [{ uri: uri.toString(), text: 'Organism not found' }] };
-            if (!(await canSeeOrganism(organism))) {
+            // The organism, the visibility rule and its active members: services/organism-read/member.ts,
+            // which GET /v1/organisms/:id asks too.
+            const shown = await organismShownTo(storage, id, { owner: getOwnerName() });
+            if (!shown.ok && shown.code === 'NOT_FOUND') return { contents: [{ uri: uri.toString(), text: 'Organism not found' }] };
+            if (!shown.ok) {
                 return resourceRefusal(uri, 'FORBIDDEN', 'This organism is private and you are not a member of it yet. '
                     + 'Ask one of its owners for an invitation, or search the organisms you can join instead.');
             }
-            const allMembers = await storage.listMembers(id, { status: 'active' });
+            const { organism, members: allMembers } = shown;
             // Roster privacy (memberVisibility): below the tier only creator/admin rows + own row.
             const canSeeRoster = await canSeeMembers(storage, organism, await rosterCaller());
             const members = canSeeRoster ? allMembers
@@ -292,11 +298,11 @@ export function registerOrganismsTools(
             annotations: annotationsFor('aimeat_organism_get'),
         },
         async ({ organism_id }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            if (!(await canSeeOrganism(organism))) return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
-
-            const allMembers = await storage.listMembers(organism_id, { status: 'active' });
+            // The organism, the visibility rule and its active members: services/organism-read/member.ts,
+            // which GET /v1/organisms/:id asks too.
+            const shown = await organismShownTo(storage, organism_id, { owner: getOwnerName() });
+            if (!shown.ok) return { content: [{ type: 'text' as const, text: shown.code === 'NOT_FOUND' ? 'Organism not found' : 'Access denied' }], isError: true };
+            const { organism, members: allMembers } = shown;
             // Roster privacy (memberVisibility): below the tier only creator/admin rows + own row.
             const canSeeRoster = await canSeeMembers(storage, organism, await rosterCaller());
             const members = canSeeRoster ? allMembers

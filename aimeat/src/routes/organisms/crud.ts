@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-14 — GET /v1/organisms/:id reads through services/organism-read/member.ts organismShownTo,
+ *     which aimeat_organism_get and the organism resource ask too; the answers are unchanged
+ *     (structure programme 2026-11, unit 2b phase B).
  *   2026-11-13 — PUT /v1/organisms/:id asks services/organism-read/manager.ts organismForManager, the
  *     read and the rule aimeat_organism_update asks; the answers are unchanged (structure programme
  *     2026-11, unit 2b). buildOrganismList's query and its rules moved unchanged to
@@ -101,6 +104,7 @@ import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { organismForManager } from '../../services/organism-read/manager.js';
 import { listedOrganisms } from '../../services/organism-read/list.js';
 import { leaveOrganismAs } from '../../services/organism-read/leave.js';
+import { organismShownTo } from '../../services/organism-read/member.js';
 import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
 import { isOwnerInPerson, resolveIdentity } from '../../utils/gaii.js';
 import { agentBarred, organismsAdmitting } from '../../services/organism-agent-access.js';
@@ -287,27 +291,15 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
 
   router.get('/v1/organisms/:id', optionalAuth(), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
+    // The organism, the visibility rule (a private organism is there only for an active member) and
+    // its active members: services/organism-read/member.ts, which aimeat_organism_get and the
+    // organism resource ask too. A hidden organism answers as one that does not exist.
+    const shown = await organismShownTo(storage, id, { owner: req.auth?.owner });
+    if (!shown.ok) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
       return;
     }
-
-    // Check visibility
-    if (organism.visibility === 'private') {
-      const ghii = req.auth?.owner;
-      if (!ghii) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-        return;
-      }
-      const membership = await storage.getMembership(id, ghii);
-      if (!membership || membership.status !== 'active') {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-        return;
-      }
-    }
-
-    const members = await storage.listMembers(id, { status: 'active' });
+    const { organism, members } = shown;
     const readme = await showOrganismReadme(storage, readerFor({ storage, config }, req.auth), id);
 
     // Roster privacy (memberVisibility): redact members[]/agentGaiis for callers below the tier.

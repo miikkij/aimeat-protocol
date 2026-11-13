@@ -11,14 +11,18 @@
  *
  *   WHO. `sub` is the session's subject (the agent's GAII over MCP), `owner` the account it acts in.
  *   The refusal is a code; each surface keeps its own sentence for it.
- * @structure MemberGate · organismMemberGate(storage, id, who) · organismForActiveMember(storage, id, who)
+ * @structure MemberGate · organismMemberGate(storage, id, who) · organismForActiveMember(storage, id, who) ·
+ *   organismShownTo(storage, id, who)
  * @usage const gate = await organismMemberGate(storage, id, { sub: req.auth!.sub, owner: req.auth!.owner });
  * @version-history
  *   v1.0.0 — 2026-11-13 — Moved from the workspace routes and mcp/workspaces.ts, which each held a copy
  *     (structure programme 2026-11, unit 2b). organismMemberGate also from the organism search route
  *     and tool; organismForActiveMember from the export route and tool, the same day.
+ *   v1.1.0 — 2026-11-14 — organismShownTo: the private-organism rule of GET /v1/organisms/:id, which
+ *     aimeat_organism_get and the organism resource now ask instead of the organism's members list
+ *     (one answer per caller, parity section ORG-READ; structure programme 2026-11, unit 2b phase B).
  */
-import type { Storage, OrganismRecord } from '../../storage/interface.js';
+import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../../storage/interface.js';
 import { memberRoleOf } from '../workspace/share.js';
 
 export type MemberGate =
@@ -38,6 +42,24 @@ export async function organismForActiveMember(
     const m = who.owner ? await storage.getMembership(organismId, who.owner) : null;
     if (!m || m.status !== 'active') return { ok: false, code: 'NOT_A_MEMBER' };
     return { ok: true, organism };
+}
+
+/**
+ * The organism and its active members, when the caller may read it: a private organism is there only
+ * for an account with an active membership in it; the other visibilities for anyone. GET
+ * /v1/organisms/:id, aimeat_organism_get and the aimeat://organisms resource.
+ */
+export async function organismShownTo(
+    storage: Storage, organismId: string, who: { owner: string | undefined },
+): Promise<{ ok: true; organism: OrganismRecord; members: OrganismMembershipRecord[] } | { ok: false; code: 'NOT_FOUND' | 'HIDDEN' }> {
+    const organism = await storage.getOrganism(organismId);
+    if (!organism) return { ok: false, code: 'NOT_FOUND' };
+    if (organism.visibility === 'private') {
+        const m = who.owner ? await storage.getMembership(organismId, who.owner) : null;
+        if (!m || m.status !== 'active') return { ok: false, code: 'HIDDEN' };
+    }
+    const members = await storage.listMembers(organismId, { status: 'active' });
+    return { ok: true, organism, members };
 }
 
 /** The organism and the caller's role in it, when the caller is in it. */
