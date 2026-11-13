@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description E2E for seven places where an MCP tool and the REST route beside it answered the same
  *   caller differently (structure programme 2026-11, unit 7). Each section holds the refused case and
- *   the designed use of the same path. A section headed RECORDED states today's answer of a
- *   difference whose fix waits for the developer's decision; GROUPS follows his decision of 2026-11-13.
+ *   the designed use of the same path. WS-ROLE and GROUPS follow the developer's decision of
+ *   2026-11-13 on the two differences that waited for it.
  *     APPROVALS  POST /v1/organisms/:id/approvals: a caller that is not the person in person does not
  *                choose who may resolve its request (approverRole), as it does not lower `risk`; the
  *                person's own word stands, and an agent following a flow gate takes the gate's role.
@@ -15,8 +15,9 @@
  *                as GET /v1/organisms/:id/members does; a caller who sees the roster sees the agents.
  *     BARRED     GET /v1/organisms?member=<self> leaves out, for an agent, an organism that does not
  *                admit it, as aimeat_organism_list does; the owner and an admitted agent see it.
- *     WS-ROLE    RECORDED: an agent attached to an organism manages a workspace with its owner's
- *                creator role over MCP and is a plain member on REST.
+ *     WS-ROLE    An agent attached to an organism, whose owner is an active member, acts with its
+ *                owner's role on both surfaces: attaching never narrows an agent. An attached agent
+ *                whose owner left manages nothing on either surface.
  *     GROUPS     An agent holding consent:groups sees its owner's sharing groups on both surfaces;
  *                without it, only the groups it is a member of. The owner in person as before.
  *     FILES      GET /v1/memory/files lists to an agent only the files its classification reader
@@ -25,6 +26,7 @@
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.2.0 — 2026-11-13 — WS-ROLE asserts the decided rule instead of today's answer.
  *   v1.1.0 — 2026-11-13 — GROUPS asserts the decided rule instead of today's answer.
  *   v1.0.0 — 2026-11-13 — Initial (structure programme 2026-11, unit 7).
  */
@@ -244,11 +246,11 @@ await test('USE KEPT: alice in person and her listed agent see it in the member 
 });
 
 // ─── WS-ROLE ───
-console.log('\nWS-ROLE (RECORDED, decision open): an attached agent and its owner\'s role');
+console.log('\nWS-ROLE: attaching an agent never narrows it (developer ruling 2026-11-13, after the 2026-11-10 ruling)');
 
 let roleOrg = '', bobWs = '';
-let attached!: McpAgent, attachedMcp!: McpSession, sibling!: McpAgent;
-await test('Setup: alice\'s organism; bob a member who creates a workspace; one of alice\'s agents attached, one not', async () => {
+let attached!: McpAgent, attachedMcp!: McpSession, sibling!: McpAgent, carolAgent!: McpAgent, carolMcp!: McpSession;
+await test('Setup: alice\'s organism; bob a member who creates a workspace; one of alice\'s agents attached, one not; carol\'s agent attached, then carol leaves', async () => {
     roleOrg = await organism(alice.token, `U7 roles ${stamp}`);
     await join(bob.token, roleOrg);
     const w = await call('POST', `/v1/organisms/${roleOrg}/workspaces`, bob.token, { name: 'Bob\'s', manifest: {
@@ -261,21 +263,35 @@ await test('Setup: alice\'s organism; bob a member who creates a workspace; one 
     const att = await call('POST', `/v1/organisms/${roleOrg}/agents`, alice.token, { agent_gaii: attached.gaii });
     assert(att.status === 201, `attach: ${show(att)}`);
     attachedMcp = await openSession(BASE, attached.token, 'u7 attached');
+    await join(carol.token, roleOrg);
+    carolAgent = await makeAgent(BASE, carol, ['*'], N('carolag'));
+    const catt = await call('POST', `/v1/organisms/${roleOrg}/agents`, carol.token, { agent_gaii: carolAgent.gaii });
+    assert(catt.status === 201, `carol attaches her agent: ${show(catt)}`);
+    const left = await call('POST', `/v1/organisms/${roleOrg}/leave`, carol.token, {});
+    assert(left.status === 200, `carol leaves: ${show(left)}`);
+    carolMcp = await openSession(BASE, carolAgent.token, 'u7 carol agent');
 });
 
-await test('RECORDED: the attached agent lists the members of bob\'s workspace over MCP (its owner\'s creator role)', async () => {
+await test('USE KEPT: the attached agent lists the members of bob\'s workspace over MCP (its owner\'s creator role)', async () => {
     const r = await callTool(attachedMcp, 'aimeat_workspace_members', { organism_id: roleOrg, ws: bobWs });
     assert(!r.isError, `MCP: ${r.text.slice(0, 300)}`);
 });
 
-await test('RECORDED: the same agent is refused the same list on REST (a plain member there)', async () => {
+await test('DECIDED: the same agent reads the same list on REST with its owner\'s role', async () => {
     const r = await call('GET', `/v1/organisms/${roleOrg}/workspace-access?${q({ ws: bobWs })}`, attached.token);
-    assert(r.status === 403, `REST: ${show(r)}`);
+    assert(r.status === 200, `REST: ${show(r)}`);
 });
 
-await test('RECORDED: alice\'s agent that is not attached reads the same list on REST (its owner\'s role)', async () => {
+await test('USE KEPT: alice\'s agent that is not attached reads the same list on REST (its owner\'s role)', async () => {
     const r = await call('GET', `/v1/organisms/${roleOrg}/workspace-access?${q({ ws: bobWs })}`, sibling.token);
     assert(r.status === 200, `REST, not attached: ${show(r)}`);
+});
+
+await test('REFUSED: an attached agent whose owner is no longer a member manages nothing, on both surfaces', async () => {
+    const mcp = await callTool(carolMcp, 'aimeat_workspace_members', { organism_id: roleOrg, ws: bobWs });
+    assert(mcp.isError, `MCP: ${mcp.text.slice(0, 300)}`);
+    const rest = await call('GET', `/v1/organisms/${roleOrg}/workspace-access?${q({ ws: bobWs })}`, carolAgent.token);
+    assert(rest.status === 403, `REST: ${show(rest)}`);
 });
 
 // ─── GROUPS ───

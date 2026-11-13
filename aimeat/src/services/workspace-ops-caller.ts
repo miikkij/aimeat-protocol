@@ -15,6 +15,8 @@
  *   const caller = workspaceCallerOf({ principal: agentGaii, ownerName, roles: ['agent'] }, config);
  *   const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
  * @version-history
+ *   v1.3.0 — 2026-11-13 — memberRoleOf asks services/workspace-share.ts memberRoleOf, the rule the REST
+ *     routes ask (structure programme 2026-11, unit 7). Its answer is unchanged.
  *   v1.2.0 — 2026-10-13 — fencedOpRefusal hands the session's `scopes` to the fenced-space rule: a
  *     session that covers `organism:direct` writes a record space that names extensions directly
  *     (ruled by the developer on 2026-10-13; no permission let an agent through before).
@@ -30,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { fencedSpaceRefusal, type FenceTarget } from './fenced-space.js';
+import { memberRoleOf as organismMemberRoleOf } from './workspace-share.js';
 
 export interface WorkspaceOpsDeps { storage: Storage; config: AimeatConfig }
 
@@ -100,12 +103,16 @@ export async function denyReason(storage: Storage, caller: WorkspaceOpsCaller, o
     return m && m.status === 'active' ? null : refuse(403, 'ACCESS_DENIED', 'Not an active member of this organism');
 }
 
-/** The caller's role for the meta.* rule; an organism agent is a member and nothing more. */
+/**
+ * The caller's role for the meta.* rule: the one rule the REST routes ask too
+ * (services/workspace-share.ts memberRoleOf). The owner's membership first, so an attached agent of an
+ * active member keeps its owner's role; an attached agent of a non-member is a member and nothing more.
+ */
 export async function memberRoleOf(storage: Storage, caller: WorkspaceOpsCaller, orgId: string): Promise<'creator' | 'admin' | 'member' | null> {
-    const m = await storage.getMembership(orgId, caller.ownerName);
-    if (m && m.status === 'active') return m.role;
     const org = await storage.getOrganism(orgId);
-    return org?.agentGaiis?.includes(caller.principal) ? 'member' : null;
+    if (!org) return null;
+    const role = await organismMemberRoleOf(storage, org, orgId, { sub: caller.principal, owner: caller.ownerName });
+    return role === 'creator' || role === 'admin' || role === 'member' ? role : null;
 }
 
 /**

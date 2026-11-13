@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-13 — The meta.* role (memberRoleOf) is services/workspace-share.ts memberRoleOf, the rule the
+ *     REST routes ask; its answer here is unchanged (structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_workspace_read hands archived ('only') to readWorkspaceOp (unit 3b).
  *   2026-11-08 — findWsEntry is the gate's (services/organism-gate.ts, workspaceRegistrations), so the
  *     access, member and transfer tools name the creator the REST gate and the access layer name
@@ -225,7 +227,7 @@ import type { CallerContext } from '../services/caller-context.js';
 import { fencedSpaceRefusal } from '../services/fenced-space.js';
 import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
 import { toolError } from './tool-error.js';
-import { setWorkspaceShareOp } from '../services/workspace-share.js';
+import { setWorkspaceShareOp, memberRoleOf as organismMemberRoleOf } from '../services/workspace-share.js';
 import { shareBodyFromToolInput } from '../services/workspace-share-input.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -323,14 +325,16 @@ export function registerWorkspaceTools(
      * all"; this answers "may they change the structure", and the two are different questions —
      * publishing over the manifest or the config is not the same act as writing a document.
      *
-     * An organism AGENT (org.agentGaiis) acts for the organism itself and is treated as a member;
-     * it does not inherit creator or admin, so it cannot publish into meta.* either.
+     * The rule the REST routes ask (services/workspace-share.ts memberRoleOf): the owner's membership
+     * first, so an agent on the organism's agent list whose owner is an active member keeps its
+     * owner's role (attaching never narrows an agent, ruling 2026-11-13); an agent on the list whose
+     * owner is not a member is a member and nothing more.
      */
     async function memberRoleOf(orgId: string): Promise<'creator' | 'admin' | 'member' | null> {
-        const m = await storage.getMembership(orgId, ownerName);
-        if (m && m.status === 'active') return m.role;
         const org = await storage.getOrganism(orgId);
-        return org?.agentGaiis?.includes(agentGaii) ? 'member' : null;
+        if (!org) return null;
+        const role = await organismMemberRoleOf(storage, org, orgId, { sub: agentGaii, owner: ownerName });
+        return role === 'creator' || role === 'admin' || role === 'member' ? role : null;
     }
 
     /** Write one workspace record: ONE owner per key, forked copies collapsed, and the fan-out every

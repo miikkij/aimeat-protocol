@@ -30,6 +30,8 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.5.3 — 2026-11-13 — Structure programme unit 7: workspaces.ts 6 → 5 (the meta.* role asks
+ *     services/workspace-share.ts memberRoleOf, as the REST routes do).
  *   v1.5.2 — 2026-11-13 — Structure programme unit 7: sharing-groups.ts 4 → none (aimeat_group_list
  *     and aimeat_group_get call services/sharing-groups/reach.ts, as GET /v1/groups does).
  *   v1.5.1 — 2026-11-13 — Structure programme unit 7: core.ts 9 → 8 (aimeat_discover builds its caller
@@ -149,7 +151,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/prompts.ts': 1,
     'src/mcp/skills.ts': 1,
     'src/mcp/wallet-extended.ts': 2,
-    'src/mcp/workspaces.ts': 6,
+    'src/mcp/workspaces.ts': 5,
 };
 
 /** A direct storage call: the bare `storage` or a member receiver (`deps.storage`, `this.storage`). */

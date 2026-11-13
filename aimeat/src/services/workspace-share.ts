@@ -25,6 +25,9 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   2026-11-13 — memberRoleOf asks the account's membership before the organism's agent list, so an
+ *     attached agent of an active member keeps its owner's role on every surface (developer ruling
+ *     2026-11-13; structure programme 2026-11, unit 7).
  *   2026-11-01 — The publish gate and the label cap read end dates as the viewer does: a target whose
  *     end has passed is not open, so giving it a new end or removing its end is asked about as an
  *     opening (newlyOpened and shareCapRefusal take the call's time). The end check is shareEndPassed
@@ -130,14 +133,25 @@ export function shareServedVisibility(share: Pick<ResolvedShare, 'access'>): 'pu
     return shareIsOpen(share) ? 'public' : 'private';
 }
 
-/** The caller's active role in the organism: an organism agent is a member, a person by their membership. */
+/**
+ * The caller's active role in the organism, for the REST routes (organism-gate memberRole), the
+ * workspace operations (workspace-ops-caller memberRoleOf) and the MCP workspace tools alike.
+ *
+ * The account's membership decides first: a person by their own membership, and an agent by its
+ * owner's, whether or not it is on the organism's agent list. Attaching an agent never narrows it
+ * (services/organism-agent-access.ts v1.1.0, 2026-11-10; developer ruling 2026-11-13). An agent on
+ * the list whose owner is not an active member is a member in its own right, and nothing more.
+ * Until 2026-11-13 the list was read first here, so the creator's attached agent was a plain member
+ * on REST while the MCP tools gave it its owner's role (structure programme 2026-11, unit 7).
+ */
 export async function memberRoleOf(
     storage: Storage, organism: Pick<OrganismRecord, 'agentGaiis'>, orgId: string, who: { sub?: string; owner?: string },
 ): Promise<string | null> {
-    if (who.sub && organism.agentGaiis.includes(who.sub)) return 'member';
-    if (!who.owner) return null;
-    const m = await storage.getMembership(orgId, who.owner);
-    return m && m.status === 'active' ? m.role : null;
+    if (who.owner) {
+        const m = await storage.getMembership(orgId, who.owner);
+        if (m && m.status === 'active') return m.role;
+    }
+    return who.sub && organism.agentGaiis.includes(who.sub) ? 'member' : null;
 }
 
 /** The address a person opens the shared workspace at, or one page of it. Relative to the node. */
