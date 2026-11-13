@@ -65,7 +65,7 @@ const SPEC_GATE_INPUT = {
     },
 } as const;
 
-/** What the draft is changing (services/app-news.ts), on the three tools that start or fill a draft. */
+/** What the draft is changing (services/app/news.ts), on the three tools that start or fill a draft. */
 const DRAFT_NOTICE_INPUT = {
     notice: {
         type: 'string',

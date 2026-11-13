@@ -30,7 +30,7 @@
  *     form (feature-list audit #64).
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { readWorkspaceMetaRecord, workspaceRegistrations } from './workspace-meta-read.js';
+import { readWorkspaceMetaRecord, workspaceRegistrations } from './workspace/meta-read.js';
 import { threadIsExpired, type IntakeThreadConfig } from './intake-thread.js';
 import { logger } from '../utils/logger.js';
 

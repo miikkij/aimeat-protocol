@@ -10,12 +10,12 @@
  *
  *   - An app: an access code shuts everyone out who lacks it, so such an app is not counted, and an
  *     app an operator hid is served to nobody. Otherwise the app's own `open_to` (`access` on the
- *     record, read by services/app-access.ts appAccessOf) names who opens it: signed-in or one
+ *     record, read by services/app/access.ts appAccessOf) names who opens it: signed-in or one
  *     organism; for 'anyone' a listed app is public, and a community or unlisted app opens for anyone
- *     holding its address (services/app-visibility.ts: "a link opens the app in all three").
+ *     holding its address (services/app/visibility.ts: "a link opens the app in all three").
  *     The node's own signed-in setting is applied to every kind by the report.
  *   - A workspace share: what the share routes hand an anonymous visitor, asked of their own
- *     collectors (services/workspace-public-collectors.ts) with the anonymous classification reader,
+ *     collectors (services/workspace/public-collectors.ts) with the anonymous classification reader,
  *     as services/share-provenance.ts does. An open share is 'link', an account share 'signed-in'.
  *     A password share is not counted: a stranger needs the password too.
  *   - An organism: its visibility, and its member roster when the roster is set public.
@@ -44,12 +44,12 @@
  */
 import type { OrganismRecord } from '../../storage/interface.js';
 import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
-import { appAccessOf } from '../app-access.js';
-import { resolveAppUrls } from '../app-urls.js';
-import { readShareMetaOf, publicViewerPath } from '../workspace-share.js';
-import { createPublicCollectors } from '../workspace-public-collectors.js';
+import { appAccessOf } from '../app/access.js';
+import { resolveAppUrls } from '../app/urls.js';
+import { readShareMetaOf, publicViewerPath } from '../workspace/share.js';
+import { createPublicCollectors } from '../workspace/public-collectors.js';
 import { readerFor } from '../classification/reader.js';
-import { workspaceRegistrations } from '../workspace-meta-read.js';
+import { workspaceRegistrations } from '../workspace/meta-read.js';
 import { isOrganismOwner } from '../organism-ownership.js';
 import { companyAddress } from '../company/company-service.js';
 import { listPublishedMembers } from '../portfolio-members.js';
@@ -64,7 +64,7 @@ import {
 const enc = encodeURIComponent;
 
 /**
- * The level the app's own `open_to` names (services/app-access.ts appAccessOf), or 'listing' when it
+ * The level the app's own `open_to` names (services/app/access.ts appAccessOf), or 'listing' when it
  * is 'anyone' and the listing decides. The node's own signed-in setting is applied by the report.
  */
 function appAccessLevel(app: Pick<AppRecord, 'access'>): { level: ExposureLevel; organism_id?: string } | 'listing' {

@@ -2,7 +2,7 @@
  * @file test/unit/app-storage-read-keep.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The storage:read step for published apps (services/app-storage-read-keep-migration.ts),
+ * @description The storage:read step for published apps (services/app/storage-read-keep-migration.ts),
  *   on a node that ran the 4.0.x keep-working step before QA audit S3-03 gated GET /v1/pub.
  *
  *   - An app published before the step that declares its own aimeat-scopes without storage:read and
@@ -29,10 +29,10 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
-import { keepStorageReadForAppsOnce, APP_STORAGE_READ_KEEP_KEY } from '../../src/services/app-storage-read-keep-migration.js';
-import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app-scope-allowance-store.js';
+import { keepStorageReadForAppsOnce, APP_STORAGE_READ_KEEP_KEY } from '../../src/services/app/storage-read-keep-migration.js';
+import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app/scope-allowance-store.js';
 import { readAccountEvents } from '../../src/services/account-events.js';
-import { readAppAudit } from '../../src/services/app-audit.js';
+import { readAppAudit } from '../../src/services/app/audit.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 
 const NODE_ID = 'aimeat-app-storage-read-keep';

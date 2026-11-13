@@ -5,7 +5,7 @@
  * @description Two member-roster routes beside routes/app-members.ts, in a module of their own
  *   because that file was near the line limit: the roster's audit trail, and cancelling an open
  *   invitation. Both are for the app's owner and the members who manage its roster; the handlers
- *   are the route's gate and one call of services/app-roster-ops.ts, which the aimeat_app_manage
+ *   are the route's gate and one call of services/app/roster-ops.ts, which the aimeat_app_manage
  *   MCP tool calls too.
  * @structure appMembersExtraRouter(config, storage) — GET .../members/audit,
  *   DELETE .../members/invites/:id
@@ -23,7 +23,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { requireScopeOrOwnApp } from '../auth/app-own-gate.js';
-import { rosterAuditTrail, cancelInvite } from '../services/app-roster-ops.js';
+import { rosterAuditTrail, cancelInvite } from '../services/app/roster-ops.js';
 import { sendAppOp } from './app-op-answer.js';
 
 export function appMembersExtraRouter(config: AimeatConfig, storage: Storage): Router {

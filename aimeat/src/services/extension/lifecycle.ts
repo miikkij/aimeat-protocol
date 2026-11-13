@@ -1,0 +1,387 @@
+/**
+ * @file src/services/extension/lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The write half of an extension's life: storing an install or a redeploy, switching one
+ *   on, switching it off, and removing it together with everything it left behind.
+ *
+ *   Two doors do all four. Over HTTP that is POST/PUT /v1/extensions plus the activate, deactivate
+ *   and DELETE routes in routes/extensions/crud.ts; over MCP it is the aimeat_extension_* tools in
+ *   mcp/extensions.ts. Manifest validation was already shared (services/extension/manifest.ts) and the
+ *   in-place code swap was already shared (extension-upsert.ts). Everything around those two stayed
+ *   copied, and the copies had stopped being the same code:
+ *
+ *   - Deleting over MCP removed the row and nothing else. The HTTP door removes the extension's
+ *     scheduled jobs first, then empties its `ext:{name}` namespace and every `ext:{name}.{instance}`
+ *     namespace beside it. So an extension uninstalled by an agent left cron jobs registered against
+ *     a name that no longer resolved, and left its stored data unreachable while it still counted
+ *     against the node.
+ *   - Activating over MCP wrote the status field. The HTTP door also registers the schedules the
+ *     manifest declares and runs the extension's `@activate` jobs, which is what makes a scheduled
+ *     extension start running at all. Switched on by an agent, it never started its clock.
+ *   - Deactivating over MCP wrote the status field and left the scheduled jobs registered, so a
+ *     switched-off extension kept firing on its cron.
+ *   - Installing over MCP prepared secrets with prepareSecretConfigForWrite, which carries a stored
+ *     secret forward when the new manifest omits its value; PUT called encryptSecretFields directly,
+ *     which does not. The same redeploy kept a secret through one door and erased it through the
+ *     other.
+ *
+ *   None of those failed loudly. That is the shape of this class of bug: the surface answers with the
+ *   record it wrote, and the part that did not happen stays invisible until somebody asks why the
+ *   schedule stopped or where the data went.
+ * @structure
+ *   - writeExtensionRecord() — create or upsert: quota, secret preparation, idempotency, projection
+ *   - activateExtension() — status, schedule registration from the manifest, @activate jobs
+ *   - deactivateExtension() — status, schedule removal
+ *   - uninstallExtension() — schedules, `ext:` and instance memory, then the row
+ * @usage
+ *   const out = await writeExtensionRecord({ storage, config, scheduler }, record,
+ *     { existing, ownerName, actor, isOperator });
+ *   if (!out.ok) return refuse(out.code, out.message);
+ * @version-history
+ *   v1.12.0 — 2026-10-29 — writeExtensionRecord refuses a new name that starts with aimeat- to anyone
+ *     but an operator, 409 NAME_RESERVED (component-name-prefix.ts; secaudit2026oct26 round 8c).
+ *   v1.11.0 — 2026-10-25 — uninstallExtension writes a bare name down with its holder, and a new
+ *     install that took a released bare name settles it (services/component-address.ts; owner
+ *     namespaces wish, secaudit2026oct22).
+ *   v1.10.0 — 2026-10-21 — An update of byte-identical code keeps the old-code first-use mark; a changed
+ *     script drops it (services/extension-first-use-keep.ts carryFirstUseKeep).
+ *   v1.9.0 — 2026-10-20 —writeExtensionRecord stamps `installedByPrincipal` with the actor of the
+ *     write, so an unattended run reads files as the principal that wrote the code and not as the
+ *     account name (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
+ *   v1.8.0 — 2026-10-13 — activateExtension makes the extension's capability rows before it answers
+ *     (capability-aggregator.ts aggregateExtensionNow), so an app tool bound to an action is callable
+ *     at once.
+ *   v1.7.0 — 2026-10-09 — Secrets are prepared and compared bound to the extension's name
+ *     (SecretBinding; secrets audit 2026-10-09, 1.1). uninstallExtension needs only storage (and the
+ *     scheduler when there is one), so account erasure can call it; with no scheduler the stored
+ *     schedule rows still go.
+ *   v1.6.0 — 2026-10-09 — An in-place update keeps the owner's host field values (carryHostFieldValues).
+ *   v1.5.0 — 2026-09-28 — writeExtensionRecord refuses other code for an extension a managed package
+ *     install owns, 409 MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts); a config-only change passes.
+ *   v1.4.0 — 2026-09-24 — writeExtensionRecord refuses a redeploy that brings other code under a
+ *     version already kept (409 VERSION_EXISTS) before anything is written (secaudit 2026-09, A6-7).
+ *   v1.3.0 — 2026-09-13 — writeExtensionRecord refuses a flagged action whose changed text would break
+ *     an ODPS length cap (422 ODPS_FIELD_TOO_LONG, with details) before anything is written.
+ *   v1.2.0 — 2026-09-03 — writeExtensionRecord snapshots each version; uninstall forgets the kept versions.
+ *   v1.1.0 — 2026-08-16 — Schedule registration moved to services/extension-schedules.ts, shared with
+ *     the redeploy and the two install routes. The copy here stamped no `ownerScope`, and since
+ *     2026-08-15 the executor reads the owner off the job.
+ *   v1.0.0 — 2026-08-11 — Extracted in the August 2026 one-capability-one-implementation audit,
+ *     after the MCP tools were found writing extensions through storage directly.
+ */
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ExtensionRecord } from '../../storage/interface.js';
+import type { Scheduler } from '../scheduler.js';
+import { upsertExtensionInPlace } from './upsert.js';
+import { recordAccountEvent } from '../account-events.js';
+import { registerExtensionSchedules } from './schedules.js';
+import { aggregateExtensionNow } from '../capability-aggregator.js';
+import { reconcileAfterExtensionWrite } from '../exchange-projection.js';
+import { odpsWriteRefusal, extensionOdpsKey } from '../exchange-odps-write.js';
+import { extensionInstallRefusal } from '../install-quotas.js';
+import { prepareSecretConfigForWrite, decryptSecretFields, getExtSecretKeys } from './secrets.js';
+import { getEncryptionKey } from '../encryption.js';
+import { emitChange } from '../event-bus.js';
+import { stableStringify } from '../../utils/stable-json.js';
+import { logger } from '../../utils/logger.js';
+import { snapshotExtensionVersion, forgetVersions, keptVersionRefusal, extensionCodeOf } from '../component-versions.js';
+import { managedChangeRefusal } from '../packages/install/package-managed.js';
+import { carryHostFieldValues } from './network-hosts.js';
+import { carryFirstUseKeep } from './first-use-keep.js';
+import { releaseBareName, settleReclaimed } from '../component-address.js';
+import { nodePrefixRefusal } from '../component-name-prefix.js';
+
+export interface ExtensionLifecycleDeps {
+    storage: Storage;
+    config: AimeatConfig;
+    /** Absent on a door with no scheduler wired; then schedules are neither registered nor removed. */
+    scheduler?: Scheduler | null;
+}
+
+export interface ExtensionWriteContext {
+    /**
+     * The stored record this write lands on, or null for a fresh install. Both doors already read it
+     * to decide whether the caller may write here, so it is passed in rather than read twice: the
+     * permission decision and the write must be made about the same row.
+     */
+    existing: ExtensionRecord | null;
+    /** The bare owner name of the caller, for the per-owner install ceiling. */
+    ownerName: string;
+    /** Who is recorded as having created re-registered schedule jobs. */
+    actor: string;
+    /** Operators bypass the per-owner ceiling and not the node-wide one. */
+    isOperator: boolean;
+}
+
+export type ExtensionWriteOutcome =
+    | { ok: true; record: ExtensionRecord; action: 'installed' | 'updated' | 'unchanged'; reinitialized: boolean }
+    | { ok: false; status: number; code: string; message: string; details?: unknown };
+
+/**
+ * What the stored record MEANS, for deciding whether a redeploy changes anything.
+ *
+ * stableStringify rather than JSON.stringify: config/actions/limits/federation/instances are Json
+ * columns, and PostgreSQL jsonb does not preserve object key order, so a naive stringify reads
+ * identical data as changed. Compared on plaintext config (decrypt the stored secrets, drop the
+ * __secretKeys marker) because secret ciphertext takes a fresh IV on every call and would otherwise
+ * make every redeploy look different.
+ */
+function recordSignature(r: ExtensionRecord, encKey: Buffer | null): string {
+    return stableStringify({
+        version: r.version, description: r.description, author: r.author,
+        requiredApis: r.requiredApis, actions: r.actions,
+        config: decryptSecretFields(r.config, getExtSecretKeys(r), encKey, { extension: r.name }),
+        limits: r.limits, federation: r.federation, instances: r.instances ?? null,
+    });
+}
+
+/**
+ * Store a validated extension record: create it, or replace an installed one in place.
+ *
+ * The caller owns the policy above this — whether an existing name may be replaced at all (POST
+ * refuses, PUT allows, the MCP tool wants `update: true`) and who is allowed to write here. This owns
+ * what happens once that is settled: the install ceilings, secret handling, the no-op shortcut, the
+ * swap and the EXCHANGE re-projection.
+ *
+ * Mutates `record.config` in place with the storage-ready value, as both doors always have.
+ */
+export async function writeExtensionRecord(
+    deps: ExtensionLifecycleDeps,
+    record: ExtensionRecord,
+    ctx: ExtensionWriteContext,
+): Promise<ExtensionWriteOutcome> {
+    const { storage, config, scheduler } = deps;
+    const { existing } = ctx;
+    const name = record.name;
+    const encKey = getEncryptionKey(config);
+
+    // A flagged action whose CHANGED text would publish an ODPS document past a schema cap is refused
+    // before the ceilings and the write (the developer's decision, 2026-09-13).
+    const odps = odpsWriteRefusal(extensionOdpsKey(name), record, existing);
+    if (odps) return odps;
+
+    // The listing belongs to whoever installed the extension, not to whoever is redeploying it. On
+    // every ordinary write those are the same principal, because managing an extension requires
+    // being its installer; they part company when an operator writes on somebody else's behalf.
+    const listingOwner = existing ? existing.installedBy : record.installedBy;
+
+    // WHO WROTE THIS CODE, as a principal and not as an account name. `installedBy` is the bare
+    // account name, so an install by the account holder in person and one by that person's agent
+    // read the same, and an unattended run that judged a file read against it gave the agent the
+    // owner's whole reach (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii). The
+    // actor of the write that produced the running code is the honest answer: an owner redeploying
+    // an agent's extension takes it back, and an agent redeploying the owner's narrows it to the
+    // agent. Set on every write, so the record never carries a principal older than its code.
+    record.installedByPrincipal = ctx.actor;
+
+    if (!existing) {
+        // A name with the node's prefix is kept for what the node ships next (component-name-prefix.ts).
+        const prefixed = await nodePrefixRefusal(storage, 'extension', name, { ownerName: ctx.ownerName, isOperator: ctx.isOperator });
+        if (prefixed) return { ok: false, ...prefixed };
+        // Both ceilings, node-wide and per-owner, from services/install-quotas.ts. Only a new name
+        // counts: replacing your own extension in place adds nothing to either number.
+        const overQuota = await extensionInstallRefusal({ storage, config }, ctx.ownerName, ctx.isOperator);
+        if (overQuota) return { ok: false, ...overQuota };
+
+        const prepared = prepareSecretConfigForWrite(record.config, undefined, encKey, { extension: name });
+        if (prepared === null) return encryptionRefusal();
+        record.config = prepared;
+
+        const created = await storage.createExtension(record);
+        // A bare name its holder installed again is no longer released (services/component-address.ts).
+        await settleReclaimed(storage, 'extension', created.name);
+        // Every version is kept: this one too, so `name@<version>` keeps serving it after an update.
+        await snapshotExtensionVersion(storage, created, ctx.actor)
+            .catch(err => logger.warn('writeExtensionRecord: version not kept', { name, version: created.version, error: String(err) }));
+        // TARGET-050: an action flagged `commercial.exchange` is projected onto the market from here.
+        await reconcileAfterExtensionWrite(storage, listingOwner, config.nodeId, created.name);
+        emitChange('extensions');
+        // Installed only. Replacing an extension's code in place is ordinary maintenance; arriving
+        // in the account for the first time is a new thing that can act there.
+        void recordAccountEvent(storage, {
+            ownerGhii: `${ctx.ownerName}@${config.nodeId}`,
+            kind: 'extension_installed',
+            actorGaii: ctx.actor,
+            subject: created.name,
+            link: '/v1/profile?tab=extensions',
+            data: { name: created.name },
+        }, config);
+        return { ok: true, record: created, action: 'installed', reinitialized: false };
+    }
+
+    // A host field (manifest network.host_fields) is the owner's answer for this install: the new
+    // build takes the host the install holds, before the no-op comparison below sees it.
+    record.config = carryHostFieldValues(record.config, existing.config);
+    // Byte-identical code keeps the old-code first-use mark; a changed script drops it
+    // (services/extension/first-use-keep.ts).
+    record.config = carryFirstUseKeep(record.config, record.actions, existing);
+
+    // Identical derived bytes are a safe no-op, and a no-op must not re-run the extension's
+    // @activate work or re-register its schedules.
+    if (recordSignature(record, encKey) === recordSignature(existing, encKey)) {
+        return { ok: true, record: existing, action: 'unchanged', reinitialized: false };
+    }
+
+    // A kept version is immutable (services/component-versions.ts): `name@version` is an address
+    // apps pin, so other code under a version already kept is refused here, before anything is
+    // written, and the author gives the change a new version. A change to config alone is not code
+    // and goes through (secaudit 2026-09, A6-7).
+    const kept = await keptVersionRefusal(storage, 'extension', name, record.version, extensionCodeOf(record));
+    if (kept) return { ok: false, ...kept };
+
+    // An extension a managed package install owns keeps the package's code; its config is a
+    // setting and still goes through (services/packages/install/package-managed.ts). Asked of the installing owner.
+    if (extensionCodeOf(record) !== extensionCodeOf(existing)) {
+        const managed = await managedChangeRefusal(storage, existing.installedBy, 'extension', name, 'code');
+        if (managed) return { ok: false, ...managed };
+    }
+
+    // Carry forward the encrypted secrets this manifest omitted, then encrypt the plaintext ones. A
+    // manifest that declares a secret field without repeating its value must not wipe what is stored.
+    const prepared = prepareSecretConfigForWrite(record.config, existing.config, encKey, { extension: name });
+    if (prepared === null) return encryptionRefusal();
+    record.config = prepared;
+
+    const upserted = await upsertExtensionInPlace({ storage, config, scheduler }, name, record, {
+        ownerName: listingOwner,
+        actor: ctx.actor,
+        wasActive: existing.status === 'active',
+    });
+    // Never answer a write that did not apply with the record we WANTED to store: that looks exactly
+    // like proof the deploy worked, while the database still holds the old code.
+    if (!upserted.record) {
+        logger.error(`Extension upsert wrote nothing: ${name}`, { by: ctx.actor });
+        return {
+            ok: false, status: 500, code: 'WRITE_NOT_APPLIED',
+            message: `Extension "${name}" was NOT updated — the storage write did not apply, and the installed version is unchanged. Nothing was deployed.`,
+        };
+    }
+    // The version just deployed joins the kept ones; apps pinned to the previous one keep running it.
+    await snapshotExtensionVersion(storage, upserted.record, ctx.actor)
+        .catch(err => logger.warn('writeExtensionRecord: version not kept', { name, version: upserted.record?.version, error: String(err) }));
+    emitChange('extensions');
+    return { ok: true, record: upserted.record, action: 'updated', reinitialized: upserted.reinitialized };
+}
+
+function encryptionRefusal(): ExtensionWriteOutcome {
+    return {
+        ok: false, status: 503, code: 'ENCRYPTION_NOT_CONFIGURED',
+        message: 'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.',
+    };
+}
+
+/**
+ * Switch an extension on.
+ *
+ * Three things, not one: the status field, the schedules the manifest declares, and the `@activate`
+ * jobs that do an extension's first run. An extension whose status says active but whose schedules
+ * were never registered looks installed and working and does nothing on its clock.
+ *
+ * `ext` is the record as stored BEFORE the update, because its config carries the `__schedules` this
+ * reads. Returns the updated record, or null when the row went away underneath.
+ */
+export async function activateExtension(
+    deps: ExtensionLifecycleDeps,
+    ext: ExtensionRecord,
+    actor: string,
+): Promise<ExtensionRecord | null> {
+    const { storage, scheduler } = deps;
+    const name = ext.name;
+
+    const updated = await storage.updateExtension(name, {
+        status: 'active',
+        activatedAt: new Date().toISOString(),
+    });
+
+    await registerExtensionSchedules({ storage, config: deps.config, scheduler }, ext, actor);
+
+    // Its actions are capability rows before this answers: an app tool bound to one of them is
+    // callable from the moment the extension is on, and not five minutes later.
+    await aggregateExtensionNow(deps.config, storage, name);
+
+    // The extension's first run, once it is on. Deliberately not awaited: an @activate job may be
+    // long, and activation has already happened.
+    if (scheduler) {
+        scheduler.runActivateJobs(name).catch(err =>
+            logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
+    }
+
+    emitChange('extensions');
+    return updated;
+}
+
+/** Switch an extension off, and stop its clock with it. */
+export async function deactivateExtension(
+    deps: ExtensionLifecycleDeps,
+    name: string,
+): Promise<ExtensionRecord | null> {
+    const updated = await deps.storage.updateExtension(name, { status: 'inactive' });
+    await removeExtensionSchedules(deps, name);
+    emitChange('extensions');
+    return updated;
+}
+
+/**
+ * Remove an extension and everything it accumulated: its scheduled jobs, its `ext:{name}` memory, and
+ * the `ext:{name}.{instanceId}` memory of each of its instances.
+ *
+ * The row alone is not the extension. A job left registered fires against a name that no longer
+ * resolves, and a namespace left behind is data nobody can reach and nobody can list.
+ */
+export async function uninstallExtension(
+    deps: Pick<ExtensionLifecycleDeps, 'storage' | 'scheduler'> & Partial<ExtensionLifecycleDeps>,
+    name: string,
+): Promise<boolean> {
+    const { storage } = deps;
+
+    await removeExtensionSchedules(deps, name);
+
+    const extNamespace = `ext:${name}`;
+    const extMemoryRecords = await storage.listMemory(extNamespace);
+    for (const record of extMemoryRecords) {
+        await storage.deleteMemory(extNamespace, record.key);
+    }
+    if (extMemoryRecords.length > 0) {
+        logger.info(`Cleaned ${extMemoryRecords.length} memory keys from namespace: ${extNamespace}`);
+    }
+
+    const instances = await storage.listExtensionInstances(name);
+    for (const inst of instances) {
+        const instNamespace = `ext:${name}.${inst.id}`;
+        const instMemory = await storage.listMemory(instNamespace);
+        for (const record of instMemory) {
+            await storage.deleteMemory(instNamespace, record.key);
+        }
+        if (instMemory.length > 0) {
+            logger.info(`Cleaned ${instMemory.length} memory keys from instance namespace: ${instNamespace}`);
+        }
+    }
+
+    const holder = (await storage.getExtension(name))?.installedBy;
+    const deleted = await storage.deleteExtension(name);
+    // A bare name stays its holder's: written down so only they install under it again, and an old
+    // `/v1/ext/<name>/<instance>/…` address keeps reading as this extension's (services/component-address.ts).
+    if (deleted && holder) await releaseBareName(storage, 'extension', name, holder);
+    await forgetVersions(storage, 'extension', name)
+        .catch(err => logger.warn('uninstallExtension: kept versions not dropped', { name, error: String(err) }));
+    emitChange('extensions');
+    return deleted;
+}
+
+/**
+ * Drop every scheduled job registered for this extension, from the scheduler and from storage. With
+ * no scheduler wired (account erasure) the stored rows still go, so the next boot does not load jobs
+ * for an extension that no longer exists.
+ */
+async function removeExtensionSchedules(deps: Pick<ExtensionLifecycleDeps, 'storage' | 'scheduler'>, name: string): Promise<void> {
+    const { storage, scheduler } = deps;
+    const jobs = await storage.listScheduledJobs({ extensionName: name });
+    for (const job of jobs) {
+        scheduler?.removeJob(job.id);
+        await storage.deleteScheduledJob(job.id);
+    }
+    if (jobs.length > 0) {
+        logger.info(`Removed ${jobs.length} scheduled jobs for extension: ${name}`);
+    }
+}

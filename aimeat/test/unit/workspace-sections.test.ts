@@ -2,7 +2,7 @@
  * @file workspace-sections.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The section index of a document space as plain data (services/workspace-sections.ts):
+ * @description The section index of a document space as plain data (services/workspace/sections.ts):
  *   what the doors accept, the steps between two indexes, and applying those steps to an index that
  *   moved on in between, which is what an approved suggestion does days after it was made.
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-sections.test.ts
@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
     validateSections, diffSections, applySectionOps, normalizeSectionTree, readStoredSections,
     validateSectionOps, summarizeSectionOps, type Section,
-} from '../../src/services/workspace-sections.js';
+} from '../../src/services/workspace/sections.js';
 
 const sec = (id: string, name: string, parentId: string | null = null, documents: string[] = [], color?: string): Section =>
     ({ id, name, parentId, documents, ...(color ? { color } : {}) });

@@ -12,7 +12,7 @@
  *   Seeded on every boot.
  *
  *   WHAT IT MUST AGREE WITH. The capabilities answer (services/ai/capabilities.ts), the routes, the
- *   library (sdk-libs/ai/), the publish hints (services/app-ai-capability-hints.ts) and the jobs and
+ *   library (sdk-libs/ai/), the publish hints (services/app/ai-capability-hints.ts) and the jobs and
  *   workflow step. It is measured with its eval suite, .claude/evals/aimeat-ai-capabilities/, through
  *   `pnpm eval:skill --node-skill aimeat-ai-capabilities`, which never copies it into the repo.
  * @structure AI_CAPABILITIES_SKILL_ENTRY

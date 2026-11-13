@@ -1,16 +1,16 @@
 /**
  * @file test/unit/app-structure.test.ts
  * @description The rules of the app plan and the structure steps, without a node: what a plan write
- *   accepts and refuses (services/app-plan.ts readPlanPatch, held to the node's own registries), and
- *   how the eight steps read a plan, a draft and a published app (services/app-structure.ts).
+ *   accepts and refuses (services/app/plan.ts readPlanPatch, held to the node's own registries), and
+ *   how the eight steps read a plan, a draft and a published app (services/app/structure.ts).
  * @version-history
  *   v1.2.0 — 2026-10-30 — Layouts the AI drew (proposals); a layout or nav id is held to them where the plan is written.
  *   v1.1.0 — 2026-10-29 — A custom layout or nav with a note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { describe, it, expect } from 'vitest';
-import { readPlanPatch, allowedChoiceValues, strayChoice, APP_PLAN_SPEC, type AppPlan } from '../../src/services/app-plan.js';
-import { computeStructure, nextStep, STEP_IDS } from '../../src/services/app-structure.js';
+import { readPlanPatch, allowedChoiceValues, strayChoice, APP_PLAN_SPEC, type AppPlan } from '../../src/services/app/plan.js';
+import { computeStructure, nextStep, STEP_IDS } from '../../src/services/app/structure.js';
 import { LOOKS } from '../../src/data/atelier-looks.js';
 import { UI_LAYOUT_PRESETS } from '../../src/services/app-ui/layouts.js';
 

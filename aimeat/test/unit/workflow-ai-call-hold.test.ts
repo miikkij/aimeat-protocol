@@ -66,8 +66,8 @@ vi.mock('../../src/services/ai/completion.js', async importOriginal => ({
         new Promise(resolve => { model.calls.push({ prompt: opts.prompt, resolve }); }),
 }));
 
-vi.mock('../../src/services/extension-system-run.js', async importOriginal => ({
-    ...await importOriginal<typeof import('../../src/services/extension-system-run.js')>(),
+vi.mock('../../src/services/extension/system-run.js', async importOriginal => ({
+    ...await importOriginal<typeof import('../../src/services/extension/system-run.js')>(),
     runExtensionActionAsSystem: () => new Promise((resolve, reject) => { sandbox.runs.push({ resolve, reject }); }),
 }));
 

@@ -36,7 +36,7 @@ import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
 import { cortexInstallRefusal } from './install-quotas.js';
 import { libsWithoutContent, missingLibsMessage } from './cortex-lifecycle.js';
-import { managedIntakeForms } from './app-intake-forms.js';
+import { managedIntakeForms } from './app/intake-forms.js';
 
 const APP_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -258,7 +258,7 @@ async function uniqueCopyExtName(storage: Storage, name: string): Promise<string
 
 /**
  * The manifest a restored version is stored with. The author is the caller. The search settings are
- * the live app's when the version stacks on one, as a publish carries them (services/app-publish.ts);
+ * the live app's when the version stacks on one, as a publish carries them (services/app/publish.ts);
  * a new app keeps the owner's own search switches from the ZIP but no operator's approval, which only
  * the operator's review sets (routes/admin/seo.ts).
  */

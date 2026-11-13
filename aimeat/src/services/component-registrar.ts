@@ -88,15 +88,15 @@
 
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from './extension-manifest.js';
+import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from './extension/manifest.js';
 import { aggregateExtensionNow } from './capability-aggregator.js';
 import YAML from 'yaml';
 import type { Storage, PackageComponentType, CortexComponent, CortexActivationArtifacts } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
-import { parseBundledCrews } from './app-bundled-crews.js';
+import { parseBundledCrews } from './app/bundled-crews.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
-import { publishApp } from './app-publish.js';
+import { publishApp } from './app/publish.js';
 import { putProgramMap } from './data-map/data-map-access.js';
 import { installPackageAppTools } from './packages/install/package-app-tools.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
@@ -104,7 +104,7 @@ import { removeCortex } from './cortex-lifecycle.js';
 import { holdAppLabels } from './held-app-labels.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './packages/install/package-memory-component.js';
-import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
+import { writeAppConfigValues, type AppConfigValues } from './app/config.js';
 import { mergeExtensionConfig } from './packages/compose/package-config.js';
 import { registerSkillComponent, deleteSkillComponent } from './packages/install/package-skill-component.js';
 import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './packages/compose/package-component-collisions.js';
@@ -112,8 +112,8 @@ import { cortexLockRuleRefusal, ownerLockCaller } from './packages/install/packa
 import type { SchemaLockCaller } from './schema-lock-rule.js';
 import { rewriteComponentRefs } from './component-ref-rewrite.js';
 import { releaseBareName } from './component-address.js';
-import { installRoleRefusal } from './extension-install-role.js';
-import { EXTENSION_CODE_HOLD_KEY, askOperatorsForExtensionCode, requesterFromPrincipal } from './extension-code-hold.js';
+import { installRoleRefusal } from './extension/install-role.js';
+import { EXTENSION_CODE_HOLD_KEY, askOperatorsForExtensionCode, requesterFromPrincipal } from './extension/code-hold.js';
 import { csmVisibilityDefault } from './content-defaults.js';
 
 // ── Types ────────────────────────────────────────────────────────────

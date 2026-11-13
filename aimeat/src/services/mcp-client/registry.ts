@@ -71,7 +71,7 @@ import { mcpClientPool } from './pool.js';
 import { withPersonalSignIn } from './personal-sign-in.js';
 import { recordAccountEvent } from '../account-events.js';
 import { organismOwners } from '../organism-ownership.js';
-import { listWorkspaceMemberRoles } from '../workspace-roles.js';
+import { listWorkspaceMemberRoles } from '../workspace/roles.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
 

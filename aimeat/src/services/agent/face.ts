@@ -57,7 +57,7 @@ import type { Storage, AppRecord } from '../../storage/interface.js';
 import { sendMarkdown, htmlToMarkdown } from '../markdown-negotiation.js';
 import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
 import { getOwnerScopePublicMemory } from '../owner-memory.js';
-import { renderAppMarkdown, FORMAT_MD_BUSY } from '../app-format-md.js';
+import { renderAppMarkdown, FORMAT_MD_BUSY } from '../app/format-md.js';
 import {
   loadServedProvenance, provenanceFrontmatter, provenanceMarkdownNote, setProvenanceHeaders,
 } from '../ai/provenance-marks.js';
@@ -154,7 +154,7 @@ export async function buildAppAgentFace(
   const building = (async () => {
     try {
       return await cached(key, TTL.public, async () => {
-        // The app's own answer comes first (services/app-format-md.ts): an action of the owner's
+        // The app's own answer comes first (services/app/format-md.ts): an action of the owner's
         // extension, declared with aimeat-format-md. Null when the app declares none or the run
         // gave nothing, and then the stored face or the converted page answers as before.
         const rendered = await renderAppMarkdown({ storage, config }, app, { lang });

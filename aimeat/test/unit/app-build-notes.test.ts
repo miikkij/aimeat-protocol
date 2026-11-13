@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { buildNotesDeclared, NOTE_LIMITS } from '../../src/services/app-build-notes.js';
+import { buildNotesDeclared, NOTE_LIMITS } from '../../src/services/app/build-notes.js';
 
 const page = (body: string) => `<!DOCTYPE html><html><head><script type="application/json" id="aimeat-build-notes">${body}</script></head><body></body></html>`;
 

@@ -58,7 +58,7 @@ import type { Storage, AppGrantRecord, AgentRecord, MemoryRecord } from '../stor
 import type { ConnectionRecord } from '../models/connection-schemas.js';
 import { buildOutboundProviders, findProvider, type OutboundProvider } from './connections/providers.js';
 import { notify, MAX_NOTIF_ACTIONS, NOTIF_PREFIX, type NotifyInput } from './notify.js';
-import { READ_THROUGH_SCOPE } from './app-grant-scopes.js';
+import { READ_THROUGH_SCOPE } from './app/grant-scopes.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';

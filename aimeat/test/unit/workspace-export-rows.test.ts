@@ -14,8 +14,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { collectWorkspace, EXPORT_RECORD_LIMIT } from '../../src/services/workspace-export.js';
-import { restoreWorkspace } from '../../src/services/workspace-import.js';
+import { collectWorkspace, EXPORT_RECORD_LIMIT } from '../../src/services/workspace/export.js';
+import { restoreWorkspace } from '../../src/services/workspace/import.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, OrganismRecord, OrganismMembershipRecord, WorkspaceRowRecord } from '../../src/storage/interface.js';
 import type { ContentReader } from '../../src/services/classification/reader.js';

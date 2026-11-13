@@ -100,19 +100,19 @@ import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWrite
 import { componentCollision } from '../compose/package-component-collisions.js';
 import { packageCapabilities, type PackageCapabilities } from './package-capabilities.js';
 import { codeInstallRefusal, combinedRefusal, packageSourceOf, recordApproval, isOwnPackage } from './package-approvals.js';
-import { registerExtensionSchedules } from '../../extension-schedules.js';
+import { registerExtensionSchedules } from '../../extension/schedules.js';
 import { planPackageConfig, missingConfigMessage, configPreview } from '../compose/package-config.js';
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from '../compose/package-expects.js';
 import { emitChange } from '../../event-bus.js';
 import { packageVisibleTo } from '../compose/package-read.js';
 import { listedSaleRefusal } from '../sale/package-account-entitlement.js';
 import { skillComponentName } from './package-skill-component.js';
-import { proposeBundledAgentsOfApps, type BundledAgentProposal } from '../../app-agent-propose.js';
+import { proposeBundledAgentsOfApps, type BundledAgentProposal } from '../../app/agent-propose.js';
 import type { AppRecord } from '../../../storage/types/apps.js';
 import type { Scheduler } from '../../scheduler.js';
 import { logger } from '../../../utils/logger.js';
 import { isOwnerInPerson } from '../../../utils/gaii.js';
-import { installRoleRefusal } from '../../extension-install-role.js';
+import { installRoleRefusal } from '../../extension/install-role.js';
 import { packageLockCaller, cortexLockRuleRefusal } from './package-schema-lock.js';
 import { ownerPrefixed } from '../../csm-service.js';
 
@@ -222,7 +222,7 @@ export type PackageInstallResult =
     | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[]; agentsProposed: BundledAgentProposal[]; ownPackage: boolean; appGrants?: Record<string, AppGrantStep>; awaitingOperator?: ExtensionCodeAwaiting[] }
     | PackageInstallRefusal;
 
-/** An extension component installed switched off, its code waiting for an operator (services/extension-code-hold.ts). */
+/** An extension component installed switched off, its code waiting for an operator (services/extension/code-hold.ts). */
 export interface ExtensionCodeAwaiting { component: string; extension: string; request_id: string | null }
 
 /**
@@ -255,7 +255,7 @@ function sortByDependencies(components: PackageComponent[]): string[] {
  * AN APP COMPONENT'S ID IS ITS FILENAME. Nothing between here and storage adds a suffix: the
  * registrar writes `filename: registeredAs` verbatim. But two other places decide "is this an app"
  * by looking for `.html` on that filename — the publish-time subdomain provisioning
- * (`services/app-publish.ts`) and the app-host path form (`routes/subdomains.ts`) — so a component
+ * (`services/app/publish.ts`) and the app-host path form (`routes/subdomains.ts`) — so a component
  * named `app-admin` installs an app that skips both: no subdomain until something opens it through
  * the apex, and a 404 on the shared path form, which is exactly the address a listing hands out for
  * an app that has no subdomain yet. `app-publish.ts` records that this same symptom "reads as a
@@ -564,7 +564,7 @@ export async function installPackage(
             // install, leaving config.app / config.genres / config.init missing in
             // ext-namespace memory.
             // An extension whose code waits for an operator is switched off, so nothing of it runs yet:
-            // the operator's Allow registers its schedules (services/extension-code-hold.ts).
+            // the operator's Allow registers its schedules (services/extension/code-hold.ts).
             if (result.awaitingOperator) {
                 awaitingOperator.push({ component: comp.id, ...result.awaitingOperator });
                 warnings.push(`The extension ${registeredAs} is installed switched off: on this node only the operator's account installs add-on code, so it waits for an operator to allow it.`);

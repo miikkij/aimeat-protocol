@@ -71,7 +71,7 @@ import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../confi
 import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
 import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-odps.js';
 import { AppToolsDocSchema, appToolsKey, toolMoneyPrices } from '../models/app-tool-schemas.js';
-import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled } from '../services/exchange-projection.js';
 import { migrateLegacyOfferings } from '../services/exchange-projection-migrate.js';
 import { proposeDeliversData, packageIfaceApp, DATAPACKAGE_ACTION } from '../services/exchange-datapackage.js';

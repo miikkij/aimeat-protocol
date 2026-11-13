@@ -21,7 +21,7 @@ import { logger } from '../../utils/logger.js';
 import { providersForOwner } from './provider-store.js';
 import { appAiMetaOf } from './policy-store.js';
 import { readRoles, rolesWithLegacy, readRolesUsed, readRoleRequests, bindingKey, type OwnerRole } from './roles.js';
-import type { AppAiRole } from '../app-ai-roles.js';
+import type { AppAiRole } from '../app/ai-roles.js';
 import { roleFit, type RoleFit } from './roles-fit.js';
 
 export interface AppRoleView extends AppAiRole {

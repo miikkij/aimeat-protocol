@@ -82,7 +82,7 @@ import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js
 import type { WriteProvenance } from '../services/app-ui/service.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { partProvenanceIds } from '../services/design-book/part-provenance.js';
-import { applyServeMarks } from '../services/app-serve-marks.js';
+import { applyServeMarks } from '../services/app/serve-marks.js';
 import { detectLocale } from '../i18n.js';
 import { loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders, envelopeMeta } from '../services/ai/provenance-marks.js';
 import { DesignBookError } from '../services/design-book/validate.js';
@@ -363,7 +363,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // The grown genre's frame card carries no script either, so it gets none.
       const nonce = part?.kind === 'component' || grownHtml ? undefined : res.locals.cspNonce as string | undefined;
       // A part an AI wrote is shown with its marks and the visible AI label, as a published app is
-      // (services/app-serve-marks.ts); the gallery frames this page, so the label sits on it.
+      // (services/app/serve-marks.ts); the gallery frames this page, so the label sits on it.
       const prov = part ? await loadServedProvenance(storage, config, (await partProvenanceIds(storage, config, [part.id])).get(part.id)) : undefined;
       setProvenanceHeaders(res, prov);
       const marked = prov

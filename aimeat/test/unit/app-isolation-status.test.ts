@@ -8,8 +8,8 @@
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { isolationStatusFor, appIsolationStatus } from '../../src/services/app-isolation-status.js';
-import { resetAppIsolationCache } from '../../src/services/app-isolation.js';
+import { isolationStatusFor, appIsolationStatus } from '../../src/services/app/isolation-status.js';
+import { resetAppIsolationCache } from '../../src/services/app/isolation.js';
 
 const owners = (...names: string[]) => ({ listOwners: async () => names.map(name => ({ name })) }) as any;
 

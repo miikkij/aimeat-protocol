@@ -66,11 +66,11 @@ import { appSpendRefusal } from '../services/metered-access.js';
 import { chargePacing, pacingReceipt, resolvePacingToll } from '../services/metered-settlement.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { paymentChallenge } from '../commerce/x402.js';
-import { publicAppManifest } from '../services/app-public-manifest.js';
-import { appToll, presentAppManifest } from '../services/app-pacing.js';
+import { publicAppManifest } from '../services/app/public-manifest.js';
+import { appToll, presentAppManifest } from '../services/app/pacing.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
-import { appPurchaseGate } from '../services/app-purchase-gate.js';
+import { appPurchaseGate } from '../services/app/purchase-gate.js';
 
 /**
  * The 3.x receipt fields, while legacyMorselFieldsLive(): `price_morsels` (and, with `withShare`,
@@ -128,7 +128,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         }
         // The app's own gates, before anything else is said about it and before any morsel moves: the
         // operator's hiding and who the app opens for refuse as the apex read does; without the right
-        // access code the receipt carries no copy of the app (services/app-purchase-gate.ts;
+        // access code the receipt carries no copy of the app (services/app/purchase-gate.ts;
         // secaudit2026oct26). The code is read where the apex read reads it, or from the body.
         const sentCode = [req.headers['x-access-code'], req.query.code, req.body?.code, req.body?.access_code]
             .find((c): c is string => typeof c === 'string' && c.length > 0);

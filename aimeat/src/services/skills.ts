@@ -103,7 +103,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
-import { canReadWorkspace } from './workspace-access.js';
+import { canReadWorkspace } from './workspace/access.js';
 import { assertWsSkillWrite, mayActOnEveryWsSkillCopy, wsWriteCaller } from './skill-workspace-gate.js';
 import { localAccountName } from '../utils/gaii.js';
 import { showSkillRecords } from './skill-reader.js';

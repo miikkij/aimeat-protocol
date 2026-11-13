@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for an app: the one change it names (list it, open it to
- *   anyone, or remove its access code) is made as the owner, through services/app-settings.ts
+ *   anyone, or remove its access code) is made as the owner, through services/app/settings.ts
  *   applyOwnerSettingsUpdate, the function PATCH /v1/apps/:filename and aimeat_app_manage call
  *   (plan doc-mvcn6c7e4e5q, V4).
  *
@@ -18,9 +18,9 @@
 import type { AppRecord } from '../../storage/interface.js';
 import { appListingOf } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { appAccessOf } from '../app-access.js';
-import { applyOwnerSettingsUpdate, type AppSettingsInput } from '../app-settings.js';
-import { resolveAppUrls } from '../app-urls.js';
+import { appAccessOf } from '../app/access.js';
+import { applyOwnerSettingsUpdate, type AppSettingsInput } from '../app/settings.js';
+import { resolveAppUrls } from '../app/urls.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 /** The field's value now, in the words the request was made in. */

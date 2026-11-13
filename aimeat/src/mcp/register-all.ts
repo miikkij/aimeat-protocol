@@ -203,7 +203,7 @@ import { registerSecretTools } from './secrets.js';
 import { registerCsmTool } from './csm.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
-import { publishingAppOfVerifiedToken } from '../services/app-published-by-app.js';
+import { publishingAppOfVerifiedToken } from '../services/app/published-by-app.js';
 
 /** What every tool group needs. The two emitters are passed in so this file has no cycle home. */
 export interface ServerToolDeps {

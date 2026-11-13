@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-11-06 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { appOwnDescription, appSeoIndexable, appSeoListable, seoNote } from '../../src/services/app-seo.js';
+import { appOwnDescription, appSeoIndexable, appSeoListable, seoNote } from '../../src/services/app/seo.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { AppSummaryRecord } from '../../src/storage/types/apps.js';
 

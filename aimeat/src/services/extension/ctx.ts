@@ -1,0 +1,761 @@
+/**
+ * @file src/services/extension/ctx.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The ONE builder for the sandbox capability object. Every road into
+ *   `executeExtensionAction` gets its `ExtensionCtx` from here, so the guards are part of the
+ *   context rather than something each caller has to remember.
+ *
+ *   Why this file exists: the context used to be assembled by hand at four call sites, and each copy
+ *   forgot something different. The REST door enforced the memory quota, the scheduler did not (the
+ *   June H-5 fix landed on two of the three write paths). Three of four used safeFetch, the scheduler
+ *   used a bare fetch, so a scheduled extension had no SSRF guard at all. The identical
+ *   `emailPolicy === 'unrestricted'` branch was typed out three times. Five findings in the August
+ *   2026 audit are one missing line in one of those copies, which is what a shared implementation
+ *   with per-caller guards always produces eventually.
+ *
+ *   The split: the CORE (memory, fetch, log) is built here and always carries its guards. The
+ *   OPTIONAL capabilities (files, notify, email, buy, wallet, consent, trust) are passed in, because
+ *   what a road can offer genuinely differs — a scheduled run has no caller to notify, an MCP call
+ *   has no HTTP response to write a paywall refusal into. A capability the caller cannot offer is
+ *   simply absent, and the guest sees `undefined`, which is the contract ExtensionCtx already had.
+ * @structure
+ *   - ExtensionCtxDeps — what a caller must supply, and what it may
+ *   - buildExtensionCtx() — the core with guards applied, merged with the optional parts
+ *   - decodeBody() — in services/extension/fetch-decode.ts: the shared charset detection, on an
+ *     answer read up to the outbound ceiling
+ * @usage
+ *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
+ *   await executeExtensionAction(script, ctx, …);
+ * @version-history
+ *   2026-11-09 — deps.changed becomes ctx.changed (services/extension-live/changed.ts).
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
+ *   v1.20.4 — 2026-10-31 — ctx.fetch refuses an unknown responseType before resolveOutboundSecrets,
+ *     so the refused call does not bind a vault or shared secret to its host (secaudit 2026-10-31 inv-19).
+ *   v1.20.3 — 2026-10-27 — ctx.memory.search runs one call at a time per run, queued, so a script that
+ *     starts many at once holds one namespace copy in host memory, not one per call (secaudit2026oct26).
+ *   v1.20.2 — 2026-10-25 — The in-flight fetch budget is the operator setting extensions.fetch_inflight_mb (secaudit2026oct22, lead 782).
+ *   v1.20.1 — 2026-10-25 — buildExtensionEmail and unavailableEmail moved to services/extension-email.ts by pure
+ *     extraction (max-file-lines), re-exported here; ctx.email's tier 1 asks extensionConsentHolds
+ *     there (secaudit2026oct22).
+ *   v1.20.0 — 2026-10-25 — ctx.fetch calls of one run are queued past its in-flight answer budget,
+ *     and getPublic by a bare owner name reads one record (extension-host-bounds.ts; secaudit2026oct22).
+ *   v1.19.1 — 2026-10-24 — ctx.fetch asks decideSharedFirstUse before a value from the extension's
+ *     shared secret map is bound to its first host (secaudit2026oct22; Jouni, 2026-10-24).
+ *   v1.19.0 — 2026-10-24 — ctx.fetch takes `responseType: 'base64'`: the bytes come back intact as
+ *     `base64`, scrubbed like text, and an unknown responseType is refused (jussil riistakartta).
+ *   v1.18.3 — 2026-10-21 — The owner's approvals and the extension's declared uses reach the resolver;
+ *     a refusal's text, with the allow page's address, comes from secretRefusalText.
+ *   v1.18.2 — 2026-10-21 —v58 amended: the caller's vault serves any extension they run, to a bound
+ *     host only; another account's extension never binds a secret with no host (SECRET_HOST).
+ *   v1.18.1 — 2026-10-21 —ExtensionCtxDeps.unattended: the unattended run names itself, and the
+ *     vault's first-use decision reads that flag instead of role strings.
+ *   v1.18.0 — 2026-10-20 — ctx.fetch fills `{{secret:NAME}}` from the caller's vault only for an
+ *     extension the caller's account installed, or living-hooks as the node ships it (secaudit
+ *     2026-10, v58), and a vault secret with no host is bound on first use only when the deciding
+ *     principal is the owner in person or holds secrets:manage; in an unattended run that is the
+ *     extension's code writer (ruling 6; v59). Both in services/extension-secret-authority.ts.
+ *   v1.17.0 — 2026-10-18 —`visitor`: a run for nobody signed in refuses memory set and delete with
+ *     VISITOR_READ_ONLY (Comicland v3 A-7).
+ *   v1.16.0 — 2026-10-13 — ctx.calendar on every code path (services/extension-calendar.ts).
+ *   v1.15.0 — 2026-10-13 — ctx.fetch takes `timeoutMs`, the script's own deadline for one call
+ *     (100 ms to 30 s, inside the run's): past it the call throws FETCH_TIMEOUT, which the script
+ *     can catch. Asked for by the KIIKARI extension, which checks up to 40 source addresses in one
+ *     run and would fail the whole save on one that never answers.
+ *   v1.14.2 — 2026-10-10 — ctx.fetch refuses a provider call over http before resolveOutboundSecrets,
+ *     so the refused call does not bind a vault secret to its host:port (secaudit 2026-10-10 I16).
+ *   v1.14.1 — 2026-10-10 — decodeBody, looksLikeUtf8 and hostOfUrl moved to
+ *     services/extension-fetch-decode.ts unchanged (800-line rule; pure extraction).
+ *   v1.14.0 — 2026-10-09 — ctx.fetch removes from the response every value the node put into the
+ *     request (vault secrets, the shared map, the owner's provider key) before the script sees it, and
+ *     a first use records its principal (secrets audit 2026-10-09, item 10).
+ *   v1.13.0 — 2026-10-09 — ctx.fetch takes `gunzip: true` (the answer is inflated before it is
+ *     decoded, under the same ceiling) and reads under the extension's own ceiling when its manifest
+ *     declared `limits.fetch_max_mb` (capabilities.fetchMaxBytes); RESPONSE_TOO_LARGE names the
+ *     ceiling in force (wish-tv-opas: a 1 MB gzipped XMLTV guide is 6.5 MB inflated).
+ *   v1.12.2 — 2026-10-09 — The refusal names each host field the owner has not set, beside fixed hosts too.
+ *   v1.12.1 — 2026-10-09 — An empty host list (a host field not set yet) says so in the refusal.
+ *   v1.12.0 — 2026-10-08 — ctx.fetch reaches only `capabilities.hosts` when the manifest names
+ *     `network: { hosts }`, refused before any secret is resolved and on every redirect hop.
+ *   v1.11.0 — 2026-10-05 — `capabilities` is required: ctx.fetch refuses without `network`, and
+ *     ctx.ai, ctx.email and ctx.buy are attached only with `ai`, `email` and `payments`. The approval
+ *     read the script text and the sandbox gave everything, so an aliased call got past it
+ *     (secaudit 2026-10, PKG-3).
+ *   v1.10.0 — 2026-09-30 — TARGET-082 review, item 1: ctx.memory.getPublic reads an organism's public
+ *     record as absent for a caller outside that organism when its label keeps it inside.
+ *   v1.9.0 — 2026-09-29 — TARGET-082 review: ctx.memory.getPublic tells an AI caller that the record
+ *     it read is warning-classified: an object value comes back with `classificationWarning`
+ *     ({ label, name, says }) beside its fields; any other value is returned as it is and logged.
+ *   v1.8.0 — 2026-09-29 — ctx.memory reads pass the classification reader (TARGET-082): the own
+ *     namespace as the node's own work, getPublic for the caller, both through presentMemory.
+ *   v1.7.0 — 2026-09-28 — System 2 plan, V6: `providerCall` in ExtensionCtxDeps. Set when the
+ *     extension runs as an AI provider: ctx.fetch refuses a hostname that is not exactly one of the
+ *     declared hosts (`Fetch blocked: …`), and adds the owner's provider key header to a request to a
+ *     listed host on the host side, after removing the script's own copy of that header name. The
+ *     name joins sensitiveHeaders, so safeFetch drops it on a redirect to another origin. The key goes
+ *     only over https, or http to localhost; a plain http request that would carry it is refused.
+ *   v1.6.7 — 2026-09-26 — ctx.memory.getPublic refuses a Design Book part with `DESIGN_BOOK_PART: …`,
+ *     naming GET /v1/designbook/:id, the one door that reads a part (utils/own-door-keys.ts).
+ *   v1.6.6 — 2026-09-26 — RESPONSE_TOO_LARGE names the host the script called, with its port, so an
+ *     owner whose script calls several services can tell which one answered too much. The userinfo,
+ *     the path, the query and the fragment stay out of it, since each can carry a key (secaudit
+ *     2026-09, N3).
+ *   v1.6.5 — 2026-09-26 — ctx.fetch reads the answer through readBodyCapped up to OUTBOUND_READ_MAX_BYTES
+ *     (utils/read-capped.ts, 4 MB). Past it the rest is cancelled, nothing is decoded, and the call
+ *     throws `RESPONSE_TOO_LARGE: …`, the shape of every other refusal ctx.fetch makes (secaudit 2026-09, N3).
+ *   v1.6.4 — 2026-09-26 — ctx.wallet.getBalance takes the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.6.3 — 2026-09-24 — A ctx.fetch that carries a secret checks its address before the secret is
+ *     resolved (919ef5f56d69). Resolving binds a first use to the host, and safeFetch refused the
+ *     address only after that, so a refused address stayed the secret's one permitted host.
+ *   v1.6.2 — 2026-09-24 — ctx.memory.set refuses a key only the node writes (`__redirect__`), as every
+ *     memory door does.
+ *   v1.6.1 — 2026-09-16 — ctx.fetch passes its URL to the secret resolver, and a vault secret bound to
+ *     another host refuses with SECRET_HOST before anything is sent.
+ *   v1.6.0 — 2026-09-06 — ctx.fetch resolves `{{secret:NAME}}` in header VALUES from the caller's
+ *     owner vault, falling back to the extension's own `secrets` config and refusing by name when
+ *     neither has it. It sits here rather than in a script because a script that resolves its own
+ *     secret HOLDS it: living-hooks did exactly that until today, and every other extension wanting
+ *     the same thing would have had to write the same code and get it right. Here the guest never
+ *     sees the value, and every road into the sandbox inherits it from this one builder.
+ *   v1.5.0 — 2026-09-05 — `workspace`, an optional capability like files: a road that has a real
+ *     caller and an extension whose manifest declares it passes what
+ *     services/extension-workspace.ts built; the scheduler passes nothing. Its guards live in the
+ *     builder, so this file only carries it through.
+ *   v1.4.0 — 2026-08-31 — `ai` joins the optional capabilities, with one condition the others do not
+ *     have: it is attached ONLY alongside `extension`. A background job is billed to the installer,
+ *     and `deps.extension` is the only server-resolved answer to who that is, so a road that cannot
+ *     name the record gets no ctx.ai rather than one that guesses whose money to spend.
+ *   v1.3.0 — 2026-08-23 — Carries `extension: { name, owner }` through to the sandbox so an
+ *     owner-only action can exist. Every road that knows the record passes it; a road that does not
+ *     leaves it absent, and a script must read that as "not the owner" rather than as permission.
+ *   v1.2.0 — 2026-08-23 — `memory.getVersioned` + `memory.set(..., { ifVersion })`: compare-and-swap
+ *     over the primitives the storage layer already had (`setMemoryIfVersion` for the update,
+ *     `createMemoryIfAbsent` for the first write — the pair PATCH /v1/memory/:key uses). Without it
+ *     every counter an extension keeps is last-write-wins. A refusal writes nothing and reports the
+ *     version really there; the key is still resolved under extMemoryOwner, so the guard adds no
+ *     reach. A backend with no atomic update refuses rather than falling back to a silent clobber.
+ *   v1.1.0 — 2026-08-11 — sandboxLimits(): the memory/timeout/API-call arithmetic, which both doors
+ *     had written out themselves. The MCP copy used max(declared, cap), turning the node ceiling
+ *     into a floor.
+ *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 4: one sandbox context, one set of guards).
+ */
+import { randomUUID } from 'node:crypto';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { ExtensionCtx } from './runtime.js';
+import { enforceExtensionMemoryLimits } from '../quota.js';
+import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { ownDoorRefusal } from '../../utils/own-door-keys.js';
+import { extensionCrossNotify, safeNotificationLink } from './notify.js';
+import { notify } from '../notify.js';
+import { safeFetch, validateOutboundUrl } from '../../utils/url-validator.js';
+import { decodeBody, fetchResponseType, readBodyBytes } from './fetch-decode.js';
+import { parseGAII, localAccountName } from '../../utils/gaii.js';
+import { resolveSecretForHeaders, secretPlaceholderNames } from '../owner-secrets.js';
+import { vaultOwnerForCall, decideFirstUse, decideSharedFirstUse, secretRefusalText } from './secret-authority.js';
+import { scrubBytes, scrubFormsOf, scrubResponse } from './fetch-scrub.js';
+import { logger } from '../../utils/logger.js';
+import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
+import { presentMemories, presentMemory, classificationWarningOf } from '../classification/present-memory.js';
+import { readerForCaller, systemReader } from '../classification/reader.js';
+import { shareCarriesKey } from '../group-shares-classification.js';
+import { capabilityNotDeclared, type ExtensionCapabilitySet } from './capability-declaration.js';
+import { buildExtensionCalendar } from './calendar.js';
+import { createFetchGate, withFetchGate, agentRecordByKey } from './host-bounds.js';
+
+/** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
+const FETCH_TIMEOUT_MS = 30_000;
+/** The shortest deadline a script may give one fetch (`timeoutMs`); a smaller number is read as this. */
+const FETCH_OWN_TIMEOUT_MIN_MS = 100;
+
+export interface ExtensionCtxDeps {
+    config: AimeatConfig;
+    storage: Storage;
+    /** The namespace this extension's memory lives in: `ext:{name}` or `ext:{name}.{instanceId}`. */
+    extMemoryOwner: string;
+    /** Who invoked this action. A scheduled run passes the owner as its own caller. */
+    caller: ExtensionCtx['caller'];
+    /** The extension's manifest config, secrets already decrypted by the caller. */
+    extConfig: Record<string, unknown>;
+    /** Which extension this is and who owns it, from the record — never from the request. */
+    extension?: ExtensionCtx['extension'];
+    /** Instance id + its config, when the action runs against a named instance. */
+    instance?: ExtensionCtx['instance'];
+    /** Prefix for the sandbox's log lines, so a scheduled run is distinguishable from a request. */
+    logPrefix: string;
+    /**
+     * What this extension may do beyond its memory: capabilitiesOfRecord(ext), the list its package
+     * approval showed. Required, so no road can build a ctx that forgets it. ctx.fetch refuses
+     * without `network`, and ai, email and buy stay undefined without theirs (secaudit 2026-10, PKG-3).
+     */
+    capabilities: ExtensionCapabilitySet;
+
+    // ── Optional capabilities: present only on the roads that can honestly offer them ──
+    wallet?: ExtensionCtx['wallet'];
+    files?: ExtensionCtx['files'];
+    datapackage?: ExtensionCtx['datapackage'];
+    buy?: ExtensionCtx['buy'];
+    /** Background model calls. Offered only where `extension` is known, because the job is billed to
+     *  the INSTALLER and a road that cannot name the record cannot say who pays. */
+    ai?: ExtensionCtx['ai'];
+    notify?: ExtensionCtx['notify'];
+    changed?: ExtensionCtx['changed'];
+    email?: ExtensionCtx['email'];
+    /** The caller's organism workspace (services/extension/workspace.ts). Only a road with a real
+     *  caller and a manifest that declares it can offer this. */
+    workspace?: ExtensionCtx['workspace'];
+
+    /** Set when the extension runs as an AI provider (System 2 plan V6): ctx.fetch reaches only these
+     *  hosts, and `inject` is added to a request to exactly one of them, outside the sandbox. */
+    providerCall?: { hosts: readonly string[]; inject?: { name: string; value: string } };
+
+    /** A visitor's run (a public action, nobody signed in): the memory reads, its writes are refused. */
+    visitor?: boolean;
+
+    /** An unattended run (services/extension/system-run.ts): nobody is present, so the code writer
+     *  decides a vault secret's first host (ruling 6). Set by the code path, never read from roles. */
+    unattended?: boolean;
+}
+
+/** The refusal a visitor's write meets. A public action serves reading; a write needs an account. */
+const VISITOR_READ_ONLY = 'VISITOR_READ_ONLY: this action was called without an account, so it reads and never writes. Sign in to change anything.';
+
+/**
+ * In a provider run (System 2 plan V6), refuse an address whose hostname is not EXACTLY one of the
+ * declared hosts, compared in lowercase, with no suffix match: `api.example.com` does not admit
+ * `evil.api.example.com`. The refusal starts `Fetch blocked:`, the prefix of every other ctx.fetch
+ * refusal, and names the host and the list, which the manifest publishes anyway.
+ */
+function assertProviderHost(providerCall: NonNullable<ExtensionCtxDeps['providerCall']>, url: string): void {
+    // An address that does not parse has no hostname, and is refused just below with the list.
+    const hostname = URL.canParse(url) ? new URL(url).hostname.toLowerCase() : null;
+    const allowed = providerCall.hosts.map(h => h.toLowerCase());
+    if (!hostname || !allowed.includes(hostname)) {
+        throw new Error(`Fetch blocked: ${hostname ? `host ${hostname}` : 'this address'} is not one of the hosts this AI `
+            + `provider declared (${allowed.join(', ')}). In a provider run ctx.fetch reaches only those hosts.`);
+    }
+}
+
+/**
+ * Add the owner's provider key header to a request whose host assertProviderHost accepted. It is set
+ * here, on the host side of the bridge, so its value never enters the VM. Every case variant of its
+ * name the script wrote is removed first, so the script cannot send a value of its own beside the
+ * key. Nothing here returns request headers to the script: it receives only the response.
+ */
+function injectProviderHeader(
+    inject: { name: string; value: string },
+    headers: Record<string, string> | undefined,
+): Record<string, string> {
+    const name = inject.name.toLowerCase();
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(headers ?? {})) {
+        if (k.toLowerCase() !== name) out[k] = v;
+    }
+    out[inject.name] = inject.value;
+    return out;
+}
+
+
+/**
+ * The wallet a sandboxed script may spend from: the caller's own balance and nobody else's.
+ *
+ * Two guards, and the MCP copy had neither of them at full strength: a non-positive or non-finite
+ * amount is refused (a negative one would MINT morsels rather than spend them), and a single call
+ * cannot exceed `extensionMaxDebitPerCall`. The HTTP door capped the per-call debit and the MCP door
+ * did not, so the same script spending through a tool call had no ceiling at all.
+ *
+ * hold, release and transfer are deliberately absent: an extension moves its caller's money forward,
+ * never anyone else's, and never in a way that outlives the call.
+ */
+export function buildExtensionWallet(deps: {
+    config: AimeatConfig;
+    storage: Storage;
+    /** Whose balance is spent. Always the caller, never the extension's installer. */
+    callerGaii: string;
+    extName: string;
+    /** Appended to the tracking code, so an instance-scoped spend is attributable to its instance. */
+    trackingScope?: string;
+}): NonNullable<ExtensionCtx['wallet']> {
+    const { config, storage, callerGaii, extName, trackingScope } = deps;
+    const prefix = trackingScope ? `ext:${extName}:${trackingScope}` : `ext:${extName}`;
+    return {
+        consume: async (amount: number, reason: string) => {
+            if (!Number.isFinite(amount) || amount <= 0) {
+                throw new Error('INVALID_AMOUNT: consume amount must be a positive number');
+            }
+            if (amount > config.extensionMaxDebitPerCall) {
+                throw new Error(`DEBIT_LIMIT: max ${config.extensionMaxDebitPerCall} morsels per call`);
+            }
+            const debited = await storage.debitBalance(callerGaii, amount);
+            if (!debited) return { success: false, error: 'Insufficient balance' };
+            await storage.addTransaction({
+                id: `ext-tx-${randomUUID()}`,
+                gaii: callerGaii,
+                type: 'extension_consume',
+                amount: -amount,
+                trackingCode: `${prefix}:${reason}`,
+                timestamp: new Date().toISOString(),
+            });
+            return { success: true };
+        },
+        getBalance: async () => {
+            const parsed = parseGAII(callerGaii);
+            if (!parsed) return 0;
+            const ghii = await storage.getGHIIByOwner(localAccountName(callerGaii));
+            return ghii?.morselBalance ?? 0;
+        },
+    };
+}
+
+/**
+ * The owner-facing notification capability: a record in the recipient's own `notifications.{owner}`
+ * key, plus the header bell and web push. `opts.to` hands off to the cross-owner path, which has its
+ * own consent check.
+ *
+ * The recipient differs by road and that difference is real: a request notifies its caller, a
+ * scheduled run notifies whoever installed the extension, because there is nobody else present.
+ */
+export function buildExtensionNotify(deps: {
+    storage: Storage;
+    config: AimeatConfig;
+    extName: string;
+    /** Namespace the notification list is stored under. */
+    recipientGaii: string;
+    /** Bare owner name, used for the key suffix and the GHII the bell belongs to. */
+    recipientOwner: string;
+}): NonNullable<ExtensionCtx['notify']> {
+    const { storage, config, extName, recipientOwner } = deps;
+    return async (message, opts?: { title?: string; priority?: string; channel?: string; to?: string; link?: string }) => {
+        if (opts?.to) return extensionCrossNotify(storage, config, extName, opts.to, message, opts);
+
+        // One store, the bell's (2026-08-30). This used to also append to `notifications.<owner>`,
+        // a second list nothing read, which is how an extension's notifications came to exist twice.
+        // safeNotificationLink keeps a guest-supplied link on this node: the scheduler copy
+        // sidestepped that by ignoring opts.link entirely, which was safe but meant a scheduled
+        // notification could not deep-link anywhere.
+        const recipientGhii = recipientOwner.includes('@') ? recipientOwner : `${recipientOwner}@${config.nodeId}`;
+        const r = await notify(storage, recipientGhii, {
+            type: 'extension', title: opts?.title || extName, body: message,
+            link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
+            source: { kind: 'extension', name: extName, id: extName },
+        });
+        return r.stored;
+    };
+}
+
+// buildExtensionEmail and unavailableEmail live in services/extension/email.ts (moved 2026-10-25,
+// max-file-lines) and are re-exported here, so every importer resolves unchanged.
+export { buildExtensionEmail, unavailableEmail } from './email.js';
+
+/**
+ * How much memory, time and outbound calls one action may have. The declared numbers are a request,
+ * the node's configured maxima are the answer, and the small floors keep a manifest that asks for
+ * nothing from getting a sandbox too small to start in.
+ *
+ * The order of min and max is the whole point. The MCP door computed max(declared, cap), which turns
+ * the node ceiling into a FLOOR: an extension declaring a 60-second timeout got 60 seconds, and every
+ * extension got at least the node maximum memory and API budget. Written once here so the ceiling
+ * stays a ceiling on every road into the sandbox.
+ */
+export function sandboxLimits(
+    declared: { memoryMb: number; timeoutMs: number; maxApiCalls: number },
+    config: AimeatConfig,
+): { memoryMb: number; timeoutMs: number; maxApiCalls: number } {
+    return {
+        memoryMb: Math.min(Math.max(declared.memoryMb, 16), config.extensionMaxMemoryMb),
+        timeoutMs: Math.min(Math.max(declared.timeoutMs, 1000), config.extensionTimeoutMs),
+        maxApiCalls: Math.min(Math.max(declared.maxApiCalls, 10), config.extensionMaxApiCalls),
+    };
+}
+
+/**
+ * Fill every `{{secret:NAME}}` in these header values from the CALLER's owner vault, then from the
+ * extension's own `secrets` config, and refuse by name if neither has it.
+ *
+ * WHY IT IS HERE AND NOT IN THE SANDBOX. living-hooks did this inside its own script until
+ * 2026-09-06, which meant the value was handed INTO the VM: the guest held the credential in a
+ * variable for the length of the call, and every other extension that wanted the same thing had to
+ * write the same code and get it right. Here, the guest never sees it, and every road into the
+ * sandbox inherits the behaviour because they all take their context from this one builder.
+ *
+ * The refusal is a THROW rather than a return, because ctx.fetch's contract is "you get a response
+ * or you get an error", and a script that treats a refusal as a response would send nothing and
+ * report success. The message begins `SECRET_UNKNOWN:` so a script can tell this apart from the far
+ * end being down, and it names the secret and the header without ever naming a value.
+ */
+async function resolveOutboundSecrets(
+    deps: ExtensionCtxDeps,
+    headers: Record<string, string> | undefined,
+    url: string,
+): Promise<{ values: Record<string, string> | undefined; sensitive: string[]; inserted: string[] }> {
+    const named = secretPlaceholderNames(headers);
+    // The common case: no placeholder, no database read, nothing changed.
+    if (!named.length) return { values: headers, sensitive: [], inserted: [] };
+
+    // THE ADDRESS FIRST (919ef5f56d69). Resolving binds a vault secret's first use to this host, and
+    // safeFetch checks the address only after that, so an address it refuses (the cloud metadata
+    // service, a private range) was left as the secret's only host and every real call after it was
+    // refused. The same check safeFetch makes on its first hop, asked before anything is bound; only
+    // a call that carries a secret pays for it.
+    const address = await validateOutboundUrl(url);
+    if (!address.valid) throw new Error(`Fetch blocked: ${address.reason}`);
+
+    // The extension's name from the record when a road knows it, and otherwise from the namespace,
+    // which is always `ext:{name}` or `ext:{name}.{instanceId}`. Only the usedBy stamp reads it.
+    const extName = deps.extension?.name
+        ?? deps.extMemoryOwner.replace(/^ext:/, '').split('.')[0];
+
+    // The vault belongs to the HUMAN, whichever of their principals is calling: the owner at a
+    // screen, their agent, their granted app; vaultOwnerForCall collapses all three to one GHII. It
+    // serves every extension the caller runs, another account's included (bring your own key). A
+    // bound secret goes only to its bound host; a secret with no host is never bound through
+    // another account's extension, because that script chose the address (secaudit 2026-10, v58 as
+    // amended 2026-10-21). decideFirstUse answers the second.
+    const vaultOwner = vaultOwnerForCall(deps.caller);
+
+    const resolved = await resolveSecretForHeaders({
+        storage: deps.storage,
+        config: deps.config,
+        ownerGhii: vaultOwner,
+        principal: deps.caller.gaii,
+        // Who may choose the first host of a vault secret that has none (ruling 6, the extension's
+        // declared uses; secaudit 2026-10, v59). Asked only when this call would bind one.
+        firstUse: (secretName, host) => decideFirstUse({
+            storage: deps.storage, config: deps.config, caller: deps.caller, extension: deps.extension,
+            vaultOwnerGhii: vaultOwner, unattended: deps.unattended === true, secretName, host, extConfig: deps.extConfig,
+        }),
+        // Who may choose the first host of a value from the extension's shared map, which then serves
+        // every account (secaudit2026oct22; Jouni, 2026-10-24).
+        sharedFirstUse: (secretName, host) => decideSharedFirstUse({
+            storage: deps.storage, config: deps.config, caller: deps.caller, extension: deps.extension,
+            unattended: deps.unattended === true, secretName, host, extConfig: deps.extConfig,
+        }),
+        // The approvals the owner gave on a secret name this extension and the account that installed it.
+        ...(deps.extension ? { approvedFor: { extension: deps.extension.name, installer: deps.extension.owner } } : {}),
+        extConfig: deps.extConfig,
+        extName,
+        headers,
+        url,
+    });
+    // A refused first use files the owner's question and names its address (services/secret-approvals.ts).
+    if (!resolved.ok) throw new Error(await secretRefusalText({ ...deps, vaultOwnerGhii: vaultOwner, extName }, resolved));
+    // Which headers actually carried a secret — the ones a cross-origin redirect must not inherit.
+    const sensitive = Object.entries(headers ?? {})
+        .filter(([, v]) => typeof v === 'string' && named.some(n => v.includes(`{{secret:${n}}}`)))
+        .map(([k]) => k);
+    // What the node put into this request, for scrubbing the answer: each value and each whole header.
+    return { values: resolved.headers, sensitive, inserted: [...resolved.values, ...sensitive.map(k => resolved.headers[k] ?? '')] };
+}
+
+/**
+ * Build the sandbox context. The three capabilities in the core are the ones that carry a guard, and
+ * they are built here precisely so no road can be given a context without them.
+ */
+export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
+    const { config, storage, extMemoryOwner, logPrefix } = deps;
+    // The classification readers (TARGET-082): the extension reading its own namespace is the node's
+    // own work; a read of somebody's public memory is made for the caller who invoked the action.
+    const ownReader = systemReader({ storage, config }, extMemoryOwner);
+    let searchQueue: Promise<unknown> = Promise.resolve();
+    const callerReader = readerForCaller({ storage, config }, deps.caller);
+    // One gate per run: fetches started together are queued past the run's in-flight budget, the
+    // operator setting extensions.fetch_inflight_mb (0 is no limit).
+    const fetchGate = createFetchGate(deps.capabilities.fetchMaxBytes, config.extensionFetchInflightMb);
+
+    const ctx: ExtensionCtx = {
+        memory: {
+            get: async (key) => {
+                const stored = await storage.getMemory(extMemoryOwner, key);
+                const record = stored ? await presentMemory(ownReader, stored) : null;
+                return record ? record.value : null;
+            },
+
+            // The read half of compare-and-swap. `get` returns only the value, so a script had no
+            // way to learn the version it needed to swap against.
+            getVersioned: async (key) => {
+                const stored = await storage.getMemory(extMemoryOwner, key);
+                const record = stored ? await presentMemory(ownReader, stored) : null;
+                return record ? { value: record.value, version: record.version } : null;
+            },
+
+            // GUARD (June H-5): the per-value size and per-key count limits. Enforcing this only in
+            // the REST wrapper left the scheduler able to fill the database on a clock, repeatably,
+            // which is why it belongs to the context and not to the caller.
+            //
+            // COMPARE-AND-SWAP (TARGET-070). Without `ifVersion` this is the historical
+            // read-increment-write, which is last-write-wins: two concurrent invocations of one
+            // action both read a stock of 1 and both write 0. The node already owned the atomic
+            // primitives — `setMemoryIfVersion` for the update and `createMemoryIfAbsent` for the
+            // first write, the same pair PATCH /v1/memory/:key uses — and the sandbox simply could
+            // not reach them. `ifVersion: 0` means "only if absent"; a refusal writes NOTHING and
+            // reports the version that is really there, so the script can re-read and retry.
+            //
+            // The key is always resolved under `extMemoryOwner`, here as everywhere else in this
+            // block, so the guard adds no reach: an extension still cannot aim a write at another
+            // namespace.
+            set: async (key, value, opts) => {
+                // A key only the node writes (utils/reserved-keys.ts) is refused here as on every
+                // memory door: the public agent profile reads `__redirect__` in this namespace too.
+                if (isServerWrittenKey(key)) throw new Error(`RESERVED_KEY: ${serverWrittenKeyRefusal(key).message}`);
+                await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
+                // The extension is both the namespace and the hand: it writes into `ext:{name}`,
+                // which nothing else may write. Called from every success path below rather than
+                // once at the top, so a refused compare-and-swap is not counted as a write.
+                const noteWrite = (): void => recordMemoryTouch({
+                    ownerGaii: extMemoryOwner, key, writerPrincipal: extMemoryOwner, kind: 'write',
+                });
+                const existing = await storage.getMemory(extMemoryOwner, key);
+                const now = new Date().toISOString();
+                const record = {
+                    key,
+                    ownerGaii: extMemoryOwner,
+                    value,
+                    // Default 'public' is the historical contract every extension was written
+                    // against; 'private' is opt-in for a key holding somebody's personal data.
+                    visibility: (opts?.visibility === 'private' ? 'private' : 'public') as 'private' | 'public',
+                    tags: [] as string[],
+                    ttlHours: null,
+                    version: existing ? existing.version + 1 : 1,
+                    createdAt: existing ? existing.createdAt : now,
+                    updatedAt: now,
+                };
+
+                if (opts?.ifVersion === undefined) {
+                    const written = await storage.setMemory(record);
+                    noteWrite();
+                    return { ok: true, version: written?.version ?? record.version };
+                }
+
+                // Create-only. `createMemoryIfAbsent` answers null when another writer got there
+                // first.
+                if (opts.ifVersion === 0) {
+                    const created = await storage.createMemoryIfAbsent({ ...record, version: 1 });
+                    if (created) { noteWrite(); return { ok: true, version: created.version }; }
+                    const now2 = await storage.getMemory(extMemoryOwner, key);
+                    return { ok: false, version: now2?.version ?? null };
+                }
+
+                // Update-only, at exactly that version.
+                if (!existing) return { ok: false, version: null };
+                const swapped = await storage.setMemoryIfVersion(record, opts.ifVersion);
+                if (swapped) { noteWrite(); return { ok: true, version: swapped.version }; }
+                const current = await storage.getMemory(extMemoryOwner, key);
+                return { ok: false, version: current?.version ?? null };
+            },
+
+            // One search at a time per run, queued and not refused: each answer holds the matching
+            // namespace in host memory until the guest has it, and a script may start every host call
+            // at once (secaudit2026oct26).
+            search: (prefix) => {
+                const run = searchQueue.then(async () => {
+                    const records = await presentMemories(ownReader, await storage.listMemory(extMemoryOwner, { prefix }));
+                    return records.map(r => ({ key: r.key, value: r.value }));
+                });
+                // The next search waits for this one to settle either way; the caller gets a failure through `run`.
+                searchQueue = Promise.allSettled([run]);
+                return run;
+            },
+
+            delete: async (key) => {
+                const gone = await storage.deleteMemory(extMemoryOwner, key);
+                // A delete is a hand on the key too, and the row stays behind to say whose.
+                if (gone) recordMemoryTouch({
+                    ownerGaii: extMemoryOwner, key, writerPrincipal: extMemoryOwner, kind: 'delete',
+                });
+                return gone;
+            },
+
+            getPublic: async (namespace, key) => {
+                // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which
+                // benches a component again before it hands one out (utils/own-door-keys.ts).
+                const ownDoor = ownDoorRefusal(namespace, key, config.nodeId);
+                if (ownDoor) throw new Error(`${ownDoor.code}: ${ownDoor.message}`);
+                let record = await storage.getMemory(namespace, key);
+                // A bare owner name resolves through that owner's agents, reading one record
+                // (extension-host-bounds.ts; secaudit2026oct22).
+                if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
+                    record = await agentRecordByKey(storage, namespace, key);
+                }
+                // An ext: namespace is world-readable by design, so only 'public' leaves it, and it
+                // leaves through the one presentation of a memory value, for the caller.
+                if (!record || record.visibility !== 'public') return null;
+                // An organism's record reaches a caller outside that organism only when its label lets
+                // it leave (TARGET-082 review, item 1); kept inside, it reads as absent.
+                if (!(await shareCarriesKey({ storage, config }, record.ownerGaii, record.key, deps.caller.gaii)).carries) return null;
+                const shown = await presentMemory(callerReader, record);
+                if (!shown) return null;
+                // TARGET-082 review: an AI caller shown a warning-classified record is told so. The
+                // answer is the value, so an object value carries `classificationWarning` beside its
+                // own fields (a copy; the record is untouched); any other value is logged with it.
+                const warned = classificationWarningOf(shown);
+                if (!warned) return shown.value;
+                const v = shown.value;
+                if (v && typeof v === 'object' && !Array.isArray(v)) return { ...(v as Record<string, unknown>), classificationWarning: warned };
+                logger.info(`${logPrefix} getPublic: a warning-classified value was read`, { key, label: warned.label, reader: deps.caller.gaii });
+                return v;
+            },
+        },
+
+        // GUARD (June H-3): safeFetch validates the URL and re-validates every redirect hop. A bare
+        // fetch here is an SSRF hole with a script the owner installed on the other end of it, and
+        // the scheduler copy had exactly that.
+        //
+        // GUARD (2026-09-06): the owner's secrets vault. A header value written as
+        // `{{secret:NAME}}` is filled in HERE, after the script has handed the request over — so a
+        // sandboxed script can SEND a credential and cannot LEARN one. That is what lets an AI write
+        // the script and a stranger open the document it renders. Header VALUES only: a placeholder
+        // in a URL, a body or a header NAME is left exactly as it arrived, because substituting into
+        // any of those puts the value somewhere the script or the far end can read it back.
+        //
+        // GUARD (2026-09-28, System 2 plan V6): in a provider run the host is checked against the
+        // declared list BEFORE any secret is resolved, and the owner's provider key is added last,
+        // after the vault placeholders, so nothing the script wrote can override it.
+        //
+        // GUARD (2026-10-08): a manifest that names `network: { hosts }` reaches only those hosts.
+        // Checked here before any secret is resolved, and again on every redirect hop by safeFetch.
+        // GUARD (2026-10-25): at most the run's in-flight budget of answers is buffered at once;
+        // a call past it waits for a slot (extension-host-bounds.ts; secaudit2026oct22).
+        fetch: withFetchGate<ExtensionCtx['fetch']>(fetchGate, async (url, opts, host) => {
+            if (deps.providerCall) assertProviderHost(deps.providerCall, url);
+            const inject = deps.providerCall?.inject;
+            // The owner's key never travels in clear text: over https only, or http to localhost on
+            // this machine (a provider's own test service). Refused, not sent without the key, so
+            // the extension's author learns why. Checked before resolveOutboundSecrets, which binds
+            // a vault secret to the host of its first use: a refused http call must not bind it to
+            // the wrong host:port (secaudit 2026-10-10 I16).
+            if (inject && URL.canParse(url) && new URL(url).protocol !== 'https:' && new URL(url).hostname.toLowerCase() !== 'localhost') {
+                throw new Error(`Fetch blocked: the owner's key is sent only over https; ${new URL(url).origin} is not.`);
+            }
+            const declaredHosts = deps.capabilities.hosts;
+            if (declaredHosts) {
+                const h = URL.canParse(url) ? new URL(url).hostname.toLowerCase() : null;
+                if (!h || !declaredHosts.includes(h)) {
+                    const unset = deps.capabilities.unsetHostFields ?? [];
+                    throw new Error(`Fetch blocked: ${h ? `host ${h}` : 'this address'} is not one of the hosts this extension declared `
+                        + `(network.hosts: ${declaredHosts.join(', ') || 'none'}${unset.length ? `; the owner has not set the host field ${unset.join(', ')}` : ''}).`);
+                }
+            }
+            // Refused before the call goes out: an option ctx.fetch does not know was ignored until
+            // 2026-10-24, and the script then received a lossy text decode of a binary answer. Asked
+            // before resolveOutboundSecrets for the reason the https check above is: a refused call
+            // must not bind a secret to its host (secaudit 2026-10-31 inv-19).
+            const asBase64 = fetchResponseType(opts?.responseType) === 'base64';
+            const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);
+            // The script's own deadline for this one call (`timeoutMs`), inside the run's. Without
+            // it one address that never answers holds the call until the run's deadline, and the
+            // whole run then fails; with it the script catches FETCH_TIMEOUT and goes on.
+            const ownMs = typeof opts?.timeoutMs === 'number' && Number.isFinite(opts.timeoutMs)
+                ? Math.min(Math.max(Math.floor(opts.timeoutMs), FETCH_OWN_TIMEOUT_MIN_MS), FETCH_TIMEOUT_MS) : null;
+            const own = ownMs === null ? null : AbortSignal.timeout(ownMs);
+            // The caller's deadline when it has one — the sandbox road hands over the run's own
+            // timeout and its teardown signal — and this file's ceiling when it does not.
+            const outer = host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS);
+            let resp: Response;
+            let text = '';
+            let bytes: Buffer | null = null;
+            try {
+                resp = await safeFetch(url, {
+                    method: opts?.method || 'GET',
+                    headers: inject ? injectProviderHeader(inject, outbound.values) : outbound.values,
+                    body: opts?.body,
+                    // The headers a secret went into are dropped if a redirect leaves the origin the
+                    // script aimed at. The hop is re-validated for SSRF, which says nothing about
+                    // whether the new host should be handed somebody's key.
+                    sensitiveHeaders: inject ? [...outbound.sensitive, inject.name] : outbound.sensitive,
+                    signal: own ? AbortSignal.any([outer, own]) : outer,
+                    ...(declaredHosts ? { allowHosts: declaredHosts } : {}),
+                });
+                // Opted in per extension, in its manifest config — so a feed reader keeps the forgiving
+                // default and a package producer gets a failed run instead of a mojibake version.
+                // GUARD (2026-09-26): the answer is read up to the outbound ceiling and no further, and
+                // one past it throws RESPONSE_TOO_LARGE (decodeBody above).
+                const read = { gunzip: opts?.gunzip === true, maxBytes: deps.capabilities.fetchMaxBytes };
+                if (asBase64) bytes = await readBodyBytes(resp, url, read);
+                else text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true, read);
+            } catch (err) {
+                // The script's own deadline passed and the run's did not: said by a code the script
+                // can test for. Any other failure, the run's deadline included, is thrown as it came.
+                if (own?.aborted && !outer.aborted) {
+                    throw new Error(`FETCH_TIMEOUT: ${URL.canParse(url) ? new URL(url).host : 'the address'} did not answer within ${ownMs} ms (the timeoutMs of this call).`, { cause: err });
+                }
+                throw err;
+            }
+            const headers: Record<string, string> = {};
+            resp.headers.forEach((v, k) => { headers[k] = v; });
+            // GUARD (2026-10-09): what the node inserted does not come back. A host that echoes the
+            // request would hand the script the secret or key it never held (extension-fetch-scrub.ts).
+            const forms = scrubFormsOf([...outbound.inserted, ...(inject ? [inject.value, inject.value.replace(/^Bearer\s+/i, '')] : [])]);
+            if (bytes) return { status: resp.status, ok: resp.ok, ...scrubResponse('', headers, forms), base64: scrubBytes(bytes, forms).toString('base64') };
+            return { status: resp.status, ok: resp.ok, ...scrubResponse(text, headers, forms) };
+        }),
+
+        caller: deps.caller,
+        // Server-derived, so an owner-only action can exist at all. Absent on a road that does not
+        // know the record; a script must treat that as "not the owner" rather than as permission.
+        extension: deps.extension,
+        config: deps.extConfig,
+
+        // A wallet is per-road: a request can spend the caller's balance, a scheduled run has
+        // nobody's balance to spend, so it gets the empty object it always had.
+        wallet: deps.wallet ?? {},
+
+        // consent and trust were byte-identical in all four copies and have no per-road variance.
+        consent: {
+            check: async (gaii, scope) => {
+                const consents = await storage.listConsents(gaii, { status: 'active' });
+                return consents.some(c => c.purpose === scope);
+            },
+            require: async (gaii, scope) => {
+                const consents = await storage.listConsents(gaii, { status: 'active' });
+                if (!consents.some(c => c.purpose === scope)) {
+                    throw new Error(`CONSENT_REQUIRED: ${scope}`);
+                }
+            },
+        },
+        trust: {
+            getScore: async (gaii: string) => {
+                const agent = await storage.getAgent(gaii);
+                return agent?.trustScore ?? 0;
+            },
+        },
+
+        log: {
+            info: (msg, data) => logger.info(`${logPrefix} ${msg}`, data),
+            warn: (msg, data) => logger.warn(`${logPrefix} ${msg}`, data),
+            error: (msg, data) => logger.error(`${logPrefix} ${msg}`, data),
+        },
+    };
+
+    // Optional capabilities: attached only when the caller can honestly provide them, so the guest
+    // sees `undefined` rather than a function that fails at the far end.
+    if (deps.instance) ctx.instance = deps.instance;
+    if (deps.files) ctx.files = deps.files;
+    if (deps.datapackage) ctx.datapackage = deps.datapackage;
+    // Buying, AI jobs and email exist only for an extension whose capabilities name them: the list
+    // the installer approved (services/extension/capability-declaration.ts).
+    const caps = deps.capabilities;
+    if (deps.buy && caps.payments) ctx.buy = deps.buy;
+    // Never without `extension`: the job is billed to the installer, and `deps.extension` is the only
+    // server-resolved answer to who that is. A road that omits the record gets no ctx.ai rather than
+    // one that guesses.
+    if (deps.ai && deps.extension && caps.ai) ctx.ai = deps.ai;
+    if (deps.notify) ctx.notify = deps.notify;
+    if (deps.changed) ctx.changed = deps.changed;
+    if (deps.email && caps.email) ctx.email = deps.email;
+    // ctx.fetch has always existed, so a script without `network` meets a refusal that says why
+    // rather than a missing function.
+    if (!caps.network) ctx.fetch = async () => { throw capabilityNotDeclared('network'); };
+    if (deps.workspace) ctx.workspace = deps.workspace;
+    // Pure computation with no storage and no network behind it, so it is on every code path and
+    // asks for no capability (services/extension/calendar.ts).
+    ctx.calendar = buildExtensionCalendar();
+
+    // A visitor reads. Refused here, in the context, so every write path of the guest meets it.
+    if (deps.visitor) {
+        ctx.memory.set = async () => { throw new Error(VISITOR_READ_ONLY); };
+        ctx.memory.delete = async () => { throw new Error(VISITOR_READ_ONLY); };
+    }
+
+    return ctx;
+}

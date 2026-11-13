@@ -19,7 +19,7 @@
  *   (--aimeat-mark-badge-w); it declares its own room as --aimeat-mark-aiuse-w, which the install
  *   button (public/js/install-chip.js) adds to its own position.
  *
- *   The words come in translated (services/app-serve-marks.ts asks the locale), and every
+ *   The words come in translated (services/app/serve-marks.ts asks the locale), and every
  *   non-ASCII character is written as an entity, because a served app often declares no charset.
  * @structure AI_USE_MARK; AI_USE_WIDTH_VAR; appAiUseOn; AppAiUse; AiUseBadgeSpec; aiUseBadgeSnippet(spec)
  * @usage parts.push(aiUseBadgeSnippet({ guideUrl, title, counts, link, open }));  // via applyServeMarks
@@ -37,14 +37,14 @@ export const AI_USE_WIDTH_VAR = '--aimeat-mark-aiuse-w';
 /** 34px button plus the 8px gap to the next mark. */
 const ROW_PX = 42;
 
-/** The owner's switch for this mark (manifest.marks.aiUse, services/app-marks.ts). Absent = on. */
+/** The owner's switch for this mark (manifest.marks.aiUse, services/app/marks.ts). Absent = on. */
 export function appAiUseOn(m: { marks?: { aiUse?: boolean } } | undefined | null): boolean {
   return m?.marks?.aiUse !== false;
 }
 
 /**
- * What services/app-ai-use.ts counted for one app. Declared here, beside the markup that shows it,
- * so the serve pass (services/app-serve-marks.ts) takes it without importing the service, whose
+ * What services/app/ai-use.ts counted for one app. Declared here, beside the markup that shows it,
+ * so the serve pass (services/app/serve-marks.ts) takes it without importing the service, whose
  * imports lead back to the serve pass (app-marks → app-audit → app-lifecycle → the publish strip).
  */
 export interface AppAiUse {
@@ -57,7 +57,7 @@ export interface AppAiUse {
 }
 
 export interface AiUseBadgeSpec {
-  /** The app's guide page (services/app-ai-use.ts aiUseGuideUrl). */
+  /** The app's guide page (services/app/ai-use.ts aiUseGuideUrl). */
   guideUrl: string;
   /** The panel's first line: "Use this app with your AI". */
   title: string;

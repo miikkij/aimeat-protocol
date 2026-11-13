@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-11-08 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { documentSteps } from '../../src/services/app-publish-next-steps.js';
+import { documentSteps } from '../../src/services/app/publish-next-steps.js';
 
 describe('documentSteps', () => {
     it('names the owner in the spec_set call when there is no spec yet', () => {

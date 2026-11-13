@@ -1,13 +1,13 @@
 /**
  * @file test/unit/extension-consent.test.ts
- * @description extensionConsentHolds (services/extension-consent.ts), the check ctx.notify's
+ * @description extensionConsentHolds (services/extension/consent.ts), the check ctx.notify's
  *   cross-owner delivery and ctx.email's tier 1 ask: a consent counts for the extension installed
  *   under the name now, granted at or after its install, unexpired, of the right purpose and pattern.
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, extension-uninstall:name-keyed-consents-survive-reinstall).
  */
 import { describe, it, expect } from 'vitest';
-import { extensionConsentHolds } from '../../src/services/extension-consent.js';
+import { extensionConsentHolds } from '../../src/services/extension/consent.js';
 import type { ConsentRecord, ExtensionRecord } from '../../src/storage/interface.js';
 
 const OWNER = 'target@node-1';

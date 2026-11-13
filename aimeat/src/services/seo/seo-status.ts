@@ -16,7 +16,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { indexedPages, primaryNodeOf } from '../../data/public-pages.js';
-import { appSeoIndexable, appSeoListable, appSeoState, appOwnDescription, appOwnWords, APP_OWN_WORDS_MIN, type AppSeoState } from '../app-seo.js';
+import { appSeoIndexable, appSeoListable, appSeoState, appOwnDescription, appOwnWords, APP_OWN_WORDS_MIN, type AppSeoState } from '../app/seo.js';
 import { readIndexNowRuns } from '../indexnow-log.js';
 import { planAnnouncement, type AnnounceScope } from '../indexnow-site.js';
 import { safeFetch } from '../../utils/url-validator.js';

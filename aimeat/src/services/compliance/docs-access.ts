@@ -31,7 +31,7 @@ import { isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
 import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { actsForSomeone, askOperator, type OperatorCaller } from '../operator-principal.js';
 import { agentBarred } from '../organism-agent-access.js';
-import { isOrgManager } from '../workspace-access.js';
+import { isOrgManager } from '../workspace/access.js';
 import type { ComplianceScope } from './docs.js';
 
 export type DocAccess =

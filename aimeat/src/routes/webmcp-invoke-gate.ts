@@ -20,7 +20,7 @@
  *   - A visitor from another node and an anonymous session: neither is an agent or an ecosystem app of
  *     this node, and the route's own rules for them stay as they were.
  *   - An agent or ecosystem app holding exchange:write (or `*`, or `exchange:*`).
- *   - An agent or ecosystem app the once-only step services/app-tool-invoke-keep.ts listed, because it
+ *   - An agent or ecosystem app the once-only step services/app/tool-invoke-keep.ts listed, because it
  *     called app tools over HTTP before this rule, while its token still covers what it held then.
  *
  *   THE REFUSAL. 403 SCOPE_DENIED naming the word. An agent gets, through auth/deny.ts denyScope403,
@@ -47,7 +47,7 @@ import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { permissionAskText } from '../services/permission-ask.js';
-import { APP_TOOL_INVOKE_WORD, appToolInvokeKept } from '../services/app-tool-invoke-keep.js';
+import { APP_TOOL_INVOKE_WORD, appToolInvokeKept } from '../services/app/tool-invoke-keep.js';
 import { logger } from '../utils/logger.js';
 
 /**

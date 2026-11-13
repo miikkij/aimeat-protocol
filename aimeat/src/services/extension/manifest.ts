@@ -1,0 +1,800 @@
+/**
+ * @file src/services/extension/manifest.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
+ *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
+ * @version-history
+ *   2026-11-01 — An action's commercial block keeps `deliversData` for its EXCHANGE listing (plan D5.5).
+ *   2026-10-25 — EXT_ADDRESS_PATTERN: the name, or `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
+ *   2026-10-25 — NODE_OWNED_CONFIG_KEYS is exported: the config route and the action-script route ask it too (secaudit2026oct22).
+ *   v1.15.0 — 2026-10-21 — `uses_secrets: [{ name, hosts, why }]`, stored as `config.__usesSecrets`.
+ *   v1.14.0 — 2026-10-18 —An action may say `public: true`: it answers a caller without an account.
+ *     Refused with a price or a pacing toll (Comicland v3 A-7).
+ *   v1.13.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). `commercial.payMorsels` is deprecated and read as pacing; accepted until
+ *     4.0.0 and refused with MORSEL_PRICE_REMOVED from it. A `commercial` block may now hold only the
+ *     listing fields when the action states a pacing amount (`tollMorsels>0`): a free, paced action.
+ *   v1.12.0 — 2026-10-09 — `limits.fetch_max_mb`: the ceiling this extension's ctx.fetch reads one
+ *                         answer under, stored as `limits.fetchMaxBytes` clamped to
+ *                         EXTENSION_FETCH_MAX_BYTES_CEILING; a non-positive value is refused.
+ *   v1.11.0 — 2026-10-09 — `network: { host_fields: { FIELD: required|optional } }`: config fields
+ *                         whose value the installer gives as one more host, stored as
+ *                         `config.__networkHostFields` (services/extension-network-hosts.ts, where
+ *                         hostRefusal() moved). A host field with no value in the manifest is stored
+ *                         as '' (not set), never as its descriptor.
+ *   v1.10.0 — 2026-10-08 — `workspace.rows`: append to and read the row spaces that name the
+ *                         extension, on a schedule or a workflow step too (aimeat-soc ingest).
+ *                         `network: { hosts }`: the only hostnames ctx.fetch may reach, stored as
+ *                         `config.__networkHosts`.
+ *   v1.9.0 — 2026-10-05 — A manifest may declare `capabilities: [network, ai, email, payments]`,
+ *                         stored as `config.__capabilities`; the sandbox allows only those, and the
+ *                         package approval shows them (services/extension-capability-declaration.ts,
+ *                         secaudit 2026-10, PKG-3).
+ *   v1.8.0 — 2026-09-28 — System 2 plan, V6: a manifest may declare `provides: { ai_provider: … }`
+ *                         (ops, models, data_statement, hosts, auth_header). Every op needs an action
+ *                         with the id `ai.<op>`; hosts are bare hostnames only. Stored as
+ *                         `config.__aiProvider` (services/extension-ai-provider-declaration.ts), a key
+ *                         the manifest's own `config:` cannot set.
+ *   v1.7.2 -- 2026-09-27 -- Move the shared builder out of the route layer; behavior unchanged.
+ *   v1.7.1 — 2026-09-26 — The installer named in the config.app check comes from localAccountName
+ *                         (utils/gaii.ts), which keeps an identity of another node whole, so it never
+ *                         names the local namesake (secaudit 2026-09, F-1).
+ *   v1.7.0 — 2026-09-13 — A manifest that does not parse answers with the parser's line and column
+ *                         (yamlErrorText, also used by the package ZIP door), and a `type: secret`
+ *                         config field with no `default` is no longer stored as its own descriptor,
+ *                         which the sandbox read as a truthy ctx.config value.
+ *   v1.6.0 — 2026-09-05 — A manifest may declare `workspace: { read: bool, write: bool }`, which is
+ *                         what makes `ctx.workspace` exist in the sandbox. Validated here and stored
+ *                         as `config.__workspace`, a key the manifest's own `config:` cannot set.
+ *   v1.5.0 — 2026-08-10 — config.app must name the installer's own app, and a manifest price and
+ *                         toll are bounded. Naming somebody else's app made a private roster a
+ *                         per-call oracle; "non-negative integer" admitted 2^31 as a price.
+ *   v1.4.0 — 2026-08-10 — metadata.name is validated. The name IS the memory address, and the other
+ *                         half of it (the instance id) has always been validated; this half was not,
+ *                         so `victim.probe` addressed the `probe` instance of `victim`.
+ *   v1.3.0 — 2026-08-10 — A manifest can no longer set the node's own config keys. __-prefixed
+ *                         ones are written from validated sections; emailPolicy needs an operator,
+ *                         which the code reading it always assumed and nothing checked.
+ *   v1.2.0 — 2026-07-26 — validateManifestShape: type-check every field the builder later reads as a
+ *     string. `(a.method as string).toUpperCase()` on a mis-typed field threw a TypeError out of the
+ *     builder, which the presigned-upload router turned into a bare 500 with no mention of the
+ *     manifest. Mis-typed fields are now a 400 naming the field and what the YAML produced.
+ *   v1.1.0 — 2026-07-17 — Per-action pricing: validate + carry `tollMorsels` (anti-abuse burn) and
+ *     `commercial` {payMorsels, payMoney} for priced raw calls (design notes doc-r6tyr3o, C1/M1)
+ *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
+ */
+import type { AimeatConfig } from '../../config.js';
+import type { ExtensionRecord } from '../../storage/interface.js';
+import { parse as parseYaml } from 'yaml';
+import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from './secrets.js';
+import { MONEY_CURRENCIES } from '../../commerce/money.js';
+import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './workspace-declaration.js';
+import { CAPABILITY_DECLARATION_KEY, NETWORK_HOSTS_KEY, parseCapabilityDeclaration } from './capability-declaration.js';
+import { NETWORK_HOST_FIELDS_KEY, hostRefusal, parseNetworkDeclaration } from './network-hosts.js';
+import { USES_SECRETS_KEY, parseUsesSecrets } from './secret-uses.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { EXTENSION_FETCH_MAX_BYTES_CEILING } from '../../utils/read-capped.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../../config/pacing.js';
+import {
+  AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
+  type ExtensionAiOp, type ExtensionAiProviderDeclaration,
+} from './ai-provider-declaration.js';
+
+/** Discriminated result of validating an extension install/upsert payload. */
+export type ExtBuildResult =
+  | { ok: true; record: ExtensionRecord; warnings?: string[] }
+  | { ok: false; status: number; code: string; message: string };
+
+/**
+ * APIs an author reaches for that the QuickJS sandbox either does NOT have, or that make an action
+ * non-deterministic. These are WARNINGS, never errors: the code still installs, but the author is
+ * told at install time instead of discovering it in production.
+ *
+ * This exists because of a real, expensive failure: a browser app hashed values with
+ * `crypto.subtle`, its extension could not (no WebCrypto in QuickJS) so it used a different
+ * algorithm, and every value the app computed then looked stale to the server — silently
+ * recomputing and re-charging AI work forever. `ctx.hash()` is the fix; this scan is what makes
+ * anyone reaching past it notice.
+ */
+const SANDBOX_CAPABILITY_WARNINGS: { pattern: RegExp; message: string }[] = [
+  {
+    pattern: /\bcrypto\s*\.\s*subtle\b/,
+    message: 'crypto.subtle is NOT available in the sandbox (no WebCrypto in QuickJS). Use ctx.hash(s) — the node publishes that exact function so a browser app can compute the identical value; a hand-rolled hash on one side only is how an app and its extension stop agreeing about what is up to date.',
+  },
+  {
+    pattern: /\bcrypto\s*\.\s*randomUUID\b|\brequire\s*\(\s*['"]node:crypto['"]/,
+    message: 'Node crypto is not available in the sandbox. Derive ids from your input with ctx.hash(s), or let the caller supply them.',
+  },
+  {
+    pattern: /\bDate\s*\.\s*now\s*\(|\bnew\s+Date\s*\(\s*\)/,
+    message: 'Date.now() / new Date() make the action non-deterministic and un-replayable. Use ctx.now() — one timestamp captured at the start of the run, stable across the whole action.',
+  },
+  {
+    pattern: /\bMath\s*\.\s*random\s*\(/,
+    message: 'Math.random() makes the action non-deterministic, so an identical request stops returning an identical result (and cannot be cached or sold with an accuracy claim). Derive from the input instead, e.g. ctx.hash(JSON.stringify(input)).',
+  },
+  {
+    pattern: /\beval\s*\(|\bnew\s+Function\s*\(/,
+    message: 'eval() / new Function() are refused by the app-origin CSP on the browser side and are a code-injection risk here. Parse explicitly instead.',
+  },
+];
+
+/**
+ * Scan every action script for sandbox-unavailable or non-deterministic APIs.
+ * Pure and side-effect free; returns one message per distinct problem found, naming the scripts.
+ */
+export function scanSandboxCapabilityWarnings(scripts: Record<string, string>): string[] {
+  const out: string[] = [];
+  for (const { pattern, message } of SANDBOX_CAPABILITY_WARNINGS) {
+    const hits = Object.entries(scripts)
+      .filter(([, content]) => pattern.test(content))
+      .map(([name]) => name);
+    if (hits.length) out.push(`${hits.join(', ')}: ${message}`);
+  }
+  return out;
+}
+
+/**
+ * A YAML parse error as one line an author can act on: the parser's first message line, which names
+ * the line and column, plus a hint when the cause is the usual one. The `yaml` library follows its
+ * message with a code excerpt spread over further lines; that excerpt is dropped so the answer stays
+ * one readable sentence in an error envelope.
+ */
+export function yamlErrorText(err: unknown): string {
+  const first = (err instanceof Error ? err.message : String(err)).split('\n')[0].trim().replace(/[:.]\s*$/, '');
+  const hint = /nested mappings|compact mapping|implicit keys/i.test(first)
+    ? ' This is usually a plain value containing ": ", such as a description: quote it, or write it as a folded block (>-).'
+    : '';
+  return `${first}.${hint}`;
+}
+
+const isNonNegInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && Number.isFinite(v);
+const fail = (message: string): ExtBuildResult => ({ ok: false, status: 400, code: 'INVALID_MANIFEST', message });
+
+const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
+
+/**
+ * Describe what a manifest field actually turned out to be, so the error names the mistake instead
+ * of the type. A YAML flow map (`input: { type: object, description: a, b }`) is the usual way a
+ * field silently becomes the wrong shape: the comma starts a new entry, and what the author read as
+ * prose ends up as a key.
+ */
+function describeYamlValue(v: unknown): string {
+  if (v === undefined) return 'missing';
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'a list';
+  if (typeof v === 'object') return `a map (${Object.keys(v as object).slice(0, 4).join(', ')})`;
+  return `${typeof v} (${JSON.stringify(v)})`;
+}
+
+/**
+ * Every manifest field this builder later treats as a string MUST be checked here first.
+ *
+ * The bug this closes: `actions[].method` was read as `(a.method as string).toUpperCase()` with no
+ * check, so a manifest where the field parsed as anything else threw a TypeError out of the whole
+ * builder. On the REST/MCP paths that surfaced as a message; on the presigned ZIP path the router's
+ * catch-all turned it into a bare `500 PROCESSING_FAILED`, which tells the author nothing about
+ * their manifest. A mis-typed field is the author's mistake to fix, so it must be a 400 that names
+ * the field, the action and what the YAML actually produced.
+ */
+function validateManifestShape(
+  metadata: Record<string, unknown>,
+  actions: Array<Record<string, unknown>>,
+): ExtBuildResult | null {
+  for (const field of ['name', 'description', 'author'] as const) {
+    if (!isNonEmptyString(metadata[field])) {
+      return fail(`metadata.${field} must be a non-empty string, got ${describeYamlValue(metadata[field])}`);
+    }
+  }
+  // A YAML scalar like `version: 1.0` parses as a number, which is a legitimate thing to write.
+  // Accept it and coerce at build time; refuse the shapes that cannot be a version at all.
+  if (!isNonEmptyString(metadata.version) && typeof metadata.version !== 'number') {
+    return fail(`metadata.version must be a string (quote it, e.g. "1.0.0"), got ${describeYamlValue(metadata.version)}`);
+  }
+
+  for (const [i, action] of actions.entries()) {
+    if (typeof action !== 'object' || action === null || Array.isArray(action)) {
+      return fail(`actions[${i}] must be a map with id, method, path and script, got ${describeYamlValue(action)}`);
+    }
+    const label = isNonEmptyString(action.id) ? `"${action.id}"` : `at index ${i}`;
+    for (const field of ['id', 'method', 'path', 'script'] as const) {
+      if (!isNonEmptyString(action[field])) {
+        return fail(`Action ${label}: ${field} must be a non-empty string, got ${describeYamlValue(action[field])}`);
+      }
+    }
+    // input/output are JSON Schema documents. A comma inside an unquoted flow-map description is
+    // the common way these stop being maps, and storing the wreckage means the action advertises
+    // an input contract nobody wrote.
+    for (const field of ['input', 'output'] as const) {
+      const v = action[field];
+      if (v !== undefined && (typeof v !== 'object' || v === null || Array.isArray(v))) {
+        return fail(`Action ${label}: ${field} must be a JSON Schema map, got ${describeYamlValue(v)}`
+          + '. A comma inside an unquoted flow map splits it into another entry — quote the text.');
+      }
+    }
+  }
+  return null;
+}
+
+/** Headers the provider key may never be written to: each one changes how the request is framed or
+ *  routed, or carries another credential, so a manifest naming one is refused at install. */
+const FORBIDDEN_AUTH_HEADERS = ['host', 'cookie', 'content-length', 'transfer-encoding', 'connection', 'set-cookie'];
+/** An HTTP header name (RFC 9110 token). */
+const HEADER_NAME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,100}$/;
+const PRICE_FIELDS = { in_per_mtok: 'inPerMtok', out_per_mtok: 'outPerMtok', per_image: 'perImage', per_second: 'perSecond' } as const;
+
+/**
+ * Validate `provides:` and build the AI provider declaration it carries (System 2 plan V6). Returns
+ * the declaration (or undefined when the manifest declares none), or a refusal naming the field.
+ * `provides` holds only `ai_provider` for now, and an unknown key is refused so a misspelling does
+ * not install as an extension that quietly provides nothing.
+ */
+function validateProvides(
+  provides: unknown,
+  actions: Array<Record<string, unknown>>,
+): { decl: ExtensionAiProviderDeclaration | undefined } | ExtBuildResult {
+  if (provides === undefined) return { decl: undefined };
+  if (typeof provides !== 'object' || provides === null || Array.isArray(provides)) {
+    return fail(`provides must be a map, e.g. provides: { ai_provider: { … } }, got ${describeYamlValue(provides)}`);
+  }
+  const p = provides as Record<string, unknown>;
+  const unknownTop = Object.keys(p).filter(k => k !== 'ai_provider');
+  if (unknownTop.length) return fail(`provides declares unknown field(s) ${unknownTop.join(', ')}; only ai_provider exists`);
+  if (p.ai_provider === undefined) return { decl: undefined };
+  const a = p.ai_provider;
+  if (typeof a !== 'object' || a === null || Array.isArray(a)) {
+    return fail(`provides.ai_provider must be a map with ops, models, data_statement and hosts, got ${describeYamlValue(a)}`);
+  }
+  const ap = a as Record<string, unknown>;
+  const known = ['ops', 'models', 'data_statement', 'hosts', 'auth_header'];
+  const unknownAp = Object.keys(ap).filter(k => !known.includes(k));
+  if (unknownAp.length) {
+    return fail(`provides.ai_provider declares unknown field(s) ${unknownAp.join(', ')}; the fields are ${known.join(', ')}`);
+  }
+
+  // ops: each one of the five, once, and each served by the action `ai.<op>`.
+  if (!Array.isArray(ap.ops) || ap.ops.length === 0) {
+    return fail(`provides.ai_provider.ops must be a non-empty list of ${EXTENSION_AI_OPS.join(', ')}, got ${describeYamlValue(ap.ops)}`);
+  }
+  const ops: ExtensionAiOp[] = [];
+  for (const op of ap.ops as unknown[]) {
+    if (typeof op !== 'string' || !(EXTENSION_AI_OPS as readonly string[]).includes(op)) {
+      return fail(`provides.ai_provider.ops: ${describeYamlValue(op)} is not an op; the ops are ${EXTENSION_AI_OPS.join(', ')}`);
+    }
+    if (ops.includes(op as ExtensionAiOp)) return fail(`provides.ai_provider.ops lists "${op}" twice`);
+    ops.push(op as ExtensionAiOp);
+  }
+  const actionIds = new Set(actions.map(x => x.id as string));
+  for (const op of ops) {
+    const id = `${AI_OP_ACTION_PREFIX}${op}`;
+    if (!actionIds.has(id)) {
+      return fail(`provides.ai_provider.ops declares "${op}", and no action has the id "${id}". Add an action with id: ${id}, which serves that op`);
+    }
+  }
+
+  // models: at least one, each with an id and a name, optional boolean caps and non-negative prices.
+  if (!Array.isArray(ap.models) || ap.models.length === 0) {
+    return fail(`provides.ai_provider.models must be a non-empty list of { id, name }, got ${describeYamlValue(ap.models)}`);
+  }
+  if (ap.models.length > 100) return fail(`provides.ai_provider.models lists ${ap.models.length} models; the most is 100`);
+  const models: ExtensionAiProviderDeclaration['models'] = [];
+  for (const [i, raw] of (ap.models as unknown[]).entries()) {
+    const at = `provides.ai_provider.models[${i}]`;
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return fail(`${at} must be a map with id and name, got ${describeYamlValue(raw)}`);
+    const m = raw as Record<string, unknown>;
+    const unknownM = Object.keys(m).filter(k => !['id', 'name', 'caps', 'price'].includes(k));
+    if (unknownM.length) return fail(`${at} declares unknown field(s) ${unknownM.join(', ')}; the fields are id, name, caps, price`);
+    for (const f of ['id', 'name'] as const) {
+      if (!isNonEmptyString(m[f]) || m[f].length > 200) {
+        return fail(`${at}.${f} must be a non-empty string of at most 200 characters, got ${describeYamlValue(m[f])}`);
+      }
+    }
+    if (models.some(x => x.id === m.id)) return fail(`${at}.id "${m.id as string}" is listed twice`);
+    const model: ExtensionAiProviderDeclaration['models'][number] = { id: m.id as string, name: m.name as string };
+    if (m.caps !== undefined) {
+      if (typeof m.caps !== 'object' || m.caps === null || Array.isArray(m.caps)) return fail(`${at}.caps must be a map of booleans, got ${describeYamlValue(m.caps)}`);
+      for (const [k, v] of Object.entries(m.caps)) {
+        if (typeof v !== 'boolean') return fail(`${at}.caps.${k} must be a boolean, got ${describeYamlValue(v)}`);
+      }
+      model.caps = { ...(m.caps as Record<string, boolean>) };
+    }
+    if (m.price !== undefined) {
+      if (typeof m.price !== 'object' || m.price === null || Array.isArray(m.price)) return fail(`${at}.price must be a map, got ${describeYamlValue(m.price)}`);
+      const price: NonNullable<typeof model.price> = {};
+      for (const [k, v] of Object.entries(m.price)) {
+        if (!(k in PRICE_FIELDS)) return fail(`${at}.price declares unknown field ${k}; the fields are ${Object.keys(PRICE_FIELDS).join(', ')}`);
+        if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return fail(`${at}.price.${k} must be a non-negative number, got ${describeYamlValue(v)}`);
+        price[PRICE_FIELDS[k as keyof typeof PRICE_FIELDS]] = v;
+      }
+      model.price = price;
+    }
+    models.push(model);
+  }
+
+  if (!isNonEmptyString(ap.data_statement) || ap.data_statement.length > 500) {
+    return fail(`provides.ai_provider.data_statement must be a non-empty string of at most 500 characters, got ${describeYamlValue(ap.data_statement)}`);
+  }
+
+  if (!Array.isArray(ap.hosts) || ap.hosts.length === 0 || ap.hosts.length > 20) {
+    return fail(`provides.ai_provider.hosts must be a list of 1 to 20 hostnames, got ${describeYamlValue(ap.hosts)}`);
+  }
+  const hosts: string[] = [];
+  for (const h of ap.hosts as unknown[]) {
+    if (!isNonEmptyString(h)) return fail(`provides.ai_provider.hosts: each host must be a non-empty string, got ${describeYamlValue(h)}`);
+    const host = h.trim().toLowerCase();
+    const why = hostRefusal(host);
+    if (why) return fail(`provides.ai_provider.hosts: "${h}" is refused, ${why}`);
+    if (!hosts.includes(host)) hosts.push(host);
+  }
+
+  let authHeader: string | undefined;
+  if (ap.auth_header !== undefined) {
+    if (typeof ap.auth_header !== 'string' || !HEADER_NAME_TOKEN.test(ap.auth_header)) {
+      return fail(`provides.ai_provider.auth_header must be an HTTP header name such as x-api-key, got ${describeYamlValue(ap.auth_header)}`);
+    }
+    if (FORBIDDEN_AUTH_HEADERS.includes(ap.auth_header.toLowerCase())) {
+      return fail(`provides.ai_provider.auth_header "${ap.auth_header}" is refused: the key is never written to ${FORBIDDEN_AUTH_HEADERS.join(', ')}`);
+    }
+    authHeader = ap.auth_header;
+  }
+
+  return { decl: { ops, models, dataStatement: ap.data_statement.trim(), hosts, ...(authHeader ? { authHeader } : {}) } };
+}
+
+/**
+ * Validate a raw action's two values (design: notes doc-r6tyr3o; ruling decision-morseli-on-tahdistus-
+ * ei-hinta-tarjouksen-kaksi-arvoa, 2026-10-11). `tollMorsels` is the pacing amount per call
+ * (non-negative integer, within the node's per-call ceiling). `commercial` (optional) carries the money
+ * price: `payMoney` (optional) is `{amount>0, currency ∈ MONEY_CURRENCIES}`. `payMorsels` is a
+ * deprecated 3.x morsel figure: a non-negative integer, read as pacing and added to the toll where the
+ * call is charged, accepted until MORSEL_PRICE_FIELDS_REMOVED_IN and refused with MORSEL_PRICE_REMOVED
+ * from it. A morsel is never a price. C1 requires the block to say something: a money price, or a
+ * pacing amount (`payMorsels>0` while it is accepted, or `tollMorsels>0`) for a free, paced action.
+ * Returns an error result on any violation, or `null` when valid.
+ */
+export function validateActionPricing(action: Record<string, unknown>, actionId: string, config: AimeatConfig): ExtBuildResult | null {
+  if (action.tollMorsels !== undefined && !isNonNegInt(action.tollMorsels)) {
+    return fail(`Action "${actionId}": tollMorsels must be a non-negative integer`);
+  }
+  // Pacing is debited from the caller per call, so it answers to the same ceiling as
+  // ctx.wallet.consume. Unbounded, a manifest could name a number that empties whoever calls it once.
+  if (isNonNegInt(action.tollMorsels) && action.tollMorsels > config.extensionMaxDebitPerCall) {
+    return fail(`Action "${actionId}": tollMorsels ${action.tollMorsels} exceeds this node's per-call pacing ceiling of ${config.extensionMaxDebitPerCall}`);
+  }
+  const commercial = action.commercial as Record<string, unknown> | undefined;
+  if (commercial === undefined) return null;
+  if (typeof commercial !== 'object' || commercial === null) {
+    return fail(`Action "${actionId}": commercial must be an object`);
+  }
+  const payMorsels = commercial.payMorsels ?? 0;
+  if (!isNonNegInt(payMorsels)) {
+    return fail(`Action "${actionId}": commercial.payMorsels must be a non-negative integer`);
+  }
+  if (payMorsels > 0 && !legacyMorselFieldsLive()) {
+    return { ok: false, status: 400, code: 'MORSEL_PRICE_REMOVED',
+      message: `Action "${actionId}": commercial.payMorsels was removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}: a morsel is pacing, not a price. Set tollMorsels (the pacing amount per call) and commercial.payMoney.` };
+  }
+  // A sanity bound on the deprecated figure. It exists because an agent invoking a capability does
+  // not necessarily read the action first, and "non-negative integer" admitted 2^31.
+  if (payMorsels > config.extensionMaxPayMorsels) {
+    return fail(`Action "${actionId}": commercial.payMorsels ${payMorsels} exceeds this node's ceiling of ${config.extensionMaxPayMorsels}`);
+  }
+  const payMoney = commercial.payMoney as Record<string, unknown> | undefined;
+  if (payMoney !== undefined) {
+    if (typeof payMoney !== 'object' || payMoney === null) {
+      return fail(`Action "${actionId}": commercial.payMoney must be an object`);
+    }
+    if (typeof payMoney.amount !== 'number' || !Number.isInteger(payMoney.amount) || payMoney.amount <= 0) {
+      return fail(`Action "${actionId}": commercial.payMoney.amount must be a positive integer (6-decimal micro-units)`);
+    }
+    if (typeof payMoney.currency !== 'string' || !(MONEY_CURRENCIES as readonly string[]).includes(payMoney.currency)) {
+      return fail(`Action "${actionId}": commercial.payMoney.currency must be one of ${MONEY_CURRENCIES.join(', ')}`);
+    }
+  }
+  // C1: the block states a money price or a pacing amount; an empty one says nothing.
+  if (Number(payMorsels) <= 0 && payMoney === undefined && !(isNonNegInt(action.tollMorsels) && action.tollMorsels > 0)) {
+    return fail(`Action "${actionId}": commercial must set a money price (payMoney), or the action a pacing amount (tollMorsels>0) for a free, paced call`);
+  }
+  // Optional EXCHANGE pricing plans (bundle / subscription) — amounts in the action's unit (TARGET-045 Phase B).
+  const plans = commercial.plans;
+  if (plans !== undefined) {
+    if (!Array.isArray(plans)) return fail(`Action "${actionId}": commercial.plans must be an array`);
+    const ids = new Set<string>();
+    for (const raw of plans) {
+      const plan = raw as Record<string, unknown>;
+      if (typeof plan.id !== 'string' || !plan.id) return fail(`Action "${actionId}": each plan needs a non-empty id`);
+      if (ids.has(plan.id)) return fail(`Action "${actionId}": duplicate plan id "${plan.id}"`);
+      ids.add(plan.id);
+      const posInt = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v > 0;
+      if (plan.model === 'bundle') {
+        if (!posInt(plan.blockSize) || !posInt(plan.blockPrice)) {
+          return fail(`Action "${actionId}" plan "${plan.id}": bundle needs positive integer blockSize + blockPrice`);
+        }
+      } else if (plan.model === 'subscription') {
+        if (!posInt(plan.periodSeconds) || !posInt(plan.periodPrice) || !posInt(plan.callsPerWindow) || !posInt(plan.windowSeconds)) {
+          return fail(`Action "${actionId}" plan "${plan.id}": subscription needs positive integer periodSeconds, periodPrice, callsPerWindow, windowSeconds`);
+        }
+      } else {
+        return fail(`Action "${actionId}" plan "${plan.id}": model must be 'bundle' or 'subscription'`);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Validate an extension install payload (YAML manifest + scripts map) and build the
+ * ExtensionRecord it describes. Shared by POST (install) and PUT (upsert) so both validate the
+ * manifest identically and produce the same record. Does NOT enforce quota, duplicate-name, or
+ * permission — those are caller-specific (create vs. update). The caller supplies the lifecycle
+ * fields (installedBy/installedAt); status defaults to 'inactive'.
+ */
+/**
+ * Config keys the NODE owns, which an installer's manifest must never set.
+ *
+ * `__`-prefixed keys are the node's own namespace inside `ext.config`: `__schedules` is what makes
+ * the scheduler run this extension on a clock, and `__secretKeys` is what tells the runtime which
+ * fields to decrypt before the VM. Both are written below from validated manifest sections. An
+ * installer writing them directly bypasses that validation, and a declared-but-untrue `__secretKeys`
+ * points the decrypt step at plaintext.
+ *
+ * `emailPolicy` is the one that mattered. `'unrestricted'` lifts the email capability's recipient
+ * check entirely, and the code that reads it has always called that operator-granted. Nothing
+ * enforced it: config comes only from the manifest, and installing needs `requireAuth()` plus
+ * whatever `extInstallRole` says, which defaults to `owner`. So on a node with more than one
+ * account, anyone who could install an extension could send mail to any address under the node's
+ * own SMTP identity. On a personal node the installer IS the operator, which is why this held for
+ * as long as it did.
+ */
+export const NODE_OWNED_CONFIG_KEYS: readonly string[] = ['emailPolicy'];
+
+/**
+ * An extension's name IS its memory address, so it has to be as tightly shaped as the other half of
+ * that address. An instance-scoped extension stores under `ext:{name}.{instanceId}`, and a plain one
+ * under `ext:{name}`. The instanceId half has been validated on create since it existed
+ * (routes/extensions/instances.ts) with exactly this pattern, which admits no dot and therefore
+ * cannot forge the separator. The name half was checked only for being a non-empty string.
+ *
+ * So an extension named `victim.probe` addressed `ext:victim.probe` — the same place the `probe`
+ * instance of the `victim` extension keeps its tenant's data. The duplicate-name check does not
+ * notice, because `victim.probe` and `victim` are different names. One owner could read and write
+ * another owner's instance memory by choosing a name, through the ordinary install route, with two
+ * calls and no special role. Proved in test/e2e-ext-hardening.ts before this pattern existed.
+ *
+ * The charset is the security property, not the length: `.` and `:` are what carry meaning in a
+ * namespace, and neither is admitted. The length is generous on purpose — the package flow generates
+ * names like `{package}-{owner}-{shortId}-{componentId}`, which reached 66 characters on the very
+ * first seeded package, and the storage column is unbounded TEXT. A borrowed 64-character cap would
+ * have refused every package install while protecting nothing.
+ *
+ * All 63 extensions on aimeat.io satisfy this, so nothing in production has to be renamed.
+ */
+export const EXT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
+
+/**
+ * An extension's address: the name, or `<owner>/<name>`, which is how an install is stored since
+ * names live in the owner's namespace (services/component-address.ts). The slash is the one
+ * separator the address adds; `.` and `:` stay out, so the memory namespace keeps its meaning.
+ */
+export const EXT_ADDRESS_PATTERN = /^(?:[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\/)?[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
+
+/** Strip the keys an installer must not set. Operator installs keep `emailPolicy`, which is what
+ *  "operator-granted" meant; everything `__`-prefixed goes regardless of who is installing. */
+export function stripNodeOwnedConfig(
+  manifestConfig: Record<string, unknown> | undefined,
+  installerIsOperator: boolean,
+): { config: Record<string, unknown> | undefined; stripped: string[] } {
+  if (!manifestConfig) return { config: manifestConfig, stripped: [] };
+  const stripped: string[] = [];
+  const kept: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(manifestConfig)) {
+    if (k.startsWith('__') || (!installerIsOperator && NODE_OWNED_CONFIG_KEYS.includes(k))) {
+      stripped.push(k);
+      continue;
+    }
+    kept[k] = v;
+  }
+  return { config: kept, stripped };
+}
+
+export function buildExtensionRecordFromManifest(
+  manifestYaml: string | undefined,
+  scripts: Record<string, string> | undefined,
+  config: AimeatConfig,
+  installedBy: string,
+  installedAt: string,
+  /** Did the principal installing this hold the operator role? Decides whether the manifest may
+   *  set `emailPolicy`. Defaults to false, so a caller that forgets gets the safe answer. */
+  installerIsOperator = false,
+): ExtBuildResult {
+  if (!manifestYaml || typeof manifestYaml !== 'string') {
+    return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'manifest (YAML string) is required' };
+  }
+  if (!scripts || typeof scripts !== 'object') {
+    return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'scripts object is required' };
+  }
+
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = parseYaml(manifestYaml) as Record<string, unknown>;
+  } catch (err) {
+    // The parser's own message carries the line and column ("Nested mappings are not allowed in
+    // compact mappings at line 4, column 16"), and that position is the whole fix for the common
+    // case: an unquoted `: ` inside a description. Returning a bare "Failed to parse" sent authors
+    // to parse the file locally just to find out where.
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+      message: `Failed to parse manifest YAML: ${yamlErrorText(err)}` };
+  }
+
+  const metadata = manifest.metadata as Record<string, unknown> | undefined;
+  if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+      message: 'metadata.name, metadata.version, metadata.description, and metadata.author are required' };
+  }
+  if (!EXT_NAME_PATTERN.test(metadata.name as string)) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+      message: `metadata.name "${String(metadata.name)}" is not a valid extension name. Use lowercase `
+        + 'letters, digits and hyphens, 3 to 128 characters, starting and ending with a letter or digit. '
+        + 'The name becomes this extension\'s memory address, so it cannot contain a separator.' };
+  }
+
+  const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'actions array is required and must not be empty' };
+  }
+  // Type-check before ANY field is read as a string — see validateManifestShape.
+  const shapeErr = validateManifestShape(metadata, actions);
+  if (shapeErr) return shapeErr;
+
+  for (const action of actions) {
+    if (!scripts[action.script as string]) {
+      return { ok: false, status: 400, code: 'MISSING_SCRIPT',
+        message: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` };
+    }
+    // Two values (design: notes doc-r6tyr3o). tollMorsels = pacing per call; commercial.payMoney = the money price.
+    const pricingErr = validateActionPricing(action, action.id as string, config);
+    if (pricingErr) return pricingErr;
+    // A public action answers a visitor, who can neither pay a price nor be paced (Comicland v3 A-7).
+    if (action.public !== undefined && typeof action.public !== 'boolean') {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `Action "${action.id as string}": public must be true or false` };
+    }
+    const commercial = action.commercial as Record<string, unknown> | undefined;
+    if (action.public === true && ((isNonNegInt(action.tollMorsels) && action.tollMorsels > 0)
+      || (commercial && (commercial.payMoney !== undefined || commercial.plans !== undefined || commercial.pricesMoney !== undefined)))) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+        message: `Action "${action.id as string}": a public action answers callers without an account, who cannot pay, so it takes no price and no tollMorsels` };
+    }
+  }
+
+  const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
+  if (manifestInstances) {
+    if (typeof manifestInstances.supported !== 'boolean') {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'instances.supported must be a boolean' };
+    }
+    if (manifestInstances.config_per_instance !== undefined
+      && (typeof manifestInstances.config_per_instance !== 'object' || manifestInstances.config_per_instance === null)) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'instances.config_per_instance must be an object (JSON Schema)' };
+    }
+  }
+
+  // `workspace: { read, write }` is what makes ctx.workspace exist in the sandbox — the
+  // extension acting on its CALLER's organism workspace. Declared at the top level, never inside
+  // `config:`, and stored under a __-prefixed key so a config block cannot grant it to itself.
+  let workspaceDecl: WorkspaceDeclaration | undefined;
+  if (manifest.workspace !== undefined) {
+    const w = manifest.workspace;
+    if (typeof w !== 'object' || w === null || Array.isArray(w)) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'workspace must be a map with read, write and/or rows booleans, e.g. workspace: { read: true, write: true }' };
+    }
+    const decl = w as Record<string, unknown>;
+    for (const field of ['read', 'write', 'rows'] as const) {
+      if (decl[field] !== undefined && typeof decl[field] !== 'boolean') {
+        return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `workspace.${field} must be a boolean, got ${describeYamlValue(decl[field])}` };
+      }
+    }
+    const unknown = Object.keys(decl).filter(k => k !== 'read' && k !== 'write' && k !== 'rows');
+    if (unknown.length) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `workspace declares unknown field(s) ${unknown.join(', ')}; only read, write and rows exist` };
+    }
+    // `rows: true` lets the scripts append to and read the row spaces that name this extension
+    // (objectTypes[].extensions), also on a schedule or a workflow step (extension-workspace.ts).
+    if (decl.read === true || decl.write === true || decl.rows === true) {
+      workspaceDecl = { read: decl.read === true, write: decl.write === true, rows: decl.rows === true };
+    }
+  }
+
+  // `provides: { ai_provider: … }` makes this extension usable as an AI provider (System 2 plan V6).
+  // Declared at the top level and stored under a __-prefixed key, like `workspace`, so a config
+  // block cannot declare hosts the owner's provider key would then be sent to.
+  const provided = validateProvides(manifest.provides, actions);
+  if ('ok' in provided) return provided;
+  const aiProviderDecl = provided.decl;
+
+  // `capabilities: [network, ai, email, payments]` is what the sandbox lets the scripts do beyond
+  // their own memory, and what the package approval shows. Without it the node infers the list from
+  // the scripts' text (services/extension/capability-declaration.ts).
+  const capabilityDecl = parseCapabilityDeclaration(manifest.capabilities);
+  if (!capabilityDecl.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: capabilityDecl.message };
+  // `uses_secrets: [{ name, hosts, why }]`: which vault secrets the scripts send where (extension-secret-uses.ts).
+  const usesSecrets = parseUsesSecrets(manifest.uses_secrets);
+  if (!usesSecrets.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: usesSecrets.message };
+
+  for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
+    const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
+    if (sizeKb > config.extensionMaxCodeSizeKb) {
+      return { ok: false, status: 400, code: 'CODE_TOO_LARGE',
+        message: `Script "${scriptKey}" is ${sizeKb.toFixed(1)}KB, max is ${config.extensionMaxCodeSizeKb}KB` };
+    }
+  }
+
+  // Strip the node's own config keys before anything reads them, so the rest of this function sees
+  // only what an installer is allowed to declare. What was removed goes back as a warning: the
+  // author learns their manifest lost a key instead of wondering why it has no effect.
+  const { config: nodeOwnedStripped, stripped: strippedNodeKeys } =
+    stripNodeOwnedConfig(manifest.config as Record<string, unknown> | undefined, installerIsOperator);
+  // And a value that arrives already encrypted: only this node mints those, from a plaintext it
+  // just encrypted with its own key, so one submitted from outside is either meaningless or a
+  // ciphertext taken from somewhere it should not have been.
+  const { config: manifestConfig, stripped: strippedEncrypted } = stripClientEncryptedValues(nodeOwnedStripped);
+  const strippedConfigKeys = [...strippedNodeKeys, ...strippedEncrypted];
+
+  // `config: { app: owner/file.html }` names the app whose membership this extension enforces, and
+  // the node then reads that app's roster on the extension's behalf — the caller's role on every
+  // invoke, and the carry plan on the paywall. Naming somebody else's app turns a deliberately
+  // private roster into a per-call oracle, and puts the caller on that owner's carry plan. The owner
+  // half has to be the installer. All 8 extensions declaring `app` on aimeat.io already are.
+  // At this point config entries are still in descriptor form (`app: { default: 'owner/x.html' }`);
+  // the flatten to a bare value happens further down, where the record is assembled.
+  const rawApp = manifestConfig?.app;
+  const declaredApp = (rawApp && typeof rawApp === 'object' && 'default' in rawApp)
+    ? (rawApp as Record<string, unknown>).default
+    : rawApp;
+  if (typeof declaredApp === 'string' && declaredApp.length) {
+    const appOwner = (declaredApp.split('/')[0] ?? '').toLowerCase();
+    const installer = localAccountName(installedBy.toLowerCase());
+    if (appOwner !== installer) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+        message: `config.app "${declaredApp}" names an app owned by "${appOwner}", and this extension `
+          + `is being installed by "${installer}". An extension can only gate its own installer's app.` };
+    }
+  }
+  const manifestSecretKeys = computeManifestSecretKeys(manifestConfig);
+
+  // `network: { hosts, host_fields }`: the only hostnames ctx.fetch may reach, on every redirect hop
+  // too (utils/url-validator.ts allowHosts). `hosts` are bare hostnames, compared exactly;
+  // `host_fields` names config fields whose value the installer gives (extension-network-hosts.ts).
+  const network = parseNetworkDeclaration(manifest.network, capabilityDecl.list, manifestConfig, manifestSecretKeys);
+  if (!network.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: network.message };
+  const hostFieldNames = new Set((network.hostFields ?? []).map(f => f.field));
+  const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
+  // `limits.fetch_max_mb` raises this extension's ctx.fetch ceiling (4 MB when absent) up to the
+  // node's own ceiling; the record stores the clamped value, so what the installer reads on the
+  // record is what the sandbox gets. A value that is not a positive number is refused rather than
+  // ignored, because an ignored limit fails at the first large answer with nothing naming why.
+  const fetchMaxMb = manifestLimits?.fetch_max_mb;
+  if (fetchMaxMb !== undefined && (typeof fetchMaxMb !== 'number' || !Number.isFinite(fetchMaxMb) || fetchMaxMb <= 0)) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `limits.fetch_max_mb must be a positive number of megabytes (at most ${EXTENSION_FETCH_MAX_BYTES_CEILING / (1024 * 1024)}), got ${describeYamlValue(fetchMaxMb)}` };
+  }
+  const fetchMaxBytes = typeof fetchMaxMb === 'number' ? Math.min(Math.round(fetchMaxMb * 1024 * 1024), EXTENSION_FETCH_MAX_BYTES_CEILING) : undefined;
+  const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
+  const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
+
+  const record: ExtensionRecord = {
+    name: metadata.name as string,
+    // Coerced, not cast: `version: 1.0` is a number in YAML and validateManifestShape allows it.
+    version: String(metadata.version),
+    description: metadata.description as string,
+    author: metadata.author as string,
+    status: 'inactive',
+    requiredApis: (manifest.required_apis as string[]) ?? [],
+    actions: actions.map(a => {
+      const commercial = a.commercial as {
+        payMorsels?: unknown; payMoney?: unknown; plans?: unknown;
+        pricesMoney?: unknown; exchange?: unknown; usageTerms?: unknown; deliversData?: unknown;
+        provenance?: unknown; odps?: unknown;
+      } | undefined;
+      type ActionCommercial = NonNullable<ExtensionRecord['actions'][number]['commercial']>;
+      return {
+        id: a.id as string,
+        method: (a.method as string).toUpperCase(),
+        path: a.path as string,
+        inputSchema: (a.input as Record<string, unknown>) ?? {},
+        outputSchema: (a.output as Record<string, unknown>) ?? {},
+        scriptContent: scripts[a.script as string],
+        // Pricing (validated above; design notes doc-r6tyr3o).
+        ...(a.tollMorsels !== undefined ? { tollMorsels: a.tollMorsels as number } : {}),
+        ...(a.public === true ? { public: true } : {}),
+        ...(commercial ? {
+          commercial: {
+            payMorsels: (commercial.payMorsels as number | undefined) ?? 0,
+            ...(commercial.payMoney !== undefined
+              ? { payMoney: commercial.payMoney as { amount: number; currency: string } }
+              : {}),
+            ...(commercial.plans !== undefined
+              ? { plans: commercial.plans as ActionCommercial['plans'] }
+              : {}),
+            // TARGET-050: the action is the source of truth for its EXCHANGE listing.
+            ...(commercial.pricesMoney !== undefined
+              ? { pricesMoney: commercial.pricesMoney as ActionCommercial['pricesMoney'] }
+              : {}),
+            ...(commercial.exchange !== undefined ? { exchange: commercial.exchange === true } : {}), ...(typeof commercial.deliversData === 'boolean' ? { deliversData: commercial.deliversData } : {}),
+            ...(commercial.usageTerms !== undefined
+              ? { usageTerms: commercial.usageTerms as ActionCommercial['usageTerms'] }
+              : {}),
+            // ODPS: the action is also the source of its listing's Open Data Product Specification
+            // document, so the descriptor travels with the manifest that declares the capability.
+            ...(commercial.provenance !== undefined
+              ? { provenance: commercial.provenance as ActionCommercial['provenance'] }
+              : {}),
+            ...(commercial.odps !== undefined
+              ? { odps: commercial.odps as ActionCommercial['odps'] }
+              : {}),
+          },
+        } : {}),
+      };
+    }),
+    config: {
+      ...(manifestConfig
+        ? Object.fromEntries(
+            Object.entries(manifestConfig)
+              // A `type: secret` field declared WITHOUT a default has no value, and storing its
+              // descriptor in its place made `ctx.config.apiKey` the object
+              // `{ type: 'secret', description }`: truthy, so `if (ctx.config.apiKey)` passed and the
+              // extension sent "Bearer [object Object]" upstream. Leave it out; the field stays listed
+              // in __secretKeys below, and a re-install without a value keeps the stored secret.
+              .filter(([k, v]) => !(manifestSecretKeys.includes(k) && !('default' in (v as Record<string, unknown>))))
+              .map(([k, v]) => {
+                if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
+                  const d = (v as Record<string, unknown>).default;
+                  return [k, hostFieldNames.has(k) && typeof d === 'string' ? d.trim().toLowerCase() : d];
+                }
+                // A host field the manifest gives no value is not set: '', which reaches nothing.
+                if (hostFieldNames.has(k)) return [k, typeof v === 'string' ? v.trim().toLowerCase() : ''];
+                return [k, v];
+              }),
+          )
+        : {}),
+      ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
+      ...(workspaceDecl ? { [WORKSPACE_DECLARATION_KEY]: workspaceDecl } : {}),
+      ...(aiProviderDecl ? { [AI_PROVIDER_DECLARATION_KEY]: aiProviderDecl } : {}),
+      ...(capabilityDecl.list ? { [CAPABILITY_DECLARATION_KEY]: capabilityDecl.list } : {}),
+      ...(network.hosts ? { [NETWORK_HOSTS_KEY]: network.hosts } : {}),
+      ...(network.hostFields ? { [NETWORK_HOST_FIELDS_KEY]: network.hostFields } : {}),
+      ...(usesSecrets.uses.length ? { [USES_SECRETS_KEY]: usesSecrets.uses } : {}),
+      // Record which config fields are `type: 'secret'` so the route can encrypt their values
+      // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
+      // lost by the flatten above). See services/extension/secrets.ts.
+      ...(manifestSecretKeys.length ? { [SECRET_KEYS_FIELD]: manifestSecretKeys } : {}),
+    },
+    limits: {
+      memoryMb: Math.min((manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb, config.extensionMaxMemoryMb),
+      timeoutMs: Math.min((manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs, config.extensionTimeoutMs),
+      maxApiCalls: Math.min((manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls, config.extensionMaxApiCalls),
+      ...(fetchMaxBytes !== undefined ? { fetchMaxBytes } : {}),
+    },
+    federation: {
+      advertise: (manifestFederation?.advertise as boolean) ?? false,
+      capabilities: (manifestFederation?.capabilities as string[]) ?? [],
+    },
+    ...(manifestInstances?.supported ? {
+      instances: {
+        supported: true,
+        configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
+      },
+    } : {}),
+    installedBy,
+    installedAt,
+  };
+
+  // Non-blocking: the extension installs either way, the author just learns now instead of in
+  // production. See SANDBOX_CAPABILITY_WARNINGS.
+  const warnings = scanSandboxCapabilityWarnings(scripts);
+  if (strippedConfigKeys.length) {
+    warnings.push(
+      `config: ignored ${strippedConfigKeys.join(', ')} — these keys belong to the node and cannot be `
+      + 'set from a manifest. __-prefixed keys are written from the manifest\'s own schedules and '
+      + 'secret fields; emailPolicy is granted by the node operator.');
+  }
+  return warnings.length ? { ok: true, record, warnings } : { ok: true, record };
+}

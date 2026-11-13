@@ -49,7 +49,7 @@
  */
 import type { ContentLabelKind, ContentLabelRow, ContentLabelSuggestion } from '../../storage/interface.js';
 import { agentBarred } from '../organism-agent-access.js';
-import { isOrgManager } from '../workspace-access.js';
+import { isOrgManager } from '../workspace/access.js';
 import { audienceCheck } from './audience.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
 import { ClassificationError, type ClassificationDeps, type LabelActor } from './labels.js';

@@ -24,7 +24,7 @@ import http from 'node:http';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { appendToDocument, WorkspaceDocError } from '../../src/services/workspace-doc-edit.js';
+import { appendToDocument, WorkspaceDocError } from '../../src/services/workspace/doc-edit.js';
 import { memoryRouter } from '../../src/routes/memory.js';
 
 const ORG = '7c2a1e4b-3d5f-4a6b-8c9d-0e1f2a3b4c5d';

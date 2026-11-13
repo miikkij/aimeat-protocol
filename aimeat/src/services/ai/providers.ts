@@ -216,7 +216,7 @@ function readSpeechPcm(v: Record<string, unknown>, c: AiCapability, entry: Provi
   }
 }
 
-/** An extension's name, as the extension manifest allows it (services/extension-manifest.ts), with
+/** An extension's name, as the extension manifest allows it (services/extension/manifest.ts), with
  *  the optional `<owner>/` of a name in the owner's namespace (services/component-address.ts). */
 const EXTENSION_NAME_RE = /^(?:[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\/)?[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 

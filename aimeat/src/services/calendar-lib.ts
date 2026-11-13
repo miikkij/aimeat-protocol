@@ -8,7 +8,7 @@
  *   browser runs and no second calendar exists.
  *
  *   Two callers: the ICS feed of a shared record space (services/calendar-feed.ts) and the calendar
- *   host calls of an extension (services/extension-calendar.ts).
+ *   host calls of an extension (services/extension/calendar.ts).
  *
  *   Moved out of calendar-feed.ts unchanged when the extension host calls became its second
  *   caller; the interface below names the functions the two use.

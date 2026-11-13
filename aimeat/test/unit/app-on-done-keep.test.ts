@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The ext:invoke step for published apps whose AI jobs bind `on_done`
- *   (services/app-on-done-keep-migration.ts), and the publish check that reads the same call
- *   (services/app-scope-needs.ts, rule 'ai-job-on-done').
+ *   (services/app/on-done-keep-migration.ts), and the publish check that reads the same call
+ *   (services/app/scope-needs.ts, rule 'ai-job-on-done').
  *
  *   secaudit 2026-10 made an AI job's on_done ask ext:invoke of a caller that is not the owner in
  *   person. An app grant holds what its app asks for and its owner cannot add a word, so an app that
@@ -29,11 +29,11 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
-import { keepOnDoneForAppsOnce, APP_ON_DONE_KEEP_KEY } from '../../src/services/app-on-done-keep-migration.js';
-import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app-scope-allowance-store.js';
-import { undeclaredScopeNeeds } from '../../src/services/app-scope-needs.js';
+import { keepOnDoneForAppsOnce, APP_ON_DONE_KEEP_KEY } from '../../src/services/app/on-done-keep-migration.js';
+import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app/scope-allowance-store.js';
+import { undeclaredScopeNeeds } from '../../src/services/app/scope-needs.js';
 import { readAccountEvents } from '../../src/services/account-events.js';
-import { readAppAudit } from '../../src/services/app-audit.js';
+import { readAppAudit } from '../../src/services/app/audit.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 
 const NODE_ID = 'aimeat-app-on-done-keep';

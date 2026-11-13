@@ -110,7 +110,7 @@ const DUPLICATE_PROOF_MESSAGE =
  *    ContributionProof records, so a connector-written proof could never reach `proven_models`, which
  *    is the one place a proof is meant to show up.
  * 3. It wrote under the calling agent's own GAII. Both records belong to the OWNER GHII
- *    (services/contribution-proofs.ts, services/app-template-proposals.ts), and a second ledger for
+ *    (services/contribution-proofs.ts, services/app/template-proposals.ts), and a second ledger for
  *    the same pack hides the first: the reader keys proofs by packId, last record read wins.
  *
  * The append costs a read, so this path needs `memory:read` as well as the tool's `memory:write`.
@@ -361,7 +361,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             const found = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
             // The listing leaves out hidden, unlisted and (for a visitor) community apps; an app behind an
             // access code is listed with `protected`, and its detail is its owner's, as the node's MCP
-            // aimeat_app_get answers it (services/app-visibility.ts; QA audit W15).
+            // aimeat_app_get answers it (services/app/visibility.ts; QA audit W15).
             const ownApp = !!found && (config.owner === found.owner || String(config.owner).startsWith(`${String(found.owner)}@`));
             const app = found && (found.protected !== true || ownApp) ? found : undefined;
             if (!app) {

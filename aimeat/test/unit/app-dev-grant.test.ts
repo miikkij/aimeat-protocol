@@ -18,13 +18,13 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { GHIIRecord, Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { putMember, getMemberRow } from '../../src/services/app-members.js';
+import { putMember, getMemberRow } from '../../src/services/app/members.js';
 import {
   APP_DEV_LEVELS, actsFor, mayAct, levelName, parseDevLevel,
   putDevGrant, getDevGrant, removeDevGrant, listDevGrants,
   putBlanketGrant, listBlanketGrants, removeBlanketGrant,
   effectiveDevLevel, resolveAppTarget, ownAppScope,
-} from '../../src/services/app-dev-grant.js';
+} from '../../src/services/app/dev-grant.js';
 
 const NODE = 'node-x';
 const config = { nodeId: NODE } as AimeatConfig;

@@ -5,13 +5,13 @@
  * @description Opening an app that needs a sign-in (plan doc-mvcn6c7e4e5q, V2.2 and V2.3).
  *
  *   An app's own setting (`open_to`: signed-in, or one organism's members) or the node's signed-in
- *   content access decides who may open it (services/app-access.ts). A browser that opens an app
+ *   content access decides who may open it (services/app/access.ts). A browser that opens an app
  *   carries no session on the page load, because the SPA keeps it in localStorage. So the app origin
  *   and the apex read send such a browser to /v1/app-open, the SPA page that holds the session; the
  *   page signs the person in if needed and asks POST /v1/apps/:owner/:filename/open with it. This
  *   route checks who the caller is, and answers the address to open: the app's origin (or the apex
  *   inline address on a node without app origins) with a short-lived grant the origin verifies
- *   (services/app-access-token.ts). The grant names the app and nothing else, as for an access code.
+ *   (services/app/access-token.ts). The grant names the app and nothing else, as for an access code.
  *
  *   signInGateRefused() is the same decision for GET /v1/apps/:owner/:filename (routes/apps/read.ts),
  *   which also takes a grant this route handed out, so the apex inline address works the same way.
@@ -39,11 +39,11 @@ import type { Storage, AppRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { answerAccessRequest, answerAccessRequestState, type AccessRequestTarget } from '../access-request.js';
-import { appNeedsSignIn, mayOpenApp } from '../../services/app-access.js';
-import { signInGateOf, SIGN_IN_REFUSAL, type AppReader } from '../../services/app-read-gate.js';
+import { appNeedsSignIn, mayOpenApp } from '../../services/app/access.js';
+import { signInGateOf, SIGN_IN_REFUSAL, type AppReader } from '../../services/app/read-gate.js';
 import { isNodeAccount } from '../../services/audience.js';
-import { appIsPaced } from '../../services/app-pacing.js';
-import { appAccessGranted, appShotGranted, generateAppAccessToken, generateAppShotToken } from '../../services/app-access-token.js';
+import { appIsPaced } from '../../services/app/pacing.js';
+import { appAccessGranted, appShotGranted, generateAppAccessToken, generateAppShotToken } from '../../services/app/access-token.js';
 import { operatorOverride } from '../../services/operator-override.js';
 import { appAccessTarget } from '../../services/organism-join-requests/access-targets.js';
 import { validateBody } from '../../models/schemas.js';
@@ -80,7 +80,7 @@ export async function signInGateRefused(
 }
 
 /**
- * The caller of an apex app read, for services/app-read-gate.ts. `app` names the app whose opening
+ * The caller of an apex app read, for services/app/read-gate.ts. `app` names the app whose opening
  * grant (`?access=`) counts; without it no grant is read.
  */
 export function appReaderOf(

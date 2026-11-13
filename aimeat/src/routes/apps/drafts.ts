@@ -72,27 +72,27 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { generateFrameToken } from '../../services/draft-token.js';
-import { mintDraftPreview } from '../../services/app-draft-preview.js';
+import { mintDraftPreview } from '../../services/app/draft-preview.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
-import { stageAppDraft, discardAppDraft, publishAppDraft } from '../../services/app-lifecycle.js';
-import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';
+import { stageAppDraft, discardAppDraft, publishAppDraft } from '../../services/app/lifecycle.js';
+import { servedMarksResponse } from '../../services/app/serve-marks-strip.js';
 import {
     writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
-} from '../../services/app-draft-edit.js';
+} from '../../services/app/draft-edit.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
-import { isSharedApp } from '../../services/app-dev-grant.js';
-import { roadmapGate } from '../../services/app-roadmap.js';
-import { presentAppManifest } from '../../services/app-pacing.js';
+import { isSharedApp } from '../../services/app/dev-grant.js';
+import { roadmapGate } from '../../services/app/roadmap.js';
+import { presentAppManifest } from '../../services/app/pacing.js';
 import { callerOf } from '../../middleware/caller.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
-import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
-import { draftNoticeFrom } from '../../services/app-news.js';
+import { publishAskedFields, askedStatus } from '../../services/app/publish-gate.js';
+import { draftNoticeFrom } from '../../services/app/news.js';
 import type { AppDraftNotice } from '../../storage/interface.js';
-import { appDisplayVersionRefusal } from '../../services/app-display-version.js';
-import { publishingAppOf } from '../../services/app-published-by-app.js';
+import { appDisplayVersionRefusal } from '../../services/app/display-version.js';
+import { publishingAppOf } from '../../services/app/published-by-app.js';
 
 /**
  * The body's `notice` (what the draft changes) as the record the slot keeps: undefined when not sent,
@@ -162,7 +162,7 @@ export function registerDraftRoutes(
         if (version === false) return;
 
         // The filename rule, the size cap and the manifest that inherits from the live app are
-        // services/app-lifecycle.ts — the same function aimeat_app_draft_save calls. This route maps
+        // services/app/lifecycle.ts — the same function aimeat_app_draft_save calls. This route maps
         // its JSON body onto that one shape and nothing more.
         const staged = await stageAppDraft(storage, config, {
             ownerName: owner,
@@ -410,7 +410,7 @@ export function registerDraftRoutes(
         const t = await appTargetOr(appTarget, config, req, res, 'draft');
         if (!t) return;
         const { owner, ownerGhii } = t;
-        // The token and the URL are services/app-draft-preview.ts, shared with aimeat_app_draft_save.
+        // The token and the URL are services/app/draft-preview.ts, shared with aimeat_app_draft_save.
         const out = await mintDraftPreview(storage, config, { owner, ownerGhii, filename });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
@@ -539,7 +539,7 @@ export function registerDraftRoutes(
         if (version === false) return;
 
         // The promotion — the draft manifest mapped onto the publish input, publishApp, and the slot
-        // cleared afterwards — is services/app-lifecycle.ts, shared with aimeat_app_draft_publish.
+        // cleared afterwards — is services/app/lifecycle.ts, shared with aimeat_app_draft_publish.
         // The draft manifest IS the caller's statement, so every field it can express is passed as
         // stated; what it CANNOT express (the pacing amount, licence, per-locale descriptions) is left
         // unmentioned and carried from the live app.

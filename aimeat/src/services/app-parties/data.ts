@@ -17,11 +17,11 @@
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { rosterContext, rosterBucketOf, type RosterCaller } from '../app-roster-context.js';
-import { done, refuse, type AppOpOutcome } from '../app-op-outcome.js';
-import { tokenOfThisApp } from '../app-record-keys.js';
+import { rosterContext, rosterBucketOf, type RosterCaller } from '../app/roster-context.js';
+import { done, refuse, type AppOpOutcome } from '../app/op-outcome.js';
+import { tokenOfThisApp } from '../app/record-keys.js';
 import { DATA_KEY_RE, MAX_PARTY_COLLECTIONS, MAX_PARTY_VALUE_BYTES, PARTY_DATA_PREFIX, partyDataKey, sharedDataKey } from './contract.js';
-import { appKeySegment } from '../app-record-keys.js';
+import { appKeySegment } from '../app/record-keys.js';
 import { updateRecord } from '../record-cas.js';
 import type { AppPartyCtx } from './service.js';
 

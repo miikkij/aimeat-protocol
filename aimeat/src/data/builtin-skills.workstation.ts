@@ -11,7 +11,7 @@
  *   base64 images inlined into the source, one line 294 490 characters long. Its author's small
  *   changes went from about five minutes to about forty over two days, and the cause was in his
  *   file rather than in the node — the median app here is 39 kB and the second largest is 0.64 MB.
- *   The publish response now measures this (services/app-size-health.ts) and its `note` names this
+ *   The publish response now measures this (services/app/size-health.ts) and its `note` names this
  *   skill, so this is where the measurement leads.
  *
  *   WHY A SKILL RATHER THAN MORE BUILD PROMPT. /v1/prompts/build-app is 89 kB and grew 21% in one

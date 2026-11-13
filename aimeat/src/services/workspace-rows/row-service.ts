@@ -92,8 +92,8 @@ import type {
   Storage, WorkspaceRowRecord, WorkspaceRowStats, WorkspaceRowRevision,
 } from '../../storage/interface.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
-import { decideWorkspaceRead } from '../workspace-access.js';
-import { readWorkspaceManifest, isRowBackedSpace } from '../workspace-meta.js';
+import { decideWorkspaceRead } from '../workspace/access.js';
+import { readWorkspaceManifest, isRowBackedSpace } from '../workspace/meta.js';
 import { emitChange, emitRowsAppended } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { rowTarget } from '../classification/labels.js';
@@ -133,7 +133,7 @@ export interface RowCaller {
   app?: string;
   /**
    * For an extension writing through `ctx.workspace.appendRows`: its installed name. Set only by
-   * services/extension-workspace.ts, never from a request, and `owner` is then the installer.
+   * services/extension/workspace.ts, never from a request, and `owner` is then the installer.
    */
   extension?: string;
   /**
@@ -259,7 +259,7 @@ async function authorizeApp(
  * membership would put the owner's whole authority on a clock, which the scope guard on the
  * attended road exists to refuse. So an extension reaches a row space only when (1) the ORGANISM
  * named the extension in the space's `extensions` list as `installer/name`, (2) its manifest declared `workspace.rows`,
- * which services/extension-workspace.ts checked before the call arrived and the install approval
+ * which services/extension/workspace.ts checked before the call arrived and the install approval
  * showed, and (3) its INSTALLER is an active member. It appends to and reads that space; every other
  * space, and every record and document surface, stays closed to it. Decided 2026-10-08 so an alert
  * ingest on a schedule can fill a SOC queue (aimeat-soc).
@@ -321,7 +321,7 @@ async function authorizeReceiver(
 /**
  * A READ meets the workspace read decision, the same one the records loader makes.
  *
- * Membership opens the organism, not the workspace: the records path (services/workspace-access.ts
+ * Membership opens the organism, not the workspace: the records path (services/workspace/access.ts
  * decideWorkspaceRead) asks on top of it whether the caller may read THIS workspace's manifest, as
  * its creator, as the same owner, as an organism manager, or on a viewer or contributor grant. Rows
  * asked only the namespace rule, which for a person signed in as themselves is active membership

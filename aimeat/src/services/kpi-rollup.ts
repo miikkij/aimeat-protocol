@@ -25,7 +25,7 @@
  *     holds a dot is aggregated under its whole id; it was left out (secaudit2026oct31w2 round 10b).
  */
 import type { MemoryRecord } from '../storage/interface.js';
-import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace/record-key.js';
 
 export type KpiAgg = 'sum' | 'count' | 'avg' | 'min' | 'max';
 

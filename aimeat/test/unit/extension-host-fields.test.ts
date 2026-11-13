@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A host the installer answers instead of the author (manifest `network.host_fields`,
- *   services/extension-network-hosts.ts), so one package bundle serves every buyer:
+ *   services/extension/network-hosts.ts), so one package bundle serves every buyer:
  *   - the built record keeps the field, and ctx.fetch reaches the declared hosts plus the field's
  *     value, and is refused any other host with `Fetch blocked:`;
  *   - a value with a scheme, a path, a wildcard or two names is refused when it is set, at build,
@@ -34,12 +34,12 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     };
 });
 
-const { buildExtensionRecordFromManifest } = await import('../../src/services/extension-manifest.js');
-const { capabilitiesOfRecord } = await import('../../src/services/extension-capability-declaration.js');
-const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
-const { parseHostFieldValue, carryHostFieldValues, NETWORK_HOST_FIELDS_KEY, HOST_FIELDS_UNVETTED_KEY } = await import('../../src/services/extension-network-hosts.js');
-const { declaresHost } = await import('../../src/services/extension-secret-uses.js');
-const { setExtensionConfig } = await import('../../src/services/extension-config-set.js');
+const { buildExtensionRecordFromManifest } = await import('../../src/services/extension/manifest.js');
+const { capabilitiesOfRecord } = await import('../../src/services/extension/capability-declaration.js');
+const { buildExtensionCtx } = await import('../../src/services/extension/ctx.js');
+const { parseHostFieldValue, carryHostFieldValues, NETWORK_HOST_FIELDS_KEY, HOST_FIELDS_UNVETTED_KEY } = await import('../../src/services/extension/network-hosts.js');
+const { declaresHost } = await import('../../src/services/extension/secret-uses.js');
+const { setExtensionConfig } = await import('../../src/services/extension/config-set.js');
 const { questionsOf } = await import('../../src/services/packages/compose/package-config-needs.js');
 const { planPackageConfig } = await import('../../src/services/packages/compose/package-config.js');
 const { packageCapabilities } = await import('../../src/services/packages/install/package-capabilities.js');

@@ -123,30 +123,30 @@ import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.j
 import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { captureAppScreenshot } from '../../services/screenshot-capture.js';
-import { storeAppScreenshot, clearAppScreenshot, type AppScreenshotGate } from '../../services/app-screenshot-store.js';
-import { listAppVersionsView } from '../../services/app-versions.js';
+import { storeAppScreenshot, clearAppScreenshot, type AppScreenshotGate } from '../../services/app/screenshot-store.js';
+import { listAppVersionsView } from '../../services/app/versions.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
-import { generateAppAccessToken } from '../../services/app-access-token.js';
+import { generateAppAccessToken } from '../../services/app/access-token.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { ownerCoordinate, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';
-import { applyServeMarks } from '../../services/app-serve-marks.js';
-import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
-import { appToolNames } from '../../services/app-tool-names.js';
-import { appAiUse } from '../../services/app-ai-use.js';
-import { appInfoMarkFor } from '../../services/app-news.js';
+import { applyServeMarks } from '../../services/app/serve-marks.js';
+import { servedBadgeOn, appReviewedBy } from '../../services/app/marks.js';
+import { appToolNames } from '../../services/app/tool-names.js';
+import { appAiUse } from '../../services/app/ai-use.js';
+import { appInfoMarkFor } from '../../services/app/news.js';
 import { internetOpenMarkFor } from '../../services/internet-opening/opening-mark.js';
 import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
-import { appOfRequestOrigin } from '../../services/app-origin-target.js';
+import { appOfRequestOrigin } from '../../services/app/origin-target.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appContentType } from '../../utils/app-content-type.js';
 import { servedPageLocale } from '../../i18n.js';
-import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
+import { collectAppLineage, resolveAppStatus } from '../../services/app/lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
-import { currentAppRow } from '../../services/app-served-protection.js';
+import { currentAppRow } from '../../services/app/served-protection.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent/face.js';
-import { formatMdLang } from '../../services/app-format-md.js';
+import { formatMdLang } from '../../services/app/format-md.js';
 import { appOriginUrl, appTargetOr, withForwardedQuery, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { runnableAnswer, sendFrameHost, sandboxedCsp, withFrameShim, type RunnableAnswer } from './inline-frame.js';
 import { logger } from '../../utils/logger.js';
@@ -158,10 +158,10 @@ import { visitSignals } from '../../utils/visit-signals.js';
 import { ownerTagsFor, withOwnerTags } from '../../services/visibility/analytics-tags.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
-import { appIsPaced, appToll } from '../../services/app-pacing.js';
-import { appNeedsSignIn } from '../../services/app-access.js';
+import { appIsPaced, appToll } from '../../services/app/pacing.js';
+import { appNeedsSignIn } from '../../services/app/access.js';
 import { signInGateRefused, screenshotGateRefused, screenshotFollowsAccess, appReaderOf } from './open.js';
-import { hiddenFromReader } from '../../services/app-read-gate.js';
+import { hiddenFromReader } from '../../services/app/read-gate.js';
 import { accessCodeUnlockPage } from './access-code-page.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
@@ -184,9 +184,9 @@ export function registerReadRoutes(
     };
 
     // GET /v1/apps/:owner/:filename/versions — List all versions
-    // The owner segment, the lookup, the gates and the list are services/app-versions.ts, shared with
+    // The owner segment, the lookup, the gates and the list are services/app/versions.ts, shared with
     // MCP. The caller is read (optionalAuth) so the app's owner, an account the app opens for and an
-    // operator pass the gates the app read asks (services/app-read-gate.ts).
+    // operator pass the gates the app read asks (services/app/read-gate.ts).
     router.get('/v1/apps/:owner/:filename/versions', optionalAuth(), async (req, res) => {
         const filename = req.params.filename as string;
         let operatorRead: boolean | undefined;
@@ -345,7 +345,7 @@ export function registerReadRoutes(
         ]));
     });
 
-    // Validation, storage and the change event are services/app-screenshot-store.ts, shared with MCP.
+    // Validation, storage and the change event are services/app/screenshot-store.ts, shared with MCP.
     router.post('/v1/apps/:owner/:filename/screenshot', requireAuth(), requireScope('app:write'), async (req, res) => {
         const body = req.body ?? {};
         const out = await storeAppScreenshot(storage, {
@@ -411,7 +411,7 @@ export function registerReadRoutes(
             }
             // The token is scoped to one filename and one owner; the URL must name both. Without per-app
             // origins the URL decides the app address the draft runs at, and every preview_url names the
-            // draft owner (services/app-draft-preview.ts; secaudit2026oct22).
+            // draft owner (services/app/draft-preview.ts; secaudit2026oct22).
             if (claim.filename !== filename || !isSameAccount(claim.sub, owner)) {
                 res.status(403).json(error(config.nodeId, 'TOKEN_INVALID', 'Draft preview token does not match this app'));
                 return;
@@ -684,10 +684,10 @@ export function registerReadRoutes(
         const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
         setProvenanceHeaders(res, prov);
         const locale = servedPageLocale(req, config.siteLinks?.defaultLocale);
-        // The "Use with your AI" mark rides with the visible chrome (services/app-ai-use.ts).
+        // The "Use with your AI" mark rides with the visible chrome (services/app/ai-use.ts).
         const aiUse = (runnable && isHtml) ? await appAiUse(storage, config, app) : null;
         // The app-info mark rides on the live version only: a page pinned to ?version= is not
-        // reloaded onto a newer one (services/app-news.ts, public/js/app-news.js).
+        // reloaded onto a newer one (services/app/news.ts, public/js/app-news.js).
         const info = (runnable && isHtml && !version) ? await appInfoMarkFor(storage, config, app, locale) : undefined;
         let body = (runnable && isHtml)
             // The visible label rides ONLY on the inline (runnable) form. A raw download stays
@@ -696,7 +696,7 @@ export function registerReadRoutes(
                 // `isHtml` is already true on this branch, so the marks pass does not have to
                 // infer it from a closing tag a single-file app is under no obligation to write.
                 isDocument: true,
-                // The node's switch, then the owner's (services/app-marks.ts); on unless one is off.
+                // The node's switch, then the owner's (services/app/marks.ts); on unless one is off.
                 badge: servedBadgeOn(config, app.manifest),
                 provenance: prov,
                 aiUse: aiUse ? { use: aiUse, locale } : undefined,

@@ -1134,7 +1134,7 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
     const pendingOf = (ws: string, doc: string, slot: string) => `organism.${ORG}.w.${ws}.living-pending.${doc}__${slot}.latest`;
 
     // A workspace record in a space its manifest does not declare is refused with 422 UNDECLARED_SPACE
-    // (services/workspace-write-items.ts, 2026-09-13), and production's living deploy declares its
+    // (services/workspace/write-items.ts, 2026-09-13), and production's living deploy declares its
     // spaces before writing (public/js/services/living.js livingObjectTypes). So each workspace declares
     // the three spaces this seeding writes through POST /v1/memory, first. living-slot, living-pending,
     // living-ledger and living-hist are left out: the pulse writes those straight through storage.

@@ -209,7 +209,7 @@ export function monthWindow(month: string): { from: string; to: string; days: nu
  */
 /**
  * Which workspace shares count as public, in both rings: the rule every surface decides a shared
- * page's AI label with (services/workspace-share.ts shareIsOpen), stated where the counts are read.
+ * page's AI label with (services/workspace/share.ts shareIsOpen), stated where the counts are read.
  */
 const SHARES_OPEN_ONLY: ComplianceLimit = {
   code: 'shares-open-only',

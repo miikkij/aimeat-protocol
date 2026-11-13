@@ -101,7 +101,7 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { checkScopeAddition, recordScopeAddition } from '../../services/agent/scope-add.js';
-import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
+import { READ_THROUGH_SCOPE } from '../../services/app/grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { executeHooks } from '../../services/hooks.js';

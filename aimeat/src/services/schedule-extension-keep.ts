@@ -12,7 +12,7 @@
  *   time. The ruling of this round is that a use that worked keeps working: the security fix closes
  *   the way in, it does not take away what already ran. An app has no permission page where the owner
  *   presses Allow, so the schedule keeps its fire here instead, as an app published before 4.0.x keeps
- *   its words (services/app-scope-allowance.ts).
+ *   its words (services/app/scope-allowance.ts).
  *
  *   WHICH SCHEDULES. Only the ones that existed when this node first started with the rule: an
  *   `extension` schedule whose maker is an app or an ecosystem app, live at that start and not holding

@@ -20,9 +20,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
-import { executeExtensionAction } from '../../src/services/extension-runtime.js';
-import type { ExtensionCtx, ExtensionLimits } from '../../src/services/extension-runtime.js';
+import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
+import { executeExtensionAction } from '../../src/services/extension/runtime.js';
+import type { ExtensionCtx, ExtensionLimits } from '../../src/services/extension/runtime.js';
 import { loadConfig } from '../../src/config.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

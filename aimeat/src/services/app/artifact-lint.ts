@@ -1,0 +1,826 @@
+/**
+ * @file src/services/app/artifact-lint.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What the node checks about an app's BYTES at publish, and the three findings it
+ *   refuses to publish over.
+ *
+ *   THE PUBLISH THIS WAS WRITTEN AGAINST (aimeat.io, 2026-08-11). An app went live loading
+ *   /lib/aimeat-auth.js and /lib/aimeat-data.js — both 404, the real path is /v1/libs/ — so it
+ *   threw before drawing anything. Nothing in the publish path looked at the file. The response
+ *   said "published", the catalogue card appeared, and the failure was discovered by opening it.
+ *
+ *   BLOCKING IS FOR "THIS CANNOT WORK", NEVER FOR "THIS COULD BE BETTER". Two findings block on
+ *   that ground: an inline `<script>` that does not parse, and an asset URL this node answers 404
+ *   for. Both are claims about the bytes that can be PROVEN here, and both mean the app is broken
+ *   for every visitor the moment it goes live. Everything else warns, for the same reason the
+ *   AI-disclosure check warns (decision D2): a publish that fails is a publish that gets worked
+ *   around.
+ *
+ *   THE ONE EXCEPTION IS THE REGISTER (v1.3.0), and it blocks on a different ground: a decision
+ *   rather than a proof. Every Atelier app built from the bare shell came out as stacked sections
+ *   in the default look, and the owner ruled that it must never happen again. So an Atelier app
+ *   names the register it committed to — `<meta name="aimeat-register">` carrying a genre id, a
+ *   Design Book part id or `custom:<name>` — and one that does not, or still carries the shell's
+ *   REPLACE-ME placeholder, is refused. The shell carries the placeholder ON PURPOSE: the frame
+ *   fails the gate, a fork of a genre passes it by construction.
+ *
+ *   THE PROBE FAILS OPEN ON INFRASTRUCTURE AND CLOSED ON EVIDENCE. Only a completed HTTP exchange
+ *   answering 404/410 blocks. A timeout, a refused connection, a 5xx or a disabled probe produces
+ *   NO finding: the node then has no evidence about that URL, and blocking a publish on the node's
+ *   own network trouble would be a gate that fires when it is least useful. The probe only ever
+ *   asks THIS node about its own paths — the destination is 127.0.0.1 on the node's own port, never
+ *   a host taken from the uploaded HTML — so an app cannot make a publish reach anywhere.
+ * @structure
+ *   - AppArtifactFinding / AppArtifactLintResult — the shapes a publish response carries
+ *   - lintAppArtifact(html, config) — the whole check: blocking[] + warnings[]
+ *   - checkInlineScripts / checkUnparsedModules / collectAssetRefs / probeNodeAssets / checkRegister /
+ *     checkTheme / checkMetas / checkAgentDataReads — one concern each
+ * @usage
+ *   import { lintAppArtifact } from './artifact-lint.js';
+ *   const { blocking, warnings } = await lintAppArtifact(html, config);
+ *   if (blocking.length) return refusal;
+ * @version-history
+ *   (2026-11-08) A straight genre fork publishes quietly: hardcoded-theme-colors stands down for an
+ *     Atelier page drawn in `--ak-*` tokens or declaring `aimeat-light`, and names the Atelier fix
+ *     when it does speak; the daisyUI half of track-mixing ignores a class the page defines in its
+ *     own styles. 22 of 24 genres drew one or both (test/unit/app-artifact-lint-genres.test.ts).
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
+ *   2026-10-31 — Refuses a page that calls AIMEAT.atelier without loading the kit (app-lint-kit-loaded.ts; v28 #13).
+ *   2026-10-27 — collectAssetRefs reads the tags with one linear scan (utils/html-tag-scan.ts), not a
+ *     `[^>]*` pattern per opener (secaudit2026oct26, collectAssetRefs:unclosed-tag-quadratic-scan).
+ *   2026-10-25 — A dead cortex lib path gets one sentence on the owner's namespace, where a cortex installed since then loads from (secaudit2026oct22).
+ *   2026-10-17 — The two inline-js-does-not-parse messages give a node command a builder can run, not
+ *     `pnpm check:js-syntax`, which exists only in this repository (pitfall-list round).
+ *   2026-10-13 — undeclared-scope-words: a warning naming each word the code (and the cortex libs it loads,
+ *     read from this node) needs on a 4.0 node and the sign-in does not ask for (services/app-scope-needs.ts).
+ *   2026-10-02 — Classic with kit blocks is a case of its own (wish-a-classic-app-that-loads-the-
+ *     atelier-kit-for-its-library-blo): `aimeat-track` classic plus the kit is silent when the page
+ *     calls into AIMEAT.atelier and draws no shell. The track-mixing warning stays for a Classic
+ *     page that draws the shell (`atelier.app(`) and for one that loads the kit and calls nothing
+ *     in it, and neither tells a page using blocks to drop the kit any more. The register refusal
+ *     of a page with the kit and no track line names `content="classic"` as the fix for a page that
+ *     only uses blocks; the refusal itself is unchanged.
+ *   2026-09-19 — checkRegister stands down for a page whose owner chose the level "proto" or
+ *     "plain" (`<meta name="aimeat-level">`, app-build-level.ts). Ruled the same day: the default
+ *     look is refused unless the owner chose that level themselves.
+ *   2026-09-19 — loadsAtelierKit is exported, for the track-drift check the publish runs beside
+ *     this one.
+ *   v1.5.1 — 2026-09-19 — A warning when `aimeat-app` still holds the shell's REPLACE placeholder.
+ *   v1.5.0 — 2026-09-13 — checkServedCopy is gone. The developer decided that a served copy is
+ *     stored as its source: services/app-publish.ts removes the node's serve marks before this check
+ *     runs and names them in the publish response (services/app-serve-marks-strip.ts), which
+ *     replaces the warning that told the builder to fetch the raw download instead.
+ *   v1.4.0 — 2026-09-13 — Four warnings the publish response owed its builders, all from appdev
+ *     pitfall triage. An aimeat-scopes word the node cannot grant is named (one such word refuses
+ *     the whole sign-in, so nobody could sign in and the publish said nothing), and an empty
+ *     aimeat-scopes counts as declaring nothing. An upload carrying the node's own serve marks is
+ *     told it is a served copy and where the raw download is (checkServedCopy). A type="module"
+ *     block the parser skipped now says it was not parsed instead of passing in silence. And the
+ *     cdn-libs-blocked sentence stops claiming the app CSP allows this node only, which it does not.
+ *   v1.3.1 — 2026-09-06 — Three CodeQL findings on this file, one of them a hole. The asset probe
+ *     no longer resolves the uploaded path against a base URL: `new URL('/\\host/x', base)` moves
+ *     the request to `host`, because a backslash is a slash in a special scheme, so an app could
+ *     aim the node's own probe outward (alert 1612). The destination is now built from the port
+ *     alone and the path reaches it through the pathname and search setters, which cannot change
+ *     the host. The `rel="…stylesheet…"` and `@media … prefers-color-scheme` matches were rewritten
+ *     without their two-sided unbounded runs (alerts 1607, 1608): same answers, linear time.
+ *   v1.3.0 — 2026-09-05 — checkRegister, the third blocking finding (atelier-register): an
+ *     Atelier app with no `aimeat-register` meta, with the shell's REPLACE-ME placeholder, or
+ *     with a custom register that is not a name. Read on the declared track, and on the kit
+ *     loaded with no track declared, so dropping the track line is not a way past. declaredTrack
+ *     is extracted from checkTrackMixing so both read the head the same way.
+ *   v1.2.1 — 2026-08-28 — atelier.app() counts as mounting the login pill. The Atelier shell mounts
+ *     it internally (sdk-libs/atelier/shell.js), so the pill and the language switch exist without
+ *     either verb appearing in the app's bytes — and the first AEB bench run (phase 3) flagged all
+ *     three correct Atelier builds. Found by the measurement, not by a reader.
+ *   v1.2.0 — 2026-08-27 — checkTrackMixing (TARGET-074): the two build tracks have separate guides
+ *     that never cross-reference, and this is the seam where a mixed app would land unnoticed. Four
+ *     warnings, same declared-vs-actual shape as v1.1.0: Classic declared with the Atelier kit
+ *     loaded, Atelier declared with the kit missing, daisyUI class markup in an Atelier app outside
+ *     the section escape hatch, and the kit loaded with no track declared at all.
+ *   v1.1.0 — 2026-08-15 — checkDeclaredButUnused: an auth library loaded with no pill mounted, a
+ *     locales meta with nothing that switches language, daisyUI linked with no daisyUI class. One
+ *     run shipped all three at once, and the two findings the publish DID return were fixed on the
+ *     spot — which is the argument for checking these, not a comment on whoever built it.
+ *   v1.0.0 — 2026-08-11 — initial: inline-JS parse + dead node asset URL (blocking); theme tokens,
+ *     the head declarations and unscoped reads of agent-written data (warnings).
+ */
+import type { AimeatConfig } from '../../config.js';
+import { extractInlineScripts, moduleGoalAvailable, parseSource, selfTest } from '../../utils/inline-script-parse.js';
+import { logger } from '../../utils/logger.js';
+import { APP_GRANTABLE_SCOPES } from './grant-vocabulary.js';
+import { registerIsOwed } from './build-level-meta.js';
+import { undeclaredScopeFindings } from './scope-needs.js';
+import { readTextCapped } from '../../utils/read-capped.js';
+import { tagAttributes } from '../../utils/html-tag-scan.js';
+import { kitCalledButNotLoaded, KIT_NOT_LOADED_MESSAGE } from './lint-kit-loaded.js';
+
+/** The most of one cortex lib the scope check reads; a larger one is not read (its calls are not seen). */
+const LIB_READ_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * One finding, shaped so an agent can act on it without prose parsing: a curated pitfall id, the
+ * URL that explains it in full, and a message written for whoever built the app.
+ */
+export interface AppArtifactFinding {
+  /** A curated appdev-pitfall id — GET /v1/appdev/pitfalls/{pitfall} has the full entry. */
+  pitfall: string;
+  severity: 'critical' | 'warn';
+  message: string;
+  /** Where the full entry lives. Node-relative, like every other link in a publish response. */
+  url: string;
+}
+
+export interface AppArtifactLintResult {
+  /** Proven-broken. The publish is refused and these are the reasons. */
+  blocking: AppArtifactFinding[];
+  /** Worth fixing. The app publishes anyway. */
+  warnings: AppArtifactFinding[];
+}
+
+/** Only look at the head-ish part for declarations, as the posture check does. */
+const SCAN_BYTES = 64 * 1024;
+
+/** Belt on the probe: an app with a hundred asset refs must not turn one publish into a hundred. */
+const MAX_PROBED_URLS = 25;
+const PROBE_CONCURRENCY = 6;
+const PROBE_TIMEOUT_MS = 2500;
+
+function finding(pitfall: string, severity: AppArtifactFinding['severity'], message: string): AppArtifactFinding {
+  return { pitfall, severity, message, url: `/v1/appdev/pitfalls/${pitfall}` };
+}
+
+/**
+ * THE publish-time artifact check — one function, so every door (inline, presigned, draft, MCP)
+ * asks the same questions of the same bytes.
+ */
+export async function lintAppArtifact(html: string, config: AimeatConfig): Promise<AppArtifactLintResult> {
+  const blocking: AppArtifactFinding[] = [];
+  const warnings: AppArtifactFinding[] = [];
+
+  blocking.push(...checkInlineScripts(html));
+  if (kitCalledButNotLoaded(html)) blocking.push(finding('atelier-kit-not-loaded', 'critical', KIT_NOT_LOADED_MESSAGE));
+
+  const refs = collectAssetRefs(html, config);
+  warnings.push(...refs.warnings);
+  blocking.push(...await probeNodeAssets(refs.nodePaths, config));
+  blocking.push(...checkRegister(html));
+
+  warnings.push(...checkUnparsedModules(html));
+  warnings.push(...checkTheme(html));
+  warnings.push(...checkMetas(html));
+  warnings.push(...checkAgentDataReads(html));
+  warnings.push(...checkDeclaredButUnused(html));
+  warnings.push(...checkTrackMixing(html));
+  // A word the code needs on a 4.0 node and the sign-in does not ask for (services/app/scope-needs.ts).
+  warnings.push(...await undeclaredScopeFindings(html, (path) => readNodeLib(path, config)));
+  // No served-copy check: services/app/publish.ts strips the node's serve marks before this runs and
+  // names them in its own result (services/app/serve-marks-strip.ts), so there is nothing left here
+  // to warn about.
+
+  return { blocking, warnings };
+}
+
+/**
+ * The two build tracks stay separate, and this is where a mixed app gets told.
+ *
+ * Classic and Atelier have their own guides, and neither teaches the other's mechanics — so an app
+ * carrying both vocabularies was built from two guides at once, and the next edit session will load
+ * ONE of them and half-understand the file. All four findings are the same declared-versus-actual
+ * shape as checkDeclaredButUnused, and all four warn rather than block: a track declaration is
+ * advice to the next builder, and a page that mixes still renders.
+ *
+ * The section escape check is deliberately permissive about what counts as using the hatch: any
+ * `section(` call silences it. A missed warning costs nothing; a warning on a correct app teaches
+ * people to ignore the check.
+ *
+ * CLASSIC WITH KIT BLOCKS IS A TRACK OF ITS OWN, NOT A MIX. A Classic page loads the kit for the
+ * library blocks it uses (members, joinRequest, aiTask, copy, workspaceTeam, ...), because those
+ * blocks are the one implementation of their screens on either track. So Classic plus the kit is
+ * silent when the page calls into the kit's namespace and does not draw the Atelier shell. It is
+ * told when it draws the shell (that is an Atelier app with the wrong track line, and the line is
+ * how it escapes the register), and when it calls nothing in the kit at all (a load with no use).
+ */
+/** daisyUI's class names that an Atelier page uses without defining them in its own styles. */
+function undefinedDaisyClasses(html: string): string[] {
+  const DAISY = /^(btn|card|navbar|modal|drawer|badge|alert|menu|tabs|table|input|select|toggle|stat)$/i;
+  const used = new Set<string>();
+  for (const m of html.matchAll(/class\s*=\s*["']([^"']*)["']/gi)) {
+    for (const c of m[1].split(/\s+/)) if (DAISY.test(c)) used.add(c.toLowerCase());
+  }
+  if (used.size === 0) return [];
+  const styles = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
+  return [...used].filter(c => !new RegExp('\\.' + c + '(?![\\w-])', 'i').test(styles));
+}
+
+function checkTrackMixing(html: string): AppArtifactFinding[] {
+  const out: AppArtifactFinding[] = [];
+  const head = html.slice(0, SCAN_BYTES);
+
+  const track = declaredTrack(head);
+  const loadsAtelier = loadsAtelierKit(html);
+
+  if (track === 'classic' && loadsAtelier && drawsAtelierShell(html)) {
+    out.push(finding('track-mixing', 'warn',
+      'The head declares the Classic track and the page draws the Atelier app shell '
+      + '(`AIMEAT.atelier.app(...)`). A Classic page may load the kit for the library blocks it uses, '
+      + 'but the shell makes this an Atelier app, and the next edit session will load the Classic guide '
+      + 'and not know what half this file is. Declare `<meta name="aimeat-track" content="atelier">` '
+      + 'with its `aimeat-register`, and build with the Atelier guide.'));
+  } else if (track === 'classic' && loadsAtelier && !callsAtelierKit(html)) {
+    out.push(finding('track-mixing', 'warn',
+      'The head declares the Classic track and the page loads the Atelier kit without calling anything '
+      + 'in it. A Classic page loads the kit only for the library blocks it uses (for example '
+      + '`AIMEAT.atelier.members(...)`, `joinRequest`, `aiTask`, `copy`, `workspaceTeam`). Call the '
+      + 'block this page needs, or drop the aimeat-atelier script and stylesheet.'));
+  }
+
+  if (track === 'atelier' && !loadsAtelier) {
+    out.push(finding('track-mixing', 'warn',
+      'The head declares the Atelier track and the page never loads the Atelier kit '
+      + '(/v1/libs/aimeat-atelier.js + /lib/aimeat-atelier.css), so future edit sessions will read '
+      + 'this as an Atelier app while nothing on the page is one. Load the kit, or declare '
+      + '`content="classic"` and build with that guide.'));
+  }
+
+  if (track === 'atelier') {
+    // The escape hatch for raw markup in an Atelier app is a section body the app fills itself.
+    // daisyUI-shaped class strings with no section call anywhere means the raw markup has no
+    // declared home, which is the class soup the track separation exists to prevent.
+    // A class the page defines in its own styles is the page's vocabulary, not daisyUI: every genre
+    // names `.label`, `.stat` or `.menu` for itself, and a straight fork was told it mixed tracks
+    // (a real build on aimeat.io, 2026-11-08).
+    const daisyClasses = undefinedDaisyClasses(html).length > 0;
+    const usesSection = /\bsection\s*\(/.test(html);
+    if (daisyClasses && !usesSection) {
+      out.push(finding('track-mixing', 'warn',
+        'This Atelier app carries daisyUI-style class markup and never uses the section escape '
+        + 'hatch. On the Atelier track the kit is the vocabulary; raw daisyUI belongs only inside a '
+        + 'body the app fills itself via `AIMEAT.atelier.section(...)`. Move the markup into a '
+        + 'section body, or express it with kit components.'));
+    }
+  }
+
+  if (!track && loadsAtelier) {
+    out.push(finding('track-mixing', 'warn',
+      'The page loads the Atelier kit and declares no build track. Without a track line in the head, '
+      + 'a later edit session reads this app as Classic and loads the wrong guide. Declare '
+      + '`<meta name="aimeat-track" content="atelier">` for an Atelier app, or `content="classic"` for '
+      + 'a Classic page that loads the kit only for its library blocks. One line fixes it.'));
+  }
+
+  return out;
+}
+
+/**
+ * Whether the page calls into the Atelier kit's namespace: a library block, copy(), the i18n, or
+ * the namespace held in a name of its own (`var K = AIMEAT.atelier`). Permissive on purpose, like
+ * the section check above: any reference counts.
+ */
+function callsAtelierKit(html: string): boolean {
+  return /\bAIMEAT\s*(?:\.\s*atelier\b|\[\s*["']atelier["']\s*\])/.test(html);
+}
+
+/**
+ * Whether the page draws the Atelier app shell, written as a call on the namespace
+ * (`AIMEAT.atelier.app(` or `atelier.app(`). An alias (`K.app(`) is not seen, which only means a
+ * warning is missed.
+ */
+function drawsAtelierShell(html: string): boolean {
+  return /\batelier\s*\.\s*app\s*\(/.test(html);
+}
+
+/**
+ * Three ways an app can LOAD the platform and never use it.
+ *
+ * All three came out of one run on 2026-08-15, and all three were invisible to every check that
+ * existed: the two hints the publish did return were fixed on the spot because they were in front of
+ * the builder, and these were not returned, so they shipped. Each is the same shape — a declaration
+ * in the head with nothing behind it — and each costs the person something they can see: no way to
+ * sign in, no way to change language, a design system that never renders.
+ *
+ * Warnings rather than blocks, deliberately. Live apps published before this check exists carry all
+ * three, and refusing their next update would take a working app off the air to make a point about
+ * its login pill. The repo has done that once already (changelog 1.33.1) and the lesson stuck.
+ */
+function checkDeclaredButUnused(html: string): AppArtifactFinding[] {
+  const out: AppArtifactFinding[] = [];
+  const head = html.slice(0, SCAN_BYTES);
+
+  // 1. The auth library is loaded and the pill is never mounted. The pill IS the login, the language
+  // switch and the theme control; without the mount the page has a script and no way in.
+  const loadsAuth = /aimeat-auth\.js/i.test(html);
+  // The real API is AIMEAT.auth.mountLoginButton (it delegates to mountPill internally). Matched on
+  // the verb rather than the full path, so a destructured or aliased call still counts — a check
+  // that only knows one spelling of a correct call is a check that flags correct apps. The Atelier
+  // shell mounts the pill itself inside atelier.app() (sdk-libs/atelier/shell.js), so that call is a
+  // mount too — and an app may hold the namespace in an alias (`var K = AIMEAT.atelier; K.app(...)`),
+  // so the shell test is "the atelier namespace appears AND some .app( is called", not one spelling.
+  // Both halves of the first AEB bench run (phase 3) hit this: three direct calls, then one alias.
+  const usesAtelierShell = /AIMEAT\s*\.\s*atelier/.test(html) && /\.\s*app\s*\(/.test(html);
+  const mountsPill = usesAtelierShell
+    || /mountLoginButton\s*\(|mountPill\s*\(|data-aimeat-pill|aimeat-login-pill/i.test(html);
+  if (loadsAuth && !mountsPill) {
+    out.push(finding('app-declared-unused', 'warn',
+      'The page loads `aimeat-auth.js` and never mounts the login pill, so there is no sign-in, no '
+      + 'language switch and no theme control — the three things the pill draws. Mount it, or drop the '
+      + 'script: a library that is loaded and unused is a page that looks connected and is not.'));
+  }
+
+  // 2. Languages declared, nothing that switches them. The declaration is what draws the switcher in
+  // the pill, so this is usually case 1 wearing a different hat — but an app can also roll its own.
+  const declaresLocales = /<meta\b[^>]*name\s*=\s*["']aimeat-locales["']/i.test(head);
+  const hasSwitcher = mountsPill || /setLocale|changeLanguage|data-locale|i18n\.(set|use)|lang-switch/i.test(html);
+  if (declaresLocales && !hasSwitcher) {
+    out.push(finding('app-declared-unused', 'warn',
+      'The head declares `aimeat-locales` but the page offers no way to change language. The '
+      + 'declaration draws the switch in the login pill, so either mount the pill or provide your own '
+      + 'control — a declared language nobody can select is a promise the page does not keep.'));
+  }
+
+  // 3. A stylesheet linked and never used. daisyUI classes are distinctive enough to detect, and the
+  // failure is visible: the page renders unstyled while carrying the weight of the framework.
+  const linksDaisy = /daisyui[^"']*\.css/i.test(head);
+  const usesDaisy = /class\s*=\s*["'][^"']*\b(btn|card|navbar|modal|drawer|badge|alert|menu|tabs|table|input|select|toggle|stat)\b/i.test(html);
+  if (linksDaisy && !usesDaisy) {
+    out.push(finding('app-declared-unused', 'warn',
+      'The page links daisyUI and uses none of its classes, so it downloads a design system and '
+      + 'renders without one. Build on the shell from `GET /v1/app-templates`, which already uses it, '
+      + 'or remove the stylesheet.'));
+  }
+
+  return out;
+}
+
+/** The build track the head declares, or undefined when it declares none. */
+function declaredTrack(head: string): 'classic' | 'atelier' | undefined {
+  const value = /<meta\b[^>]*name\s*=\s*["']aimeat-track["'][^>]*content\s*=\s*["'](classic|atelier)["']/i
+    .exec(head)?.[1]?.toLowerCase();
+  return value === 'classic' || value === 'atelier' ? value : undefined;
+}
+
+/** Whether the page loads the Atelier kit (its script or its stylesheet) anywhere. */
+export function loadsAtelierKit(html: string): boolean {
+  return /aimeat-atelier\.(js|css)/i.test(html);
+}
+
+// ── Blocking check 3: does an Atelier app name the look it committed to? ────────────────────────
+
+/**
+ * The shell's placeholder, matched on its prefix so a builder who edits the sentence and leaves the
+ * marker is still told. The exact line lives in shells.ts (SHELL_ATELIER).
+ */
+const REGISTER_PLACEHOLDER = /^REPLACE-ME\b/i;
+
+/**
+ * An Atelier app names its register or it does not publish.
+ *
+ * THE DECISION BEHIND THIS BLOCK. Every Atelier app an agent built from the bare shell came out as
+ * stacked sections in the default look, and the owner ruled it must never happen again. The Design
+ * Book's genres exist so a page starts from a committed register; this is
+ * the gate that makes starting there the only road. It is the one blocking finding that is a
+ * decision rather than a proof about the bytes — see the file header.
+ *
+ * WHAT COUNTS AS A REGISTER. A genre template id (`genre-nightfloor`, every genre body carries its
+ * own), a Design Book part id, or `custom:<name>` for a page that commits to a look of its own. The
+ * value is not validated against the registries: the meta is a declaration of what the page IS,
+ * and a wrong id is a lie the next edit session catches, while a missing one is the shell. What is
+ * refused is the absence, the shell's REPLACE-ME placeholder, and a custom register with no name in
+ * it (`custom:`, `custom:default`) — "default" is the look this exists to prevent.
+ *
+ * WHICH APPS ARE ASKED. The declared Atelier track, and the Atelier kit loaded with no track
+ * declared at all: deleting the track line must not be the way past. A page that declares Classic
+ * never hears about this, including a Classic page that loads the kit for its library blocks; the
+ * refusal of the no-track case names that line, because it is the fix for such a page.
+ */
+function checkRegister(html: string): AppArtifactFinding[] {
+  const head = html.slice(0, SCAN_BYTES);
+  const track = declaredTrack(head);
+  const atelier = track === 'atelier' || (track === undefined && loadsAtelierKit(html));
+  if (!atelier) return [];
+  // The owner chose a quick prototype or an ordinary page (app-build-level.ts): those levels owe
+  // no register. A page that states no level is held to the finest, as every page was before.
+  if (!registerIsOwed(html)) return [];
+
+  const declared = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']([^"']*)["']/i
+    .exec(head)?.[1]?.trim() ?? '';
+  const placeholder = REGISTER_PLACEHOLDER.test(declared);
+  const unnamedCustom = /^custom:\s*(default)?$/i.test(declared);
+  if (declared && !placeholder && !unnamedCustom) return [];
+
+  const what = placeholder
+    ? 'This Atelier app still carries the shell\'s REPLACE-ME register line, so it names no register. '
+    : declared
+      ? `This Atelier app names "${declared}" as its register, which is not a name. `
+      : 'This Atelier app names no register. ';
+  // A page that loads the kit with no track line may be a Classic page using library blocks; the
+  // refusal names that one-line way out too, since the page then owes no register.
+  const classicWayOut = track === undefined
+    ? ' If this is a Classic page that loads the kit only for its library blocks (members, aiTask, '
+      + 'copy, workspaceTeam, ...) and does not draw the Atelier shell, declare '
+      + '<meta name="aimeat-track" content="classic"> instead: such a page owes no register.'
+    : '';
+  return [finding('atelier-register', 'critical',
+    what
+    + 'Every app here starts from a committed look: fork a genre from the Design Book '
+    + '(GET /v1/designbook?kind=genre, then GET /v1/app-templates/genre-<id>) or name your own with '
+    + '<meta name="aimeat-register" content="custom:<name>">. The bare shell is a frame, not a page.'
+    + classicWayOut)];
+}
+
+// ── Blocking check 1: does the app's own JavaScript compile? ────────────────────────────────────
+
+/**
+ * Parse every inline `<script>` body. A syntax error here is not a style opinion: the browser stops
+ * at the same character, and everything the app was going to do after it never happens.
+ *
+ * `type="module"` blocks are skipped unless the process was started with --experimental-vm-modules,
+ * because the alternative — parsing module source in script goal — reports a syntax error for a
+ * correct `import` line. A false block is worse than a missed one: it teaches people that the gate
+ * is wrong, and the next real finding gets worked around too.
+ */
+function checkInlineScripts(html: string): AppArtifactFinding[] {
+  try {
+    // The checker proves it still checks before it is trusted. If a sentinel ever parses, this
+    // throws and the whole check is skipped rather than reporting passes it has not earned.
+    selfTest();
+  } catch (err) {
+    logger.error('app-artifact-lint: the inline-script parser failed its own self-test — skipping the syntax check', { error: String(err) });
+    return [];
+  }
+
+  const canParseModules = moduleGoalAvailable();
+  const out: AppArtifactFinding[] = [];
+  for (const block of extractInlineScripts(html)) {
+    if (block.goal === 'module' && !canParseModules) continue;
+    try {
+      parseSource(block.source, `<script #${block.index}>`, block.goal);
+    } catch (err) {
+      out.push(finding('inline-js-does-not-parse', 'critical',
+        `Inline <script> #${block.index} does not parse, so the browser stops there and the rest of the `
+        + `app never runs: ${(err as Error).message}. Fix the syntax and publish again. To parse a block on `
+        + 'your own machine, save its body as block.js and run '
+        + '`node -e \'new (require("vm").Script)(require("fs").readFileSync(process.argv[1],"utf8"))\' block.js`.'));
+    }
+  }
+  return out;
+}
+
+/**
+ * The module blocks checkInlineScripts had to skip, said out loud.
+ *
+ * A skipped block used to leave no trace, so a module script with a syntax error published with a
+ * clean response. No production start path passes --experimental-vm-modules, which makes this the
+ * common case rather than the exception. A warning, not a block: nothing here proves the module is
+ * broken, only that this node did not look.
+ */
+function checkUnparsedModules(html: string): AppArtifactFinding[] {
+  if (moduleGoalAvailable()) return [];
+  const skipped = extractInlineScripts(html).filter(b => b.goal === 'module').map(b => `<script> #${b.index}`);
+  if (skipped.length === 0) return [];
+  const one = skipped.length === 1;
+  return [finding('inline-js-does-not-parse', 'warn',
+    `${skipped.join(', ')} ${one ? 'is a type="module" block and was' : 'are type="module" blocks and were'} `
+    + 'not parsed: this node runs without --experimental-vm-modules, so it cannot read module syntax, '
+    + 'and a syntax error in there would stop the module in the browser with nothing said here. Parse '
+    + 'it before publishing: save the block as block.mjs and run `node --check block.mjs`.')];
+}
+
+// ── Blocking check 2: do the app's asset URLs exist on this node? ───────────────────────────────
+
+interface AssetRefs {
+  /** Same-node paths, deduped, ready to probe. */
+  nodePaths: string[];
+  /** Findings the classification itself produced (external hosts, relative paths). */
+  warnings: AppArtifactFinding[];
+}
+
+/**
+ * Every `<script src>` and stylesheet `<link href>`, sorted into "this node can answer for it" and
+ * "this node cannot".
+ *
+ * An absolute URL on some other host is a warning, not a probe: the app CSP blocks external hosts,
+ * so it is a real problem, but the node has no business making requests to a stranger's server
+ * because someone published HTML naming it. A relative path is a warning too — a published app is
+ * ONE file, so a sibling it refers to does not exist by construction.
+ */
+function collectAssetRefs(html: string, config: AimeatConfig): AssetRefs {
+  const raw: string[] = [];
+  for (const attrs of tagAttributes(html, 'script')) {
+    // The last src in the tag, as the greedy pattern this replaced read it.
+    let src: string | undefined;
+    for (const s of attrs.matchAll(/\bsrc\s*=\s*["']([^"']+)["']/gi)) src = s[1];
+    if (src) raw.push(src);
+  }
+  for (const attrs of tagAttributes(html, 'link')) {
+    // The rel value is read out and then searched, rather than matched with `[^"']*stylesheet[^"']*`
+    // in one pattern: that shape has an unbounded run on both sides of the word, so a `<link>` tag
+    // with a long rel costs quadratic time on bytes a stranger uploaded.
+    const rel = /\brel\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1];
+    if (!rel?.toLowerCase().includes('stylesheet')) continue;
+    const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1];
+    if (href) raw.push(href);
+  }
+
+  const nodeHosts = nodeHostnames(config);
+  const nodePaths: string[] = [];
+  const warnings: AppArtifactFinding[] = [];
+  const seenPaths = new Set<string>();
+  const seenExternal = new Set<string>();
+  const seenRelative = new Set<string>();
+
+  for (const ref of raw) {
+    const value = ref.trim();
+    if (!value || value.startsWith('#') || /^(data|blob|javascript|about):/i.test(value)) continue;
+
+    if (/^https?:\/\//i.test(value) || value.startsWith('//')) {
+      const url = safeParseUrl(value.startsWith('//') ? `https:${value}` : value);
+      if (!url) continue;
+      const host = url.hostname.toLowerCase();
+      if (nodeHosts.some(h => host === h || host.endsWith(`.${h}`))) {
+        addPath(url.pathname + url.search);
+        continue;
+      }
+      if (!seenExternal.has(host)) {
+        seenExternal.add(host);
+        // The app CSP allows https: scripts and styles today (utils/app-csp.ts). The sentence said
+        // "this node only" until 2026-09-13, which was false and made a working app look broken.
+        warnings.push(finding('cdn-libs-blocked', 'warn',
+          `This app loads assets from ${host}. The app CSP on this node still allows https hosts, so it `
+          + 'works today, and on a node that tightens its CSP to its own origin the page goes blank. Use '
+          + 'the node-vendored equivalent under /lib/ or /v1/libs/; the build spec lists what exists.'));
+      }
+      continue;
+    }
+
+    if (value.startsWith('/')) { addPath(value); continue; }
+
+    if (!seenRelative.has(value)) {
+      seenRelative.add(value);
+      warnings.push(finding('invented-lib-urls', 'warn',
+        `"${value}" is a relative path, and a published app is ONE file with no siblings beside it — `
+        + 'there is nothing for the browser to fetch there. Inline it, or load it from a node URL the '
+        + 'build spec names.'));
+    }
+  }
+
+  return { nodePaths, warnings };
+
+  function addPath(path: string): void {
+    if (seenPaths.has(path) || nodePaths.length >= MAX_PROBED_URLS) return;
+    seenPaths.add(path);
+    nodePaths.push(path);
+  }
+}
+
+/** The hostnames that mean "this node": the apex from the base URL, plus its app-origin parent. */
+function nodeHostnames(config: AimeatConfig): string[] {
+  const out = new Set<string>();
+  const apex = safeParseUrl(config.baseUrl)?.hostname.toLowerCase();
+  if (apex) out.add(apex);
+  return [...out];
+}
+
+function safeParseUrl(value: string): URL | null {
+  // An unparseable URL is the ANSWER here, not a failure: the caller asks "is this a URL" and acts
+  // on "no". Logging every malformed href an app happens to contain would be noise about the app.
+  // eslint-disable-next-line aimeat/no-silent-catch -- "not a URL" is a result, not an error
+  try { return new URL(value); } catch { return null; }
+}
+
+/**
+ * Ask THIS node whether each path exists.
+ *
+ * The request goes to 127.0.0.1 on the node's own listening port — a fixed destination, with only
+ * the path coming from the uploaded HTML — so this is the server asking itself a question, not
+ * outbound traffic an app can aim. Anything other than a 404/410 leaves no finding: see the file
+ * header on failing open.
+ */
+async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<AppArtifactFinding[]> {
+  if (!config.appAssetProbe || paths.length === 0) return [];
+
+  const dead: string[] = [];
+  for (let i = 0; i < paths.length; i += PROBE_CONCURRENCY) {
+    const slice = paths.slice(i, i + PROBE_CONCURRENCY);
+    const answers = await Promise.all(slice.map(async (path) => ({ path, status: await probeOne(path, config) })));
+    for (const a of answers) if (a.status === 404 || a.status === 410) dead.push(a.path);
+  }
+  if (dead.length === 0) return [];
+
+  return [finding('invented-lib-urls', 'critical',
+    `This node answers 404 for ${dead.length === 1 ? 'an asset this app loads' : 'assets this app loads'}: `
+    + `${dead.join(', ')}. The app would throw before it drew anything. The SDK libraries live under `
+    + '/v1/libs/ (aimeat-auth.js, aimeat-data.js, …) and the vendored packs under /lib/ — take the exact '
+    + 'URLs from the build spec (GET /v1/prompts/build-app-atelier, or /v1/prompts/build-app for an app on the Classic track) rather than guessing one that looks right.'
+    + (dead.some(p => p.startsWith('/v1/cortex/'))
+      ? ' A cortex installed under its owner\'s name (`full_name` in the install answer) loads from '
+        + '/v1/cortex/<owner>/<name>/libs/<file>; the install answer lists its exact addresses.'
+      : ''))];
+}
+
+/**
+ * The text of a cortex lib this node serves at `path`, read the way probeOne reaches the node (its own
+ * port and nothing else), or null. Off with the asset probe, so a test node that does not answer its
+ * own port reads the app's own code only.
+ */
+async function readNodeLib(path: string, config: AimeatConfig): Promise<string | null> {
+  if (!config.appAssetProbe || !path.startsWith('/v1/cortex/')) return null;
+  const target = new URL(`http://127.0.0.1:${config.port}`);
+  target.pathname = path;
+  try {
+    const libRes = await fetch(target, { redirect: 'manual', headers: { 'User-Agent': 'aimeat-publish-asset-probe' }, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    if (!libRes.ok) { await libRes.body?.cancel(); return null; }
+    return await readTextCapped(libRes, LIB_READ_MAX_BYTES);
+  } catch (err) {
+    logger.warn('app artifact lint: a cortex lib could not be read for the scope check', { path, error: String(err) });
+    return null;
+  }
+}
+
+/** The status of one path, or null when the node could not get an answer at all. */
+async function probeOne(path: string, config: AimeatConfig): Promise<number | null> {
+  // The destination is built from the node's own port and NOTHING else, and the uploaded path then
+  // reaches it through the pathname and search setters, which cannot move a request to another
+  // host. `new URL(path, base)` can: WHATWG treats a backslash in a special scheme as a slash, so
+  // `/\example.invalid/x` in an app's `<script src>` resolves to `http://example.invalid/x` and the
+  // node's own asset probe would call a stranger's server on that app's say-so.
+  const target = new URL(`http://127.0.0.1:${config.port}`);
+  const q = path.indexOf('?');
+  target.pathname = q === -1 ? path : path.slice(0, q);
+  target.search = q === -1 ? '' : path.slice(q + 1);
+  try {
+    const res = await fetch(target, {
+      method: 'GET',
+      redirect: 'manual',
+      // Named so this reads as what it is in an access log, and so a handler can tell it from a
+      // visitor. No Host header: `fetch` forbids setting one, and a loopback request without it is
+      // treated as the node's apex, which is where these paths live.
+      headers: { 'User-Agent': 'aimeat-publish-asset-probe', Accept: '*/*' },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    // Nothing here reads the body; cancelling releases the socket immediately.
+    await res.body?.cancel().catch((err: unknown) => {
+      logger.debug('app-artifact-lint: releasing the probe body failed, which changes no answer', { path, error: String(err) });
+    });
+    return res.status;
+  } catch (err) {
+    logger.debug('app-artifact-lint: asset probe could not reach this node — no finding recorded', { path, error: String(err) });
+    return null;
+  }
+}
+
+// ── Warnings ────────────────────────────────────────────────────────────────────────────────────
+
+/** How far back from `prefers-color-scheme` its `@media` may sit. No hand-written condition is longer. */
+const MEDIA_CONDITION_LOOKBACK = 200;
+
+/**
+ * Does a media condition in this page ask for `prefers-color-scheme`?
+ *
+ * Read backwards from each mention of the feature rather than forwards from each `@media`. Forwards
+ * is the natural way to write it (`/@media[^{]*prefers-color-scheme/`) and it is quadratic: the
+ * unbounded run restarts at every `@media` in the file, and the file is bytes a stranger uploaded.
+ * The feature name appears a handful of times at most, and each one is settled by a fixed window.
+ */
+function hasColorSchemeMediaQuery(html: string): boolean {
+  const lower = html.toLowerCase();
+  for (let at = lower.indexOf('prefers-color-scheme'); at !== -1;
+    at = lower.indexOf('prefers-color-scheme', at + 1)) {
+    const before = lower.slice(Math.max(0, at - MEDIA_CONDITION_LOOKBACK), at);
+    const media = before.lastIndexOf('@media');
+    // A `{` after the `@media` means the condition already closed and this mention is inside the
+    // block's declarations, which is not the app deciding light and dark for itself.
+    if (media !== -1 && !before.slice(media).includes('{')) return true;
+  }
+  return false;
+}
+
+/**
+ * Does the app let the user's own light/dark and palette choices reach it?
+ *
+ * The observable failure is small and infuriating: the switch in the login pill flips
+ * `<html data-theme>`, the app painted its own colours from `prefers-color-scheme`, and the control
+ * does nothing. Flagged only when the app carries NEITHER the platform stylesheet NOR any theme
+ * token, so an app that themes properly and happens to mention a media query stays quiet.
+ */
+function checkTheme(html: string): AppArtifactFinding[] {
+  const usesPlatformTheme = /aimeat-theme\.css|aimeat-daisyui-bridge\.css|daisyui@5\.css/i.test(html);
+  const usesTokens = /var\(\s*--(color-|text-|elev-|motion-|aimeat-)/i.test(html);
+  const ownColorScheme = hasColorSchemeMediaQuery(html);
+  const ownHexes = (html.match(/[:\s]#[0-9a-f]{3,8}\b/gi) ?? []).length;
+  const head = html.slice(0, SCAN_BYTES);
+  const atelier = declaredTrack(head) === 'atelier';
+
+  if (usesPlatformTheme || usesTokens) return [];
+  // An Atelier page draws in the kit's `--ak-*` tokens, and a genre that keeps its own colours says
+  // so with `<meta name="aimeat-light" content="fixed">`, where the pill's light/dark control stands
+  // down on purpose. Both are the track's own design; a straight genre fork was told to load the
+  // Classic theme stylesheet (a real build on aimeat.io, 2026-11-08).
+  if (atelier && (/var\(\s*--ak-/i.test(html) || /<meta\b[^>]*name\s*=\s*["']aimeat-light["'][^>]*content\s*=\s*["'](fixed|follows)["']/i.test(head))) return [];
+  if (!ownColorScheme && ownHexes < 6) return [];
+
+  return [finding('hardcoded-theme-colors', 'warn',
+    'This app paints its own colours (no theme tokens'
+    + (ownColorScheme ? ', and it decides light/dark from prefers-color-scheme' : '')
+    + '), so the login pill\'s light/dark switch and palette picker do nothing for its chrome — the '
+    + 'user clicks and nothing happens. '
+    + (atelier
+      ? 'On the Atelier track, draw in the kit\'s `--ak-*` tokens so the page follows the person\'s theme, '
+        + 'or declare `<meta name="aimeat-light" content="fixed">` when it keeps its own colours on purpose.'
+      : 'Load /lib/aimeat-theme.css and style with the tokens (var(--color-primary), base-100/200/300); '
+        + 'then all five palettes work for free and the user\'s stored choice wins over the OS preference.'))];
+}
+
+/**
+ * The three declarations in the head, checked once and reported once.
+ *
+ * Each is optional in the sense that the app still runs, and each changes what the platform can do
+ * for it: scopes decide what the sign-in asks for, locales draw the language switch in the login
+ * pill, and `aimeat-app` is how the page names itself on a per-app subdomain, where the filename
+ * cannot be read off the URL.
+ */
+function checkMetas(html: string): AppArtifactFinding[] {
+  const head = html.slice(0, SCAN_BYTES);
+  const has = (name: string) => new RegExp(`<meta\\b[^>]*name\\s*=\\s*["']${name}["']`, 'i').test(head);
+  const out: AppArtifactFinding[] = [];
+  const missing: string[] = [];
+  // The words, read the way the SDK reads them (auth/config.js appDeclaredScopes: the first tag,
+  // trimmed, an empty one meaning "nothing declared") and split the way the node splits them.
+  const scopeWords = declaredScopeWords(head);
+  if (!has('aimeat-app')) missing.push('`aimeat-app` (your published filename — on an app subdomain the page cannot work it out, and AIMEATAgentFace.publish needs it)');
+  if (!has('aimeat-scopes')) missing.push('`aimeat-scopes` (what sign-in asks the user to approve; without it the app gets the default grant only, so ai:use and memory:delete are unavailable)');
+  else if (scopeWords.length === 0) missing.push('`aimeat-scopes` (the tag is there with no words in it, which the sign-in reads as declaring nothing, so the app gets the default grant only)');
+  if (!has('aimeat-locales')) missing.push('`aimeat-locales` (the languages you have — this is what draws the language switch in the login pill; declare one language and nothing renders)');
+  if (missing.length) {
+    out.push(finding('app-meta-declarations', 'warn',
+      `The head declares none of: ${missing.join('; ')}. They are one line each and the build spec shows `
+      + 'the exact form.'));
+  }
+  // The shells carry `aimeat-app` with a placeholder since 2026-09-19, so that a first publish is
+  // clean. A placeholder left in is worse than no tag: the page then claims a filename that is
+  // not its own.
+  if (/<meta\b[^>]*name\s*=\s*["']aimeat-app["'][^>]*content\s*=\s*["']\s*REPLACE/i.test(head)) {
+    out.push(finding('app-meta-declarations', 'warn',
+      '`<meta name="aimeat-app">` still holds the shell\'s placeholder. Put your published filename in it, exactly as you publish it (for example `my-app.html`).'));
+  }
+
+  // A word outside the vocabulary refuses the WHOLE list: the silent bridge answers invalid_scope
+  // and GET /v1/app-grants/authorize answers 400 INVALID_SCOPE, so nobody signs in to the app, its
+  // owner included. A warning rather than a block, as the file header explains: a publish that
+  // fails is a publish that gets worked around, and the sentence below tells the builder exactly
+  // which word to change.
+  const unknown = [...new Set(scopeWords.filter(w => !Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, w)))];
+  if (unknown.length) {
+    out.push(finding('app-meta-declarations', 'warn',
+      `\`<meta name="aimeat-scopes">\` asks for ${unknown.map(w => `\`${w}\``).join(', ')}, which this node `
+      + 'cannot grant. One word outside the vocabulary refuses the whole sign-in, so nobody can sign in '
+      + 'to this app, the owner included. Take the words from GET /v1/app-grants/scopes (file deletion '
+      + 'is storage:write; there is no storage:delete).'));
+  }
+  return out;
+}
+
+/** The words of the first `<meta name="aimeat-scopes">`, or none when it is absent or empty. */
+function declaredScopeWords(head: string): string[] {
+  // Walked with indexOf, each tag ending at its own `>` and the next search starting after it, so
+  // the cost stays linear in the head a stranger uploaded (a `<meta\b[^>]*>` scan restarts its run
+  // at every `<meta`).
+  const lower = head.toLowerCase();
+  for (let at = lower.indexOf('<meta'); at !== -1;) {
+    const end = lower.indexOf('>', at);
+    if (end === -1) break;
+    const tag = head.slice(at, end + 1);
+    if (/^<meta[\s/]/i.test(tag) && /\bname\s*=\s*["']aimeat-scopes["']/i.test(tag)) {
+      const content = /\bcontent\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] ?? '';
+      return content.split(/[\s,]+/).map(w => w.trim()).filter(Boolean);
+    }
+    at = lower.indexOf('<meta', end + 1);
+  }
+  return [];
+}
+
+/**
+ * An app that only READS, and never says whose namespace it is reading.
+ *
+ * Data an agent writes over MCP lands under the AGENT's GAII, not the owner's. An app-grant token is
+ * role `app` and gets no owner-scope broadening, so `list({prefix})` legitimately returns nothing
+ * and the app shows an empty screen to the very owner whose fleet produced the data. Flagged only
+ * for the exact signature of that failure — the app reads, never writes, and names no namespace
+ * anywhere — so a normal app storing its own data stays quiet.
+ */
+function checkAgentDataReads(html: string): AppArtifactFinding[] {
+  const reads = /AIMEAT\.data\.(list|get|count)\s*\(/.test(html);
+  if (!reads) return [];
+  const writes = /AIMEAT\.data\.(set|remove|delete)\s*\(/.test(html);
+  if (writes) return [];
+  const scoped = /ownerScope|owner_scope|\bagent\s*:|getPublic\s*\(/.test(html);
+  if (scoped) return [];
+
+  return [finding('namespace-rule', 'warn',
+    'This app reads memory and never writes any, and no read names a namespace — so every value it '
+    + 'shows was written by something else. If that something else is one of the owner\'s agents, its '
+    + 'keys live under the agent\'s GAII and these reads return nothing: the owner signs in and sees an '
+    + 'empty app. Pass `{ ownerScope: true }` to cover the owner and all their agents, or `{ agent: '
+    + '"name#owner@node" }` for one of them.')];
+}

@@ -170,14 +170,14 @@ import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { misdirectedCrewKey, crewSitesWriteRefusal } from './crews/def-envelope.js';
 import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
-import { undeclaredSpaceForKey } from './workspace-write-items.js';
+import { undeclaredSpaceForKey } from './workspace/write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from './legacy-pacing-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 import { agentKeyRefusal } from '../utils/agent-key-address.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { canonicalAppToolsKey } from './app-tools-key.js';
+import { canonicalAppToolsKey } from './app/tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
 import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../storage/memory-sharing.js';
@@ -213,7 +213,7 @@ export async function writeMemoryRecord(
 ): Promise<MemoryWriteResult> {
     const { storage, config } = deps;
 
-    // 0. An app's tool manifest lives under the app's filename (services/app-tools-key.ts). A manifest
+    // 0. An app's tool manifest lives under the app's filename (services/app/tools-key.ts). A manifest
     //    written as `apps.nuotta.tools` for the app nuotta.html was sold on the market and shown in no
     //    catalogue. Decided here, before anything reads the key, so every door writes the same one.
     // `let`: the publish gate (step 3a) may store the record at the level it had instead of public.

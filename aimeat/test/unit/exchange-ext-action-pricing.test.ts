@@ -1,7 +1,7 @@
 /**
  * @file test/unit/exchange-ext-action-pricing.test.ts
  * @description What a contract on an extension action costs, read from the action the way the node
- *   stores it (services/extension-manifest.ts): the 4.0.0 form keeps the pacing amount on the action
+ *   stores it (services/extension/manifest.ts): the 4.0.0 form keeps the pacing amount on the action
  *   (`tollMorsels`) and refuses `commercial.payMorsels`; a 3.x record may still carry payMorsels.
  *
  *   WHY. resolveActionPricing read only the `commercial` block, so an action in the 4.0.0 form answered

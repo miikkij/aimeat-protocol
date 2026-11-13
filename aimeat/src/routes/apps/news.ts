@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description GET /v1/apps/:owner/:filename/news: which version of an app runs, when it was last
  *   updated, what the latest versions changed, and, for the people who build it, the draft under way
- *   and what it is changing (services/app-news.ts). The app-info mark on a served app reads it for a
+ *   and what it is changing (services/app/news.ts). The app-info mark on a served app reads it for a
  *   builder's draft line, and an AI asked "what is new in this app" reads the same answer.
  * @structure registerAppNewsRoutes(router, config, storage)
  * @usage registerAppNewsRoutes(router, config, storage);   // from routes/apps.ts
@@ -16,7 +16,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { appViewerStanding, readAppNews } from '../../services/app-news.js';
+import { appViewerStanding, readAppNews } from '../../services/app/news.js';
 
 const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
 

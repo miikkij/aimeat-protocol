@@ -170,7 +170,7 @@ export type AccountEventKind =
   // `data.count` how many, `data.words` the words, so the owner can narrow any of them.
   | 'scope_words_kept'
   // `app_scope_words_kept` is the same start's line for the owner's published apps whose code calls
-  // a route their aimeat-scopes declaration does not name (services/app-scope-allowance.ts).
+  // a route their aimeat-scopes declaration does not name (services/app/scope-allowance.ts).
   | 'app_scope_words_kept'
   // One of the owner's agents, holding agent:permissions-add, added permissions to another
   // (services/agent/scope-add.ts): `data.by` the agent that added, `data.name` the agent that got

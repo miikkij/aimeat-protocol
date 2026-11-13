@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig } from '../../src/config.js';
-import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
+import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
 import { librarianSearch } from '../../src/services/librarian.js';
 import { systemReader } from '../../src/services/classification/reader.js';
 

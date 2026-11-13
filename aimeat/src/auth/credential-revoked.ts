@@ -38,7 +38,7 @@ import { agentGone } from './agent-alive.js';
 import { visitorPeerRefuses } from './visitor-peer.js';
 import { sessionConfig, sessionStorage } from './node-auth.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
-import { grantGivenToEarlierAuthor } from '../services/app-grant-author.js';
+import { grantGivenToEarlierAuthor } from '../services/app/grant-author.js';
 import { memoGetOwner } from '../services/request-memo.js';
 
 /**
@@ -73,7 +73,7 @@ async function standingAppGrant(verified: VerifiedToken): Promise<AppGrantRecord
   const grant = await storage.getAppGrant(verified.app_grant);
   if (!grant || grant.revoked === true) return false;
   // A grant given to the app of an EARLIER holder of the author's name covers nothing the current
-  // holder publishes (services/app-grant-author.ts). The silent bridge, the refresh and the grant list
+  // holder publishes (services/app/grant-author.ts). The silent bridge, the refresh and the grant list
   // asked it; the access token minted from the grant before the erasure kept working until it
   // expired, at the same origin where the new holder's code runs (secaudit2026oct26,
   // credential-revoked:app-grant-token-ignores-earlier-author). One keyed owner read.

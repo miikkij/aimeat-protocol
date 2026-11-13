@@ -108,8 +108,8 @@ const CREWS_KEY = /^crews\.([^.]+)\./;
  */
 export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: string }[] = [
   { prefix: 'agents.', writtenBy: 'services/agent/statistics.ts, services/agent/offers-write.ts' },
-  { prefix: 'apps.', writtenBy: 'services/app-tool-interfaces.ts (apps.{appId}.tools)' },
-  { prefix: 'apptool.', writtenBy: 'services/app-tool-interfaces.ts' },
+  { prefix: 'apps.', writtenBy: 'services/app/tool-interfaces.ts (apps.{appId}.tools)' },
+  { prefix: 'apptool.', writtenBy: 'services/app/tool-interfaces.ts' },
   { prefix: 'app-catalog.', writtenBy: 'routes/apps (promoted + favourites docs)' },
   { prefix: 'skills.', writtenBy: 'services/skills.ts, services/skill-seeds.ts' },
   { prefix: 'workflows.', writtenBy: 'services/workflow/store.ts, engine.ts, lifecycle.ts' },
@@ -117,7 +117,7 @@ export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: st
   { prefix: 'onboarding.', writtenBy: 'services/onboarding-funnel.ts and 10 more' },
   { prefix: 'compliance.', writtenBy: 'services/compliance/register.ts (under system@{nodeId})' },
   { prefix: 'calibrator.', writtenBy: 'routes/calibrator.ts, services/db/calibrator-detail-db-service.ts' },
-  { prefix: 'template.catalog.', writtenBy: 'services/app-template-proposals.ts' },
+  { prefix: 'template.catalog.', writtenBy: 'services/app/template-proposals.ts' },
   { prefix: 'atelier.book.', writtenBy: 'services/design-book/service.ts (parts + usage counters)' },
   { prefix: 'packages', writtenBy: 'services/component-registrar.ts' },
   { prefix: 'ecosystem.', writtenBy: 'services/ecosystem-events.ts' },

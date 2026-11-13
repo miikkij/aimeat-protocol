@@ -103,12 +103,12 @@ import { hashPassword } from '../../services/password.js';
 import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner-provisioning.js';
 import { nodeContext } from '../../services/node-context.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
-import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
-import { isOrgManager } from '../../services/workspace-access.js';
-import { workspaceMetaReader } from '../../services/workspace-meta.js';
+import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace/enrichment.js';
+import { isOrgManager } from '../../services/workspace/access.js';
+import { workspaceMetaReader } from '../../services/workspace/meta.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
-import { decideAccessRequest, requestStatus } from '../../services/workspace-access-decision.js';
+import { decideAccessRequest, requestStatus } from '../../services/workspace/access-decision.js';
 import { listWorkspaceAccessRequests } from '../../services/organism-read/workspace-access-requests.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, membershipAfterGrant, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
@@ -312,7 +312,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   });
 
   // requestStatus (what a request record says about itself) and the decision itself live in
-  // services/workspace-access-decision.ts, which the MCP aimeat_workspace_access decide path calls too.
+  // services/workspace/access-decision.ts, which the MCP aimeat_workspace_access decide path calls too.
 
   /* ── GET /v1/organisms/:id/workspace-access?ws= — the workspace creator (or org admin) lists the
    * pending/decided access requests for a workspace they own. ── */
@@ -399,7 +399,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can decide access')); return;
     }
     // Grant or revoke, write the decision on the request record, tell the requester: the same
-    // function the MCP aimeat_workspace_access decide path calls (services/workspace-access-decision.ts).
+    // function the MCP aimeat_workspace_access decide path calls (services/workspace/access-decision.ts).
     const decided = await decideAccessRequest({ storage, config }, {
       orgId: id, ws, wsName: entry.name ?? ws, creator: createdBy, requester, decision,
       role: req.body?.role === 'viewer' ? 'viewer' : 'contributor', decidedBy: ownerName,

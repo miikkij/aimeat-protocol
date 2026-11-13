@@ -420,7 +420,7 @@ await test('A DELETED fork still appears in lineage with status=deleted', async 
 // routes/apps/fork-manage.ts. The fork never copied the source screenshot, and the delete never
 // removed the app's own — so a fork made by an agent had no thumbnail, and republishing a filename
 // an agent had deleted served the deleted app's picture. Both now go through
-// services/app-lifecycle.ts, and these assertions are what tells the two apart.
+// services/app/lifecycle.ts, and these assertions are what tells the two apart.
 console.log('\nPhase 5: the same act through the MCP door');
 
 // A 1x1 PNG. Small enough to inline, real enough for decodeStrictBase64 and the mime sniffing.
@@ -540,7 +540,7 @@ await test("Setup: owner B publishes a locked app and a paid one", async () => {
     assert(paid.status === 201, `B paid publish: ${paid.status} ${JSON.stringify(paid.body).slice(0, 160)}`);
     const on = await json(`/v1/apps/${B_PAID}`, bAuthed({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
     assert(on.status === 200 && on.body.data?.forkable === true, 'B\'s paid app is forkable, so only the paywall can stop it');
-    // A fresh publish is not forkable (services/app-publish.ts: forkable = !!live?.forkable).
+    // A fresh publish is not forkable (services/app/publish.ts: forkable = !!live?.forkable).
     const { body: list } = await json('/v1/apps?limit=200', bAuthed());
     const lockedRow = (list.data?.apps ?? []).find((a: any) => a.filename === B_LOCKED && a.owner === ownerBName);
     assert(lockedRow?.forkable !== true, `B's locked app must not be forkable: ${JSON.stringify(lockedRow?.forkable)}`);

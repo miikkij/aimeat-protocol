@@ -25,9 +25,9 @@ vi.mock('../../src/services/rest-scope-gates-migration.js', () => ({
     migrateRestScopeGatesOnce: step('restGates'), migrateAgentReadGrantOnce: step('agentRead'),
 }));
 vi.mock('../../src/services/rest-scope-keep-working-migration.js', () => ({ migrateRestScopeKeepWorkingOnce: step('keepWorking') }));
-vi.mock('../../src/services/app-datapackage-read-keep-migration.js', () => ({ keepDatapackageReadForAppsOnce: step('datapackageRead') }));
-vi.mock('../../src/services/app-storage-read-keep-migration.js', () => ({ keepStorageReadForAppsOnce: step('storageRead') }));
-vi.mock('../../src/services/app-on-done-keep-migration.js', () => ({ keepOnDoneForAppsOnce: step('onDone') }));
+vi.mock('../../src/services/app/datapackage-read-keep-migration.js', () => ({ keepDatapackageReadForAppsOnce: step('datapackageRead') }));
+vi.mock('../../src/services/app/storage-read-keep-migration.js', () => ({ keepStorageReadForAppsOnce: step('storageRead') }));
+vi.mock('../../src/services/app/on-done-keep-migration.js', () => ({ keepOnDoneForAppsOnce: step('onDone') }));
 
 const { runOnceOnlyKeepSteps } = await import('../../src/server-bootstrap/once-only-keep-steps.js');
 const storage = {} as never;

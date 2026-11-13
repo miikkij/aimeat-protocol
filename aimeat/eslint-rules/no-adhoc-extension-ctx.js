@@ -2,7 +2,7 @@
  * @file no-adhoc-extension-ctx.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Custom ESLint rule: an `ExtensionCtx` is built by services/extension-ctx.ts, never by
+ * @description Custom ESLint rule: an `ExtensionCtx` is built by services/extension/ctx.ts, never by
  *   hand at a call site. Reports an object literal typed as `ExtensionCtx`.
  *
  *   Why this rule exists. Four roads reach the extension sandbox: the two REST invoke handlers, the
@@ -29,7 +29,7 @@
  *   offer. A capability that genuinely differs by road (a wallet, a notification recipient, whether
  *   email is reachable at all) is a parameter. A guard is not.
  *
- *   Allowed by design: services/extension-ctx.ts itself, and tests that need a stub context.
+ *   Allowed by design: services/extension/ctx.ts itself, and tests that need a stub context.
  * @structure
  *   - noAdhocExtensionCtx: the rule module
  * @usage
@@ -40,7 +40,7 @@
 
 /** The file that IS the builder, plus test stubs. Matched against the ESLint filename (either slash). */
 const ALLOWED = [
-  'services/extension-ctx.ts',
+  'services/extension/ctx.ts',
   '/test/',
   '\\test\\',
 ];
@@ -69,7 +69,7 @@ export const noAdhocExtensionCtx = {
     schema: [],
     messages: {
       adhoc:
-        'Build the sandbox context with buildExtensionCtx() from services/extension-ctx.js instead of '
+        'Build the sandbox context with buildExtensionCtx() from services/extension/ctx.js instead of '
         + 'assembling it here. The guards live inside the builder on purpose: the memory quota, '
         + 'safeFetch, the per-call debit ceiling and the email authorization rule. Every hand-built '
         + 'copy this replaced was missing at least one of them, and a different one each time. '

@@ -21,7 +21,7 @@ import { validateMemoryWrite } from '../../src/services/schema-validator.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 import {
   settleWorkspaceSchemasAtStart, OPEN_RECORDS_SCHEMA, RELOCK_INCIDENT_TYPE,
-} from '../../src/services/workspace-schema-relock.js';
+} from '../../src/services/workspace/schema-relock.js';
 
 const config = { nodeId: 'node-test', baseUrl: 'http://node.test' } as never;
 const OLD = { type: 'object', additionalProperties: true };

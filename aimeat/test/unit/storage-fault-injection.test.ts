@@ -28,7 +28,7 @@ import { deactivateOwner } from '../../src/services/owner-lifecycle.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { createAccountRows } from '../../src/services/owner-provisioning.js';
 import { deliverWork } from '../../src/services/work-lifecycle.js';
-import { recordAppAudit, readAppAudit } from '../../src/services/app-audit.js';
+import { recordAppAudit, readAppAudit } from '../../src/services/app/audit.js';
 import { PostgresKyselyStorage } from '../../src/storage/providers/postgres-kysely/index.js';
 import { logger } from '../../src/utils/logger.js';
 import { requirePostgresWhenAsked } from './postgres-arm.js';

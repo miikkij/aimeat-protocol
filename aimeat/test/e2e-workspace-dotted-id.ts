@@ -16,7 +16,7 @@
  *   the dotted record breaks on the old tree.
  *
  *   Round 10b: every other reader of a workspace key reads a dotted id the same way (recordAt and
- *   spaceRowAt in services/workspace-record-key.ts): the GET /workspace read, the workspace list's
+ *   spaceRowAt in services/workspace/record-key.ts): the GET /workspace read, the workspace list's
  *   counts, the activity log, the overview, content search, the dangling-reference scan, the append-
  *   only write guard, the share's AI label in the member read, the public share and the member records
  *   read, and the labels' cap on a space shared whole. Each "Refused:" test of that section fails on

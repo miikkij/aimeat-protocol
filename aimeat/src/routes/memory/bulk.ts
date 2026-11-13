@@ -122,7 +122,7 @@ import { presentMemories, presentMemory } from '../../services/classification/pr
 import { readerFor } from '../../services/classification/reader.js';
 import { storedFileShownTo } from '../../services/datapackage/source-labels.js';
 import { leaveMemories } from '../../services/classification-exits.js';
-import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
+import { undeclaredSpaceForKey } from '../../services/workspace/write-items.js';
 import { fencedKeysRefusal } from '../../services/fenced-space.js';
 import { bulkDeleteKeyRefusal } from '../../services/memory-bin.js';
 import { callerOf } from '../../middleware/caller.js';

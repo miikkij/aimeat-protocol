@@ -479,8 +479,8 @@ await test('9d. Cross-owner notify DELIVERS once the target consents (extension_
   // The notification landed in the TARGET's bell, attributed to the extension.
   //
   // Read at GET /v1/notifications, not at the memory key. `notifications.<owner>` was a SECOND list
-  // beside the bell's own rows and was deleted on 2026-08-30 — services/extension-ctx.ts:220 and
-  // services/extension-notify.ts:77 both carry the same sentence, "One store, the bell's". The
+  // beside the bell's own rows and was deleted on 2026-08-30 — services/extension/ctx.ts:220 and
+  // services/extension/notify.ts:77 both carry the same sentence, "One store, the bell's". The
   // delivery path was never broken; this read had been asking a key nobody writes any more, so the
   // 404 it got was the correct answer to the wrong question (pitfalls §19, category three).
   const bell = await json('/v1/notifications', { headers: { Authorization: `Bearer ${targetToken}` } });

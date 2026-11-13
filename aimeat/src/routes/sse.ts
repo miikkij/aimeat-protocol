@@ -83,8 +83,8 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { onChangeEvent, offChangeEvent, onAppChangeEvent, offAppChangeEvent } from '../services/event-bus.js';
 import type { ChangeEvent, AppChangeEvent } from '../services/event-bus.js';
-import { appStreamTopic, type AppStreamTopic } from '../services/app-news.js';
-import { equalAppId } from '../services/app-record-keys.js';
+import { appStreamTopic, type AppStreamTopic } from '../services/app/news.js';
+import { equalAppId } from '../services/app/record-keys.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { BUILD_ID } from './portal-spa.js';
 import { resolveIdentity, localAccountName, runAsNode } from '../utils/gaii.js';
@@ -112,7 +112,7 @@ interface Ticket {
    */
   presenceEligible: boolean;
   /**
-   * The one app this stream follows (services/app-news.ts appStreamTopic), decided at mint time
+   * The one app this stream follows (services/app/news.ts appStreamTopic), decided at mint time
    * like `allow`. A stream opened for an app carries that app's events and the build, nothing else.
    */
   app?: AppStreamTopic;

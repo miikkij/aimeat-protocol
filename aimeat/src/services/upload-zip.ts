@@ -36,7 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import type { ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { parseCortexManifest } from './cortex-manifest.js';
 import { isUnsafeName } from './safe-zip.js';
-import { buildExtensionRecordFromManifest } from './extension-manifest.js';
+import { buildExtensionRecordFromManifest } from './extension/manifest.js';
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 /** Files one extension or cortex ZIP may hold when config.extensionZipMaxFiles is unset (tests). */

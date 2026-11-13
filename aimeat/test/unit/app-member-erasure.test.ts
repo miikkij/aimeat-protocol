@@ -26,8 +26,8 @@ import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
 import {
   getCarryPlan, getMemberRow, listRequests, listVisits, noteVisit, putCarryPlan, putMember, putRequest, removeMember,
-} from '../../src/services/app-members.js';
-import { getBlanketLevel, putBlanketGrant, putDevGrant } from '../../src/services/app-dev-grant.js';
+} from '../../src/services/app/members.js';
+import { getBlanketLevel, putBlanketGrant, putDevGrant } from '../../src/services/app/dev-grant.js';
 
 requirePostgresWhenAsked('app-member-erasure');
 

@@ -2782,7 +2782,7 @@
     {
       "fingerprint": "97b872933937ddf0",
       "ruleId": "js/polynomial-redos",
-      "file": "aimeat/src/services/workspace-doc-markdown.ts",
+      "file": "aimeat/src/services/workspace/doc-markdown.ts",
       "line": 160,
       "source": "codeql",
       "alertNumber": 1601,
@@ -3341,7 +3341,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/workspace-tool-ops.ts",
+      "file": "aimeat/src/services/workspace/tool-ops.ts",
       "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "cd163bbd24a7",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
@@ -3501,7 +3501,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/workspace-tool-ops.ts",
+      "file": "aimeat/src/services/workspace/tool-ops.ts",
       "note": "[poistettu julkisesta repostä: korjaamattoman haavoittuvuuden yksityiskohta. Ajossa syntyvä kopio on secaudit/-hakemistossa, joka on gitignored.]",
       "id": "f41de998c424",
       "commitRange": "94f58c5af..085a6df379d4550da76c37b5ee04443c2ec914bc",
@@ -3591,7 +3591,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/app-publish.ts",
+      "file": "aimeat/src/services/app/publish.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "bbfbeca149de",
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
@@ -3671,7 +3671,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/workspace-tool-ops.ts",
+      "file": "aimeat/src/services/workspace/tool-ops.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "2c0639ff342e",
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
@@ -3681,7 +3681,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/workspace-tool-ops.ts",
+      "file": "aimeat/src/services/workspace/tool-ops.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "3b4882500941",
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
@@ -3691,7 +3691,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/extension-ctx.ts",
+      "file": "aimeat/src/services/extension/ctx.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "919ef5f56d69",
       "commitRange": "085a6df379d4550da76c37b5ee04443c2ec914bc..d5fbfc3439c761926601030ea8eee2ac1b1e4fb9",
@@ -3861,7 +3861,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/extension-ctx.ts",
+      "file": "aimeat/src/services/extension/ctx.ts",
       "note": "Tiedoston extension-ctx.ts ctx.fetch kutsuu ensin resolveOutboundSecrets-funktiota, joka sitoo holvisalaisuuden ensimmäisen käytön isäntään (storage.bindSecretHost), ja vasta sen jälkeen tarkistaa, kulkeeko palveluntarjoajan avain https-yhteydellä, joten http-osoitteeseen tehty provider-kutsu ehtii kirjoittaa sidoksen ennen kuin se hylätään.",
       "id": "346ede55ba27",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
@@ -4049,7 +4049,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/app-audit.ts",
+      "file": "aimeat/src/services/app/audit.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "c3293d8e0726",
       "commitRange": "9542a9f834f2baa8e2db78ee4569e9b1feae37a8..0f7529be3fb535ff87a395d3c17cd1d43d205e61",
@@ -4058,7 +4058,7 @@
     },
     {
       "invariant": 13,
-      "file": "aimeat/src/services/app-published-by-app.ts",
+      "file": "aimeat/src/services/app/published-by-app.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "52bdb9b3e8a4",
       "commitRange": "9542a9f834f2baa8e2db78ee4569e9b1feae37a8..0f7529be3fb535ff87a395d3c17cd1d43d205e61",
@@ -4121,7 +4121,7 @@
     },
     {
       "invariant": 14,
-      "file": "aimeat/src/services/extension-ctx.ts",
+      "file": "aimeat/src/services/extension/ctx.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "979017099afa",
       "commitRange": "9542a9f834f2baa8e2db78ee4569e9b1feae37a8..0f7529be3fb535ff87a395d3c17cd1d43d205e61",
@@ -4130,7 +4130,7 @@
     },
     {
       "invariant": 13,
-      "file": "aimeat/src/services/extension-purchase.ts",
+      "file": "aimeat/src/services/extension/purchase.ts",
       "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
       "id": "5cb8528f40cf",
       "commitRange": "9542a9f834f2baa8e2db78ee4569e9b1feae37a8..0f7529be3fb535ff87a395d3c17cd1d43d205e61",

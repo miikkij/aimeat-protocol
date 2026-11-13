@@ -144,7 +144,7 @@
         ]
       },
       {
-        "name": "src/services/app-ai-posture.ts",
+        "name": "src/services/app/ai-posture.ts",
         "dependencyTypes": [
           "local",
           "type-only",
@@ -3335,7 +3335,7 @@
         ]
       },
       {
-        "name": "src/services/app-ai-posture.ts",
+        "name": "src/services/app/ai-posture.ts",
         "dependencyTypes": [
           "local",
           "type-only",
@@ -6887,8 +6887,8 @@
   {
     "type": "cycle",
     "from": "src/storage/types/apps.ts",
-    "to": "src/services/app-ai-posture.ts",
-    "unresolvedTo": "../../services/app-ai-posture.js",
+    "to": "src/services/app/ai-posture.ts",
+    "unresolvedTo": "../../services/app/ai-posture.js",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -6900,7 +6900,7 @@
     },
     "cycle": [
       {
-        "name": "src/services/app-ai-posture.ts",
+        "name": "src/services/app/ai-posture.ts",
         "dependencyTypes": [
           "local",
           "type-only",

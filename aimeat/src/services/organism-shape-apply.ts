@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Gives a new organism the workspaces of a starting shape (data/organism-shapes.ts):
- *   each through services/workspace-provision.ts, the same path POST /v1/organisms/:id/workspaces
+ *   each through services/workspace/provision.ts, the same path POST /v1/organisms/:id/workspaces
  *   and aimeat_workspace_create take, so a shaped workspace is locked, registered and rolled back on
  *   failure exactly like any other. Called from createOrganismRecord, which REST and MCP share.
  * @structure resolveShape(input) · applyOrganismShape(deps, orgId, owner, shape, lang) -> { made, notCreated }
@@ -19,7 +19,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ORGANISM_SHAPES, shapeById, shapeWorkspaceInput, type OrganismShape } from '../data/organism-shapes.js';
-import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from './workspace-provision.js';
+import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from './workspace/provision.js';
 import { logger } from '../utils/logger.js';
 
 export interface ShapedWorkspace { ws: string; name: string }

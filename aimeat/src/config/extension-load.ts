@@ -33,7 +33,7 @@ export const EXT_FETCH_INFLIGHT_MB_DEFAULT = 128;
 export interface ExtensionLoadConfig {
   /**
    * The most answer bytes, in megabytes, that one extension run's ctx.fetch calls may hold in
-   * flight together; a call past it waits for a slot (services/extension-host-bounds.ts). 0: no limit.
+   * flight together; a call past it waits for a slot (services/extension/host-bounds.ts). 0: no limit.
    */
   extensionFetchInflightMb: number;
   /**
@@ -46,12 +46,12 @@ export interface ExtensionLoadConfig {
   extensionMaxInstances: number;
   /**
    * The ctx.email messages one account's extension runs may send in an hour, counted per account
-   * whichever extension sends (services/extension-email.ts). 0: no limit. Default 200.
+   * whichever extension sends (services/extension/email.ts). 0: no limit. Default 200.
    */
   extensionEmailPerHour: number;
   /**
    * Extension runs started by a request (REST, MCP, a visitor) that may be in progress on this node at
-   * once; a run past it is answered 503 with Retry-After (services/extension-run-slots.ts). 0: no limit.
+   * once; a run past it is answered 503 with Retry-After (services/extension/run-slots.ts). 0: no limit.
    */
   extensionRunSlots: number;
   /** The share of those slots one account (or one visitor address) may hold at once. 0: no limit. */

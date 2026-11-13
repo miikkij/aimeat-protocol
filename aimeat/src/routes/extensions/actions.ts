@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Extension action execution routes — instance-scoped (/v1/ext/:extName/:instanceId/:actionId)
- *   and default (/v1/ext/:extName/:actionId). Both run services/extension-invoke.ts, the sequence the
+ *   and default (/v1/ext/:extName/:actionId). Both run services/extension/invoke.ts, the sequence the
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
@@ -74,7 +74,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
-import { EXT_HASH_REFERENCE_JS } from '../../services/extension-runtime.js';
+import { EXT_HASH_REFERENCE_JS } from '../../services/extension/runtime.js';
 
 /** The published hash, evaluated here so the served example is produced BY the served source. */
 const aimeatHashRef: (s: string) => string =
@@ -86,11 +86,11 @@ import { INTERNAL_PASS_HEADER } from '../../services/extension-access/internal-p
 import { enforcePaywall, APP_TOOL_HEADER } from '../../services/extension-access/paywall.js';
 import type { EmailService } from '../../services/email.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { invokeExtensionAction } from '../../services/extension-invoke.js';
+import { invokeExtensionAction } from '../../services/extension/invoke.js';
 import { resolveExtensionForCall } from '../../services/component-versions.js';
 import { extensionCallTarget, addressSegment } from '../../services/component-address.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
-import { visitorRunShareKey } from '../../services/extension-run-slots.js';
+import { visitorRunShareKey } from '../../services/extension/run-slots.js';
 import { appPartyForExtensionCall, partyBearer } from '../../services/app-parties/iam-gate.js';
 import type { AppPartyCtx } from '../../services/app-parties/service.js';
 

@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-09-19 — Initial, with the cold-agent measurement that found the hand-off.
  */
 import { describe, it, expect } from 'vitest';
-import { instanceFromKey } from '../../src/services/workspace-tool-ops.js';
+import { instanceFromKey } from '../../src/services/workspace/tool-ops.js';
 
 const ROOT = 'organism.org-1.w.ws-1';
 const SPACES = ['shared.notes', 'shared.notes-old', 'shared.tasks'];

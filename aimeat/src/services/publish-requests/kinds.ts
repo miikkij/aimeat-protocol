@@ -35,7 +35,7 @@ export type PublishKind =
   | 'delegation-binding'
   // AIMEAT's model doing a goal's work on the AI allowance for an agent without ai:use (services/goals/goals-model-spend.ts).
   | 'goal-model-spend'
-  // Extension code a package brought into an account that may not install extension code (services/extension-code-hold.ts).
+  // Extension code a package brought into an account that may not install extension code (services/extension/code-hold.ts).
   | 'extension-code'
   // A cortex name's new holder, allowed by the owner of an app that loaded the earlier library (services/cortex-holder-change.ts).
   | 'cortex-holder'

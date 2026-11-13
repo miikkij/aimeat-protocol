@@ -106,7 +106,7 @@ import type { Storage, ContentLabelRow, ContentLabelTarget } from '../../storage
 import type { AimeatConfig } from '../../config.js';
 import { isSameOwner, isForeignPrincipal, callerPrincipal, localAccountOf, isGEAI, ownerGhiiOf } from '../../utils/gaii.js';
 import { agentBarred } from '../organism-agent-access.js';
-import { decideWorkspaceRead } from '../workspace-access.js';
+import { decideWorkspaceRead } from '../workspace/access.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../ecosystem-access.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';

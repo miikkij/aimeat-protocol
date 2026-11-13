@@ -26,8 +26,8 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { updateRecord } from '../record-cas.js';
-import { decideWorkspaceRead, isOrgManager } from '../workspace-access.js';
-import { findWorkspaceRegistration } from '../workspace-meta-read.js';
+import { decideWorkspaceRead, isOrgManager } from '../workspace/access.js';
+import { findWorkspaceRegistration } from '../workspace/meta-read.js';
 import { ContentError } from './pipeline.js';
 import { systemOwnerOf } from './shared-profile-key.js';
 

@@ -24,7 +24,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { requireScope } from './middleware.js';
-import { tokenOfThisApp } from '../services/app-record-keys.js';
+import { tokenOfThisApp } from '../services/app/record-keys.js';
 
 export { tokenOfThisApp };
 

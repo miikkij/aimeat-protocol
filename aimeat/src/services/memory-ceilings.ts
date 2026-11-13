@@ -9,7 +9,7 @@
  *   excess charged as overage.
  *
  *   They were written out twice: once in services/memory-write.ts for a single record, and once in
- *   services/workspace-write-guards.ts for a workspace batch. The workspace path deliberately does
+ *   services/workspace/write-guards.ts for a workspace batch. The workspace path deliberately does
  *   NOT go through writeMemoryRecord — it has its own owner-collapse rule, one owner per key — but
  *   that is a reason to share the CEILINGS, not a reason to copy them. Two copies of a limit agree
  *   until the day somebody raises one, and nobody notices a ceiling that stopped holding.

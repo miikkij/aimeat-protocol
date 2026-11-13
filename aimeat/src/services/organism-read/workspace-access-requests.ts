@@ -5,7 +5,7 @@
  * @description The access request records of one organism workspace. GET
  *   /v1/organisms/:id/workspace-access (both branches) and aimeat_workspace_access (action 'list') read
  *   them here (CLAUDE.md, Backend: one capability, one implementation). The lookup only: who may see
- *   the requests and how a status reads (services/workspace-access-decision.ts requestStatus) stay
+ *   the requests and how a status reads (services/workspace/access-decision.ts requestStatus) stay
  *   with each surface.
  * @structure listWorkspaceAccessRequests
  * @usage const items = await listWorkspaceAccessRequests(storage, orgId, ws);

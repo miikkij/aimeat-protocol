@@ -18,7 +18,7 @@
  *     `audit.agents.<name>.scope-request`  the last approval: the scopes asked for and granted
  *   The `audit.` prefix is reserved (utils/reserved-keys.ts), so neither the agent nor a granted app
  *   can erase or forge the record of its own refusals. Written through storage directly, like
- *   services/app-audit.ts, because a refusal note is a machine's note about an act and not content
+ *   services/app/audit.ts, because a refusal note is a machine's note about an act and not content
  *   anybody authored, so it takes no AI-provenance record.
  *
  *   HOW IT GOES STALE. A refusal is shown while it is open: the agent still lacks the permission and

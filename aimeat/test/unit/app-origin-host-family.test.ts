@@ -1,6 +1,6 @@
 /**
  * @file test/unit/app-origin-host-family.test.ts
- * @description appOriginHostFamily (services/app-origin-target.ts): the one test of which address
+ * @description appOriginHostFamily (services/app/origin-target.ts): the one test of which address
  *   family a host belongs to, which the grant redirect check and resolveAppOriginTarget both ask
  *   (secaudit 2026-10, C8).
  * @usage pnpm test -- app-origin-host-family
@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C8).
  */
 import { describe, it, expect } from 'vitest';
-import { appOriginHostFamily } from '../../src/services/app-origin-target.js';
+import { appOriginHostFamily } from '../../src/services/app/origin-target.js';
 
 const config = {
   appHost: 'apps.example.org', portfolioOriginEnabled: true, portfolioHost: 'me.example.org',

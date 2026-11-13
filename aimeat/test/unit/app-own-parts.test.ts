@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { GENRE_BODIES } from '../../src/data/app-templates/genres.js';
-import { ownClassNames, designBookStep, OWN_PARTS_MIN } from '../../src/services/app-genre-fork.js';
+import { ownClassNames, designBookStep, OWN_PARTS_MIN } from '../../src/services/app/genre-fork.js';
 
 const receipt = (GENRE_BODIES as Record<string, string>).receipt;
 const withStyles = (html: string, names: string[]) => html.replace('</style>', names.map(n => `.${n} { color: red; }`).join('\n') + '\n</style>');

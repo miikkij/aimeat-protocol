@@ -135,7 +135,7 @@ async function main() {
     // spaces only, never showed it: a production CRM ran four such spaces for a month. The developer
     // decided on 2026-09-13 that it is REFUSED on every door, 422 UNDECLARED_SPACE, before anything is
     // written. These cases went green by asserting the hole the decision closes: every one of them
-    // asserted a stored record and a warning until then (services/workspace-write-items.ts).
+    // asserted a stored record and a warning until then (services/workspace/write-items.ts).
     // Appdev pitfalls group-apps/new-space-needs-a-heal-step and data/heal-step-catch-hides-a-
     // workspace-a-version-behind.
     type Refusal = { code?: string; message?: string; details?: { namespace?: string; declared_spaces?: Array<{ namespace: string }>; how_to_fix?: string } };

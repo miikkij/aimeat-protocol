@@ -36,11 +36,11 @@ import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.j
 import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { accountOf } from '../../services/app-members.js';
+import { accountOf } from '../../services/app/members.js';
 import { emitChange } from '../../services/event-bus.js';
 import {
   readAppRoadmap, addRoadmapEntry, removeRoadmapEntry, setWantedVisibility, publicRoadmap,
-} from '../../services/app-roadmap.js';
+} from '../../services/app/roadmap.js';
 import type { AppTargetFor } from './helpers.js';
 
 const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;

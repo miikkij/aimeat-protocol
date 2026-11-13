@@ -29,14 +29,14 @@ vi.mock('../../src/services/record-cas.js', () => ({
     return next;
   },
 }));
-vi.mock('../../src/services/workspace-access.js', () => ({
+vi.mock('../../src/services/workspace/access.js', () => ({
   decideWorkspaceRead: async () => ({ member: true, manager: false, canRead: true,
     manRec: { value: { objectTypes: [{ namespace: 'shared.pages' }] } } }),
 }));
-vi.mock('../../src/services/workspace-write.js', () => ({
+vi.mock('../../src/services/workspace/write.js', () => ({
   findWorkspaceRecord: async (_s: unknown, key: string) => ({ key, ownerGaii: 'w@n', value: { title: 'Sivu', markdown: TEXT }, version: 3, updatedAt: '2026-11-03T00:00:00Z' }),
 }));
-vi.mock('../../src/services/workspace-content.js', () => ({ loadWorkspaceContent: vi.fn() }));
+vi.mock('../../src/services/workspace/content.js', () => ({ loadWorkspaceContent: vi.fn() }));
 vi.mock('../../src/services/organism-namespace-access.js', () => ({ checkOrganismNamespaceAccess: async () => null }));
 vi.mock('../../src/services/classification/reader.js', () => ({
   readerFor: () => ({ show: async <T>(items: T[]) => items, useForAi: async () => undefined }),

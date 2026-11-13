@@ -16,7 +16,7 @@
  *   THE TEST A CALLER APPLIES, in the words the two 2026-10 defects were found by: can an
  *   anonymous reader open what this event names, as the event is about to be stored? Not "did a
  *   flag change" (a workspace share whose access is 'organism', 'password' or 'account' turns the
- *   public flag on and opens nothing: services/workspace-share.ts) and not "is some related record
+ *   public flag on and opens nothing: services/workspace/share.ts) and not "is some related record
  *   public" (a task completion named any public record of the agent to carry the task's private
  *   title out: services/agent/task-fanout.ts). Every field put in `summary`, `detail` and `link`
  *   answers the same question on its own, field by field.

@@ -10,7 +10,7 @@
  *   that compute it differently produce two identities for the same bytes, and every consumer pinned
  *   to a hash breaks silently. This node has already paid for that shape once — an app and its
  *   extension hashed the same spreadsheet inputs differently, so every value the app computed looked
- *   stale to the server forever (see EXT_HASH_REFERENCE_JS in services/extension-runtime.ts). So the
+ *   stale to the server forever (see EXT_HASH_REFERENCE_JS in services/extension/runtime.ts). So the
  *   hash, the schema inference, the validation and the CSV serialisation live HERE, on the server,
  *   and a browser app reaches them over `/v1/datapackages` rather than reimplementing them.
  *

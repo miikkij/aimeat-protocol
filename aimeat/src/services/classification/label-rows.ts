@@ -31,7 +31,7 @@ const COPY_ROLE = /^(?:draft|latest|version\.\d+)$/;
 /**
  * The one label address of a workspace document or an organism record (decided 2026-09-30): its key
  * without the `.draft`, `.latest` or `.version.N` suffix the workspace stores its copies under
- * (services/workspace-write.ts deleteWorkspaceInstance names the same family). A label set on any
+ * (services/workspace/write.ts deleteWorkspaceInstance names the same family). A label set on any
  * copy is the document's, so publishing never makes an unlabelled copy. The address needs a
  * namespace and an instance before the suffix: `organism.<id>.w.<ws>.<ns>.<instance>` in a
  * workspace, `organism.<id>.<ns>.<instance>` outside one. Any other key is its own address.

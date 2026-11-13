@@ -49,7 +49,7 @@ module.exports = {
             name: 'manifest-is-transport-independent',
             comment: 'The shared extension builder belongs below routes and CLI adapters.',
             severity: 'error',
-            from: { path: '^src/services/extension-manifest[.]ts$' },
+            from: { path: '^src/services/extension/manifest[.]ts$' },
             to: { path: '^src/(routes|cli|mcp)/', dependencyTypesNot: ['type-only'] },
         },
         {
@@ -100,7 +100,7 @@ module.exports = {
                 + 'This is the import half of eslint-rules/no-express-in-service.js: that rule reads '
                 + 'the parameter types, this one refuses the import that makes them reachable.',
             severity: 'error',
-            from: { path: '^src/services', pathNot: 'src/services/(extension-ctx|http)' },
+            from: { path: '^src/services', pathNot: 'src/services/(extension/ctx|http)' },
             to: { dependencyTypes: ['npm'], path: '^express$' },
         },
         {

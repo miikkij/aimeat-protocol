@@ -2,7 +2,7 @@
  * @file test/unit/app-scope-allowance-narrowed.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A boot-time keep step (services/app-scope-allowance.ts keepWorkingAppsOnce) leaves a
+ * @description A boot-time keep step (services/app/scope-allowance.ts keepWorkingAppsOnce) leaves a
  *   grant its holder narrowed by hand (PATCH /v1/app-grants/:grantId stamps scopesFixedAt) as the
  *   holder left it, as the vocabulary migration and the own-app consent already do; the holder's next
  *   sign-in to the app asks for the word once (own-app consent, owner_narrowed). Every other live grant
@@ -18,8 +18,8 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
-import { keepWorkingAppsOnce, readAppScopeAllowance } from '../../src/services/app-scope-allowance.js';
-import { readAppAudit } from '../../src/services/app-audit.js';
+import { keepWorkingAppsOnce, readAppScopeAllowance } from '../../src/services/app/scope-allowance.js';
+import { readAppAudit } from '../../src/services/app/audit.js';
 import { ownAppConsentNeed } from '../../src/services/own-app-consent.js';
 
 const NODE_ID = 'aimeat-allowance-narrowed';

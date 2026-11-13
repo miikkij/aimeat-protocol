@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description PATCH /v1/extensions/:name/config: change config values of an installed extension in
- *   place, without a new version. The work is services/extension-config-set.ts, shared with the MCP
+ *   place, without a new version. The work is services/extension/config-set.ts, shared with the MCP
  *   tool aimeat_extension_config_set.
  * @structure registerExtensionConfigRoutes(router, config, storage)
  * @usage registerExtensionConfigRoutes(router, config, storage) in routes/extensions.ts
@@ -22,9 +22,9 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
-import { getExtSecretKeys, maskSecretFields } from '../../services/extension-secrets.js';
-import { setExtensionConfig, mayChooseSecretHost } from '../../services/extension-config-set.js';
-import { capabilitiesOfRecord } from '../../services/extension-capability-declaration.js';
+import { getExtSecretKeys, maskSecretFields } from '../../services/extension/secrets.js';
+import { setExtensionConfig, mayChooseSecretHost } from '../../services/extension/config-set.js';
+import { capabilitiesOfRecord } from '../../services/extension/capability-declaration.js';
 import { mayManageInstalledExt } from './permissions.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { isOperatorCaller } from '../../services/operator-override.js';

@@ -23,7 +23,7 @@ import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
   organismAdmits, requireUsableServer, requireManageableServer, listUsableServers, attachOrganismServer,
 } from '../../src/services/mcp-client/registry.js';
-import { grantWorkspaceRole } from '../../src/services/workspace-roles.js';
+import { grantWorkspaceRole } from '../../src/services/workspace/roles.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const NODE = 'test-node-001';

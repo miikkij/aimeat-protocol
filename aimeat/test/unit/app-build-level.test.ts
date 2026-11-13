@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { declaredLevel, registerIsOwed, levelFindings, levelStep } from '../../src/services/app-build-level.js';
+import { declaredLevel, registerIsOwed, levelFindings, levelStep } from '../../src/services/app/build-level.js';
 
 const page = (level: string | null, styles = 0) => '<!DOCTYPE html><html><head>'
   + (level === null ? '' : `<meta name="aimeat-level" content="${level}">`)

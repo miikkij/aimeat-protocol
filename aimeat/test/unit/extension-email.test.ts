@@ -2,7 +2,7 @@
  * @file test/unit/extension-email.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description ctx.email (services/extension-email.ts) sends one message to one recipient and draws on
+ * @description ctx.email (services/extension/email.ts) sends one message to one recipient and draws on
  *   a per-account allowance the operator sets (secaudit2026oct22, lead 325, decided 2026-10-25):
  *     - a `to` naming several addresses is refused with a sentence telling the extension to send one
  *       message per recipient, and nothing is sent, on every tier;
@@ -21,11 +21,11 @@ import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { EmailService } from '../../src/services/email.js';
 
-vi.mock('../../src/services/extension-consent.js', () => ({
+vi.mock('../../src/services/extension/consent.js', () => ({
     extensionConsentHolds: vi.fn(async (_s: unknown, ownerGhii: string) => ownerGhii === 'consenting@node-1'),
 }));
 
-const { buildExtensionEmail } = await import('../../src/services/extension-email.js');
+const { buildExtensionEmail } = await import('../../src/services/extension/email.js');
 
 function mailer() {
     const sent: string[] = [];

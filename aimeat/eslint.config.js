@@ -74,7 +74,7 @@ export default tseslint.config(
       // sibling modules). New files over 800 now fail the pre-commit hook + CI.
       'aimeat/max-file-lines': ['error', { max: 800 }],
 
-      // The sandbox capability object comes from services/extension-ctx.ts. Four roads used to build
+      // The sandbox capability object comes from services/extension/ctx.ts. Four roads used to build
       // it by hand and each copy was missing a different guard: no memory quota on the scheduler, a
       // bare fetch instead of safeFetch on the same road, no paywall and no per-call debit ceiling
       // over MCP. Straight to 'error' with no ratchet, because the four offenders were fixed in the

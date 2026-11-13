@@ -33,7 +33,7 @@ import {
 } from '../services/parties/service.js';
 import { sendShareLink, shareAndSend } from '../services/parties/invite.js';
 import { decideRegistration, listRegistrationRequests } from '../services/app-parties/owner.js';
-import type { AppOpOutcome } from '../services/app-op-outcome.js';
+import type { AppOpOutcome } from '../services/app/op-outcome.js';
 import { operatorSetStop } from '../services/parties/admin.js';
 import { PARTY_MANAGE_SCOPE } from '../services/parties/contract.js';
 

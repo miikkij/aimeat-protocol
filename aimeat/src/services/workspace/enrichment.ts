@@ -1,0 +1,202 @@
+/**
+ * @file src/services/workspace/enrichment.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Pure derivation helpers for workspace list enrichment — the SINGLE source of truth
+ *   for the per-workspace projections (record/doc counts, latest event, participants) that were
+ *   previously computed inline in the per-ws endpoints (GET /workspace, /workspace/activity,
+ *   /workspace/participants) AND, separately, in the frontend. The batch enrichment endpoint
+ *   (GET /v1/organisms/:id/workspaces?include=enrichment) and the per-ws routes call these, so the
+ *   numbers can never drift. All functions are PURE (no storage/IO); the caller is responsible for
+ *   applying the per-record read-authorization BEFORE passing records to the count/event helpers
+ *   (participants deliberately runs over the raw bucket, matching the existing participants endpoint).
+ * @structure
+ *   - deriveWorkspaceEvents(readable, manifest, root) — publish/draft events incl. direct writes (newest-first not guaranteed)
+ *   - latestWorkspaceEvent(readable, manifest, root)   — the single most-recent event, or null
+ *   - countWorkspaceInstances(readable, manifest, root) — { recs, docs } distinct-instance counts
+ *   - aggregateParticipants(records, opts)             — node→owner participation (agentsCount only)
+ * @usage import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from './enrichment.js';
+ * @version-history
+ *   v1.0.0 -- 2026-06-22 -- Extracted from organisms.ts per-ws endpoints to back the batch
+ *     ?include=enrichment workspace list (kills the 3N per-workspace fetch fan-out).
+ *   v1.1.0 -- 2026-06-23 -- deriveWorkspaceEvents now emits a publish event for current content
+ *     (`.latest`/bare) that has no `.version.N`, so direct writes (notebook docs pre-fix, agent/import
+ *     writes that skip draft→publish) appear in the activity log/heatmap instead of going unnoticed.
+ *   v1.1.1 -- 2026-09-26 -- An event's actor comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   2026-11-01 -- countWorkspaceInstances and deriveWorkspaceEvents read a record's id from the end of
+ *     its key within its declared space (spaceRowAt, recordRowAt), so a dotted id is counted once and
+ *     its events name its own space (secaudit2026oct31w2 round 10b, dotted record ids).
+ */
+import type { MemoryRecord } from '../../storage/interface.js';
+import { parseGaiiLoose, localAccountName } from '../../utils/gaii.js';
+import { isMemoryBackedSpace } from './meta.js';
+import { recordRowAt, spacePrefixesOf, spaceRowAt } from './record-key.js';
+
+type ObjectType = { name?: unknown; namespace?: unknown; mode?: unknown; kind?: unknown; backing?: unknown };
+
+/** Document-space predicate — mirrors the frontend `isDocSpace` (organisms.js) + the server's
+ *  normalizeObjectTypes inference: an explicit mode:'document', or a legacy kind:'document' with no mode. */
+function isDocSpace(ot: ObjectType): boolean {
+  return ot.mode === 'document' || (!ot.mode && ot.kind === 'document');
+}
+
+function objectTypesOf(manifest: Record<string, unknown> | null | undefined): ObjectType[] {
+  return (manifest?.objectTypes as ObjectType[] | undefined) ?? [];
+}
+
+export interface WorkspaceEvent {
+  at: string; actor: string; agent: string | null; namespace: string;
+  type: string; mode: 'document' | 'records'; instance: string; action: 'publish' | 'draft';
+}
+
+/**
+ * Derive publish/draft events from a workspace's (already read-authorized) records. The feed is a
+ * reconstruction of CURRENT memory state, not an append-only log, so events come from the key shape:
+ *   - `.draft`     → a `draft` (edit) event @updatedAt — exists only while a draft is open.
+ *   - `.version.N` → a `publish` event @createdAt — the persistent record of a publish.
+ *   - bare / `.latest` with NO `.version.N` for that instance → a `publish` event @updatedAt. This is
+ *     the "direct write" case: content written straight to `.latest`/bare (an agent, an import, or any
+ *     path that skips draft→publish) would otherwise emit NOTHING and go unnoticed in the activity
+ *     log / heatmap. When a `.version.N` DOES exist, the bare/`.latest` pointer is ignored (the publish
+ *     events already cover it — avoids double-counting).
+ * meta./access. keys are skipped. `root` is the workspace root WITHOUT a trailing dot, e.g.
+ * `organism.{id}.w.{ws}`.
+ */
+export function deriveWorkspaceEvents(readable: MemoryRecord[], manifest: Record<string, unknown> | null | undefined, root: string): WorkspaceEvent[] {
+  const types = objectTypesOf(manifest);
+  const typeByNs = new Map(types.filter(o => o.namespace && o.name).map(o => [o.namespace as string, o.name as string]));
+  const modeByNs = new Map(types.filter(o => o.namespace).map(o => [o.namespace as string, o.mode === 'document' ? 'document' : 'records'] as const));
+
+  // Group each instance's records so a direct write (current content, no version history) can be told
+  // apart from a normal publish (which has `.version.N`).
+  interface Slot { ns: string; instance: string; draft?: MemoryRecord; versions: MemoryRecord[]; current?: MemoryRecord }
+  const slots = new Map<string, Slot>();
+  // A key of a declared space: the longest declared namespace it continues, and the record read from
+  // the end of the rest (recordRowAt), so a dotted id is one record under its own space. Read from the
+  // end alone, `notes.v1.2.draft` was record `2` of a space `notes.v1` (secaudit2026oct31w2 round 10b).
+  const declared = [...typeByNs.keys()].sort((a, b) => b.length - a.length);
+  for (const r of readable) {
+    const rel = r.key.slice(root.length + 1);
+    if (rel.startsWith('meta.') || rel.startsWith('access.')) continue;
+    const ns = declared.find(d => rel.startsWith(`${d}.`));
+    const row = ns ? recordRowAt(rel.slice(ns.length + 1)) : null;
+    let role: 'draft' | 'version' | 'latest' | 'bare';
+    let instance: string | undefined;
+    let namespace: string;
+    if (ns && row) { role = row.copy; instance = row.id; namespace = ns; }
+    else {
+      const parts = rel.split('.');
+      const last = parts[parts.length - 1];
+      const secondLast = parts[parts.length - 2];
+      let core: string[];
+      if (last === 'draft') { role = 'draft'; core = parts.slice(0, -1); }
+      else if (secondLast === 'version' && /^\d+$/.test(last)) { role = 'version'; core = parts.slice(0, -2); }
+      else if (last === 'latest') { role = 'latest'; core = parts.slice(0, -1); }
+      else { role = 'bare'; core = parts; }
+      instance = core[core.length - 1];
+      namespace = core.slice(0, -1).join('.');
+    }
+    if (!instance || !namespace) continue;
+    const k = `${namespace}.${instance}`;
+    let s = slots.get(k);
+    if (!s) { s = { ns: namespace, instance, versions: [] }; slots.set(k, s); }
+    if (role === 'draft') s.draft = r;
+    else if (role === 'version') s.versions.push(r);
+    else if (role === 'latest') s.current = r;       // `.latest` is the canonical current pointer
+    else if (!s.current) s.current = r;              // bare key only counts as current if no `.latest`
+  }
+
+  const events: WorkspaceEvent[] = [];
+  const push = (r: MemoryRecord, ns: string, instance: string, action: 'publish' | 'draft', at: string) => {
+    const p = parseGaiiLoose(r.ownerGaii);
+    events.push({
+      at, actor: localAccountName(r.ownerGaii), agent: p.agent || null, namespace: ns,
+      type: typeByNs.get(ns) || ns,
+      mode: (modeByNs.get(ns) as 'document' | 'records') || 'records',
+      instance, action,
+    });
+  };
+  for (const s of slots.values()) {
+    if (s.draft) push(s.draft, s.ns, s.instance, 'draft', s.draft.updatedAt);
+    for (const v of s.versions) push(v, s.ns, s.instance, 'publish', v.createdAt);
+    // Direct write: current content with no version history — surface it so nothing goes unnoticed.
+    if (s.versions.length === 0 && s.current) push(s.current, s.ns, s.instance, 'publish', s.current.updatedAt);
+  }
+  return events;
+}
+
+/** The single most-recent event for the workspace list's "last: type/instance published 2h ago" line. */
+export function latestWorkspaceEvent(readable: MemoryRecord[], manifest: Record<string, unknown> | null | undefined, root: string): { type: string; instance: string; action: 'publish' | 'draft'; at: string } | null {
+  let best: WorkspaceEvent | null = null;
+  for (const e of deriveWorkspaceEvents(readable, manifest, root)) {
+    if (!best || (e.at || '') > (best.at || '')) best = e;
+  }
+  return best ? { type: best.type, instance: best.instance, action: best.action, at: best.at } : null;
+}
+
+/**
+ * Count distinct instances per memory-backed space, split into documents vs records — identical to
+ * what GET /workspace returns (objects ∪ drafts), which the frontend reduced to recs/docs counts.
+ * An instance with ONLY `.version.N` history (no bare/latest/draft) is NOT counted (matches the read).
+ */
+export function countWorkspaceInstances(readable: MemoryRecord[], manifest: Record<string, unknown> | null | undefined, root: string): { recs: number; docs: number } {
+  let recs = 0, docs = 0;
+  const prefixes = spacePrefixesOf(root, objectTypesOf(manifest));
+  for (const ot of objectTypesOf(manifest)) {
+    const name = typeof ot.name === 'string' ? ot.name : undefined;
+    const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
+    if (!name || !namespace || !isMemoryBackedSpace(ot)) continue;
+    const nsPrefix = `${root}.${namespace}.`;
+    const instances = new Map<string, boolean>();   // instanceId → has a current/draft record (vs version-only)
+    for (const r of readable) {
+      // The id is read from the end of the key, so a dotted id is one instance under its whole id
+      // (secaudit2026oct31w2 round 10b); a key of a longer namespace is left to that space.
+      const row = spaceRowAt(r.key, nsPrefix, prefixes);
+      if (!row) continue;
+      if (row.copy === 'version') { if (!instances.has(row.id)) instances.set(row.id, false); continue; }
+      instances.set(row.id, true);   // bare / latest / draft → a real (countable) instance
+    }
+    let count = 0;
+    for (const present of instances.values()) if (present) count++;
+    if (isDocSpace(ot)) docs += count; else recs += count;
+  }
+  return { recs, docs };
+}
+
+export interface Participant {
+  owner: string; node: string; isLocalNode: boolean; isCreator: boolean; isSelf: boolean; agentsCount: number;
+}
+
+/**
+ * Aggregate participation from record owner traces — identical to GET /workspace/participants but
+ * emitting only `agentsCount` (never agent names, so the list view leaks nothing the detail view
+ * wouldn't). Runs over the RAW bucket (no read-authorization) exactly like the participants endpoint,
+ * which exposes participation counts, not content. `root` has NO trailing dot.
+ */
+export function aggregateParticipants(records: MemoryRecord[], opts: { root: string; members: string[]; creator: string | undefined; viewerOwner: string; nodeId: string }): Participant[] {
+  const { root, members, creator, viewerOwner, nodeId } = opts;
+  interface Agg { owner: string; node: string; human: number; agents: Set<string> }
+  const byKey = new Map<string, Agg>();
+  const ensure = (owner: string, node: string): Agg => {
+    const k = `${owner}@${node}`;
+    let a = byKey.get(k);
+    if (!a) { a = { owner, node, human: 0, agents: new Set() }; byKey.set(k, a); }
+    return a;
+  };
+  for (const r of records) {
+    const rel = r.key.slice(root.length + 1);
+    if (rel.startsWith('access.')) continue;   // access-request plumbing, not participation
+    const p = parseGaiiLoose(r.ownerGaii);
+    if (!p.owner || !p.node) continue;
+    const agg = ensure(p.owner, p.node);
+    if (p.agent) agg.agents.add(p.agent); else agg.human++;
+  }
+  for (const m of members) ensure(m, nodeId);   // members with access count even if they've written nothing
+  return [...byKey.values()].map(a => ({
+    owner: a.owner, node: a.node,
+    isLocalNode: a.node === nodeId,
+    isCreator: a.owner === creator,
+    isSelf: a.owner === viewerOwner && a.node === nodeId,
+    agentsCount: a.agents.size,
+  }));
+}

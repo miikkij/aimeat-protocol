@@ -31,7 +31,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { installRoleRefusal } from '../../services/extension-install-role.js';
+import { installRoleRefusal } from '../../services/extension/install-role.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { canManageExtensionAs, type ExtensionCaller, type ExtensionAct } from '../../services/extension-access/manage.js';
 
@@ -42,7 +42,7 @@ function callerOf(req: Request): ExtensionCaller | null {
   return { ...auth, owner: auth.owner, roles: auth.roles || [], scopes: (auth as { scopes?: string[] }).scopes || [] };
 }
 
-/** The install role as a rule on the account (services/extension-install-role.ts), re-exported for the doors. */
+/** The install role as a rule on the account (services/extension/install-role.ts), re-exported for the doors. */
 export { installRoleRefusal };
 
 // Does this caller have permission to write extensions?

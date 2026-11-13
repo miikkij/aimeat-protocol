@@ -26,7 +26,7 @@ import {
     rebindLegacySecretFields,
     secretContext,
     SECRET_MASK,
-} from '../../src/services/extension-secrets.js';
+} from '../../src/services/extension/secrets.js';
 import { encrypt, encryptBound, decryptBound, isBoundCiphertext } from '../../src/services/encryption.js';
 
 const KEY = randomBytes(32);

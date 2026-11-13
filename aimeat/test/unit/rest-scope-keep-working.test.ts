@@ -107,7 +107,7 @@ const INLINE_NOT_KEPT: Record<string, string> = {
     'connections:read-through': 'the read-through route asked it from its first day',
     // routes/webmcp-invoke-gate.ts (secaudit 2026-10, v72): a word split out of exchange:write, which
     // accepts contracts and places bids and is not given wholesale; the callers of the app-tool route
-    // are kept by their own step (services/app-tool-invoke-keep.ts, test/unit/app-tool-invoke-keep.test.ts).
+    // are kept by their own step (services/app/tool-invoke-keep.ts, test/unit/app-tool-invoke-keep.test.ts).
     'exchange:invoke': 'the app-tool route keeps its earlier callers through services/app-tool-invoke-keep.ts',
     // routes/memory/key.ts and patch.ts (secaudit2026oct26): a relabel or an answer through owner_scope
     // of a record the caller reads as absent. The word is outside every wildcard and only the owner's

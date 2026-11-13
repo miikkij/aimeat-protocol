@@ -21,8 +21,8 @@ import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { memoryTarget, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { readerFor, readerForAgent } from '../../src/services/classification/reader.js';
 import { resetClassificationAudit, pendingClassificationAudit } from '../../src/services/classification/audit.js';
-import { loadWorkspaceContent } from '../../src/services/workspace-content.js';
-import { readWorkspaceOp } from '../../src/services/workspace-tool-ops.js';
+import { loadWorkspaceContent } from '../../src/services/workspace/content.js';
+import { readWorkspaceOp } from '../../src/services/workspace/tool-ops.js';
 import { hideFromAiOnNode } from './classification-fixtures.js';
 
 const N = 'n';

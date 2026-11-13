@@ -19,7 +19,7 @@
  *   attended call that is the caller; in an unattended run (here a workflow step) it is the agent
  *   that wrote the extension's code. A secret that already has a host keeps working for everyone.
  *
- *   FIRST FAIL, measured 2026-10-20 with both decisions in services/extension-secret-authority.ts
+ *   FIRST FAIL, measured 2026-10-20 with both decisions in services/extension/secret-authority.ts
  *   short-circuited to the old behaviour (the caller's vault, any first use allowed): 9 and 14
  *   failed (the wildcard agent's own code delivered the unbound value, attended and in a workflow
  *   step), 10 (that bound V59_A to the agent first) and 15 (the binding named the owner's GHII).

@@ -2,7 +2,7 @@
  * @file test/unit/app-invite-mail-count.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description services/app-roster-write.ts setMember by email: an invitation an agent or an app
+ * @description services/app/roster-write.ts setMember by email: an invitation an agent or an app
  *   sends by email counts against the account's emailed-invitation allowance
  *   (account-limits.ts INVITE_EMAIL_LIMIT, the organism invitation's), before anything is stored, as
  *   the rest of third-party mail does; past it, 429 RATE_LIMITED with retry_after_sec, and nothing is
@@ -16,8 +16,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { setMember } from '../../src/services/app-roster-write.js';
-import { listInvites } from '../../src/services/app-member-invites.js';
+import { setMember } from '../../src/services/app/roster-write.js';
+import { listInvites } from '../../src/services/app/member-invites.js';
 import { INVITE_EMAIL_LIMIT } from '../../src/services/account-limits.js';
 import { provideNodeService } from '../../src/services/node-context.js';
 import type { EmailService } from '../../src/services/email.js';

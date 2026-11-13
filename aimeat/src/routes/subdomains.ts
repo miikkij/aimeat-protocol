@@ -178,17 +178,17 @@ import { readCompanyPortfolioPage } from '../services/company/company-portfolio.
 import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
 } from '../services/ai/provenance-marks.js';
-import { applyServeMarks } from '../services/app-serve-marks.js';
-import { servedBadgeOn, appInstallChipOn, appReviewedBy } from '../services/app-marks.js';
-import { legalLinksFor } from '../services/app-legal.js';
+import { applyServeMarks } from '../services/app/serve-marks.js';
+import { servedBadgeOn, appInstallChipOn, appReviewedBy } from '../services/app/marks.js';
+import { legalLinksFor } from '../services/app/legal.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
-import { appToolNames } from '../services/app-tool-names.js';
-import { appAiUse } from '../services/app-ai-use.js';
-import { appInfoMarkFor } from '../services/app-news.js';
+import { appToolNames } from '../services/app/tool-names.js';
+import { appAiUse } from '../services/app/ai-use.js';
+import { appInfoMarkFor } from '../services/app/news.js';
 import { internetOpenMarkFor } from '../services/internet-opening/opening-mark.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
-import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage, appOwnDescription } from '../services/app-seo.js';
+import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage, appOwnDescription } from '../services/app/seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { countPageView } from '../services/signals/page-views.js';
@@ -200,10 +200,10 @@ import { countApexDocs } from './visibility.js';
 import { servePortfolio, portfolioMarks } from './serve-portfolio.js';
 import { ownerTagsFor, withOwnerTags, ownerTagsIntoHtml } from '../services/visibility/analytics-tags.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
-import { appAccessGranted } from '../services/app-access-token.js';
+import { appAccessGranted } from '../services/app/access-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../services/agent/face.js';
-import { formatMdLang } from '../services/app-format-md.js';
+import { formatMdLang } from '../services/app/format-md.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName, resolveIdentity } from '../utils/gaii.js';
@@ -274,7 +274,7 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
   // And where the visitor came from, counted for every owner by default (services/visibility/).
   countVisit(storage, protect.config, { ownerGaii: app.ownerGaii, target: app.filename, ...protect.visit });
 
-  // Search visibility, decided once (services/app-seo.ts) and used twice below: the header here,
+  // Search visibility, decided once (services/app/seo.ts) and used twice below: the header here,
   // and the head metadata inside the marks pass. The header is the half that stops a LISTING —
   // robots.txt on this origin stops the crawl, but a URL somebody else linked to gets indexed
   // from the link text alone, and a crawler told not to fetch the page cannot read the noindex
@@ -304,10 +304,10 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
     // the meta tags and nothing else) and the head metadata the app almost certainly has none of
     // (measured on a live app origin: lang, canonical, description, og:*, JSON-LD all absent —
     // authors write apps, not meta tags, and author-declared tags always win).
-    // The "Use with your AI" mark rides with the visible chrome a person sees (services/app-ai-use.ts).
+    // The "Use with your AI" mark rides with the visible chrome a person sees (services/app/ai-use.ts).
     const aiUse = visible ? await appAiUse(storage, protect.config, app) : null;
     // The app-info mark: the version, the latest changes, and the live follow that reloads the page
-    // on a new version (services/app-news.ts, public/js/app-news.js).
+    // on a new version (services/app/news.ts, public/js/app-news.js).
     const info = visible ? await appInfoMarkFor(storage, protect.config, app, visible.locale) : undefined;
     let buf = applyServeMarks(relaxed, {
       aiUse: aiUse && visible ? { use: aiUse, locale: visible.locale } : undefined,
@@ -317,10 +317,10 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
       // This branch is inside a `text/html` test, so the media type is already settled and the
       // marks pass does not have to guess from a closing tag the author never had to write.
       isDocument: true,
-      // The node's switch, then the owner's (services/app-marks.ts); on unless one is off.
+      // The node's switch, then the owner's (services/app/marks.ts); on unless one is off.
       badge: servedBadgeOn(protect.config, app.manifest),
       provenance: prov,
-      // Public or not as the publish decides it (services/app-publish.ts): an access code or a
+      // Public or not as the publish decides it (services/app/publish.ts): an access code or a
       // park makes the app private, and the reviewer's re-decision of the label reads that.
       visibleLabel: visible ? { ...visible, publiclyReadable: !app.accessCode && !app.parked } : undefined,
       // The named reviewer, when the account holder declared one: served in the head, and the
@@ -367,7 +367,7 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             // nothing to do with being indexed: an app nobody may find is still one its owner puts
             // on their own phone.
             hasIconImage: await appHasIconImage(storage, app),
-            // The owner's switch on the browser install offer (services/app-marks.ts).
+            // The owner's switch on the browser install offer (services/app/marks.ts).
             installChip: appInstallChipOn(app.manifest),
             // The declared reviewer becomes the JSON-LD author and editor, which is how a byline
             // scanner reads a page (schema.org author/editor, meta author, rel=author).
@@ -583,7 +583,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
     // An app's draft origin (DRAFT_LABEL_SUFFIX): the app's unpublished draft, against a draft-preview
     // token and nothing else. The published app is never served here, no frame grant widens the
-    // policy, and the silent sign-in treats code from here as unpublished (services/app-origin-target.ts).
+    // policy, and the silent sign-in treats code from here as unpublished (services/app/origin-target.ts).
     const draftOf = draftBaseLabel(sub);
     if (draftOf !== null) {
       const draftSite = await storage.getSubdomainSite(draftOf);
@@ -646,7 +646,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const app = await resolveServableApp(storage, site.target);
     if (!app) return notFound();
     // A gated app is served here only against a grant the APEX issued after it checked the access
-    // code or the licence (services/app-access-token.ts). This origin holds no session, so the
+    // code or the licence (services/app/access-token.ts). This origin holds no session, so the
     // grant is the whole authorization. Without one the answer stays the uniform 404 an unmapped
     // subdomain gets, so the origin still tells a stranger nothing about which apps exist.
     // The query grant is accepted once and moved to a host-only cookie, with a 302 to the address

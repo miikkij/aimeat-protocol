@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, expect, it } from 'vitest';
-import { bundledAgentScopes } from '../../src/services/app-agent-propose.js';
+import { bundledAgentScopes } from '../../src/services/app/agent-propose.js';
 
 const ownerSession = { sub: 'alice', owner: 'alice', roles: ['owner'], scopes: [] };
 const agent = (scopes: string[]) => ({ sub: 'concierge#alice@n', owner: 'alice', roles: ['agent'], scopes });

@@ -73,7 +73,7 @@ export const CrewDefSchema = z.object({
   // What the agent is for, in one or two sentences. The owner reads it on the proposal.
   description: z.string().max(2000).optional(),
   // The permissions the agent's job needs. A proposal asks the owner for these, capped by what the
-  // proposer may grant; `*` and the exact-grant scopes are left out (services/app-agent-propose.ts).
+  // proposer may grant; `*` and the exact-grant scopes are left out (services/app/agent-propose.ts).
   scopes: z.array(z.string().min(1).max(64)).max(40).optional(),
   readme_md: z.string().max(20000).optional(),
   temperature: z.number().min(0).max(2).optional(),

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The REST routes for the two workspace operations an agent performs most: read the
- *   index (or open named records) and write a draft. Both are services/workspace-tool-ops.ts, the
+ *   index (or open named records) and write a draft. Both are services/workspace/tool-ops.ts, the
  *   functions aimeat_workspace_read and aimeat_workspace_write run on the node's MCP and ctx.workspace
  *   runs in the extension sandbox.
  *
@@ -36,7 +36,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { readerFor } from '../../services/classification/reader.js';
 import {
     readWorkspaceOp, writeWorkspaceDraftsOp, workspaceCallerOf, type WorkspaceOpRefusal, type WorkspaceOpsCaller,
-} from '../../services/workspace-tool-ops.js';
+} from '../../services/workspace/tool-ops.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 
 export function registerOrganismWorkspaceToolRoutes(

@@ -34,7 +34,7 @@
  */
 import type { FieldType } from '../datapackage/contract.js';
 import type { ContentLabelTarget } from '../../storage/interface.js';
-import { runExtensionActionAsSystem } from '../extension-system-run.js';
+import { runExtensionActionAsSystem } from '../extension/system-run.js';
 import { personalRowsFor } from '../datapackage/personal-guard.js';
 import { resolveFileRef } from '../file-refs.js';
 import { readerFor } from '../classification/reader.js';

@@ -67,7 +67,7 @@ import { resolveWriteTarget, type WriteTargetAuth } from '../write-target.js';
 import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OWNER_SCOPE, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
 import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../memory-write-asks.js';
 import { isKeyArchived } from '../archive.js';
-import { undeclaredSpaceForKey } from '../workspace-write-items.js';
+import { undeclaredSpaceForKey } from '../workspace/write-items.js';
 import { odpsWriteRefusal } from '../exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../legacy-pacing-write.js';
 import { stampAgentWrite, storeHeldProvenance } from '../ai/provenance.js';

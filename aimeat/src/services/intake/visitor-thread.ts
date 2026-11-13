@@ -23,7 +23,7 @@
  *     2026-11-03, decision 2 of 2026-11-05).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { readWorkspaceMetaRecord } from '../workspace-meta-read.js';
+import { readWorkspaceMetaRecord } from '../workspace/meta-read.js';
 import { threadIdOf, type IntakeThreadConfig } from '../intake-thread.js';
 import { formConfigOfRecord } from './form-owner.js';
 

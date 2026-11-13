@@ -31,7 +31,7 @@ import { createStorage, type StorageProvider } from '../../src/storage/storage-f
 import type { Storage } from '../../src/storage/interface.js';
 import { emailHashOf } from '../../src/services/owner-provisioning.js';
 import { promoteContactsForVerifiedEmail } from '../../src/services/contacts.js';
-import { applyAppInvitesForVerifiedEmail } from '../../src/services/app-member-invites.js';
+import { applyAppInvitesForVerifiedEmail } from '../../src/services/app/member-invites.js';
 import { pinnedSqlitePath, serverDbUrl } from './server-db.js';
 
 const handles = new Map<string, Promise<Storage>>();

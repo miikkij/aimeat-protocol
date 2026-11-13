@@ -26,7 +26,7 @@
  */
 import { parse as parseYaml } from 'yaml';
 import type { PackageRecord, PackageComponent } from '../../../storage/types/packages.js';
-import { parseBundledCrews } from '../../app-bundled-crews.js';
+import { parseBundledCrews } from '../../app/bundled-crews.js';
 import { expectsOf, type PackageExpects } from './package-expects.js';
 import { questionsOf } from './package-config-needs.js';
 import { packageCapabilities } from '../install/package-capabilities.js';

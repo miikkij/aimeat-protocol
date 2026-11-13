@@ -34,9 +34,9 @@ import {
 } from '../classification/audience-cap.js';
 import { appTarget, boardTarget, organismTarget } from '../classification/containers.js';
 import { fileTarget, memoryTarget } from '../classification/labels.js';
-import { appAudienceOf } from '../app-publish-gate.js';
-import { readShareMetaOf } from '../workspace-share.js';
-import { shareCapRefusal } from '../workspace-share-gate.js';
+import { appAudienceOf } from '../app/publish-gate.js';
+import { readShareMetaOf } from '../workspace/share.js';
+import { shareCapRefusal } from '../workspace/share-gate.js';
 import type { PublishRequest, PublishStoreCtx } from './store.js';
 
 type Refusal = { ok: false; status: 409; code: string; message: string };

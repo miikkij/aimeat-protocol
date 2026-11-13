@@ -85,7 +85,7 @@ const CODE_COMPONENT_TYPES = new Set(['extension', 'app', 'cortex', 'skill']);
 import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { emitChange } from '../../event-bus.js';
 import { logger } from '../../../utils/logger.js';
-import { carryFirstUseKeep, keepsPreAuditFirstUse } from '../../extension-first-use-keep.js';
+import { carryFirstUseKeep, keepsPreAuditFirstUse } from '../../extension/first-use-keep.js';
 import { purchaseRefusal } from '../sale/package-account-entitlement.js';
 import type { ExtensionCodeAwaiting } from './package-install.js';
 import { packageLockCaller } from './package-schema-lock.js';
@@ -109,7 +109,7 @@ export interface MigrateOutcome {
     newVersion: string;
     /** A skill left out because the owner has one of that name of their own (package-skill-component.ts). */
     warnings?: string[];
-    /** Extension components stored switched off, their code waiting for an operator (services/extension-code-hold.ts). */
+    /** Extension components stored switched off, their code waiting for an operator (services/extension/code-hold.ts). */
     awaitingOperator?: ExtensionCodeAwaiting[];
 }
 
@@ -524,7 +524,7 @@ export async function applyInstanceMigration(
                 noteHeld(compId, result.awaitingOperator);
 
                 // A reinstall of byte-identical extension code keeps the old-code first-use mark the
-                // replaced record carried; changed code does not (services/extension-first-use-keep.ts).
+                // replaced record carried; changed code does not (services/extension/first-use-keep.ts).
                 if (previousExtension && keepsPreAuditFirstUse(previousExtension.config)) {
                     const fresh = await storage.getExtension(registeredAs);
                     const kept = fresh ? carryFirstUseKeep(fresh.config ?? {}, fresh.actions, previousExtension) : null;

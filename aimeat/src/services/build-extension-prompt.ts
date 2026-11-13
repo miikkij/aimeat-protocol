@@ -114,10 +114,10 @@ export interface ExtensionPromptOpts {
 }
 
 /**
- * The sandbox context. Transcribed from services/extension-ctx-contract.ts (ExtensionCtx), the guest
- * object built in services/extension-runtime.ts (buildSandboxScript), and the roads that decide which
+ * The sandbox context. Transcribed from services/extension/ctx-contract.ts (ExtensionCtx), the guest
+ * object built in services/extension/runtime.ts (buildSandboxScript), and the roads that decide which
  * optional members exist: routes/extensions/actions.ts, mcp/extensions.ts and
- * services/extension-system-run.ts. test/unit/build-extension-prompt.test.ts runs a script in the
+ * services/extension/system-run.ts. test/unit/build-extension-prompt.test.ts runs a script in the
  * sandbox and fails when a member the guest receives is missing from this table.
  */
 function sandboxSection(): string {
@@ -354,7 +354,7 @@ function sandboxSection(): string {
   ].join('\n');
 }
 
-/** The manifest contract, transcribed from services/extension-manifest.ts. */
+/** The manifest contract, transcribed from services/extension/manifest.ts. */
 function manifestSection(owner: string): string {
   return [
     '## The manifest',
@@ -406,7 +406,7 @@ function manifestSection(owner: string): string {
   ].join('\n');
 }
 
-/** Secrets, transcribed from services/extension-secrets.ts. */
+/** Secrets, transcribed from services/extension/secrets.ts. */
 function secretsSection(): string {
   return [
     '## Secrets, the only safe place for an API key',

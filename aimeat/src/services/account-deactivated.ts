@@ -5,7 +5,7 @@
  * @description Is the account a piece of background work acts for deactivated? One read, asked at the
  *   three places that act with no token: the scheduler fire (services/scheduler.ts executeJob), the
  *   start of a workflow run by a trigger (services/workflow/trigger-authority.ts refuseTriggerStart)
- *   and an unattended extension run (services/extension-system-run.ts runExtensionActionAsSystem).
+ *   and an unattended extension run (services/extension/system-run.ts runExtensionActionAsSystem).
  *   Since 2026-10-27 also before a workflow run in flight dispatches a step
  *   (services/workflow/dispatch-authority.ts waits) and in the goal sweep (services/goals/goals-sweep.ts).
  *

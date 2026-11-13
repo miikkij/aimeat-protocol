@@ -87,7 +87,7 @@ export interface AppHeadSpec {
   /** CSP nonce attribute for the JSON-LD script tag, or ''. */
   nonceAttr?: string;
   /**
-   * Whether a search engine should index this app (services/app-seo.ts). False stamps a robots
+   * Whether a search engine should index this app (services/app/seo.ts). False stamps a robots
    * meta and skips the descriptive tags: an app nobody asked to have found does not need keywords.
    * Defaults to false, so a caller that has not thought about it does not accidentally opt an
    * owner's app in.
@@ -130,7 +130,7 @@ export interface AppHeadSpec {
    */
   author?: string;
   /**
-   * The app's own legal pages (services/app-legal.ts), as `<link rel>` tags where a registered
+   * The app's own legal pages (services/app/legal.ts), as `<link rel>` tags where a registered
    * relation exists (terms-of-service, privacy-policy, help) so a store, a crawler or an agent
    * finds them without reading the page.
    */

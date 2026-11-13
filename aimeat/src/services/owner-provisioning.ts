@@ -60,7 +60,7 @@ import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
 import { promoteContactsForVerifiedEmail } from './contacts.js';
-import { applyAppInvitesForVerifiedEmail } from './app-member-invites.js';
+import { applyAppInvitesForVerifiedEmail } from './app/member-invites.js';
 import { executeHooks } from './hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { setupCodeGateFor, setupCodeRefusal, setupCodeRequired, SETUP_CODE_USED_MESSAGE } from './setup-code.js';
@@ -403,7 +403,7 @@ export async function provisionOwner(
   if (verified) {
     await promoteContactsForVerifiedEmail(storage, emailHashOf(verified), ghii)
       .catch(err => { logger.warn('provisionOwner: contact promotion is best-effort', { error: String(err) }); });
-    // An app roster invitation sent to this address becomes a membership (services/app-member-invites.ts).
+    // An app roster invitation sent to this address becomes a membership (services/app/member-invites.ts).
     await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHashOf(verified), ghii)
       .catch(err => { logger.warn('provisionOwner: app invitations are best-effort', { error: String(err) }); });
   }

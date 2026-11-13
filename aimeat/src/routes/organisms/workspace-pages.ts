@@ -9,7 +9,7 @@
  *       read answers to and the classification reader's show.
  *     - POST …/documents/:space/:docId/opened — the day this page was last opened, for a page the
  *       member's own view renders itself (a Markdown page). The public reads and the frame address
- *       record it on their own (services/workspace-opened.ts).
+ *       record it on their own (services/workspace/opened.ts).
  *   The space and the page are in the path and the workspace in `?ws=`, as the document edit routes
  *   on this router have them.
  * @structure registerOrganismWorkspacePageRoutes(router, config, storage, H)
@@ -27,14 +27,14 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { findWorkspaceRecord } from '../../services/workspace-write.js';
+import { findWorkspaceRecord } from '../../services/workspace/write.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { isHtmlPageValue } from '../../services/html-page.js';
 import { frameUrlFor } from '../../services/page-frame.js';
 import { PAGE_FRAME_TTL_SECONDS } from '../../services/page-frame-token.js';
-import { markPageOpened } from '../../services/workspace-opened.js';
-import { canReadWorkspaceRecords } from '../../services/workspace-access.js';
+import { markPageOpened } from '../../services/workspace/opened.js';
+import { canReadWorkspaceRecords } from '../../services/workspace/access.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismWorkspacePageRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -46,7 +46,7 @@ export function registerOrganismWorkspacePageRoutes(router: Router, config: Aime
         const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
         if (!ws) { res.status(400).json(error(config.nodeId, 'WS_REQUIRED', 'Name the workspace with ?ws=<workspace id>.')); return null; }
         // 404 for a workspace the caller cannot read, the same no-disclosure answer the workspace read gives.
-        // The gate of the member records read (services/workspace-access.ts canReadWorkspaceRecords):
+        // The gate of the member records read (services/workspace/access.ts canReadWorkspaceRecords):
         // the manifest alone admitted its own owner, a creator removed from the organism (secaudit2026oct22).
         const organism = await storage.getOrganism(id);
         if (!organism || !(await canReadWorkspaceRecords(storage, config, organism, req.auth!.sub, req.auth!.owner, resolveIdentity(req.auth!, config.nodeId), ws))) {

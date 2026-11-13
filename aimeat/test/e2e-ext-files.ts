@@ -1,6 +1,6 @@
 /**
  * @file test/e2e-ext-files.ts
- * @description E2E for ctx.files — the file half of the extension sandbox (services/extension-files.ts).
+ * @description E2E for ctx.files — the file half of the extension sandbox (services/extension/files.ts).
  *   Proves the two rules that make it safe to hand to sandboxed code: a READ is authorized AS THE
  *   CALLER through the same authorizeRead() the /v1/pub route uses (an extension can read exactly
  *   what the person invoking it could read, and a private file belonging to someone else is

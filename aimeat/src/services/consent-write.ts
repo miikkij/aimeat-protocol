@@ -87,7 +87,7 @@ import { notifyDirectoryChange } from './directory.js';
 import { callerFromAuth } from './caller-context.js';
 import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
 import { isNamedShare, normalizePartyShare, normalizeVisitorShare, packageOfPattern, sharesEnded } from './parties/shares.js';
-import { consentWsRole, WS_ROLE_KEY } from './workspace-roles.js';
+import { consentWsRole, WS_ROLE_KEY } from './workspace/roles.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
@@ -161,7 +161,7 @@ export interface ConsentGrantInput {
     /**
      * What the recipient may do: `read` (absent) or `write`. Write is the contributor role on one
      * workspace, for one person on this node, filed under the workspace's creator; any other `write`
-     * is refused (consentWsRole in services/workspace-roles.ts). The purpose never decides it.
+     * is refused (consentWsRole in services/workspace/roles.ts). The purpose never decides it.
      */
     role?: unknown;
 }

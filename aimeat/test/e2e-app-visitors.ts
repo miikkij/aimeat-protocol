@@ -29,7 +29,7 @@ import type { Kysely } from 'kysely';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import { USAGE_FOLDED_VISITOR, type Storage } from '../src/storage/interface.js';
 import { rebuildUsageRollup } from '../src/services/usage/rollup-engine.js';
-import { readAppVisitors, type AppVisitorsReport } from '../src/services/app-visitors.js';
+import { readAppVisitors, type AppVisitorsReport } from '../src/services/app/visitors.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 

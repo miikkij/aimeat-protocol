@@ -8,7 +8,7 @@
  *
  *   A handler here reads the signed token's meta, unpacks whatever shape the bytes arrive in, and
  *   renders the answer. The decisions belong to the service each capability already has, so the
- *   app, storage and cortex-install paths call services/app-publish.ts, storage-file-write.ts and
+ *   app, storage and cortex-install paths call services/app/publish.ts, storage-file-write.ts and
  *   cortex-lifecycle.ts, and a cortex replace calls services/cortex/upsert.ts, rather than restating
  *   their gates. Presigned upload is the endpoint an author is told to use for anything over ~1 kB,
  *   which makes a gate that is missing here a gate that is missing for most real traffic.
@@ -180,17 +180,17 @@ import { handleStorageUpload, declaredFromMeta, completeDirectStorageUpload } fr
 import { handleSkillUpload } from './upload-skill.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { operatorName } from '../services/operator-principal.js';
-import { publishApp } from '../services/app-publish.js';
-import { publishAskFromMeta, publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
-import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
+import { publishApp } from '../services/app/publish.js';
+import { publishAskFromMeta, publishAskedFields, askedStatus } from '../services/app/publish-gate.js';
+import { servedMarksResponse } from '../services/app/serve-marks-strip.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
-import { effectiveDevLevel, mayAct } from '../services/app-dev-grant.js';
-import { accountOf } from '../services/app-members.js';
+import { effectiveDevLevel, mayAct } from '../services/app/dev-grant.js';
+import { accountOf } from '../services/app/members.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../services/resource-events.js';
 import { getEncryptionKey } from '../services/encryption.js';
-import { prepareSecretConfigForWrite } from '../services/extension-secrets.js';
-import { carryHostFieldValues } from '../services/extension-network-hosts.js';
+import { prepareSecretConfigForWrite } from '../services/extension/secrets.js';
+import { carryHostFieldValues } from '../services/extension/network-hosts.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
 import { managedChangeRefusal } from '../services/packages/install/package-managed.js';
@@ -199,7 +199,7 @@ import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 import { publishAskOf, type PublishAsk } from '../services/publish-requests/ask.js';
 import { uploadPrincipalRefusal } from '../services/upload-principal.js';
 import { cortexAskedFields } from '../services/cortex-visibility.js';
-import { carryFirstUseKeep } from '../services/extension-first-use-keep.js';
+import { carryFirstUseKeep } from '../services/extension/first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
 import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component-address.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
@@ -359,7 +359,7 @@ async function handleAppUpload(
         cortexAgents = check.agents as unknown as Record<string, unknown>[];
     }
 
-    // Everything from here to the response is services/app-publish.ts, shared with POST /v1/apps and
+    // Everything from here to the response is services/app/publish.ts, shared with POST /v1/apps and
     // publish-draft. This door's own business is only the token meta → requested-manifest mapping:
     // a presigned publish that omits a field must NEVER blank what the live app declares, and
     // `undefined` is exactly how the shared path is told "not mentioned".
@@ -390,7 +390,7 @@ async function handleAppUpload(
         accessCode: { mode: 'carry' },
         source: 'presigned',
         // The gate was asked when the URL was minted, for the session that asked for it; the signed
-        // token carries the answer (services/app-publish-gate.ts). An agent the mint ALLOWED is asked
+        // token carries the answer (services/app/publish-gate.ts). An agent the mint ALLOWED is asked
         // again with the grant its record holds now, so publish:public taken away after the mint
         // applies to this upload too.
         publishGate: await livePublishAsk(storage, config, actor, actorIsAgent, publishAskFromMeta(meta.publish_ask)),
@@ -497,8 +497,8 @@ async function handleExtensionUpload(
     const record = result.record!;
     record.installedAt = new Date().toISOString();
     // The principal that wrote THIS code, as writeExtensionRecord stamps it on the inline install and
-    // redeploy routes (services/extension-lifecycle.ts): an unattended run the owner narrowed to
-    // 'installer' reads files with this principal's reach (services/extension-system-run.ts). The
+    // redeploy routes (services/extension/lifecycle.ts): an unattended run the owner narrowed to
+    // 'installer' reads files with this principal's reach (services/extension/system-run.ts). The
     // token's actor, set at the mint from the session's identity, never from the client. Without it a
     // ZIP written by an agent kept the previous writer, often the owner, and the narrowing read as
     // the owner (secaudit 2026-10, handleExtensionUpload:installedByPrincipal-not-stamped).
@@ -561,7 +561,7 @@ async function handleExtensionUpload(
     }
 
     // A host field (manifest network.host_fields) keeps the host the installed copy holds, as on
-    // PUT /v1/extensions/:name (services/extension-lifecycle.ts).
+    // PUT /v1/extensions/:name (services/extension/lifecycle.ts).
     if (existing) record.config = carryHostFieldValues(record.config, existing.config);
 
     // Encrypt `type: secret` config values before they are stored, exactly as POST/PUT
@@ -580,7 +580,7 @@ async function handleExtensionUpload(
         return;
     }
     // Byte-identical code keeps the old-code first-use mark; a changed script drops it
-    // (services/extension-first-use-keep.ts).
+    // (services/extension/first-use-keep.ts).
     record.config = carryFirstUseKeep(encConfig, record.actions, existing);
 
     let saved: ExtensionRecord;
@@ -599,7 +599,7 @@ async function handleExtensionUpload(
             limits: record.limits,
             federation: record.federation,
             instances: record.instances,
-            // Travels with the code, as in services/extension-upsert.ts. `unattendedReadAuthority` is
+            // Travels with the code, as in services/extension/upsert.ts. `unattendedReadAuthority` is
             // deliberately absent: it is the owner's choice about the extension, not the code's.
             installedByPrincipal: record.installedByPrincipal,
             ...(wantActivate && existing.status !== 'active'

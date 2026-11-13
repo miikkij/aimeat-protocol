@@ -114,7 +114,7 @@ import {
 } from '../services/portfolio-config.js';
 import { callerOf } from '../middleware/caller.js';
 import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
-import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
+import { publishAskedFields, askedStatus } from '../services/app/publish-gate.js';
 import { notePortfolioWriter, portfolioReadHold } from '../services/portfolio-read-hold.js';
 import { writePortfolioHtml } from '../services/portfolio/page-write.js';
 

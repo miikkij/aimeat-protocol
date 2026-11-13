@@ -1,7 +1,7 @@
 /**
  * @file extension-sandbox-limits.test.ts
  * @description Locks the arithmetic that decides how much memory, time and outbound budget one
- *   extension action may have (services/extension-ctx.ts sandboxLimits). The node's configured
+ *   extension action may have (services/extension/ctx.ts sandboxLimits). The node's configured
  *   maxima are a CEILING; the manifest's declared numbers are a request; the small floors keep a
  *   manifest that asks for nothing from getting a sandbox too small to start in.
  *
@@ -14,7 +14,7 @@
  *   v1.0.0 -- 2026-08-11 -- Security audit, MCP/REST drift: one ceiling, both doors
  */
 import { describe, it, expect } from 'vitest';
-import { sandboxLimits } from '../../src/services/extension-ctx.js';
+import { sandboxLimits } from '../../src/services/extension/ctx.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const config = {

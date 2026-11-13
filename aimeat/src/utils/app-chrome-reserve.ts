@@ -24,7 +24,7 @@
  *
  *   Same mechanics as the marks themselves: pure static markup, a scoped `<style>` riding the
  *   `style-src 'unsafe-inline'` the inline marks already need, idempotent via RESERVE_MARK, injected
- *   by the one pass in services/app-serve-marks.ts. It declares a variable and nothing else — it
+ *   by the one pass in services/app/serve-marks.ts. It declares a variable and nothing else — it
  *   never restyles the app, so an app that ignores it is exactly as well off as before.
  * @structure RESERVE_MARK — idempotency marker; reserveSnippet() — the markup.
  * @usage import { reserveSnippet } from '../utils/app-chrome-reserve.js';  // via applyServeMarks()

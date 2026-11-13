@@ -15,11 +15,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { recordAppAudit, readAppAudit, appAuditKey } from '../../src/services/app-audit.js';
+import { recordAppAudit, readAppAudit, appAuditKey } from '../../src/services/app/audit.js';
 import {
   ACTIVE_ROLL_AT, ACTIVE_KEEP, ARCHIVE_PART_MAX, archiveKey, listArchives, readArchiveYear, readAllEntries,
   moveToArchive, bindAppAuditConfig, writeKeep,
-} from '../../src/services/app-audit-archive.js';
+} from '../../src/services/app/audit-archive.js';
 
 const OWNER = 'alice@node-test';
 const FILE = 'shop.html';

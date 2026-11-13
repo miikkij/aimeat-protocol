@@ -1,10 +1,10 @@
 /**
  * @file test/unit/app-artifact-lint-linear.test.ts
- * @description The publish-time asset scan (src/services/app-artifact-lint.ts collectAssetRefs) runs
+ * @description The publish-time asset scan (src/services/app/artifact-lint.ts collectAssetRefs) runs
  *   on the node's event loop before the write, so it reads the uploaded HTML in time linear in its
  *   size. A `<script` or `<link` opener with no `>` after it made the old patterns scan to the end of
  *   the text once per opener (secaudit2026oct26,
- *   aimeat/src/services/app-artifact-lint.ts:collectAssetRefs:unclosed-tag-quadratic-scan). The
+ *   aimeat/src/services/app/artifact-lint.ts:collectAssetRefs:unclosed-tag-quadratic-scan). The
  *   usage half: the scan still finds the stylesheet link with rel and href in either order, a
  *   script src in single or double quotes, and tells a broken node path, an external host and a
  *   relative path apart as before.
@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
+import { lintAppArtifact } from '../../src/services/app/artifact-lint.js';
 
 const config = { baseUrl: 'https://aimeat.io', port: 40050, appAssetProbe: false } as unknown as AimeatConfig;
 

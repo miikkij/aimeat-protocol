@@ -124,7 +124,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { AppTargetFor, CanonicalOwner } from './apps/helpers.js';
-import { resolveAppTarget, type AppDevAct } from '../services/app-dev-grant.js';
+import { resolveAppTarget, type AppDevAct } from '../services/app/dev-grant.js';
 import { registerCatalogueAdminRoutes } from './apps/catalogue-admin.js';
 import { registerReadRoutes } from './apps/read.js';
 import { registerAppIconRoutes } from './apps/icon.js';

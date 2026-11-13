@@ -1,0 +1,780 @@
+/**
+ * @file src/services/app/lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The app-catalogue writes that are NOT a publish: the draft slot, the fork, and the
+ *   delete. services/app/publish.ts owns "publish one version" for the same reason and after the same
+ *   kind of drift; this file owns the other three acts.
+ *
+ *   WHY THIS FILE EXISTS. Each of these acts had two implementations, one behind HTTP and one behind
+ *   MCP, and they had drifted in the direction nobody watches. What the route did and the tool did
+ *   not, before this file:
+ *
+ *   - DELETE. The route removes every bucket the owner has for that filename (old publish paths left
+ *     ghost rows under a second ownerGaii), deletes the app's screenshot and writes a change-log
+ *     line. `aimeat_app_delete` deleted one bucket, left the screenshot in storage forever and wrote
+ *     nothing to the log, so an app an agent deleted could reappear in a listing with its thumbnail
+ *     still on disk.
+ *   - FORK. The route re-measures the AI disclosure posture against the copied bytes, strips the
+ *     source owner's private `specCheck` note, copies the screenshot, writes a change-log line and
+ *     fires the public feed. `aimeat_app_fork` did none of those five: a fork made over MCP carried
+ *     one owner's build-spec note into another owner's catalogue and left no trace anywhere.
+ *   - DRAFT SAVE. Two manifest builders that disagreed on the default category — 'utility' over HTTP
+ *     and inside publishApp, 'tool' over MCP — so a draft-first app staged by an agent landed in a
+ *     category no other door can produce.
+ *
+ *   WHAT DELIBERATELY STAYS AT THE DOOR: the authorization gates (the fork's two gates need the
+ *   operator role, which only an HTTP session carries), the payload decode, the 404 wording for a
+ *   missing draft (one door tells the caller to `PUT .../draft`, the other to call
+ *   `aimeat_app_draft_save`), the MCP resource notification, and every response document.
+ * @structure
+ *   - APP_FILENAME_RE / appFilenameRefusal() — the one filename rule for a catalogue entry
+ *   - resolveAppOwnerScope() — principal → { ownerName, ownerGhii }; the MCP-side twin of the
+ *     canonicalOwner closure in routes/apps.ts, so both surfaces address the same bucket
+ *   - stageAppDraft() — validate, inherit the live manifest, write the draft slot
+ *   - discardAppDraft() — clear the draft slot
+ *   - publishAppDraft() — draft manifest → publishApp → clear the slot (the slot survives a refusal)
+ *   - forkApp() — validate, copy manifest + bytes + screenshot, record lineage, log, announce
+ *   - deleteOwnedApp() — sweep every bucket (or one version), drop screenshots, log
+ * @usage
+ *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
+ *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
+ * @version-history
+ *   v1.12.0 — 2026-11-13 — resolveAppTargetScope also answers `delegated`, so aimeat_app_publish
+ *     refuses the pacing amount and the licence to a delegated builder as POST /v1/apps does.
+ *   v1.11.0 — 2026-11-11 — A staged draft reads its agents from the page's own aimeat-crews block
+ *     when it has a usable one, as a publish does; otherwise it keeps the live app's.
+ *   v1.10.5 — 2026-10-29 — deleteOwnedApp removes the app's plan with the whole app
+ *     (services/app-plan.ts), so the structure page does not list a deleted app as one being built.
+ *   v1.10.4 — 2026-10-27 — A fork into another account keeps only the intake forms the forker manages
+ *     (secaudit2026oct26, forkApp/manifest-spread-carries-intake-forms).
+ *   v1.10.3 — 2026-10-27 — publishAppDraft passes `publishingApp`, the app whose grant publishes
+ *     (secaudit2026oct26, app-grant-publisher-reads-as-owner).
+ *   v1.10.2 — 2026-10-25 — deleteOwnedApp marks the app's own address held (held-app-labels.ts;
+ *     secaudit2026oct22, app-label-recycled-after-delete).
+ *   v1.10.1 — 2026-10-25 — A fork into another account's catalogue leaves out the source owner's
+ *     named reviewer, its log, the legal pages and the data-map gap (secaudit2026oct22).
+ *   v1.10.0 — 2026-10-23 — Deleting every version of an app deletes its compliance documents (plan
+ *     doc-mvlftkh9zmc9).
+ *   v1.9.0 — 2026-10-19 — The draft states its display version: stageAppDraft takes `version` (judged by
+ *     services/app-display-version.ts when it differs from the live app's) and publishAppDraft takes a
+ *     `version` that overrides the draft's (wish-the-app-draft-tools-can-set-the-display-version).
+ *   v1.8.0 — 2026-10-18 — A fork's default exposure is narrowed to its label's audience cap before the
+ *     publish gate (capFirstPublishExposure; plan doc-mvdipuyqraas, L3.5).
+ *   v1.7.0 — 2026-10-18 — A fork is announced on the public feed only when the new app is really public
+ *     (listed, open to anyone, no access code; services/app-announce.ts, Jouni's ruling).
+ *   v1.6.0 — 2026-10-18 — The publish gate (services/app-publish-gate.ts): a fork the node's defaults
+ *     would make public, by a caller the owner is asked about, lands unlisted and files a request to
+ *     list it (`publishAsked`); the draft promotion passes the gate's answer to publishApp.
+ *   v1.7.0 — 2026-10-18 — The draft slot carries what the draft is changing (`draftNotice`, kept until
+ *     restated or cleared), and promoting it makes that the roadmap line when none is given. Every
+ *     write, discard and promotion of the slot tells the live channel (emitDraftChange), and a delete
+ *     tells it which version is live now, so an open page of the app follows.
+ *   v1.5.0 — 2026-10-17 — A fork is listed and opened by the node's new-app defaults (apps.default_listing,
+ *     apps.default_access) instead of always listed; it still gets no code (plan doc-mvcn6c7e4e5q V2.4).
+ *   v1.4.1 — 2026-10-11 — A fork drops the source's pacing amount `tollMorsels` (was `priceMorsels`;
+ *     a morsel is pacing, not a price).
+ *   v1.4.0 — 2026-10-08 — A fork of another owner's app that nobody else can read carries a copy of
+ *     its provenance record (forkProvenance) instead of the record itself, which the public fork row
+ *     would have made resolvable to anyone (aiprov D12).
+ *   v1.0.2 — 2026-10-02 — A fork drops `formatMd`: the ?format=md handler is the source owner's extension.
+ *   v1.0.1 — 2026-09-20 — resolveAppOwnerScope and AppOwnerScope moved whole to app-owner-scope.ts
+ *     and are re-exported from here: two services that needed only them depended, through this
+ *     file, on the publish, which became a cycle the day a publish needed the Design Book.
+ *   v1.0.0 — 2026-08-11 — August 2026 audit step 8, unit "apps". Extracted from routes/apps/drafts.ts,
+ *     routes/apps/fork-manage.ts, mcp/apps.ts and mcp/apps-fork.ts, which held two copies of each of
+ *     these four acts.
+ *   v1.1.0 — 2026-09-03 — A fork refreshes the dependency map for the new app; a delete forgets its edges.
+ *   v1.2.0 — 2026-09-13 — stageAppDraft removes the node's serve marks from a served copy before the
+ *     slot is written (stripServedMarks, the function publishApp uses) and names them in
+ *     servedMarksRemoved, so every draft door stores the source rather than the served page.
+ *   v1.3.0 — 2026-09-28 — stageAppDraft refuses a draft of an app a managed package install owns
+ *     (services/packages/install/package-managed.ts), before the slot is written.
+ *   v1.2.1 — 2026-09-26 — resolveAppTargetScope takes the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ */
+import { randomBytes } from 'node:crypto';
+import type { AimeatConfig } from '../../config.js';
+import type {
+  Storage, AppManifest, AppProtection, AppRecord, AppDraftRecord, AppDraftNotice,
+} from '../../storage/interface.js';
+import { parseGAII, localAccountName } from '../../utils/gaii.js';
+import { resolveAppTarget, type AppDevAct } from './dev-grant.js';
+import { DesignBookReasons } from '../design-book/reasons.js';
+import { logger } from '../../utils/logger.js';
+import { emitChange, emitAppChange } from '../event-bus.js';
+import { isAnnounceable, recordAppActivity } from './announce.js';
+import { appQuotaRefusal } from '../install-quotas.js';
+import { lintAppAiDisclosure } from './ai-posture.js';
+import { stripServedMarks, type ServedMarkRemoval } from './serve-marks-strip.js';
+import { publishApp, type PublishAppRefusal, type PublishAppResult } from './publish.js';
+import { decideBundledCrews } from './bundled-crews.js';
+import { mintProvenance, type DeclaredProvenance } from '../ai/provenance.js';
+import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from '../dependency-map.js';
+import { managedChangeRefusal } from '../packages/install/package-managed.js';
+import { appDisplayVersionRefusal } from './display-version.js';
+
+/**
+ * What a catalogue filename may look like. One spelling, because four doors used to carry their own
+ * copy of it and a rule that is written four times is a rule that holds until someone widens one.
+ */
+export const APP_FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
+
+/** The refusal for a filename that breaks the rule, or null when it does not. */
+export function appFilenameRefusal(filename: string): PublishAppRefusal | null {
+  if (APP_FILENAME_RE.test(filename)) return null;
+  return {
+    refusal: {
+      status: 400, code: 'INVALID_INPUT',
+      message: 'Invalid filename. Use alphanumeric, dots, hyphens, underscores. Max 100 chars.',
+    },
+  };
+}
+
+// The owner scope and its resolver live in app-owner-scope.ts, below this file and the publish,
+// so the services that only need them do not depend on publishing. Re-exported for every importer.
+import type { AppOwnerScope } from './owner-scope.js';
+import { publishExposure } from './publish-exposure.js';
+import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './publish-gate.js';
+import type { PublishAsk } from '../publish-requests/ask.js';
+import { removeComplianceDocs } from '../compliance/docs.js';
+import { holdAppLabels } from '../held-app-labels.js';
+import { deleteAppPlan } from './plan.js';
+import { managedIntakeForms } from './intake-forms.js';
+export { resolveAppOwnerScope, type AppOwnerScope } from './owner-scope.js';
+
+/**
+ * The same question with a TARGET owner allowed: which bucket, or the sentence to refuse with.
+ *
+ * The MCP tools are the second surface of every app door, and a parameter that exists on one surface
+ * and not the other is a capability half the fleet cannot reach. `owner` is optional and absent means
+ * what it has always meant. The decision itself is `resolveAppTarget`, the same function the HTTP
+ * doors ask, so there is one place where a rung is measured against an act.
+ */
+export async function resolveAppTargetScope(
+  storage: Storage, config: AimeatConfig,
+  input: { principal: string; owner?: string | undefined; filename?: string | undefined; act: AppDevAct },
+): Promise<(AppOwnerScope & { delegated: boolean }) | { refusal: string } | null> {
+  const parsed = parseGAII(input.principal);
+  if (!parsed) return null;
+  const t = await resolveAppTarget(storage, config, {
+    callerOwner: localAccountName(input.principal),
+    requestedOwner: input.owner,
+    filename: input.filename,
+    act: input.act,
+  });
+  // `delegated`: the act lands in another owner's bucket on a development right, so the owner's own
+  // terms (the pacing amount, the licence) are refused to it, as on POST /v1/apps.
+  return t.ok ? { ownerName: t.ownerName, ownerGhii: t.ownerGhii, delegated: t.delegated !== null } : { refusal: t.message };
+}
+
+// ── The draft slot ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The manifest fields a caller may state when staging a draft. `undefined` means "not mentioned" and
+ * is taken from the live app, exactly as it is on the publish path.
+ */
+export interface DraftManifestRequest {
+  name?: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  icon?: string;
+  usesCortex?: string[];
+  /**
+   * The display version the draft will publish with. Unstated, the draft takes the live app's.
+   * A stated value that differs from the live one is judged by services/app/display-version.ts.
+   */
+  version?: string;
+  /** Already through sanitizeProtection() at the door. */
+  protection?: AppProtection;
+  /** Overrides the live app's mime type; the doors that cannot express one leave it undefined. */
+  mimeType?: string;
+  /**
+   * What the draft is changing, already built at the door (services/app/news.ts draftNoticeFrom).
+   * `undefined` keeps the notice the slot has, `null` clears it.
+   */
+  draftNotice?: AppDraftNotice | null;
+}
+
+export interface StageAppDraftInput {
+  ownerName: string;
+  ownerGhii: string;
+  filename: string;
+  data: Buffer;
+  requested: DraftManifestRequest;
+}
+
+export interface StagedAppDraft {
+  filename: string;
+  manifest: AppManifest;
+  mimeType: string;
+  size: number;
+  updatedAt: string;
+  hasLiveVersion: boolean;
+  liveVersionNumber: number;
+  /** The node's serve marks a served copy carried, removed before the slot was written. */
+  servedMarksRemoved: ServedMarkRemoval[];
+}
+
+/**
+ * Save (upsert) the app's draft. The live published versions are untouched: this writes the staging
+ * slot and nothing else, which is why there is no change log, no feed and no provenance stamp here.
+ * All three belong to the promotion, which is publishAppDraft below.
+ */
+export async function stageAppDraft(
+  storage: Storage, config: AimeatConfig, input: StageAppDraftInput,
+): Promise<StagedAppDraft | PublishAppRefusal> {
+  const { ownerName, ownerGhii, filename, requested } = input;
+
+  const badName = appFilenameRefusal(filename);
+  if (badName) return badName;
+
+  const maxBytes = config.appMaxSizeMb * 1024 * 1024;
+  if (input.data.length > maxBytes) {
+    return {
+      refusal: {
+        status: 413, code: 'TOO_LARGE',
+        message: `Draft exceeds ${config.appMaxSizeMb}MB limit (${input.data.length} bytes)`,
+      },
+    };
+  }
+
+  // A draft of an app a managed install owns could only ever be refused at publish, so it is refused
+  // here, before the slot is written (services/packages/install/package-managed.ts).
+  const managed = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
+  if (managed) return { refusal: managed };
+
+  // The live app's manifest is the base, so a draft that only changes the HTML keeps its name,
+  // description, category and icon.
+  const live = await storage.getApp(ownerGhii, filename);
+  const base = live?.manifest;
+  // A stated display version is judged by the rule the publish applies; the live app's own is not.
+  const badVersion = requested.version !== base?.version ? appDisplayVersionRefusal(requested.version) : null;
+  if (badVersion) return { refusal: badVersion };
+  const manifest: AppManifest = {
+    name: requested.name ?? base?.name ?? filename.replace(/\.html?$/i, ''),
+    description: requested.description ?? base?.description ?? '',
+    version: requested.version ?? base?.version ?? '1.0.0',
+    // 'utility' is what publishApp and the HTTP door both default to. The MCP door said 'tool', so
+    // an app first staged by an agent was filed under a category the catalogue's own filters do not
+    // offer, and the difference survived every later publish because category carries forward.
+    category: requested.category ?? base?.category ?? 'utility',
+    tags: requested.tags ?? base?.tags ?? [],
+    authorDisplay: ownerName,
+    usesCortex: requested.usesCortex ?? base?.usesCortex ?? [],
+  };
+  const icon = requested.icon ?? base?.icon;
+  if (icon) manifest.icon = icon;
+  const protection = requested.protection ?? base?.protection;
+  if (protection && Object.values(protection).some(Boolean)) manifest.protection = protection;
+  // The draft's own aimeat-crews block declares its agents, as it does on a publish
+  // (services/app/bundled-crews.ts); a draft with no usable block keeps the live app's bundled
+  // crew-defs, and the promotion carries either into the new version unchanged.
+  const draftCrews = /html/i.test(requested.mimeType ?? live?.mimeType ?? 'text/html')
+    ? decideBundledCrews({ requested: undefined, html: input.data.toString('utf8') }).agents : undefined;
+  if (draftCrews !== undefined) {
+    if (draftCrews.length > 0) manifest.cortex = { agents: draftCrews };
+  } else if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
+  // What the draft is changing stays with the slot until somebody states a new one or clears it.
+  const notice = requested.draftNotice !== undefined
+    ? requested.draftNotice
+    : (await storage.getAppDraft(ownerGhii, filename))?.manifest.draftNotice;
+  if (notice) manifest.draftNotice = notice;
+
+  const mimeType = requested.mimeType ?? live?.mimeType ?? 'text/html';
+  // A served copy is staged as its source, by the same function the publish uses.
+  const { data, removed: servedMarksRemoved } = /html/i.test(mimeType)
+    ? stripServedMarks(input.data)
+    : { data: Buffer.from(input.data), removed: [] as ServedMarkRemoval[] };
+  const updatedAt = new Date().toISOString();
+  await storage.saveAppDraft({
+    ownerGaii: ownerGhii, ownerName, filename, manifest,
+    mimeType, size: data.length, data, updatedAt,
+  });
+  emitDraftChange(ownerGhii, filename);
+
+  return {
+    filename, manifest, mimeType,
+    size: data.length,
+    updatedAt,
+    hasLiveVersion: !!live,
+    liveVersionNumber: live?.versionNumber ?? 0,
+    servedMarksRemoved,
+  };
+}
+
+/**
+ * Throw the draft away. The live app is untouched; `false` means there was nothing to discard.
+ *
+ * A one-line wrapper on purpose: the draft slot has one owner in code, so the next thing a discard
+ * has to do — a change-log line, a cache drop, a notification — lands on both doors at once instead
+ * of on whichever one the author had open.
+ */
+export async function discardAppDraft(
+  storage: Storage, ownerGhii: string, filename: string,
+): Promise<boolean> {
+  const gone = await storage.deleteAppDraft(ownerGhii, filename);
+  if (gone) emitDraftChange(ownerGhii, filename);
+  return gone;
+}
+
+/**
+ * The draft slot of one app changed: the owner's and the builders' open pages of the app re-read
+ * its draft news (routes/sse.ts forwards `draft` only to them). The slot is keyed by the owner's
+ * GHII, and the event by the bare owner name every app id uses.
+ */
+export function emitDraftChange(ownerGhii: string, filename: string): void {
+  emitAppChange({ appId: `${localAccountName(ownerGhii)}/${filename}`, kind: 'draft' });
+}
+
+export interface PublishAppDraftInput {
+  roadmap?: string;
+  /** The display version to publish with, overriding the draft's; judged by publishApp. */
+  version?: string;
+  ownerName: string;
+  ownerGhii: string;
+  /** WHO pressed publish, resolved server-side. Audit + provenance principal. */
+  callerGaii: string;
+  filename: string;
+  /** The slot's contents, already loaded by the door so it can word its own "no draft" answer. */
+  draft: AppDraftRecord;
+  /** The publish gate's answer for this caller (services/app/publish-gate.ts); see PublishAppInput. */
+  publishGate: PublishAsk | null;
+  /** The app whose grant publishes, when the caller is a role-'app' token; see PublishAppInput. */
+  publishingApp?: string;
+  declaredProvenanceId?: string;
+  declaredProvenance?: DeclaredProvenance;
+  specToken?: string;
+  specAck?: string;
+}
+
+/**
+ * Promote the draft to a new live version, then clear the slot.
+ *
+ * The draft manifest IS the caller's statement, so every field it can express is passed as stated;
+ * what it cannot express — the pacing amount, licence, per-locale descriptions — is left unmentioned and
+ * publishApp carries it from the live app. Both doors wrote that mapping out by hand, nine fields
+ * each, which is how the two of them can disagree about whether promoting a draft keeps an app paid.
+ */
+export async function publishAppDraft(
+  storage: Storage, config: AimeatConfig, input: PublishAppDraftInput,
+): Promise<PublishAppResult | PublishAppRefusal> {
+  const { ownerName, ownerGhii, callerGaii, filename, draft } = input;
+
+  const out = await publishApp(storage, config, {
+    ownerName,
+    ownerGhii,
+    callerGaii,
+    filename,
+    data: draft.data,
+    mimeType: draft.mimeType,
+    requested: {
+      name: draft.manifest.name,
+      description: draft.manifest.description,
+      // Stated at the promotion, or the one the draft carries (stated at the save, or the live app's).
+      version: input.version ?? (draft.manifest.version || undefined),
+      category: draft.manifest.category,
+      tags: draft.manifest.tags,
+      icon: draft.manifest.icon,
+      usesCortex: draft.manifest.usesCortex,
+      cortexAgents: draft.manifest.cortex?.agents,
+      protection: draft.manifest.protection,
+    },
+    accessCode: { mode: 'carry' },
+    source: 'draft',
+    publishGate: input.publishGate,
+    publishingApp: input.publishingApp,
+    // The draft's own notice says what it changed, so it is the roadmap line when none is given.
+    roadmap: input.roadmap?.trim() ? input.roadmap : draft.manifest.draftNotice?.text,
+    declaredProvenanceId: input.declaredProvenanceId,
+    declaredProvenance: input.declaredProvenance,
+    specToken: input.specToken,
+    specAck: input.specAck,
+  });
+  // The draft SURVIVES a refusal. A broken artifact is work to fix and publish again, and clearing
+  // the staging slot would delete the only copy of it.
+  if ('refusal' in out) return out;
+
+  await storage.deleteAppDraft(ownerGhii, filename);
+  emitDraftChange(ownerGhii, filename);
+  return out;
+}
+
+// ── The fork ──────────────────────────────────────────────────────────────────────────────────────
+
+export interface ForkAppInput {
+  /** The source app version to copy, already loaded and already past both authorization gates. */
+  source: AppRecord;
+  /** The forker's bare owner name (display + URL form). */
+  callerOwner: string;
+  /** The forker's canonical bucket key. */
+  callerGhii: string;
+  /** WHO forked, resolved server-side. Recorded on the lineage event and the public feed. */
+  callerGaii: string;
+  newFilename: string;
+  /**
+   * The publish gate's answer for the forker (services/app/publish-gate.ts). A fork is the first
+   * publish of a new app: when the node's defaults make it public and the owner is asked, it lands
+   * unlisted and a request to list it is filed.
+   */
+  publishGate: PublishAsk | null;
+}
+
+export interface ForkedApp {
+  filename: string;
+  versionNumber: number;
+  manifest: AppManifest;
+  downloadUrl: string;
+  forkedFrom: { owner: string; filename: string; version: number };
+  /** The publish request the gate filed, or the warning that it could not be filed. */
+  publishAsked?: AppPublishAsked;
+}
+
+/**
+ * Copy an app into the caller's catalogue as a new app at version 1.
+ *
+ * The gates are the door's: derivative permission and the paid-app paywall both need to know whether
+ * the caller is an operator, and only an HTTP session carries that role. What happens after them is
+ * one act, and it is this: the manifest is copied with the source's paid terms and private notes
+ * removed, the bytes and the screenshot come across unchanged, and the fork is written into the
+ * append-only lineage log, the change log and the public feed.
+ */
+/**
+ * The record a fork carries (aiprov D12). The source's own record when the source is served to
+ * anyone or the forker owns it. From another owner's app that is NOT served to anyone (parked,
+ * operator-hidden or behind an access code), the fork row would be public and would make that
+ * owner's private record resolvable by anyone, principal and notes included, so the fork gets a copy
+ * instead: the forker's own record, saying the same level and model about the same bytes, derived
+ * from the source's id, and naming the forker rather than the source's writer.
+ */
+async function forkProvenance(
+  storage: Storage, config: AimeatConfig, source: AppRecord, callerGhii: string,
+): Promise<string | undefined> {
+  if (!source.aiProvenanceId) return undefined;
+  const servedToAnyone = !source.parked && !source.operatorHidden && !source.accessCode;
+  if (servedToAnyone || source.ownerGaii === callerGhii || config.aiProvenance === false) return source.aiProvenanceId;
+  const row = await storage.getAiProvenance(source.aiProvenanceId);
+  if (!row) return undefined;
+  const rec = row.record;
+  const copy = await mintProvenance(storage, {
+    stampedBy: 'node', observed: false, ownerGhii: callerGhii, principal: callerGhii,
+    level: rec.level, humanInvolvement: rec.humanInvolvement, method: rec.method,
+    content: Buffer.from(source.data),
+    generator: { ...(rec.generator?.model ? { model: rec.generator.model } : {}), pipeline: 'app.fork' },
+    derivedFrom: [row.id],
+    notes: 'Copied when a private app was forked: the bytes are the source app\'s, and this states what its record said about them.',
+    surface: { visibility: 'public', humanAudience: true },
+    labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl,
+  });
+  return copy.id;
+}
+
+export async function forkApp(
+  storage: Storage, config: AimeatConfig, input: ForkAppInput,
+): Promise<ForkedApp | PublishAppRefusal> {
+  const { source, callerOwner, callerGhii, callerGaii, newFilename } = input;
+  const sourceFilename = source.filename;
+
+  if (!newFilename || !APP_FILENAME_RE.test(newFilename)) {
+    return {
+      refusal: {
+        status: 400, code: 'INVALID_INPUT',
+        message: 'new_filename is required (alphanumeric, dots, hyphens, underscores; max 100 chars)',
+      },
+    };
+  }
+
+  // A fork is a NEW app in the caller's catalogue — refuse to shadow an app they already own by that
+  // filename. To update one, publish; do not fork.
+  const existingVersion = await storage.getLatestVersionNumber(callerGhii, newFilename);
+  if (existingVersion > 0) {
+    return {
+      refusal: {
+        status: 409, code: 'ALREADY_EXISTS',
+        message: `You already have an app named "${newFilename}". Choose a different new_filename.`,
+      },
+    };
+  }
+
+  // The per-owner app quota, from the one place that holds it (services/install-quotas.ts).
+  const overQuota = await appQuotaRefusal({ storage, config }, callerGhii);
+  if (overQuota) return { refusal: overQuota };
+
+  const now = new Date().toISOString();
+  const forkedManifest: AppManifest = {
+    ...source.manifest,
+    name: `${source.manifest.name || sourceFilename.replace(/\.html?$/i, '')} (fork)`,
+    authorDisplay: callerOwner,
+    // A fork starts as its own independent app with no pacing amount and no licence terms; the forker
+    // sets their own copy's toll_morsels later. Record its origin.
+    forkedFrom: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber, node: config.nodeId },
+  };
+  delete forkedManifest.tollMorsels;
+  delete forkedManifest.licenseType;
+  // The build-spec state describes how the SOURCE's last publish was made. It says nothing about this
+  // fork, and it is owner-only besides — copying it hands one owner's note about their own working
+  // habits to whoever forked them, which is what the MCP fork did.
+  delete forkedManifest.specCheck;
+  // The ?format=md handler is an action of the SOURCE owner's extension, which the forker does not
+  // own; their own publish of the fork declares one of their own, or none.
+  delete forkedManifest.formatMd;
+  // Search visibility is NOT inherited, and this is the one place it could have been. The manifest
+  // spread above would otherwise hand a brand-new fork the source's `index: true` — and, on a node
+  // in review mode, the operator's approval of a different app along with it. Whoever forked this
+  // makes their own decision about being findable, on their own copy, the same way they would for
+  // an app they wrote. It also stops the obvious abuse: forking a well-ranked app fifty times and
+  // having fifty indexed copies appear on the operator's domain without anyone approving one.
+  delete forkedManifest.seo;
+  // The source owner's own statements do not travel to another account's fork: the named reviewer
+  // (a declaration only the account holder makes in person), its log, the legal pages and the
+  // data-map check's owner-only gap. On the fork they were served as the forker's declarations and
+  // carried forward by every later publish (secaudit2026oct22,
+  // app-lifecycle.ts:forkApp/manifest-spread-carries-owner-statements). A same-owner fork keeps
+  // them, as it did: the statements are that owner's own either way.
+  if (source.ownerGaii !== callerGhii) {
+    delete forkedManifest.authorship;
+    delete forkedManifest.authorshipLog;
+    delete forkedManifest.legal;
+    if (forkedManifest.dataMap?.gap) {
+      forkedManifest.dataMap = { ...forkedManifest.dataMap };
+      delete forkedManifest.dataMap.gap;
+    }
+    // The intake forms an opening opens with the app: only those the forker manages, by the rule a
+    // publish applies, since a fork is stored without one (secaudit2026oct26).
+    if (forkedManifest.intake?.length) {
+      const { kept } = await managedIntakeForms(storage, callerOwner, forkedManifest.intake);
+      if (kept.length) forkedManifest.intake = kept;
+      else delete forkedManifest.intake;
+    }
+  }
+  // A FORK OF A GENERATIVE APP IS STILL A GENERATIVE APP. The manifest spread above brings the
+  // posture across, and this re-measures the observed half against the bytes actually being stored
+  // while keeping what the source DECLARED — so the statement neither resets to silence nor becomes
+  // a claim about code that moved on.
+  if (/html/i.test(source.mimeType)) {
+    forkedManifest.aiPosture = lintAppAiDisclosure(
+      Buffer.from(source.data).toString('utf8'), source.manifest.aiPosture,
+    ).posture;
+  }
+
+  const forkProvenanceId = await forkProvenance(storage, config, source, callerGhii);
+
+  // A fork is a new app of the forker's, so it is listed and opened the way a first publish is: the
+  // node's new-app defaults (services/app/publish-exposure.ts). No code: the fork answer has no place
+  // to tell the forker one, and the source's code is never copied.
+  // Narrowed first to the fork's label's audience cap (plan doc-mvdipuyqraas, L3.5).
+  const capped = await capFirstPublishExposure({ storage, config }, callerGhii, newFilename, publishExposure(config, null, { mode: 'explicit', value: undefined }), true);
+  const gated = gateFirstPublishExposure(capped, true, input.publishGate);
+  if ('refusal' in gated) return gated;
+  const { exposure } = gated;
+  await storage.createApp({
+    ownerGaii: callerGhii,
+    ownerName: callerOwner,
+    filename: newFilename,
+    versionNumber: 1,
+    manifest: forkedManifest,
+    mimeType: source.mimeType,
+    size: source.size,
+    data: source.data,
+    parked: exposure.parked,
+    community: exposure.community,
+    access: exposure.access,
+    forkable: false,   // the forker decides their own copy's forkability later
+    createdAt: now,
+    // The record describes how these BYTES were made, and a fork copies the bytes exactly, so the
+    // statement travels with them. A fresh mint here would claim the forker's agent produced content
+    // it merely copied; a dropped one would read as unstated content that is known to be model-written.
+    // From a source nobody else can read, the statement travels as a copy (forkProvenance below).
+    ...(forkProvenanceId ? { aiProvenanceId: forkProvenanceId } : {}),
+  });
+
+  // The fork's bytes are the source's, so its dependencies are too; the map gets its own row set.
+  await refreshAppDependencies(storage, { ownerName: callerOwner, filename: newFilename, versionNumber: 1, mimeType: source.mimeType, data: source.data, manifest: forkedManifest })
+    .catch(err => logger.warn('forkApp: dependency map not refreshed', { filename: newFilename, error: String(err) }));
+
+  // Copy the source screenshot into the fork's bucket so the fork renders with the same catalogue
+  // thumbnail. Best-effort: a missing thumbnail is not worth failing a fork over.
+  try {
+    const srcShot = await storage.getStorageFile(source.ownerGaii, `apps/screenshots/${sourceFilename}`);
+    if (srcShot) {
+      await storage.createStorageFile({
+        key: `apps/screenshots/${newFilename}`,
+        ownerGaii: callerGhii,
+        visibility: 'public',
+        mimeType: srcShot.mimeType,
+        size: srcShot.size,
+        data: srcShot.data,
+        createdAt: now,
+      });
+    }
+  } catch (err) { logger.warn('forkApp: screenshot copy is non-critical', { error: String(err) }); }
+
+  // The append-only fork event — the source of truth for fork stats + lineage.
+  await storage.recordAppFork({
+    id: `fork-${Date.now()}-${randomBytes(4).toString('hex')}`,
+    sourceOwnerGaii: source.ownerGaii,
+    sourceOwnerName: source.ownerName,
+    sourceFilename,
+    sourceVersion: source.versionNumber,
+    childOwnerGaii: callerGhii,
+    childOwnerName: callerOwner,
+    childFilename: newFilename,
+    forkedByGaii: callerGaii,
+    forkedAt: now,
+  });
+
+  const downloadUrl = `/v1/apps/${encodeURIComponent(callerOwner)}/${encodeURIComponent(newFilename)}`;
+
+  await storage.addSiteChangeLog({
+    id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+    action: 'app_publish',
+    summary: `Forked "${sourceFilename}" (by ${source.ownerName}) into "${newFilename}"`,
+    changedBy: callerOwner,
+    changedAt: now,
+  });
+
+  emitChange('apps');
+  // The feed announces the fork only when the new app is really public: listed, open to anyone and
+  // with no access code (services/app/announce.ts). A settings change that makes it public later
+  // announces it then.
+  if (isAnnounceable(await storage.getApp(callerGhii, newFilename))) {
+    recordAppActivity(storage, config, {
+      actor: callerGaii,
+      summary: `App ${forkedManifest.name} forked from ${source.ownerName}/${sourceFilename}`,
+      detail: forkedManifest.description || '',
+      link: `${downloadUrl}?mode=inline`,
+    });
+  }
+
+  const publishAsked = gated.asked
+    ? await fileAppPublishAsk({ storage, config }, { ownerName: callerOwner, filename: newFilename, versionNumber: 1 }, gated.asked)
+    : undefined;
+
+  return {
+    filename: newFilename,
+    versionNumber: 1,
+    manifest: forkedManifest,
+    downloadUrl,
+    forkedFrom: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber },
+    ...(publishAsked ? { publishAsked } : {}),
+  };
+}
+
+// ── The delete ────────────────────────────────────────────────────────────────────────────────────
+
+export interface DeleteOwnedAppInput {
+  /** The caller's bare owner name. Every bucket swept has to match it. */
+  ownerName: string;
+  /** The canonical bucket key. */
+  ownerGhii: string;
+  /** The caller's resolved identity, one of the shadow buckets an old publish path could have used. */
+  callerGaii: string;
+  filename: string;
+  /** Omit to remove every version in every bucket. */
+  version?: number;
+}
+
+export interface DeletedApp {
+  filename: string;
+  versionDeleted: number | 'all';
+}
+
+/**
+ * Remove an app the caller owns, with or without a version.
+ *
+ * The no-version case sweeps EVERY bucket this owner has for the filename. Old publish paths wrote
+ * the same owner+filename under different ownerGaii keys, and a delete that only looked in the
+ * canonical bucket left those ghost rows listed and downloadable — which is what `aimeat_app_delete`
+ * did, along with leaving the screenshot in storage. A single-version delete still targets one
+ * bucket, because keeping versions in one bucket while removing a stray from another is a real thing
+ * to want.
+ */
+export async function deleteOwnedApp(
+  storage: Storage, input: DeleteOwnedAppInput,
+): Promise<DeletedApp | PublishAppRefusal> {
+  const { ownerName, ownerGhii, callerGaii, filename, version } = input;
+
+  if (!version) {
+    let sweepCount = 0;
+    for (;;) {
+      const app = await storage.getAppByOwnerName(ownerName, filename);
+      if (!app) break;
+      // Authorization sanity check: ownerName MUST match the caller's owner. (It always will,
+      // because getAppByOwnerName takes ownerName as the key — but defense in depth.)
+      if (app.ownerName !== ownerName) break;
+      await storage.deleteApp(app.ownerGaii, filename);
+      await forgetDependencies(storage, 'app', depAppRef(ownerName, filename))
+        .catch(err => logger.warn('deleteOwnedApp: dependency map not cleared', { filename, error: String(err) }));
+      await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`)
+        .catch(err => { logger.warn('deleteOwnedApp: continuing after a suppressed failure', { error: String(err) }); });
+      sweepCount++;
+      if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
+    }
+    if (sweepCount === 0) {
+      return {
+        refusal: {
+          status: 404, code: 'NOT_FOUND',
+          message: `App "${filename}" not found in your uploads`,
+        },
+      };
+    }
+    // The whole app went, so its compliance documents go (plan doc-mvlftkh9zmc9).
+    await removeComplianceDocs(storage, ownerGhii.slice(ownerGhii.indexOf('@') + 1), { kind: 'app', ownerName, app: filename })
+      .catch(err => logger.warn('deleteOwnedApp: compliance documents not removed', { filename, error: String(err) }));
+    // Its own address stays as a held name for this owner, and the hold's clock starts now
+    // (services/held-app-labels.ts; secaudit2026oct22). The daily sweep starts it if this fails.
+    await holdAppLabels(storage, ownerName, filename)
+      .catch(err => logger.warn('deleteOwnedApp: address not marked held', { filename, error: String(err) }));
+    // Its plan goes too, or the structure page would list a deleted app as one being built.
+    await deleteAppPlan(storage, `${ownerName}/${filename}`)
+      .catch(err => logger.warn('deleteOwnedApp: app plan not removed', { filename, error: String(err) }));
+  } else {
+    // Single-version case: try the buckets in order, delete from the one that has it.
+    let app = await storage.getApp(ownerGhii, filename, version);
+    let effectiveGaii = ownerGhii;
+    if (!app) { app = await storage.getApp(callerGaii, filename, version); if (app) effectiveGaii = callerGaii; }
+    if (!app) { app = await storage.getApp(ownerName, filename, version); if (app) effectiveGaii = ownerName; }
+    if (!app) {
+      // Last resort: find the row by ownerName across all buckets.
+      const found = await storage.getAppByOwnerName(ownerName, filename, version);
+      if (found && found.ownerName === ownerName) { app = found; effectiveGaii = found.ownerGaii; }
+    }
+    if (!app) {
+      return {
+        refusal: {
+          status: 404, code: 'NOT_FOUND',
+          message: `App "${filename}" not found in your uploads (version ${version})`,
+        },
+      };
+    }
+    await storage.deleteApp(effectiveGaii, filename, version);
+  }
+
+  await storage.addSiteChangeLog({
+    id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+    action: 'app_delete',
+    summary: version ? `Deleted version ${version} of app "${filename}"` : `Deleted app "${filename}" (all versions)`,
+    changedBy: ownerName,
+    changedAt: new Date().toISOString(),
+  });
+
+  emitChange('apps');
+  // An open page of this app reloads onto what is live now: the version before, or nothing.
+  try {
+    const latestLeft = await storage.getAppByOwnerName(ownerName, filename);
+    emitAppChange({ appId: `${ownerName}/${filename}`, kind: 'version', version: latestLeft?.versionNumber ?? 0 });
+  } catch (err) {
+    logger.warn('deleteOwnedApp: open pages of the app were not told; they reload on their next visit', { filename, error: String(err) });
+  }
+
+  // A deleted app leaves the Design Book's reasons: a part must not look favoured by apps that no
+  // longer exist. Whole-app deletes only (one version gone is still an app), and best-effort:
+  // commentary about the Book never gets to fail a delete.
+  if (!version) {
+    // The node's id is the part of the owner's GHII after the "@"; this function holds no config.
+    await new DesignBookReasons(storage, { nodeId: ownerGhii.slice(ownerGhii.indexOf('@') + 1) }).forget(ownerGhii, ownerName, filename)
+      .catch(err => { logger.warn('deleteApp: forgetting the Design Book reasons is best-effort', { filename, error: String(err) }); });
+  }
+
+  return { filename, versionDeleted: version ?? 'all' };
+}

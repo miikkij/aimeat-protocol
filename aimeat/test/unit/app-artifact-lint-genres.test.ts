@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
+import { lintAppArtifact } from '../../src/services/app/artifact-lint.js';
 import { getAppTemplates } from '../../src/data/app-templates.js';
 
 const config = { baseUrl: 'https://aimeat.io', port: 40050, appAssetProbe: false } as unknown as AimeatConfig;

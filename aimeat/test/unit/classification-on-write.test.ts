@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { writeMemoryRecord } from '../../src/services/memory-write.js';
-import { writeWorkspaceRecord } from '../../src/services/workspace-write.js';
+import { writeWorkspaceRecord } from '../../src/services/workspace/write.js';
 import { classifyAfterWrite, flushWriteClassification, pendingWriteClassifications, setWriteClassifier } from '../../src/services/classify-on-write.js';
 import { runClassificationQueueJob, installWriteClassifier } from '../../src/services/classification-queue-job.js';
 import { enqueue, readQueue } from '../../src/services/classification-run/classifier.js';

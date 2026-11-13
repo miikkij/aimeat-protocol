@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { trackDriftFindings } from '../../src/services/app-track-drift.js';
+import { trackDriftFindings } from '../../src/services/app/track-drift.js';
 
 const base = { isUpdate: false, track: undefined, loadsAtelier: false, carriedAtelierToken: false } as const;
 

@@ -45,8 +45,8 @@ const ROW_PX = 42;
 type MarksFacts = { marks?: { info?: boolean; tucked?: boolean } } | undefined | null;
 
 /**
- * The owner's switch for this mark (manifest.marks.info, services/app-marks.ts). Absent = on. Declared
- * beside the mark, as appAiUseOn is, so services/app-news.ts reads it without importing app-marks.ts
+ * The owner's switch for this mark (manifest.marks.info, services/app/marks.ts). Absent = on. Declared
+ * beside the mark, as appAiUseOn is, so services/app/news.ts reads it without importing app-marks.ts
  * and closing an import cycle through the publish path.
  */
 export function appInfoMarkOn(m: MarksFacts): boolean {

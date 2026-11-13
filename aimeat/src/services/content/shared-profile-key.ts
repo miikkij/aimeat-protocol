@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where a workspace document's shared fingerprint is stored, as keys only. It imports
- *   nothing, so the workspace delete path (services/workspace-write.ts) and the content pipeline can
+ *   nothing, so the workspace delete path (services/workspace/write.ts) and the content pipeline can
  *   both read it without an import cycle through the content service.
  *
  *   One record per document, `organism.<org>.w.<ws>.meta.fingerprint.<namespace>~<id>`, held by the

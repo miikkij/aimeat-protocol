@@ -31,7 +31,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { pubEmbedUrl } from '../../services/doc-images.js';
 import { decodeUriSegment } from '../../utils/uri-decode.js';
 import type { OrganismHelpers } from './shared.js';
-import { shareServedVisibility } from '../../services/workspace-share.js';
+import { shareServedVisibility } from '../../services/workspace/share.js';
 
 /** `<org>/<ws>/<space>/<id>`, each segment URL-encoded, or null. */
 function parseShareRef(raw: unknown): { org: string; ws: string; type: string; id: string } | null {
@@ -45,7 +45,7 @@ function parseShareRef(raw: unknown): { org: string; ws: string; type: string; i
 /**
  * Does the shared page this request names admit this workspace-scoped file? Answers the visibility
  * the file is then served on, which its AI label is decided against (public on an open share,
- * services/workspace-share.ts shareServedVisibility), or null when it is not admitted.
+ * services/workspace/share.ts shareServedVisibility), or null when it is not admitted.
  */
 export async function sharedPageAdmitsFile(
     H: Pick<OrganismHelpers, 'readShareMeta' | 'collectPublicDocs' | 'shareGateDenied'>,

@@ -75,7 +75,7 @@ export interface BundleWorkspace {
     schemas?: Record<string, Record<string, unknown>>;
     readme?: string;
     /**
-     * The contract an app declares for this workspace (services/app-workspaces.ts). The install
+     * The contract an app declares for this workspace (services/app/workspaces.ts). The install
      * tells every installed app that declares it where the workspace is.
      */
     contract?: string;

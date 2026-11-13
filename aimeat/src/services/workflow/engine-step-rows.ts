@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-09-26 — Moved from engine-steps.ts unchanged, to keep that file under the 800-line
  *     limit.
  */
-import type { SystemRunResult } from '../extension-system-run.js';
+import type { SystemRunResult } from '../extension/system-run.js';
 import { template } from './engine-util.js';
 import type { WorkflowStep } from '../../models/workflow-schemas.js';
 

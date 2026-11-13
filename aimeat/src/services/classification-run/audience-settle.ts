@@ -66,11 +66,11 @@ import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
 import { CAS_ATTEMPTS } from '../record-cas.js';
 import { updateOrganismRecord } from '../organism-lifecycle.js';
-import { applyOwnerSettingsUpdate, type AppSettingsInput } from '../app-settings.js';
-import { generateAccessCode } from '../app-publish-exposure.js';
-import { appAudienceOf } from '../app-publish-gate.js';
-import { readShareMetaOf, setWorkspaceShareOp, type SetShareBody } from '../workspace-share.js';
-import { findWorkspaceRegistration, workspaceRegistrations } from '../workspace-meta-read.js';
+import { applyOwnerSettingsUpdate, type AppSettingsInput } from '../app/settings.js';
+import { generateAccessCode } from '../app/publish-exposure.js';
+import { appAudienceOf } from '../app/publish-gate.js';
+import { readShareMetaOf, setWorkspaceShareOp, type SetShareBody } from '../workspace/share.js';
+import { findWorkspaceRegistration, workspaceRegistrations } from '../workspace/meta-read.js';
 import {
   activeExceptionsFor, appTarget, AUDIENCE_LEVEL_WORDS, audienceOfOrganism, audienceOfShareAccess, audienceOfVisibility,
   boardTarget, capAllows, classificationActiveFor, documentContentKeys, effectiveLabels, fileTarget, labelById,

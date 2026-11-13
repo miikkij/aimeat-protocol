@@ -87,7 +87,7 @@
         "count": 1,
         "why": "request.arrayBuffer() reads the outgoing request this node built, not an answer."
       },
-      "src/services/app-playtest.ts": {
+      "src/services/app/playtest.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -461,7 +461,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/extension-network-hosts.ts": {
+      "src/services/extension/network-hosts.ts": {
         "count": 2,
         "why": "Not a scope test: both refuse a hostname wildcard (*.example.com), in a manifest host and in a host field value, because hosts are compared exactly. Moved from extension-manifest.ts with hostRefusal() on 2026-10-09."
       },
@@ -670,11 +670,11 @@
     },
     "mail-send": {},
     "self-fetch": {
-      "src/services/app-artifact-lint.ts": {
+      "src/services/app/artifact-lint.ts": {
         "count": 2,
         "why": "The publish-time asset probe (probeOne) and the cortex lib read (readNodeLib): anonymous server-side GETs of the node's own served paths, with appAssetProbe off in tests. Not a headless browser, as the codebase analysis listed them; they could take the in-process dispatch too, which D-j did not include."
       },
-      "src/services/app-playtest.ts": {
+      "src/services/app/playtest.ts": {
         "count": 1,
         "why": "The headless browser loads the app page from this origin, and the page's relative URLs resolve against it; a browser needs a real socket."
       },

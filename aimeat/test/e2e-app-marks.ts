@@ -347,7 +347,7 @@ console.log('\nPhase 5: a served copy published as source');
 // publish is not refused. The node skips a mark already in a document, so a stored copy kept a badge
 // the owner may have switched off, an AI-disclosure block for a version that no longer existed, and an
 // identity block naming whoever the copy was taken from. Each door is exercised, because the strip lives
-// in services/app-publish.ts and a door that bypassed it would pass every other case here.
+// in services/app/publish.ts and a door that bypassed it would pass every other case here.
 const SERVED_FILE = 'served-copy-app.html';
 const SERVED_SRC = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Served copy</title>'
     + '<script>window.__early = document.getElementById("aimeat-app-ref");</script></head>'

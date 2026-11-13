@@ -42,8 +42,8 @@ import { systemGhiiFor } from '../../src/services/compliance/register.js';
 import { addKnowledgePackageEntry } from '../../src/services/knowledge-package-entry.js';
 import { setKnowledgeEntryVisibility } from '../../src/services/knowledge-sharing.js';
 import { attachContributionProof, packProofsKey } from '../../src/services/contribution-proofs.js';
-import { proposeTemplate, templateProposalKey, type ProposeTemplateInput } from '../../src/services/app-template-proposals.js';
-import type { BuildNotes } from '../../src/services/app-build-notes.js';
+import { proposeTemplate, templateProposalKey, type ProposeTemplateInput } from '../../src/services/app/template-proposals.js';
+import type { BuildNotes } from '../../src/services/app/build-notes.js';
 
 requirePostgresWhenAsked('content-a-races');
 

@@ -39,11 +39,11 @@ import type { Storage, UsageCallRecord, UsageRollupRow } from '../../src/storage
 import { USAGE_FOLDED_VISITOR, APP_VISIT_ROLLUP_CUTS, APP_USE_CUT } from '../../src/storage/interface.js';
 import { pendingRollupDeltas } from '../../src/services/usage/rollup-engine.js';
 import { CUTS } from '../../src/services/usage/rollup-cuts.js';
-import { readAppVisitors, type AppVisitorsReport } from '../../src/services/app-visitors.js';
+import { readAppVisitors, type AppVisitorsReport } from '../../src/services/app/visitors.js';
 import {
   runVisitRetentionJob, visitNameCutoffDay, ACCOUNT_ACTIVITY_CUTS,
 } from '../../src/services/usage/visit-retention.js';
-import { noteVisit, listVisits } from '../../src/services/app-members.js';
+import { noteVisit, listVisits } from '../../src/services/app/members.js';
 
 requirePostgresWhenAsked('visit-retention');
 
@@ -341,7 +341,7 @@ for (const providerName of PROVIDER_NAMES) describe(`folding the account out of 
 });
 
 // A6-14. An app that keeps a member list shows its owner, by name, the signed-in people who opened
-// it and hold no role there (services/app-members.ts noteVisit). That list is a visit record that
+// it and hold no role there (services/app/members.ts noteVisit). That list is a visit record that
 // names an account too, so it keeps the same thirteen months, counted from the person's last visit.
 for (const providerName of PROVIDER_NAMES) describe(`a signed-in visitor leaves an app's member list thirteen months after their last visit, on ${providerName}`, () => {
   const pick = (): Provider[] => provs.filter(x => x.name === providerName);

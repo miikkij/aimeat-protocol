@@ -21,7 +21,7 @@
  *
  *   THE KEY. An app grant's token names the owner's GHII as its `sub` (routes/app-grants.ts
  *   issueAccessToken), so every app of one owner looks the same by principal. The token also carries
- *   `app_grant`, the grant's id, which a re-consent or a refresh keeps (services/app-grant-upsert.ts
+ *   `app_grant`, the grant's id, which a re-consent or a refresh keeps (services/app/grant-upsert.ts
  *   updates the one live row of an owner and an app). The record is keyed by that id. A grant revoked
  *   and given again is a new row with a new id, and follows the new rule.
  *

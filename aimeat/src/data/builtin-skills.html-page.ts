@@ -8,7 +8,7 @@
  *   wish-kevyet-html-esitykset-ilman-sovellusta-eristetty-html-sivu-j, brief doc-mvb4bmxr8eyg.
  *
  *   It must agree with services/html-page.ts (the value, the file names, the frame's policy and the
- *   version window), services/workspace-share.ts (the end dates and their default), the catalog
+ *   version window), services/workspace/share.ts (the end dates and their default), the catalog
  *   entries of aimeat_workspace_write and aimeat_workspace_share, and the ready-made prompt in
  *   public/js/services/html-pages.js htmlPagePrompt, which gives an AI outside MCP the same rules.
  * @structure HTML_PAGE_SKILL_ENTRY

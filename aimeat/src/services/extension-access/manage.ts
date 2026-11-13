@@ -18,7 +18,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { installRoleRefusal } from '../extension-install-role.js';
+import { installRoleRefusal } from '../extension/install-role.js';
 import { isOperatorCaller, operatorOverride, type OperatorAuth } from '../operator-override.js';
 
 /** The caller as both surfaces describe it: the session fields the operator check reads, plus the

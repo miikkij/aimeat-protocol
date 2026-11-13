@@ -60,11 +60,11 @@
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { localAccountOf } from '../utils/gaii.js';
-import { isMemoryBackedSpace } from './workspace-meta.js';
-import { loadWorkspaceContent } from './workspace-content.js';
+import { isMemoryBackedSpace } from './workspace/meta.js';
+import { loadWorkspaceContent } from './workspace/content.js';
 import type { ContentReader } from './classification/reader.js';
 import { isRecordsSource, evaluateRecordsKpi } from './kpi-rollup.js';
-import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace/record-key.js';
 import { logger } from '../utils/logger.js';
 
 /** Recent entries listed per space in either overview. The total is always reported alongside. */
@@ -187,7 +187,7 @@ export async function collectWorkspaceSummary(
     spaces: [], skills: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
     archived: opts.archived ?? false, archivedCount: 0,
   };
-  // The one loader (services/workspace-content.ts): it loads (version rows excluded in SQL), decides
+  // The one loader (services/workspace/content.ts): it loads (version rows excluded in SQL), decides
   // the read with decideWorkspaceRead and passes the classification reader. A member who may not read
   // the workspace sees its name and readme; anyone else sees what the caller already knew.
   const got = await loadWorkspaceContent({ storage, config }, opts.reader,

@@ -91,11 +91,11 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ConsentRecord } from '../storage/interface.js';
 import { matchesRecipient } from '../storage/consent-recipient.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
-import { findWorkspaceRegistration } from './workspace-meta.js';
+import { findWorkspaceRegistration } from './workspace/meta.js';
 import { agentAccessOf, agentBarred, agentBarredMessage, attachedAsParticipant, participantRefusalMessage } from './organism-agent-access.js';
 import { isOwnerInPerson, parseGaiiLoose } from '../utils/gaii.js';
 import { fencedSpaceRefusal, type ManifestWrite } from './fenced-space.js';
-import { wsRoleOf } from './workspace-roles.js';
+import { wsRoleOf } from './workspace/roles.js';
 import type { CallerContext } from './caller-context.js';
 
 /** The session asking, in the terms this rule decides on. */
@@ -108,7 +108,7 @@ export interface OrganismAccessCaller {
     roles: string[];
     /**
      * `installer/name` of the extension whose action makes this call, lower-cased. Set only by the
-     * workspace capability of an extension action (services/extension-workspace.ts), never from a
+     * workspace capability of an extension action (services/extension/workspace.ts), never from a
      * request: it is what lets a caller that is not a person write a record space that names the
      * extension (services/fenced-space.ts).
      */

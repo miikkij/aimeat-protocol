@@ -5,8 +5,8 @@
  * @description The pure rules of HTML pages in workspaces: the text the node writes from a page
  *   (services/html-page.ts htmlToText), the page check, the page as a locked schema reads it, the
  *   version window, the file names, the frame's policy, a share's end dates
- *   (services/workspace-share.ts isDocPublicAt), the stale mark (services/workspace-opened.ts), the
- *   tool input of aimeat_workspace_share (services/workspace-share-input.ts) and the decoding that
+ *   (services/workspace/share.ts isDocPublicAt), the stale mark (services/workspace/opened.ts), the
+ *   tool input of aimeat_workspace_share (services/workspace/share-input.ts) and the decoding that
  *   answers instead of throwing (utils/uri-decode.ts).
  * @usage pnpm exec vitest run test/unit/html-page.test.ts
  * @version-history
@@ -17,9 +17,9 @@ import {
     htmlToText, normalizeHtmlPageValue, schemaViewOfDocument, htmlPageRetention, pageFileNameOk,
     isServablePageFileType, pageFrameCsp, pageHolderCsp, pageOriginOf, HTML_PAGE_MAX_VERSIONS,
 } from '../../src/services/html-page.js';
-import { isDocPublicAt, resolveShare } from '../../src/services/workspace-share.js';
-import { isPageStale } from '../../src/services/workspace-opened.js';
-import { shareBodyFromToolInput } from '../../src/services/workspace-share-input.js';
+import { isDocPublicAt, resolveShare } from '../../src/services/workspace/share.js';
+import { isPageStale } from '../../src/services/workspace/opened.js';
+import { shareBodyFromToolInput } from '../../src/services/workspace/share-input.js';
 import { decodeUriSegment } from '../../src/utils/uri-decode.js';
 
 describe('htmlToText', () => {

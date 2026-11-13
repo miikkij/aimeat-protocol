@@ -156,7 +156,7 @@ async function run() {
     let appToken = '';
     const FILENAME = 'doomed-app.html';
     // The app's own path, owner included: on a node several people share with no app origin, the
-    // authorize door takes only an address bound to the requesting app (services/app-frame-redirect.ts).
+    // authorize door takes only an address bound to the requesting app (services/app/frame-redirect.ts).
     const REDIRECT = `${BASE}/v1/apps/${victim.owner}/${FILENAME}`;
     await test('setup: the victim grants an app', async () => {
         const pub = await json('/v1/apps', {

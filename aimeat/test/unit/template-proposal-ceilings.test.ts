@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 last items, F3).
  */
 import { describe, it, expect } from 'vitest';
-import { proposeTemplate, type ProposeTemplateInput } from '../../src/services/app-template-proposals.js';
+import { proposeTemplate, type ProposeTemplateInput } from '../../src/services/app/template-proposals.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 

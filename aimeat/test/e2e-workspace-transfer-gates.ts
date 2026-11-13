@@ -6,7 +6,7 @@
  *   (secaudit 2026-10).
  *
  *   1. A RESTORE IS A WRITE. An archive names every key and every level in it, and
- *      services/workspace-import.ts wrote all of them raw, so an import stored a record and a file
+ *      services/workspace/import.ts wrote all of them raw, so an import stored a record and a file
  *      at `organism:<an organism the importer is not in>`, put a chosen-mime file at the app-owned
  *      key `apps/icons/…` that the app origin then served as a page, and made records public on a
  *      node whose publish gate asks the owner first. Here a hostile archive meets each of those and
@@ -40,7 +40,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn } from './helpers/owner-login.js';
-import { unzipBuffer } from '../src/services/workspace-import.js';
+import { unzipBuffer } from '../src/services/workspace/import.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 

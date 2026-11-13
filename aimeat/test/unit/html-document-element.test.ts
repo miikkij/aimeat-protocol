@@ -12,8 +12,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { findDocumentElement } from '../../src/utils/html-document-element.js';
-import { applyServeMarks } from '../../src/services/app-serve-marks.js';
-import { stripServedMarks } from '../../src/services/app-serve-marks-strip.js';
+import { applyServeMarks } from '../../src/services/app/serve-marks.js';
+import { stripServedMarks } from '../../src/services/app/serve-marks-strip.js';
 import { authorDisclosure } from '../../src/services/ai/disclosure-author.js';
 import { provFixture } from './serve-marks-fixtures.js';
 

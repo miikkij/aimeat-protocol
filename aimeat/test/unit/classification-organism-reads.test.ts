@@ -28,7 +28,7 @@ import { resetClassificationAudit } from '../../src/services/classification/audi
 import { organismKeysCarried } from '../../src/services/group-shares-classification.js';
 import { memoryRouter } from '../../src/routes/memory.js';
 import { registerMemoryExtendedTools } from '../../src/mcp/memory-extended.js';
-import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
+import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
 import { librarianSearch } from '../../src/services/librarian.js';
 import { createMemorySource } from '../../src/services/discovery/sources/memory-source.js';
 import type { DiscoveryContext } from '../../src/services/discovery/types.js';

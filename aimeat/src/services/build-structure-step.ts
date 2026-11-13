@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The section of the Atelier build interview that starts the app's plan and hands the
- *   person the structure page (services/app-structure.ts): the page that shows the app's steps
+ *   person the structure page (services/app/structure.ts): the page that shows the app's steps
  *   from the first moment of building and lets the person pick a layout and a look by seeing them,
  *   with the choice going back to the AI that builds.
  *

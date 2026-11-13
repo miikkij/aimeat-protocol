@@ -13,7 +13,7 @@
  */
 import { localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
-import { actionCodeDigest, EMAIL_POLICY_KEY, UNRESTRICTED_EMAIL } from '../extension-email-policy-ask.js';
+import { actionCodeDigest, EMAIL_POLICY_KEY, UNRESTRICTED_EMAIL } from '../extension/email-policy-ask.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 export async function applyExtensionEmailPolicy(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

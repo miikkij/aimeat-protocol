@@ -34,7 +34,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppSummaryRecord } from '../storage/types/apps.js';
 import { indexedPages } from '../data/public-pages.js';
-import { appSeoListable } from './app-seo.js';
+import { appSeoListable } from './app/seo.js';
 import { submitToIndexNow, appSubmitUrls, groupByHost, stampAnnounced } from './indexnow.js';
 import type { IndexNowRun } from './indexnow-log.js';
 import { indexedDatasetPages } from './datapackage/copy-origin.js';

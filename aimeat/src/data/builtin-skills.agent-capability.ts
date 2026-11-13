@@ -19,7 +19,7 @@
  *   calls free, and that a tool with no action answers TOOL_NOT_INVOKABLE to a direct call),
  *   commerce/sellable-resolvers.ts (a tool with no action becomes a task through a checkout only;
  *   the first text of this skill said "a call creates a task", which a reviewer checked against
- *   the route and found false on 2026-10-12), services/extension-ctx-contract.ts (what an extension's action is given),
+ *   the route and found false on 2026-10-12), services/extension/ctx-contract.ts (what an extension's action is given),
  *   services/connect-tunnel-push.ts onMemoryWrite (a published record wakes a subscribed agent;
  *   services/workspace-rows/row-service.ts does not call it, so a row wakes no agent by itself),
  *   services/workflow/engine-triggers.ts fireWorkspaceRows with workflow-event.ts (a workflow starts

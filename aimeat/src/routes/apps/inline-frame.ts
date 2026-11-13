@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The isolated frame on the app download route (audit A7-1). On a node that several
- *   people share and that has no app origin (services/app-isolation.ts), a runnable app request on
+ *   people share and that has no app origin (services/app/isolation.ts), a runnable app request on
  *   the node's own address gets one of two answers, and neither puts the app's bytes in the node's
  *   origin:
  *     - a browser opening the app gets the page that holds the frame (src/static/app-frame.html). It
@@ -30,7 +30,7 @@
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { appIsolationMode } from '../../services/app-isolation.js';
+import { appIsolationMode } from '../../services/app/isolation.js';
 import { isPackageApp } from '../../services/packages/install/package-approvals.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appFrameHostHtml, withFrameShim } from '../../utils/app-frame-assets.js';

@@ -26,7 +26,7 @@
 import type { LevelSchema, LevelDef } from './model.js';
 import { validateCommandManifest, deriveAppCommandDecision, type CommandDef } from './app-commands.js';
 import { generateIamExtension, accumulateCapabilities, type GeneratedExtension } from './generate-extension.js';
-import { EXT_NAME_PATTERN } from '../extension-manifest.js';
+import { EXT_NAME_PATTERN } from '../extension/manifest.js';
 
 export interface DefineAppIamInput {
   /** `owner/file.html` to also GENERATE the installable gate; a bare label only validates. */

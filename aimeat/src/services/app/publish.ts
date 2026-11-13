@@ -1,0 +1,768 @@
+/**
+ * @file src/services/app/publish.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE one act of publishing an app version. Three doors lead here — `POST /v1/apps`
+ *   (inline base64), the presigned upload completion (`PUT /v1/upload/:token`, utype `app`), and
+ *   `POST /v1/apps/:owner/:filename/publish-draft` — and after this file they differ only in how
+ *   they OBTAIN the bytes and how they SHAPE their response. Everything between those two points
+ *   happens exactly once, here.
+ *
+ *   WHY THIS FILE EXISTS. The three doors were written separately and drifted, repeatedly, in the
+ *   direction nobody notices: whatever the newest door forgot. The presigned door — the one the
+ *   guidance tells every agent to use for anything over ~1 KB — never wrote a change-log entry,
+ *   never announced, never fired the public feed, never emitted `apps` to the live channel and
+ *   never enforced the per-owner quota. The draft door never provisioned the app's subdomain and
+ *   silently dropped `priceMorsels`, `licenseType` and the per-locale `descriptions`, because a
+ *   draft manifest cannot express them and it published the draft manifest verbatim — so promoting
+ *   a draft turned a paid app free. Provenance went missing at a forgotten door in Phase 4 and
+ *   again in Phase 5. A shared function is the only fix that survives the next door.
+ *
+ *   THE CARRY-FORWARD RULE, IN ONE PLACE. `undefined` in `requested` means "the caller did not
+ *   mention this", and every such field is taken from the live app. It never means "clear it".
+ *   Clearing is explicit: `toll_morsels: 0`, `cortex: { agents: [] }`. That rule was written out
+ *   three times with three different field lists, which is how an update came to rename five live
+ *   apps to their own filenames in the public catalogue.
+ *
+ *   WHAT DELIBERATELY STAYS AT THE DOOR: the screenshot (only the inline body carries one), the
+ *   draft-slot clear, the MCP resource notification, and each door's response document — those are
+ *   published contracts, and unifying them would be an API break dressed up as a refactor.
+ * @structure
+ *   - PublishAppInput / PublishAppResult / PublishAppRefusal — the contract
+ *   - publishApp(storage, config, input) — strip the node's serve marks → resolve version → quota →
+ *     ARTIFACT CHECK → spec check → carry forward → lint → stamp → store → subdomain → change log →
+ *     announce → feed
+ * @usage
+ *   const out = await publishApp(storage, config, {
+ *     ownerName, ownerGhii, callerGaii, filename, data, mimeType: 'text/html',
+ *     requested: { name, description, category, tags, icon },
+ *     accessCode: { mode: 'carry' }, source: 'presigned',
+ *   });
+ *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
+ * @version-history
+ *   2026-11-11 — A publish that states no cortex.agents reads the page's aimeat-crews block, the one a
+ *     package install reads; a block that cannot be used, a block that differs from the request, and
+ *     a definition that names tools and asks for no permissions are named in the publish hints
+ *     (services/app-bundled-crews.ts decideBundledCrews).
+ *   2026-11-06 — A new version keeps the owner's `about`, the text about the app (TARGET-093).
+ *   2026-11-06 — A publish announces the app to IndexNow only when it has a description of its own
+ *     (appSeoListable, TARGET-089 Y2).
+ *   2026-10-31 — A new version keeps the owner's `screenshotPublic` (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-10-27 — A version published through an app's grant also names that app (`publishedByApp`), and the owner hears of it when the app is another author's (services/app-published-by-app.ts; secaudit2026oct26).
+ *   2026-10-25 — Every version's manifest names who published it (`publishedBy`), so the owner's own app asks the owner before a version another account published gets a permission the owner's grant lacks (services/own-app-consent.ts; secaudit2026oct22).
+ *   2026-10-25 — The aimeat-intake declaration is read from the bytes (services/app-intake-forms.ts): a form the publisher does not manage refuses the publish, a form the code calls undeclared is a warning, and the forms go on the manifest. A new version of an app open to the internet is handed to services/internet-opening/. The input types (RequestedManifest, PublishAppInput, PublishAppRefusal) moved unchanged to app-publish-types.ts (line limit) and are re-exported.
+ *   2026-10-22 — The delegated-settings check moved unchanged to app-publish-delegate.ts (line limit), which also refuses a developer of another account without the full right who adds the ?format=md declaration or changes which extension action it names (secaudit 2026-10, r54).
+ *   2026-10-19 — A display version the caller states is refused when it breaks the one rule (services/app-display-version.ts); a carried one is not re-judged (wish-the-app-draft-tools-can-set-the-display-version).
+ *   2026-10-18 — The data-map stamp is checked against the scopes the version declares, so an app asking for organism:invite whose map does not say it invites people is stamped with DATAMAP_INVITES_UNSTATED (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
+ *   2026-10-18 — A first publish's default exposure is narrowed to the app's label's audience cap
+ *     before the publish gate (capFirstPublishExposure; plan doc-mvdipuyqraas, L3.5).
+ *   2026-10-18 — A published app's name and description meet the detection rules written for apps (plan doc-mvdipuyqraas, L1.6).
+ *   2026-10-18 — The board post and the public feed announce a version only when the app is really public (listed, open to anyone, no access code); the board post moved to services/app-announce.ts (Jouni's ruling, plan doc-mvcn6c7e4e5q).
+ *   2026-10-18 — `publishGate`: a first publish the node's defaults make public, by a caller the owner is asked about, is stored unlisted and files a request to list it (`publishAsked`; services/app-publish-gate.ts, plan doc-mvcn6c7e4e5q V4). provenanceModelFindings moved to app-ai-model-hints.ts.
+ *   2026-10-18 — The live channel hears which app got which version (emitAppVersion), so an open page of it reloads.
+ *   2026-10-18 — sanitizeDescriptions moved to app-publish-helpers.ts unchanged (line limit).
+ *   2026-10-17 — The exposure of a version (listing, forking, code, who may open it) comes from publishExposure: carried from the live version, or the node's new-app defaults on a first publish (V2.4).
+ *   2026-10-11 — requested.priceMorsels is tollMorsels, the app's pacing amount, carried forward the same way.
+ *   2026-10-10 — nextSteps is told how the data map and the design spec stand (app-publish-next-steps.ts).
+ *   2026-10-08 — The board announcement post carries a provenance record of its own text (aiprov D13).
+ *   2026-10-08 — The app's provenance record states `mediaKind: code` and the app's MIME type.
+ *   2026-10-02 — The design spec's stamp is copied onto the new manifest, and `designSpecHint` says
+ *     when a shared app has no spec or this version moved past the one it was written against
+ *     (services/app-design-spec.ts). A hint, never a refusal.
+ *   2026-10-02 — `<meta name="aimeat-format-md">` is read into `manifest.formatMd`, refused with
+ *     APP_FORMAT_MD_INVALID when it names an extension the owner did not install or an action it lacks.
+ *   2026-10-02 — The app's `aimeat-workspace` declaration is parsed into `manifest.workspaces`, each
+ *     manifest and schema checked as provisioning takes it; one that cannot be used is refused, 422
+ *     APP_WORKSPACE_INVALID (services/app-workspaces.ts).
+ *   2026-09-28 — The app's `aimeat-config` declaration is parsed into `manifest.configSchema`, and one
+ *     that cannot be used is refused, 422 APP_CONFIG_SCHEMA_INVALID (services/app-config.ts).
+ *   2026-09-28 — An app a managed package install owns is refused a new version (409
+ *     MANAGED_BY_PACKAGE, services/packages/install/package-managed.ts) unless the package itself registers it.
+ *   2026-09-28 — A declared model the catalogue does not know is a hint (app-ai-model-hints.ts; System 2 plan, V5).
+ *   2026-09-26 — A provenance declaration the caller may not make (no provenance:write) is refused
+ *     above the dry-run return, 403 SCOPE_DENIED with the held scopes (bbfbeca149de): the mint threw
+ *     it below the return, so a dry run answered "would pass" to a publish that then refused.
+ *   2026-09-26 — A declared ai_provenance that names no model earns the `provenance-without-model`
+ *     hint: a GPT-6 build of material-lab published a record that read only "Served by openai".
+ *   2026-09-24 — A new app's missing description is refused above the dry-run return
+ *     (bbfbeca149de), so a dry run answers what the real publish answers.
+ *   2026-09-19 — A build that left the Atelier track is named in the publish hints
+ *     (services/app-track-drift.ts): the Atelier token carried with a Classic app, or a NEW app on
+ *     Classic. Warnings, never a refusal.
+ *   v1.10.0 — 2026-09-13 — A served copy is stored as its source (the developer's decision): the
+ *     node's own serve marks are removed first (services/app-serve-marks-strip.ts), so the lints, the
+ *     AI posture, the provenance hash, the stored bytes, the size and the dependency map all read
+ *     the author's bytes, and the result names what was removed in `servedMarksRemoved`. Measured
+ *     before the change on a served copy of an app that asks for ai:use and discloses nothing: the
+ *     node's own visible label read as the app's disclosure and hid the gap.
+ *   v1.9.1 — 2026-09-11 — The IndexNow notice goes through announceApp: each host under its own key,
+ *     and the app stamped with when it was last told.
+ *   v1.9.0 — 2026-09-05 — The declared register travels to the publish response beside the track,
+ *     so an Atelier app is told which genre page it has to stand beside
+ *     (wish-atelier-always-excellent, part 4).
+ *   v1.8.0 — 2026-09-03 — A publish refreshes the dependency map from the published source.
+ *   v1.7.0 — 2026-08-29 — `legal` (the app's own pages) carries forward on a republish.
+ *   v1.6.0 — 2026-08-29 — `marks`, `authorship` and `authorshipLog` carry forward on a republish.
+ *   v1.5.0 — 2026-08-27 — The build track (TARGET-074): `<meta name="aimeat-track">` in the app's
+ *     head is parsed into `manifest.track` and carried forward on silent updates, so a later edit
+ *     session loads the guide the app was built with instead of mixing Classic and Atelier.
+ *   v1.4.0 — 2026-08-25 — The publish writes the map DOCUMENT as well as stamping the summary.
+ *     The stamp names a key, and with nothing at that key every surface that opens a map said "no
+ *     data map yet" about an app it had just stamped. Best-effort: a publish that already happened
+ *     must not fail because a side record could not be stored.
+ *   v1.3.0 — 2026-08-24 — The data map (TARGET-073): the node drafts where this app puts what
+ *     from the permissions it asks for and the document its owner wrote, stamps the SUMMARY on the
+ *     manifest beside `aiPosture`, and WARNS rather than refusing. Refusing would break the next
+ *     publish of all 169 apps already on the node, and a map is a statement about storage rather
+ *     than a property of the bytes.
+ *   v1.2.0 — 2026-08-11 — Three additions, all on the shared path so no door can miss them: the
+ *     ARTIFACT CHECK (services/app-artifact-lint.ts) refuses a publish whose inline script does not
+ *     parse or whose asset URL this node answers 404 for — the first thing here that blocks, because
+ *     both are proof the app cannot run rather than an opinion about it; the build-spec check
+ *     (services/app-spec-gate.ts) reports whether the publisher carried the current spec token, and
+ *     records an owner-declared skip on the change-log line; and `nextSteps` moved in from mcp/apps.ts
+ *     so the agent-face and bound-skill reminder reaches every door instead of MCP-inline only.
+ *   v1.1.0 — 2026-08-02 — The app's declared `public-interest` reaches the disclosure decision.
+ *     It was parsed into the posture and then never passed, so every publish fell to the
+ *     over-label default and recorded the statutory basis. Tri-state: `observed` (the author
+ *     said nothing) stays unstated rather than becoming a `no`.
+ *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a. Extracted from routes/apps/publish.ts,
+ *     routes/upload.ts and routes/apps/drafts.ts, which each held a partial copy of it.
+ */
+import { classifyContainerAfterWrite } from '../classify-on-write.js';
+import { appTarget } from '../classification/containers.js';
+import { accountOf } from './members.js';
+import { effectiveDevLevel, mayAct, isSharedApp } from './dev-grant.js';
+import { roadmapGate, addRoadmapEntry, roadmapStamp } from './roadmap.js';
+import { readAppDesignSpec, designSpecStamp, designSpecHint } from './design-spec.js';
+import { randomBytes } from 'node:crypto';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AppManifest, AppManifestCortex } from '../../storage/interface.js';
+import { emitAppVersion } from '../event-bus.js';
+import { isAnnounceable, postAppBoardAnnouncement, recordAppActivity } from './announce.js';
+import { recordAccountEvent } from '../account-events.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from '../ai/provenance.js';
+import { sanitizeDescriptions } from './publish-helpers.js';
+import { lintAppAiDisclosure, type AppAiLintResult } from './ai-posture.js';
+import { unknownModelHints, provenanceModelFindings } from './ai-model-hints.js';
+import { lintAppArtifact, loadsAtelierKit, type AppArtifactFinding } from './artifact-lint.js';
+import { stripServedMarks, type ServedMarkRemoval } from './serve-marks-strip.js';
+import { evaluateSpecCheck, type AppSpecCheck } from './spec-gate.js';
+import { buildAtelierSpecToken } from '../build-atelier-prompt.js';
+import { trackDriftFindings } from './track-drift.js';
+import { oneLanguageFindings } from './language-default.js';
+import { genreForkFindings } from './genre-fork.js';
+import { handRolledFindings } from './hand-rolled.js';
+import { levelFindings } from './build-level.js';
+import { recordBookParts } from './book-parts.js';
+import { buildPublishNextSteps } from './publish-next-steps.js';
+import { appDisplayVersionRefusal } from './display-version.js';
+import { readAppDataMap } from '../data-map/data-map-store.js';
+import { stampFor } from '../data-map/data-map-check.js';
+import { parseAppScopes } from '../protected-resource.js';
+import type { DataMapStamp } from '../data-map/data-map-types.js';
+import { lintAppHtmlForMobile } from '../../utils/app-mobile-lint.js';
+import { invalidateProtectionCache } from '../../utils/app-protect.js';
+import { ensureAppSubdomain } from '../subdomain-names.js';
+import { appSeoListable } from './seo.js';
+import { announceApp } from '../indexnow.js';
+import { logger } from '../../utils/logger.js';
+import { refreshAppDependencies } from '../dependency-map.js';
+import { managedChangeRefusal } from '../packages/install/package-managed.js';
+import { parseAppConfigSchema } from './config.js';
+import { parseAppWorkspaces, checkAppWorkspaces } from './workspaces.js';
+import { intakeDeclarationOf } from './intake-forms.js';
+import { decideBundledCrews } from './bundled-crews.js';
+import { onAppVersionPublished } from '../internet-opening/opening-version.js';
+import { parseFormatMdMeta, formatMdRefusal } from './format-md.js';
+import { delegatedSettingsRefusal } from './publish-delegate.js';
+import { publishExposure } from './publish-exposure.js';
+import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './publish-gate.js';
+export type { RequestedManifest, PublishAppInput, PublishAppRefusal } from './publish-types.js';
+import type { PublishAppInput, PublishAppRefusal } from './publish-types.js';
+import { byAnotherAuthorsApp, tellOwnerAppPublishedByApp } from './published-by-app.js';
+
+export interface PublishAppResult {
+  roadmapHint?: string;
+  /** The design spec is missing on a shared app, or this version moved past it (app-design-spec.ts). */
+  designSpecHint?: string;
+  filename: string;
+  versionNumber: number;
+  isUpdate: boolean;
+  manifest: AppManifest;
+  size: number;
+  mimeType: string;
+  accessCode?: string;
+  parked: boolean;
+  forkable: boolean;
+  downloadUrl: string;
+  /** Non-blocking phone-overflow hints (HTML only). */
+  mobileHints: string[];
+  /** The AI transparency check, or null for a non-HTML bundle. */
+  aiLint: AppAiLintResult | null;
+  /** Where this app puts what. Null for a non-HTML bundle. `missing` when nobody has written one. */
+  dataMap: DataMapStamp | null;
+  aiProvenanceId?: string;
+  /** Did the publisher carry the current build spec? Warns; never refuses. */
+  specCheck: AppSpecCheck;
+  /** Non-blocking artifact findings (HTML only) — the blocking ones became a refusal. */
+  artifactWarnings: AppArtifactFinding[];
+  /**
+   * The node's own serve marks this upload carried and the publish took out before storing
+   * (services/app/serve-marks-strip.ts). Empty for a source upload. Doors render it with
+   * servedMarksResponse().
+   */
+  servedMarksRemoved: ServedMarkRemoval[];
+  /** Agent face + bound skill, and what to do about each. Best-effort, so it can be undefined. */
+  nextSteps?: Record<string, unknown>;
+  /** The publish request the gate filed (or the warning that it could not be): the app is unlisted. */
+  publishAsked?: AppPublishAsked;
+}
+
+/**
+ * Publish or update one app version.
+ *
+ * The order below is load-bearing in two places. The quota is checked before anything is written,
+ * so a refusal leaves no half-published state. The provenance stamp is taken over the bytes **as
+ * stored** and before `createApp`, so the hash in the record identifies exactly the bytes a
+ * detection query will be asked about — the serve-time marks are added on the way out and cannot
+ * change the answer. "As stored" means after the serve marks an uploaded served copy carried were
+ * taken back out, which is the first thing this function does.
+ */
+/** What a dry run answers when nothing refused it: this publish would have gone through. */
+export interface PublishAppWouldPass { dryRun: true }
+
+export async function publishApp(
+  storage: Storage, config: AimeatConfig, input: PublishAppInput & { dryRun: true },
+): Promise<PublishAppWouldPass | PublishAppRefusal>;
+export async function publishApp(
+  storage: Storage, config: AimeatConfig, input: PublishAppInput,
+): Promise<PublishAppResult | PublishAppRefusal>;
+export async function publishApp(
+  storage: Storage, config: AimeatConfig, input: PublishAppInput & { dryRun?: boolean },
+): Promise<PublishAppResult | PublishAppRefusal | PublishAppWouldPass> {
+  const { ownerName, ownerGhii, callerGaii, filename, mimeType, requested } = input;
+
+  // A SERVED COPY IS STORED AS ITS SOURCE (the developer's decision, 2026-09-13). The node's own
+  // serve marks are taken out here, before anything reads the bytes, so the artifact check, the AI
+  // posture, the provenance hash, the stored row, the size and the dependency map all see what the
+  // owner wrote rather than what the node added on the way out. It never refuses: the removals are
+  // named in the result, and every serve adds the current marks again. HTML only, since the marks
+  // only ever go into HTML.
+  const isHtml = /html/i.test(mimeType);
+  const { data, removed: servedMarksRemoved } = isHtml
+    ? stripServedMarks(input.data)
+    : { data: input.data, removed: [] };
+
+  const delegate = accountOf(callerGaii) !== accountOf(ownerName)
+    ? await effectiveDevLevel(storage, { owner: ownerName, filename, principal: callerGaii }) : null;
+  const delegated = accountOf(callerGaii) !== accountOf(ownerName);
+  if (delegated && (!delegate || !mayAct(delegate.level, 'publish'))) {
+    return { refusal: { status: 403, code: 'FORBIDDEN', message: 'You do not hold a right to publish this app.' } };
+  }
+  const shared = await isSharedApp(storage, ownerName, filename);
+  const road = roadmapGate({ line: input.roadmap, shared });
+  if (!road.ok) return { refusal: { status: 400, code: 'ROADMAP_REQUIRED', message: road.message } };
+  // The design spec's stamp as it stands before this version: copied onto the new manifest below,
+  // and compared with the new version number for the hint the response carries.
+  const designSpec = designSpecStamp(await readAppDesignSpec(storage, `${ownerName}/${filename}`));
+
+  const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
+  const isUpdate = existingVersion > 0;
+  const newVersion = existingVersion + 1;
+
+  // The per-owner app quota, on EVERY door. The presigned door skipped it, which made the upload
+  // route the recommended way past a limit the inline route enforced — the same shape of hole the
+  // storage quota had before v1.10.0 of routes/upload.ts closed it there.
+  if (!isUpdate && input.enforceQuota !== false && config.maxAppsPerAgent > 0) {
+    const { total } = await storage.listApps({ ownerGaii: ownerGhii, limit: 1 });
+    if (total >= config.maxAppsPerAgent) {
+      return {
+        refusal: {
+          status: 429, code: 'QUOTA_EXCEEDED',
+          message: `You have reached the maximum of ${config.maxAppsPerAgent} published apps`,
+        },
+      };
+    }
+  }
+
+  // THE ARTIFACT CHECK, before a single byte is written. Two findings are proof the app cannot work
+  // — an inline script that does not parse, and an asset URL this node answers 404 for — and both
+  // used to reach production unremarked: an app published on 2026-08-11 loaded /lib/aimeat-auth.js
+  // (the path is /v1/libs/) and threw before drawing anything, while the publish response said
+  // "published". Everything else the check notices is a warning further down. Refusing here rather
+  // than after createApp is what keeps a rejected publish from leaving a half-written version.
+  const html = isHtml ? data.toString('utf8') : '';
+  const artifact = isHtml
+    ? await lintAppArtifact(html, config)
+    : { blocking: [], warnings: [] };
+  if (artifact.blocking.length > 0) {
+    return {
+      refusal: {
+        status: 422, code: 'APP_ARTIFACT_BROKEN',
+        message: `This app cannot run as published: ${artifact.blocking.map(f => f.message).join(' ')}`,
+        details: { findings: artifact.blocking },
+      },
+    };
+  }
+
+  // The config the app declares (services/app/config.ts). A declaration that does not parse is
+  // refused here rather than stored: an install would otherwise fill values against a schema that
+  // cannot check them, and a secret field would put an API key in front of every visitor.
+  const configDecl = isHtml ? parseAppConfigSchema(html) : null;
+  if (configDecl && 'error' in configDecl) {
+    return { refusal: { status: 422, code: 'APP_CONFIG_SCHEMA_INVALID', message: `The app's config declaration cannot be used: ${configDecl.error}.` } };
+  }
+  // The app's own answer to ?format=md (services/app/format-md.ts): an action of the owner's own
+  // extension. Refused here, before anything is written, when it names an extension the owner did
+  // not install or an action it lacks; otherwise every ?format=md would quietly fall back.
+  const formatMdDecl = isHtml ? parseFormatMdMeta(html) : null;
+  if (formatMdDecl && 'error' in formatMdDecl) {
+    return { refusal: { status: 422, code: 'APP_FORMAT_MD_INVALID', message: `The app's aimeat-format-md declaration cannot be used: ${formatMdDecl.error}.` } };
+  }
+  if (formatMdDecl) {
+    const why = await formatMdRefusal(storage, ownerName, formatMdDecl);
+    if (why) return { refusal: { status: 422, code: 'APP_FORMAT_MD_INVALID', message: `The app's aimeat-format-md declaration cannot be used: ${why}.` } };
+  }
+  // The workspaces the app declares (services/app/workspaces.ts), checked as provisioning will take
+  // them, so a set built from this app never fails at the customer's install.
+  const workspaceDecl = isHtml ? parseAppWorkspaces(html) : null;
+  if (workspaceDecl) {
+    const why = 'error' in workspaceDecl ? workspaceDecl.error : await checkAppWorkspaces(storage, workspaceDecl.workspaces);
+    if (why) return { refusal: { status: 422, code: 'APP_WORKSPACE_INVALID', message: `The app's workspace declaration cannot be used: ${why}.` } };
+  }
+  // The intake forms the app submits to (services/app/intake-forms.ts): each must be the publisher's
+  // to manage, because an app opened to the internet on a closed node opens them with it.
+  const intakeDecl = isHtml ? await intakeDeclarationOf(storage, ownerName, html) : null;
+  if (intakeDecl && 'refusal' in intakeDecl) return { refusal: intakeDecl.refusal };
+
+  // Did whoever is publishing read the build spec that is in force NOW? This one only ever warns
+  // (services/app/spec-gate.ts explains why), and an owner-declared skip is recorded on the change
+  // log below rather than passing silently.
+  const specCheck = evaluateSpecCheck(config, { specToken: input.specToken, specAck: input.specAck });
+
+  const live = isUpdate ? await storage.getApp(ownerGhii, filename) : null;
+  const prev = live?.manifest;
+  // A display version the caller states is judged; one carried from the live app, or a package's own, is not.
+  const badVersion = input.source !== 'package-install' && requested.version !== prev?.version ? appDisplayVersionRefusal(requested.version) : null;
+  if (badVersion) return { refusal: badVersion };
+  // AN APP A MANAGED INSTALL OWNS changes only through its package (services/packages/install/package-managed.ts).
+  // The package's own update registers through here with source `package-install`, which is the one
+  // publish the lock lets through. Above the dry run, so a dry run answers what the publish would.
+  if (isUpdate && input.source !== 'package-install') {
+    const managed = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
+    if (managed) return { refusal: managed };
+  }
+  // What a developer of another account may not change (services/app/publish-delegate.ts), the
+  // ?format=md handler among it: the node runs that action in the owner's name for every reader.
+  if (delegated) {
+    const refused = delegatedSettingsRefusal({
+      ownerName, level: delegate!.level, requested, prev, liveAccessCode: live?.accessCode, accessCode: input.accessCode, formatMd: formatMdDecl,
+    });
+    if (refused) return { refusal: refused };
+  }
+
+  // A description is REQUIRED for a NEW app so the catalogue and the landing wall always have one.
+  // On an update, silence carries the existing one forward — a re-publish or a restore must never
+  // blank it. Asked ABOVE the dry run: it sat below it, so a dry run answered "would pass" to a
+  // publish that then refused (bbfbeca149de).
+  const description = (requested.description ?? '').trim() || (prev?.description ?? '');
+  if (!description) {
+    return {
+      refusal: {
+        status: 400, code: 'INVALID_INPUT',
+        message: 'A description is required when publishing a new app — write 1-2 sentences about what it does (your AI can write it for you).',
+      },
+    };
+  }
+
+  // A declaration of how the bytes were made is the caller's to make only with provenance:write.
+  // provenanceForWrite below throws that refusal after the manifest is built, which is under the dry
+  // run; asked here, without minting, a dry run answers it as the real publish does (bbfbeca149de).
+  const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+    principal: callerGaii, declared: input.declaredProvenance, declaredId: input.declaredProvenanceId,
+    enabled: config.aiProvenance,
+  });
+  if (provenanceRefused) {
+    return {
+      refusal: {
+        status: 403, code: provenanceRefused.code, message: provenanceRefused.message,
+        details: { held_scopes: provenanceRefused.heldScopes },
+      },
+    };
+  }
+
+  // A DRY RUN STOPS HERE, and this line is only correct because of how the rest of the function is
+  // ordered. Every refusal publishApp can make is ABOVE it — the publish right, the roadmap, the
+  // per-owner quota, the artifact lint, the delegated-settings check, a new app's description and a
+  // provenance declaration the caller may not make — and everything below builds the manifest, mints
+  // provenance and writes. `pnpm check:route-scopes` will not tell you that; the `return { refusal`
+  // sites will.
+  //
+  // WHO ASKS FOR ONE. services/packages/install/package-migrate.ts, whose `replace` and `custom` actions delete the
+  // owner's installed component before registering its replacement. Without a way to ask "would
+  // this register?", a lint or quota refusal left the owner with neither copy. One implementation:
+  // the answer comes from the same checks the real publish runs, not from a second reading of them.
+  if (input.dryRun) return { dryRun: true as const };
+
+  // ── The manifest: one carry-forward list, applied to every door ──
+  const manifest: AppManifest = {
+    name: requested.name ?? prev?.name ?? filename.replace(/\.html?$/i, ''),
+    description,
+    version: requested.version ?? prev?.version ?? `1.0.${newVersion - 1}`,
+    category: requested.category ?? prev?.category ?? 'utility',
+    tags: requested.tags ?? prev?.tags ?? [],
+    authorDisplay: ownerName,
+    usesCortex: requested.usesCortex ?? prev?.usesCortex ?? [],
+    // Who published this version, never carried forward (services/own-app-consent.ts).
+    publishedBy: callerGaii,
+    // The app whose grant published it, beside the owner it acts for (services/app/published-by-app.ts).
+    ...(input.publishingApp ? { publishedByApp: input.publishingApp } : {}),
+  };
+  const descriptions = sanitizeDescriptions(requested.descriptions) ?? prev?.descriptions;
+  if (descriptions) manifest.descriptions = descriptions;
+  // The build track (TARGET-074), read from the app's own head declaration — the same
+  // bytes-on-demand pattern as `aimeat-scopes`, but persisted so an edit session months later
+  // loads the guide this app was built with. Silence carries the previous answer forward; an app
+  // that never declared either reads as classic, because every pre-track app is one.
+  const declaredTrack = /<meta\s+name=["']aimeat-track["']\s+content=["'](classic|atelier)["']/i
+    .exec(html.slice(0, 4096))?.[1] as 'classic' | 'atelier' | undefined;
+  const track = declaredTrack ?? prev?.track;
+  if (track) manifest.track = track;
+  // The register the app committed to. The lint has already refused an Atelier app that names
+  // none, so by here it is a genre id or a `custom:<name>`; the publish response uses it to name
+  // the exact genre this app has to stand beside.
+  const declaredRegister = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']([^"']*)["']/i
+    .exec(html.slice(0, 4096))?.[1];
+  const icon = requested.icon ?? prev?.icon;
+  if (icon) manifest.icon = icon;
+  // An explicit `cortexAgents` replaces the section (send `[]` to clear it). Without one, the page's
+  // own aimeat-crews block is the declaration, the same block a package install reads; with neither,
+  // the previous version's agents carry forward (services/app/bundled-crews.ts).
+  const crews = decideBundledCrews({ requested: requested.cortexAgents, html: isHtml ? html : null });
+  const cortex: AppManifestCortex | undefined = crews.agents !== undefined
+    ? (crews.agents.length > 0 ? { agents: crews.agents } : undefined)
+    : (prev?.cortex?.agents?.length ? prev.cortex : undefined);
+  if (cortex) manifest.cortex = cortex;
+  // The config declaration is read from these bytes and never carried forward.
+  if (configDecl) manifest.configSchema = configDecl.schema as unknown as Record<string, unknown>;
+  // So is the workspace declaration.
+  if (workspaceDecl && 'workspaces' in workspaceDecl) manifest.workspaces = workspaceDecl.workspaces;
+  // And the intake forms.
+  if (intakeDecl?.forms.length) manifest.intake = intakeDecl.forms;
+  // And the ?format=md handler: a version that stops declaring it stops having it.
+  if (formatMdDecl) manifest.formatMd = formatMdDecl;
+  // Pacing amount: `0` clears it explicitly, silence keeps it. An update that omits the field must
+  // never silently drop it — which is what publishing a DRAFT used to do, because a draft manifest
+  // cannot carry one and the draft door published it verbatim.
+  const tollMorsels = requested.tollMorsels ?? prev?.tollMorsels;
+  if (typeof tollMorsels === 'number' && tollMorsels > 0) manifest.tollMorsels = tollMorsels;
+  const licenseType = requested.licenseType ?? prev?.licenseType;
+  if (licenseType) manifest.licenseType = licenseType;
+  const protection = requested.protection ?? prev?.protection;
+  if (protection && Object.values(protection).some(Boolean)) manifest.protection = protection;
+  // A fork stays a fork: the badge lives on the manifest and nothing in a re-publish restates it.
+  if (prev?.forkedFrom) manifest.forkedFrom = prev.forkedFrom;
+  // Search visibility survives a republish, and it has to. No publish door accepts this field —
+  // it is set through PATCH, from the app's own details view — so a manifest rebuilt without it
+  // would silently switch an app back out of search every time its author shipped a new version,
+  // and they would find out weeks later from their traffic.
+  //
+  // The operator's approval carries too, in review mode. What they approved is this app being
+  // findable under this name and this description, not one particular build of its HTML; making
+  // every version bump re-enter the queue would make the mode unusable and would teach owners to
+  // stop shipping. An operator who wants to withdraw it has the seo-approve door, and the block
+  // is a column that a republish cannot touch at all.
+  if (prev?.seo) manifest.seo = prev.seo;
+  // The owner's chrome switches and the named reviewer travel the same road, for the same reason:
+  // PATCH-only fields that a rebuilt manifest would otherwise silently reset. The reviewer's
+  // declaration and its log survive a new version on purpose — the person answers for the app,
+  // and withdrawing that is their explicit act, never a side effect of shipping.
+  if (prev?.marks) manifest.marks = prev.marks;
+  if (prev?.authorship) manifest.authorship = prev.authorship;
+  if (prev?.authorshipLog?.length) manifest.authorshipLog = prev.authorshipLog;
+  // The app's legal pages are the owner's standing statements about the app, not about one build.
+  if (prev?.legal) manifest.legal = prev.legal;
+  // The owner's "show the screenshot to everyone" is a settings choice no publish door carries.
+  if (prev?.screenshotPublic) manifest.screenshotPublic = true;
+  // So is the owner's text about the app (TARGET-093): a new build does not unsay it.
+  if (prev?.about) manifest.about = prev.about;
+
+  // What the app DECLARES survives a version whose author forgot the meta tag; what the node
+  // OBSERVES is re-measured from the bytes being published, never carried. HTML only — there is
+  // nothing to read in a binary. It WARNS and never blocks (decision D2): a publish that fails is a
+  // publish that gets worked around, and the app then ships with less transparency, not more.
+  const aiLint = isHtml ? lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture) : null;
+  if (aiLint) manifest.aiPosture = aiLint.posture;
+  // A declared model the catalogue does not know (app-ai-model-hints.ts; outside the posture check,
+  // whose import graph must not reach the catalogue store).
+  if (aiLint) aiLint.hints.push(...unknownModelHints(aiLint.posture.models));
+
+  // WHERE THIS APP PUTS WHAT. The node READS the map somebody wrote and stamps its summary on the
+  // manifest. It does NOT draft one: a map guessed from permission words produced the same confident
+  // row on 114 apps, sitting exactly where the answer belonged and reading like one. An app with no
+  // map is stamped as having none, which is the honest answer and the one that gets it written.
+  //
+  // Never refuses. A map is a statement about storage rather than a property of the bytes, and the
+  // one blocking check on this path refuses things that are broken, not things that are unfinished.
+  let dataMap: DataMapStamp | null = null;
+  if (isHtml) {
+    const at = new Date().toISOString();
+    const appId = filename.replace(/\.html$/i, '');
+    const existing = await readAppDataMap(storage, ownerGhii, appId);
+    dataMap = stampFor(existing, appId, at, parseAppScopes(html));
+    manifest.dataMap = dataMap;
+  }
+
+  // The spec state of THIS publish, kept where the owner can still find it later. Deliberately not
+  // carried forward: a clean publish clears it, so the field answers "how was this version put
+  // here" rather than marking an app forever for one hurried afternoon.
+  if (specCheck.status !== 'ok') {
+    manifest.specCheck = { status: specCheck.status, at: new Date().toISOString() };
+  }
+
+  // Carry the moderation and exposure state forward, so an update never silently re-exposes a
+  // parked app, opens forking, or escapes an operator hide by re-uploading.
+  // A first publish the node's defaults make public waits for the owner when the gate asks (V4).
+  // Before it, the defaults are narrowed to the app's label's audience cap (plan doc-mvdipuyqraas, L3.5).
+  const capped = await capFirstPublishExposure({ storage, config }, ownerGhii, filename, publishExposure(config, live, input.accessCode), !live);
+  const gated = gateFirstPublishExposure(capped, !live, input.publishGate);
+  if ('refusal' in gated) return gated;
+  const { parked, community, forkable, accessCode, access } = gated.exposure;
+
+  // The bytes changed → drop any cached obfuscated/locked base.
+  invalidateProtectionCache(ownerName, filename);
+
+  // MINT-3 and the declaration path in one call. An app published by an agent or an ecosystem app
+  // that declared nothing is stamped by the node — silence from a non-human principal must not read
+  // as "a human wrote it" — while an owner publishing through their own token is never stamped. Per
+  // version, because each publish is different content, and the record becomes anonymously
+  // resolvable exactly while this app is actually public.
+  const aiProvenanceId = await provenanceForWrite(storage, {
+    principal: callerGaii,
+    content: data,
+    // An app is code: its label says "AI wrote this app", not "this text".
+    mediaKind: 'code',
+    mediaType: mimeType,
+    declaredId: input.declaredProvenanceId,
+    declared: input.declaredProvenance,
+    pipeline: 'app.publish',
+    surface: {
+      visibility: accessCode || parked || access ? 'private' : 'public',
+      humanAudience: true,
+      // THE APP'S OWN ANSWER, finally asked. `<meta name="aimeat-ai" content="… public-interest=yes">`
+      // was parsed into the posture and then never reached the disclosure decision, so no publish on
+      // this node had ever stated one — every record fell to the D4 default and claimed the statutory
+      // basis regardless. Tri-state on purpose: `observed` means the author said nothing, which is
+      // NOT the same as saying no, and mapping silence to 'no' would be the opposite overclaim.
+      ...(aiLint?.posture.source === 'declared'
+        ? { publicInterest: aiLint.posture.publicInterest ? 'yes' as const : 'no' as const }
+        : {}),
+    },
+    labelPolicy: config.aiLabelPublic,
+    nodeId: config.nodeId,
+    baseUrl: config.baseUrl,
+    enabled: config.aiProvenance,
+  });
+
+  await storage.transaction(async () => {
+    if (road.line) {
+      const updatedRoadmap = await addRoadmapEntry(storage, {
+        appId: `${ownerName}/${filename}`, state: 'done', what: road.line,
+        by: accountOf(callerGaii), version: newVersion,
+      });
+      manifest.roadmap = roadmapStamp(updatedRoadmap);
+    } else if (prev?.roadmap) manifest.roadmap = prev.roadmap;
+    // The spec's stamp follows the record, not the previous manifest: a spec removed since the last
+    // publish leaves no stamp behind.
+    if (designSpec) manifest.designSpec = designSpec;
+    await storage.createApp({
+      ownerGaii: ownerGhii,
+      ownerName,
+      filename,
+      versionNumber: newVersion,
+      manifest,
+      mimeType,
+      size: data.length,
+      data,
+      accessCode,
+      parked, community, access,
+      forkable,
+      operatorHidden: !!live?.operatorHidden,
+      operatorHiddenBy: live?.operatorHiddenBy,
+      operatorHiddenAt: live?.operatorHiddenAt,
+      operatorHideReason: live?.operatorHideReason,
+      createdAt: new Date().toISOString(),
+      ...(aiProvenanceId ? { aiProvenanceId } : {}),
+    });
+  });
+
+  // The detection rules written for apps read its name and description (plan doc-mvdipuyqraas, L1.6).
+  classifyContainerAfterWrite({ storage, config }, appTarget(ownerGhii, filename), String(manifest.name || filename), manifest.description);
+  // The dependency map follows the bytes: what this version loads and calls, read from the source
+  // just stored, replaces whatever the previous version had. Best-effort, the publish stands.
+  await refreshAppDependencies(storage, { ownerName, filename, versionNumber: newVersion, mimeType, data, manifest })
+    .catch(err => logger.warn('publishApp: dependency map not refreshed', { filename, owner: ownerName, error: String(err) }));
+
+  const downloadUrl = `/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}`;
+  const now = new Date().toISOString();
+
+  // Provision the per-app subdomain NOW. Previously assigned on the first path-form open, so a new
+  // app's vanity URL 404'd until someone hit the canonical URL — which reads as a broken app rather
+  // than a missing mapping. Best-effort: a failed ensure never fails the publish.
+  if (/\.html?$/i.test(filename)) {
+    try {
+      await ensureAppSubdomain(storage, config, ownerName, filename);
+    } catch (err) {
+      logger.warn('publishApp: subdomain provisioning failed; the vanity URL will 404 until the canonical path is opened',
+        { filename, owner: ownerName, error: String(err) });
+    }
+  }
+
+  // Tell the search engines that participate in IndexNow, instead of waiting to be crawled. Only
+  // when this app is actually search-visible, which for a newly published app it is not — the
+  // switch is off until its owner turns it on. So in practice this fires on the republish of an
+  // app somebody already chose to have found, which is exactly the case where the wait matters.
+  // Best-effort and silent by contract: submitToIndexNow never throws.
+  //
+  // The three blocks gated on `announces` below say "something new is public here" to three
+  // different audiences: search engines, the announcement board and the node's public feed. A
+  // package install is not that event, and the owner's own change log and account event (which are
+  // NOT gated) still record it, so nothing is lost from the record. The board and the feed also need
+  // the app to be really public: listed, open to anyone and with no access code
+  // (services/app/announce.ts). A settings change that makes it public announces it then.
+  const published = input.source !== 'package-install' ? await storage.getApp(ownerGhii, filename) : null;
+  const announces = isAnnounceable(published);
+  // Listable: an app with no description of its own is not announced (TARGET-089 Y2).
+  if (published && appSeoListable(published, config)) {
+    const site = /\.html?$/i.test(filename)
+      ? (await storage.listSubdomainSites())
+        .find(s => s.enabled && s.kind === 'app' && s.target === `${ownerName}/${filename}`)
+      : undefined;
+    await announceApp(config, storage, { ownerGaii: ownerGhii, ownerName, filename }, site?.subdomain);
+  }
+
+  await storage.addSiteChangeLog({
+    id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+    action: isUpdate ? 'app_update' : 'app_publish',
+    // The spec-check state rides on the change-log line, which is the owner's own record of what
+    // happened to their node. A skip the owner asked for is a decision, and a decision that leaves
+    // no trace is indistinguishable from an omission six months later.
+    summary: `${isUpdate ? 'Updated' : 'Published'} app "${filename}" v${newVersion}`
+      + `${input.source === 'draft' ? ' from draft' : ''}`
+      + `${input.source === 'package-install' ? ' from a package' : ''} (${(data.length / 1024).toFixed(1)} KB)`
+      + (specCheck.status === 'ok' ? '' : ` [build spec: ${specCheck.status}]`),
+    changedBy: callerGaii,
+    changedAt: now,
+  });
+
+  // Board announcement — best-effort, never fails the publish (services/app/announce.ts).
+  if (announces) {
+    await postAppBoardAnnouncement(storage, config, {
+      callerGaii, name: manifest.name || filename, description: manifest.description, tags: manifest.tags,
+      version: newVersion, isUpdate, downloadUrl,
+    });
+  }
+
+  emitAppVersion(ownerName, filename, newVersion);
+  // An app open to the internet on a closed node: the operators hear of the new version, and the
+  // forms it opens follow the new declaration (services/internet-opening/). Never fails the publish.
+  void onAppVersionPublished({ storage, config }, {
+    ownerName, filename, version: newVersion, by: callerGaii, intake: manifest.intake ?? [],
+  });
+  if (announces) {
+    recordAppActivity(storage, config, {
+      actor: callerGaii,
+      summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
+      detail: manifest.description || '',
+      link: `${downloadUrl}?mode=inline`,
+    });
+  }
+
+  // The owner's own "what has happened". The public feed above tells the NODE; this tells the
+  // person, and the two are different audiences with different privacy — a private app publishes
+  // nothing publicly and still belongs in its owner's history.
+  void recordAccountEvent(storage, {
+    ownerGhii: `${ownerName}@${config.nodeId}`,
+    kind: isUpdate ? 'app_updated' : 'app_published',
+    actorGaii: callerGaii,
+    subject: `${ownerName}/${filename}`,
+    link: `${downloadUrl}?mode=inline`,
+    data: { name: manifest.name || filename, version: String(newVersion) },
+  }, config);
+  // Another author's app published this through its grant: the owner hears of it (secaudit2026oct26).
+  if (byAnotherAuthorsApp(input.publishingApp, ownerName)) {
+    void tellOwnerAppPublishedByApp(storage, config, { ownerName, filename, version: newVersion, publisher: input.publishingApp });
+  }
+
+  // Activation (05-mittaus.md): a published app is one of the three ways an account first
+  // produces something durable of its own. Write-once and fire-and-forget — measuring a publish
+  // must never be able to fail it.
+  void import('../onboarding-funnel.js')
+    .then(m => m.recordActivation(storage, config, ownerName, 'app'))
+    .catch(err => { logger.warn('publishApp: activation marker is best-effort', { error: String(err) }); });
+
+  if (specCheck.status !== 'ok') {
+    logger.info('publishApp: published without a current build-spec token', {
+      filename, owner: ownerName, by: callerGaii, spec_check: specCheck.status,
+    });
+  }
+
+  // The request the gate asked for, now that the unlisted version it names is stored.
+  const publishAsked = gated.asked && await fileAppPublishAsk({ storage, config }, { ownerName, filename, versionNumber: newVersion }, gated.asked);
+
+  // The two calls a builder is measured to forget once the app is live (app-book-parts.ts).
+  const bookParts = isHtml
+    ? await recordBookParts(storage, config, {
+      ownerName, ownerGaii: ownerGhii, filename, html, provenance: { principal: callerGaii },
+      // An app behind an access code, or parked, keeps its reasons to its owner.
+      version: newVersion, shareable: !parked && !accessCode,
+    })
+    : undefined;
+  const steps = await buildPublishNextSteps(
+    storage, config, ownerName, filename, data.length, track, declaredRegister, isHtml ? html : undefined,
+    // The data map and the design spec, as this publish found them (HTML apps only: both describe an app).
+    isHtml && dataMap ? {
+      dataMapMissing: dataMap.missing, dataMapRowsWithoutWhy: dataMap.rowsWithoutWhy,
+      designSpecVersion: designSpec?.version, newVersion,
+    } : undefined);
+
+  const specHint = designSpecHint({ stamp: designSpec, newVersion, shared });
+
+  return {
+    ...('warning' in road ? { roadmapHint: road.warning } : {}),
+    ...(specHint ? { designSpecHint: specHint } : {}),
+    filename,
+    versionNumber: newVersion,
+    isUpdate,
+    manifest,
+    size: data.length,
+    mimeType,
+    accessCode,
+    parked,
+    forkable,
+    downloadUrl,
+    mobileHints: isHtml ? lintAppHtmlForMobile(data.toString('utf8')) : [],
+    dataMap,
+    aiLint,
+    ...(aiProvenanceId ? { aiProvenanceId } : {}),
+    specCheck,
+    // A build that left the Atelier track is named here, beside the other hints, on every door
+    // (services/app/track-drift.ts). A warning: an owner may have asked for Classic.
+    artifactWarnings: [...artifact.warnings, ...(isHtml ? trackDriftFindings({
+      isUpdate, track, loadsAtelier: loadsAtelierKit(html),
+      carriedAtelierToken: typeof input.specToken === 'string' && input.specToken.trim() === buildAtelierSpecToken(config),
+    }) : []), ...(isHtml ? oneLanguageFindings({ isUpdate, html }) : []), ...(isHtml ? genreForkFindings(html) : []), ...(isHtml ? handRolledFindings(html) : []), ...(isHtml ? levelFindings(html) : []),
+      // Only a record minted from THIS declaration; an attached record was written elsewhere.
+      ...(aiProvenanceId && !input.declaredProvenanceId ? provenanceModelFindings(input.declaredProvenance) : []),
+      // A form the code submits to and the aimeat-intake meta leaves out.
+      ...(intakeDecl && 'warnings' in intakeDecl ? intakeDecl.warnings : []),
+      // The agents the app bundles: a block that was not used, and tools with no permissions asked for.
+      ...crews.findings],
+    servedMarksRemoved,
+    // Every door returns this now. It used to exist only on the MCP inline branch, so the two
+    // things an app most often lacks went unmentioned on the door most apps come through.
+    nextSteps: bookParts ? { ...(steps ?? {}), design_book_parts: bookParts } : steps,
+    ...(publishAsked ? { publishAsked } : {}),
+  };
+}

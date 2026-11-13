@@ -5,7 +5,7 @@
  * @description aimeat_workspace_create, moved out of mcp/workspaces.ts by pure extraction when that
  *   file passed the 800-line limit. What is left here is the door: the tool's parameters, the
  *   JSON-string tolerance MCP clients need, the membership check and the text answer. The
- *   provisioning itself is services/workspace-provision.ts, which is what
+ *   provisioning itself is services/workspace/provision.ts, which is what
  *   POST /v1/organisms/:id/workspaces calls.
  * @structure registerWorkspaceCreateTool(mcp, storage, config, deps)
  * @usage import { registerWorkspaceCreateTool } from './workspace-create.js';
@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from '../services/workspace-provision.js';
+import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from '../services/workspace/provision.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -69,7 +69,7 @@ export function registerWorkspaceCreateTool(
                 return fail('manifest must be an object with an objectTypes array.');
             }
             try {
-                // Everything from here is services/workspace-provision.ts: normalize the objectTypes
+                // Everything from here is services/workspace/provision.ts: normalize the objectTypes
                 // (rejecting an unsupported backing before anything is written, so a misdeclared
                 // space fails the first call instead of becoming invisible data), lock each records
                 // schema strict under the owner GHII, write the manifest against its meta-schema with

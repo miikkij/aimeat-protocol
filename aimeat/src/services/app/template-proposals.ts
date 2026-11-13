@@ -1,0 +1,190 @@
+/**
+ * @file src/services/app/template-proposals.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Agent-proposed app templates — after building/publishing an app, an agent
+ *   records what generalizes so the owner's NEXT build starts from it (fork the source app or
+ *   scaffold from the reuse notes). Mirrors the skills-registry substrate 1:1: one manifest
+ *   memory record per proposal at `template.catalog.{id}.manifest` under the owner's GHII,
+ *   visibility `private` in v1 (sharing/selling later = a visibility flip, no migration).
+ *   The tier/packs/composes fields reuse the curated AppTemplate vocabulary so promotion into
+ *   src/data/app-templates.ts is a copy, not a mapping. Model attribution is MANDATORY and
+ *   indicative. Read by the appdev overview and the `templates` discovery source.
+ * @structure TemplateProposalManifest; proposeTemplate/listTemplateProposals/
+ *   getTemplateProposal/deleteTemplateProposal; templateProposalKey()
+ * @usage import { proposeTemplate, listTemplateProposals } from './template-proposals.js';
+ * @version-history
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
+ *   v1.0.1 — 2026-09-26 — The caller's account comes from localAccountOf, so a visitor from another
+ *     node has none here and never reaches the local namesake's proposals (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-10-06 — proposeTemplate answers to the memory ceilings (memory-ceilings.ts) before it
+ *     writes, and a refusal carries its status and code (secaudit 2026-10 last items, F3).
+ *   v1.1.1 — 2026-10-19 — proposeTemplate writes on the version that was read (record-cas.ts
+ *     updateMemoryRecord) and builds the proposal again on a fresh read after a conflict, so the
+ *     proofs it carries over are the stored ones (check:atomic-writes).
+ */
+
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { isGEAI, localAccountOf } from '../../utils/gaii.js';
+import { memoryCeilings } from '../memory-ceilings.js';
+import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
+import type { ContributionProof } from '../../models/contribution-proof.js';
+
+const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export interface TemplateProposalManifest {
+    id: string;
+    title: string;
+    description: string;
+    /** The app this template was distilled from. */
+    derivedFrom: { owner: string; filename: string; version: number; node: string };
+    /** Curated AppTemplate vocabulary — promotion to the registry is a copy. */
+    tier: 'T1' | 'T2' | 'T3';
+    tags: string[];
+    /** What generalizes: the parts a next build should copy/keep, in plain prose. */
+    reuseNotes: string;
+    /** How the next build should start from this. */
+    startMode: 'fork' | 'scaffold' | 'either';
+    startModeRationale?: string;
+    /** The model that built the source app. MANDATORY, self-reported, indicative. */
+    model: string;
+    /** Per-model observations (which models handle this template well/badly). */
+    modelNotes?: Array<{ model: string; notes: string; evidence?: string }>;
+    /** Self-reported acceleration proofs (Phase 8 attaches these). */
+    proofs?: ContributionProof[];
+    /** Library packs the template relies on (pack registry ids). */
+    packs?: string[];
+    /** Component template ids this composes (curated registry vocabulary). */
+    composes?: string[];
+    proposedBy: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export const templateProposalKey = (id: string): string => `template.catalog.${id}.manifest`;
+export const TEMPLATE_PROPOSAL_KEY_RE = /^template\.catalog\.([a-z0-9]+(?:-[a-z0-9]+)*)\.manifest$/;
+
+export interface ProposeTemplateInput {
+    id: string;
+    title: string;
+    description: string;
+    derived_from: { owner: string; filename: string };
+    tier: 'T1' | 'T2' | 'T3';
+    tags?: string[];
+    reuse_notes: string;
+    start_mode?: 'fork' | 'scaffold' | 'either';
+    start_mode_rationale?: string;
+    model: string;
+    model_notes?: Array<{ model: string; notes: string; evidence?: string }>;
+    packs?: string[];
+    composes?: string[];
+}
+
+/** The caller's account on this node and its GHII; none for an ecosystem app or another node's identity. */
+function ownerGhiiOf(callerGaii: string, config: AimeatConfig): { owner: string; ownerGhii: string } | null {
+    const owner = isGEAI(callerGaii) ? null : localAccountOf(callerGaii);
+    return owner ? { owner, ownerGhii: `${owner}@${config.nodeId}` } : null;
+}
+
+/** Upsert a proposal (same id replaces — proposals are meant to improve over time). */
+export async function proposeTemplate(
+    storage: Storage, config: AimeatConfig, callerGaii: string, input: ProposeTemplateInput,
+): Promise<{ manifest: TemplateProposalManifest; updated: boolean } | { error: string; status?: number; code?: string }> {
+    const who = ownerGhiiOf(callerGaii, config);
+    if (!who) return { error: 'Could not resolve the caller to an owner' };
+    if (!ID_RE.test(input.id) || input.id.length > 64) {
+        return { error: 'Invalid template id — use kebab-case (a-z, 0-9, dashes), max 64 chars' };
+    }
+
+    // The derived-from app must exist and belong to THIS owner (a template proposal is a
+    // reflection on the owner's own build, not a claim over someone else's app).
+    if (input.derived_from.owner !== who.owner) {
+        return { error: 'derived_from.owner must be your own owner name' };
+    }
+    const sourceOwnerGhii = `${input.derived_from.owner}@${config.nodeId}`;
+    const app = await storage.getApp(sourceOwnerGhii, input.derived_from.filename);
+    if (!app) return { error: `derived_from app not found: ${input.derived_from.owner}/${input.derived_from.filename}` };
+
+    const key = templateProposalKey(input.id);
+    // Written on the version that was read (record-cas.ts): a proof attached meanwhile is read again
+    // and carried over, not written over with the copy read before it.
+    let refusal = null as { error: string; status?: number; code?: string } | null;
+    const written = await updateMemoryRecord(storage, who.ownerGhii, key, async (existing) => {
+        const existingValue = existing?.value as TemplateProposalManifest | null;
+        const now = new Date().toISOString();
+
+        const manifest: TemplateProposalManifest = {
+            id: input.id,
+            title: input.title,
+            description: input.description,
+            derivedFrom: {
+                owner: input.derived_from.owner,
+                filename: input.derived_from.filename,
+                version: app.versionNumber,
+                node: config.nodeId,
+            },
+            tier: input.tier,
+            tags: (input.tags ?? []).slice(0, 12),
+            reuseNotes: input.reuse_notes,
+            startMode: input.start_mode ?? 'either',
+            ...(input.start_mode_rationale ? { startModeRationale: input.start_mode_rationale } : {}),
+            model: input.model.trim().toLowerCase(),
+            ...(input.model_notes ? { modelNotes: input.model_notes } : {}),
+            // Proofs survive an upsert — they attach to the proposal id, not one wording of it.
+            ...(existingValue?.proofs ? { proofs: existingValue.proofs } : {}),
+            ...(input.packs ? { packs: input.packs } : {}),
+            ...(input.composes ? { composes: input.composes } : {}),
+            proposedBy: callerGaii,
+            createdAt: existingValue?.createdAt ?? now,
+            updatedAt: now,
+        };
+
+        // A proposal is a memory record of the owner's, so it answers to the value size, the key count
+        // and the byte budget every memory write answers to, and is refused before it is written
+        // (secaudit 2026-10 last items, F3).
+        const ceilings = await memoryCeilings({ storage, config }, who.ownerGhii, [{ key, value: manifest }]);
+        refusal = ceilings.ok ? null : { error: ceilings.refusal.message, status: ceilings.refusal.status, code: ceilings.refusal.code };
+        if (refusal) return UNCHANGED;
+
+        return {
+            value: manifest,
+            visibility: existing?.visibility ?? 'private',
+            tags: ['template', 'template-proposal', `model:${manifest.model}`, `tier:${manifest.tier}`],
+            ttlHours: null,
+        };
+    });
+    if (!written) return refusal ?? { error: 'The proposal was not written' };
+    // A first write is version 1; a write over an existing proposal is a later one.
+    return { manifest: written.value as TemplateProposalManifest, updated: written.version > 1 };
+}
+
+export async function listTemplateProposals(
+    storage: Storage, config: AimeatConfig, callerGaii: string,
+): Promise<TemplateProposalManifest[]> {
+    const who = ownerGhiiOf(callerGaii, config);
+    if (!who) return [];
+    const records = await storage.listMemory(who.ownerGhii, { prefix: 'template.catalog.', tags: ['template'] });
+    return records
+        .filter(r => TEMPLATE_PROPOSAL_KEY_RE.test(r.key))
+        .map(r => r.value as TemplateProposalManifest)
+        .filter(Boolean);
+}
+
+export async function getTemplateProposal(
+    storage: Storage, config: AimeatConfig, callerGaii: string, id: string,
+): Promise<{ record: MemoryRecord; manifest: TemplateProposalManifest } | null> {
+    const who = ownerGhiiOf(callerGaii, config);
+    if (!who || !ID_RE.test(id)) return null;
+    const record = await storage.getMemory(who.ownerGhii, templateProposalKey(id));
+    if (!record) return null;
+    return { record, manifest: record.value as TemplateProposalManifest };
+}
+
+export async function deleteTemplateProposal(
+    storage: Storage, config: AimeatConfig, callerGaii: string, id: string,
+): Promise<boolean> {
+    const who = ownerGhiiOf(callerGaii, config);
+    if (!who || !ID_RE.test(id)) return false;
+    return storage.deleteMemory(who.ownerGhii, templateProposalKey(id));
+}

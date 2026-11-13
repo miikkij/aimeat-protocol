@@ -19,7 +19,7 @@
  *   "nuotta", and every tool lookup for it misses.
  * @structure DISCOVERY_MARK: the idempotency marker; agentDiscoverySnippet(spec): the body markup;
  *   APP_REF_MARK + appRefSnippet(spec): the `#aimeat-app-ref` JSON block for the head. Where each
- *   goes and whether the document can take it is decided once, in services/app-serve-marks.ts.
+ *   goes and whether the document can take it is decided once, in services/app/serve-marks.ts.
  * @usage import { agentDiscoverySnippet, appRefSnippet } from '../utils/app-agent-discovery.js';
  * @version-history
  *   v3.0.0 — 2026-11-06 — The noscript block is one statement and four links (?format=md, webmcp,
@@ -135,7 +135,7 @@ export const APP_REF_MARK = 'id="aimeat-app-ref"';
  * The app's own identity as JSON, `#aimeat-app-ref`: a machine-readable twin of the discovery
  * block's facts, and what `AIMEAT.atelier.appRef()` and the WebMCP bridge read.
  *
- * IT BELONGS AT THE START OF THE HEAD, and services/app-serve-marks.ts puts it there. It used to
+ * IT BELONGS AT THE START OF THE HEAD, and services/app/serve-marks.ts puts it there. It used to
  * ride at the end of the body with the rest of this module's markup, which is after every inline
  * script the app wrote, so an app that read its own identity at parse time read nothing: the owner
  * was shown the visitor view of their own app, and a public read went to an empty identity.

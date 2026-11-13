@@ -2,7 +2,7 @@
  * @file test/unit/extension-purchase-seller-target.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description ctx.buy (services/extension-purchase.ts) runs an extension-backed capability only as
+ * @description ctx.buy (services/extension/purchase.ts) runs an extension-backed capability only as
  *   the extension its ref names in the SELLER's namespace. A ref that names nothing there ran after
  *   the settle as written, and the run read the bare name in the BUYER's namespace, so the buyer's
  *   own extension of that name ran with the seller's locked input and the
@@ -20,7 +20,7 @@ import type { AimeatConfig } from '../../src/config.js';
 vi.mock('../../src/services/metered-access.js', () => ({ authoriseMeteredCall: vi.fn() }));
 
 const { SqliteStorage } = await import('../../src/storage/providers/sqlite/index.js');
-const { buyForExtension } = await import('../../src/services/extension-purchase.js');
+const { buyForExtension } = await import('../../src/services/extension/purchase.js');
 const { authoriseMeteredCall } = await import('../../src/services/metered-access.js');
 const { resolveExtensionForCall } = await import('../../src/services/component-versions.js');
 

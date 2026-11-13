@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description App-catalog publish route: POST /v1/apps — the INLINE door (base64 body), plus the
  *   presigned-mode handshake that mints an upload URL for the other one. Everything the three
- *   publish doors share now lives in services/app-publish.ts; what stays here is the inline door's
+ *   publish doors share now lives in services/app/publish.ts; what stays here is the inline door's
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
@@ -77,19 +77,19 @@ import { success, error } from '../../middleware/envelope.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { publishApp } from '../../services/app-publish.js';
-import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';
-import { isSharedApp } from '../../services/app-dev-grant.js';
-import { roadmapGate } from '../../services/app-roadmap.js';
+import { publishApp } from '../../services/app/publish.js';
+import { servedMarksResponse } from '../../services/app/serve-marks-strip.js';
+import { isSharedApp } from '../../services/app/dev-grant.js';
+import { roadmapGate } from '../../services/app/roadmap.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { imageUploadType } from '../../utils/raster-image.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
-import { readAppTollInput, presentAppManifest } from '../../services/app-pacing.js';
+import { readAppTollInput, presentAppManifest } from '../../services/app/pacing.js';
 import { callerOf } from '../../middleware/caller.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
-import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
-import { publishingAppOf } from '../../services/app-published-by-app.js';
+import { publishAskedFields, askedStatus } from '../../services/app/publish-gate.js';
+import { publishingAppOf } from '../../services/app/published-by-app.js';
 
 export function registerPublishRoutes(
     router: Router,
@@ -121,7 +121,7 @@ export function registerPublishRoutes(
             return;
         }
         // `toll_morsels`, plus the 3.x `price_morsels` / `priceMorsels` read as pacing while they are
-        // live (services/app-pacing.ts); from 4.0.0 an old field is 400 MORSEL_PRICE_REMOVED.
+        // live (services/app/pacing.ts); from 4.0.0 an old field is 400 MORSEL_PRICE_REMOVED.
         const tollIn = readAppTollInput(req.body);
         if (!tollIn.ok) {
             res.status(400).json(error(config.nodeId, tollIn.code, tollIn.message));
@@ -187,7 +187,7 @@ export function registerPublishRoutes(
             }
         }
 
-        // The publish gate's answer for this session (services/app-publish-gate.ts), asked once for
+        // The publish gate's answer for this session (services/app/publish-gate.ts), asked once for
         // both modes. The presigned PUT has no session, so the signed token carries the answer.
         const publishGate = publishAskOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app);
 
@@ -219,7 +219,7 @@ export function registerPublishRoutes(
                     }),
                     // Server-side, never from the body: buildUploadMeta picks only the declared keys.
                     publish_ask: publishGate,
-                    // The app whose grant publishes, stamped on the version (services/app-published-by-app.ts).
+                    // The app whose grant publishes, stamped on the version (services/app/published-by-app.ts).
                     ...(publishingAppOf(req.auth) ? { publishing_app: publishingAppOf(req.auth) } : {}),
                 },
                 maxBytes: MAX_APP_SIZE,

@@ -96,20 +96,20 @@ import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyPassword } from '../../services/password.js';
-import { setWorkspaceShareOp, shareServedVisibility, type SetShareBody } from '../../services/workspace-share.js';
+import { setWorkspaceShareOp, shareServedVisibility, type SetShareBody } from '../../services/workspace/share.js';
 import { servePublicDocs } from '../../services/page-frame.js';
-import { markPageOpened, markPagesOpened } from '../../services/workspace-opened.js';
+import { markPageOpened, markPagesOpened } from '../../services/workspace/opened.js';
 import { generateShareToken, shareTokenVersionOf, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
 import { recordsToIcs, icsKeyMatches } from '../../services/calendar-feed.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, workspaceMetaReader } from '../../services/workspace-meta.js';
-import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace-provision.js';
-import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
-import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../../services/workspace-engagements.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, workspaceMetaReader } from '../../services/workspace/meta.js';
+import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace/provision.js';
+import { deriveWorkspaceEvents } from '../../services/workspace/enrichment.js';
+import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../../services/workspace/engagements.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { callerOf } from '../../middleware/caller.js';
-import { workspaceCallerOf, deleteRecordsBatchOp } from '../../services/workspace-tool-ops.js';
+import { workspaceCallerOf, deleteRecordsBatchOp } from '../../services/workspace/tool-ops.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
-import { isOrgManager, canReadWorkspaceRecords } from '../../services/workspace-access.js';
+import { isOrgManager, canReadWorkspaceRecords } from '../../services/workspace/access.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { workspaceTarget } from '../../services/classification/containers.js';
@@ -425,7 +425,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   /* ── POST /v1/organisms/:id/workspaces — CREATE a new workspace from a manifest + per-namespace JSON
      schemas (locked strict). Any active member may create; the workspace meta + schema locks are owned
      by the caller's OWNER GHII (resolveIdentity). Mirrors the MCP aimeat_workspace_create — both share
-     services/workspace-provision.ts. The gate is requireScope('organism:write'): requireRoleOrScope
+     services/workspace/provision.ts. The gate is requireScope('organism:write'): requireRoleOrScope
      ('agent', …) admitted every agent before it read the word, so the permission that hides
      aimeat_workspace_create from an agent's MCP surface did nothing here. Reasoning and measurement on
      POST /v1/organisms in crud.ts. Owner/operator sessions bypass scopes; membership is unchanged. ── */
@@ -616,7 +616,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
 
   /* ── PUT /v1/organisms/:id/workspace/share?ws= — set the share state. Body { public?, spaces?, docs?,
    * access?, password?, ics_key?, until? } is MERGED into the existing meta.share. The workspace creator
-   * or an org admin only. services/workspace-share.ts holds the whole rule, end dates and the HTML page
+   * or an org admin only. services/workspace/share.ts holds the whole rule, end dates and the HTML page
    * default included, and the MCP tool aimeat_workspace_share runs it too. ── */
   router.put('/v1/organisms/:id/workspace/share', requireAuth(), requireScope('memory:write'), async (req, res) => {
     // The resolved caller, as the MCP tool passes it: an organism agent is matched by its GAII.
@@ -706,7 +706,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * mukaan, item 9). From 2026-10-02 it asked memory:purge, because it removed the rows for good.
    * `memory:purge` stays the word for what cannot come back: a whole workspace (above) and rows. ── */
   router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:delete'), async (req, res) => {
-    // The body is deleteRecordsBatchOp (services/workspace-tool-ops.ts), which
+    // The body is deleteRecordsBatchOp (services/workspace/tool-ops.ts), which
     // ctx.workspace.deleteRecords runs too: membership, the append-only guard, the caller-owned family.
     const who = callerOf(req, config.nodeId, storage);
     if (who.visitor) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node is not a member of this organism.')); return; }

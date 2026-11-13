@@ -1,6 +1,6 @@
 /**
  * @file test/unit/app-serve-marks-strip.test.ts
- * @description What a publish takes back out of a served copy (src/services/app-serve-marks-strip.ts).
+ * @description What a publish takes back out of a served copy (src/services/app/serve-marks-strip.ts).
  *
  *   THE DECISION THESE HOLD (2026-09-13). An app published with HTML that carries the node's own
  *   serve marks is stored without them, the response names what came out, and the publish is not
@@ -28,10 +28,10 @@
  *     strip that removes nothing is trivially silent; they guard the implementation, not the stub).
  */
 import { describe, it, expect } from 'vitest';
-import { applyServeMarks, type ServeMarksSpec } from '../../src/services/app-serve-marks.js';
+import { applyServeMarks, type ServeMarksSpec } from '../../src/services/app/serve-marks.js';
 import {
   stripServedMarks, servedMarksResponse, type ServedMarkKind,
-} from '../../src/services/app-serve-marks-strip.js';
+} from '../../src/services/app/serve-marks-strip.js';
 import { agentDiscoverySnippet, type AppDiscoverySpec } from '../../src/utils/app-agent-discovery.js';
 import { SERVE_MARK_CASES, FIXTURE_CONFIG, provFixture } from './serve-marks-fixtures.js';
 import { ownerTagsSnippet, ownerTagsIntoHtml } from '../../src/services/visibility/analytics-tags.js';
@@ -61,13 +61,13 @@ const FULL: ServeMarksSpec = {
   discovery: DISCOVERY,
 };
 
-/** The "Use with your AI" mark as services/app-ai-use.ts hands it over, in a language with non-ASCII words. */
+/** The "Use with your AI" mark as services/app/ai-use.ts hands it over, in a language with non-ASCII words. */
 const AI_USE: NonNullable<ServeMarksSpec['aiUse']> = {
   use: { tools: 2, skills: 1, guideUrl: 'https://aimeat.io/v1/use-with-ai/alice/demo.html' }, locale: 'fi',
 };
 
 /**
- * The app-info mark as services/app-news.ts hands it over: roadmap lines with characters that must
+ * The app-info mark as services/app/news.ts hands it over: roadmap lines with characters that must
  * be escaped, a label and a Finnish date, so its JSON block and its words are both exercised.
  */
 const INFO: NonNullable<ServeMarksSpec['info']> = {

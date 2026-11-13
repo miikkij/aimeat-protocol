@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which legal pages an app ought to have, and which of them it does not have yet.
- *   A pure move out of services/app-legal.ts (which re-exports both names), so the publish answer
+ *   A pure move out of services/app/legal.ts (which re-exports both names), so the publish answer
  *   (app-publish-next-steps.ts) can say which pages are open without importing app-legal, whose
  *   imports lead back to the publish path and close an import cycle.
  * @structure LegalReadiness · legalReadiness(app, opts)

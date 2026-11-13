@@ -161,7 +161,7 @@ import { flagOrphanPeerApprovalsOnce } from '../services/federation-orphan-appro
 import { peerInfoFromRow } from '../services/federation-peer-reload.js';
 import { startNodeBusRelay } from './bus-relay-start.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
-import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
+import { migrateAppToolsKeysOnce } from '../services/app/tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
 import { seedBuiltinSkills } from '../services/skill-seeds.js';
 import { DirectoryService, registerDirectoryNotifier } from '../services/directory.js';
@@ -179,7 +179,7 @@ import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
 import { claimedSweep } from '../services/process-lease.js';
 import { errorFields } from '../utils/error-fields.js';
-import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
+import { sweepLapsedMemberships } from '../services/app/member-sweep.js';
 import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai/disclosure-sweep.js';
 import { scheduleAgreementSweep } from '../services/compliance/agreements-gaps.js';
@@ -189,7 +189,7 @@ import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 import { refreshOpenings } from '../services/internet-opening/opening-registry.js';
 import { registerScheduleKinds } from './schedule-kinds.js';
-import { bindLegacyExtensionSecrets } from '../services/extension-secrets.js';
+import { bindLegacyExtensionSecrets } from '../services/extension/secrets.js';
 import { sealLegacyTransportSecrets } from '../services/mcp-client/transport-secrets.js';
 import { removeDeletedAgentsConnections } from '../services/connections/agent-orphans.js';
 import { getEncryptionKey } from '../services/encryption.js';
@@ -313,7 +313,7 @@ export async function initializeServices(
   await loadCatalog(storage, config);
 
   // Extension secrets written before 2026-10-09 are rewritten bound to their extension and field
-  // (services/extension-secrets.ts). AWAITED and before the shipped extensions are seeded: from now
+  // (services/extension/secrets.ts). AWAITED and before the shipped extensions are seeded: from now
   // on the sandbox opens only a bound value, and the seed's carry-forward must see the new form.
   // Idempotent; a value that does not open is left as it is; never throws.
   await bindLegacyExtensionSecrets(storage, getEncryptionKey(config));
@@ -430,7 +430,7 @@ export async function initializeServices(
     .catch(err => logger.error('Failed to encrypt stored payment secrets', { error: String(err) })));
 
   // Once per node, an app tool manifest written under a name that is not its app's filename moves to
-  // the filename key, so both app catalogues show it (services/app-tools-key.ts).
+  // the filename key, so both app catalogues show it (services/app/tools-key.ts).
   bootSeeds.track(migrateAppToolsKeysOnce(storage, config)
     .then(({ ran, moved, left }) => {
       if (ran && (moved.length || left.length)) logger.info(`App tool manifests: ${moved.length} carried over to the app filename, ${left.length} left for the owner`);

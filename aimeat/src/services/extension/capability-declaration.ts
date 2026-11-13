@@ -1,0 +1,141 @@
+/**
+ * @file src/services/extension/capability-declaration.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What an extension may do beyond its own memory: reach the internet (`network`), start
+ *   AI jobs billed to its installer (`ai`), send email (`email`) and buy from another provider
+ *   (`payments`). The package approval shows this list and the sandbox enforces the same list, so
+ *   what the owner approved is what the code can do.
+ *
+ *   WHY. Until 2026-10-05 the approval searched the script text for `ctx.fetch(`, `ctx.email(` and
+ *   the like, and the sandbox gave every extension every capability. A script that wrote
+ *   `const f = ctx.fetch`, `ctx['fe' + 'tch']` or called the raw `__fetch` global was approved as
+ *   "no network" and reached the internet anyway (secaudit 2026-10, PKG-3).
+ *
+ *   DECLARED OR INFERRED. A manifest may say `capabilities: [network, ai]`; that list is the answer.
+ *   A manifest that says nothing (every extension written before this file) gets the list inferred
+ *   from its scripts by a deliberately broad word match: a script that contains the word `fetch`
+ *   anywhere is taken to use the network. Over-reading is safe in both directions, because the
+ *   approval then shows more and the sandbox allows what was shown; what the text does not name at
+ *   all (a computed property, a decoded string) is refused.
+ * @structure CAPABILITY_DECLARATION_KEY · EXTENSION_CAPABILITY_NAMES · ExtensionCapabilitySet ·
+ *   parseCapabilityDeclaration(raw) · inferCapabilities(code) · declaredHostsOf(config) ·
+ *   capabilitiesOfRecord(record) · capabilityNotDeclared(name)
+ * @usage
+ *   const caps = capabilitiesOfRecord(ext);
+ *   buildExtensionCtx({ ..., capabilities: caps });
+ * @version-history
+ *   v1.3.0 — 2026-10-09 — `fetchMaxBytes`: the record's `limits.fetchMaxBytes` rides the capability
+ *     set, so ctx.fetch reads one answer under the ceiling the manifest declared (wish-tv-opas).
+ *   v1.2.1 — 2026-10-09 — `unsetHostFields`: the host fields with no value, also when fixed hosts are
+ *     declared beside them (found on a hosted SOC trial by cc-jouni-soc-sale).
+ *   v1.2.0 — 2026-10-09 — `hosts` is the declared list plus the current value of each `host_fields`
+ *     field (services/extension-network-hosts.ts), so one bundle reaches each buyer's own host. A
+ *     manifest with host fields and no value set yet has `hosts: []`, which reaches nothing.
+ *   v1.1.0 — 2026-10-08 — `hosts` (manifest `network: { hosts }`, stored as `__networkHosts`): the only
+ *     hostnames ctx.fetch reaches, checked on every redirect hop by safeFetch's allowHosts.
+ *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, PKG-3, plan S8).
+ */
+
+import { hostFieldsOf, parseHostFieldValue } from './network-hosts.js';
+
+/** Where the manifest's declaration is stored on the record's config. __-prefixed, so `config:` cannot set it. */
+export const CAPABILITY_DECLARATION_KEY = '__capabilities';
+
+export const EXTENSION_CAPABILITY_NAMES = ['network', 'ai', 'email', 'payments'] as const;
+export type ExtensionCapabilityName = typeof EXTENSION_CAPABILITY_NAMES[number];
+
+/** Where the manifest's `network: { hosts }` is stored on the record's config. __-prefixed, like the list. */
+export const NETWORK_HOSTS_KEY = '__networkHosts';
+
+/**
+ * The four capabilities, and whether the manifest declared them (true) or the node inferred them
+ * (false). `hosts`, when the manifest named them, is the only hostnames ctx.fetch may reach, on
+ * every redirect hop too; absent means any public address, as before. `unsetHostFields` names the
+ * host fields with no value yet, so a refused fetch can say which one the owner still has to set.
+ */
+export type ExtensionCapabilitySet = Record<ExtensionCapabilityName, boolean> & {
+  declared: boolean; hosts?: string[]; unsetHostFields?: string[];
+  /** The record's `limits.fetchMaxBytes`: how much of one answer ctx.fetch reads. Absent: the 4 MB default. */
+  fetchMaxBytes?: number;
+};
+
+/** The manifest's `network.hosts` on an installed record, or undefined when it named none. */
+export function declaredHostsOf(config: Record<string, unknown> | undefined): string[] | undefined {
+  const raw = config?.[NETWORK_HOSTS_KEY];
+  if (!Array.isArray(raw)) return undefined;
+  const hosts = raw.filter((h): h is string => typeof h === 'string' && !!h).map(h => h.toLowerCase());
+  return hosts.length ? hosts : undefined;
+}
+
+/**
+ * The hosts ctx.fetch may reach on this install: the declared list plus the host part of each host
+ * field's current value. Undefined when the manifest named neither (any public address). A stored
+ * value that does not read as a host adds nothing; the config writers refuse one before it is stored.
+ */
+function networkHostsOf(config: Record<string, unknown> | undefined): { hosts?: string[]; unsetHostFields?: string[] } {
+  const declared = declaredHostsOf(config);
+  const fields = hostFieldsOf(config);
+  if (!fields.length) return declared ? { hosts: declared } : {};
+  const hosts = new Set(declared ?? []);
+  const unset: string[] = [];
+  for (const { field } of fields) {
+    const parsed = parseHostFieldValue(config?.[field]);
+    if (parsed.ok && parsed.host) hosts.add(parsed.host);
+    else unset.push(field);
+  }
+  return { hosts: [...hosts].sort(), ...(unset.length ? { unsetHostFields: unset } : {}) };
+}
+
+/** The broad word each capability is inferred from. Matching more than the call is the safe side. */
+const INFERRED_FROM: Record<ExtensionCapabilityName, RegExp> = {
+  network: /fetch/i,
+  ai: /\bai\b|_ai_/,
+  email: /email/i,
+  payments: /buy/i,
+};
+
+/** Read a manifest's `capabilities:`. Undefined is "not declared"; anything else must be a list of the four names. */
+export function parseCapabilityDeclaration(raw: unknown):
+  { ok: true; list?: ExtensionCapabilityName[] } | { ok: false; message: string } {
+  if (raw === undefined) return { ok: true };
+  if (!Array.isArray(raw) || raw.some(x => typeof x !== 'string')) {
+    return { ok: false, message: `capabilities must be a list of names, e.g. capabilities: [network, ai]. The names are ${EXTENSION_CAPABILITY_NAMES.join(', ')}.` };
+  }
+  const unknown = (raw as string[]).filter(x => !(EXTENSION_CAPABILITY_NAMES as readonly string[]).includes(x));
+  if (unknown.length) {
+    return { ok: false, message: `capabilities names ${unknown.join(', ')}, which do not exist; the names are ${EXTENSION_CAPABILITY_NAMES.join(', ')}.` };
+  }
+  return { ok: true, list: [...new Set(raw as ExtensionCapabilityName[])].sort() };
+}
+
+/** The capabilities a script's text names, by the broad word match above. */
+export function inferCapabilities(code: string): Record<ExtensionCapabilityName, boolean> {
+  const out = {} as Record<ExtensionCapabilityName, boolean>;
+  for (const name of EXTENSION_CAPABILITY_NAMES) out[name] = INFERRED_FROM[name].test(code);
+  return out;
+}
+
+/** The capabilities an extension record has: its declaration, else what its scripts name. */
+export function capabilitiesOfRecord(record: {
+  config?: Record<string, unknown>; actions: Array<{ scriptContent?: string }>; limits?: { fetchMaxBytes?: number };
+}): ExtensionCapabilitySet {
+  const declared = record.config?.[CAPABILITY_DECLARATION_KEY];
+  const network = networkHostsOf(record.config);
+  // The read ceiling travels with the capability set because ctx.fetch is where both are enforced,
+  // and every road builds its ctx from this one function.
+  const ceiling = typeof record.limits?.fetchMaxBytes === 'number' ? { fetchMaxBytes: record.limits.fetchMaxBytes } : {};
+  if (Array.isArray(declared)) {
+    const out = { declared: true } as ExtensionCapabilitySet;
+    for (const name of EXTENSION_CAPABILITY_NAMES) out[name] = declared.includes(name);
+    return { ...out, ...network, ...ceiling };
+  }
+  const code = record.actions.map(a => a.scriptContent ?? '').join('\n');
+  return { ...inferCapabilities(code), declared: false, ...network, ...ceiling };
+}
+
+/** The refusal a script meets when it uses a capability its extension does not have. */
+export function capabilityNotDeclared(name: ExtensionCapabilityName): Error {
+  return new Error(`CAPABILITY_NOT_DECLARED: this extension may not use ${name}. Its manifest does not `
+    + `declare it in capabilities: [...], and its scripts do not name it where the installer could see it.`);
+}

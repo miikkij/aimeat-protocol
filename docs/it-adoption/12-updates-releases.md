@@ -1,6 +1,6 @@
 # 12 Updates and releases
 
-> Checked against AIMEAT node 4.3.1 (commit d76b3dac5) on 2026-11-13. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 682799b99) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page is for the people who approve and apply updates: the system owner, the sysadmin and the security officer. It says how the project makes a release, what a release consists of, what you can verify about its integrity and what you cannot, how an update and a rollback work, and how security fixes are announced. The step-by-step procedure stays in [Upgrading](../operations/upgrading.md).
 

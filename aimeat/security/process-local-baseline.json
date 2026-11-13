@@ -413,19 +413,19 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/app-audit-archive.ts :: let :: boundConfig": {
+    "src/services/app/audit-archive.ts :: let :: boundConfig": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/app-isolation.ts :: let :: cached": {
+    "src/services/app/isolation.ts :: let :: cached": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/app-playtest.ts :: let :: playtestsRunning": {
+    "src/services/app/playtest.ts :: let :: playtestsRunning": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/app-playtest.ts :: map :: playtestHistory": {
+    "src/services/app/playtest.ts :: map :: playtestHistory": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -937,15 +937,15 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/extension-run-slots.ts :: let :: inUse": {
+    "src/services/extension/run-slots.ts :: let :: inUse": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/extension-run-slots.ts :: map :: byAccount": {
+    "src/services/extension/run-slots.ts :: map :: byAccount": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/extension-run-slots.ts :: set :: slotWaiters": {
+    "src/services/extension/run-slots.ts :: set :: slotWaiters": {
       "count": 1,
       "reason": "DEBT"
     },

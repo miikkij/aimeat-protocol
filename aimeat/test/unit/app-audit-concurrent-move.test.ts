@@ -25,10 +25,10 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import {
   recordAppAudit, readAppAudit, appAuditKey, archiveAppAuditBefore, applyAppAuditKeep,
-} from '../../src/services/app-audit.js';
+} from '../../src/services/app/audit.js';
 import {
   ACTIVE_ROLL_AT, ACTIVE_KEEP, listArchives, readAllEntries, moveToArchive, bindAppAuditConfig,
-} from '../../src/services/app-audit-archive.js';
+} from '../../src/services/app/audit-archive.js';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 
 requirePostgresWhenAsked('app-audit-concurrent-move');

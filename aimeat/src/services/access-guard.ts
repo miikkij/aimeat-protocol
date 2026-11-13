@@ -62,7 +62,7 @@ import { checkConsentForRead, auditDataAccess } from './consent.js';
 import { isKeyShared } from './group-shares.js';
 import { parseGaiiLoose, localAccountOf, currentNodeId, isSameOwner, isGEAI, localAccountName } from '../utils/gaii.js';
 import { ecoMayReadKey } from './ecosystem-access.js';
-import { readWorkspaceMetaRecord } from './workspace-meta.js';
+import { readWorkspaceMetaRecord } from './workspace/meta.js';
 import { agentBarred } from './organism-agent-access.js';
 import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
 import { organismVisibilityAdmits } from './organism-visibility.js';
@@ -321,7 +321,7 @@ export async function decideWorkspaceRead(
 
   // Gate 2: workspace read (manifest is the single gate record). An org manager (creator/admin) passes
   // unconditionally — they own the organism's access, so they read every workspace under it. The
-  // record is the copy that counts (services/workspace-meta.ts), never the first one the store
+  // record is the copy that counts (services/workspace/meta.ts), never the first one the store
   // returns: a member's own copy of the manifest would otherwise make them its owner here.
   const manRec = known ? known.manRec
     : ws === null ? null : await readWorkspaceMetaRecord(storage, organism.id, ws, 'meta.manifest', config.nodeId);

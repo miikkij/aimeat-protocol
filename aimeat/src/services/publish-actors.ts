@@ -25,7 +25,7 @@
  *
  *   WHAT EXISTS KEEPS WORKING. An extension an agent installed before this rule keeps publishing as
  *   before until its code changes, and a workflow saved before it until its next save
- *   (services/extension-publish-keep.ts). A run started before runs recorded their principal acts for
+ *   (services/extension/publish-keep.ts). A run started before runs recorded their principal acts for
  *   the owner, as it always has.
  * @structure PublishActor · invokingActor · principalActor · installerActor · runActor · askActors
  * @usage
@@ -44,7 +44,7 @@ import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import type { PublishStoreCtx } from './publish-requests/store.js';
 import { saverAuthority } from './workflow/trigger-authority.js';
 import { isGEAI } from '../utils/gaii.js';
-import { keepsPrePublishGate, definitionPredatesPublishGate } from './extension-publish-keep.js';
+import { keepsPrePublishGate, definitionPredatesPublishGate } from './extension/publish-keep.js';
 
 /** A principal the gate is asked about, as the gate reads it. */
 export interface PublishActor {
@@ -61,7 +61,7 @@ function ownerActor(storage: Storage, nodeId: string, ownerName: string): Publis
 }
 
 /**
- * The caller of an extension action (services/extension-invoke.ts ExtensionInvokeCaller). The kind
+ * The caller of an extension action (services/extension/invoke.ts ExtensionInvokeCaller). The kind
  * is the one the surface decided, so a visitor from another node stays a visitor.
  */
 export function invokingActor(
@@ -99,7 +99,7 @@ export async function principalActor(storage: Storage, nodeId: string, ownerName
  * Whom an extension's unattended run publishes for: the principal that installed it. A name with no
  * `#` is the account itself (the owner in person, or an app grant, whose `sub` is the account's GHII).
  * An extension an agent or an ecosystem app installed before this rule, with its code unchanged since,
- * publishes for the owner as it did (services/extension-publish-keep.ts).
+ * publishes for the owner as it did (services/extension/publish-keep.ts).
  */
 export async function installerActor(
     storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, ext: Pick<ExtensionRecord, 'name' | 'actions' | 'installedByPrincipal'> & { installedAt?: string }, ownerName: string,
@@ -114,7 +114,7 @@ export async function installerActor(
 /**
  * Whom a workflow run publishes for: its recorded principal. Null when nobody but the owner is behind
  * it: the owner in person, a run started before runs recorded a principal (2026-10-20), or a
- * definition last saved before this rule (services/extension-publish-keep.ts), which keeps publishing
+ * definition last saved before this rule (services/extension/publish-keep.ts), which keeps publishing
  * as it did until its next save.
  */
 export async function runActor(

@@ -17,7 +17,7 @@
  *                                            only way to see whether a publish is actually in force
  *   All in the AGENT's namespace with owner visibility, which is where the Python side already
  *   writes and reads. Versioning follows workspace records (`.version.N` copies, value-free
- *   enumeration from services/workspace-versions.ts) rather than a second scheme.
+ *   enumeration from services/workspace/versions.ts) rather than a second scheme.
  * @structure
  *   - crewKeysFor() / CREW_VERSION_WINDOW — the key contract
  *   - crewSitesWriteRefusal() / misdirectedCrewKey() — re-exported from crews/def-envelope.ts
@@ -47,7 +47,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
-import { listVersionRefs, versionNumberOf } from './workspace-versions.js';
+import { listVersionRefs, versionNumberOf } from './workspace/versions.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { ENVELOPE_VERSION, asObject, unwrapEnvelope, type CrewDefEnvelope } from './crews/def-envelope.js';

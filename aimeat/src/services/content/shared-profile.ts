@@ -24,7 +24,7 @@
  *
  *   STALE. A new publication changes the document's words, so the fingerprint's `readFrom` no
  *   longer matches: it is answered with `stale: true` and stays visible until someone makes it
- *   again. It goes when the document goes (services/workspace-write.ts deleteWorkspaceInstance) and
+ *   again. It goes when the document goes (services/workspace/write.ts deleteWorkspaceInstance) and
  *   with the workspace, being under its prefix; a listing drops one whose document is gone.
  *
  *   THE READERS' OWN EARLIER ONES. Before 2026-11-03 a workspace document's fingerprint was kept in
@@ -42,10 +42,10 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
-import { decideWorkspaceRead } from '../workspace-access.js';
-import { findWorkspaceRecord } from '../workspace-write.js';
-import { instanceFromKey } from '../workspace-record-key.js';
-import { loadWorkspaceContent } from '../workspace-content.js';
+import { decideWorkspaceRead } from '../workspace/access.js';
+import { findWorkspaceRecord } from '../workspace/write.js';
+import { instanceFromKey } from '../workspace/record-key.js';
+import { loadWorkspaceContent } from '../workspace/content.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
 import { readerFor, systemReader, type ContentReader } from '../classification/reader.js';
 import { memoryTarget, ClassificationError } from '../classification/labels.js';
@@ -405,7 +405,7 @@ export async function listSharedProfiles(
     const s = parseShared(r.value);
     if (!s) continue;
     if (docs.has(s.doc.key)) { byDoc.set(s.doc.key, s); continue; }
-    // A fingerprint whose document is gone goes too (services/workspace-write.ts removes it on a
+    // A fingerprint whose document is gone goes too (services/workspace/write.ts removes it on a
     // delete; this catches any other way a document leaves); an archived document keeps its own.
     if (!s.doc.key.startsWith(prefix)) continue;
     void findWorkspaceRecord(deps.storage, s.doc.key).then((doc) => (doc ? undefined : deps.storage.deleteMemory(r.ownerGaii, r.key)))

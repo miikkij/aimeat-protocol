@@ -71,7 +71,7 @@ export function resolveActionPricing(
  * The contract terms of an extension ACTION: resolveActionPricing over its `commercial` block, and the
  * pacing toll the contract carries beside the per-call amount. The 4.0.0 form of a morsel-rail action
  * is its own `tollMorsels` with no `commercial.payMorsels` (the manifest refuses payMorsels from 4.0.0,
- * services/extension-manifest.ts stores tollMorsels on the action). Such an action was NOT_PRICED here,
+ * services/extension/manifest.ts stores tollMorsels on the action). Such an action was NOT_PRICED here,
  * so it could be listed by the projection but never contracted. Read as listingTerms reads it: with no
  * money price and no 3.x payMorsels, the toll IS the per-call pacing amount and the toll beside it is
  * 0, so a tollMorsels of 10 charges 10 per call, not 20. A 3.x record (payMorsels, with or without a

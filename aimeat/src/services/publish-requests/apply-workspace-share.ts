@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for a workspace share: the part of the change that was
  *   held back (the access set to `open`, or the targets shared under it) is applied, as the owner,
- *   through setWorkspaceShareOp (services/workspace-share.ts), the operation PUT
+ *   through setWorkspaceShareOp (services/workspace/share.ts), the operation PUT
  *   /v1/organisms/:id/workspace/share and aimeat_workspace_share run (plan doc-mvcn6c7e4e5q, V4).
  *   The owner must still be the workspace's creator or an organism admin; the operation asks that.
  *
@@ -16,8 +16,8 @@
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
-import { readShareMetaOf, setWorkspaceShareOp, type SetShareBody } from '../workspace-share.js';
-import { readWorkspaceMetaRecord } from '../workspace-meta-read.js';
+import { readShareMetaOf, setWorkspaceShareOp, type SetShareBody } from '../workspace/share.js';
+import { readWorkspaceMetaRecord } from '../workspace/meta-read.js';
 import { localAccountName } from '../../utils/gaii.js';
 
 export async function applyWorkspaceSharePublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

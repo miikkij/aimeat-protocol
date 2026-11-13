@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     findSections, locateSection, insertAt, replaceRange, isHeadingLine,
-} from '../../src/services/workspace-doc-markdown.js';
+} from '../../src/services/workspace/doc-markdown.js';
 
 const DOC = [
     '# Agent v2',

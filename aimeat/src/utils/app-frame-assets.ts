@@ -10,7 +10,7 @@
  * @structure appFrameHostHtml() · appFrameHostScript() · appFrameCoreScript() · appFrameShimSource() — each the file's text,
  *   or null when the static tree was not shipped with this node. Cached after the first read.
  *   FRAME_SUPPORT_MARK · withFrameShim(body) — the support script put in front of an app's markup,
- *   under the attribute services/app-serve-marks-strip.ts recognises it by.
+ *   under the attribute services/app/serve-marks-strip.ts recognises it by.
  *   pageFrameShimSource() · withPageFrameShim(html) — the same for an HTML page in the page frame
  *   (src/static/page-frame-shim.js, routes/page-host.ts); pageFrameHolderHtml() · pageFrameHolderScript()
  *   — the holder the viewer frames, which frames the page (src/static/page-frame-holder.*).
@@ -81,7 +81,7 @@ export function appFrameShimSource(): string | null {
 /**
  * The attribute the support script's tag carries. It is a serve mark like the badge: a copy of the
  * app as the frame received it, published again, has the script taken out before it is stored
- * (services/app-serve-marks-strip.ts), and every serve puts the current one in once.
+ * (services/app/serve-marks-strip.ts), and every serve puts the current one in once.
  */
 export const FRAME_SUPPORT_MARK = 'data-aimeat-frame-support';
 

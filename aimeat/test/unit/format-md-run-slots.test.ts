@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An anonymous ?format=md read runs the app owner's extension action
- *   (services/app-format-md.ts) through runExtensionActionAsSystem, which took no slot of the
+ *   (services/app/format-md.ts) through runExtensionActionAsSystem, which took no slot of the
  *   request-driven run pool, and readers who missed the cache at once each started a run, for any
  *   number of `?lang=` values (secaudit2026oct26,
  *   extension-system-run:request-driven-runs-outside-run-slot-pool). Now the run takes a slot on
@@ -17,7 +17,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 
 const runs = { inFlight: 0, max: 0, total: 0, waiting: [] as Array<() => void> };
-vi.mock('../../src/services/extension-system-run.js', () => ({
+vi.mock('../../src/services/extension/system-run.js', () => ({
   runExtensionActionAsSystem: async () => {
     runs.inFlight++; runs.total++; runs.max = Math.max(runs.max, runs.inFlight);
     await new Promise<void>(r => runs.waiting.push(r));

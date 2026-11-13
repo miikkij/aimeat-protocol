@@ -80,7 +80,7 @@ async function main(): Promise<void> {
   const party = await import('../../../src/services/parties/token.js');
   const pageFrame = await import('../../../src/services/page-frame-token.js');
   const preview = await import('../../../src/services/design-book/preview-token.js');
-  const appAccess = await import('../../../src/services/app-access-token.js');
+  const appAccess = await import('../../../src/services/app/access-token.js');
   const external = await import('../../../src/services/external-login.js');
   download.initDownloadTokenKeys(privateKey, publicKey);
   upload.initUploadTokenKeys(privateKey, publicKey);
@@ -155,7 +155,7 @@ async function main(): Promise<void> {
   const setupOnly = await totp.setupTotp(OWNER, totpOnly);
   const atRest = await import('../../../src/services/config/at-rest.js');
   const transport = await import('../../../src/services/mcp-client/transport-secrets.js');
-  const ext = await import('../../../src/services/extension-secrets.js');
+  const ext = await import('../../../src/services/extension/secrets.js');
   const protect = await import('../../../src/utils/app-protect.js');
   const nodeAtRest = await import('../../../src/storage/node-key-at-rest.js');
   const keyConfig = { encryptionKey: DATA_KEY_HEX, totpSecretEncryptionKey: TOTP_KEY_HEX };

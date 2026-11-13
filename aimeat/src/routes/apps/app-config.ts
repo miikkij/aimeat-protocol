@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description An app's config over REST: the fields it declares, their values with the defaults
  *   filled in, and which required ones are still empty; and the owner's change to them. The work is
- *   services/app-config.ts, which the node MCP tool calls too.
+ *   services/app/config.ts, which the node MCP tool calls too.
  *
  *   READ IS PUBLIC, because the app reads its owner's values in the browser of whoever opened it,
  *   signed in or not (AIMEAT.data.appConfig()). Nothing secret can be there: publish refuses a
@@ -29,7 +29,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';
-import { getAppConfig, setAppConfig } from '../../services/app-config.js';
+import { getAppConfig, setAppConfig } from '../../services/app/config.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerAppConfigRoutes(router: Router, config: AimeatConfig, storage: Storage): void {

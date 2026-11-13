@@ -8,7 +8,7 @@
  *   specification, and that is the question a change to the specification's wording has to be
  *   measured against: a calmer text that publishes as often and breaks more rules is worse. So the
  *   published bytes are read back and put through the node's own publish-time lint
- *   (services/app-artifact-lint.ts, the same function every publish door calls), plus a few facts
+ *   (services/app/artifact-lint.ts, the same function every publish door calls), plus a few facts
  *   the specification asks of every app and the lint does not look at.
  *
  *   Facts, not a score. Which of them matter is for whoever reads two reports side by side.
@@ -32,9 +32,9 @@
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import type { AimeatConfig } from '../../src/config.js';
-import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
-import { genreKeptShare, ownClassNames } from '../../src/services/app-genre-fork.js';
-import { buildNotesDeclared } from '../../src/services/app-build-notes.js';
+import { lintAppArtifact } from '../../src/services/app/artifact-lint.js';
+import { genreKeptShare, ownClassNames } from '../../src/services/app/genre-fork.js';
+import { buildNotesDeclared } from '../../src/services/app/build-notes.js';
 import { ATELIER_COMPONENTS } from '../../src/services/build-atelier-prompt.js';
 import { regexLiteral } from '../../src/utils/regex-literal.js';
 

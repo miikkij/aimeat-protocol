@@ -1,6 +1,6 @@
 /**
  * @file test/unit/app-artifact-lint.test.ts
- * @description Unit tests for the publish-time artifact check (src/services/app-artifact-lint.ts).
+ * @description Unit tests for the publish-time artifact check (src/services/app/artifact-lint.ts).
  *
  *   THE APP THESE ARE WRITTEN FROM went live on aimeat.io on 2026-08-11 with three defects at once:
  *   it loaded /lib/aimeat-auth.js (404 — the path is /v1/libs/), it hardcoded its colours past the
@@ -55,8 +55,8 @@ import { describe, it, expect } from 'vitest';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { AimeatConfig } from '../../src/config.js';
-import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
-import { applyServeMarks } from '../../src/services/app-serve-marks.js';
+import { lintAppArtifact } from '../../src/services/app/artifact-lint.js';
+import { applyServeMarks } from '../../src/services/app/serve-marks.js';
 import { moduleGoalAvailable } from '../../src/utils/inline-script-parse.js';
 
 /** Only the fields the check reads. Cast rather than built: the rest of the config is irrelevant. */
@@ -257,7 +257,7 @@ describe('lintAppArtifact — a served copy published as source', () => {
   // the way OUT and skips any mark already present, so a republished served copy kept a badge the
   // owner may have switched off and an AI-disclosure block for a version that no longer existed.
   // The developer decided the same day: the publish takes the marks out before it lints, hashes and
-  // stores (services/app-serve-marks-strip.ts) and names them in the response. The lint therefore
+  // stores (services/app/serve-marks-strip.ts) and names them in the response. The lint therefore
   // has nothing to say about them; the served-copy WARNING it carried earlier that day is gone.
   it('says nothing about the serve marks, which the publish removes before this check runs', async () => {
     const served = applyServeMarks(CLEAN, { badge: true, reviewedBy: 'Jane Reviewer', isDocument: true }).toString('utf-8');

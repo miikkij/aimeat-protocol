@@ -53,7 +53,7 @@ import { updateRecord, UNCHANGED } from './record-cas.js';
 import { PORTFOLIO_HTML_KEY, portfolioReadGaiis } from './portfolio-config.js';
 import { fileAsk, requesterOf } from './publish-requests/ask.js';
 import type { PublishRequester } from './publish-requests/store.js';
-import { askedOf, type AppPublishAsked } from './app-publish-gate.js';
+import { askedOf, type AppPublishAsked } from './app/publish-gate.js';
 import { logger } from '../utils/logger.js';
 import { parseGAII } from '../utils/gaii.js';
 import { madeBefore } from './once-only-step.js';

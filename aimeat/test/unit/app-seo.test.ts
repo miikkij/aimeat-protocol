@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   appSeoIndexable, appSeoState, appSeoMeta, appDeclaredLocales,
-} from '../../src/services/app-seo.js';
+} from '../../src/services/app/seo.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { AppSummaryRecord } from '../../src/storage/types/apps.js';
 

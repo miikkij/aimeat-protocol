@@ -263,7 +263,7 @@ const BUILDER_ACTION_SPECS: Record<string, AppManageAction> = {
 };
 
 /**
- * The design spec beside the app (services/app-design-spec.ts): what the app is for, its screens,
+ * The design spec beside the app (services/app/design-spec.ts): what the app is for, its screens,
  * where its data lives, what was decided and what is open, for everybody who builds it. Over the
  * route like the member actions, which decides who is inside the build (the owner, the owner's
  * agents, and everybody holding a development right) and that only the owner removes it.
@@ -275,7 +275,7 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
     spec_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'remove the design spec. Owner only: a builder corrects it with spec_set instead' },
-    // The permissions the app kept when the node moved to 4.0 (services/app-scope-allowance.ts).
+    // The permissions the app kept when the node moved to 4.0 (services/app/scope-allowance.ts).
     scope_allowance: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'the permissions the app kept when this server moved to 4.0 because its code calls routes its aimeat-scopes declaration does not name: the words, the code that needs each, and the words its owner removed. The owner and everybody who may build the app' },
     scope_allowance_remove: { fields: F(['filename', 'words'], ['owner']), scope: 'app:manage',
@@ -283,7 +283,7 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
 };
 
 /**
- * The app's structure and plan (services/app-structure.ts, services/app-plan.ts): the eight steps the
+ * The app's structure and plan (services/app/structure.ts, services/app/plan.ts): the eight steps the
  * structure page shows, from the first moment of building, before any code or publish. Over the
  * route like the spec actions, which decides who is inside the build.
  */

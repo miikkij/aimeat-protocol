@@ -24,7 +24,7 @@ import { readerFor, readerForAgent, type ContentReader, type EgressDestination }
 import { memoryTarget, fileTarget, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { getRun, listRuns, runKey, WITHHELD_CLASSIFIED } from '../../src/services/workflow/store.js';
 import { buildOfferEvalCtx } from '../../src/services/offer-prereqs.js';
-import { makeExtensionFiles } from '../../src/services/extension-files.js';
+import { makeExtensionFiles } from '../../src/services/extension/files.js';
 import { runOwnPublish } from '../../src/services/connections/publish-run.js';
 import { createTrackedResponse, getTrackedResponse } from '../../src/services/tracked-response.js';
 import { dispatchDataPackageStep } from '../../src/services/workflow/engine-steps.js';

@@ -26,11 +26,11 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { unzipBuffer, restoreWorkspace } from './workspace-import.js';
+import { unzipBuffer, restoreWorkspace } from './workspace/import.js';
 import { ORG_EXPORT_VERSION } from './organism-export.js';
 import { logger } from '../utils/logger.js';
 import { createOrganismRecord } from './organism-lifecycle.js';
-import { importCallerContext, type ImportCaller } from './workspace-import-gates.js';
+import { importCallerContext, type ImportCaller } from './workspace/import-gates.js';
 import type { PublishRequestedBody } from './publish-requests/door.js';
 
 interface OrgJson {

@@ -108,11 +108,11 @@ through the agents by hand. The node removes nothing, and leaves an agent or app
 covering wildcard such as `task:*`) as it is. Anonymous mode's shared agent is the one exception: its
 words are fixed, and the start takes back the two words earlier versions gave it.
 
-The same start reads the code of every published app (`aimeat/src/services/app-scope-needs.ts`). An
+The same start reads the code of every published app (`aimeat/src/services/app/scope-needs.ts`). An
 app whose code calls one of these routes (an extension action, `AIMEAT.webhook`, the agent list,
 an organism's workspaces, a schedule and the rest) while its `aimeat-scopes` meta tag, or the default
 set when it has none, does not name the word keeps that word
-(`aimeat/src/services/app-scope-allowance.ts`): it counts as declared, every live grant of the app
+(`aimeat/src/services/app/scope-allowance.ts`): it counts as declared, every live grant of the app
 gets it, and the next sign-in asks for it. Nobody edits the apps. The app's change log in the App
 Catalog says which line of code needs each word.
 
@@ -132,7 +132,7 @@ such image, and nothing else on the page shows it: the images stay empty until s
 document that has one. A node that moved to 4.0.x before that check existed did not give the word to
 any app, so on a later start the node gives `storage:read` once to every published app whose code
 reads `/v1/pub` (a string that starts with the path, or the path written escaped in a regex) and does
-not ask for it (`aimeat/src/services/app-storage-read-keep-migration.ts`). It is kept like the words
+not ask for it (`aimeat/src/services/app/storage-read-keep-migration.ts`). It is kept like the words
 above: one feed line per owner, one incident for the operator, and the owner removes it the same
 way. Agents and ecosystem apps on such a node do not get it by themselves; give it to an agent in its
 settings when it reads workspace files. The fix in the app itself is to name `storage:read` in

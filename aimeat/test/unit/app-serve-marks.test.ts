@@ -73,7 +73,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { applyServeMarks } from '../../src/services/app-serve-marks.js';
+import { applyServeMarks } from '../../src/services/app/serve-marks.js';
 import { SERVE_MARK_CASES, FIXTURE_CONFIG, provFixture } from './serve-marks-fixtures.js';
 
 const GOLDEN: Record<string, string> = JSON.parse(

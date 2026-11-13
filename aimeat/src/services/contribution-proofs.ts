@@ -50,7 +50,7 @@ import type { ContributionProof } from '../models/contribution-proof.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { namespacedName } from './component-address.js';
 import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
-import { getTemplateProposal, templateProposalKey } from './app-template-proposals.js';
+import { getTemplateProposal, templateProposalKey } from './app/template-proposals.js';
 import { CAS_ATTEMPTS } from './record-cas.js';
 
 /** The community pack's append-only proof ledger: one public record per pack, under its owner. */

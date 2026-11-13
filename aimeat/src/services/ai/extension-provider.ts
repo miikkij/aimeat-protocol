@@ -32,11 +32,11 @@ import { localAccountName } from '../../utils/gaii.js';
 import { AiCompletionError } from './errors.js';
 import type { AiCapability, AiOp, ExtensionOpRunner } from './types.js';
 import type { AiProvider } from './providers.js';
-import { aiProviderDeclarationOf, type ExtensionAiProviderDeclaration } from '../extension-ai-provider-declaration.js';
-import { runExtensionActionAsSystem } from '../extension-system-run.js';
+import { aiProviderDeclarationOf, type ExtensionAiProviderDeclaration } from '../extension/ai-provider-declaration.js';
+import { runExtensionActionAsSystem } from '../extension/system-run.js';
 import { findExtension } from '../component-address.js';
-import { waitExtensionRunSlot } from '../extension-run-slots.js';
-import { extensionWallClockMs } from '../extension-run-deadline.js';
+import { waitExtensionRunSlot } from '../extension/run-slots.js';
+import { extensionWallClockMs } from '../extension/run-deadline.js';
 
 /** The action op a capability is served by. */
 export const CAPABILITY_OP: Record<AiCapability, AiOp> = {

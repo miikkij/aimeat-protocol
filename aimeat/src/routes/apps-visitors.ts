@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who opened one of my apps, when, and from where: the REST door on
- *   services/app-visitors.ts. The App Catalog's Visitors section and the two MCP tools
+ *   services/app/visitors.ts. The App Catalog's Visitors section and the two MCP tools
  *   (aimeat_app_manage, actions "visitors" and "visitors_measure") answer from the same service.
  *
  *   ONLY THE APP'S OWN ACCOUNT. The report is built from a usage cut keyed by the VISITOR, read
@@ -33,7 +33,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { SIGNAL_GEO_LEVELS } from '../models/signal-schemas.js';
 import {
   AppVisitorsError, clampDays, parseAppId, readAppVisitors, setAppMeasurement, type AppRef,
-} from '../services/app-visitors.js';
+} from '../services/app/visitors.js';
 
 const MeasurementSchema = z.object({
   app_id: z.string().min(3).max(300).optional(),

@@ -263,7 +263,7 @@ const AI_PROVENANCE_REQUIRED = [
   'aimeat_app_draft_publish',
   'aimeat_app_publish',
   // An app's own legal page (terms, privacy notice, imprint, …) is text a person reads and an AI
-  // is exactly who drafts it. DECIDED 2026-08-29: services/app-legal.ts mints through
+  // is exactly who drafts it. DECIDED 2026-08-29: services/app/legal.ts mints through
   // provenanceForWrite() on every door, the served page carries the marks and the visible label,
   // and the app's named reviewer lifts the label the way it is lifted on the app itself.
   // A mosaic layout's titles, notes and empty-state wording are text a person reads on the app's
@@ -407,7 +407,7 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   'aimeat_agent_description_set',
   // aimeat_app_legal_set was listed here for a few hours on 2026-08-29 with an open question:
   // should an AI-drafted legal page carry its own provenance record? The developer's answer was
-  // yes, so the tool now takes aiProvenanceInputs and services/app-legal.ts mints through
+  // yes, so the tool now takes aiProvenanceInputs and services/app/legal.ts mints through
   // provenanceForWrite like every publish door. Entry removed; the gate sees the declaration.
   // DECIDED, 2026-08-26, after the developer asked what the law actually requires.
   //
@@ -534,11 +534,11 @@ function checkMcpWriteTools(): void {
 // found FIVE doors where the audit had counted three. One function, and a short list of acts that
 // genuinely are not a publish.
 
-const PUBLISH_PATH = 'src/services/app-publish.ts';
+const PUBLISH_PATH = 'src/services/app/publish.ts';
 
 /** Writes an app row WITHOUT being a publish. Each is a different act, with a different rule. */
 const CREATE_APP_DISTINCT_ACTS: Record<string, string> = {
-  'src/services/app-lifecycle.ts':
+  'src/services/app/lifecycle.ts':
     'A fork COPIES bytes rather than generating them: it carries the source provenance record forward '
     + 'and must not mint a new one, must not announce, and must not fire the publish feed. This was '
     + 'two entries until 2026-08-11 (routes/apps/fork-manage.ts and mcp/apps-fork.ts), which is what '

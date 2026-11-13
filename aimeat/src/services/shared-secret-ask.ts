@@ -11,7 +11,7 @@
  *   name a host on its own living-hooks list, receive the operator's value there, and leave the
  *   operator's real host refused. The first use now binds by itself only toward a host on the
  *   operator's allow_hosts, a host the extension declares, or when the operator makes the call in
- *   person (services/extension-secret-authority.ts decideSharedFirstUse). Every other first use is
+ *   person (services/extension/secret-authority.ts decideSharedFirstUse). Every other first use is
  *   refused before anything is sent, and the operators hear about it once per (secret, host).
  *
  *   HOW THE OPERATOR APPROVES. With the control that already exists: the host goes on the extension's

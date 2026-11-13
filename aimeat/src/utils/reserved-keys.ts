@@ -192,7 +192,7 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // under `notifications.<owner>` is gone (2026-08-30), so nothing legitimate writes this prefix
   // through the memory API any more.
   'notifications.',
-  // `audit.apps.<filename>` is the per-app audit log (services/app-audit.ts): what the owner shows
+  // `audit.apps.<filename>` is the per-app audit log (services/app/audit.ts): what the owner shows
   // when asked what was in force on a given day. Only the service writes it, server-side; a
   // granted app or a delegated agent must not be able to erase or forge the record of its own
   // changes. Measured 2026-08-29: nothing wrote an `audit.*` key through the memory API.

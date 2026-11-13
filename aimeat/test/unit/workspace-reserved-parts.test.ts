@@ -9,8 +9,8 @@
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14).
  */
 import { describe, it, expect } from 'vitest';
-import { isNodeReservedPart, isNodeReservedWorkspaceKey, spaceRowAt } from '../../src/services/workspace-record-key.js';
-import { normalizeObjectTypes } from '../../src/services/workspace-meta.js';
+import { isNodeReservedPart, isNodeReservedWorkspaceKey, spaceRowAt } from '../../src/services/workspace/record-key.js';
+import { normalizeObjectTypes } from '../../src/services/workspace/meta.js';
 import { livingConfigContent } from '../../src/services/living-pulse-spend.js';
 
 const root = 'organism.o1.w.ws-1';

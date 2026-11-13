@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `templates` discovery source — surfaces agent-proposed app templates
- *   (`template.catalog.{id}.manifest` memory records, services/app-template-proposals.ts)
+ *   (`template.catalog.{id}.manifest` memory records, services/app/template-proposals.ts)
  *   as first-class `type: 'template'` entries. This file did NOT exist before AppDev KB
  *   Phase 6 despite earlier headers claiming otherwise — the prefix was only on the
  *   memory-source exclusion list with no writer. Own scope = the caller's owner identity
@@ -20,8 +20,8 @@ import type { AimeatConfig } from '../../../config.js';
 import type { Storage, MemoryRecord } from '../../../storage/interface.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
 import { normalizeVisibility, toFullOwner } from '../normalize.js';
-import { TEMPLATE_PROPOSAL_KEY_RE } from '../../app-template-proposals.js';
-import type { TemplateProposalManifest } from '../../app-template-proposals.js';
+import { TEMPLATE_PROPOSAL_KEY_RE } from '../../app/template-proposals.js';
+import type { TemplateProposalManifest } from '../../app/template-proposals.js';
 
 export const TEMPLATES_SOURCE_ID = 'templates';
 const PREFIX = 'template.catalog.';

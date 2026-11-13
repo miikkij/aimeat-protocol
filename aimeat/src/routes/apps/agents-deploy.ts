@@ -9,7 +9,7 @@
  *   a client-supplied owner that differs is 403, and the node never executes the crew-def.
  *   Status derives the fleet's deployed name (<agent_name>-<slug(app_id)>) and reads liveness
  *   from the agent registration + the agents.<name>.deploy memory key the fleet writes.
- *   The work itself is in services/app-agent-deploy.ts; this file holds the auth and the envelope.
+ *   The work itself is in services/app/agent-deploy.ts; this file holds the auth and the envelope.
  * @structure
  *   - registerAppAgentRoutes() — POST .../agents/:agentName/deploy | /undeploy, GET .../status,
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
@@ -50,7 +50,7 @@ import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import {
     deployAppAgent, appAgentInstances, appAgentStatus, type AppAgentRefusal,
-} from '../../services/app-agent-deploy.js';
+} from '../../services/app/agent-deploy.js';
 import type { ProposerPrincipal } from '../../services/agent/proposals.js';
 import { callerOf } from '../../middleware/caller.js';
 

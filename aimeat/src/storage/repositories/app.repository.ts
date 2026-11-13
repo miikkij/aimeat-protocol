@@ -171,7 +171,7 @@ export interface AppRepository {
              */
             legal?: Partial<Record<import('../types/apps.js').AppLegalKind, import('../types/apps.js').AppLegalDoc | null>>;
             /**
-             * The design spec's stamp (services/app-design-spec.ts). Whole-value: every write of
+             * The design spec's stamp (services/app/design-spec.ts). Whole-value: every write of
              * the spec sends the new stamp, and null takes it off when the spec is removed.
              */
             designSpec?: import('../types/apps.js').AppManifest['designSpec'] | null;

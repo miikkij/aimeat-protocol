@@ -18,7 +18,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 let sellerNow = 0, sellerMost = 0;
 
-vi.mock('../../src/services/extension-runtime.js', async (importOriginal) => {
+vi.mock('../../src/services/extension/runtime.js', async (importOriginal) => {
     const real = await importOriginal<Record<string, unknown>>();
     return {
         ...real,
@@ -42,7 +42,7 @@ vi.mock('../../src/services/extension-runtime.js', async (importOriginal) => {
     };
 });
 
-vi.mock('../../src/services/extension-purchase.js', () => ({
+vi.mock('../../src/services/extension/purchase.js', () => ({
     buyForExtension: async (args: { runSellerAction: (run: unknown) => Promise<{ kind: string }> }) => {
         const out = await args.runSellerAction({
             extRef: 'seller', actionId: 'act', input: {},
@@ -54,7 +54,7 @@ vi.mock('../../src/services/extension-purchase.js', () => ({
 }));
 
 const { SqliteStorage } = await import('../../src/storage/providers/sqlite/index.js');
-const { invokeExtensionAction } = await import('../../src/services/extension-invoke.js');
+const { invokeExtensionAction } = await import('../../src/services/extension/invoke.js');
 const { loadConfig } = await import('../../src/config.js');
 
 function ext(name: string, installedBy: string) {

@@ -14,7 +14,7 @@
  *   checks the label's useForAi itself before any model reads it:
  *   - memory in a personal scope: the record at (scope, key);
  *   - memory in an organism scope `organism:<id>`: the freshest record at the exact key, whichever
- *     member identity holds it (services/workspace-write.ts findWorkspaceRecord), and only when the
+ *     member identity holds it (services/workspace/write.ts findWorkspaceRecord), and only when the
  *     key is under `organism.<id>.`; for a document address, the text of each of its current copies
  *     (the bare key, `.latest`, `.draft`), once each;
  *   - a stored file or a workspace row: not loaded yet. The loader answers null, and drainQueue
@@ -41,7 +41,7 @@ import { classifyText, drainQueue, enqueue, type QueuedItem } from './classifica
 import { scopeOrganism } from './classification/policy.js';
 import { documentContentKeys } from './classification/labels.js';
 import { contentText, setWriteClassifier } from './classify-on-write.js';
-import { findWorkspaceRecord } from './workspace-write.js';
+import { findWorkspaceRecord } from './workspace/write.js';
 
 /** How many queued items one run judges at most. */
 export const QUEUE_BATCH = 200;

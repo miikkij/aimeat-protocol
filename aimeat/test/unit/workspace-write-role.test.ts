@@ -24,7 +24,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkOrganismNamespaceAccess } from '../../src/services/organism-namespace-access.js';
 import { grantConsent } from '../../src/services/consent-write.js';
-import { listWorkspaceMemberRoles, LEGACY_ROLE_PURPOSE_BEFORE } from '../../src/services/workspace-roles.js';
+import { listWorkspaceMemberRoles, LEGACY_ROLE_PURPOSE_BEFORE } from '../../src/services/workspace/roles.js';
 import type { OrganismRecord, GHIIRecord, ConsentRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 

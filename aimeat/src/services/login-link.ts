@@ -67,7 +67,7 @@ import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
 import { appendMailLog } from './notification-settings.js';
 import { welcomeEmail } from './email-template-welcome.js';
-import { resolveAppOriginTarget } from './app-origin-target.js';
+import { resolveAppOriginTarget } from './app/origin-target.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
 
 /** Why a link goes to the address the caller names (mail-gate.ts sign-in). */

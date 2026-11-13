@@ -1543,7 +1543,7 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
     // An app grant holds what the app's aimeat-scopes asks for, and its owner cannot add a word. An
     // app that declares ext:invoke keeps binding on_done; one that does not is told what its author
     // declares. An app published before the change keeps the word by itself
-    // (services/app-on-done-keep-migration.ts, test/unit/app-on-done-keep.test.ts).
+    // (services/app/on-done-keep-migration.ts, test/unit/app-on-done-keep.test.ts).
     const appCode = "AIMEAT.ai.job.start({ prompt: 'x', result_key: 'k', on_done: { extension: 'aijobinvoke', action: 'mark' } })";
     await test('22a. An app whose aimeat-scopes lacks ext:invoke is refused on_done with words for its author, and the action never runs', async () => {
         await publishApp(e, 'jobnocb.html', 'ai:use', appCode);

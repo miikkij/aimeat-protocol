@@ -50,7 +50,7 @@ import {
   requireOwnCompany, checkSlugAvailable, companyAddress, slugify, listOwnCompanies, type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
 import { setCompanyFrontPageGated, publishCompanyPortfolioGated } from '../services/company/company-publish-gate.js';
-import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
+import { publishAskedFields, askedStatus } from '../services/app/publish-gate.js';
 import { callerOf } from '../middleware/caller.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import type { CompanyRecord } from '../models/company-schemas.js';

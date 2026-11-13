@@ -34,7 +34,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { ValidationResult } from './schema-validator.js';
-import { declaredNamespaceOf } from './workspace-record-key.js';
+import { declaredNamespaceOf } from './workspace/record-key.js';
 
 export interface WriteGuardCtx {
   /** True when the write arrives through the draft → publish path (organisms/MCP publish). */

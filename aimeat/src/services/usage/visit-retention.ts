@@ -36,7 +36,7 @@
  *   never run folds nothing.
  *
  *   THE MEMBER LIST'S GUESTS TOO. An app with members shows its owner, by name, the signed-in people
- *   who opened it and hold no role (services/app-members.ts noteVisit): a visit record that names an
+ *   who opened it and hold no role (services/app/members.ts noteVisit): a visit record that names an
  *   account, kept apart from the usage rows. Nothing counts them, so there is nothing to fold: a
  *   guest whose last visit is older than the cutoff leaves the list, whatever the fold's cursor says.
  * @structure
@@ -52,7 +52,7 @@
  *   v1.0.0 — 2026-09-25 — Initial, with the thirteen-month rule in the privacy notice.
  */
 import type { Storage, UsageVisitFoldResult } from '../../storage/interface.js';
-import { forgetVisitsLastSeenBefore } from '../app-members.js';
+import { forgetVisitsLastSeenBefore } from '../app/members.js';
 import { logger } from '../../utils/logger.js';
 
 /** How long a visit record may name the visitor's account. The privacy notice says thirteen months. */
@@ -92,7 +92,7 @@ export async function runVisitRetentionJob(storage: Storage, now: Date = new Dat
   const cutoff = visitNameCutoffDay(now);
 
   // An app's member list names the signed-in people who opened it and hold no role there, with how
-  // often and when they came (services/app-members.ts). Nothing counts them, so there is no fold to
+  // often and when they came (services/app/members.ts). Nothing counts them, so there is no fold to
   // wait for: a guest whose last visit is older than the cutoff leaves the list.
   const guestsForgotten = await forgetVisitsLastSeenBefore(storage, cutoff);
   if (guestsForgotten > 0) {

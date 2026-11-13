@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
     APP_DESIGN_SPEC_MAX_BYTES, APP_DESIGN_SPEC_TEMPLATE, checkDesignSpecMarkdown, designSpecHint, designSpecStamp,
     isDesignSpecStale, designSpecMeaning, APP_DESIGN_SPEC_SPEC,
-} from '../../src/services/app-design-spec.js';
+} from '../../src/services/app/design-spec.js';
 import { buildSpecMcpPrompt, buildSpecPastePrompt, readSpecAnswer } from '../../public/views/profile/apps/design-spec.prompt.js';
 
 describe('checkDesignSpecMarkdown', () => {

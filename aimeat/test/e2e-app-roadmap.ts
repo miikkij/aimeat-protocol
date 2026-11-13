@@ -445,7 +445,7 @@ await test('a former builder can withdraw a wish but cannot erase a completed ch
 // A6-16. The wish list had one cap, 300, shared by everybody who can see the app, and nothing that
 // counted by person: one account could leave all 300 and every other visitor was refused until the
 // owner pruned. One account now holds at most ten open wishes on one app (the constant is
-// APP_ROADMAP_WISHES_PER_ACCOUNT in services/app-roadmap.ts); the owner's own wishes are not counted.
+// APP_ROADMAP_WISHES_PER_ACCOUNT in services/app/roadmap.ts); the owner's own wishes are not counted.
 await test('one account cannot fill the wish list for everybody else', async () => {
     const PER_ACCOUNT = 10;
     const WISH_APP = 'roadmap-wishes.html';

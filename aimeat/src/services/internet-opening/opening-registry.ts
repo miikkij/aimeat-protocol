@@ -80,7 +80,7 @@ export const INTAKE_ROUTE = /^\/v1\/intake\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\/
 /**
  * True when this request is a public intake route of a form that is open to the internet. The ids
  * are matched as written: an organism, workspace and form id hold no character a URL escapes
- * (services/app-intake-forms.ts), so an escaped segment names no opened form.
+ * (services/app/intake-forms.ts), so an escaped segment names no opened form.
  */
 export function isOpenedIntakeRoute(method: string, rawPath: string): boolean {
   if (openForms.size === 0) return false;

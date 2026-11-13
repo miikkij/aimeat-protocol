@@ -90,8 +90,8 @@ import { paymentChallenge } from '../commerce/x402.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered-settlement.js';
 import { publicManifestTools, toolPacing, paceFreeToolUse } from '../commerce/app-tool-catalog.js';
-import { checkAppToolInput } from '../services/app-tool-input.js';
-import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { checkAppToolInput } from '../services/app/tool-input.js';
+import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-access.js';
 import type { MeteredEntitlement } from '../services/metered-entitlements.js';
 import { refuseAppToolInvokeWithoutWord } from './webmcp-invoke-gate.js';
@@ -103,8 +103,8 @@ import { recordCallDuration } from '../services/call-timing.js';
 import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { findBackingCapability } from '../services/component-address.js';
-import { buildAppAgentSurface } from '../services/app-agent-surface.js';
-import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
+import { buildAppAgentSurface } from '../services/app/agent-surface.js';
+import { appHiddenFromPublicSurfaces } from '../services/app/ai-use.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
@@ -115,7 +115,7 @@ interface BoundTool { cap: CapabilityRecord; pinnedVersion: number | undefined; 
 
 /**
  * True when an app must not be described on a public surface (gated, priced, or moderated away).
- * The test lives in services/app-ai-use.ts, so the "Use with your AI" mark and this listing agree.
+ * The test lives in services/app/ai-use.ts, so the "Use with your AI" mark and this listing agree.
  */
 const isRestricted = (config: AimeatConfig, app: AppRecord): boolean => appHiddenFromPublicSurfaces(config, app);
 
@@ -255,7 +255,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     const appRef = `${ownerName}/${filename}`;
 
     // Checked against the tool's published schema BEFORE anything is metered or paid for, and every
-    // problem named at once (services/app-tool-input.ts). Same check as the MCP twin.
+    // problem named at once (services/app/tool-input.ts). Same check as the MCP twin.
     const toolInput = applyLockedInput(tool, (req.body?.input ?? req.body ?? {}) as Record<string, unknown>);
     const inputCheck = checkAppToolInput(tool, toolInput);
     if (!inputCheck.ok) {

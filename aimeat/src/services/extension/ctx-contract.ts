@@ -1,0 +1,418 @@
+/**
+ * @file src/services/extension/ctx-contract.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE CONTRACT a sandboxed extension script is written against: the `ctx` object it is
+ *   handed, what a write reports back, the limits one run may have, and the hash helper the guest
+ *   gets for free.
+ *
+ *   Its own file because extension-runtime.ts reached the 800-line ceiling. A pure extraction — the
+ *   declarations are unchanged and extension-runtime.ts re-exports every one of them, so nothing
+ *   that imports them had to move — and a coherent one: everything here describes what a SCRIPT
+ *   sees, while what stayed behind is how the QuickJS runtime is built, guarded and torn down.
+ * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
+ * @usage import type { ExtensionCtx } from './runtime.js';  // unchanged
+ * @version-history
+ *   2026-11-09 — ctx.changed({ owners }): the extension's live domain to named owners' open pages.
+ *   2026-11-01 — ctx.caller.party: a person registered to the gated app, with no account (WP9d).
+ *   2026-10-30 — ctx.files.read answers `visibility` and `workspaceRef`.
+ *   2026-10-25 — ctx.email's comment: one recipient per message and the hourly allowance (secaudit2026oct22, lead 325).
+ *   2026-10-18 — ctx.ai.result(jobId): the answer of a job this extension started, for its installer.
+ *   2026-10-18 — ctx.caller.anonymous (a visitor on a public action), ctx.caller.adult (verified
+ *     adult yes/no, method, time) and ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
+ *   v1.11.0 — 2026-10-24 — `fetch` takes `responseType: 'base64'` and answers `base64`: a binary
+ *     body intact (jussil riistakartta, support thread 1ac0a199).
+ *   2026-10-16 — ExtensionLimits.wallClockMs: the wall-clock limit of a whole run (QA audit S7-02).
+ *   v1.10.0 — 2026-10-13 — `ctx.calendar`: the calendar library's computation as host calls
+ *     (services/extension-calendar.ts).
+ *   v1.9.0 — 2026-10-13 — `ctx.workspace.readRow`: one row by its id, under the same rule as
+ *     `readRows`. An extension that had a row id read pages of rows to find it. `fetch` takes
+ *     `timeoutMs`, the script's own deadline for one call.
+ *   v1.8.0 — 2026-10-09 — `fetch` takes `gunzip`, and ExtensionLimits carries `fetchMaxBytes`: the
+ *     manifest's `limits.fetch_max_mb`, the ceiling one answer is read under, raw and inflated.
+ *   v1.7.0 — 2026-10-09 — `ctx.workspace.archiveRecords`: archive many records of one space in one
+ *     call, under the archive route's creator-or-admin rule (services/archive.ts).
+ *   v1.6.0 — 2026-10-08 — `ctx.workspace.appendRows` and `readRows`: a row space that names the
+ *     extension, also on a schedule or a workflow step (services/extension-workspace.ts).
+ *   v1.5.0 — 2026-10-06 — `ctx.workspace.publishRecords` and `deleteRecords`: a batch of records in
+ *     one host call (services/workspace-tool-ops.ts).
+ *   v1.4.0 — 2026-09-28 — `ctx.ai.start` takes `role`, the AI role the job's call runs as.
+ *   v1.3.0 — 2026-09-28 — System 2 plan, V5: `ctx.ai.start` takes `op` (text, image, transcribe),
+ *     `provider`, `audio_key`, `language` and `size`, the fields POST /v1/ai/jobs takes.
+ *   v1.2.0 — 2026-09-06 — `fetch` takes a third, host-only argument. The VM bridge had written its
+ *     own fetch precisely because it had nowhere to hand the run's deadline and its teardown signal,
+ *     and that copy then drifted from this one; the argument is what lets the bridge call the
+ *     capability instead of reimplementing it. A guest cannot supply it: the bridge crosses JSON.
+ *   v1.1.0 — 2026-09-06 — `caller.scopes`: the permission words the calling credential carries. A
+ *     script could name its caller and not tell a read-only agent from an unrestricted one, so an
+ *     action that writes outward had no way to hold a scope word the way a route does.
+ *   v1.0.0 — 2026-08-31 — Extracted from extension-runtime.ts (pure extraction; no behaviour change).
+ */
+
+/**
+ * What a sandbox write reports back. `set` used to return nothing, which is why an extension could
+ * not tell a landed write from a lost one — the whole reason every counter here was racy.
+ */
+export interface MemoryWriteResult {
+    /** Did this write land? False only when an `ifVersion` guard refused it; nothing was written. */
+    ok: boolean;
+    /**
+     * The version now on the record: the one just written when `ok`, the one that was really there
+     * when a guard refused, and null when the key does not exist (a refused `ifVersion: 0` means it
+     * does exist, so this is a number there).
+     */
+    version: number | null;
+}
+
+export interface ExtensionCtx {
+    memory: {
+        get(key: string): Promise<unknown | null>;
+        /**
+         * The value AND the version to swap against, or null when the key does not exist.
+         *
+         * The read half of compare-and-swap: `set(..., { ifVersion })` is unusable without it,
+         * because a script has no other way to learn the version it is racing.
+         */
+        getVersioned(key: string): Promise<{ value: unknown; version: number } | null>;
+        /** `visibility` defaults to 'public' — the historical behaviour every extension was written
+         *  against. Pass 'private' for a key that holds anyone's personal data: an ext namespace is
+         *  world-readable, so a membership list written the default way is served to strangers.
+         *
+         *  `ifVersion` makes the write a COMPARE-AND-SWAP: it lands only if the stored record is
+         *  still at that version, and `0` means "only if this key does not exist yet". Omit it and
+         *  the write is last-write-wins, exactly as before. Anything an extension COUNTS — stock, a
+         *  reservation, a balance — needs the guard: without it two concurrent calls both read 1 and
+         *  both write 0. */
+        set(
+            key: string,
+            value: unknown,
+            opts?: { visibility?: 'public' | 'private'; ifVersion?: number },
+        ): Promise<MemoryWriteResult>;
+        search(prefix: string, opts?: Record<string, unknown>): Promise<Array<{ key: string; value: unknown }>>;
+        delete(key: string): Promise<boolean>;
+        getPublic(namespace: string, key: string): Promise<unknown | null>;
+    };
+    wallet: {
+        consume?(amount: number, reason: string): Promise<{ success: boolean; error?: string }>;
+        getBalance?(): Promise<number>;
+    };
+    /**
+     * Buy one call of ANOTHER owner's app-tool, on this extension's owner's account.
+     *
+     * The supply-chain leg: a user pays the app, the app pays its supplier, and the difference is the
+     * app owner's margin. Billed to the extension's OWNER, never to whoever happens to be calling —
+     * the caller has no relationship with the supplier and should not acquire one by using the app.
+     * Requires a contract the owner already holds against that tool; without one it returns
+     * `{ ok: false, code: 'NO_CONTRACT' }` rather than throwing, so the extension can degrade.
+     */
+    buy?(appRef: string, tool: string, input?: Record<string, unknown>): Promise<{
+        ok: boolean; result?: unknown; code?: string; message?: string; charged?: number; correlation?: string;
+    }>;
+    /**
+     * Start a BACKGROUND model call and get a handle back in milliseconds.
+     *
+     * A model call can take twenty or thirty minutes. The sandbox caps at 60 seconds and holds a
+     * QuickJS runtime for the whole wait, so waiting here is the one thing an extension must not do.
+     * `start()` queues the call, answers with an id, and — when `on_done` names one of this
+     * extension's own actions — calls that action once the answer has landed at `result_key`. The
+     * chain logic stays in this extension's code; there is no engine interpreting a graph.
+     *
+     * BILLED TO THE EXTENSION'S OWNER, never to whoever happens to be calling: the same rule, and
+     * the same reason, as `ctx.buy` above. A road that does not know the extension record cannot
+     * answer who pays, so on that road `ctx.ai` is simply absent.
+     *
+     * IT ANSWERS WITH A DECISION, NOT A THROW, so a full queue or a chain that has gone too deep is
+     * something the extension can degrade around instead of dying on.
+     */
+    ai?: {
+        start(opts: {
+            prompt?: string;
+            prompt_key?: string;
+            input_keys?: string[];
+            result_key: string;
+            result_visibility?: 'private' | 'owner' | 'public';
+            model?: string;
+            system_prompt?: string;
+            json?: boolean;
+            on_done?: { extension: string; action: string };
+            /** 'text' (default), 'image' (one picture from the prompt, the result is
+             *  { storage_key, url, mime_type, model }) or 'transcribe' (the audio at `audio_key`,
+             *  in the extension owner's storage, becomes text). services/ai-jobs/op.ts. */
+            op?: 'text' | 'image' | 'transcribe';
+            /** A provider id or type. Naming one turns fallback off. */
+            provider?: string;
+            /** The AI role the call runs as: one of the owner's role ids (GET /v1/ai/roles). */
+            role?: string;
+            /** For 'transcribe' (required there): the storage key of the audio. */
+            audio_key?: string;
+            /** For 'transcribe': an ISO-639-1 hint. */
+            language?: string;
+            /** For 'image': a provider-specific size, e.g. '1024x1024'. */
+            size?: string;
+        }): Promise<
+            | { ok: true; job_id: string; queue_position: number }
+            | { ok: false; code: string; message: string; retry_after_s?: number }
+        >;
+        /**
+         * The answer of a job this extension started (or is the `on_done` of), read from the
+         * installer's namespace without the answer having to be public. `value` is present once the
+         * answer is written, which is already true inside `on_done`. Answers a decision, never a
+         * throw. services/ai-jobs/service.ts readResult.
+         */
+        result(jobId: string): Promise<
+            | { ok: true; job_id: string; state: string; result_key: string; value?: unknown }
+            | { ok: false; code: string; message: string }
+        >;
+    };
+    consent: {
+        check?(gaii: string, scope: string): Promise<boolean>;
+        require?(gaii: string, scope: string): Promise<void>;
+    };
+    trust: {
+        getScore?(gaii: string): Promise<number>;
+    };
+    /**
+     * The guest's only way out, and the host's single implementation of it.
+     *
+     * `host` is a THIRD argument the guest cannot supply: the VM bridge crosses JSON, so a script
+     * can pass an object shaped like an AbortSignal and never a real one. The sandbox road uses it
+     * to hand over the per-run deadline (min(timeout_ms, 30s)) and the teardown signal, which is why
+     * this argument exists at all — without it the runtime had to write its own fetch, and did, and
+     * the two drifted: the copy in extension-runtime.ts threw on a charset it could not name where
+     * this one falls back with a warning, and it never honoured `strictCharset`.
+     *
+     * `gunzip: true` inflates a gzipped answer before it is decoded (a `.xml.gz` guide, a
+     * compressed export); an answer that is not gzip comes back as it is. The ceiling counts the
+     * bytes as they arrive and again as they inflate, and it is the extension's own
+     * (`limits.fetch_max_mb` in the manifest, 4 MB when the manifest names none).
+     *
+     * `timeoutMs` is the script's own deadline for this one call, between 100 ms and 30 s and
+     * inside the run's. Past it the call throws `FETCH_TIMEOUT: …`, which the script can catch and
+     * go on from; without it an address that never answers holds the call until the run ends.
+     *
+     * `responseType: 'base64'` answers the body's bytes as they arrived, in `base64`, with `text`
+     * empty: a binary answer (a Garmin `.img`, an image) decoded as text loses every byte that is
+     * not valid UTF-8. The same ceiling, the same `gunzip` and the same removal of what the node
+     * put into the request apply. Any responseType other than 'text' or 'base64' throws.
+     */
+    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string; gunzip?: boolean; timeoutMs?: number; responseType?: 'text' | 'base64' }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string>; base64?: string }>;
+    /** Stored FILES, by reference. Optional the way notify/email are: a road that cannot offer it
+     *  simply does not, and the guest sees undefined.
+     *
+     *  A SCHEDULED RUN NOW OFFERS IT. It used to be the road that could not — which is why "produce
+     *  a file on a clock" did not exist on this node — and the reason was that the scheduler passed
+     *  no `files`, not that a clock cannot own bytes. It writes into the INSTALLER's namespace, so
+     *  `write()` returns `owner` alongside `gaii`: the caller the sandbox sees is not necessarily
+     *  the namespace its bytes landed in, and a script handing the address on must not have to guess. */
+    files?: {
+        read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string; visibility: string; workspaceRef?: string } | null>;
+        write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
+            Promise<{ key: string; gaii: string; owner: string; url: string; size: number }>;
+    };
+    /**
+     * AIMEAT Data Packages, as a HOST capability — the answer to "a sandboxed extension cannot load
+     * a shared library, and the deterministic producers live in extensions". The work (schema
+     * inference, validation, the content hash, canonical CSV, the storage writes) happens on the
+     * host; the browser binding and the MCP tools reach the same functions, so a package built here
+     * is byte-identical to one built there.
+     *
+     * `publish` THROWS when the quality gate refuses. The scheduler and the workflow engine record a
+     * normal return as a successful run, so a returned refusal would be a green run that published
+     * nothing; `validate` is the non-throwing call for looking first.
+     */
+    datapackage?: {
+        publish(input: unknown): Promise<unknown>;
+        validate(resources: unknown): Promise<unknown>;
+        inferSchema(rows: unknown): Promise<unknown>;
+        open(ref: string): Promise<unknown>;
+        rows(ref: string, resource: string, opts?: unknown): Promise<unknown>;
+        fail(name: string, message: string): Promise<void>;
+    };
+    /**
+     * An organism WORKSPACE, as the caller. Present only when the manifest declares
+     * `workspace: { read, write }` and somebody real invoked the action; a scheduled run gets
+     * nothing here. Every call is the same operation the MCP tool of that name performs, run as
+     * `ctx.caller`, and every refusal the tool would make (not a member, no scope, schema, version
+     * conflict, publish gate) arrives as a thrown `CODE: message`. Counted against maxApiCalls.
+     */
+    workspace?: {
+        /** The manifest, the pinned apps, the locked schemas and per-space titles. No bodies. */
+        index(organismId: string, ws: string): Promise<unknown>;
+        /** The full values of these instance ids; `_draftVersion` is what `write({ ifVersion })` swaps against. */
+        get(organismId: string, ws: string, ids: string[], opts?: { space?: string }): Promise<unknown>;
+        /** A DRAFT record in a records space, schema-validated. `ifVersion: 0` means "only if no draft yet". */
+        write(organismId: string, ws: string, space: string, id: string, value: unknown, opts?: { ifVersion?: number }): Promise<unknown>;
+        /** A DRAFT document `{ title, markdown }` in a document space; the id is generated unless given. */
+        writeDoc(organismId: string, ws: string, space: string, doc: { title: string; markdown: string }, opts?: { id?: string; section?: string }): Promise<unknown>;
+        /** Publish the draft at namespace/id: `.version.N` under the caller, `.latest` under the member. */
+        publish(organismId: string, ws: string, namespace: string, id: string, opts?: { expectedVersion?: number }): Promise<unknown>;
+        /**
+         * Publish up to 1000 records `[{ id, value, visibility? }]` in ONE call (one API call, one bulk
+         * write). Each record is decided alone: `{ published, skipped, failed, results: [{ instance, ok,
+         * version?, skipped?, code?, violations? }] }`. `dryRun` decides and writes nothing; `createOnly`
+         * refuses an id that exists (code EXISTS); `expectedVersions[id]` is a compare-and-swap (0 = must
+         * not exist yet).
+         */
+        publishRecords(organismId: string, ws: string, namespace: string, records: Array<{ id: string; value: unknown; visibility?: string }>, opts?: { expectedVersions?: Record<string, number | null>; createOnly?: boolean; dryRun?: boolean }): Promise<unknown>;
+        /** Remove up to 2000 records the caller owns in ONE call: `{ deleted: [{ id, keys }], failed: [{ id, reason }], rows_removed }`. */
+        deleteRecords(organismId: string, ws: string, namespace: string, ids: string[]): Promise<unknown>;
+        /**
+         * Archive up to 500 records of one space in ONE call: `{ archived: [ids], rows }`. An archived
+         * record leaves every read and stays restorable. The caller must be the organism's creator or
+         * an admin, and a token needs organism:write, as on POST /v1/organisms/:id/archive.
+         */
+        archiveRecords(organismId: string, ws: string, namespace: string, ids: string[]): Promise<unknown>;
+        /**
+         * Append up to 500 rows `[{ body, rowId?, occurredAt? }]` to a ROW space that names this
+         * extension as `installer/name` (`objectTypes[].extensions`); manifest `workspace.rows`. A repeated `rowId`
+         * replaces the stored row. Works on a schedule and a workflow step too. Answers
+         * `{ written, rowIds, pruned }`.
+         */
+        appendRows(organismId: string, ws: string, space: string, rows: Array<{ body: Record<string, unknown>; rowId?: string; occurredAt?: string }>): Promise<unknown>;
+        /** One page of a row space that names this extension, newest first: `{ rows, cursor, indexed }`. */
+        readRows(organismId: string, ws: string, space: string, opts?: { where?: Record<string, unknown>; since?: string; until?: string; changedSince?: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' }): Promise<unknown>;
+        /** One row of such a row space by its id, in the shape `readRows` gives a row; null when there is none. */
+        readRow(organismId: string, ws: string, space: string, rowId: string): Promise<unknown>;
+    };
+    /**
+     * The calendar library's computation (aimeat-calendar), run on the node: the sandbox has no
+     * time-zone data, so this is how an extension expands a recurrence, finds free time or
+     * converts between a zone's local time and an instant. Pure computation, on every code path,
+     * with no capability to declare; a refusal is thrown as `CALENDAR: <message>`
+     * (services/extension/calendar.ts, which also names the host's bounds).
+     */
+    calendar?: {
+        occurrences(events: unknown, options: unknown): Promise<unknown[]>;
+        freeSlots(busy: unknown, options: unknown): Promise<unknown[]>;
+        toInstant(local: unknown, timeZone: unknown): Promise<string>;
+        fromInstant(instant: unknown, timeZone: unknown): Promise<string>;
+        normalize(event: unknown): Promise<unknown>;
+        fromICS(ics: unknown, options?: unknown): Promise<unknown>;
+        toICS(events: unknown, options?: unknown): Promise<string>;
+    };
+    /**
+     * Who invoked this action. `member` is their standing in the app this extension gates, resolved
+     * by the NODE before the sandbox starts and handed in: a gate needs the role, the roster is
+     * private, and reading it here means no lookup has to be opened to the sandbox. It is null when
+     * the extension declares no app (`config.app`), when the caller is the app's owner (who is not a
+     * member of their own app — `isAppOwner` says so), or when they simply are not one.
+     */
+    caller: {
+      gaii: string; owner: string; roles: string[];
+      /**
+       * The permission words this credential actually carries, as the token granted them.
+       *
+       * An extension could see WHO was calling and not WHAT THEY MAY DO, so a script that needed to
+       * refuse a read-only agent had nothing to read: `requireScope` sits on routes, and an
+       * extension action is one route for every action there will ever be. The roads that have a
+       * session pass what that session holds; a road with none passes an empty list, and an
+       * unattended run says so with the `operator` role instead. Empty is not "everything": an
+       * owner signed in at their own screen carries no scopes either, because owner sessions bypass
+       * them, so a script asks about the ROLE first and the word second.
+       */
+      scopes?: string[];
+      member?: { role: string; level: number | null; since: string; note: string } | null;
+      isAppOwner?: boolean;
+      /**
+       * True when nobody is signed in: a visitor calling an action the manifest marks `public`. The
+       * gaii is then `anonymous@<node>`, owner, roles and scopes are empty, memory writes are refused
+       * (VISITOR_READ_ONLY) and the capabilities that act for a person are absent (Comicland v3 A-7).
+       */
+      anonymous?: boolean;
+      /**
+       * Whether the caller's account holder is a verified adult, resolved by the node before the run:
+       * `{ verified, method, at }`, never a birth date or any other personal data. `verified: false`
+       * for a visitor and for anyone not verified (Comicland v3 A-3, A-4).
+       */
+      adult?: { verified: boolean; method: string | null; at: string | null };
+      /**
+       * The caller's running subscriptions to THIS extension's plans ({ plan, active_until }), resolved
+       * by the node from the records only it writes; empty for a visitor (Comicland v3 A-5).
+       */
+      subscriptions?: Array<{ plan: string; active_until: string }>;
+      /**
+       * Set when a person registered to the app the extension gates calls it with the app's sign-in
+       * (services/app-parties/iam-gate.ts): its identity `party:<owner>/ap-…@<node>` (also `gaii` and
+       * `owner`), its name, display name and app. Such a caller has no account here: `member` is its
+       * roster row, `isAppOwner` is false, and the capabilities that act for an account are absent.
+       */
+      party?: { ref: string; name: string; displayName: string; app: string };
+    };
+    config: Record<string, unknown>;
+    /**
+     * Which extension this is, and WHO IT BELONGS TO — resolved server-side from the record
+     * (`ExtensionRecord.installedBy`), never from anything a caller sends.
+     *
+     * Without it a script cannot tell its owner from any other signed-in stranger, so an
+     * owner-only action could not exist: the usual workaround is "whoever calls first claims it",
+     * and on a per-owner extension that is a shop somebody else can take. Compare against
+     * `caller.owner`, which is the account behind any principal form.
+     */
+    extension?: {
+        name: string;
+        /** Bare account name of the owner, matching `caller.owner`. */
+        owner: string;
+    };
+    instance?: {
+        id: string;
+        config: Record<string, unknown>;
+    };
+    log: {
+        info(msg: string, data?: Record<string, unknown>): void;
+        warn(msg: string, data?: Record<string, unknown>): void;
+        error(msg: string, data?: Record<string, unknown>): void;
+    };
+    /** Notify the caller's owner; with `to`, ANOTHER owner — delivered only when the target holds
+     *  an active `extension_notify` consent for `ext:{name}` (see services/extension/notify.ts). */
+    notify?(message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }): Promise<boolean>;
+    /** Tell the open pages of `owners` (default: the caller's owner) that the data this extension
+     *  serves changed for them: the live domain `ext:<installer>/<name>` reaches their event streams,
+     *  with no payload. Answers how many owners were told (services/extension-live/changed.ts). */
+    changed?(opts?: { owners?: string[] }): Promise<number>;
+    /** Send one message to ONE recipient (services/extension/email.ts): a `to` naming several is
+     *  refused with a thrown sentence, and a send past the account's hourly allowance
+     *  (extensions.email_per_hour) throws naming that setting. False when no tier allows it. */
+    email?(to: string, subject: string, body: string): Promise<boolean>;
+    // NOTE: the guest ctx also exposes two PURE helpers that need no host call and are therefore
+    // implemented inside buildSandboxScript rather than here:
+    //   ctx.hash(s) -> 16 hex chars, FNV-1a 64-bit (see EXT_HASH_REFERENCE_JS)
+    //   ctx.now()   -> the ISO timestamp captured when this action started (fixed for the run)
+}
+
+/**
+ * The EXACT source of `ctx.hash`, exported so an app that must agree with an extension on a
+ * derived value can run the identical function in the browser.
+ *
+ * Why this exists: the sandbox has no `crypto.subtle`, so an extension author reaches for a
+ * hand-rolled hash while the browser side reaches for SHA-256, and the two silently disagree. That
+ * is not hypothetical — it shipped: an app and its extension hashed the same spreadsheet inputs
+ * differently, so every value the app computed looked stale to the server and would have been
+ * recomputed and re-charged forever. One published function, usable verbatim on both sides.
+ *
+ * FNV-1a style, 64 bits as two 32-bit lanes. Not cryptographic: use it for cache keys, change
+ * detection and content identity, never for signatures or secrets.
+ */
+export const EXT_HASH_REFERENCE_JS = `function aimeatHash(s) {
+  s = String(s);
+  var h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (var i = 0; i < s.length; i++) {
+    var ch = s.charCodeAt(i);
+    h1 = (h1 ^ ch) >>> 0; h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 = (h2 ^ (ch + i)) >>> 0; h2 = Math.imul(h2, 0x85ebca6b) >>> 0;
+  }
+  return ('00000000' + h1.toString(16)).slice(-8) + ('00000000' + h2.toString(16)).slice(-8);
+}`;
+
+export interface ExtensionLimits {
+    memoryMb: number;
+    /** The CPU limit: the interrupt handler stops guest code that runs longer. */
+    timeoutMs: number;
+    /**
+     * The wall-clock limit of the whole run, waiting on host calls included. Absent: twelve times
+     * timeoutMs, at least one minute (extensionWallClockMs in extension-runtime.ts; QA audit S7-02).
+     */
+    wallClockMs?: number;
+    maxApiCalls: number;
+    /** How much of one answer ctx.fetch reads, raw and inflated. Absent on a record whose manifest named none: the 4 MB default applies. */
+    fetchMaxBytes?: number;
+}

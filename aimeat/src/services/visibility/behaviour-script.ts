@@ -25,7 +25,7 @@
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
 
-/** The attribute the script element carries; services/app-serve-marks-strip.ts takes it back out of a served copy. */
+/** The attribute the script element carries; services/app/serve-marks-strip.ts takes it back out of a served copy. */
 export const BEHAVIOUR_MARK = 'data-aimeat-behaviour';
 
 /** A value made safe to sit inside a script element as a JSON string literal. */

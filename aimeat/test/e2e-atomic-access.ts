@@ -31,9 +31,9 @@ import { createServer } from '../src/server.js';
 import { loadConfig, type AimeatConfig } from '../src/config.js';
 import type { Storage } from '../src/storage/interface.js';
 import { grantAccountant, revokeAccountant, listAccountants, listClients } from '../src/services/finance/accountant-access.js';
-import { putMember, removeMember, getMemberRow, putRequest, getRequest, NS_MEMBER, NS_REQUEST } from '../src/services/app-members.js';
-import { putDevGrant, removeDevGrant, putBlanketGrant, listBlanketGrants } from '../src/services/app-dev-grant.js';
-import { putInvite, NS_INVITE } from '../src/services/app-member-invites.js';
+import { putMember, removeMember, getMemberRow, putRequest, getRequest, NS_MEMBER, NS_REQUEST } from '../src/services/app/members.js';
+import { putDevGrant, removeDevGrant, putBlanketGrant, listBlanketGrants } from '../src/services/app/dev-grant.js';
+import { putInvite, NS_INVITE } from '../src/services/app/member-invites.js';
 import { writeAgentGate, readAgentGates, DECIDE_AGENTS_RECORD } from '../src/services/decide/gate.js';
 import { decideDefaultCap, settleDefaultCapsAtStart, DEFAULT_CAPS_INCIDENT_TYPE } from '../src/services/classification/default-caps.js';
 import { NODE_POLICY_KEY, readNodePolicy } from '../src/services/classification/policy.js';
@@ -169,7 +169,7 @@ await test('a revoke and a grant at the same moment: the revoked accountant is r
 // ── App members, development rights and invitations ───────────────────────────────────────────
 
 const APP = `${alice.name}/race-${stamp}.html`;
-const memberKeyOf = async (account: string) => (await import('../src/services/app-members.js')).memberKey(APP, account);
+const memberKeyOf = async (account: string) => (await import('../src/services/app/members.js')).memberKey(APP, account);
 
 await test('a member removal and a development-right revoke at the same moment leave neither', async () => {
     await putMember(storage, { appId: APP, account: carol.name, role: 'member', approvedBy: ghii(alice.name) });
@@ -192,7 +192,7 @@ await test('a development-right revoke beside a member removal: the revoke reads
 });
 
 await test('an owner\'s decline and the person\'s note edit at the same moment: the new note is kept', async () => {
-    const { requestKey } = await import('../src/services/app-members.js');
+    const { requestKey } = await import('../src/services/app/members.js');
     await putRequest(storage, { appId: APP, account: erin.name, note: 'first note' });
     await interleave(NS_REQUEST, requestKey(APP, erin.name),
         s => putRequest(s, { appId: APP, account: erin.name, state: 'declined' }),
@@ -204,7 +204,7 @@ await test('an owner\'s decline and the person\'s note edit at the same moment: 
 await test('two changes of one blanket development right at the same moment are both kept', async () => {
     const until = new Date(Date.now() + 7 * 86_400_000).toISOString();
     await putBlanketGrant(storage, { owner: alice.name, grantee: bob.name, level: 2, grantedBy: ghii(alice.name) });
-    const { blanketKey } = await import('../src/services/app-dev-grant.js');
+    const { blanketKey } = await import('../src/services/app/dev-grant.js');
     await interleave('app-dev-blanket', blanketKey(alice.name, bob.name),
         s => putBlanketGrant(s, { owner: alice.name, grantee: bob.name, level: 2, grantedBy: ghii(alice.name), expiresAt: until }),
         () => putBlanketGrant(storage, { owner: alice.name, grantee: bob.name, level: 2, grantedBy: ghii(alice.name), note: 'builds the shop' }));
@@ -213,7 +213,7 @@ await test('two changes of one blanket development right at the same moment are 
 });
 
 await test('two invitations of one address to one app at the same moment answer one invitation id', async () => {
-    const { inviteKey } = await import('../src/services/app-member-invites.js');
+    const { inviteKey } = await import('../src/services/app/member-invites.js');
     const hash = randomBytes(16).toString('hex');
     const input = { appId: APP, emailHash: hash, emailShown: 'race@example.com', role: 'member', invitedBy: ghii(alice.name) };
     const [a, b] = await interleave(NS_INVITE, inviteKey(APP, hash),

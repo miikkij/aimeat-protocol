@@ -15,7 +15,7 @@
 import { notify, type NotifAction, type NotifyInput } from '../notify.js';
 import { listOperatorGhiis } from '../operators.js';
 import { emitChange } from '../event-bus.js';
-import { intakeFormKey } from '../app-intake-forms.js';
+import { intakeFormKey } from '../app/intake-forms.js';
 import type { OpeningCtx } from './opening-store.js';
 import type { InternetOpening, IntakeFormRef } from './opening-types.js';
 

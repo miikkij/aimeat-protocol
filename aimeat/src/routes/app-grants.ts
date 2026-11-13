@@ -151,22 +151,22 @@ import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
-import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel, appRecordForAuthorize } from '../services/app-origin-target.js';
-import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app-grant-portfolio.js';
+import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel, appRecordForAuthorize } from '../services/app/origin-target.js';
+import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app/grant-portfolio.js';
 import { portfolioReadHold } from '../services/portfolio-read-hold.js';
 import { ownAppConsentNeed } from '../services/own-app-consent.js';
-import { byAnotherAuthorsApp } from '../services/app-published-by-app.js';
-import { accountOf } from '../services/app-members.js';
-import { apexOrigin, frameRedirect, bareAppHostRedirectOk } from '../services/app-frame-redirect.js';
+import { byAnotherAuthorsApp } from '../services/app/published-by-app.js';
+import { accountOf } from '../services/app/members.js';
+import { apexOrigin, frameRedirect, bareAppHostRedirectOk } from '../services/app/frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
-import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
-import { appAllowanceWords, withAllowance } from '../services/app-scope-allowance-store.js';
-import { hashGrantToken, upsertAppGrant, type GrantSpec } from '../services/app-grant-upsert.js';
-import { grantGivenToEarlierAuthor, liveAppGrantFor } from '../services/app-grant-author.js';
+import { heldOwnerAdded, narrowToDeclared } from '../services/app/grant-scopes.js';
+import { appAllowanceWords, withAllowance } from '../services/app/scope-allowance-store.js';
+import { hashGrantToken, upsertAppGrant, type GrantSpec } from '../services/app/grant-upsert.js';
+import { grantGivenToEarlierAuthor, liveAppGrantFor } from '../services/app/grant-author.js';
 import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
-import { APP_GRANTABLE_SCOPES } from '../services/app-grant-vocabulary.js';
+import { APP_GRANTABLE_SCOPES } from '../services/app/grant-vocabulary.js';
 import { isPackageApp } from '../services/packages/install/package-approvals.js';
 import { LOCALES } from '../i18n.js';
 import { oneTimeStore, type ClaimEntry } from '../services/ephemeral-claims.js';
@@ -281,7 +281,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
    * Only ever removes. An app that gained a permission in its manifest has to go through the consent
    * screen for it, and a refresh is not consent. An app that declares nothing is left as it is. A word
    * the OWNER added by hand (`ownerAdded`) is not the app's to drop: it stays until the owner takes it
-   * away (services/app-grant-scopes.ts).
+   * away (services/app/grant-scopes.ts).
    */
   async function narrowToDeclaration(target: string, stored: string[], ownerAdded: string[] = []): Promise<string[] | null> {
     const declared = await declaredScopesOf(storage, target);
@@ -306,7 +306,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false };
     const host = u.hostname.toLowerCase();
     const appHost = (config.appHost || '').toLowerCase();
-    // The host families are services/app-origin-target.ts appOriginHostFamily, the test
+    // The host families are services/app/origin-target.ts appOriginHostFamily, the test
     // resolveAppOriginTarget asks too (secaudit 2026-10, C8). A per-app subdomain, or the app host
     // itself, which serves apps by path — never the apex SPA origin.
     const family = appOriginHostFamily(config, host);
@@ -321,7 +321,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
   }
 
   // Which redirect is the node itself, and which is the page that holds an app in a frame:
-  // services/app-frame-redirect.ts (frameRedirect), moved out unchanged at the line ceiling.
+  // services/app/frame-redirect.ts (frameRedirect), moved out unchanged at the line ceiling.
 
   // ── GET /v1/app-grants/scopes ── the grantable scope vocabulary, machine-readable + public.
   // Apps and agentic coders check this BEFORE declaring <meta name="aimeat-scopes">: requesting
@@ -364,7 +364,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     let rd = validRedirect(redirectUri);
     // The app's own path on the node is a redirect bound to exactly this app, on every node. A node that
-    // runs apps in the isolated frame takes no other address of its own (services/app-frame-redirect.ts).
+    // runs apps in the isolated frame takes no other address of its own (services/app/frame-redirect.ts).
     const frame = await frameRedirect(config, storage, redirectUri, app);
     if (frame.onNode) rd = frame.bound ? { ok: true, origin: frame.origin } : { ok: false };
     if (!rd.ok) {
@@ -382,7 +382,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (slash <= 0 || slash === app.length - 1) {
       return res.status(400).json(error(config.nodeId, 'INVALID_APP', 'app must be "owner/filename"'));
     }
-    // A never-published app's draft signs in from its draft origin (services/app-origin-target.ts).
+    // A never-published app's draft signs in from its draft origin (services/app/origin-target.ts).
     const appRecord = await appRecordForAuthorize(config, storage, app, redirectUri);
     if (!appRecord) {
       return res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No published app "${app}"`));
@@ -400,7 +400,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const coHostL = (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase();
     const rdHost = new URL(redirectUri).hostname.toLowerCase();
     const responseMode = String(req.query.response_mode ?? 'query') === 'web_message' ? 'web_message' : 'query';
-    // The bare app host: the app's own path-form address, or its root in web_message mode (services/app-frame-redirect.ts).
+    // The bare app host: the app's own path-form address, or its root in web_message mode (services/app/frame-redirect.ts).
     if (appHostL && rdHost === appHostL && !bareAppHostRedirectOk(redirectUri, app, responseMode)) {
       return res.status(400).json(error(config.nodeId, 'INVALID_REDIRECT_URI', 'redirect_uri on the shared app host must be this app\'s own address, /<owner>/<filename>'));
     } else if (appHostL && rdHost !== appHostL && rdHost.endsWith('.' + appHostL)) {
@@ -438,7 +438,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage, originBound,
       packageApp, prompt: String(req.query.prompt ?? '') === 'create' ? 'create' : '',
       // Another account published the live version: the consent page asks the owner for new words (services/own-app-consent.ts).
-      // A version another author's app published through its grant names that app (services/app-published-by-app.ts).
+      // A version another author's app published through its grant names that app (services/app/published-by-app.ts).
       publishedByOther: typeof appRecord.manifest?.publishedBy === 'string' && accountOf(appRecord.manifest.publishedBy) !== accountOf(app.slice(0, slash))
         ? appRecord.manifest.publishedBy
         : byAnotherAuthorsApp(appRecord.manifest?.publishedByApp, app.slice(0, slash)) ? appRecord.manifest.publishedByApp : '',
@@ -519,7 +519,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { redirect_url: url.toString() }));
   });
 
-  // Establish the owner's SINGLE live grant for an app (services/app-grant-upsert.ts). Both consent
+  // Establish the owner's SINGLE live grant for an app (services/app/grant-upsert.ts). Both consent
   // paths (silent SSO bridge, authorization_code exchange) go through it so neither can stack duplicates.
   const upsertGrant = (spec: GrantSpec, existing: AppGrantRecord | null) => upsertAppGrant(storage, spec, existing);
 
@@ -563,7 +563,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (callerOrigin && callerOrigin !== apexOrigin(config)) return reply({ ok: false, error: 'bad_caller' });
 
     // Origin → grant target, resolved by the one function that knows the binding
-    // (services/app-origin-target.ts). The origin is a value the CALLER writes; nothing downstream
+    // (services/app/origin-target.ts). The origin is a value the CALLER writes; nothing downstream
     // trusts it beyond what this node actually publishes at that hostname.
     //
     // `app` instead of `origin` is a page of the node holding app code in an opaque-origin frame (audit

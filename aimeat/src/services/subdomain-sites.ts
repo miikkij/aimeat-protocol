@@ -39,9 +39,9 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
-import { resolveAppTarget } from './app-access.js';
+import { resolveAppTarget } from './app/access.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from './subdomain-names.js';
-import { appNeedsCodeOrPayment } from './app-access.js';
+import { appNeedsCodeOrPayment } from './app/access.js';
 import { isNodeApexLabel } from './subdomain-node-labels.js';
 
 /** A refusal, in the shape each door renders as its own error envelope. */

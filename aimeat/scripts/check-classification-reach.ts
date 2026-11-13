@@ -207,7 +207,7 @@ function main(): void {
     return;
   }
   if (p.added.length) {
-    console.error('NEW content reads outside the list. Load through a loader that takes a classification reader (services/workspace-content.ts, services/ai/inputs.ts, services/file-refs.ts, services/classification/present-memory.ts), or add the file with why its read is the node\'s own:');
+    console.error('NEW content reads outside the list. Load through a loader that takes a classification reader (services/workspace/content.ts, services/ai/inputs.ts, services/file-refs.ts, services/classification/present-memory.ts), or add the file with why its read is the node\'s own:');
     for (const l of p.added) console.error(`  ${l}`);
   }
   if (p.grew.length) {

@@ -35,14 +35,14 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
-import { exportWorkspace } from '../services/workspace-export.js';
+import { exportWorkspace } from '../services/workspace/export.js';
 import { readerForAgent } from '../services/classification/reader.js';
-import { importWorkspace } from '../services/workspace-import.js';
+import { importWorkspace } from '../services/workspace/import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
-import type { ImportCaller } from '../services/workspace-import-gates.js';
+import type { ImportCaller } from '../services/workspace/import-gates.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 

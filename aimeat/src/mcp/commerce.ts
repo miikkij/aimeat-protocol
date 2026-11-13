@@ -102,7 +102,7 @@ import { pspSecretHint } from '../commerce/psp-secrets.js';
 import { setInvoiceAcceptImmediate } from '../commerce/psp-record.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { canonicalAppToolsId } from '../services/app-tools-key.js';
+import { canonicalAppToolsId } from '../services/app/tools-key.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
 import { AppToolsDocSchema, appToolsKey, isToolPriced, legacyToolPriceRefusal, normalizeToolPacing, toolTollMorsels } from '../models/app-tool-schemas.js';
@@ -297,7 +297,7 @@ export function registerCommerceTools(
             // An old morsel `price` is pacing: refused from 4.0.0, and until then stored as `tollMorsels`.
             const legacyRefusal = legacyToolPriceRefusal(parsed.data);
             if (legacyRefusal) return fail(`${legacyRefusal.code}: ${legacyRefusal.message}`);
-            // The app's filename, when the caller named the app without it (services/app-tools-key.ts):
+            // The app's filename, when the caller named the app without it (services/app/tools-key.ts):
             // the shared write stores it there anyway, and the answer has to name where it went.
             const app_id = await canonicalAppToolsId(storage, ownerGhii, named);
             const key = appToolsKey(app_id);

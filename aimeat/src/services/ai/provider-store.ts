@@ -80,7 +80,7 @@ import { readRouting, type RoutingDefaults, type RoutingRules } from './routing.
 import { catalogModel, catalogModels } from './catalog/store.js';
 import { servesCapability } from './catalog/price.js';
 import { assertOwnExtensionProvider } from './extension-provider.js';
-import { aiProviderDeclarationOf } from '../extension-ai-provider-declaration.js';
+import { aiProviderDeclarationOf } from '../extension/ai-provider-declaration.js';
 import { FIXED_BASE_URLS, isFixedType, type AiCapability } from './types.js';
 import { nodeOpenRouterKey } from './node-openrouter-key.js';
 

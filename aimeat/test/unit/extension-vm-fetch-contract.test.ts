@@ -6,7 +6,7 @@
  * @version-history 1.0.0 2026-09-27 Delegation, refusal and host deadline contract.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { executeExtensionAction, type ExtensionCtx } from '../../src/services/extension-runtime.js';
+import { executeExtensionAction, type ExtensionCtx } from '../../src/services/extension/runtime.js';
 
 const script = 'export default async function(ctx, input) { return await ctx.fetch(input.url, input.opts); }';
 function context(fetch: ExtensionCtx['fetch']): ExtensionCtx {

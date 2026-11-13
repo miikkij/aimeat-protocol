@@ -71,9 +71,9 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from '../../services/workspace-meta.js';
-import { readStoredSections } from '../../services/workspace-sections.js';
-import { spacePrefixesOf, spaceRowAt } from '../../services/workspace-record-key.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from '../../services/workspace/meta.js';
+import { readStoredSections } from '../../services/workspace/sections.js';
+import { spacePrefixesOf, spaceRowAt } from '../../services/workspace/record-key.js';
 import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js';
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
@@ -89,12 +89,12 @@ import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input
 import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
 import { fresherRec } from './shared.js';
 import { sharedPublishedProvenanceIds } from '../../services/share-provenance.js';
-import { loadWorkspaceContent } from '../../services/workspace-content.js';
+import { loadWorkspaceContent } from '../../services/workspace/content.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { logger } from '../../utils/logger.js';
-import { readOpened } from '../../services/workspace-opened.js';
+import { readOpened } from '../../services/workspace/opened.js';
 
 export function registerOrganismWorkspaceReadRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
@@ -121,7 +121,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller can
     // read the manifest (they created it, are a same-owner agent, hold a viewer/contributor grant, or
     // manage the organism), they see ALL of the workspace's content, whoever wrote it. If not, they see
-    // nothing (org membership alone is discovery-only). The one loader (services/workspace-content.ts)
+    // nothing (org membership alone is discovery-only). The one loader (services/workspace/content.ts)
     // loads, decides (decideWorkspaceRead) and passes the classification reader; this route shapes.
     const contentReader = readerFor({ storage, config }, req.auth);
     const got = await loadWorkspaceContent({ storage, config }, contentReader, {
@@ -132,7 +132,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       return;
     }
     const nsRoot = got.root;
-    // A workspace's meta records are the copies that count (services/workspace-meta.ts), not the
+    // A workspace's meta records are the copies that count (services/workspace/meta.ts), not the
     // first or the last the scan holds; the organism root keeps its own manifest as before.
     const reader = got.meta;
     const metaOf = async (rel: string, from: MemoryRecord[]): Promise<MemoryRecord | undefined> =>
@@ -158,7 +158,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // Apps pinned to this workspace (meta.apps binding record) — presentation/launch-context only.
     const appsRec = reader ? await metaOf('meta.apps', readable) : byKey.get(`${nsRoot}meta.apps`);
     const apps = ((appsRec?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
-    // How the workspace takes a member's change (services/workspace-meta.ts `member_changes`), and each
+    // How the workspace takes a member's change (services/workspace/meta.ts `member_changes`), and each
     // document space's section index: the copies that count. The page reads the sections here, where
     // its own memory read saw only the caller's copies and so showed a member an empty tree.
     const rules = reader && canReadWorkspace
@@ -270,7 +270,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // the schema store rather than in the manifest, so without this a caller could replace a schema
     // it had no way of reading first. Empty when the caller cannot read the workspace.
     const schemas = canReadWorkspace ? await readWorkspaceSchemas(storage, id, ws) : {};
-    // The day each page was last opened (services/workspace-opened.ts): the page view marks one
+    // The day each page was last opened (services/workspace/opened.ts): the page view marks one
     // nobody opened or changed for six months and offers to archive it.
     const opened = ws && canReadWorkspace ? await readOpened(storage, config, id, ws) : {};
 
@@ -282,7 +282,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       ...(rules ? { rules, sections } : {}),
       ...(Object.keys(schemas).length ? { schemas } : {}),
       ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
-      // More rows than one read loads: `objects` is not the whole workspace (services/workspace-content.ts).
+      // More rows than one read loads: `objects` is not the whole workspace (services/workspace/content.ts).
       ...(got.truncated ? { truncated: true } : {}),
     }, [
       { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },

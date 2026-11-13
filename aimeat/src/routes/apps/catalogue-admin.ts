@@ -60,7 +60,7 @@
  *   v1.5.0 — 2026-08-19 — the copy-scan reads listAppsWithContent; the plain listing no longer carries bytes.
  */
 import type { Router } from 'express';
-import { listAppsBuiltFor, levelName } from '../../services/app-dev-grant.js';
+import { listAppsBuiltFor, levelName } from '../../services/app/dev-grant.js';
 import { resolveIdentity, localAccountName, isForeignPrincipal } from '../../utils/gaii.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -74,15 +74,15 @@ import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { peerFetch } from '../../utils/peer-fetch.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
-import { scanCatalogForCopies } from '../../services/app-similarity.js';
-import { publicAppManifest } from '../../services/app-public-manifest.js';
-import { appToll, presentAppManifest } from '../../services/app-pacing.js';
-import { appAccessOf, appAccessLevelOf } from '../../services/app-access.js';
+import { scanCatalogForCopies } from '../../services/app/similarity.js';
+import { publicAppManifest } from '../../services/app/public-manifest.js';
+import { appToll, presentAppManifest } from '../../services/app/pacing.js';
+import { appAccessOf, appAccessLevelOf } from '../../services/app/access.js';
 import { isAppOpenToInternet } from '../../services/internet-opening/opening-registry.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
-import { appSeoState } from '../../services/app-seo.js';
-import { stripLegalContent } from '../../services/app-legal.js';
+import { appSeoState } from '../../services/app/seo.js';
+import { stripLegalContent } from '../../services/app/legal.js';
 import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -215,7 +215,7 @@ export function registerCatalogueAdminRoutes(
             // the data map travels on the same terms: where an app puts what is the promise it makes
             // to whoever installs it. The publish checks' findings, the build-spec state and the
             // reviewer log are the OWNER's own, and come off for everyone else, here AND inside the
-            // manifest the card renders from (services/app-public-manifest.ts, one place for every
+            // manifest the card renders from (services/app/public-manifest.ts, one place for every
             // door that shows a manifest to somebody else).
             const isOwn = !!viewerGhii && app.ownerGaii === viewerGhii;
             const shownManifest = isOwn ? app.manifest : {

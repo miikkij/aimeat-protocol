@@ -54,7 +54,7 @@
  *     counts.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
-import type { ExtensionCtx } from '../extension-ctx-contract.js';
+import type { ExtensionCtx } from '../extension/ctx-contract.js';
 import { logger } from '../../utils/logger.js';
 import { AiJobError } from './types.js';
 import type { AiJobStarter, AiJobChainStop, StartAiJobInput, AiJobStartedBy } from './types.js';

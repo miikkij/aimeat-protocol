@@ -39,10 +39,10 @@ import {
     type RawComponentInput,
 } from './package-create.js';
 import { packageCapabilities, type CapabilitySummary } from '../install/package-capabilities.js';
-import { parseBundledCrews } from '../../app-bundled-crews.js';
-import { checkAppConfigValues, type AppConfigSchema } from '../../app-config.js';
+import { parseBundledCrews } from '../../app/bundled-crews.js';
+import { checkAppConfigValues, type AppConfigSchema } from '../../app/config.js';
 import { parseInstallBundle, BUNDLE_SPEC } from '../../install-set-spec.js';
-import type { AppWorkspaceDeclaration } from '../../app-workspaces.js';
+import type { AppWorkspaceDeclaration } from '../../app/workspaces.js';
 
 export interface ComposeSetInput {
     /** The set's package name; with the owner it forms the bundle's group id. */

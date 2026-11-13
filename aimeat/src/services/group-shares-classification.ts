@@ -22,7 +22,7 @@
  *   route or service that serves another account's memory by visibility or by share asks here:
  *   GET /v1/memory/:gaii/:key (routes/memory/public-read.ts), the node MCP tool
  *   aimeat_memory_read_public (mcp/memory-extended.ts), an extension's ctx.memory.getPublic
- *   (services/extension-ctx.ts), discovery's public scope (discovery/sources/memory-source.ts) and
+ *   (services/extension/ctx.ts), discovery's public scope (discovery/sources/memory-source.ts) and
  *   the librarian's public scope (services/librarian.ts).
  * @structure ShareCarried · OrganismLeft · organismKeysCarried(deps, records, accessor) ·
  *   shareCarriesKey(deps, ownerGaii, key, accessor)

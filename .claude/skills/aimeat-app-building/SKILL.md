@@ -169,7 +169,7 @@ permissions its tools need does the work and then has it refused: measured 2026-
 marketplace tools on an agent that held only the memory permissions.
 
 When the code behind this changes, the facts live in `aimeat/src/models/crew-def-schemas.ts`,
-`aimeat/src/services/app-bundled-crews.ts`, `app-agent-propose.ts`, `app-agent-deploy.ts` and
+`aimeat/src/services/app/bundled-crews.ts`, `app-agent-propose.ts`, `app-agent-deploy.ts` and
 `app-agents/app-agent-link.ts`, and the skill text in `aimeat/src/data/builtin-skills.app-agents.ts`.
 
 ## Served browser SDK libs

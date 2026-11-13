@@ -95,7 +95,7 @@ import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../../services/
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
-import { listByAgent as listEngagementsByAgent } from '../../services/workspace-engagements.js';
+import { listByAgent as listEngagementsByAgent } from '../../services/workspace/engagements.js';
 import {
   setAgentTags, setAgentMode, setAgentConsoleUrl, setAgentRunMode, setAgentRuntimeSource, setAgentDescription,
   type AgentWriteRefusal,

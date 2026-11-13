@@ -9,7 +9,7 @@
  *   permissions change only when its author republishes it. AIMEAT-PURPOSE.md uses 4 and 6,
  *   invariant 20.
  *
- *   THE UPDATE, SIMULATED. The step (services/app-datapackage-read-keep-migration.ts, P2 of the
+ *   THE UPDATE, SIMULATED. The step (services/app/datapackage-read-keep-migration.ts, P2 of the
  *   October 2026 round) runs at boot before the node serves. Here its record is taken away and the
  *   step is run against the server's own storage, as test/e2e-secrets-approvals.ts tests 23 to 25 run
  *   the extension first-use step.
@@ -21,7 +21,7 @@
  *   the 4.0 update keep their routes (e2e-rest-scope-keep-working, e2e-app-scope-allowance). The
  *   on_done keep step (P3) has its unit test, test/unit/app-on-done-keep.test.ts.
  *
- *   FAIL FIRST, 2026-10-21, both backends: with keepWorkingAppsOnce in services/app-scope-allowance.ts
+ *   FAIL FIRST, 2026-10-21, both backends: with keepWorkingAppsOnce in services/app/scope-allowance.ts
  *   writing no grant (the loop over liveGrantsOf given no grant), test 3 is red; restored byte for byte.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-purpose-update-keeps
  * @version-history
@@ -30,7 +30,7 @@
 import { registerOwner } from './helpers/owner-login.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
-import { APP_DATAPACKAGE_READ_KEEP_KEY, keepDatapackageReadForAppsOnce } from '../src/services/app-datapackage-read-keep-migration.js';
+import { APP_DATAPACKAGE_READ_KEEP_KEY, keepDatapackageReadForAppsOnce } from '../src/services/app/datapackage-read-keep-migration.js';
 import { BASE, NODE_ID, assert, appGrant, auth, harness, json } from './helpers/purpose-kit.js';
 
 const h = harness('Purpose: what exists at an update keeps working');

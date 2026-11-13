@@ -23,7 +23,7 @@
  *   routes too. test/unit/rest-scope-keep-working.test.ts derives the same set from the source and
  *   fails when the two differ, so a gate added later fails there until it is listed here. A node that
  *   ran this step before a word joined the list gets it from a step of its own
- *   (services/app-storage-read-keep-migration.ts for storage:read).
+ *   (services/app/storage-read-keep-migration.ts for storage:read).
  *   - `passedBy`: a word that passes every gate of this word (requireRestScope `orScope` on every one,
  *     and no MCP tool asks the word). A principal holding it already passes, so it gets nothing.
  *   - `agentsOnly`: every REST gate of the word is followed by requireRole('agent') and no MCP tool
@@ -40,8 +40,8 @@
  *   too, and nobody edits sixty apps by hand). An app grant follows its app's `aimeat-scopes`
  *   declaration and a refresh trims what the app does not declare, so a word cannot simply be written
  *   onto a grant. Instead each app published before the step whose code calls a gated route its
- *   declaration (or the default set) does not cover gets an allowance (services/app-scope-allowance.ts
- *   keepWorkingAppsOnce, read by services/app-scope-needs.ts): the words count as declared, and they
+ *   declaration (or the default set) does not cover gets an allowance (services/app/scope-allowance.ts
+ *   keepWorkingAppsOnce, read by services/app/scope-needs.ts): the words count as declared, and they
  *   go onto the app's live grants. Its own record, APP_SCOPE_KEEP_WORKING_KEY.
  *
  *   WHEN. Only on a node that runs REST_SCOPE_GATES_ENFORCED_IN or later, so a 3.x node does not run it
@@ -95,7 +95,7 @@ import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../utils/rest-scope-release.js';
 import { recordAccountEvent } from './account-events.js';
 import { recordSecurityIncident } from './security-incident.js';
-import { keepWorkingAppsOnce, type KeptApp } from './app-scope-allowance.js';
+import { keepWorkingAppsOnce, type KeptApp } from './app/scope-allowance.js';
 import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
 import { changeScopeList } from './scope-list-swap.js';
 import {
@@ -244,7 +244,7 @@ export interface KeepWorkingResult {
   halves: Array<'principals' | 'apps'>;
   agents: KeptPrincipal[];
   ecosystemApps: KeptPrincipal[];
-  /** Published apps that got an allowance (services/app-scope-allowance.ts). */
+  /** Published apps that got an allowance (services/app/scope-allowance.ts). */
   apps: KeptApp[];
 }
 

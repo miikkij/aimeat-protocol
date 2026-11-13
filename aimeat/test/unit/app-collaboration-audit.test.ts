@@ -9,10 +9,10 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { getDevGrant, putDevGrant, putBlanketGrant, listRightsHeldBy, listAppsBuiltFor } from '../../src/services/app-dev-grant.js';
+import { getDevGrant, putDevGrant, putBlanketGrant, listRightsHeldBy, listAppsBuiltFor } from '../../src/services/app/dev-grant.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { sameApp, putMember, getMemberRow, removeMember, writePrivateRecord, memberKey, listMembers } from '../../src/services/app-members.js';
-import { addRoadmapEntry, readAppRoadmap, removeRoadmapEntry, setWantedVisibility, appRoadmapKey, APP_ROADMAP_SPEC, APP_ROADMAP_MAX } from '../../src/services/app-roadmap.js';
+import { sameApp, putMember, getMemberRow, removeMember, writePrivateRecord, memberKey, listMembers } from '../../src/services/app/members.js';
+import { addRoadmapEntry, readAppRoadmap, removeRoadmapEntry, setWantedVisibility, appRoadmapKey, APP_ROADMAP_SPEC, APP_ROADMAP_MAX } from '../../src/services/app/roadmap.js';
 
 const stores: SqliteStorage[] = [];
 function store() { const s = new SqliteStorage(':memory:'); stores.push(s); return s; }

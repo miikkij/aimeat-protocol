@@ -31,20 +31,20 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import type { VerifiedToken } from '../../auth/jwt.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { exportWorkspace } from '../../services/workspace-export.js';
+import { exportWorkspace } from '../../services/workspace/export.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { importWorkspace } from '../../services/workspace-import.js';
+import { importWorkspace } from '../../services/workspace/import.js';
 import { exportOrganism } from '../../services/organism-export.js';
 import { importOrganism } from '../../services/organism-import.js';
 import { ZipSecurityError } from '../../services/safe-zip.js';
 import { recordSecurityIncident } from '../../services/security-incident.js';
-import type { ImportCaller } from '../../services/workspace-import-gates.js';
+import type { ImportCaller } from '../../services/workspace/import-gates.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismWorkspaceTransferRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, findWsEntry, bareOwner } = H;
 
-  /** The session's own facts, which the restore's write rules read (services/workspace-import-gates.ts). */
+  /** The session's own facts, which the restore's write rules read (services/workspace/import-gates.ts). */
   const importCaller = (auth: VerifiedToken): ImportCaller => {
     const principal = resolveIdentity(auth, config.nodeId);
     return {

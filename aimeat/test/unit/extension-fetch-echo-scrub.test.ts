@@ -44,7 +44,7 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     };
 });
 
-const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
+const { buildExtensionCtx } = await import('../../src/services/extension/ctx.js');
 const { encrypt } = await import('../../src/services/encryption.js');
 
 const KEY_HEX = '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20';

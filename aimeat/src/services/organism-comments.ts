@@ -30,7 +30,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { canReadWorkspace } from './workspace-access.js';
+import { canReadWorkspace } from './workspace/access.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
 import { classificationWarningOf } from './classification/present-memory.js';

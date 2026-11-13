@@ -47,11 +47,11 @@ import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { verifyPageFrameToken, PageFrameTokenError, type PageFrameClaims } from '../services/page-frame-token.js';
-import { findWorkspaceRecord } from '../services/workspace-write.js';
-import { listVersionRefs } from '../services/workspace-versions.js';
-import { readShareMetaOf, isDocPublicAt, publicViewerPath, shareIsOpen } from '../services/workspace-share.js';
+import { findWorkspaceRecord } from '../services/workspace/write.js';
+import { listVersionRefs } from '../services/workspace/versions.js';
+import { readShareMetaOf, isDocPublicAt, publicViewerPath, shareIsOpen } from '../services/workspace/share.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
-import { applyServeMarks } from '../services/app-serve-marks.js';
+import { applyServeMarks } from '../services/app/serve-marks.js';
 import {
     isHtmlPageValue, pageFrameCsp, pageHolderCsp, pageOriginOf, pageFileNameOk, isServablePageFileType, PAGE_PERMISSIONS_POLICY,
 } from '../services/html-page.js';
@@ -142,7 +142,7 @@ async function mappedByFamily(storage: Storage, c: PageFrameClaims, name: string
 /**
  * The classification reader on a page's file (TARGET-082): the page host holds no session, so the
  * reader is the anonymous one, and a shared page's file must also be allowed to leave the organism,
- * as the share's own content is (services/workspace-public-collectors.ts). A file it keeps back answers as
+ * as the share's own content is (services/workspace/public-collectors.ts). A file it keeps back answers as
  * absent.
  */
 async function passesClassification(
@@ -208,7 +208,7 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
         // The AI label of the page and of its files is decided for the page as it stands: public while
-        // an open share serves it to anyone (services/workspace-share.ts shareIsOpen), as the viewer's
+        // an open share serves it to anyone (services/workspace/share.ts shareIsOpen), as the viewer's
         // own answer decides it. The member's frame and the public one say the same.
         const openNow = sharedNow && shareIsOpen(share);
         const served = (provenanceId: string | null | undefined) => loadServedProvenance(storage, config, provenanceId,

@@ -8,7 +8,7 @@
  *   WHEN A FIRST USE IS REFUSED. A secret with no host is bound by its first use, and the node refuses
  *   that use through an extension another account installed, to a host the extension did not declare
  *   for that secret, or by code a principal without secrets:manage wrote, unless the owner is signed in
- *   making the call (services/extension-secret-authority.ts). Each refusal files a request here: one
+ *   making the call (services/extension/secret-authority.ts). Each refusal files a request here: one
  *   per (extension, installer, host) while it waits, a bell notice with an Allow button the first time,
  *   and the address of the allow page (views/secret-allow.js) in the refusal itself, so the AI that
  *   met it can hand it to the person. Reused from the permission-ask pattern
@@ -43,7 +43,7 @@ import type { Storage } from '../storage/interface.js';
 import type { SecretApproval, SecretRecord } from '../storage/types/secrets.js';
 import { notify, type NotifyInput } from './notify.js';
 import { emitChange } from './event-bus.js';
-import { declaredHostsFor, declaresHost, usesSecretsOf } from './extension-secret-uses.js';
+import { declaredHostsFor, declaresHost, usesSecretsOf } from './extension/secret-uses.js';
 import { listOwnerSecrets, purposeText, type SecretSummary } from './owner-secrets.js';
 import { tellAsker, closeQuestion } from './approval-standard.js';
 import { localAccountName } from '../utils/gaii.js';
