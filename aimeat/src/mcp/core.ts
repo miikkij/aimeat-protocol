@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-13 — SECURITY: aimeat_discover decides with the session's permissions, built by
+ *     services/discovery/caller.ts as GET /v1/discover builds them, not with the agent record's list
+ *     (structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_memory_list passes archived to the listing GET /v1/memory reads (unit 3b).
  *   2026-11-13 — aimeat_agents_list filters by run_mode, as GET /v1/agents does (unit 3b).
  *   2026-11-13 — aimeat_action_execute hands callback_url to createWorkItem, as POST /v1/work/request
@@ -184,7 +187,7 @@ import type { ResourceChangeEvent } from '../services/resource-events.js';
 import { resourceEvents } from '../services/resource-events.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, structuredResult } from '../tool-catalog/shape.js';
-import { buildDiscoveryRegistry, runDiscovery, computeFacets, DISCOVERY_TYPES, type DiscoveryType } from '../services/discovery/index.js';
+import { buildDiscoveryRegistry, runDiscovery, computeFacets, discoveryCaller, DISCOVERY_TYPES, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skill-agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
@@ -345,22 +348,13 @@ export function registerCoreTools(
             if (scope === 'shared' && !scopeIsCovered(sessionScopes, 'organism:read')) {
                 return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_discover', ['organism:read'], { baseUrl: config.baseUrl, agentGaii }) }], isError: true as const };
             }
-            const parsed = parseGAII(agentGaii);
-            const agent = await storage.getAgent(agentGaii);
             const types = discoverCsv(type).filter((t): t is DiscoveryType => VALID_DISCOVER_TYPES.has(t as DiscoveryType));
             const lim = typeof limit === 'number' && limit > 0 ? Math.min(limit, 100) : 20;
             const ctx = {
-                caller: {
-                    ownerName: parsed ? localAccountName(agentGaii) : '',
-                    sub: agentGaii,
-                    gaii: agentGaii,
-                    isOwnerSession: false,
-                    // An MCP session is always the connected AGENT: not an app grant, not a GEAI.
-                    // The memory source reads these before it decides whose records to search.
-                    isApp: false,
-                    isEcosystem: false,
-                    scopes: agent?.defaultScopes ?? [],
-                },
+                // The session's caller with the session's permissions, built where GET /v1/discover
+                // builds it (services/discovery/caller.ts); never the agent record's longer list
+                // (structure programme 2026-11, unit 7).
+                caller: discoveryCaller(caller()),
                 organismCaller: caller(),   // the organism read rule on the own scope (secaudit 2026-10, v57 shape)
                 readerAuth: caller().auth,  // the data package audience rule (sources/dataset-source.ts)
                 scope: (scope ?? 'own') as 'own' | 'public' | 'shared',

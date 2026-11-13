@@ -15,6 +15,8 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   2026-11-13 — The discovery caller is built by services/discovery/caller.ts, as aimeat_discover
+ *     builds it; the answer is unchanged (structure programme 2026-11, unit 7).
  *   2026-11-01 — `dataset` is a type filter (a data package, plan doc-mvwxcas3dom3 D1.1); the type list is
  *     DISCOVERY_TYPES (services/discovery/types.ts); the context carries the caller as a package reader.
  *   2026-10-25 — scope=shared on GET /v1/discover and /v1/discover/facets asks organism:read of every
@@ -41,7 +43,6 @@ import { requireScope } from '../auth/middleware.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
-import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { readerFor } from '../services/classification/reader.js';
 import { callerFromAuth } from '../services/caller-context.js';
 import {
@@ -49,6 +50,7 @@ import {
   runDiscovery,
   computeFacets,
   DISCOVERY_TYPES,
+  discoveryCaller,
   type DiscoveryContext,
   type DiscoveryFilters,
   type DiscoveryType,
@@ -97,25 +99,17 @@ function buildContext(
   }
 
   const filters = parseFilters(req.query);
+  const who = req.auth ? callerFromAuth({ ...req.auth, scopes: req.auth.scopes ?? [] }, config.nodeId, storage) : null;
   const ctx: DiscoveryContext = {
-    caller: req.auth
-      ? {
-          ownerName: req.auth.owner,
-          sub: req.auth.sub,
-          gaii: resolveIdentity(req.auth, config.nodeId),
-          isOwnerSession: isOwnerInPerson(req.auth),
-          // The principal kind, which a source needs before it narrows anybody to "their own
-          // records": for an app grant that is the owner's whole personal memory, and an ecosystem
-          // app is fenced to its granted data areas (secaudit 2026-10).
-          isApp: req.auth.roles.includes('app'),
-          isEcosystem: req.auth.roles.includes('ecosystem'),
-          scopes: req.auth.scopes ?? [],
-        }
+    // The account, identity, principal kind and the token's permissions, built where aimeat_discover
+    // builds them (services/discovery/caller.ts). The kind matters before a source narrows anybody
+    // to "their own records": for an app grant that is the owner's whole personal memory, and an
+    // ecosystem app is fenced to its granted data areas (secaudit 2026-10).
+    caller: who
+      ? discoveryCaller(who)
       : { ownerName: '', sub: '', gaii: '', isOwnerSession: false, isApp: false, isEcosystem: false, scopes: [] },
     // The organism read rule on the own scope asks this caller (secaudit 2026-10, the v57 shape).
-    ...(req.auth && !isAnonymousPrincipal(req.auth)
-      ? { organismCaller: callerFromAuth({ ...req.auth, scopes: req.auth.scopes ?? [] }, config.nodeId, storage) }
-      : {}),
+    ...(who && req.auth && !isAnonymousPrincipal(req.auth) ? { organismCaller: who } : {}),
     // The data package audience rule asks the caller's roles and scopes (sources/dataset-source.ts).
     ...(req.auth ? { readerAuth: { ...req.auth, scopes: req.auth.scopes ?? [] } } : {}),
     scope,

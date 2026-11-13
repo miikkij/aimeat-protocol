@@ -8,6 +8,7 @@
  * @structure re-exports from ./types, ./normalize, ./classify, ./registry, ./facets
  * @usage import { createRegistry, classifyMemoryKey, normalizeVisibility } from '../discovery/index.js';
  * @version-history
+ *   v0.4.0 — 2026-11-13 — export discoveryCaller (./caller.ts), the caller both surfaces build.
  *   v0.1.0 — 2026-06-23 — Phase 0: barrel for pure building blocks (design doc 2026-06-23).
  *   v0.2.0 — 2026-06-23 — Phase 1: export orchestrator (run) + memory/FTS source adapter.
  *   v0.3.0 — 2026-06-23 — Phase 2: export capabilities / apps / agent-task table source adapters.
@@ -24,3 +25,4 @@ export {
   CAPABILITIES_SOURCE_ID, APPS_SOURCE_ID, AGENT_TASKS_SOURCE_ID,
 } from './sources/table-sources.js';
 export { buildDiscoveryRegistry } from './setup.js';
+export { discoveryCaller } from './caller.js';
