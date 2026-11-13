@@ -22,10 +22,20 @@
  *                without it, only the groups it is a member of. The owner in person as before.
  *     FILES      GET /v1/memory/files lists to an agent only the files its classification reader
  *                shows, as the download beside it and the MCP storage resource do.
+ *   Unit 2b, phase B (each section red on the code it was written against, where the two disagree):
+ *     BOARD-RES      the aimeat://boards/{id} resource gives a reader holding the board owner's
+ *                    consent the posts GET /v1/boards/:id/posts and aimeat_board_read give it.
+ *     JOIN-PRIVATE   joining a private organism with an open join policy (a question: the tool
+ *                    answers it not found on purpose).
+ *     BOARD-MEMBERS  an owner's agent holding social:members changes a shared board's reader list
+ *                    (a question: REST takes the owner in person only, the tool admits the agent on
+ *                    purpose).
  *   The operator (the suite's first account) turns classification on for the FILES section only and
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.3.0 — 2026-11-13 — BOARD-RES, JOIN-PRIVATE and BOARD-MEMBERS (structure programme 2026-11,
+ *     unit 2b, phase B).
  *   v1.2.0 — 2026-11-13 — WS-ROLE asserts the decided rule instead of today's answer.
  *   v1.1.0 — 2026-11-13 — GROUPS asserts the decided rule instead of today's answer.
  *   v1.0.0 — 2026-11-13 — Initial (structure programme 2026-11, unit 7).
@@ -343,6 +353,84 @@ await test('USE KEPT: alice in person lists and reads her group; an agent that i
     assert(rest.status === 200, `member agent, REST: ${show(rest)}`);
     const mcp = await callTool(readerMcp, 'aimeat_group_list', {});
     assert(!mcp.isError && mcp.text.includes(groupId), `member agent, MCP: ${mcp.text.slice(0, 300)}`);
+});
+
+// ─── BOARD-RES ───
+console.log('\nBOARD-RES: the board posts resource asks the board read gate GET /v1/boards/:id/posts asks');
+
+let brBoard = '';
+let brReader!: McpAgent;
+let brMcp!: McpSession;
+const BR_TITLE = N('brpost');
+await test('Setup: alice\'s private board with one post; bob\'s agent holds alice\'s consent for that board', async () => {
+    const b = await call('POST', '/v1/boards', alice.token, { name: N('brboard'), visibility: 'private' });
+    assert(b.status === 201, `board: ${show(b)}`);
+    brBoard = b.body.data.id ?? b.body.data.board?.id;
+    const p = await call('POST', `/v1/boards/${brBoard}/posts`, alice.token, { title: BR_TITLE, body: 'consent reads this' });
+    assert(p.status === 201, `post: ${show(p)}`);
+    brReader = await makeAgent(BASE, bob, ['social:read', 'memory:read'], N('brag'));
+    const c = await call('POST', '/v1/consent', alice.token, { data_pattern: `board:${brBoard}`, recipient: brReader.gaii, purpose: 'read the board', scope: 'local' });
+    assert(c.status === 201, `consent: ${show(c)}`);
+    brMcp = await openSession(BASE, brReader.token, 'u2b-board-res');
+});
+
+await test('USE KEPT: GET /v1/boards/:id/posts and aimeat_board_read give the consent-holding agent the post', async () => {
+    const rest = await call('GET', `/v1/boards/${brBoard}/posts`, brReader.token);
+    assert(rest.status === 200 && rest.text.includes(BR_TITLE), `REST: ${show(rest)}`);
+    const tool = await callTool(brMcp, 'aimeat_board_read', { board_id: brBoard });
+    assert(!tool.isError && tool.text.includes(BR_TITLE), `tool: ${tool.text.slice(0, 300)}`);
+});
+
+await test('DIFFERS TODAY: the aimeat://boards/{id} resource gives the same agent the same post', async () => {
+    const body = await mcpRpc(brMcp, 'resources/read', { uri: `aimeat://boards/${encodeURIComponent(brBoard)}` });
+    const text = String(body?.result?.contents?.[0]?.text ?? JSON.stringify(body?.error ?? body));
+    assert(text.includes(BR_TITLE), `resource: ${text.slice(0, 300)}`);
+});
+
+await test('REFUSED: carol\'s agent without consent is refused by the resource and by REST', async () => {
+    const outsider = await makeAgent(BASE, carol, ['social:read', 'memory:read'], N('brout'));
+    const rest = await call('GET', `/v1/boards/${brBoard}/posts`, outsider.token);
+    assert(rest.status === 403, `REST: ${show(rest)}`);
+    const s = await openSession(BASE, outsider.token, 'u2b-board-res-out');
+    const body = await mcpRpc(s, 'resources/read', { uri: `aimeat://boards/${encodeURIComponent(brBoard)}` });
+    const text = String(body?.result?.contents?.[0]?.text ?? JSON.stringify(body?.error ?? body));
+    assert(!text.includes(BR_TITLE) && /ACCESS_DENIED/.test(text), `resource: ${text.slice(0, 300)}`);
+});
+
+// ─── JOIN-PRIVATE ───
+console.log('\nJOIN-PRIVATE: joining a private organism with an open join policy');
+
+let jpOrg = '';
+await test('Setup: alice\'s private organism with an open join policy; bob\'s agent', async () => {
+    jpOrg = await organism(alice.token, `U2b join ${stamp}`, { visibility: 'private' });
+});
+
+await test('DIFFERS TODAY (a question, not a defect): POST /v1/organisms/:id/join and aimeat_organism_join answer bob\'s agent alike', async () => {
+    const restAgent = await makeAgent(BASE, bob, ['organism:read', 'organism:write'], N('jprest'));
+    const rest = await call('POST', `/v1/organisms/${jpOrg}/join`, restAgent.token, {});
+    const toolAgent = await makeAgent(BASE, carol, ['organism:read', 'organism:write'], N('jptool'));
+    const tool = await callTool(await openSession(BASE, toolAgent.token, 'u2b-join'), 'aimeat_organism_join', { organism_id: jpOrg });
+    // The outcome is compared, not a status: a direct join and a join request are both an admission.
+    assert((rest.body.ok === true) === !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
+});
+
+// ─── BOARD-MEMBERS ───
+console.log('\nBOARD-MEMBERS: who changes a shared board\'s reader list');
+
+let bmBoard = '';
+let bmAgent!: McpAgent;
+await test('Setup: alice\'s shared board; an agent of alice holding social:members', async () => {
+    const b = await call('POST', '/v1/boards', alice.token, { name: N('bmboard'), visibility: 'shared' });
+    assert(b.status === 201, `board: ${show(b)}`);
+    bmBoard = b.body.data.id ?? b.body.data.board?.id;
+    bmAgent = await makeAgent(BASE, alice, ['social:read', 'social:write', 'social:members'], N('bmag'));
+});
+
+await test('DIFFERS TODAY (a question, not a defect): PATCH /v1/boards/:id/members and aimeat_board_members answer alice\'s agent alike', async () => {
+    const add = `ext-${stamp}#someone@aimeat-fi-001-test`;
+    const rest = await call('PATCH', `/v1/boards/${bmBoard}/members`, bmAgent.token, { add: [add] });
+    const tool = await callTool(await openSession(BASE, bmAgent.token, 'u2b-board-members'), 'aimeat_board_members', { board_id: bmBoard, add: [add] });
+    assert((rest.status === 200) === !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
 });
 
 // ─── FILES ───
