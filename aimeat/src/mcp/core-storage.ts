@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — aimeat_storage_upload hands federate to writeStorageFile on an inline upload and
+ *     answers the stored mark, as POST /v1/storage does (structure programme 2026-11, unit 3b).
  *   2026-11-06 — aimeat_storage_download opens an attachment of the owner's mailbox for an agent holding
  *     messages:read-as-owner (services/mailbox/attachment-read.ts); it answered no_matching_consent.
  *   2026-11-01 — aimeat_storage_delete hands the shared delete the session's caller, for the keys a page
@@ -114,7 +116,7 @@ export function registerCoreStorageTools(
             inputSchema: zodShapeFor('aimeat_storage_upload'),
             annotations: annotationsFor('aimeat_storage_upload'),
         },
-        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id, store: storeName, direct }) => {
+        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id, store: storeName, direct, federate }) => {
             const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
             // The store the writer named for the bytes, checked by the shared write with the session's rights.
             const store = storeName ? { id: storeName, operator: caller ? await caller().operator() : false } : undefined;
@@ -178,6 +180,8 @@ export function registerCoreStorageTools(
 
             const written = await writeStorageFile(deps, agentGaii, {
                 key, data: fileData, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
+                // The mark POST /v1/storage keeps on an inline upload (unit 3b).
+                federate: federate === true,
                 ...(publishGate ? { publishGate } : {}),
                 ...(store ? { store } : {}),
             });
@@ -204,6 +208,8 @@ export function registerCoreStorageTools(
                     ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
                     ...(written.warnings?.length ? { warnings: written.warnings } : {}),
                     mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, visibility: file.visibility, uploaded: true,
+                    // The stored mark, as POST /v1/storage answers it.
+                    federate: file.federate ?? false,
                     // Where the bytes went: `database`, `node:<name>` or `own:<name>`.
                     store: choiceIdOf(parseBlobRef(file.blobRef)?.storeId),
                     // The record the file carries: attached, declared or stamped by the shared write.

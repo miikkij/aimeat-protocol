@@ -11,6 +11,7 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_board_create hands federate to createBoard, as POST /v1/boards does (unit 3b).
  *   2026-11-01 — aimeat_board_list and the board-posts resource treat the shared anonymous principal as
  *     GET /v1/boards and the board read routes do: public and system boards only, and no owner_gaii or
  *     allowed_gaiis in the list (secaudit2026oct31w2 round 11).
@@ -249,7 +250,7 @@ export function registerBoardsTools(
             inputSchema: zodShapeFor('aimeat_board_create'),
             annotations: annotationsFor('aimeat_board_create'),
         },
-        async ({ name, visibility, description, allowed_gaiis, rules }) => {
+        async ({ name, visibility, description, allowed_gaiis, rules, federate }) => {
             // services/board-write.ts — the same create POST /v1/boards performs. The operator rule
             // lived here as "public requires operator" while the route reserves system boards too,
             // the name and description had no bound at all, and federate was never set.
@@ -257,6 +258,8 @@ export function registerBoardsTools(
             // board built over MCP ran on the defaults and its posts were gone after seven days.
             const out = await createBoard({ storage, config }, await boardCaller(), {
                 name, visibility, description, allowedGaiis: allowed_gaiis, rules,
+                // createBoard keeps an organisation's board unfederated, as for POST /v1/boards.
+                ...(federate !== undefined ? { federate } : {}),
                 // A public board asks the node's publish gate, as POST /v1/boards does.
                 publishGate: { caller: caller() },
             });

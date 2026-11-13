@@ -19,6 +19,8 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-field-adds
  * @version-history
+ *   v1.1.0 — 2026-11-13 — federate on aimeat_board_create and aimeat_storage_upload, relation on
+ *     aimeat_knowledge_links, ttl_hours on aimeat_board_post.
  *   v1.0.0 — 2026-11-13 — Initial (structure programme 2026-11, unit 3b).
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
@@ -650,6 +652,146 @@ console.log('\nThe other read filters');
         assert(ids(tool.data.packages ?? []) === ids(rest.body.data.packages), `tool ${ids(tool.data.packages ?? [])} REST ${ids(rest.body.data.packages)}`);
         const none = await callTool(p.session, 'aimeat_package_list', { category: `fadd-none-${suffix}` });
         assert((none.data.packages ?? []).length === 0, 'an unknown category lists nothing');
+    });
+}
+
+// ─── aimeat_board_create federate, aimeat_board_post ttl_hours ───
+console.log('\naimeat_board_create, aimeat_board_post');
+{
+    let boardId = '';
+    const boardOf = async (token: string, id: string) => {
+        const list = await get('/v1/boards', token);
+        assert(list.status === 200, `board list: ${list.status}`);
+        return (list.body.data.boards as any[]).find(b => b.id === id);
+    };
+
+    await test('board_create: the tool marks a public board federated, as the route does', async () => {
+        const b = await agentOf(alice, agents, 'board', ['social:write', 'social:read', 'organism:write', 'organism:read']);
+        const r = await callTool(b.session, 'aimeat_board_create', { name: `Field adds ${suffix}`, visibility: 'public', federate: true });
+        assert(!r.isError, `board refused: ${r.text}`);
+        boardId = r.data.id;
+        const board = await boardOf(b.agent.token, boardId);
+        assert(board?.federate === true, `federate: ${JSON.stringify(board)}`);
+        const rest = await post('/v1/boards', b.agent.token, { name: `Field adds REST ${suffix}`, visibility: 'public', federate: true });
+        assert(rest.status === 201 || rest.status === 202, `REST board: ${rest.status} ${JSON.stringify(rest.body.error)}`);
+        assert((await boardOf(b.agent.token, rest.body.data.id))?.federate === true, 'the REST board is federated too');
+    });
+
+    await test('board_create: an organisation\'s board is never federated, through the tool as through REST', async () => {
+        const b = agents.board!;
+        const org = await callTool(b.session, 'aimeat_organism_create', { name: `Board org ${suffix}`, visibility: 'private' });
+        assert(!org.isError, `organism: ${org.text}`);
+        const audience = `organism:${org.data.organism.id}`;
+        const tool = await callTool(b.session, 'aimeat_board_create', { name: `Org board ${suffix}`, visibility: audience, federate: true });
+        assert(!tool.isError, `tool: ${tool.text}`);
+        assert((await boardOf(b.agent.token, tool.data.id))?.federate === false, 'the tool\'s organisation board stays on this node');
+        const rest = await post('/v1/boards', b.agent.token, { name: `Org board REST ${suffix}`, visibility: audience, federate: true });
+        assert(rest.status === 201 || rest.status === 202, `REST: ${rest.status} ${JSON.stringify(rest.body.error)}`);
+        assert((await boardOf(b.agent.token, rest.body.data.id))?.federate === false, 'the REST organisation board stays on this node');
+    });
+
+    await test('board_create: an agent without social:write is refused through the tool as through REST', async () => {
+        const plain = await agentOf(alice, agents, 'plain', ['memory:read']);
+        const rest = await post('/v1/boards', plain.agent.token, { name: 'Nope', federate: true });
+        assert(rest.status === 403, `REST: ${rest.status} ${rest.body.error?.code}`);
+        const tool = await callTool(plain.session, 'aimeat_board_create', { name: 'Nope', federate: true });
+        assert(tool.isError && /SCOPE_DENIED/.test(tool.text), `tool: ${tool.text}`);
+    });
+
+    await test('board_post: the tool gives a post its own lifetime, as the route does', async () => {
+        const b = agents.board!;
+        const before = Date.now();
+        const r = await callTool(b.session, 'aimeat_board_post', { board_id: boardId, title: `Short ${suffix}`, body: 'Gone in two hours', ttl_hours: 2 });
+        assert(!r.isError, `post refused: ${r.text}`);
+        const read = await get(`/v1/boards/${boardId}/posts/${r.data.id}`, b.agent.token);
+        assert(read.status === 200, `read: ${read.status}`);
+        const expires = Date.parse(read.body.data.ttl_expires_at ?? read.body.data.post?.ttl_expires_at);
+        const hours = (expires - before) / 3_600_000;
+        assert(hours > 1.9 && hours < 2.1, `the post lives about two hours: ${hours.toFixed(3)}`);
+    });
+
+    await test('board_post: a lifetime that is no positive number is refused through the tool as through REST', async () => {
+        const b = agents.board!;
+        const rest = await post(`/v1/boards/${boardId}/posts`, b.agent.token, { title: 'x', body: 'x', ttl_hours: -1 });
+        assert(rest.status === 400, `REST: ${rest.status} ${rest.body.error?.code}`);
+        const tool = await callTool(b.session, 'aimeat_board_post', { board_id: boardId, title: 'x', body: 'x', ttl_hours: -1 });
+        assert(tool.isError, `tool: ${tool.text}`);
+    });
+
+    await test('board_post: another owner\'s agent is refused a private board through the tool as through REST', async () => {
+        const b = agents.board!;
+        const priv = await callTool(b.session, 'aimeat_board_create', { name: `Private ${suffix}`, visibility: 'private' });
+        assert(!priv.isError, `private board: ${priv.text}`);
+        const bobs = await agentOf(bob, bobAgents, 'board', ['social:write', 'social:read']);
+        const rest = await post(`/v1/boards/${priv.data.id}/posts`, bobs.agent.token, { title: 'x', body: 'x', ttl_hours: 2 });
+        assert(rest.status === 403 || rest.status === 404, `REST: ${rest.status} ${rest.body.error?.code}`);
+        const tool = await callTool(bobs.session, 'aimeat_board_post', { board_id: priv.data.id, title: 'x', body: 'x', ttl_hours: 2 });
+        assert(tool.isError && toolCode(tool) === rest.body.error?.code, `tool: ${tool.text}, REST: ${rest.body.error?.code}`);
+    });
+}
+
+// ─── aimeat_storage_upload federate ───
+console.log('\naimeat_storage_upload');
+{
+    await test('storage_upload: an inline upload keeps the federate mark, as the route does', async () => {
+        const s = await agentOf(alice, agents, 'store', ['storage:write', 'storage:read']);
+        const data = Buffer.from(`field adds ${suffix}`).toString('base64');
+        const tool = await callTool(s.session, 'aimeat_storage_upload', { key: `fadd-${suffix}.txt`, data_base64: data, mime_type: 'text/plain', federate: true });
+        assert(!tool.isError && tool.data.federate === true, `tool: ${tool.text.slice(0, 300)}`);
+        const rest = await post('/v1/storage', s.agent.token, { key: `fadd-rest-${suffix}.txt`, data, mime_type: 'text/plain', federate: true });
+        assert((rest.status === 200 || rest.status === 201) && rest.body.data.federate === true, `REST: ${rest.status} ${JSON.stringify(rest.body.data ?? rest.body.error).slice(0, 200)}`);
+        const plainUpload = await callTool(s.session, 'aimeat_storage_upload', { key: `fadd-plain-${suffix}.txt`, data_base64: data, mime_type: 'text/plain' });
+        assert(plainUpload.data.federate === false, `without the flag the mark is off: ${plainUpload.text.slice(0, 200)}`);
+    });
+
+    await test('storage_upload: an agent without storage:write is refused through the tool as through REST', async () => {
+        const plain = await agentOf(alice, agents, 'plain', ['memory:read']);
+        const data = Buffer.from('x').toString('base64');
+        const rest = await post('/v1/storage', plain.agent.token, { key: `nope-${suffix}.txt`, data, federate: true });
+        assert(rest.status === 403, `REST: ${rest.status} ${rest.body.error?.code}`);
+        const tool = await callTool(plain.session, 'aimeat_storage_upload', { key: `nope-${suffix}.txt`, data_base64: data, federate: true });
+        assert(tool.isError && /SCOPE_DENIED/.test(tool.text), `tool: ${tool.text}`);
+    });
+}
+
+// ─── aimeat_knowledge_links relation ───
+console.log('\naimeat_knowledge_links');
+{
+    await test('knowledge_links: relation filters a package\'s links as on the route', async () => {
+        const k = await agentOf(alice, agents, 'know', ['memory:write', 'memory:read']);
+        const importPackage = async (name: string) => {
+            const r = await post('/v1/knowledge/import', k.agent.token, {
+                package: {
+                    type: 'knowledge-package', name, version: '1.0.0', author: alice.name,
+                    content_type: 'research', tags: ['fadd'], language: 'en', maturity: 'published',
+                    synthesis: { level: 'original', description: 'e2e' }, references: [],
+                    entries: [{ key: 'data', title: 'Data', visibility: 'private' }], links: [],
+                    sharing: { catalog_listed: false, allow_clone: false, morsel_price: 0 },
+                },
+                entry_data: { data: { title: 'Data', summary: name } },
+            });
+            assert(r.status === 201, `import ${name}: ${r.status} ${JSON.stringify(r.body.error)}`);
+            return r.body.data.package_id as string;
+        };
+        const a = await importPackage(`fadd-a-${suffix}`);
+        const b = await importPackage(`fadd-b-${suffix}`);
+        const link = await post(`/v1/knowledge/${a}/link`, k.agent.token, { target: b, relation: 'extends', description: 'A builds on B' });
+        assert(link.status === 200 || link.status === 201, `link: ${link.status} ${JSON.stringify(link.body.error)}`);
+        const count = (x: any) => (x?.links ?? []).length;
+        const extendsTool = await callTool(k.session, 'aimeat_knowledge_links', { package_id: a, relation: 'extends' });
+        assert(!extendsTool.isError && count(extendsTool.data) >= 1, `extends: ${extendsTool.text.slice(0, 300)}`);
+        const otherTool = await callTool(k.session, 'aimeat_knowledge_links', { package_id: a, relation: 'contradicts' });
+        assert(!otherTool.isError && count(otherTool.data) === 0, `contradicts: ${otherTool.text.slice(0, 300)}`);
+        const extendsRest = await get(`/v1/knowledge/${a}/links?relation=extends`, k.agent.token);
+        const otherRest = await get(`/v1/knowledge/${a}/links?relation=contradicts`, k.agent.token);
+        assert(count(extendsRest.body.data) === count(extendsTool.data) && count(otherRest.body.data) === 0,
+            `REST extends ${count(extendsRest.body.data)}, contradicts ${count(otherRest.body.data)}`);
+        // Another owner's agent: the tool answers as the route does for the same package.
+        const bobs = await agentOf(bob, bobAgents, 'know', ['memory:read']);
+        const restBob = await get(`/v1/knowledge/${a}/links?relation=extends`, bobs.agent.token);
+        const toolBob = await callTool(bobs.session, 'aimeat_knowledge_links', { package_id: a, relation: 'extends' });
+        assert((restBob.status >= 400) === toolBob.isError, `another owner's agent: REST ${restBob.status}, tool ${toolBob.text.slice(0, 200)}`);
+        if (!toolBob.isError) assert(count(toolBob.data) === count(restBob.body.data), 'the same links on both');
     });
 }
 

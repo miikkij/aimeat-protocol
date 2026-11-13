@@ -12,6 +12,7 @@
  * @structure registerCoreBoardTools(mcp, deps, caller)
  * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
  * @version-history
+ *   2026-11-13 — aimeat_board_post hands ttl_hours to createBoardPost, as the route does (unit 3b).
  *   2026-11-01 — aimeat_board_read asks boardReadRefusal with no reader for the shared anonymous
  *     principal, as the REST read routes do, so a private board naming it is refused (secaudit2026oct31w2 round 11).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -100,7 +101,7 @@ mcp.registerTool(
         inputSchema: zodShapeFor('aimeat_board_post'),
         annotations: annotationsFor('aimeat_board_post'),
     },
-    async ({ board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
+    async ({ board_id, title, body, category, ai_provenance, ai_provenance_id, ttl_hours }) => {
         // ONE implementation (services/board-post.ts). This tool never loaded the board, so it
         // had no access check, no price on a public board, no pre_board_post hook and no bound
         // on title or body. Any agent holding social:write posted into any board on the node,
@@ -113,6 +114,8 @@ mcp.registerTool(
             auth: session.auth,
         }, {
             boardId: board_id, title, body, category,
+            // The post's own lifetime, as POST /v1/boards/:boardId/posts takes it (unit 3b).
+            ...(ttl_hours !== undefined ? { ttlHours: ttl_hours } : {}),
             declaredProvenanceId: ai_provenance_id,
             declaredProvenance: toDeclaredProvenance(ai_provenance),
             pipeline: 'mcp.board_post',

@@ -6,6 +6,7 @@
  *   aimeat_storage_download and aimeat_storage_delete, thin proxies over /v1/storage and /v1/pub.
  *   Moved from tool-call-defs-core.ts, which had reached the 800-line limit.
  * @version-history
+ *   2026-11-13 — aimeat_storage_upload forwards federate (unit 3b).
  *   v1.5.0 — 2026-10-31 — aimeat_storage_upload forwards `direct` (an upload_url in the file store itself).
  *   v1.4.0 — 2026-10-30 — aimeat_storage_upload forwards `store`, the store the writer names for the
  *     bytes (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -46,6 +47,8 @@ export const storageCliTools: ConnectCliToolDefinition[] = [
             const provenanceId = optionalString(input, 'ai_provenance_id'); if (provenanceId) body.ai_provenance_id = provenanceId;
             const store = optionalString(input, 'store'); if (store) body.store = store;
             if (!data && optionalBoolean(input, 'direct') === true) body.direct = true;
+            // The route keeps it on an inline upload, as the node's tool does.
+            const federate = optionalBoolean(input, 'federate'); if (federate !== undefined) body.federate = federate;
             return client.post('/v1/storage', body);
         },
     },

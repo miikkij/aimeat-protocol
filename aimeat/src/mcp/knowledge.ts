@@ -11,6 +11,7 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_knowledge_links filters by relation, as GET /v1/knowledge/:id/links does (unit 3b).
  *   2026-10-22 — SECURITY: aimeat_knowledge_links lists the outgoing rows of the namespace that holds
  *     the package it read, so another account's record at the same key no longer brings that
  *     account's rows into the answer (secaudit 2026-10, v78).
@@ -334,7 +335,7 @@ export function registerKnowledgeTools(
             inputSchema: zodShapeFor('aimeat_knowledge_links'),
             annotations: annotationsFor('aimeat_knowledge_links'),
         },
-        async ({ package_id, direction }) => {
+        async ({ package_id, direction, relation }) => {
             // The package read first, as GET /v1/knowledge/:id/links asks it: links of a package the
             // agent may not read answer the same as a package that does not exist.
             const read = await readPackage(package_id);
@@ -347,6 +348,8 @@ export function registerKnowledgeTools(
             // (secaudit 2026-10, v78).
             const links = await storage.listLinks(manifestKey, {
                 direction: direction ?? 'both',
+                // The same read filter the route passes (unit 3b).
+                ...(relation ? { relation } : {}),
                 sourceOwner: read.found.manifest.ownerGaii,
             });
             return {
