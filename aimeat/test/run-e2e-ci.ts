@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-13 -- e2e-tool-route-parity.ts joins the list (not the guard tier): seven places where an MCP tool and its REST route answered one caller differently (structure programme 2026-11, unit 7).
  *   2026-11-13 -- e2e-agent-field-adds.ts joins the list (not the guard tier): an MCP tool takes the fields its REST route takes, and refuses through the tool what the route refuses.
  *   2026-11-13 -- e2e-capability-update-fields.ts joins the list (not the guard tier): PUT /v1/capabilities/{id} takes the fields a capability's writer may set and no other key, on both backends, and the webhook policy reads the normalised source.
  *   2026-11-12 -- e2e-owner-ai-removal.ts joins the list (not the guard tier): the person's own AI removes an agent it registered, another agent's task and a skill.
@@ -1722,6 +1723,9 @@ const ALL_SUITES = [
     // An MCP tool takes the fields its REST route takes, and refuses through the tool what the route
     // refuses (structure programme 2026-11, unit 3b).
     'test/e2e-agent-field-adds.ts',
+    // An MCP tool and its REST route give one caller one answer: approvals, discovery, the roster, the
+    // organism list, the file list; two differences recorded for the developer's decision.
+    'test/e2e-tool-route-parity.ts',
     // A draft is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
     'test/e2e-capability-reach.ts',
     // Round 8, group memory-b: the side routes answer what the main route answers (secaudit2026oct26).
