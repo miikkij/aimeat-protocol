@@ -7,6 +7,9 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — GET /v1/organisms/:id/members takes the agents it names from rosterAgentsFor
+ *     (services/organism-privacy.ts), the rule aimeat_organism_members asks too; its answer is
+ *     unchanged (structure programme 2026-11, unit 7).
  *   2026-11-12 — GET /v1/organisms/:id/join-requests and POST …/join-requests/:requestId/review call
  *     readJoinRequests and decideJoinRequest (services/organism-join-requests/requests.ts), which
  *     the MCP tools call too: the open list leaves out a request whose person is a member by now, a person who became a member
@@ -56,14 +59,14 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
 import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
+import { canSeeMembers, rosterAgentsFor, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism-ownership.js';
 import { removeOrganismMember, MemberRemoveError } from '../../services/organism-member-remove.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
   acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
 } from '../../services/invitations.js';
-import { agentAccessOf, agentBarred } from '../../services/organism-agent-access.js';
+import { agentAccessOf } from '../../services/organism-agent-access.js';
 import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../../services/organism-agents/attach.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
@@ -119,18 +122,14 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     // "who can touch this organism" must be enumerable — an unlisted actor with access is an
     // audit gap. Each member row carries its owner's agents for ACTIVE members (or an operator)
     // only; outsiders/public callers get the legacy shape (agent rosters are not public data).
-    const callerOwner = req.auth?.owner;
-    const callerMembership = callerOwner ? await storage.getMembership(id, callerOwner) : null;
-    // rosterCaller.isOperator is isOperatorCaller's answer (the operator, or the operator's agent
-    // holding operator:admin), the same question the MCP tools ask.
-    const canSeeAgents = (callerMembership?.status === 'active') || !!rosterCaller.isOperator;
-    if (canSeeAgents) {
-      // ONE `owner IN (…)` query for every member's agents, not one getAgentsByOwner per member.
-      const ownerNames = members.map(m => localAccountName(m.ghii));
-      const agentsByOwner = await storage.getAgentsByOwners([...new Set(ownerNames)]);
-      // Where the organism admits only listed agents, the others have no access, so they are not
-      // listed: the roster names who can act here, and a customer invited in reads it.
-      const admitted = ownerNames.map(o => (agentsByOwner[o] || []).filter(a => !agentBarred(organism, a.gaii)));
+    // Who is shown them and which ones (the organism's admitted agents) is rosterAgentsFor
+    // (services/organism-privacy.ts), which aimeat_organism_members asks too. rosterCaller.isOperator
+    // is isOperatorCaller's answer (the operator, or the operator's agent holding operator:admin).
+    // ONE `owner IN (…)` query for every member's agents, not one getAgentsByOwner per member.
+    const ownerNames = members.map(m => localAccountName(m.ghii));
+    const agentsByOwner = await rosterAgentsFor(storage, organism, rosterCaller, canSeeRoster, ownerNames);
+    if (agentsByOwner) {
+      const admitted = ownerNames.map(o => agentsByOwner.get(o) ?? []);
       const avatars = await readAvatarsOrEmpty(storage, admitted.flat().map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/organisms/:id/members');
       const enriched = members.map((m, i) => ({
         ...m,

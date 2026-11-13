@@ -22,10 +22,12 @@
  *   shared gates reached from elsewhere: canReadWorkspace (services/workspace-access.ts), the
  *   `organism.*` key gate (services/organism-namespace-access.ts) and consent to an organism
  *   (services/consent.ts).
- * @structure agentAccessOf(), agentBarred(), attachedAsParticipant(), participantRefusalMessage(),
+ * @structure agentAccessOf(), agentBarred(), organismsAdmitting(), attachedAsParticipant(), participantRefusalMessage(),
  *   agentBarredMessage(), barredAgentFor()
  * @usage if (agentBarred(organism, req.auth?.sub)) → refuse as for a non-member
  * @version-history
+ *   v1.2.0 — 2026-11-13 — organismsAdmitting(): the one filter the agent's organism lists ask
+ *     (structure programme 2026-11, unit 7).
  *   v1.1.0 — 2026-11-10 — attachedAsParticipant takes the owner's membership: an agent whose owner is
  *     an active member acts with the owner's rights in both modes, so attaching it never narrows it.
  *     participantRefusalMessage says what the narrow rule allows and how to get past it.
@@ -54,6 +56,18 @@ export function agentBarred(
   if (!organism || agentAccessOf(organism) !== 'listed' || typeof principal !== 'string' || !principal) return false;
   if (isGEAI(principal) || !principal.includes('#')) return false;
   return !(organism.agentGaiis ?? []).includes(principal);
+}
+
+/**
+ * The organisms of a member list that admit `principal`: an organism that does not admit an agent is
+ * not one it works in, and its name is its own. aimeat_organism_list, GET /v1/organisms?member= and
+ * GET /v1/organisms/waiting list an agent its owner's organisms through this; until 2026-11-13 the
+ * second listed an agent the organisms that bar it (structure programme 2026-11, unit 7).
+ */
+export function organismsAdmitting<T extends Pick<OrganismRecord, 'agentAccess' | 'agentGaiis'>>(
+  organisms: T[], principal: string | null | undefined,
+): T[] {
+  return organisms.filter(o => !agentBarred(o, principal));
 }
 
 /**

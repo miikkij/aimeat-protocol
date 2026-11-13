@@ -12,18 +12,21 @@
  *   (the "who can touch this organism must be enumerable" audit principle, kept for the people
  *   who govern it). This is ROSTER privacy only: content attribution (comments, versions,
  *   activity) is deliberately out of scope — writers are visible; read-only members are not.
- * @structure memberVisibilityOf, canSeeMembers, redactOrganism
+ * @structure memberVisibilityOf, canSeeMembers, rosterAgentsFor, redactOrganism
  * @usage
  *   const canSee = await canSeeMembers(storage, organism, await rosterCallerFromAuth(storage, req.auth));
  *   res.json({ organism: redactOrganism(organism, canSee), members_hidden: !canSee });
  * @version-history
+ *   v1.2.0 — 2026-11-13 — rosterAgentsFor: the agents a roster names, for the members route and
+ *     aimeat_organism_members alike; a hidden roster names none (structure programme 2026-11, unit 7).
  *   v1.1.1 — 2026-10-21 — rosterCallerFromAuth asks isAnonymousPrincipal, so the minted anonymous token
  *     reads rosters as the anonymous internet (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). rosterCallerFromAuth is async and takes the storage.
  *   v1.0.0 — 2026-07-03 — Initial (privacy fix: rosters were world-readable via detail/list/members).
  */
-import type { Storage, OrganismRecord } from '../storage/interface.js';
+import type { Storage, OrganismRecord, AgentRecord } from '../storage/interface.js';
 import { isOrganismOwner } from './organism-ownership.js';
+import { agentBarred } from './organism-agent-access.js';
 import { isOperatorCaller, type OperatorAuth } from './operator-override.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
@@ -74,6 +77,30 @@ export async function canSeeMembers(storage: Storage, organism: OrganismRecord, 
     }
     case 'admins': return false;   // creator/admins/operator already returned above
   }
+}
+
+/**
+ * The agents a member roster names for each member account, or null when this caller is shown none.
+ * GET /v1/organisms/:id/members and aimeat_organism_members both ask here.
+ *
+ * WHO IS SHOWN THEM. A caller who sees the roster (`canSeeRoster`, canSeeMembers' answer) and is an
+ * active member, or the operator. A hidden roster hides the agents too, the accountability rows'
+ * included: until 2026-11-13 the MCP tool named the creator's and the admins' agents to a member the
+ * roster is hidden from, which the route never did (structure programme 2026-11, unit 7).
+ * WHICH AGENTS. Only those the organism admits (agentAccess): the others cannot act there.
+ */
+export async function rosterAgentsFor(
+  storage: Storage, organism: OrganismRecord, caller: RosterCaller, canSeeRoster: boolean, ownerNames: string[],
+): Promise<Map<string, AgentRecord[]> | null> {
+  if (!canSeeRoster) return null;
+  if (!caller.isOperator) {
+    const owner = caller.isAnonymous ? undefined : caller.ownerName;
+    const membership = owner ? await storage.getMembership(organism.id, owner) : null;
+    if (membership?.status !== 'active') return null;
+  }
+  const names = [...new Set(ownerNames)];
+  const batched = await storage.getAgentsByOwners(names);
+  return new Map(names.map(n => [n, (batched[n] ?? []).filter(a => !agentBarred(organism, a.gaii))]));
 }
 
 /** The organism record with the roster fields redacted when the caller may not see them.

@@ -11,6 +11,9 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — SECURITY: aimeat_organism_members names no agent when the roster is hidden from the
+ *     caller, by the members route's rule (rosterAgentsFor); aimeat_organism_list filters with
+ *     organismsAdmitting, which GET /v1/organisms?member= now asks too (structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_organism_list filters by visibility over what it already lists (unit 3b).
  *   2026-11-13 — aimeat_organism_update hands location, max_members and member_visibility to
  *     updateOrganismRecord, as PUT /v1/organisms/:id does (unit 3b).
@@ -107,12 +110,12 @@ import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { provenanceForWrite } from '../services/ai/provenance.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../services/organism-lifecycle.js';
-import { canSeeMembers, type RosterCaller } from '../services/organism-privacy.js';
+import { canSeeMembers, rosterAgentsFor, type RosterCaller } from '../services/organism-privacy.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { isOrganismOwner, organismOwners } from '../services/organism-ownership.js';
-import { agentBarred } from '../services/organism-agent-access.js';
+import { organismsAdmitting } from '../services/organism-agent-access.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -238,8 +241,7 @@ export function registerOrganismsTools(
             const publicOrgs = await storage.listOrganisms({ visibility: 'public', archived: 'exclude' });
             // Get organisms the owner is a member of (may include private ones); archived excluded too
             // An organism that does not admit this agent is not one it works in (agentAccess).
-            const memberOrgs = (await storage.listOrganisms({ member: ownerName, archived: 'exclude' }))
-                .filter(o => !agentBarred(o, agentGaii));
+            const memberOrgs = organismsAdmitting(await storage.listOrganisms({ member: ownerName, archived: 'exclude' }), agentGaii);
             // Merge, deduplicate by id
             const seen = new Set<string>();
             const all = [...publicOrgs, ...memberOrgs].filter(o => {
@@ -407,23 +409,14 @@ export function registerOrganismsTools(
             const members = canSeeRoster ? allMembers
                 : allMembers.filter(m => m.role === 'creator' || m.role === 'admin' || m.ghii === getOwnerName());
 
-            // Same-owner agents inherit a member's access implicitly — list them per member so
-            // "who can touch this organism" is enumerable (matches the REST members route). Only
-            // an ACTIVE member's agent sees the agent rosters; public visibility alone does not. The
-            // operator (isOperatorCaller) sees them too, as on the REST members route.
-            const callerMembership = await storage.getMembership(organism_id, getOwnerName());
-            const canSeeAgents = callerMembership?.status === 'active' || !!caller.isOperator;
+            // Same-owner agents inherit a member's access implicitly, so "who can touch this
+            // organism" is enumerable: the agents per member, to whom and which ones, are the REST
+            // members route's rule (services/organism-privacy.ts rosterAgentsFor). A hidden roster
+            // names none (structure programme 2026-11, unit 7).
+            const admitted = await rosterAgentsFor(storage, organism, caller, canSeeRoster, members.map(m => localAccountName(m.ghii)));
+            const canSeeAgents = admitted !== null;
             const agentsByOwner = new Map<string, { gaii: string; name: string }[]>();
-            if (canSeeAgents) {
-                const ownerNames = [...new Set(members.map(m => localAccountName(m.ghii)))];
-                const batched = await storage.getAgentsByOwners(ownerNames);
-                for (const name of ownerNames) {
-                    // Only the agents the organism admits (agentAccess): the others cannot act here.
-                    agentsByOwner.set(name, (batched[name] ?? [])
-                        .filter(a => !agentBarred(organism, a.gaii))
-                        .map(a => ({ gaii: a.gaii, name: a.name })));
-                }
-            }
+            for (const [name, agents] of admitted ?? []) agentsByOwner.set(name, agents.map(a => ({ gaii: a.gaii, name: a.name })));
 
             return {
                 content: [{

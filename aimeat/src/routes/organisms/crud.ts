@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-13 — SECURITY: GET /v1/organisms?member= leaves out, for an agent, an organism that does not
+ *     admit it, as aimeat_organism_list and GET /v1/organisms/waiting do (organismsAdmitting,
+ *     services/organism-agent-access.ts; structure programme 2026-11, unit 7).
  *   2026-11-13 — DELETE calls deleteOrganismRecords (services/organism-lifecycle.ts), which holds the
  *     delete sequence that stood here.
  *   2026-11-11 — DELETE detaches the organism's own remote MCP servers (with their personal sign-ins)
@@ -93,7 +96,7 @@ import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
 import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
-import { agentBarred } from '../../services/organism-agent-access.js';
+import { agentBarred, organismsAdmitting } from '../../services/organism-agent-access.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -191,12 +194,19 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       archived: (params.member && selfOrOperator) ? 'include' : 'exclude',
     });
 
+    // A member list leaves out, for an agent, an organism that does not admit it, as
+    // aimeat_organism_list does: its name is its own (services/organism-agent-access.ts). Not an agent:
+    // the list is as before. Browsing (no member filter) is the directory and is not narrowed here.
+    const listed = params.member && auth && !isAnonymousPrincipal(auth)
+      ? organismsAdmitting(organisms, resolveIdentity(auth, config.nodeId))
+      : organisms;
+
     // ?include=counts — attach workspace_count per org via ONE batched registry read.
     const include = String(params.include ?? '').split(',').map(s => s.trim());
-    let payload: unknown[] = organisms;
+    let payload: unknown[] = listed;
     if (include.includes('counts')) {
-      const counts = await workspaceCountsByOrg(organisms.map(o => o.id));
-      payload = organisms.map(o => ({ ...o, workspace_count: counts.get(o.id) ?? 0 }));
+      const counts = await workspaceCountsByOrg(listed.map(o => o.id));
+      payload = listed.map(o => ({ ...o, workspace_count: counts.get(o.id) ?? 0 }));
     }
 
     // Roster privacy: per-organism memberVisibility decides whether THIS caller gets the members[]/
@@ -257,7 +267,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // An organism that admits only listed agents is left out for an agent it does not admit, as the
     // MCP organism list leaves it out (secaudit2026oct22): its name and its waiting items are its own.
     const principal = resolveIdentity(req.auth!, config.nodeId);
-    const orgs = (await storage.listOrganisms({ member: owner })).filter(o => !agentBarred(o, principal));
+    const orgs = organismsAdmitting(await storage.listOrganisms({ member: owner }), principal);
     const reviews: Array<{ kind: 'review'; n: number; orgId: string; orgName: string; wsId: string; wsName: string }> = [];
     const joinRequests: Array<{ kind: 'join'; n: number; orgId: string; orgName: string }> = [];
 

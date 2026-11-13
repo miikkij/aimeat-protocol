@@ -31,7 +31,8 @@
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
  *   v1.5.1 — 2026-11-13 — Structure programme unit 7: core.ts 9 → 8 (aimeat_discover builds its caller
- *     with services/discovery/caller.ts).
+ *     with services/discovery/caller.ts), organisms.ts 21 → 19 (aimeat_organism_members asks
+ *     rosterAgentsFor in services/organism-privacy.ts).
  *   v1.5.0 — 2026-11-13 — Structure programme unit 2: the reads move onto the service functions their
  *     REST routes call, one tool file per commit, and each file's ceiling falls with its conversion.
  *   v1.4.3 — 2026-10-25 — exchange-run.ts 3 → 2, exchange.ts 3 → 1, extensions.ts 9 → 3 (2 on 2026-10-26): their
@@ -142,7 +143,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/operator-config.ts': 1,
     'src/mcp/organisms-email-invites.ts': 2,
     'src/mcp/organisms-name-invites.ts': 7,
-    'src/mcp/organisms.ts': 21,
+    'src/mcp/organisms.ts': 19,
     'src/mcp/prompts.ts': 1,
     'src/mcp/sharing-groups.ts': 4,
     'src/mcp/skills.ts': 1,
