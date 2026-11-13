@@ -30,6 +30,10 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.6.0 — 2026-11-13 — Structure programme unit 2b: a read moves with the gate both surfaces put
+ *     around it into one service function the tool and the route call, one MCP file per commit.
+ *     agent-telemetry.ts 1 → none (services/agent/telemetry-append.ts); prompts.ts 1 → none
+ *     (services/prompts/handbook-fill.ts).
  *   v1.5.3 — 2026-11-13 — Structure programme unit 7: workspaces.ts 6 → 5 (the meta.* role asks
  *     services/workspace-share.ts memberRoleOf, as the REST routes do).
  *   v1.5.2 — 2026-11-13 — Structure programme unit 7: sharing-groups.ts 4 → none (aimeat_group_list
@@ -123,13 +127,10 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * it reaches zero, and never add one: a tool written after the rule calls a service.
  */
 const CEILINGS: Record<string, number> = {
-    'src/mcp/agent-capabilities.ts': 2,
-    'src/mcp/agent-messages.ts': 2,
-    'src/mcp/agent-onboarding.ts': 3,
+    'src/mcp/agent-messages.ts': 1,
     'src/mcp/agent-schedules.ts': 1,
-    'src/mcp/agent-tasks.ts': 10,
-    'src/mcp/agent-telemetry.ts': 1,
-    'src/mcp/apps.ts': 7,
+    'src/mcp/agent-tasks.ts': 2,
+    'src/mcp/apps.ts': 6,
     'src/mcp/apps-fork.ts': 2,
     'src/mcp/boards.ts': 6,
     'src/mcp/capabilities.ts': 3,
@@ -137,9 +138,9 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/commerce.ts': 4,
     'src/mcp/consent.ts': 1,
     'src/mcp/core-boards.ts': 2,
-    'src/mcp/core-admin.ts': 9,
-    'src/mcp/core-resources.ts': 4,
-    'src/mcp/core.ts': 8,
+    'src/mcp/core-admin.ts': 3,
+    'src/mcp/core-resources.ts': 3,
+    'src/mcp/core.ts': 7,
     'src/mcp/exchange-run.ts': 1,
     'src/mcp/extensions.ts': 2,
     'src/mcp/knowledge.ts': 1,
@@ -148,7 +149,6 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/organisms-email-invites.ts': 2,
     'src/mcp/organisms-name-invites.ts': 7,
     'src/mcp/organisms.ts': 19,
-    'src/mcp/prompts.ts': 1,
     'src/mcp/skills.ts': 1,
     'src/mcp/wallet-extended.ts': 2,
     'src/mcp/workspaces.ts': 5,

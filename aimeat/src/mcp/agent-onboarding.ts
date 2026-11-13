@@ -11,8 +11,11 @@
  *   - confirmStepAsText() -- calls the shared step write and renders it as tool text
  * @usage
  *   import { registerAgentOnboardingTools } from './agent-onboarding.js';
- *   registerAgentOnboardingTools(mcp, storage, config, getAgentGaii, emitResourceUpdated);
+ *   registerAgentOnboardingTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, caller);
  * @version-history
+ *   2026-11-13 — aimeat_onboarding_status reads through services/agent/onboarding-read.ts, the gate and
+ *     reads GET /v1/agents/:name/onboarding calls; the group takes the session's caller for it
+ *     (structure programme 2026-11, unit 2b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -36,7 +39,9 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/server';
-import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding-progress.js';
+import { confirmOnboardingStep } from '../services/onboarding-progress.js';
+import { readOnboardingFor } from '../services/agent/onboarding-read.js';
+import type { CallerContext } from '../services/caller-context.js';
 import type { AimeatConfig } from '../config.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding-guide.js';
@@ -66,9 +71,11 @@ function getAgentName(agentGaii: string): string {
     return parseGAII(agentGaii)?.agent ?? agentGaii;
 }
 
-async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promise<Record<string, unknown>> {
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
+async function buildOnboardingStatus(agentGaii: string, storage: Storage, config: AimeatConfig, caller: CallerContext): Promise<Record<string, unknown>> {
+    // The gate, the agent, the refreshed record and the test task are services/agent/onboarding-read.ts,
+    // which GET /v1/agents/:name/onboarding calls too. The session is the agent itself, so the gate passes.
+    const read = await readOnboardingFor({ storage, config }, caller.auth, agentGaii);
+    if (!read.ok) {
         // Clearer signal than bare "Agent not found": when the caller is the
         // agent itself but the record is missing, the local token outlived a
         // server-side delete. Surface a recovery code so connectors can self-
@@ -79,17 +86,14 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
         };
     }
 
-    let onboarding = await storage.getOnboarding(agentGaii);
-    if (!onboarding) return { onboarding: null, status: 'not_started' };
-
     // Reading the onboarding re-runs the auto-checked steps and may complete it — the same act on
-    // both doors, so services/onboarding-progress.ts decides it.
-    onboarding = (await refreshOnboarding(storage, agentGaii, onboarding)).onboarding;
-    if (!onboarding) return { onboarding: null, status: 'not_started' };
+    // both doors, so services/onboarding-progress.ts decides it (inside readOnboardingFor).
+    if (!read.onboarding) return { onboarding: null, status: 'not_started' };
+    const onboarding = read.onboarding;
 
     const pendingSteps = onboarding.steps.filter(step => step.status === 'pending');
     const testTaskStep = onboarding.steps.find(step => step.id === 'accept_test_task');
-    const testTaskId = (testTaskStep?.details as Record<string, unknown> | undefined)?.testTaskId as string | undefined;
+    const testTaskId = read.testTaskId;
     const hints: Record<string, unknown> = {};
 
     let testTaskFound = false;
@@ -98,7 +102,7 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
         // connectors fill the {test_task_id} placeholder from it, so gating it on a specific
         // task status starved them into calling propose_todos with an empty task id.
         hints.test_task_id = testTaskId;
-        const task = await storage.getAgentTask(testTaskId);
+        const task = read.testTask;
         testTaskFound = !!task;
         if (task?.status === 'active') {
             hints.test_task_active = true;
@@ -172,15 +176,17 @@ async function confirmStepAsText(
 export function registerAgentOnboardingTools(
     mcp: McpServer,
     storage: Storage,
-    _config: AimeatConfig,
+    config: AimeatConfig,
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's caller (services/caller-context.ts): the agent itself, for the onboarding read's gate. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
     mcp.registerTool('aimeat_onboarding_status', { description: descriptionFor('aimeat_onboarding_status'), inputSchema: zodShapeFor('aimeat_onboarding_status'), annotations: annotationsFor('aimeat_onboarding_status') }, async () => {
-        const status = await buildOnboardingStatus(agentGaii, storage);
+        const status = await buildOnboardingStatus(agentGaii, storage, config, caller());
         if (status.error) return asError(String(status.error));
         emitResourceUpdated(agentGaii, `aimeat://agents/${getAgentName(agentGaii)}/onboarding`);
         return asText(status);

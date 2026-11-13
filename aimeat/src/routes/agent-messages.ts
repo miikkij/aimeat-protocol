@@ -10,6 +10,8 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   2026-11-13 — GET /v1/agents/:name/messages reads through services/agent/message-history.ts, the gate and
+ *     read aimeat_message_history calls (structure programme 2026-11, unit 2b).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.8.0 -- 2026-10-11 -- A stopped agent's own GET .../messages/inbox answers no message and `agent_stopped`.
  *   v1.7.0 -- 2026-10-08 -- POST /v1/agents/:name/messages takes ai_provenance and ai_provenance_id,
@@ -49,6 +51,7 @@ import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
+import { messageHistoryFor } from '../services/agent/message-history.js';
 import { resolveIdentity, agentGaiiFromIdentifier, isSameOwner, isOwnerInPerson, mayActOnAgent } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../services/resource-events.js';
@@ -221,19 +224,19 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
   /* ── GET /v1/agents/:name/messages -- List message history ── */
   router.get('/v1/agents/:name/messages', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-
-    if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
-      return;
-    }
-
     const agentGaii = resolveAgentGaii(req, agentName);
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
     const direction = req.query.direction as 'inbound' | 'outbound' | undefined;
     const threadId = req.query.thread_id as string | undefined;
 
-    const result = await storage.listMessages(agentGaii, { direction, threadId, page, perPage });
+    // Who may read (canAccessAgent's rule) and the read are services/agent/message-history.ts, which
+    // aimeat_message_history calls too.
+    const result = await messageHistoryFor({ storage, config }, req.auth, agentGaii, { direction, threadId, page, perPage });
+    if (!result.ok) {
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
+      return;
+    }
 
     res.json(success(config.nodeId, {
       messages: await withProvenance(result.messages),

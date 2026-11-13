@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.1 — 2026-11-13 — POST /v1/agents/:name/tasks reads the agent and decides who may give it work
+ *     in services/agent/task-access.ts taskCreateTarget, which aimeat_task_create calls too; every
+ *     refusal keeps its status and body (structure programme 2026-11, unit 2b).
  *   v1.9.0 — 2026-11-12 — GET /v1/agents/:name/tasks admits another of the owner's agents holding
  *     task:read and agent:write (mayManageSiblingTasks), which is what aimeat_task_list's
  *     target_agent_name reads (wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
@@ -42,7 +45,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
-import { isOwnerInPerson, mayActOnAgent, ownerGhiiOf } from '../../utils/gaii.js';
+import { isOwnerInPerson, mayActOnAgent, ownerGhiiOf, resolveIdentity } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
 import { createTask } from '../../services/agent/task-write.js';
@@ -54,6 +57,7 @@ import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
 import { respondDeduplicated } from './dedupe.js';
 import { agentIsStopped } from '../../services/agent/stop.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { taskCreateTarget } from '../../services/agent/task-access.js';
 
 export function registerTaskCreateReadRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -85,49 +89,41 @@ export function registerTaskCreateReadRoutes(
     // local token outlived its server record gets a clear AGENT_NOT_REGISTERED
     // hint instead of generic NOT_FOUND -- without that hint the connector
     // looks healthy (token validates) while every action 404s.
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
-      const notFound = agentNotFoundResponse(req, agentName, agentGaii, { nodeId: config.nodeId, baseUrl: config.baseUrl });
-      res.status(notFound.status).json(error(config.nodeId, notFound.code, notFound.message));
-      return;
-    }
-
-    // Authorize: owner JWT, same-owner agent JWT, OR a same-owner app grant holding task:write.
-    const callerRoles = req.auth!.roles as string[];
-    const isOwner = isOwnerInPerson(req.auth);
-    const isAgent = callerRoles.includes('agent');
-    const isApp = callerRoles.includes('app');
-    if (!isOwner && !isAgent && !isApp) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owners, agents, or granted apps may create tasks'));
-      return;
-    }
-    // An owner in person may queue work only on their own agent. The path takes a whole GAII as well
-    // as a bare name, and a whole GAII names whichever account it names: owner B queued a task on
-    // A's agent, filed under A, by sending A's agent's identity (QA audit 2026-10-16, S2-03; the
-    // class closed elsewhere on 2026-10-14 as K1, S2-01).
-    if (isOwner && !mayActOnAgent(req.auth, agentGaii, config.nodeId)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'give work to', listUrl: '/v1/agents' }));
-      return;
-    }
-    if (isAgent && agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(
-        config.nodeId, 'FORBIDDEN',
-        `Agent '${req.auth!.sub}' cannot create tasks for '${agentName}' -- different owner`,
-      ));
-      return;
-    }
-    // H-2 app grant: needs task:write AND may only target its own owner's agents (never cross-owner).
-    if (isApp) {
-      if (!tokenHasScope(req, 'task:write')) {
-        res.status(403).json(refuseNeedsPermission(config, { want: 'set up work for your agents', scope: 'task:write' }));
-        return;
-      }
-      if (agent.owner !== req.auth!.owner) {
-        res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-          `App can only create tasks for its own owner's agents (agent '${agentName}' belongs to a different owner)`));
-        return;
+    // The agent read and who may give it work (owner JWT on their own agent, same-owner agent JWT, OR a
+    // same-owner app grant holding task:write) are services/agent/task-access.ts taskCreateTarget,
+    // which aimeat_task_create calls too. An owner in person may queue work only on their own agent:
+    // the path takes a whole GAII as well as a bare name, and a whole GAII names whichever account it
+    // names (QA audit 2026-10-16, S2-03; the class closed elsewhere on 2026-10-14 as K1, S2-01).
+    const target = await taskCreateTarget({ storage, config }, req.auth!, agentGaii);
+    if (!target.ok) {
+      switch (target.code) {
+        case 'NOT_FOUND': {
+          const notFound = agentNotFoundResponse(req, agentName, agentGaii, { nodeId: config.nodeId, baseUrl: config.baseUrl });
+          res.status(notFound.status).json(error(config.nodeId, notFound.code, notFound.message));
+          return;
+        }
+        case 'NOT_A_GIVER':
+          res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owners, agents, or granted apps may create tasks'));
+          return;
+        case 'NOT_YOURS':
+          res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'give work to', listUrl: '/v1/agents' }));
+          return;
+        case 'AGENT_OTHER_OWNER':
+          res.status(403).json(error(
+            config.nodeId, 'FORBIDDEN',
+            `Agent '${resolveIdentity(req.auth!, config.nodeId)}' cannot create tasks for '${agentName}' -- different owner`,
+          ));
+          return;
+        case 'APP_NEEDS_SCOPE':
+          res.status(403).json(refuseNeedsPermission(config, { want: 'set up work for your agents', scope: 'task:write' }));
+          return;
+        case 'APP_OTHER_OWNER':
+          res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+            `App can only create tasks for its own owner's agents (agent '${agentName}' belongs to a different owner)`));
+          return;
       }
     }
+    const agent = target.agent;
 
     // The write itself is services/agent/task-write.ts, because it belongs to CREATING a task rather
     // than to this door: the body validation, the one-live-commission guard, the record (whose

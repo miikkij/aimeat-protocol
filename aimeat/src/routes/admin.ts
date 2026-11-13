@@ -12,6 +12,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-11-13 -- GET /v1/admin/dashboard reads the agents, actions, boards, work items and the 24-hour count
+ *     through services/node-admin/activity.ts, which aimeat_admin_stats reads too (structure programme 2026-11, unit 2b).
  *   2026-11-05 -- adminKeyReencryptRouter mounted: the data key's re-encrypt job (codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 -- The wrong-password count is kept in the node's storage (checkAdminPasswordOnNode), so
@@ -74,6 +76,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { TransactionTypeSum } from '../storage/repositories/wallet.repository.js';
 import { morselsInCirculation } from '../services/morsel.js';
+import { nodeActivity } from '../services/node-admin/activity.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes } from 'node:crypto';
@@ -319,23 +322,15 @@ export function adminRouter(
     // GET /v1/admin/dashboard — node overview (operator only)
     router.get('/v1/admin/dashboard', requireAuth(), requireOperator(storage), async (_req, res) => {
         const owners = await storage.listOwners();
-        const agents = await storage.listAgents();
-        const actions = await storage.listActions();
-        const boards = await storage.listBoards();
+        const now = Date.now();
+        // The agents, actions, boards and work items, and the 24-hour count, are
+        // services/node-admin/activity.ts, which aimeat_admin_stats reads too.
+        const { agents, actions, boards, allWork, activeAgents24h: activeAgents } = await nodeActivity(storage, now);
         const chatInstances = await storage.listChatInstances({});
-        const allWork = await storage.listAllWork();
         const allDisputes = await storage.listAllDisputes();
 
-        let activeAgents = 0;
-        const now = Date.now();
         const dayStart = new Date();
         dayStart.setUTCHours(0, 0, 0, 0);
-
-        for (const a of agents) {
-            if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) {
-                activeAgents++;
-            }
-        }
         // A balance lives on the person, never on an agent row (which is always 0), so the supply is
         // the account holders' balances, as aimeat_admin_stats counts it (feature-list audit #169).
         const totalMorsels = await morselsInCirculation(storage);

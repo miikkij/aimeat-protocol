@@ -13,6 +13,8 @@
  * @structure registerAgentHandbook(router, config, storage)
  * @usage registerAgentHandbook(router, config, storage);   // AFTER /v1/agents/me/handbook/:module
  * @version-history
+ *   2026-11-13 — The agent read and the shared {{variables}} come from services/prompts/handbook-fill.ts,
+ *     which aimeat_handbook_get fills its tiers from; the answer is unchanged (unit 2b).
  *   2026-10-21 — The caller's identity asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.0 — 2026-10-11 — Moved out of prompts.ts (max-file-lines), with two changes: the task queue
  *     names no `wait` endpoint, because the long poll is removed, and a stopped agent's queue
@@ -29,27 +31,24 @@ import { substituteVariables, resolvePromptContent } from '../services/prompt-va
 import { parseGaiiLoose, resolveIdentity } from '../utils/gaii.js';
 import { isStopped } from '../services/agent/stop-rules.js';
 import { activeSystemPrompt } from '../services/prompts/prompt-read.js';
+import { handbookFill } from '../services/prompts/handbook-fill.js';
 
 export function registerAgentHandbook(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/agents/me/handbook -- Agent operating handbook
   router.get('/v1/agents/me/handbook', async (req, res) => {
     // The caller's resolved identity: an agent session's own GAII as it is, an owner session's GHII.
     const gaii = req.auth && !isAnonymousPrincipal(req.auth) ? resolveIdentity(req.auth, config.nodeId) : 'unknown';
-    const agent = gaii !== 'unknown' ? await storage.getAgent(gaii) : null;
+    // The caller's agent record and the values aimeat_handbook_get fills its tiers with
+    // (services/prompts/handbook-fill.ts); this route adds the owner's name and the balance.
+    const { agent, vars } = await handbookFill({ storage, config }, gaii);
     const record = await activeSystemPrompt(storage, 'tier-1');
     if (!record) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Handbook not available')); return; }
     const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
-    const parsedSelf = parseGaiiLoose(gaii);
-    const selfAgentName = parsedSelf.agent || 'unknown';
+    const selfAgentName = String(vars.agent_name);
     const system_prompt = substituteVariables(promptContent, {
-      node_url: config.baseUrl,
-      node_id: config.nodeId,
-      gaii,
-      agent_name: selfAgentName,
+      ...vars,
       owner_name: req.auth?.owner ?? 'unknown',
-      trust_score: agent?.trustScore ?? 50,
       morsel_balance: agent?.morselBalance ?? 0,
-      daily_allowance: config.dailyAllowance,
     });
     const directives = gaii !== 'unknown' ? await storage.getAgentDirectives(gaii) : null;
     const ownerGhii = req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : '';

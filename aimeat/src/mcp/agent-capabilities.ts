@@ -9,8 +9,11 @@
  *   - registerAgentCapabilityTools() -- registers capability + activity tools on an McpServer instance
  * @usage
  *   import { registerAgentCapabilityTools } from './agent-capabilities.js';
- *   registerAgentCapabilityTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerAgentCapabilityTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, caller);
  * @version-history
+ *   2026-11-13 — aimeat_agent_activity reads through services/agent/activity-read.ts, the gate and reads
+ *     GET /v1/agents/:name/activity calls; the group takes the session's caller for it (structure
+ *     programme 2026-11, unit 2b).
  *   2026-10-24 — aimeat_agent_capabilities_report refuses the shared anonymous principal with
  *     AUTH_REQUIRED, as PUT /v1/agents/:name/capabilities does (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -36,6 +39,8 @@ import { setAgentCapabilities } from '../services/agent/profile-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 import { toolError } from './tool-error.js';
+import type { CallerContext } from '../services/caller-context.js';
+import { agentActivityFor } from '../services/agent/activity-read.js';
 
 export function registerAgentCapabilityTools(
     mcp: McpServer,
@@ -44,6 +49,8 @@ export function registerAgentCapabilityTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's caller (services/caller-context.ts): the agent itself, for the activity read's gate. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -94,15 +101,17 @@ export function registerAgentCapabilityTools(
             annotations: annotationsFor('aimeat_agent_activity'),
         },
         async ({ days, granularity }) => {
-            const agent = await storage.getAgent(agentGaii);
-            if (!agent) {
-                return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
-            }
-
-            const history = await storage.getActivityHistory(agentGaii, {
+            // The gate, the agent and its history are services/agent/activity-read.ts, which
+            // GET /v1/agents/:name/activity calls too. The session is the agent itself, so the gate
+            // passes; `days` goes through as given, as it always did here.
+            const read = await agentActivityFor({ storage, config }, caller().auth, agentGaii, {
                 days: days ?? 30,
                 granularity: granularity ?? 'daily',
             });
+            if (!read.ok) {
+                return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
+            }
+            const { agent, history } = read;
 
             return {
                 content: [{

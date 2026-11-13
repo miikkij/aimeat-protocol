@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — POST /v1/agents/:name/scope-narrowing runs services/agent/narrow-own-agent.ts, the lookup
+ *     and narrowing aimeat_agent_scope_narrow runs (structure programme 2026-11, unit 2b).
  *   2026-11-12 — DELETE /v1/agents/:name runs services/agents/remove-agent.ts (extracted unchanged), which
  *     the aimeat_agent_remove MCP tool runs too.
  *   2026-11-08 — DELETE /v1/agents/:name answers `receivers_kept` (the receivers the agent made, which
@@ -92,7 +94,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
-import { narrowAgent } from '../../services/scope-narrowing.js';
+import { narrowOwnAgent } from '../../services/agent/narrow-own-agent.js';
 import { putPortRedirect } from '../../services/agent/port-redirect.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
@@ -412,9 +414,9 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
    * do anything; a word the agent needs later is offered back on its card when it is refused once.
    */
   router.post('/v1/agents/:name/scope-narrowing', requireAuth(), requireScope('agent:permissions'), async (req, res) => {
-    const owner = req.auth!.owner as string;
-    const agent = (await storage.getAgentsByOwner(owner)).find(a => a.name === (req.params.name as string)) ?? null;
-    const out = await narrowAgent(storage, `${owner}@${config.nodeId}`, agent);
+    // The lookup among the account's own agents and the narrowing are services/agent/narrow-own-agent.ts,
+    // which aimeat_agent_scope_narrow calls too.
+    const out = await narrowOwnAgent(storage, config.nodeId, req.auth!.owner as string, req.params.name as string);
     if (!out.ok) {
       res.status(out.code === 'NOT_FOUND' ? 404 : 409).json(error(config.nodeId, out.code, out.message));
       return;

@@ -9,6 +9,10 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — aimeat_task_create, _propose_todos, _event, _todo, _complete, _fail and _decline read
+ *     their agent or task through services/agent/task-access.ts (taskCreateTarget, taskToActOn), the
+ *     read and the gate their REST routes call; aimeat_agent_scope_narrow runs
+ *     services/agent/narrow-own-agent.ts as its route does (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_task_todo hands completed_at to setTodoStatus, as the PATCH route does (unit 3b).
  *   2026-11-13 — aimeat_task_create takes rules, verification, todos, resources and parent_task_id,
  *     the fields POST /v1/agents/:name/tasks takes on the same word (structure programme 2026-11, unit 3b).
@@ -104,17 +108,18 @@ import { removeTask } from '../services/agents/remove-task.js';
 import { removeAgent } from '../services/agents/remove-agent.js';
 import { closeMcpSessionsForGaii } from './session-registry.js';
 import { setAgentTaskStart, taskStartView } from '../services/agent/task-start-write.js';
-import { narrowAgent } from '../services/scope-narrowing.js';
+import { narrowOwnAgent } from '../services/agent/narrow-own-agent.js';
 import { setAgentStopped } from '../services/agent/stop.js';
 import { stoppedView } from '../services/agent/stop-rules.js';
 import { toolError } from './tool-error.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { parseGAII, buildGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
+import { parseGAII, buildGAII, localAccountName } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';
 import { setWorkplace, clearWorkplace, workplaceView } from '../services/agent/workplace.js';
-import type { CallerContext } from '../services/caller-context.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import { taskToActOn, taskCreateTarget } from '../services/agent/task-access.js';
 import { completeTask, failTask, declineTask } from '../services/agent/task-fanout.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
@@ -138,6 +143,23 @@ export function registerAgentTaskTools(
     /** Check if a task belongs to the current agent. */
     function isOwnTask(task: AgentTaskRecord): boolean {
         return task.agentGaii === agentGaii;
+    }
+
+    /** The session's token facts: the agent itself (services/caller-context.ts). */
+    function sessionAuth(): CallerContext['auth'] {
+        return (caller ? caller() : agentSessionCaller(agentGaii, localAccountName(agentGaii), sessionScopes, config.nodeId, storage)).auth;
+    }
+
+    /**
+     * The task this session may act on: services/agent/task-access.ts taskToActOn, the read and the
+     * gate the REST task routes call. The session is the agent itself, so the gate is "the task is mine".
+     */
+    async function taskToWorkOn(taskId: string): Promise<{ ok: true; task: AgentTaskRecord } | { ok: false; text: string; code: 'NOT_FOUND' | 'FORBIDDEN' }> {
+        const found = await taskToActOn({ storage, config }, sessionAuth(), taskId);
+        if (found.ok) return found;
+        return found.code === 'NOT_FOUND'
+            ? { ok: false, code: 'NOT_FOUND', text: 'Task not found' }
+            : { ok: false, code: 'FORBIDDEN', text: 'Access denied -- task belongs to another agent' };
     }
 
     /**
@@ -174,7 +196,14 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
             const targetGaii = buildGAII(target_agent, localAccountName(agentGaii), config.nodeId);
-            const targetAgent = await storage.getAgent(targetGaii);
+            // The agent read and who may give it work are services/agent/task-access.ts, which
+            // POST /v1/agents/:name/tasks calls too. The target is named under this session's own
+            // owner, so only "not found" can refuse here; the other refusals answer as the route does.
+            const target = await taskCreateTarget({ storage, config }, sessionAuth(), targetGaii);
+            if (!target.ok && target.code !== 'NOT_FOUND') {
+                return { content: [{ type: 'text' as const, text: `Agent '${agentGaii}' cannot create tasks for '${target_agent}' -- different owner` }], isError: true };
+            }
+            const targetAgent = target.ok ? target.agent : null;
             if (!targetAgent) {
                 return {
                     content: [{ type: 'text' as const, text: `Target agent '${target_agent}' not found under owner '${localAccountName(agentGaii)}'. Use aimeat_agents_list to see available agents.` }],
@@ -379,12 +408,9 @@ export function registerAgentTaskTools(
             annotations: annotationsFor('aimeat_task_propose_todos'),
         },
         async ({ task_id, todos }) => {
-            const task = await storage.getAgentTask(task_id);
-            if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
-
-            if (!isOwnTask(task)) {
-                return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
-            }
+            const found = await taskToWorkOn(task_id);
+            if (!found.ok) return { content: [{ type: 'text' as const, text: found.text }], isError: true };
+            const task = found.task;
 
             // Accepting a plan is services/agent/task-write.ts: the live-plan guard that stops a
             // mid-run re-proposal from dropping every in-progress and completed todo, the preserved
@@ -569,9 +595,9 @@ export function registerAgentTaskTools(
             annotations: annotationsFor('aimeat_agent_scope_narrow'),
         },
         async ({ target_agent_name }) => {
-            const owner = localAccountName(agentGaii);
-            const agent = (await storage.getAgentsByOwner(owner)).find(a => a.name === target_agent_name) ?? null;
-            const out = await narrowAgent(storage, ownerGhiiOf(agentGaii), agent);
+            // The lookup among the account's own agents and the narrowing are
+            // services/agent/narrow-own-agent.ts, which POST /v1/agents/:name/scope-narrowing calls too.
+            const out = await narrowOwnAgent(storage, config.nodeId, localAccountName(agentGaii), target_agent_name);
             if (!out.ok) return { ...toolError(out.code, out.message) };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, scopes: out.agent.defaultScopes ?? [], used: out.status.used }, null, 2) }] };
         },
@@ -592,12 +618,9 @@ export function registerAgentTaskTools(
             const notReady = await readinessRefusal(storage, agentGaii, 'standard');
             if (notReady) return { content: [{ type: 'text' as const, text: `READINESS_INSUFFICIENT: ${notReady}` }], isError: true };
 
-            const task = await storage.getAgentTask(task_id);
-            if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
-
-            if (!isOwnTask(task)) {
-                return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
-            }
+            const found = await taskToWorkOn(task_id);
+            if (!found.ok) return { content: [{ type: 'text' as const, text: found.text }], isError: true };
+            const task = found.task;
 
             // The auto-resume for an agent that briefly crashed and came back, the state gate, the
             // event and the telemetry roll-up are services/agent/task-write.ts. The copy here
@@ -633,12 +656,9 @@ export function registerAgentTaskTools(
             annotations: annotationsFor('aimeat_task_todo'),
         },
         async ({ task_id, todo_id, status, completed_at }) => {
-            const task = await storage.getAgentTask(task_id);
-            if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
-
-            if (!isOwnTask(task)) {
-                return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
-            }
+            const found = await taskToWorkOn(task_id);
+            if (!found.ok) return { content: [{ type: 'text' as const, text: found.text }], isError: true };
+            const task = found.task;
 
             // Same as the event path, and the same service: ticking off a todo is the agent showing
             // up, so a stalled task resumes on it, the task's lastEventAt moves and the matching
@@ -680,12 +700,9 @@ export function registerAgentTaskTools(
             const notReady = await readinessRefusal(storage, agentGaii, 'standard');
             if (notReady) return { content: [{ type: 'text' as const, text: `READINESS_INSUFFICIENT: ${notReady}` }], isError: true };
 
-            const task = await storage.getAgentTask(task_id);
-            if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
-
-            if (!isOwnTask(task)) {
-                return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
-            }
+            const found = await taskToWorkOn(task_id);
+            if (!found.ok) return { content: [{ type: 'text' as const, text: found.text }], isError: true };
+            const task = found.task;
 
             // The whole completion is services/agent/task-fanout.ts, which POST /v1/agents/:name/
             // tasks/:id/complete calls as well: which states may complete, the record, the provenance
@@ -734,12 +751,9 @@ export function registerAgentTaskTools(
             annotations: annotationsFor('aimeat_task_fail'),
         },
         async ({ task_id, reason }) => {
-            const task = await storage.getAgentTask(task_id);
-            if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
-
-            if (!isOwnTask(task)) {
-                return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
-            }
+            const found = await taskToWorkOn(task_id);
+            if (!found.ok) return { content: [{ type: 'text' as const, text: found.text }], isError: true };
+            const task = found.task;
 
             // The whole failure — the allowed states, the record, the event and the fan-out — is
             // services/agent/task-fanout.ts. This copy had NARROWED it to an active task, so an
@@ -779,9 +793,9 @@ export function registerAgentTaskTools(
             annotations: annotationsFor('aimeat_task_decline'),
         },
         async ({ task_id, reason }) => {
-            const task = await storage.getAgentTask(task_id);
-            if (!task) return { ...toolError('NOT_FOUND', 'Task not found') };
-            if (!isOwnTask(task)) return { ...toolError('FORBIDDEN', 'Access denied -- task belongs to another agent') };
+            const found = await taskToWorkOn(task_id);
+            if (!found.ok) return { ...toolError(found.code, found.text) };
+            const task = found.task;
 
             const declined = await declineTask({ storage, config }, task, reason, agentGaii);
             if (!declined.ok) return { ...toolError(declined.code, declined.message) };

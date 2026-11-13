@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — GET /v1/agents asks services/agent/owner-roster.ts for the app refusal, the read and the
+ *     run-mode filter, which aimeat_agents_list asks too (structure programme 2026-11, unit 2b).
  *   2026-11-10 — GET /v1/agents reads every agent's onboarding record in one query (getOnboardingMany),
  *     not one per agent; the same records.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
@@ -85,7 +87,7 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { requireScopeUnlessSelf } from '../../auth/self-or-scope.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { ownerRoster } from '../../services/agent/owner-roster.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
@@ -207,20 +209,22 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // conditional refusal, on the same word, as GET /v1/agents/:name/tasks (agent-tasks/create-read.ts).
     // ?include=stats returns the active task ids and titles that the tasks route refuses the same
     // grant for want of task:read, so the data was one query string away from that refusal.
-    if (req.auth!.roles.includes('app') && !scopeIsCovered(req.auth!.scopes, 'task:read')) {
-      res.status(403).json(refuseNeedsPermission(config, { want: 'see what your agents are working on', scope: 'task:read' }));
-      return;
-    }
-    const all = await storage.getAgentsByOwner(req.auth!.owner);
-
+    //
     // ?run_mode=spawn — the roster read a runtime does on a timer. Without it a fleet runtime
     // fetches every agent the account has and filters client-side: measured 68 on one account, on
     // a 30-second loop. Filtered in memory rather than in SQL on purpose — the query is already
     // one indexed read per owner, and a second storage method would have to be written twice.
     // An unknown value returns nothing rather than everything: a filter that silently does not
     // filter is how a runtime ends up serving agents it was never meant to.
+    // The app refusal, the read and the filter are services/agent/owner-roster.ts, which
+    // aimeat_agents_list calls too.
     const wantRunMode = typeof req.query.run_mode === 'string' ? req.query.run_mode : undefined;
-    const agents = wantRunMode ? all.filter(a => (a.runMode ?? '') === wantRunMode) : all;
+    const roster = await ownerRoster(storage, req.auth!, wantRunMode);
+    if (!roster.ok) {
+      res.status(403).json(refuseNeedsPermission(config, { want: 'see what your agents are working on', scope: 'task:read' }));
+      return;
+    }
+    const agents = roster.agents;
 
     const include = String(req.query.include ?? '').split(',').map(s => s.trim());
     const wantStats = include.includes('stats');

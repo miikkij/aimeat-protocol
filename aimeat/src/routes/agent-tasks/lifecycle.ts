@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — propose-todos reads its task through services/agent/task-access.ts taskToActOn, the
+ *     read and the gate aimeat_task_propose_todos calls (structure programme 2026-11, unit 2b).
  *   2026-11-12 — DELETE /v1/agents/:name/tasks/:id runs services/agents/remove-task.ts, which also admits
  *     another of the owner's agents holding task:write and agent:write, and which aimeat_task_delete runs.
  *   2026-11-05 — DELETE /v1/agents/:name/tasks/:id admits the callers PATCH admits: the task's owner,
@@ -55,7 +57,8 @@ import { startWaitingTask } from '../../services/task-start-op.js';
 import { removeTask } from '../../services/agents/remove-task.js';
 import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
-import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
+import { startCallerOf, refuseTaskAccess, type TaskRouteHelpers } from './helpers.js';
+import { taskToActOn } from '../../services/agent/task-access.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerTaskLifecycleRoutes(
@@ -360,15 +363,13 @@ export function registerTaskLifecycleRoutes(
   router.post('/v1/agents/:name/tasks/:id/propose-todos', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
 
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    // The read and who may act on it are services/agent/task-access.ts, which aimeat_task_propose_todos asks too.
+    const found = await taskToActOn({ storage, config }, req.auth!, id);
+    if (!found.ok) {
+      refuseTaskAccess(res, config, found.code);
       return;
     }
-    if (!canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
+    const task = found.task;
     // The whole acceptance — the live-plan guard, the preserved history, the renumbering, the status
     // move and the auto-activation tail — is services/agent/task-write.ts, because it belongs to
     // ACCEPTING A PLAN rather than to this door. aimeat_task_propose_todos wrote its own copy.

@@ -103,7 +103,7 @@
       "getAllConfigValues": 1
     },
     "src/mcp/core-admin.ts": {
-      "listAgents": 2
+      "listAgents": 1
     },
     "src/routes/admin/agent-integration.ts": {
       "listAgents": 2
@@ -130,8 +130,7 @@
       "listOwners": 1
     },
     "src/routes/admin.ts": {
-      "listOwners": 2,
-      "listAgents": 1
+      "listOwners": 2
     },
     "src/routes/admin/setup-register.ts": {
       "listOwners": 1
@@ -338,6 +337,9 @@
     },
     "src/services/morsel.ts": {
       "listOwners": 1
+    },
+    "src/services/node-admin/activity.ts": {
+      "listAgents": 1
     },
     "src/services/openrouter-settings-migration.ts": {
       "listOwners": 1

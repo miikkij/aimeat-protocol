@@ -11,6 +11,8 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — aimeat_app_draft_publish reads the draft and asks the roadmap question through
+ *     services/app/draft-to-publish.ts, which POST .../publish-draft calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_app_draft_save hands mime_type to stageAppDraft, as the PUT draft route does (unit 3b).
  *   2026-11-13 — aimeat_app_publish takes toll_morsels and license_type on an inline publish, refused
  *     to a delegated builder as on POST /v1/apps (structure programme 2026-11, unit 3b).
@@ -148,6 +150,7 @@ import {
 } from '../services/app/lifecycle.js';
 import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app/dev-grant.js';
 import { roadmapGate } from '../services/app/roadmap.js';
+import { draftToPublish } from '../services/app/draft-to-publish.js';
 import { draftNoticeFrom, appViewerStanding, readAppNews } from '../services/app/news.js';
 import { publicAppManifest } from '../services/app/public-manifest.js';
 import { resolveAppUrls } from '../services/app/urls.js';
@@ -475,16 +478,15 @@ export function registerAppsTools(
             if ('refusal' in scope) return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
             // Loaded here rather than in the service so this door can name ITS remedy; the HTTP door
             // points at `PUT .../draft` for the same condition.
-            const draft = await storage.getAppDraft(scope.ownerGhii, filename);
-            if (!draft) {
-                return { content: [{ type: 'text' as const, text: `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.` }], isError: true };
+            // The draft read and the roadmap question (the draft's own notice answers it when no line is
+            // given) are services/app/draft-to-publish.ts, which POST .../publish-draft calls too.
+            const checked = await draftToPublish(storage, { ownerName: scope.ownerName, ownerGhii: scope.ownerGhii, filename }, roadmap);
+            if (!checked.ok) {
+                return { content: [{ type: 'text' as const, text: checked.code === 'NO_DRAFT'
+                    ? `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.`
+                    : checked.message }], isError: true };
             }
-            // The draft's own notice answers the roadmap question when no line is given (publishAppDraft).
-            const road = roadmapGate({
-                line: roadmap?.trim() ? roadmap : draft.manifest.draftNotice?.text,
-                shared: await isSharedApp(storage, scope.ownerName, filename),
-            });
-            if (!road.ok) return { content: [{ type: 'text' as const, text: road.message }], isError: true };
+            const draft = checked.draft;
             try {
                 // The promotion, including the draft-slot clear, is services/app/lifecycle.ts — the
                 // same function POST .../publish-draft calls. Both doors used to map the draft

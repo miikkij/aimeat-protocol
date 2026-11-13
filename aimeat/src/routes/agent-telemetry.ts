@@ -8,6 +8,9 @@
  *   - POST /v1/agents/:name/telemetry  -- Append a telemetry event
  *   - GET  /v1/agents/:name/telemetry  -- List telemetry events (with filtering)
  * @version-history
+ *   2026-11-13 — The access check, the agent read and the append are services/agent/telemetry-append.ts,
+ *     which aimeat_agent_telemetry_report calls too; the answers are unchanged (structure programme
+ *     2026-11, unit 2b).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.3.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -22,18 +25,17 @@
  *                            priced, append-only usage event via services/usage-metering.js.
  */
 
-import { Router } from 'express';
-import { recordTelemetryUsage } from '../services/usage-metering.js';
-import { randomUUID } from 'node:crypto';
+import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, TelemetryEvent } from '../storage/interface.js';
+import type { Storage, AgentRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
-import { pushTelemetry, recordTelemetryActivity, listTelemetryBuffered } from '../services/telemetry-buffer.js';
+import { agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { listTelemetryBuffered } from '../services/telemetry-buffer.js';
+import { telemetryTarget, appendAgentTelemetry } from '../services/agent/telemetry-append.js';
 
 /* ── Zod validation schema ── */
 const TelemetryAppendSchema = z.object({
@@ -52,29 +54,22 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
     return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
-  /** Check if current session can access an agent's telemetry */
-  function canAccessAgent(req: Express.Request, agentName: string): boolean {
-    // The agent itself, or its own owner in person (QA audit 2026-10-14, K1).
-    return mayActOnAgent(req.auth, resolveAgentGaii(req, agentName), config.nodeId);
+  /** The agent named in the path, or the refusal sent: the agent itself or its own owner in person
+   *  (QA audit 2026-10-14, K1), then the agent exists. services/agent/telemetry-append.ts holds the
+   *  rule, which aimeat_agent_telemetry_report asks too. */
+  async function targetOrRefuse(req: Request, res: Response, agentName: string): Promise<AgentRecord | null> {
+    const target = await telemetryTarget({ storage, config }, req.auth, resolveAgentGaii(req, agentName));
+    if (target.ok) return target.agent;
+    if (target.code === 'NOT_YOURS') res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
+    else res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+    return null;
   }
 
   /* ── POST /v1/agents/:name/telemetry -- Append telemetry event ── */
   router.post('/v1/agents/:name/telemetry', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-
-    if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
-      return;
-    }
-
-    const agentGaii = resolveAgentGaii(req, agentName);
-
-    // Verify agent exists
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
-      return;
-    }
+    const agent = await targetOrRefuse(req, res, agentName);
+    if (!agent) return;
 
     // Validate body
     const parsed = TelemetryAppendSchema.safeParse(req.body);
@@ -84,50 +79,18 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
 
-    const { type, data, session_id, task_id } = parsed.data;
-
-    const event: TelemetryEvent = {
-      id: randomUUID(),
-      agentGaii,
-      type,
-      data,
-      sessionId: session_id,
-      taskId: task_id,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Buffered in-memory: the raw event lands in a bounded per-agent ring and the
-    // derived activity counters accumulate; both are flushed to storage on an interval
-    // (see telemetry-buffer.ts). No per-request DB write — 48 agents streaming telemetry
-    // no longer translate to a write per event.
-    pushTelemetry(event);
-    recordTelemetryActivity(agentGaii, { type, data });
-
-    // LEDGER (TARGET-016) — services/usage-metering.ts, which aimeat_agent_telemetry_report calls.
-    await recordTelemetryUsage(storage,
-      { agentGaii, ownerGhii: `${agent.owner}@${config.nodeId}`, taskId: task_id },
-      type, data);
-
-    res.status(201).json(success(config.nodeId, { id: event.id }));
+    // The event, the buffered write, the activity counters and the usage ledger:
+    // services/agent/telemetry-append.ts, which aimeat_agent_telemetry_report calls.
+    const id = await appendAgentTelemetry({ storage, config }, agent, parsed.data);
+    res.status(201).json(success(config.nodeId, { id }));
   });
 
   /* ── GET /v1/agents/:name/telemetry -- List telemetry events ── */
   router.get('/v1/agents/:name/telemetry', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-
-    if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
-      return;
-    }
-
-    const agentGaii = resolveAgentGaii(req, agentName);
-
-    // Verify agent exists
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
-      return;
-    }
+    const agent = await targetOrRefuse(req, res, agentName);
+    if (!agent) return;
+    const agentGaii = agent.gaii;
 
     const since = req.query.since as string | undefined;
     const type = req.query.type as string | undefined;

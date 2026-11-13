@@ -13,6 +13,10 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-11-13 — aimeat_admin_stats reads through services/node-admin/activity.ts, the reads and 24-hour
+ *     count GET /v1/admin/dashboard reads; aimeat_admin_organism_ownership reads through
+ *     services/node-admin/organism-ownership-view.ts, as GET /v1/admin/organisms/:id/ownership does
+ *     (structure programme 2026-11, unit 2b).
  *   2026-11-05 — aimeat_admin_key_reencrypt registered (mcp/key-reencrypt.ts; codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-10-25 — aimeat_admin_config answers the list GET /v1/admin/config answers (services/config-admin-view.ts),
@@ -56,7 +60,9 @@ import type { CallerContext } from '../services/caller-context.js';
 import { toolError } from './tool-error.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { mintMorsels, morselsInCirculation } from '../services/morsel.js';
-import { addOrganismOwner, organismOwners } from '../services/organism-ownership.js';
+import { nodeActivity } from '../services/node-admin/activity.js';
+import { addOrganismOwner } from '../services/organism-ownership.js';
+import { organismOwnershipView } from '../services/node-admin/organism-ownership-view.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
@@ -101,15 +107,9 @@ export function registerCoreAdminTools(
         },
         async () => {
             if (!(await isOperator())) return notOperator;
-            const agents = await storage.listAgents();
-            const actions = await storage.listActions();
-            const boards = await storage.listBoards();
-            const allWork = await storage.listAllWork();
-            let activeAgents = 0;
-            const now = Date.now();
-            for (const a of agents) {
-                if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) activeAgents++;
-            }
+            // The four reads and the 24-hour count are services/node-admin/activity.ts, which
+            // GET /v1/admin/dashboard reads too, behind the same operator question (askOperator).
+            const { agents, actions, boards, allWork, activeAgents24h: activeAgents } = await nodeActivity(storage);
             // The supply GET /v1/admin/dashboard reports, from one function: every account holder's
             // balance, including a person with no agent, whom the per-agent loop left out
             // (feature-list audit #169).
@@ -245,20 +245,11 @@ export function registerCoreAdminTools(
         },
         async ({ organism_id }) => {
             if (!(await isOperator(OPERATOR_ORGANISM_REPAIR_SCOPE))) return notRepairer;
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
-            const members = await storage.listMembers(organism_id);
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        id: organism.id, name: organism.name,
-                        owners: organismOwners(organism), created_by: organism.createdBy, admins: organism.admins,
-                        created_at: organism.createdAt, updated_at: organism.updatedAt,
-                        members: members.map(m => ({ ghii: m.ghii, role: m.role, status: m.status, joined_at: m.joinedAt })),
-                    }, null, 2),
-                }],
-            };
+            // The two reads and the view are services/node-admin/organism-ownership-view.ts, which
+            // GET /v1/admin/organisms/:id/ownership reads too, behind the same operator question.
+            const view = await organismOwnershipView(storage, organism_id);
+            if (!view) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
         },
     );
 

@@ -151,10 +151,9 @@
       "reads": {
         "listMemory": 1,
         "getMemory": 1,
-        "listStorageFiles": 1,
-        "getStorageFile": 1
+        "listStorageFiles": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): the file read asks through storedFileShownTo; an agent's namespace holds no data package version, so it asks the file's own label only."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): the file read asks through storedFileShownTo; an agent's namespace holds no data package version, so it asks the file's own label only. 2026-11-13 (structure programme unit 2b): the file read moved into readStoredFileShownTo (services/datapackage/source-labels.ts)."
     },
     "src/mcp/core.ts": {
       "reads": {
@@ -489,8 +488,7 @@
     "src/routes/memory/files.ts": {
       "reads": {
         "listStorageFilesForOwners": 1,
-        "listStorageFiles": 1,
-        "getStorageFile": 1
+        "listStorageFiles": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file. 2026-11-09 (performance round 2): GET /v1/memory/files lists the owner's and their agents' file metadata, to the owner in person, in one IN query (listStorageFilesForOwners) where it read listStorageFiles once per identity; the same rows, the same metadata, no bytes."
     },
@@ -1579,9 +1577,10 @@
     },
     "src/services/datapackage/source-labels.ts": {
       "reads": {
-        "getStorageFileMeta": 1
+        "getStorageFileMeta": 1,
+        "getStorageFile": 1
       },
-      "why": "Reviewed 2026-11-08 (secaudit2026nov08b round 15), the node's own read: the metadata of a data package version's resource file (packageCopyTargets), only for its workspaceRef, to name the file's label address beside the version's label source. No bytes are read and nothing of the file is answered; the rows the caller copies were read before through loadResourceRows, which passes the caller's classification reader."
+      "why": "Reviewed 2026-11-08 (secaudit2026nov08b round 15), the node's own read: the metadata of a data package version's resource file (packageCopyTargets), only for its workspaceRef, to name the file's label address beside the version's label source. No bytes are read and nothing of the file is answered; the rows the caller copies were read before through loadResourceRows, which passes the caller's classification reader. 2026-11-13 (structure programme unit 2b): getStorageFile is readStoredFileShownTo's read, which passes the file to storedFileShownTo with the caller's reader in the same function before anything is answered; GET /v1/memory/files/:key and the MCP storage resource moved their read here."
     },
     "src/services/datapackage/store.ts": {
       "reads": {

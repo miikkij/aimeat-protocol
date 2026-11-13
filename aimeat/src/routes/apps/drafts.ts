@@ -6,6 +6,8 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.11.2 -- 2026-11-13 -- POST .../publish-draft reads the draft and asks the roadmap question through
+ *     services/app/draft-to-publish.ts, which aimeat_app_draft_publish calls too (structure programme 2026-11, unit 2b).
  *   v2.11.1 -- 2026-10-27 -- POST .../publish-draft through an app's grant names that app on the version (secaudit2026oct26).
  *   v2.11.0 -- 2026-10-19 -- PUT .../draft and POST .../publish-draft take `version`, the display version
  *     the promotion publishes with (services/app-display-version.ts judges it); PUT .../draft answers with
@@ -83,8 +85,7 @@ import {
 } from '../../services/app/draft-edit.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
-import { isSharedApp } from '../../services/app/dev-grant.js';
-import { roadmapGate } from '../../services/app/roadmap.js';
+import { draftToPublish } from '../../services/app/draft-to-publish.js';
 import { presentAppManifest } from '../../services/app/pacing.js';
 import { callerOf } from '../../middleware/caller.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
@@ -505,23 +506,21 @@ export function registerDraftRoutes(
         if (!t) return;
         const { owner, ownerGhii } = t;
 
-        const draft = await storage.getAppDraft(ownerGhii, filename);
-        if (!draft) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish for "${filename}". Save one with PUT .../draft first.`));
+        // The draft read and the same question POST /v1/apps asks (what did this change? A warning on
+        // your own app, a refusal on one somebody else helps build) are services/app/draft-to-publish.ts,
+        // which aimeat_app_draft_publish calls too. Asked before the promotion, so a refusal never
+        // arrives after the bytes are live. The draft's own notice answers it when the publisher gives
+        // no line (publishAppDraft).
+        const checked = await draftToPublish(storage, { ownerName: owner, ownerGhii, filename }, req.body?.roadmap);
+        if (!checked.ok) {
+            if (checked.code === 'NO_DRAFT') {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish for "${filename}". Save one with PUT .../draft first.`));
+            } else {
+                res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', checked.message));
+            }
             return;
         }
-
-        // The same question POST /v1/apps asks: what did this change? A warning on your own app, a
-        // refusal on one somebody else helps build. Asked before the promotion, so a refusal never
-        // arrives after the bytes are live.
-        // The draft's own notice answers it when the publisher gives no line (publishAppDraft).
-        const shared = await isSharedApp(storage, owner, filename);
-        const givenLine = typeof req.body?.roadmap === 'string' && req.body.roadmap.trim() ? req.body.roadmap : undefined;
-        const road = roadmapGate({ line: givenLine ?? draft.manifest.draftNotice?.text, shared });
-        if (!road.ok) {
-            res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', road.message));
-            return;
-        }
+        const draft = checked.draft;
 
         // The declaration belongs to the PUBLISH, not to the draft save: promoting a draft is the act
         // that puts bytes in front of readers, and it is the moment the publisher is answering for how

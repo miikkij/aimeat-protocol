@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — The prompt tiers fill their {{variables}} from services/prompts/handbook-fill.ts, which
+ *     GET /v1/agents/me/handbook fills from too (structure programme 2026-11, unit 2b).
  *   2026-11-08 — The handbook carries the person's context index (services/context/index-line.ts)
  *     for a session that holds memory:read, the same lines the handshake carries.
  *   2026-11-05 — aimeat_handbook_get's input schema is one module constant, so every server registers
@@ -73,6 +75,7 @@ import { contextIndexLine } from '../services/context/index-line.js';
 import { skillsBySituation } from '../services/skills-by-situation.js';
 import { journeyHandbookFor } from '../services/journey-state.js';
 import { substituteVariables } from '../services/prompt-variables.js';
+import { handbookFill } from '../services/prompts/handbook-fill.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildAppPiece, buildAppPieceIds } from '../services/build-app-layers.js';
 import { buildAppAgentContext } from '../services/build-app-agent-context.js';
@@ -225,16 +228,9 @@ export function registerPromptsTools(
 
             // Filled the way GET /v1/agents/me/handbook fills them. This door returned the raw
             // text, so an agent read "You are AIMEAT agent {{gaii}} on node {{node_id}}".
-            const gaii = getAgentGaii();
-            const agent = gaii ? await storage.getAgent(gaii) : null;
-            const fill = (content: string) => substituteVariables(content, {
-                node_url: config.baseUrl,
-                node_id: config.nodeId,
-                gaii,
-                agent_name: parseGaiiLoose(gaii).agent || 'unknown',
-                trust_score: agent?.trustScore ?? 50,
-                daily_allowance: config.dailyAllowance,
-            });
+            // The values come from services/prompts/handbook-fill.ts, which that route fills from too.
+            const { vars } = await handbookFill({ storage, config }, getAgentGaii());
+            const fill = (content: string) => substituteVariables(content, vars);
 
             const record = await activeSystemPrompt(storage, normalized);
             if (!record) {

@@ -39,12 +39,15 @@
  *   datapackage/source-labels:single-rank-picked-source-stands-for-all-labels).
  * @structure SOURCE_LABELS_PREFIX · SOURCE_TARGETS_KEPT · versionSourceTargets · onePerLabel · recordVersionLabelSource ·
  *   versionLabelSources · packageCopyTargets · fileCopyTargets · hiddenByLabelSources · hiddenBySourceLabel ·
- *   packageVersionOfFile · packageFileHiddenBySourceLabel · storedFileShownTo · storedFilesShownTo
+ *   packageVersionOfFile · packageFileHiddenBySourceLabel · storedFileShownTo · readStoredFileShownTo ·
+ *   storedFilesShownTo
  * @usage
  *   const targets = await versionSourceTargets(deps, sources.flatMap(s => s.labelSources ?? []));
  *   if (await hiddenBySourceLabel(deps, reader, ownerGhii, name, hash)) return null;
  *   const file = meta ? await storedFileShownTo({ storage, config }, reader, gaii, key, meta) : undefined;
  * @version-history
+ *   v2.4.0 — 2026-11-13 — readStoredFileShownTo: the file read with that ask, for GET /v1/memory/files/:key
+ *     and the MCP storage resource (structure programme 2026-11, unit 2b).
  *   v2.3.0 — 2026-11-13 — storedFilesShownTo: the same ask for a list of stored files (structure
  *     programme 2026-11, unit 7).
  *   v2.2.0 — 2026-11-08 — storedFileShownTo: the file's own label and the version's labels in one ask, for
@@ -218,6 +221,18 @@ export async function storedFileShownTo<F extends { workspaceRef?: string | null
     const [shown] = await reader.show([file], () => fileTarget(ownerGaii, key, file.workspaceRef));
     if (!shown || deps.config.classificationMode === 'off') return shown;
     return await packageFileHiddenBySourceLabel(deps, reader, ownerGaii, key) ? undefined : shown;
+}
+
+/**
+ * One stored file read from `ownerGaii`'s namespace and asked storedFileShownTo, else undefined (absent,
+ * or hidden from this reader). GET /v1/memory/files/:key and the MCP storage resource read a file here,
+ * so the read and the ask around it are one function (structure programme 2026-11, unit 2b).
+ */
+export async function readStoredFileShownTo(
+    deps: Deps, reader: Pick<ContentReader, 'show' | 'kind'>, ownerGaii: string, key: string,
+): Promise<Awaited<ReturnType<Deps['storage']['getStorageFile']>> | undefined> {
+    const stored = await deps.storage.getStorageFile(ownerGaii, key);
+    return stored ? await storedFileShownTo(deps, reader, ownerGaii, key, stored) : undefined;
 }
 
 /**

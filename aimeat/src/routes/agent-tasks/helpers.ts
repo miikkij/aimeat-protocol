@@ -11,9 +11,15 @@
  *     (services/agent-task-rules.ts mayLoosenStart / mayStartWaitingTask).
  *   2026-11-13 — reclaimTaskLiveTrace() moved unchanged to services/agent-tasks/live-trace.ts, so the
  *     task fan-out service no longer imports a route file (structure programme 2026-11, unit 4).
+ *   2026-11-13 — refuseTaskAccess(): the 404 and 403 a taskToActOn refusal answers with
+ *     (services/agent/task-access.ts; structure programme 2026-11, unit 2b).
  */
 
+import type { Response } from 'express';
+import type { AimeatConfig } from '../../config.js';
 import type { AgentTaskRecord } from '../../storage/interface.js';
+import { error } from '../../middleware/envelope.js';
+import { refuseNotYours } from '../../middleware/refusals.js';
 import type { createWebhookDispatcher } from '../../services/webhook-dispatcher.js';
 import { isOwnerInPerson, heldScopes } from '../../auth/effective-scopes.js';
 import type { StartCaller } from '../../services/agent/task-rules.js';
@@ -35,6 +41,20 @@ export function startCallerOf(
     scopes: heldScopes(auth),
   };
 }
+/**
+ * The answer to a taskToActOn refusal (services/agent/task-access.ts): 404 for a task that does not
+ * exist, the not-yours 403 for one the caller may not act on. The bodies are the ones each route wrote.
+ */
+export function refuseTaskAccess(
+  res: Response, config: AimeatConfig, code: 'NOT_FOUND' | 'NOT_YOURS',
+): void {
+  if (code === 'NOT_FOUND') {
+    res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    return;
+  }
+  res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
+}
+
 export type TaskBucket = 'recent' | 'keep' | 'archive';
 
 /**

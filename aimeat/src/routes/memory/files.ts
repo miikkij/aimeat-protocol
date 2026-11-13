@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.4 -- 2026-11-13 -- GET /v1/memory/files/:key reads through readStoredFileShownTo, the read and ask the
+ *     MCP storage resource calls (structure programme 2026-11, unit 2b).
  *   v1.16.3 -- 2026-11-13 -- SECURITY: GET /v1/memory/files lists only the files the caller's
  *     classification reader shows, as GET /v1/memory/files/:key and the MCP storage resource do
  *     (storedFilesShownTo; structure programme 2026-11, unit 7). The count of every file
@@ -102,7 +104,7 @@ import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-pro
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
 import type { MemoryRouteCtx } from './shared.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { storedFileShownTo, storedFilesShownTo } from '../../services/datapackage/source-labels.js';
+import { readStoredFileShownTo, storedFilesShownTo } from '../../services/datapackage/source-labels.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../../services/content-defaults.js';
 import { choiceIdOf, resolveChoice } from '../../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../../storage/blob/blob-types.js';
@@ -437,8 +439,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const key = req.params.key as string;
     // The classification reader (TARGET-082): a file this caller may not see answers as absent, and a
     // data package version's file asks the labels the version keeps too, as GET /v1/pub does.
-    const stored = await storage.getStorageFile(gaii, key);
-    const file = stored ? await storedFileShownTo({ storage, config }, readerFor({ storage, config }, req.auth), gaii, key, stored) : undefined;
+    // The read and that ask are one function (readStoredFileShownTo), which the MCP storage resource calls too.
+    const file = await readStoredFileShownTo({ storage, config }, readerFor({ storage, config }, req.auth), gaii, key);
 
     if (!file) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));

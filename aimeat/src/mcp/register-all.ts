@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-13 — registerAgentOnboardingTools, registerAgentCapabilityTools and registerAgentMessageTools receive the session's caller
+ *     (structure programme 2026-11, unit 2b).
  *   2026-11-07 — registerCsmTool (aimeat_csm: the account's data descriptions, mcp/csm.ts).
  *   2026-11-02 — registerConnectionFileTools (aimeat_files_browse, aimeat_files_get, aimeat_files_write).
  *   2026-10-31 — registerAiGenRulesTools (aimeat_ai_gen_rules, aimeat_ai_gen_rules_set).
@@ -317,8 +319,8 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAiGenRulesTools(mcp, storage, config, agentGaii);
     registerAiProviderTools(mcp, storage, config, agentGaii);
     registerAiCapabilityTools(mcp, storage, config, agentGaii);
-    registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
+    registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     // The v2 turn, beside the dashboard thread above it and the federated DM below. A session
     // here authenticates against an agent record, so the ops see the session caller with the agent role.
     registerAgentV2MessagingTools(mcp, storage, config, agentGaii, owner, caller);
@@ -343,8 +345,8 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDesignbookTools(mcp, storage, config, agentGaii, caller);
     registerUiLibraryTools(mcp, storage, config);
     registerThemeTools(mcp, storage, config, agentGaii, scopes, caller);
-    registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerAgentOnboardingTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
+    registerAgentOnboardingTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerAgentManagementTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAgentCrewTools(mcp, storage, config, agentGaii, scopes);
 }

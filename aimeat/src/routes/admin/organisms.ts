@@ -21,6 +21,8 @@
  *   - POST /v1/admin/organisms/:id/ownership: install `ghii` as the organism's creator
  *
  * @version-history
+ *   v1.1.1 — 2026-11-13 — GET /:id/ownership reads through services/node-admin/organism-ownership-view.ts,
+ *     which aimeat_admin_organism_ownership reads too (structure programme 2026-11, unit 2b).
  *   v1.1.0 — 2026-09-12 — GET /v1/admin/organisms. The repair door took an organism id, and no
  *     operator surface on this node could tell anyone one: the page could only be used by somebody
  *     who already knew the answer. The listing is also what lets a screen work out whether any
@@ -35,6 +37,7 @@ import { requireAuth, requireOperatorPrincipal } from '../../auth/middleware.js'
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { addOrganismOwner, organismOwners } from '../../services/organism-ownership.js';
+import { organismOwnershipView } from '../../services/node-admin/organism-ownership-view.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -83,22 +86,14 @@ export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Ro
      * cross-account act, and the operator should see the roster it is about to re-point. */
     router.get('/v1/admin/organisms/:id/ownership', requireAuth(), requireOperatorPrincipal(storage), async (req, res) => {
         const id = req.params.id as string;
-        const organism = await storage.getOrganism(id);
-        if (!organism) {
+        // The two reads and the view are services/node-admin/organism-ownership-view.ts, which
+        // aimeat_admin_organism_ownership reads too, behind the same operator question.
+        const view = await organismOwnershipView(storage, id);
+        if (!view) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
             return;
         }
-        const members = await storage.listMembers(id);
-        res.json(success(config.nodeId, {
-            id: organism.id,
-            name: organism.name,
-            owners: organismOwners(organism),
-            created_by: organism.createdBy,
-            admins: organism.admins,
-            created_at: organism.createdAt,
-            updated_at: organism.updatedAt,
-            members: members.map(m => ({ ghii: m.ghii, role: m.role, status: m.status, joined_at: m.joinedAt })),
-        }, [{
+        res.json(success(config.nodeId, view, [{
             description: 'Add an owner to this organism',
             method: 'POST',
             url: `/v1/admin/organisms/${id}/ownership`,
