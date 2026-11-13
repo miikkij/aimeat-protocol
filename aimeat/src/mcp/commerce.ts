@@ -105,7 +105,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { canonicalAppToolsId } from '../services/app-tools-key.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
-import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey, isToolPriced, legacyToolPriceRefusal, normalizeToolPacing, toolTollMorsels } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey, isToolPriced, legacyToolPriceRefusal, normalizeToolPacing, toolTollMorsels } from '../models/app-tool-schemas.js';
 import { loadAgentOffers, publishAgentOffers } from '../services/agent-offers-write.js';
 import { normalizeOfferPacing, presentOfferPacing, TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
@@ -124,7 +124,7 @@ import { writeMemoryRecord } from '../services/memory-write.js';
 import { exchangeOutcome, type ReconcileReport } from '../services/exchange-projection.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
-import { logger } from '../utils/logger.js';
+import { appToolManifestIds } from '../services/app-tools/manifest-read.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -142,28 +142,6 @@ function commerceFail(err: unknown) {
         return fail(`${err.code}: ${err.message}`);
     }
     return withCaughtError(fail(`COMMERCE_ERROR: ${(err as { message?: string }).message ?? 'Unexpected commerce error'}`), err);
-}
-
-/**
- * The app ids this owner publishes a tool manifest for — the signpost on an APP_TOOLS_NOT_FOUND.
- * A cross-owner caller sees only the public ones, matching the read gate itself, so the hint can
- * never reveal that a private manifest exists.
- */
-async function listAppToolManifests(storage: Storage, ownerGhii: string, includePrivate: boolean): Promise<string[]> {
-    try {
-        const recs = await storage.listMemory(ownerGhii, { prefix: 'apps.' });
-        return recs
-            .filter(r => includePrivate || r.visibility === 'public')
-            .map(r => appIdFromToolsKey(r.key))
-            .filter((id): id is string => !!id)
-            .sort()
-            .slice(0, 12);
-    } catch (err) {
-        // The hint is a courtesy on a path that has already failed; never turn it into a second
-        // failure — but say so, or a broken listing looks like an owner with no manifests.
-        logger.warn('app-tool manifest hint could not be built', { ownerGhii, error: String(err) });
-        return [];
-    }
 }
 
 export function registerCommerceTools(
@@ -371,7 +349,7 @@ export function registerCommerceTools(
                 // `nuotta.apps.aimeat.io` asked for "nuotta", was told the app declares no manifest,
                 // believed it, and went off to download the app's HTML to work out what it does. The
                 // bare "not found" was true of the key and false of the app.
-                const near = await listAppToolManifests(storage, `${targetOwner}@${config.nodeId}`, targetOwner === owner);
+                const near = await appToolManifestIds(storage,`${targetOwner}@${config.nodeId}`, targetOwner === owner);
                 const hint = near.length
                     ? ` This owner publishes tool manifests for: ${near.join(', ')}. An app id is a filename and includes its extension.`
                     : '';
