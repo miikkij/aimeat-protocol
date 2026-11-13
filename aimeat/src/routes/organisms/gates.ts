@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.2 — 2026-11-13 — POST /approvals takes approverRole from a caller not in person only through a
+ *     manifest flow gate it names, else the default, as risk is floored for it (services/gate-policy.ts
+ *     approverRoleFor; structure programme 2026-11, unit 7).
  *   v1.7.1 — 2026-10-24 — POST /publish and POST /revert ask the organism rule's write test with the
  *     record's draft key (refusedWorkspaceWrite), so a viewer or a member with no grant neither
  *     publishes another member's draft nor writes one through a reopen (secaudit2026oct22,
@@ -52,7 +55,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { shouldGate, gatePolicyFromManifest, DEFAULT_ALWAYS_GATE, type GatePolicy, type Risk } from '../../services/gate-policy.js';
+import { shouldGate, gatePolicyFromManifest, approverRoleFor, DEFAULT_ALWAYS_GATE, type GatePolicy, type Risk } from '../../services/gate-policy.js';
 import { readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
@@ -155,9 +158,9 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       return;
     }
     const riskVal: Risk = ['low', 'medium', 'high'].includes(risk) ? risk : 'medium';
-    const approverRoleVal = ['owner', 'admin', 'member'].includes(approverRole) ? approverRole : 'owner';
 
-    const orgPolicy = gatePolicyFromManifest(await readManifest(id));
+    const orgManifest = await readManifest(id);
+    const orgPolicy = gatePolicyFromManifest(orgManifest);
     // An action names its workspace in `arguments.ws`, the field the publish approval below stores.
     // The workspace manifest's policy (the autonomy level the workspace settings save) applies only
     // when the caller may read that workspace: a workspace the caller cannot read lends it no policy,
@@ -165,17 +168,26 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     // (readWorkspaceMetaRecord), the same one the workspace read takes.
     const wsArg = (actionArgs as { ws?: unknown } | null | undefined)?.ws;
     let policy = orgPolicy;
+    const manifests: unknown[] = [];
     if (typeof wsArg === 'string' && wsArg
       && await canReadWorkspace(storage, config, organism, req.auth!.sub, req.auth!.owner, resolveIdentity(req.auth!, config.nodeId), wsArg)) {
       const wsManifest = await readWorkspaceMetaRecord(storage, id, wsArg, 'meta.manifest', config.nodeId);
-      if (wsManifest) policy = mergeWorkspaceGatePolicy(orgPolicy, gatePolicyFromManifest(wsManifest.value));
+      if (wsManifest) {
+        policy = mergeWorkspaceGatePolicy(orgPolicy, gatePolicyFromManifest(wsManifest.value));
+        manifests.push(wsManifest.value);
+      }
     }
+    manifests.push(orgManifest);
     // Whose word `risk` is. A human member describing what they are about to do is the party the
     // policy protects; an agent, an app grant or an ecosystem token describing its OWN action is the
     // party it constrains, and its word cannot lower the gate below the default. Same test the rest
     // of this codebase uses for "a person in person": isOwnerInPerson (utils/gaii.ts).
     const selfDeclaredRisk = !isOwnerInPerson(req.auth);
     const decision = shouldGate({ action, risk: riskVal, rule, policy, selfDeclaredRisk });
+    // The same rule for `approverRole`, the field beside `risk`: a caller not in person does not
+    // choose a laxer approver than the default, except where a manifest flow gate it names says so
+    // (services/gate-policy.ts approverRoleFor; structure programme 2026-11, unit 7).
+    const approverRoleVal = approverRoleFor({ declared: approverRole, selfDeclared: selfDeclaredRisk, flowGateId, manifests });
 
     const actor = resolveIdentity(req.auth!, config.nodeId);
     const now = new Date().toISOString();
@@ -183,7 +195,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const record: PendingApprovalRecord = {
       id: aid, organismId: id, actor, action,
       ...(actionArgs !== undefined ? { arguments: actionArgs } : {}),
-      risk: riskVal, approverRole: approverRoleVal as PendingApprovalRecord['approverRole'],
+      risk: riskVal, approverRole: approverRoleVal,
       ...(typeof prompt === 'string' ? { prompt } : {}),
       ...(typeof stageId === 'string' ? { stageId } : {}),
       ...(typeof flowGateId === 'string' ? { flowGateId } : {}),

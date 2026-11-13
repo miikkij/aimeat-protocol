@@ -12,11 +12,16 @@
  *   - DEFAULT_ALWAYS_GATE — the safety floor when a manifest declares none
  *   - gatePolicyFromManifest() — pull { autonomy, alwaysGate } out of a manifest's policy
  *   - shouldGate() — pure decision: { gate, reason }
+ *   - approverRoleFor() — who may resolve a requested approval, held to the default for a caller
+ *     not in person unless a manifest flow gate it names says otherwise
  * @usage
  *   import { shouldGate, gatePolicyFromManifest } from '../services/gate-policy.js';
  *   const d = shouldGate({ action, risk, rule, policy: gatePolicyFromManifest(manifest) });
  *   if (d.gate) { ...create PendingApproval... } else { ...auto-approve + audit... }
  * @version-history
+ *   v1.2.0 -- 2026-11-13 -- approverRoleFor: an approval's approverRole from a caller that is not the
+ *     person in person is held to the default, as its risk is, unless a manifest flow gate it names
+ *     sets the role (structure programme 2026-11, unit 7).
  *   v1.1.0 -- 2026-09-06 -- rule:'approve' is honoured. It was in the declared union and read
  *     nowhere, so a caller asking to be gated was auto-run instead.
  *   v1.0.0 -- 2026-06-07 -- Phase 4: gate decision (alwaysGate floor + autonomy L1–L5 × risk).
@@ -156,4 +161,40 @@ export function shouldGate(input: {
   // reason still says which of the two let it through.
   if (input.rule === 'auto') return { gate: false, reason: 'rule_auto' };
   return { gate: false, reason: threshold === null ? `autonomy_${autonomy}` : `autonomy_${autonomy}_risk_${risk}` };
+}
+
+export type ApproverRole = 'owner' | 'admin' | 'member';
+const APPROVER_ROLES: readonly ApproverRole[] = ['owner', 'admin', 'member'];
+/** The role an approval needs when nobody whose word counts named one: the organism's owner. */
+export const DEFAULT_APPROVER_ROLE: ApproverRole = 'owner';
+const isApproverRole = (v: unknown): v is ApproverRole => typeof v === 'string' && (APPROVER_ROLES as readonly string[]).includes(v);
+
+/**
+ * Who may resolve a requested approval (POST /v1/organisms/:id/approvals). The same rule as `risk`
+ * in shouldGate, one field over: `approverRole` arrives on the request body, and a caller that is not
+ * the person in person (an agent, an app grant, an ecosystem token) is the party the gate constrains,
+ * so its word cannot choose a laxer approver than the default. A human member's word stands.
+ *
+ * An agent that names a flow gate (`flowGateId`) of a manifest the caller may read gets that gate's
+ * role, which is the owner's word (manifest `flow.gates[].approverRole`): following a flow whose gate
+ * any member may approve keeps working, and naming a gate never lowers what it asks.
+ * `manifests` are tried in order; the first that holds the named gate decides.
+ */
+export function approverRoleFor(input: {
+  declared: unknown;
+  selfDeclared: boolean;
+  flowGateId?: unknown;
+  manifests?: unknown[];
+}): ApproverRole {
+  if (!input.selfDeclared) return isApproverRole(input.declared) ? input.declared : DEFAULT_APPROVER_ROLE;
+  if (typeof input.flowGateId === 'string' && input.flowGateId) {
+    for (const manifest of input.manifests ?? []) {
+      const gates = (manifest as { flow?: { gates?: unknown } } | null | undefined)?.flow?.gates;
+      if (!Array.isArray(gates)) continue;
+      const gate = gates.find((g): g is { approverRole?: unknown } =>
+        !!g && typeof g === 'object' && (g as { id?: unknown }).id === input.flowGateId);
+      if (gate) return isApproverRole(gate.approverRole) ? gate.approverRole : DEFAULT_APPROVER_ROLE;
+    }
+  }
+  return DEFAULT_APPROVER_ROLE;
 }
