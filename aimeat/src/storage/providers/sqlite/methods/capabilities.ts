@@ -8,6 +8,9 @@
  * @structure capabilityMethods
  * @usage Object.assign(SqliteStorage.prototype, capabilityMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-13 — updateCapability merges the named fields only and answers the stored row,
+ *     as the PostgreSQL provider does. It merged every key of `updates` and answered the merged
+ *     object, so its answer could hold a key that was never stored.
  *   2026-11-08 — publicOrOwner lists another owner's entry only when it is public AND active: a draft,
  *     an entry waiting for review and a rejected one were listed to every signed-in account.
  *   2026-11-04 — getCapabilitiesBySourceRefs: many source refs in one read (codebase analysis
@@ -32,6 +35,14 @@ async function syncVouchCount(storage: SqliteStorage, capabilityId: string): Pro
   storage.db.prepare('UPDATE capabilities SET trust = ?, updatedAt = ? WHERE id = ?')
     .run(JSON.stringify(trust), new Date().toISOString(), capabilityId);
 }
+
+/** The record fields updateCapability writes, other than `source` (three columns) and `updatedAt`. */
+const UPDATED_CAPABILITY_FIELDS = [
+  'name', 'summary', 'ownerGhii', 'visibility', 'status', 'rejectionReason', 'deprecationMessage', 'replacedBy',
+  'authRequired', 'callable', 'inputSchema', 'outputSchema', 'exports', 'usage', 'whenToUse', 'whenNotToUse',
+  'examples', 'dependencies', 'schemaHash', 'webhookUrl', 'cost', 'trustRequired', 'trust', 'redactedFields',
+  'operatorOverride', 'stats', 'tags',
+] as const satisfies ReadonlyArray<keyof CapabilityRecord>;
 
 export const capabilityMethods = {
   // ── Capability Layer ──────────────────────────────────────────────
@@ -110,9 +121,21 @@ export const capabilityMethods = {
   async updateCapability(this: SqliteStorage, id: string, updates: Partial<CapabilityRecord>): Promise<CapabilityRecord | null> {
     const existing = await this.getCapability(id);
     if (!existing) return null;
-    const merged = { ...existing, ...updates, updatedAt: updates.updatedAt || new Date().toISOString() };
+    // The fields the UPDATE below names, the set the PostgreSQL provider writes: a key that is no
+    // such field is not merged, and a field that is undefined stays as stored. id, scope and
+    // createdAt are never updated.
+    const picked: Record<string, unknown> = {};
+    for (const f of UPDATED_CAPABILITY_FIELDS) {
+      if (updates[f] !== undefined) picked[f] = updates[f];
+    }
+    const merged: CapabilityRecord = { ...existing, ...(picked as Partial<CapabilityRecord>), updatedAt: updates.updatedAt || new Date().toISOString() };
+    // The source object is the only way to the three source columns; a partial one keeps the rest.
     if (updates.source) {
-      merged.source = { ...existing.source, ...updates.source };
+      merged.source = {
+        type: updates.source.type ?? existing.source.type,
+        ref: updates.source.ref ?? existing.source.ref,
+        version: updates.source.version ?? existing.source.version,
+      };
     }
     this.db.prepare(`UPDATE capabilities SET name=?, summary=?, ownerGhii=?, visibility=?, status=?,
       rejectionReason=?, deprecationMessage=?, replacedBy=?, sourceType=?, sourceRef=?, sourceVersion=?,
@@ -137,7 +160,8 @@ export const capabilityMethods = {
       JSON.stringify(merged.stats), JSON.stringify(merged.tags),
       merged.updatedAt, id,
     );
-    return merged;
+    // The stored row, as the PostgreSQL provider answers with RETURNING.
+    return this.getCapability(id);
   },
 
   async deleteCapability(this: SqliteStorage, id: string): Promise<boolean> {

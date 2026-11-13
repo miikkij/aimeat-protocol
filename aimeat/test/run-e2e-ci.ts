@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-13 -- e2e-capability-update-fields.ts joins the list (not the guard tier): PUT /v1/capabilities/{id} takes the fields a capability's writer may set and no other key, on both backends, and the webhook policy reads the normalised source.
  *   2026-11-12 -- e2e-app-access-request.ts joins the list (not the guard tier), and e2e-purpose-access-request.ts joins PURPOSE_SUITES: three consecutive 2/2 runs alone on each backend in the production-settings lane, and both tests red with the use disabled in source.
  *   2026-11-11 -- A Postgres run drops the lane and own-node databases it made at its end (scripts/lib/e2e-databases.ts).
  *   2026-11-10 -- e2e-live-catchup.ts joins the list (not the guard tier): a reopened live stream gets the domains that changed while it was away, and only its owner's.
@@ -1710,6 +1711,9 @@ const ALL_SUITES = [
     // The ref of an extension-backed capability names an extension and an action, and invoke resolves
     // both before its loopback request (secaudit2026oct22).
     'test/e2e-capability-extension-ref.ts',
+    // PUT /v1/capabilities/{id} takes the fields a capability's writer may set and no other key, and
+    // the webhook policy reads the normalised source.
+    'test/e2e-capability-update-fields.ts',
     // A draft is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
     'test/e2e-capability-reach.ts',
     // Round 8, group memory-b: the side routes answer what the main route answers (secaudit2026oct26).

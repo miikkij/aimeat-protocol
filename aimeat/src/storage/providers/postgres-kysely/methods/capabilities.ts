@@ -8,6 +8,8 @@
  *   cost/examples/tags JSON columns) are stored as JSONB, so the increment/trust mutators are
  *   read-modify-write on the JSON blob — identical semantics to the Prisma (Mongo/PG) implementation.
  * @version-history
+ *   v1.3.0 — 2026-11-13 — updateCapability writes named columns only, the set the SQLite provider
+ *     writes. It passed every key of `updates` to set(), so a key was used as a column name.
  *   2026-11-08 — publicOrOwner lists another owner's entry only when it is public AND active: a draft,
  *     an entry waiting for review and a rejected one were listed to every signed-in account.
  *   2026-11-04 — getCapabilitiesBySourceRefs: many source refs in one read (codebase analysis
@@ -98,23 +100,29 @@ export const capabilityMethods = {
   },
 
   async updateCapability(this: PostgresKyselyStorage, id: string, updates: Partial<CapabilityRecord>): Promise<CapabilityRecord | null> {
-    const data: Record<string, unknown> = { ...updates };
-    delete data.id;
+    // Named columns only, the set the SQLite provider's UPDATE names: a key of `updates` is never
+    // used as a column name, and a key that is no field of CapabilityRecord is not written. A field
+    // that is undefined stays as stored. id, scope and createdAt are never updated.
+    const data: Record<string, unknown> = {};
+    for (const f of ['name', 'summary', 'ownerGhii', 'visibility', 'status', 'rejectionReason', 'deprecationMessage',
+      'replacedBy', 'authRequired', 'callable', 'usage', 'whenToUse', 'whenNotToUse', 'schemaHash', 'webhookUrl',
+      'trustRequired'] as const) {
+      if (updates[f] !== undefined) data[f] = updates[f];
+    }
+    // The source object is the only way to the three source columns; a partial one keeps the rest.
     if (updates.source) {
-      data.sourceType = updates.source.type;
-      data.sourceRef = updates.source.ref;
-      data.sourceVersion = updates.source.version;
-      delete data.source;
+      if (updates.source.type !== undefined) data.sourceType = updates.source.type;
+      if (updates.source.ref !== undefined) data.sourceRef = updates.source.ref;
+      if (updates.source.version !== undefined) data.sourceVersion = updates.source.version;
     }
     // nullable JSONB columns (value or null)
     for (const f of ['inputSchema', 'outputSchema', 'exports', 'cost', 'operatorOverride'] as const) {
-      if (f in data) data[f] = jsonb(updates[f] ?? null);
+      if (updates[f] !== undefined) data[f] = jsonb(updates[f] ?? null);
     }
     // required JSONB columns
     for (const f of ['examples', 'dependencies', 'trust', 'stats', 'tags', 'redactedFields'] as const) {
-      if (f in data) data[f] = jsonb(updates[f]);
+      if (updates[f] !== undefined) data[f] = jsonb(updates[f]);
     }
-    if (typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
     data.updatedAt = updates.updatedAt ? new Date(updates.updatedAt) : new Date();
     try {
       const rows = await this.db.updateTable('Capability').set(data as never).where('id', '=', id).returningAll().execute();

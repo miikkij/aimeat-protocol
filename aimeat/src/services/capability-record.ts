@@ -58,6 +58,11 @@
  *   2026-10-26 — createCapability and updateCapability store only a visibility word the node knows
  *     (private, owner, public); any other is 400 INVALID_INPUT with a sentence that lists them. A PUT of
  *     the stored word unchanged passes (secaudit2026oct22; services/capability-reach.ts).
+ *   v1.6.0 — 2026-11-13 — updateCapability picks the fields an update may carry
+ *     (PATCHABLE_CAPABILITY_FIELDS) and drops every other key, so both storage backends receive the
+ *     same keys. The webhook policy of an update moves here from the PUT route and reads the
+ *     normalised source and webhook; create and update share webhookPolicyRefusal(). A webhookUrl is
+ *     a string or null: '' is stored as null, any other type is 400 INVALID_INPUT.
  */
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -229,6 +234,63 @@ function normaliseSource(raw: unknown): CapabilityResult<CapabilityRecord['sourc
     return { ok: true, value: { type, ref, version } };
 }
 
+/**
+ * A webhook is a string or absent. null, undefined and the empty string all mean "no webhook" and
+ * are stored as null on both backends. Any other type is refused: the webhook policy reads this
+ * value and the record stores it, so both must hold one value (invariant 13 in
+ * docs/coding-guidelines/security-development-dna.md).
+ */
+function normaliseWebhookUrl(raw: unknown): CapabilityResult<string | null> {
+    if (raw === null || raw === undefined || raw === '') return { ok: true, value: null };
+    if (typeof raw !== 'string') return refuse(400, 'INVALID_INPUT', 'webhookUrl must be a string or null');
+    return { ok: true, value: raw };
+}
+
+/**
+ * The node's webhook policy for one URL. createCapability and updateCapability both answer with
+ * this function, so a caller gets the same three codes from POST and from PUT for the same URL:
+ * WEBHOOKS_DISABLED, INVALID_WEBHOOK_URL and WEBHOOK_DOMAIN_NOT_ALLOWED.
+ */
+function webhookPolicyRefusal(config: AimeatConfig, url: string): CapabilityRefusal | null {
+    if (config.capabilityWebhooks === 'disabled') {
+        return refuse(403, 'WEBHOOKS_DISABLED', 'Webhook capabilities are disabled on this node');
+    }
+    if (config.capabilityWebhooks !== 'allowlist_only') return null;
+    let domain: string;
+    try {
+        domain = new URL(url).hostname;
+    } catch {
+        return refuse(400, 'INVALID_WEBHOOK_URL', 'Invalid webhook URL');
+    }
+    if (config.capabilityWebhookDomainAllowlist.includes(domain)) return null;
+    return refuse(403, 'WEBHOOK_DOMAIN_NOT_ALLOWED', `Domain '${domain}' is not on the webhook allowlist`);
+}
+
+/**
+ * The fields an update may carry. Every other key of a patch is dropped here, whichever caller sent
+ * it, so both storage backends receive the same keys. A dropped key is not refused: the answer
+ * carries the stored record, so a client sees that its value did not take, and a client that sends
+ * a whole stored record back keeps working.
+ *
+ * Absent on purpose, because the node writes them about the record:
+ *   trust            the operator's review and the vouch count (written by the vouch counters)
+ *   stats            invocation counters (storage.incrementCapabilityStats)
+ *   operatorOverride the operator's disable switch (PUT /v1/admin/capabilities/:id/override)
+ *   rejectionReason  the reviewer's words
+ *   schemaHash       computed at create
+ *   scope            always 'local' on this node
+ *   id, ownerGhii, createdAt   identity and birth date
+ *   updatedAt        stamped by updateCapability on every patch
+ * Also absent: sourceType, sourceRef and sourceVersion, the storage column names of a source. A
+ * source changes through `source` only, which updateCapability normalises and checks.
+ */
+const PATCHABLE_CAPABILITY_FIELDS = [
+    'name', 'summary', 'visibility', 'status', 'deprecationMessage', 'replacedBy', 'source',
+    'authRequired', 'callable', 'inputSchema', 'outputSchema', 'exports', 'usage', 'whenToUse',
+    'whenNotToUse', 'examples', 'dependencies', 'webhookUrl', 'cost', 'trustRequired',
+    'redactedFields', 'tags',
+] as const;
+
 /** True when a patched source names the stored type, ref and version exactly. */
 function sameSource(raw: unknown, stored: CapabilityRecord['source']): boolean {
     if (!raw || typeof raw !== 'object') return false;
@@ -281,22 +343,13 @@ export async function createCapability(
     const cost = normalizeCapabilityCost(input.cost);
     if (!cost.ok) return cost;
 
-    // Webhook policy, on the source the record will actually carry.
-    if (input.webhookUrl && source.value.type === 'manual') {
-        if (config.capabilityWebhooks === 'disabled') {
-            return refuse(403, 'WEBHOOKS_DISABLED', 'Webhook capabilities are disabled on this node');
-        }
-        if (config.capabilityWebhooks === 'allowlist_only') {
-            let domain: string;
-            try {
-                domain = new URL(input.webhookUrl).hostname;
-            } catch {
-                return refuse(400, 'INVALID_WEBHOOK_URL', 'Invalid webhook URL');
-            }
-            if (!config.capabilityWebhookDomainAllowlist.includes(domain)) {
-                return refuse(403, 'WEBHOOK_DOMAIN_NOT_ALLOWED', `Domain '${domain}' is not on the webhook allowlist`);
-            }
-        }
+    // Webhook policy, on the source and the webhook the record will actually carry. Nothing may be
+    // read from `input.webhookUrl` below this line.
+    const webhookUrl = normaliseWebhookUrl(input.webhookUrl);
+    if (!webhookUrl.ok) return webhookUrl;
+    if (webhookUrl.value && source.value.type === 'manual') {
+        const refusal = webhookPolicyRefusal(config, webhookUrl.value);
+        if (refusal) return refusal;
     }
 
     const schemaHash = createHash('sha256')
@@ -313,7 +366,7 @@ export async function createCapability(
             // there. The moderation rule can still override an 'active' request.
             status: moderatedStatus(config, input.visibility, caller.isOperator, input.status || 'draft'),
         },
-        { ...input, source: source.value, cost: cost.value },
+        { ...input, source: source.value, cost: cost.value, webhookUrl: webhookUrl.value },
     );
 
     try {
@@ -328,9 +381,10 @@ export async function createCapability(
 }
 
 /**
- * Apply one patch. WHICH fields a door accepts is the door's own declaration — an MCP tool publishes
- * a parameter list, an HTTP route takes a body — so the patch arrives already shaped. What happens
- * to it is the same either way.
+ * Apply one patch. An MCP tool publishes a parameter list and an HTTP route takes a body, so a
+ * caller may send a narrower patch than PATCHABLE_CAPABILITY_FIELDS, never a wider one: the fields
+ * are picked here. Every check below reads the picked and normalised value, and storage receives
+ * only what was checked.
  */
 export async function updateCapability(
     deps: CapabilityDeps,
@@ -346,11 +400,13 @@ export async function updateCapability(
         return refuse(403, 'FORBIDDEN', 'Not the owner');
     }
 
-    const updates: Record<string, unknown> = { ...patch, updatedAt: new Date().toISOString() };
-    // Identity and birth date belong to the record, never to the patch.
-    delete updates.id;
-    delete updates.ownerGhii;
-    delete updates.createdAt;
+    // Only the fields an update may carry. Identity, the birth date, the fields the node writes and
+    // every key that is no field of a capability stay out (PATCHABLE_CAPABILITY_FIELDS says why).
+    const updates: Record<string, unknown> = {};
+    for (const field of PATCHABLE_CAPABILITY_FIELDS) {
+        if (Object.hasOwn(patch, field) && patch[field] !== undefined) updates[field] = patch[field];
+    }
+    updates.updatedAt = new Date().toISOString();
 
     // A CHANGED visibility must be a word the node knows, as at create. The stored word sent back
     // unchanged passes, so a client that PUTs the whole record back keeps working on a record that
@@ -363,12 +419,46 @@ export async function updateCapability(
 
     // A CHANGED source is normalised and checked as at create. It was stored as given, so a PUT put
     // an extension ref on a record that create would have refused (secaudit2026oct22). A source
-    // equal to the stored one passes untouched: a client that PUTs the whole record back carries the
-    // node-written kinds (app-tool, offering) that a person may not name.
-    if ('source' in updates && !sameSource(updates.source, cap.source)) {
-        const source = normaliseSource(updates.source);
-        if (!source.ok) return source;
-        updates.source = source.value;
+    // equal to the stored one changes nothing and is left out of the write: a client that PUTs the
+    // whole record back carries the node-written kinds (app-tool, offering) that a person may not
+    // name. `source` in any other shape, null and a string included, is normalised like a missing
+    // source at create, so `nextSource` is the source the record will carry.
+    if ('source' in updates) {
+        if (sameSource(updates.source, cap.source)) {
+            delete updates.source;
+        } else {
+            const source = normaliseSource(updates.source);
+            if (!source.ok) return source;
+            updates.source = source.value;
+        }
+    }
+    const nextSource = (updates.source as CapabilityRecord['source'] | undefined) ?? cap.source;
+
+    // The webhook policy, on the normalised source and webhook (invariant 13 in
+    // docs/coding-guidelines/security-development-dna.md). Until 2026-11-13 this check was in the
+    // PUT route and read the request body: a `source` that was no object read there as "no source
+    // change" and here as 'manual', and the PostgreSQL provider wrote the body keys sourceType,
+    // sourceRef and sourceVersion to their columns, which neither place read.
+    //
+    // THE CHECK FIRES ON A CHANGE, NOT ON PRESENCE. A UI PUTs the whole record back, so an unchanged
+    // webhookUrl arrives with every unrelated patch, and refusing that would refuse a rename on a
+    // node running 'disabled'. The pair compared is (url, is the source manual), because invoke
+    // calls webhookUrl for a manual source only:
+    //   - a url appearing where there was none, or one url becoming another  -> policy
+    //   - the same url on a record that was already a manual webhook         -> passes
+    //   - clearing it                                                       -> passes, always
+    //   - a source becoming 'manual' while a webhook is on the record        -> policy
+    if ('webhookUrl' in updates) {
+        const webhookUrl = normaliseWebhookUrl(updates.webhookUrl);
+        if (!webhookUrl.ok) return webhookUrl;
+        updates.webhookUrl = webhookUrl.value;
+    }
+    const storedWebhook = cap.webhookUrl || null;
+    const nextWebhook = 'webhookUrl' in updates ? updates.webhookUrl as string | null : storedWebhook;
+    const sameManualWebhook = nextWebhook === storedWebhook && cap.source.type === 'manual';
+    if (nextWebhook && nextSource.type === 'manual' && !sameManualWebhook) {
+        const refusal = webhookPolicyRefusal(config, nextWebhook);
+        if (refusal) return refusal;
     }
 
     // The same rename as at create: a patched cost is stored as cost.toll_morsels.

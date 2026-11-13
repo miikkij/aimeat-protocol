@@ -63622,14 +63622,19 @@ paths:
         dropped from the body if they are sent: trust, stats, operatorOverride, rejectionReason,
         schemaHash, scope, id, ownerGhii, createdAt and updatedAt. trust is the node operator's
         review and the vouch count, so it is never the owner's to claim; stats counts invocations
-        that really happened. The response carries the stored record, which shows what took.
+        that really happened. Any other key that is not a property of the request body below is
+        dropped too, on every storage backend. The response carries the stored record, which shows
+        what took.
 
 
         Changing the webhook asks the node's webhook policy the same question POST asks, and is
         refused with the same three answers: 403 WEBHOOKS_DISABLED, 403 WEBHOOK_DOMAIN_NOT_ALLOWED
         or 400 INVALID_WEBHOOK_URL. It is asked on a CHANGE of the address the node would call, so
         sending the whole record back with webhookUrl untouched is accepted whatever the policy, and
-        clearing it is always accepted.
+        clearing it is always accepted. The policy reads the source the record will carry after the
+        update, so a change of `source` to manual on a record that holds a webhook asks it as well.
+        `webhookUrl` is a string or null: the empty string clears it and is stored as null, and any
+        other type is 400 INVALID_INPUT.
 
 
         The owner, or their agent holding `capability:write`, on a capability stored under the
@@ -63638,7 +63643,7 @@ paths:
 
         A `source` that differs from the stored one is normalised and checked as POST checks it, so
         an extension ref outside ext:<name>[@<version>][:<action>] is 400 INVALID_INPUT. A source
-        equal to the stored one passes untouched.
+        equal to the stored one passes untouched. The source changes through `source` only.
 
 
         Changing `visibility` to public meets the node's publishing policy as POST does: on a
@@ -63709,9 +63714,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
-          description: INVALID_INPUT, a changed source that POST would refuse, or a changed visibility other than private, owner or public (the stored word sent back unchanged passes).
+          description: INVALID_INPUT, a changed source that POST would refuse, a webhookUrl that is neither a string nor null, or a changed visibility other than private, owner or public (the stored word sent back unchanged passes). INVALID_WEBHOOK_URL, a changed webhook that is no URL on an allowlist node.
         '403':
-          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner. PUBLIC_DISABLED, a change to public visibility on a self_only node by a non-operator.
+          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner. PUBLIC_DISABLED, a change to public visibility on a self_only node by a non-operator. WEBHOOKS_DISABLED or WEBHOOK_DOMAIN_NOT_ALLOWED, a changed webhook the node's policy refuses.
     delete:
       operationId: capabilityDelete
       tags: [Capabilities]
