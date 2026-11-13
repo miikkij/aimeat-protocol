@@ -21,6 +21,7 @@
 import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import { calculateEscrowMany } from '../morsel.js';
 import { cached, TTL } from '../cache.js';
+import { loadOwnerAgents } from '../db/owner-identity.js';
 
 export interface WalletStanding {
     ghii: GHIIRecord;
@@ -37,7 +38,7 @@ export async function walletStanding(storage: Storage, ownerName: string): Promi
     const inEscrow = await cached(
         `escrow:${ownerName}`, TTL.dashboard,
         async () => {
-            const agents = await storage.getAgentsByOwner(ownerName);
+            const agents = await loadOwnerAgents(storage, ownerName);
             return calculateEscrowMany(storage, [ghii.ghii, ...agents.map(a => a.gaii)]);
         },
         ['domain:work', 'domain:wallet'],
