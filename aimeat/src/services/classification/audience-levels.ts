@@ -23,7 +23,7 @@
  *     level a cap names; the order and the words are unchanged (plan doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L3.1).
  */
-import { signedInOnly, type ContentAccess } from '../../config-visibility.js';
+import { signedInOnly, type ContentAccess } from '../../config/visibility.js';
 import { LEVELS, type ExposureLevel } from '../exposure/exposure-types.js';
 
 /**

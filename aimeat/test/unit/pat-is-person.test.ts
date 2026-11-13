@@ -19,7 +19,7 @@ import { readerKindOf } from '../../src/services/classification/reader-kind.js';
 import { isOwnerInPerson } from '../../src/utils/gaii.js';
 import { signInPolicyChangeRefusal, TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH } from '../../src/services/sign-in-policy.js';
 import { capabilityUseApprovalChangeRefusal } from '../../src/services/mcp-client/capability-use-setting.js';
-import { resetNodeSettingRefusal } from '../../src/services/config-admin-view.js';
+import { resetNodeSettingRefusal } from '../../src/services/config/admin-view.js';
 
 const ownerPat = { roles: ['owner'], scopes: [], via: 'pat' };
 const operatorPat = { roles: ['owner', 'operator'], scopes: [], via: 'pat' };

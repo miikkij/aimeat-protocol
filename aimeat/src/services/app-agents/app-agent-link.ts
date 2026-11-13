@@ -15,7 +15,7 @@
  *   WHERE THE LINK IS. On the proposal, and nowhere else: `source_app` names the app, the agent's
  *   name inside the app and the hash of the definition the agent runs, and the approved proposal's
  *   `name` is the agent's name. A publish of a newer definition to the agent rewrites the hash
- *   (services/agent-proposals.ts recordProposalDefinition). The proposal is the right place because
+ *   (services/agent/proposals.ts recordProposalDefinition). The proposal is the right place because
  *   the node acts on this value (it decides whether to stop the agent itself and whether to publish
  *   a definition), and `agents.proposals.` is a reserved key prefix: an app or an agent holding
  *   memory:write cannot write it (utils/reserved-keys.ts). The record `agents.<name>.deploy`, which
@@ -34,8 +34,8 @@
 import type { AgentRecord } from '../../storage/interface.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { deployedAgentName, proposedAgentName } from '../../models/crew-def-schemas.js';
-import { listProposals, type AgentProposal, type ProposalContext } from '../agent-proposals.js';
-import { isStopped } from '../agent-stop-rules.js';
+import { listProposals, type AgentProposal, type ProposalContext } from '../agent/proposals.js';
+import { isStopped } from '../agent/stop-rules.js';
 
 export type OwnBundledAgent =
   | { state: 'none' }

@@ -63,7 +63,7 @@ import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
   return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');

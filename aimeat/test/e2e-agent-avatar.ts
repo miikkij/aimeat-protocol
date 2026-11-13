@@ -2,7 +2,7 @@
  * @file test/e2e-agent-avatar.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description An agent's own picture (services/agent-avatar.ts, routes/agents/avatar.ts). The picture
+ * @description An agent's own picture (services/agent/avatar.ts, routes/agents/avatar.ts). The picture
  *   is one memory record, `agent.avatar`, in the agent's own namespace, written with the ordinary
  *   memory write (wish-agenteille-oma-avatar-jonka-agentti-asettaa-itse). This suite holds:
  *     1. the agent writes an emoji, then an SVG, with POST /v1/memory, and the agent list and the

@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import {
     serviceSummaryForm, unsignedServiceSummaryAccepted, SIGNED_SERVICE_SUMMARY_PEER_FROM, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN,
-} from '../../src/config-federation.js';
+} from '../../src/config/federation.js';
 import { serviceSummaryRequestHeaders } from '../../src/services/federation.js';
 import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
 import type { AimeatConfig } from '../../src/config.js';

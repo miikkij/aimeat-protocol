@@ -53,7 +53,7 @@ An organism is a group with members; a workspace is a shared space inside it.
 |---|---|---|
 | 1. Announce | Tell the people on the node the date, and ask each person and each organism owner to take their exports (tables above) | [Data ownership](../data-ownership.md) |
 | 2. Final backup | Database, `.env` and node key together, kept for the period your retention policy needs and no longer | [Backup and restore](../operations/backup-and-restore.md) |
-| 3. Freeze | Turn on maintenance mode (`POST /v1/admin/maintenance`) only after the exports in step 1 are done. In maintenance mode the node answers 503 `MAINTENANCE_MODE` to every caller that is not an operator, exports included; only static files, `/v1/build`, `/v1/auth/*` and `/v1/ghii/login` stay open | `aimeat/src/routes/admin-maintenance.ts`, `aimeat/src/server-bootstrap/middleware-guards.ts` |
+| 3. Freeze | Turn on maintenance mode (`POST /v1/admin/maintenance`) only after the exports in step 1 are done. In maintenance mode the node answers 503 `MAINTENANCE_MODE` to every caller that is not an operator, exports included; only static files, `/v1/build`, `/v1/auth/*` and `/v1/ghii/login` stay open | `aimeat/src/routes/admin/maintenance.ts`, `aimeat/src/server-bootstrap/middleware-guards.ts` |
 | 4. Remove peers | Remove each federation peer, so peers stop sending to the node | `aimeat_admin_federation_peer_remove`, [Running federation](../operations/federation.md) |
 | 5. Revoke outside registrations | Delete the node's app registrations at Microsoft Entra ID and Google, the outside-account clients (`AIMEAT_CONNECT_<PROVIDER>_CLIENT_ID`), the SMTP account, the AI provider keys (`AIMEAT_OPENROUTER_INSTANCE_KEY` and others) and the file store access keys, at each provider | [Organisation node sign-in](../organisation-node-sign-in.md), [Connecting an outside account](../connecting-an-outside-account.md) |
 | 6. Stop the process | `systemctl disable --now aimeat`, or stop and remove the containers | `aimeat/deploy/aimeat.service` |
@@ -91,7 +91,7 @@ Once the node key and the process are gone, every token the node issued to peopl
 | Question | Answer | Source |
 |---|---|---|
 | Licence | MIT: use, change, fork and redistribute, also internally, with the notice kept | `LICENSE` |
-| Licence keys or activation | None for the node itself. The node calls no service the project runs. By default it asks npm and unpkg for a newer version (`AIMEAT_UPDATE_CHECK`) and refreshes its model catalogue (`AIMEAT_AI_CATALOG_REFRESH`); you can turn both off | `aimeat/src/config-update-check.ts`, `aimeat/src/services/ai/catalog/sources.ts` |
+| Licence keys or activation | None for the node itself. The node calls no service the project runs. By default it asks npm and unpkg for a newer version (`AIMEAT_UPDATE_CHECK`) and refreshes its model catalogue (`AIMEAT_AI_CATALOG_REFRESH`); you can turn both off | `aimeat/src/config/update-check.ts`, `aimeat/src/services/ai/catalog/sources.ts` |
 | Hosted services the node needs | None. The project's demo node is not needed to run your node; AI providers, identity providers and SMTP are ones you choose | [02 Architecture](02-architecture.md) |
 | Building it yourself | `pnpm install` and `pnpm build` in the aimeat folder, or `aimeat/Dockerfile`; the repository's own checks run locally with `pnpm gate` | [Upgrading](../operations/upgrading.md#the-update), `aimeat/scripts/gate.ts` |
 | Third-party components | Listed in `THIRD-PARTY-NOTICES.md` and in the SBOM (`pnpm sbom`) | `aimeat/scripts/gen-sbom.ts` |

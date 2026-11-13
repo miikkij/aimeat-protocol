@@ -44,7 +44,7 @@
 
 import { registerOwner } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ownerAName = `draftowna${Date.now() % 100000}`;

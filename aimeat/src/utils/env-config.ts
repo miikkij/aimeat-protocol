@@ -12,8 +12,8 @@
 
 import { existsSync } from 'node:fs';
 import type { AimeatConfig } from '../config.js';
-import type { ConfigProvenance } from '../services/config-provenance.js';
-import { ENV_TO_DOT_PATH } from '../services/config-schema.js';
+import type { ConfigProvenance } from '../services/config/provenance.js';
+import { ENV_TO_DOT_PATH } from '../services/config/schema.js';
 import type { ConfigSection } from './env-config/shared.js';
 import { nodeSections } from './env-config/sections-node.js';
 import { federationSections } from './env-config/sections-federation.js';

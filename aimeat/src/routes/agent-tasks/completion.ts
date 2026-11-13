@@ -44,9 +44,9 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { completeTask, failTask, declineTask } from '../../services/agent-task-fanout.js';
-import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js';
-import { recordTaskEvent, setTodoStatus } from '../../services/agent-task-write.js';
+import { completeTask, failTask, declineTask } from '../../services/agent/task-fanout.js';
+import { recomputeAndCacheStatistics } from '../../services/agent/statistics.js';
+import { recordTaskEvent, setTodoStatus } from '../../services/agent/task-write.js';
 import { AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
@@ -74,7 +74,7 @@ export function registerTaskCompletionRoutes(
     }
 
     // The stalled auto-resume, the state gate, the event and the telemetry roll-up are
-    // services/agent-task-write.ts, because they belong to APPENDING AN EVENT rather than to this
+    // services/agent/task-write.ts, because they belong to APPENDING AN EVENT rather than to this
     // door. aimeat_task_event wrote its own, and its telemetry OVERWROTE the task totals with the
     // last event's numbers instead of accumulating them.
     const result = await recordTaskEvent({ storage, config }, task, req.body, resolve(req));
@@ -101,7 +101,7 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    // The whole completion is services/agent-task-fanout.ts, because it belongs to COMPLETING rather
+    // The whole completion is services/agent/task-fanout.ts, because it belongs to COMPLETING rather
     // than to this door: which states may complete (active AND stalled, so an agent that came back
     // after a stall still gets to hand its work in), the record, the provenance stamp on the message
     // the owner reads, the 'completed' event, and the eight things a completion sets off: the
@@ -164,7 +164,7 @@ export function registerTaskCompletionRoutes(
     }
 
     const message = typeof req.body?.message === 'string' ? req.body.message : 'Task failed';
-    // services/agent-task-fanout.ts, which aimeat_task_fail calls for the same transition. The state
+    // services/agent/task-fanout.ts, which aimeat_task_fail calls for the same transition. The state
     // gate that used to stand here as well (active or stalled, because an agent that cannot recover
     // still gets to say so rather than leaving the task stalled forever) was a second copy of
     // FAILABLE_STATES, the shape this whole pass exists to remove. failTask answers with the same 409.
@@ -179,7 +179,7 @@ export function registerTaskCompletionRoutes(
   /* ── POST /v1/agents/:name/tasks/:id/decline -- The agent refuses the request, with its reason ──
    *
    * A refusal is a correct answer, so it does not end as 'failed': the task goes to 'declined', the
-   * reason is the 'declined' event's message, and no failure counter moves (services/agent-task-fanout.ts
+   * reason is the 'declined' event's message, and no failure counter moves (services/agent/task-fanout.ts
    * declineTask, which aimeat_task_decline calls too). `reason` is required.
    */
   router.post('/v1/agents/:name/tasks/:id/decline', requireAuth(), async (req, res) => {
@@ -366,7 +366,7 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    // The auto-resume, the state gate, the todo write and its event are services/agent-task-write.ts.
+    // The auto-resume, the state gate, the todo write and its event are services/agent/task-write.ts.
     // aimeat_task_todo wrote its own, and that copy carried two things this one did not: the
     // lastEventAt bump that keeps the stall detector off a visibly working agent, and the
     // todo_completed / todo_failed event the task history is read from.

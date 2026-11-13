@@ -179,7 +179,7 @@ import { registerCoreWorkTools } from './core-work.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
-import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../services/agent-refusals.js';
+import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../services/agent/refusals.js';
 import type { ResourceChangeEvent } from '../services/resource-events.js';
 import { resourceEvents } from '../services/resource-events.js';
 import { annotationsFor } from './annotations.js';
@@ -220,15 +220,15 @@ import { createWorkItem, workErrorText } from '../services/work/create-work-item
 // disagreeing is how a published number becomes a promise nobody keeps.
 import { MEMORY_LIST_MAX_LIMIT } from '../models/tool-input-vocabulary.js';
 import type { PeerInfo } from '../services/federation.js';
-import { taskStartView, scopeUseLookup } from '../services/agent-task-start-write.js';
-import { stoppedView } from '../services/agent-stop-rules.js';
+import { taskStartView, scopeUseLookup } from '../services/agent/task-start-write.js';
+import { stoppedView } from '../services/agent/stop-rules.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { presentWorkCost } from '../services/morsel.js';
 import { presentActionPricing } from '../services/action-pacing.js';
 import { memoryVisibilityDefault } from '../services/content-defaults.js';
-import { invitesPeople } from '../services/agent-invites.js';
-import { avatarView, readAvatar, readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { invitesPeople } from '../services/agent/invites.js';
+import { avatarView, readAvatar, readAvatarsOrEmpty } from '../services/agent/avatar.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -457,7 +457,7 @@ export function registerCoreTools(
                     // Whether its tasks start on their own, and what holds them for the owner.
                     ...taskStartView(a, useOf(a)),
                     // Whether the owner stopped it: a stopped agent starts no new work until it is
-                    // started again, and a runtime reads that here (services/agent-stop-rules.ts).
+                    // started again, and a runtime reads that here (services/agent/stop-rules.ts).
                     ...stoppedView(a),
                     default_scopes: a.defaultScopes ?? ['*'],
                     invites_people: invitesPeople(a.defaultScopes ?? ['*']),

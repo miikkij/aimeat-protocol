@@ -26,7 +26,7 @@
  */
 
 import ini from 'ini';
-import { CONFIG_FIELDS, serializeFieldValue, readConfigField } from '../services/config-schema.js';
+import { CONFIG_FIELDS, serializeFieldValue, readConfigField } from '../services/config/schema.js';
 import type { AimeatConfig } from '../config.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 import { planConsulExport } from '../services/consul-export.js';

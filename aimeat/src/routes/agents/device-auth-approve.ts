@@ -48,12 +48,12 @@ import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD, exceedsCeiling } from '../../utils/scope-coverage.js';
-import { recordAgentScopeRequest } from '../../services/agent-refusals.js';
+import { recordAgentScopeRequest } from '../../services/agent/refusals.js';
 import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance, clearanceBoundByApprover } from '../../services/agent-clearance.js';
+import { newAgentClearance, clearanceBoundByApprover } from '../../services/agent/clearance.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { logger } from '../../utils/logger.js';
-import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
+import { standingWorkOf, noticeStandingWork } from '../../services/agent/standing-work.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
@@ -330,7 +330,7 @@ export async function approveDeviceAuth(
       data: { name: request.agentName },
     }, config);
     // A new agent under a name an earlier agent had runs that agent's schedules and saved workflows
-    // again; the owner is told what it takes over (services/agent-standing-work.ts; secaudit2026oct26).
+    // again; the owner is told what it takes over (services/agent/standing-work.ts; secaudit2026oct26).
     const ownerGhii = `${request.ownerName}@${config.nodeId}`;
     await noticeStandingWork(storage, ownerGhii, request.agentName, await standingWorkOf(storage, ownerGhii, gaii), 'resumed')
       .catch(err => logger.warn('device-auth approve: standing work not counted', { gaii, error: String(err) }));

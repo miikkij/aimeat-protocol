@@ -51,7 +51,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import {
     deployAppAgent, appAgentInstances, appAgentStatus, type AppAgentRefusal,
 } from '../../services/app-agent-deploy.js';
-import type { ProposerPrincipal } from '../../services/agent-proposals.js';
+import type { ProposerPrincipal } from '../../services/agent/proposals.js';
 import { callerOf } from '../../middleware/caller.js';
 
 /** Bare owner name of the authenticated principal (owner claim may carry an @node suffix). */

@@ -11,7 +11,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (wish-corp-moodissa-julkaistu-app-ulosp-in-vahdittuna-ja-listattun).
  */
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { readOpeners, activeOpeners, type OpeningCtx } from './opening-store.js';
 import type { OpenedUnder } from './opening-types.js';
 

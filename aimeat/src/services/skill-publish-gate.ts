@@ -32,7 +32,7 @@ import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
 import { resolveSkillRef, formatSkillRef, SkillAccessError } from './skills.js';
 import { SkillValidationError, parseSkillMd } from './skill-md.js';
-import { signedInOnly } from '../config-visibility.js';
+import { signedInOnly } from '../config/visibility.js';
 import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 
 export type SkillGateAsk = Extract<PublishAsk, { kind: 'ask' | 'refused' }>;

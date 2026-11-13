@@ -85,7 +85,7 @@ function buyerIdentityOf(buyerOwner: string, config: AimeatConfig): string {
 
 /**
  * The money currency a line is priced in. 'morsel', which 3.x clients may still send (deprecated until
- * 4.0.0, config-pacing.ts), and an absent currency both mean the node's default: a free item is priced
+ * 4.0.0, config/pacing.ts), and an absent currency both mean the node's default: a free item is priced
  * at 0 in it, and a morsel is never a currency.
  */
 export function sessionCurrency(requested: string | undefined): string {

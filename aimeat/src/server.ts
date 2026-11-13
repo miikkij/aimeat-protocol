@@ -70,7 +70,7 @@
 import express from 'express';
 import compression from 'compression';
 import type { AimeatConfig } from './config.js';
-import type { StartSettingFallback } from './config-start-check.js';
+import type { StartSettingFallback } from './config/start-check.js';
 import type { Storage } from './storage/interface.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { hasSession, optionalAuth } from './auth/middleware.js';

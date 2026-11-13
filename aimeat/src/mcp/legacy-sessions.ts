@@ -38,7 +38,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 import { touchChatInstance } from '../services/chat-instance-write.js';
-import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
+import { markAgentMcpUse } from '../services/agent/mcp-touch.js';
 import { admitMcpAgent, recordMcpContact } from '../services/mcp-agent-admission.js';
 import { answerWithoutToken } from './unauthenticated-answer.js';
 import type { VerifiedToken } from '../auth/jwt.js';
@@ -87,7 +87,7 @@ export function legacySessions(deps: LegacySessionDeps) {
     // config.mcpSessionIdleMinutes; a returning client gets the spec's 404 and re-initializes.
     const sessionLastSeen = new Map<string, number>();
     // Which agent a session belongs to and which tool it came from, so the requests that follow the
-    // initialize can keep the agent's MCP use current (services/agent-mcp-touch.ts) without a
+    // initialize can keep the agent's MCP use current (services/agent/mcp-touch.ts) without a
     // second token parse. Cleaned wherever the other session maps are.
     const sessionAgents = new Map<string, { gaii: string; platform: string }>();
     // The account each session's principal acts for, so the caps count per owner (secaudit2026nov08

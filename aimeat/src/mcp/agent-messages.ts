@@ -46,7 +46,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
-import { sendAgentMessage } from '../services/agent-message-send.js';
+import { sendAgentMessage } from '../services/agent/message-send.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentMessageTools(
@@ -101,7 +101,7 @@ export function registerAgentMessageTools(
         },
         async ({ content, thread_id, linked_task_id, metadata, ai_provenance, ai_provenance_id }) => {
             // The record, the provenance stamp and the live-update emit are the REST route's, called
-            // rather than copied (services/agent-message-send.ts). Direction is fixed: this tool is
+            // rather than copied (services/agent/message-send.ts). Direction is fixed: this tool is
             // the agent writing to its owner. The tool's job is the two ends — declaring these
             // parameters, and rendering the answer as text.
             const result = await sendAgentMessage(

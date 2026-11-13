@@ -37,7 +37,7 @@ import { extensionConsentHolds } from './extension-consent.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { sendMail, type MailIntent } from './mail-gate.js';
 import { rateBuckets } from './rate-buckets.js';
-import { EXT_EMAIL_PER_HOUR_DEFAULT } from '../config-extension-load.js';
+import { EXT_EMAIL_PER_HOUR_DEFAULT } from '../config/extension-load.js';
 
 /**
  * The tiered email capability, which is the one place a sandboxed script can reach a stranger.

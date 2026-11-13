@@ -26,7 +26,7 @@ vi.mock('../../src/services/extension-system-run.js', () => ({
   },
 }));
 
-const { buildAppAgentFace } = await import('../../src/services/agent-face.js');
+const { buildAppAgentFace } = await import('../../src/services/agent/face.js');
 const { SqliteStorage } = await import('../../src/storage/providers/sqlite/index.js');
 import type { AimeatConfig } from '../../src/config.js';
 import type { AppRecord } from '../../src/storage/interface.js';

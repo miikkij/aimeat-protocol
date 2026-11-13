@@ -20,7 +20,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { readDoc } from '../compliance/docs.js';
 import type { IntermediationNotification } from '../compliance/docs-schemas.js';
 import { isOrgManager } from '../workspace-access.js';

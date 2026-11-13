@@ -31,7 +31,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from './server.js';
 import { loadConfig } from './config.js';
-import { ConfigStartError } from './config-start-check.js';
+import { ConfigStartError } from './config/start-check.js';
 import { logger } from './utils/logger.js';
 import { HELP_TEXT, CONNECT_HELP_TEXT } from './index-help.js';
 import { runConnectCli } from './index-connect.js';
@@ -161,7 +161,7 @@ if (consulTokenFlag) cliOverrides['consul.token'] = consulTokenFlag;
 const subcommand = positionals[0];
 // `validate`, `init` and `config` exist to show or repair a broken environment, so they load it
 // without the start check; every other command runs the default of a setting the node does not accept
-// and says so, and only the few settings in REFUSE_ON_INVALID stop it (config-start-check.ts).
+// and says so, and only the few settings in REFUSE_ON_INVALID stop it (config/start-check.ts).
 const loaded = (() => {
   try {
     return loadConfig({
@@ -205,8 +205,8 @@ if (subcommand === 'config') {
 
   // Default: show config
   const { formatConfig } = await import('./utils/env-config.js');
-  const { ConfigProvenance } = await import('./services/config-provenance.js');
-  const { ALL_CONFIG_MAP } = await import('./services/config-schema.js');
+  const { ConfigProvenance } = await import('./services/config/provenance.js');
+  const { ALL_CONFIG_MAP } = await import('./services/config/schema.js');
   const prov = new ConfigProvenance();
   prov.initDefaults(Object.keys(ALL_CONFIG_MAP));
   if (envKeys.length > 0) prov.markEnv(envKeys);

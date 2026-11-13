@@ -46,7 +46,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { MCP_PROTOCOL_VERSION, MCP_SERVED_REVISIONS } from '../mcp/protocol-version.js';
-import { buildAppAgentFace } from '../services/agent-face.js';
+import { buildAppAgentFace } from '../services/agent/face.js';
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
 import { appSeoIndexable, appSeoListable, appHasIconImage, appIconKey } from '../services/app-seo.js';

@@ -14,7 +14,7 @@
  *   WHAT IT DOES (the developer's ruling 2 of 2026-10-31). An identity whose current permissions
  *   cover `messages:read` gets the payload unchanged. Any other identity gets an arrival notice: the
  *   delivery id, the time, and a sentence saying the message waits until the person allows reading.
- *   The refusal is noted for an agent (services/agent-refusals.ts), which asks the owner once with
+ *   The refusal is noted for an agent (services/agent/refusals.ts), which asks the owner once with
  *   Allow and Don't allow (services/permission-ask-notice.ts withheldDmNotice). After Allow the next
  *   delivery is whole.
  *
@@ -31,7 +31,7 @@ import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from '../auth/jwt.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { noteAgentRefusal } from './agent-refusals.js';
+import { noteAgentRefusal } from './agent/refusals.js';
 import { logger } from '../utils/logger.js';
 
 /** The permission every read of a direct message addressed to the caller asks. */

@@ -16,7 +16,7 @@
  */
 import type { Express } from 'express';
 import type { AimeatConfig } from '../config.js';
-import { signedInOnly } from '../config-visibility.js';
+import { signedInOnly } from '../config/visibility.js';
 
 /**
  * The node's robots.txt, registered AFTER the subdomain router so an app origin has already

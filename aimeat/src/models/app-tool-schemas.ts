@@ -55,7 +55,7 @@ import { z } from 'zod';
 import { MONEY_CURRENCIES, moneyPricesOf } from '../commerce/money.js';
 import { ProvenanceSchema, OdpsExtrasSchema } from './odps-schemas.js';
 import { TOLL_MORSELS_MAX } from './offer-schemas.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 
 /** A provider pricing plan on a sellable tool — mirrors exchange-market OfferingPlan so a tool can carry
  *  per-call / volume-bundle / subscription pricing surfaced on its EXCHANGE offering. */

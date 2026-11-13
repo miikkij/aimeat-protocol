@@ -31,7 +31,7 @@ import { deflateSync } from 'node:zlib';
 import { extractPdfSignatures } from '../../src/services/docsign/pdf-extract.js';
 import { validatePdf } from '../../src/services/docsign/validate.js';
 import { _setTrustListFetcher } from '../../src/services/docsign/trust-list.js';
-import { docsignDefaults } from '../../src/config-docsign.js';
+import { docsignDefaults } from '../../src/config/docsign.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { appendSignature, makeCert, name, newRsa } from '../fixtures/docsign/pdf-sign.js';
 

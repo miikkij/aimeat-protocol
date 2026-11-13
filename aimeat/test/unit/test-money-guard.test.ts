@@ -13,8 +13,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { isLoopbackBaseUrl, testMoneyHandlerActive, testMoneyHandlerOnPublicNode } from '../../src/utils/test-money-guard.js';
-import { ALL_CONFIG_MAP, CONFIG_FIELDS, MUTABLE_CONFIG_MAP } from '../../src/services/config-schema.js';
-import { securityPostureWarnings } from '../../src/config-posture.js';
+import { ALL_CONFIG_MAP, CONFIG_FIELDS, MUTABLE_CONFIG_MAP } from '../../src/services/config/schema.js';
+import { securityPostureWarnings } from '../../src/config/posture.js';
 import type { AimeatConfig } from '../../src/config-types.js';
 
 describe('the test money guard', () => {

@@ -49,7 +49,7 @@ import { cached, invalidateKey, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
 import { packageAudienceOf } from '../knowledge-audience.js';
 import { bare, bytesHash } from './contract.js';
 import type { AimeatConfig } from '../../config.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
 import { currentNodeId, localAccountName } from '../../utils/gaii.js';

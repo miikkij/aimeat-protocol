@@ -69,7 +69,7 @@ import { eraseOwner } from '../services/owner-erasure.js';
 import { logger } from '../utils/logger.js';
 import { registerOwnerExportRoute } from './owners/export.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
-import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 
 export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

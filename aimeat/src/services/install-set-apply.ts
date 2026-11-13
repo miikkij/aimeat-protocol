@@ -101,7 +101,7 @@ import { expectsMissingMessage, missingExpects, type PackageExpects } from './pa
 import { createOrganismRecord } from './organism-lifecycle.js';
 import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from './workspace-provision.js';
 import { deployAppAgent } from './app-agent-deploy.js';
-import { readProposal, settleProposal } from './agent-proposals.js';
+import { readProposal, settleProposal } from './agent/proposals.js';
 import { deriveTierFlags } from './federation-tiers.js';
 import { selfNodeIdMessage } from './federation-peer-gate.js';
 import { proveNodeCard } from './packages/peer/package-peer-register.js';

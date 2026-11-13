@@ -61,7 +61,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { readAdult, NOT_VERIFIED } from '../../services/adult-assurance.js';
 import { callerOf } from '../../middleware/caller.js';
-import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 import { logger } from '../../utils/logger.js';
 import { membersSeeEachOther, nodeColleagues } from '../../services/colleagues.js';
 

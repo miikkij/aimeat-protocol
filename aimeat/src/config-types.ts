@@ -76,11 +76,11 @@
  *   v1.0.0 — 2026-07-13 — Extracted from config.ts (max-file-lines)
  */
 
-import type { SecurityDoorConfig } from './config-security.js';
-import type { SealedConfig } from './services/config-sealing.js';
+import type { SecurityDoorConfig } from './config/security.js';
+import type { SealedConfig } from './services/config/sealing.js';
 
-import type { ExtensionHooks } from './config-types-hooks.js';
-export type { ExtensionHooks, HookName } from './config-types-hooks.js';
+import type { ExtensionHooks } from './config/types-hooks.js';
+export type { ExtensionHooks, HookName } from './config/types-hooks.js';
 
 export interface RateLimitTier {
   windowMs: number;
@@ -118,42 +118,42 @@ export interface RateLimitsConfig {
 export type NodeType = 'full' | 'relay' | 'mirror' | 'personal';
 export type FederationRole = 'operator' | 'contributor' | 'standalone';
 
-// The operator identity block lives in config-types-operator.ts since 2026-10-25, so the config
+// The operator identity block lives in config/types-operator.ts since 2026-10-25, so the config
 // schema rows can name its keys without importing this file. Re-exported so every importer is unchanged.
-import type { OperatorConfig } from './config-types-operator.js';
-export type { OperatorConfig, OperatorType } from './config-types-operator.js';
+import type { OperatorConfig } from './config/types-operator.js';
+export type { OperatorConfig, OperatorType } from './config/types-operator.js';
 
 // The site links (the apps, the store and the people the public pages point at) live in
-// config-types-site-links.ts since 2026-08-28, when they took this file past 800 lines. Re-exported
+// config/types-site-links.ts since 2026-08-28, when they took this file past 800 lines. Re-exported
 // so every importer of SiteContact / SiteLinksConfig from here is unchanged.
-import type { SiteLinksConfig } from './config-types-site-links.js';
-export type { SiteContact, SiteLinksConfig } from './config-types-site-links.js';
+import type { SiteLinksConfig } from './config/types-site-links.js';
+export type { SiteContact, SiteLinksConfig } from './config/types-site-links.js';
 
-import type { AiCapabilityConfig } from './config-types-ai.js';
-import type { SitePresenceConfig } from './config-site-presence.js';
-import type { SocialLoginConfig } from './config-types-social-login.js';
-import type { SmtpConfig } from './config-types-smtp.js';
-import type { ConnectionsConfig } from './config-types-connections.js';
-import type { McpProxyConfig } from './config-types-mcp-proxy.js';
-import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
-import type { AccountSecurityConfig } from './config-types-account-security.js';
-import type { CapabilitiesConfig } from './config-types-capabilities.js';
-import type { ThemesConfig } from './config-themes.js';
-import type { PackagesConfig } from './config-types-packages.js';
-import type { ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config-data-access.js';
-import type { UpdateCheckConfig } from './config-update-check.js';
-import type { AppAuditConfig } from './config-app-audit.js';
-import type { AgentAccessConfig } from './config-types-agent-access.js';
-import type { VisibilityConfig } from './config-visibility.js';
-import type { TurnConfig } from './config-turn.js';
-import type { DocsignConfig } from './config-docsign.js';
-import type { PagesConfig } from './config-pages.js';
-import type { ContentClassConfig } from './config-content-class.js';
-import type { RuntimeConfig } from './config-runtime.js';
-import type { ExtensionLoadConfig } from './config-extension-load.js';
-import type { NodeLimitsConfig } from './config-node-limits.js';
-import type { FileStoreConfig } from './config-file-store.js';
-import type { DataspaceConfig } from './config-dataspace.js';
+import type { AiCapabilityConfig } from './config/types-ai.js';
+import type { SitePresenceConfig } from './config/site-presence.js';
+import type { SocialLoginConfig } from './config/types-social-login.js';
+import type { SmtpConfig } from './config/types-smtp.js';
+import type { ConnectionsConfig } from './config/types-connections.js';
+import type { McpProxyConfig } from './config/types-mcp-proxy.js';
+import type { EnterpriseSsoConfig } from './config/types-enterprise-sso.js';
+import type { AccountSecurityConfig } from './config/types-account-security.js';
+import type { CapabilitiesConfig } from './config/types-capabilities.js';
+import type { ThemesConfig } from './config/themes.js';
+import type { PackagesConfig } from './config/types-packages.js';
+import type { ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config/data-access.js';
+import type { UpdateCheckConfig } from './config/update-check.js';
+import type { AppAuditConfig } from './config/app-audit.js';
+import type { AgentAccessConfig } from './config/types-agent-access.js';
+import type { VisibilityConfig } from './config/visibility.js';
+import type { TurnConfig } from './config/turn.js';
+import type { DocsignConfig } from './config/docsign.js';
+import type { PagesConfig } from './config/pages.js';
+import type { ContentClassConfig } from './config/content-class.js';
+import type { RuntimeConfig } from './config/runtime.js';
+import type { ExtensionLoadConfig } from './config/extension-load.js';
+import type { NodeLimitsConfig } from './config/node-limits.js';
+import type { FileStoreConfig } from './config/file-store.js';
+import type { DataspaceConfig } from './config/dataspace.js';
 
 export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig, DataspaceConfig, SmtpConfig {
   port: number;
@@ -448,7 +448,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    *  node as its audience (services/signed-node-request.ts audienceRefusal), and a replicate, catalogue
    *  sync, genesis catalogue ingest or read receipt without its delivery proof (deliveryRefusal). The
    *  default follows the version: off before AUDIENCE_REQUIRED_BY_DEFAULT_IN (3.27.0), on from it, and
-   *  the unproven format goes in UNPROVEN_FORMAT_REMOVED_IN (4.0.0), both in config-federation.ts. A
+   *  the unproven format goes in UNPROVEN_FORMAT_REMOVED_IN (4.0.0), both in config/federation.ts. A
    *  message that names an audience is checked either way, and a peer that has once sent a delivery
    *  proof is held to it whatever this says (secaudit 2026-10 follow-up, A7; 2026-10-10 I21, I22). */
   federationAudienceRequired: boolean;
@@ -524,7 +524,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   executionLogRetentionDays: number;
 
   // Two-step sign-in, passkeys and the key that encrypts what they store: AccountSecurityConfig,
-  // in config-types-account-security.ts.
+  // in config/types-account-security.ts.
 
   // MSM installation role restriction
   msmInstallRole: 'operator' | 'owner';
@@ -587,7 +587,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   /** How long the Crew tab's "Try" waits for a running crew to finish one trial run (invoke over the tunnel). */
   crewTryTimeoutMs: number;
 
-  // Email / SMTP (Phase 1.1): SmtpConfig, config-types-smtp.ts
+  // Email / SMTP (Phase 1.1): SmtpConfig, config/types-smtp.ts
 
   // Match Notifications (Phase 1.6)
 
@@ -612,7 +612,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   /** MCP Server Card commerce_tools block: embed the priced app-tool catalog or point at /v1/commerce/tools. */
   mcpCardCommerceTools: 'inline' | 'pointer';
   // contentSignal, aiTraining, webBotAuthSign and frontPage live in SitePresenceConfig
-  // (config-site-presence.ts), extracted when this file crossed the 800-line ceiling.
+  // (config/site-presence.ts), extracted when this file crossed the 800-line ceiling.
 
   // Push Notifications / PWA (Phase 3.1)
   pushEnabled: boolean;
@@ -643,10 +643,10 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   nonceTtlSeconds: number;
   nationalEidPidClaim: string;
 
-  // Social login (Google, Casdoor, Entra ID) → SocialLoginConfig in config-types-social-login.ts
+  // Social login (Google, Casdoor, Entra ID) → SocialLoginConfig in config/types-social-login.ts
 
   // OUTBOUND connections (the applications this node registers AS, so a person can connect
-  // their own account elsewhere) → ConnectionsConfig in config-types-connections.ts
+  // their own account elsewhere) → ConnectionsConfig in config/types-connections.ts
 
   // Cross-Federation (Phase 3.4)
   crossFederationEnabled: boolean;
@@ -680,7 +680,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   realtimeMaxMessageSizeBytes: number;
   realtimeRateLimitPerSecond: number;
   stunServers: string[];
-  // TURN relay settings: TurnConfig (config-turn.ts), mixed in above.
+  // TURN relay settings: TurnConfig (config/turn.ts), mixed in above.
 
   // Encrypted Chat (extension)
   echatAnonymous: boolean;
@@ -706,7 +706,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   statsAccess: 'public' | 'authenticated' | 'operator';
 
   // Scoped agent capabilities, MCP sessions and ecosystem scope bounds: AgentAccessConfig
-  // (config-types-agent-access.ts).
+  // (config/types-agent-access.ts).
 
   // Prometheus Metrics
   metricsEnabled: boolean;
@@ -766,7 +766,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   portfolioMaxSizeKb: number;
   portfolioMaxImages: number;
 
-  // Capabilities → CapabilitiesConfig in config-types-capabilities.ts; themes → ThemesConfig in config-themes.ts
+  // Capabilities → CapabilitiesConfig in config/types-capabilities.ts; themes → ThemesConfig in config/themes.ts
 
   // Agent Tasks (Phase 1)
   taskStallThresholdMinutes: number;
@@ -805,4 +805,4 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   consulDatacenter: string;
 }
 
-// LoadConfigOptions and LoadConfigResult moved to config-load-types.ts (pure extraction, 2026-10-16).
+// LoadConfigOptions and LoadConfigResult moved to config/load-types.ts (pure extraction, 2026-10-16).

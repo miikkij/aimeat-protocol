@@ -29,7 +29,7 @@ import {
 } from '../../src/services/signed-node-request.js';
 import {
     AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, audienceRequiredByDefault, federationDefaults, unprovenFormatLive,
-} from '../../src/config-federation.js';
+} from '../../src/config/federation.js';
 import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
 
 describe('a delivery names its node and its moment', () => {

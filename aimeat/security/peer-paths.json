@@ -1,7 +1,7 @@
 {
   "about": "Every file under src/ that writes a federation peer (saveFederationPeer) or trusts a peer url or key (<name with peer>.url / .publicKey), how many times, and on what proof. pnpm check:peer-paths fails on a new file and on a count that grew. UNREVIEWED marks an entry nobody has answered yet. Written 2026-10-01 after the peer-registration incident.",
   "writers": {
-    "src/routes/admin-monitoring.ts": {
+    "src/routes/admin/monitoring.ts": {
       "count": 1,
       "why": "completeJoin, behind requireRole('operator') on POST /v1/admin/federation/join: the operator named the target url. The key comes from a key exchange that must answer as the node id the target's card named, and the peer is saved only with that key and only when no peer of that id exists (2026-10-01)."
     },
@@ -131,7 +131,7 @@
       "count": 1,
       "why": "On a peer's recovery, a key exchange with it that must answer as its id; the key cache is written under that id only."
     },
-    "src/services/agent-port-redirect.ts": {
+    "src/services/agent/port-redirect.ts": {
       "count": 1,
       "why": "Redirects a ported agent to an active peer whose url origin matches the pointer the agent's owner wrote; the peer only supplies its own address."
     },

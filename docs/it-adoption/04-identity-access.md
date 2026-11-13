@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.3.0 (commit 99fe2f68f) on 2026-11-11. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit d76b3dac5) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -21,8 +21,8 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 | Method | Default | Settings | What IT decides | Source |
 |---|---|---|---|---|
 | Password | On for everyone (`AIMEAT_PASSWORD_SIGN_IN=on`) | `AIMEAT_PASSWORD_SIGN_IN` (`on`, `operators`, `off`), `AIMEAT_SIGN_IN_LOCKOUT` (`off`), `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5) and `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15) when the lockout is on, `AIMEAT_LOGIN_RATE_LIMIT_MAX` | Whether people sign in locally at all: `operators` keeps the password for operator accounts only, `off` for nobody (see below). Whether wrong attempts lock an account: no by default (see below). | `aimeat/src/utils/password-validation.ts`, `aimeat/src/services/password.ts`, `aimeat/src/services/sign-in-policy.ts` |
-| Passkey (WebAuthn) | On | `AIMEAT_PASSKEY_ENABLED`, `AIMEAT_PASSKEY_RP_ID`, `AIMEAT_PASSKEY_EXTRA_ORIGINS` | The domain, before the first passkey (see below). | `aimeat/src/routes/passkeys.ts`, `aimeat/src/config-types-account-security.ts` |
-| Two-step sign-in (TOTP) | Available, armed by each person; required for nobody (`AIMEAT_TWO_STEP_REQUIRED=off`) | `AIMEAT_TWO_STEP_REQUIRED` (`off`, `operators`, `everyone`), `AIMEAT_TOTP_ENABLED`, `AIMEAT_TOTP_MAX_FAILED` (5) and `AIMEAT_TOTP_LOCKOUT_SECONDS` (300) when the lockout is on, `AIMEAT_TOTP_BACKUP_CODE_COUNT` (10) | Who must use it: operator accounts or every account (see below). | `aimeat/src/config-types-account-security.ts`, `aimeat/src/services/sign-in-policy.ts` |
+| Passkey (WebAuthn) | On | `AIMEAT_PASSKEY_ENABLED`, `AIMEAT_PASSKEY_RP_ID`, `AIMEAT_PASSKEY_EXTRA_ORIGINS` | The domain, before the first passkey (see below). | `aimeat/src/routes/passkeys.ts`, `aimeat/src/config/types-account-security.ts` |
+| Two-step sign-in (TOTP) | Available, armed by each person; required for nobody (`AIMEAT_TWO_STEP_REQUIRED=off`) | `AIMEAT_TWO_STEP_REQUIRED` (`off`, `operators`, `everyone`), `AIMEAT_TOTP_ENABLED`, `AIMEAT_TOTP_MAX_FAILED` (5) and `AIMEAT_TOTP_LOCKOUT_SECONDS` (300) when the lockout is on, `AIMEAT_TOTP_BACKUP_CODE_COUNT` (10) | Who must use it: operator accounts or every account (see below). | `aimeat/src/config/types-account-security.ts`, `aimeat/src/services/sign-in-policy.ts` |
 | Sign-in link by email | Per account: on once the person has proved an address through email verification or attach-email, off for accounts created by SCIM, SAML or OIDC; no node-wide switch | Rate limit 5 requests per IP address per 10 minutes | Whether email delivery is configured. | `aimeat/src/services/login-link.ts`, `aimeat/src/routes/ghii/web-verify.ts`, `aimeat/src/routes/ghii/login-link-second-factor.ts` |
 | Microsoft Entra ID (OIDC) | Off | `AIMEAT_ENTRA_OAUTH_ENABLED`, `AIMEAT_ENTRA_OAUTH_TENANT`, `AIMEAT_ENTRA_ALLOWED_TENANTS`, `AIMEAT_ENTRA_LINK_DOMAINS` | Tenants allowed, domains whose addresses count as verified. | `aimeat/src/services/oidc-providers.ts` |
 | Google (OIDC) | Off | `AIMEAT_GOOGLE_OAUTH_ENABLED` and client settings | Whether any Google account may sign in (there is no domain gate). | `aimeat/src/services/oidc-providers.ts` |
@@ -52,7 +52,7 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 
 - The node checks the `tid` claim of the verified ID token against `AIMEAT_ENTRA_ALLOWED_TENANTS` on every sign-in, not only the first. Removing a tenant locks its people out and keeps their data (`aimeat/src/services/oidc-providers.ts`, [Organisation node sign-in](../organisation-node-sign-in.md), section 6).
 - The node asks for `openid`, `profile` and `email` only: no Microsoft Graph permission ([Organisation node sign-in](../organisation-node-sign-in.md), section 3).
-- `AIMEAT_ENTRA_ALLOWED_TENANTS` is environment-only. The tenant (`AIMEAT_ENTRA_OAUTH_TENANT`) and the Entra switch can be changed on the Config page and take effect at restart (`aimeat/src/services/config-schema-access.ts`). Without an allowlist, the tenant alone is the gate, so an operator can widen Entra sign-in without a deploy; set the allowlist, or seal those settings (below), when that must take a deploy ([Organisation node sign-in](../organisation-node-sign-in.md), section 4).
+- `AIMEAT_ENTRA_ALLOWED_TENANTS` is environment-only. The tenant (`AIMEAT_ENTRA_OAUTH_TENANT`) and the Entra switch can be changed on the Config page and take effect at restart (`aimeat/src/services/config/schema-access.ts`). Without an allowlist, the tenant alone is the gate, so an operator can widen Entra sign-in without a deploy; set the allowlist, or seal those settings (below), when that must take a deploy ([Organisation node sign-in](../organisation-node-sign-in.md), section 4).
 - A guest in the organisation's own tenant carries that tenant's `tid` and passes the gate ([Organisation node sign-in](../organisation-node-sign-in.md), section 6).
 
 ### Google (OIDC)
@@ -130,8 +130,8 @@ Incoming webhook API keys and outside party keys are not revoked: they are refus
 
 ## Passkeys and the domain
 
-- The relying party ID (RP ID) is the host of `AIMEAT_BASE_URL` unless `AIMEAT_PASSKEY_RP_ID` names another (`aimeat/src/config-types-account-security.ts`).
-- The RP ID is immutable at runtime (`immutable: true` in `aimeat/src/services/config-schema.ts`). A passkey is bound to its RP ID for good: changing the node's domain makes every registered passkey unusable ([WebAuthn Level 3, RP ID](https://www.w3.org/TR/webauthn-3/#rp-id)).
+- The relying party ID (RP ID) is the host of `AIMEAT_BASE_URL` unless `AIMEAT_PASSKEY_RP_ID` names another (`aimeat/src/config/types-account-security.ts`).
+- The RP ID is immutable at runtime (`immutable: true` in `aimeat/src/services/config/schema.ts`). A passkey is bound to its RP ID for good: changing the node's domain makes every registered passkey unusable ([WebAuthn Level 3, RP ID](https://www.w3.org/TR/webauthn-3/#rp-id)).
 - Decide the node's final domain before the first person registers a passkey. Set `AIMEAT_PASSKEY_RP_ID` to a parent domain only when keys must also work on other subdomains of it.
 - A passkey is a sign-in method of its own, not a second factor after the password; the node asks no TOTP code after a passkey (`aimeat/src/routes/passkeys.ts`).
 
@@ -151,14 +151,14 @@ Incoming webhook API keys and outside party keys are not revoked: they are refus
 
 ## Requiring two-step sign-in, limiting password sign-in
 
-Two settings decide the sign-in policy. Both can be changed while the node runs: on the admin Config page, with `PUT /v1/admin/config` or with `aimeat_admin_config_set` (`aimeat/.env.example`, `aimeat/src/services/config-schema-access.ts`).
+Two settings decide the sign-in policy. Both can be changed while the node runs: on the admin Config page, with `PUT /v1/admin/config` or with `aimeat_admin_config_set` (`aimeat/.env.example`, `aimeat/src/services/config/schema-access.ts`).
 
 | Setting | Values | What it does | Source |
 |---|---|---|---|
 | `AIMEAT_TWO_STEP_REQUIRED` (Config `auth.two_step_required`) | `off` (default), `operators`, `everyone` | Who must use two-step sign-in: nobody, accounts with the operator role, or every account | `aimeat/src/services/sign-in-policy.ts` |
 | `AIMEAT_PASSWORD_SIGN_IN` (Config `auth.password_sign_in`) | `on` (default), `operators`, `off` | Who may sign in with a password: everyone, operator accounts only, or nobody | `aimeat/src/services/sign-in-policy.ts` |
 
-The sign-in dialog's headline and the line under it can be the operator's own words per language (`AIMEAT_SIGN_IN_TITLE_EN|FI|ES` and `AIMEAT_SIGN_IN_LINE_EN|FI|ES`, Config `auth.sign_in_title_*` and `auth.sign_in_line_*`; empty by default). They are display text only: plain text of one line, at most 200 characters, escaped before display, and they change no sign-in rule (`aimeat/src/services/config-schema-access.ts`, `aimeat/src/static/sdk-libs/auth/modal.js`).
+The sign-in dialog's headline and the line under it can be the operator's own words per language (`AIMEAT_SIGN_IN_TITLE_EN|FI|ES` and `AIMEAT_SIGN_IN_LINE_EN|FI|ES`, Config `auth.sign_in_title_*` and `auth.sign_in_line_*`; empty by default). They are display text only: plain text of one line, at most 200 characters, escaped before display, and they change no sign-in rule (`aimeat/src/services/config/schema-access.ts`, `aimeat/src/static/sdk-libs/auth/modal.js`).
 
 **Required two-step sign-in.**
 
@@ -167,7 +167,7 @@ The sign-in dialog's headline and the line under it can be the operator's own wo
 - A passkey sign-in and an identity provider sign-in (OIDC or SAML) satisfy the rule; on those paths the factor is the device or the identity provider's MFA (`aimeat/src/services/sign-in-policy.ts`).
 - A session refresh of a covered account with no TOTP, no passkey and no identity provider link is refused, so the person signs in again and enrols (`aimeat/src/services/owner-session.ts`).
 - Agents, ecosystem apps and visitors from another node are not covered (`aimeat/src/services/sign-in-policy.ts`). When this node is the home node of a federated sign-in, it refuses a covered account without TOTP (`aimeat/src/routes/federation-auth.ts`).
-- The rule needs TOTP on: a save that leaves it required while `AIMEAT_TOTP_ENABLED` is false is refused with 409 `TWO_STEP_NEEDS_TOTP`, whichever of the two settings the save changes. Set that way from the environment, the node starts and logs a `SECURITY` warning (`aimeat/src/services/config-admin-view.ts`, `aimeat/src/index-start.ts`).
+- The rule needs TOTP on: a save that leaves it required while `AIMEAT_TOTP_ENABLED` is false is refused with 409 `TWO_STEP_NEEDS_TOTP`, whichever of the two settings the save changes. Set that way from the environment, the node starts and logs a `SECURITY` warning (`aimeat/src/services/config/admin-view.ts`, `aimeat/src/index-start.ts`).
 
 **Password sign-in.**
 
@@ -182,7 +182,7 @@ The sign-in dialog's headline and the line under it can be the operator's own wo
 - `on`: `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` wrong passwords lock the account for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (429 `PASSWORD_LOCKED`), and `AIMEAT_TOTP_MAX_FAILED` wrong codes for `AIMEAT_TOTP_LOCKOUT_SECONDS` (429 `TOTP_LOCKED`) (`aimeat/src/services/password-check.ts`).
 - An organisation whose policy requires an account lockout sets it `on`.
 
-**Who changes them.** A change that weakens any of these settings is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set`. The same rule refuses an AI the removal of a saved value of these settings (`DELETE /v1/admin/config/:path`). Each setting's row in the Config schema carries the rule. The admin Config API, its MCP tool and the reset apply it. The Consul import (`POST /v1/admin/consul/import`) applies it to an AI credential too: a Consul value that would weaken one of these settings is not imported, and the answer names it in `held_back`; the operator in person imports every value. An import with `aimeat config import` at the server does not apply it, because the values come from the operator's own configuration and no AI credential runs it (`aimeat/src/services/config-strictness.ts`, `aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`, `aimeat/src/services/consul-config.ts`).
+**Who changes them.** A change that weakens any of these settings is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set`. The same rule refuses an AI the removal of a saved value of these settings (`DELETE /v1/admin/config/:path`). Each setting's row in the Config schema carries the rule. The admin Config API, its MCP tool and the reset apply it. The Consul import (`POST /v1/admin/consul/import`) applies it to an AI credential too: a Consul value that would weaken one of these settings is not imported, and the answer names it in `held_back`; the operator in person imports every value. An import with `aimeat config import` at the server does not apply it, because the values come from the operator's own configuration and no AI credential runs it (`aimeat/src/services/config/strictness.ts`, `aimeat/src/services/config/admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`, `aimeat/src/services/consul-config.ts`).
 
 ## First-run setup
 
@@ -207,7 +207,7 @@ The node has one account role above a person, `operator`. There is no separate `
 | Publish an app | yes | yes | yes | yes | with `app:write` | within its scopes | not with `app:write`, which an app cannot ask |
 | Approve an agent | own agents | own agents | own agents | own agents | a sibling, never with more scopes than its own | no | no |
 
-Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin-monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/services/workspace-roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/app-grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
+Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin/monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/services/workspace-roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/app-grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
 
 ## Agent identities
 
@@ -225,8 +225,8 @@ sequenceDiagram
 ```
 
 - **Approval.** No agent is created implicitly. The owner approves each one and picks its scopes ([Identity model](../coding-guidelines/identity-model.md)). With `AIMEAT_SAME_OWNER_AUTO_APPROVE=true` (the default), a request made by the same owner's own session or one of their agents is approved without a second press; never across owners and never with more scopes than the approver holds (`aimeat/.env.example`).
-- **Scopes.** Defaults come from `AIMEAT_DEFAULT_AGENT_SCOPES` and the ceiling from `AIMEAT_MAX_AGENT_SCOPES` (`aimeat/.env.example`). The consent screens offer read only, standard, full and custom (`aimeat/public/views/profile/agents/scope-model.js`). "Full" is `*`, which never carries the words outside the wildcard: `account:security`, `secrets:manage`, `mcp:manage`, `publish:public`, `operator:admin` and the other own-tick words (`aimeat/src/utils/scope-coverage.ts`). On a node sold from the store (`site.purchase_plan` set), an agent gets every word the node's tools ask for when it is approved, whatever it asked for, and every agent that already exists gets them once, when the plan is set or when the node starts (an agent that another agent approves through device authorization gets only the words its approver holds). A token an agent signs in with copies the words on its record and never adds one. The words given leave out those words, `agent:write`, `commerce:sell`, `exchange:beneficiary`, `organism:invite`, `consent:manage` and the words that hold a task for the owner (`TASK_START_FLOOR`: `commerce:buy`, `exchange:write`, `connections:use`, `outbound:send`, `messages:send-as-owner`, `messages:delete-as-owner`, `memory:purge`; `aimeat/src/services/agent-task-rules.ts`). Those stay with the owner, who can give one per agent; an agent holding one waits for the owner before each task. The Agents page shows the result, and a word the owner then takes away stays away (`aimeat/src/services/place-agent-scopes.ts`). A node without a purchase plan does not do this. Calling an app tool asks `exchange:invoke`; opening a paid contract asks `exchange:write`, which also covers `exchange:invoke` (`aimeat/src/utils/scope-coverage.ts`).
-- **MCP scope filter.** `AIMEAT_MCP_ENFORCE_SCOPES=true` (default, immutable at runtime) hides and refuses every MCP tool the agent holds no scope for (`aimeat/src/services/config-schema-access.ts`).
+- **Scopes.** Defaults come from `AIMEAT_DEFAULT_AGENT_SCOPES` and the ceiling from `AIMEAT_MAX_AGENT_SCOPES` (`aimeat/.env.example`). The consent screens offer read only, standard, full and custom (`aimeat/public/views/profile/agents/scope-model.js`). "Full" is `*`, which never carries the words outside the wildcard: `account:security`, `secrets:manage`, `mcp:manage`, `publish:public`, `operator:admin` and the other own-tick words (`aimeat/src/utils/scope-coverage.ts`). On a node sold from the store (`site.purchase_plan` set), an agent gets every word the node's tools ask for when it is approved, whatever it asked for, and every agent that already exists gets them once, when the plan is set or when the node starts (an agent that another agent approves through device authorization gets only the words its approver holds). A token an agent signs in with copies the words on its record and never adds one. The words given leave out those words, `agent:write`, `commerce:sell`, `exchange:beneficiary`, `organism:invite`, `consent:manage` and the words that hold a task for the owner (`TASK_START_FLOOR`: `commerce:buy`, `exchange:write`, `connections:use`, `outbound:send`, `messages:send-as-owner`, `messages:delete-as-owner`, `memory:purge`; `aimeat/src/services/agent/task-rules.ts`). Those stay with the owner, who can give one per agent; an agent holding one waits for the owner before each task. The Agents page shows the result, and a word the owner then takes away stays away (`aimeat/src/services/place-agent-scopes.ts`). A node without a purchase plan does not do this. Calling an app tool asks `exchange:invoke`; opening a paid contract asks `exchange:write`, which also covers `exchange:invoke` (`aimeat/src/utils/scope-coverage.ts`).
+- **MCP scope filter.** `AIMEAT_MCP_ENFORCE_SCOPES=true` (default, immutable at runtime) hides and refuses every MCP tool the agent holds no scope for (`aimeat/src/services/config/schema-access.ts`).
 - **Clearance.** When classification is on, an agent reads content only up to its clearance. `AIMEAT_AGENT_CLEARANCE_DEFAULT` (`classification.agent_clearance_default`) sets it for new agents; empty means no limit, which is the default. An approving agent passes on no looser clearance than its own (`aimeat/src/routes/agents/device-auth-approve.ts`).
 - **The owner sees what their agents hold.** A record an agent stored is its owner's. The reverse is not true: an agent reading its owner's private data goes through the ordinary visibility and consent checks (`.claude/rules/security.md`).
 - **Removal.** Deleting an agent revokes its sessions before the agent is removed, and closes its MCP sessions (`aimeat/src/routes/agents/management.ts`). An operator lists every agent on the node with `aimeat_admin_agents`.
@@ -238,8 +238,8 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 
 | Action | Source |
 |---|---|
-| Raising an agent's clearance or removing its limit (an agent may only lower it) | `aimeat/src/services/agent-clearance.ts` |
-| Letting an agent add permissions to other agents (`agent:permissions-add`) | `aimeat/src/services/agent-scope-add.ts` |
+| Raising an agent's clearance or removing its limit (an agent may only lower it) | `aimeat/src/services/agent/clearance.ts` |
+| Letting an agent add permissions to other agents (`agent:permissions-add`) | `aimeat/src/services/agent/scope-add.ts` |
 | Turning classification off, or from `all` to `owner` | `aimeat/src/services/handbooks/admin.ts` |
 | A classification exception for one item | `aimeat/src/services/classification/exception-admin.ts` |
 | Password, recovery address, second factor, passkeys, export and erasure of the account (an agent only with the exact `account:security` tick; an app never) | `aimeat/src/auth/account-security.ts`, `aimeat/src/routes/owners.ts` |
@@ -249,7 +249,7 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 
 | Credential | Lifetime | Setting | Revocation | Source |
 |---|---|---|---|---|
-| Person's access token | 900 s | `AIMEAT_ACCESS_TTL` | Ends with its session | `aimeat/src/services/config-schema-access.ts` |
+| Person's access token | 900 s | `AIMEAT_ACCESS_TTL` | Ends with its session | `aimeat/src/services/config/schema-access.ts` |
 | Person's refresh cookie | 30 days idle, 90 days at most | `AIMEAT_REFRESH_IDLE_DAYS`, `AIMEAT_REFRESH_ABSOLUTE_DAYS` | `DELETE /v1/auth/sessions/:id`, `DELETE /v1/auth/sessions/others`, `DELETE /v1/auth/sessions` | `aimeat/src/routes/auth.ts` |
 | Agent token (device authorization) | 90 days | `AIMEAT_AGENT_JWT_TTL` | Agent delete or rekey; owner deactivation | `aimeat/src/routes/agents/management.ts` |
 | Ecosystem app token | 90 days | `AIMEAT_ECO_JWT_TTL` | Owner management, owner deactivation | [Building an ecosystem app](../building-an-aimeat-compatible-ecosystem-app.md) |
@@ -268,13 +268,13 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 
 ## Admin credentials
 
-- The first operator is created through the setup code flow above. An operator gives the operator role to another account and takes it back (`POST /v1/admin/roles/grant`, `POST /v1/admin/roles/revoke`); the last operator and the operator themselves cannot be revoked, and each change is recorded (`aimeat/src/routes/admin-monitoring.ts`).
+- The first operator is created through the setup code flow above. An operator gives the operator role to another account and takes it back (`POST /v1/admin/roles/grant`, `POST /v1/admin/roles/revoke`); the last operator and the operator themselves cannot be revoked, and each change is recorded (`aimeat/src/routes/admin/monitoring.ts`).
 - An agent of an operator account acts as operator only for the exact words the operator ticks for it, such as `operator:admin` (`aimeat/src/services/operator-principal.ts`). An agent holding `operator:admin` passes every operator REST route and MCP admin tool, by design (`aimeat/src/auth/operator-gate.ts`).
 - Turn on TOTP or a passkey for every operator account ([Deployment checklist](../security/deployment-checklist.md)), and set `AIMEAT_TWO_STEP_REQUIRED=operators` so that the node enforces it (`aimeat/src/services/sign-in-policy.ts`).
 
 ## Limits
 
-- Two-step sign-in is required for nobody until `AIMEAT_TWO_STEP_REQUIRED` is set; the default is `off` (`aimeat/src/config-types-account-security.ts`).
+- Two-step sign-in is required for nobody until `AIMEAT_TWO_STEP_REQUIRED` is set; the default is `off` (`aimeat/src/config/types-account-security.ts`).
 - After the first linked OIDC or SAML sign-in, the node asks no TOTP code, and such a sign-in satisfies a required two-step rule; MFA on that path is the identity provider's, and the node does not check it.
 - Passkey sign-in skips TOTP by design: the device is the factor.
 - No code path was found that limits one account the directory manages to its SSO connection while others keep a password. Such an account gets no emailed sign-in link unless the person later attaches and verifies an address, but it can get a password through the reset flow while `AIMEAT_PASSWORD_SIGN_IN` is `on`, because its directory-vouched address is recorded as verified. `operators` or `off` refuses that reset node-wide for non-operators (`aimeat/src/routes/ghii/recovery.ts`). The emailed sign-in link has no node-wide switch.

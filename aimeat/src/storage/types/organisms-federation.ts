@@ -443,7 +443,7 @@ export interface ExtensionRecord {
     commercial?: {
       /**
        * DEPRECATED: the 3.x morsel price. It is pacing: read as an addition to `tollMorsels` until
-       * MORSEL_PRICE_FIELDS_REMOVED_IN (config-pacing.ts). Never a payment; 0 = money-only.
+       * MORSEL_PRICE_FIELDS_REMOVED_IN (config/pacing.ts). Never a payment; 0 = money-only.
        */
       payMorsels: number;
       payMoney?: { amount: number; currency: string };       // 6-decimal micro-units, PSP-settled to owner

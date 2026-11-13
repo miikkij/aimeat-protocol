@@ -26,7 +26,7 @@ import {
 } from '../../src/services/scope-use.js';
 import { narrowAgent } from '../../src/services/scope-narrowing.js';
 import { provenanceForWrite } from '../../src/services/ai/provenance.js';
-import { decideTaskStart, floorScopesOf } from '../../src/services/agent-task-rules.js';
+import { decideTaskStart, floorScopesOf } from '../../src/services/agent/task-rules.js';
 
 const NODE = 'aimeat-test-001';
 let storage: Storage;

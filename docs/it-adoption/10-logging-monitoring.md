@@ -9,8 +9,8 @@ This page is for the sysadmin and the SOC that must watch a node. It lists what 
 | Record | What one entry holds | Where it is stored | How to read it | Source |
 |---|---|---|---|---|
 | **Process log** | Timestamp, level, message, `node_id`, and the request id and caller identity of the request it ran under | stdout (journald under systemd, the container log under Docker) | `journalctl -u aimeat`, the container log | `aimeat/src/utils/logger.ts`, `aimeat/deploy/aimeat.service` |
-| **Refusal log** | One JSON line per 401 and 403, whichever route answered, and per wrong reset code (400): time, route, source address, credential kind, a truncated digest of the credential, the code the caller got. Never the credential itself | File `AIMEAT_AUTH_LOG_PATH` (default data/auth-failures.log under the working directory) | The file, `GET /v1/admin/auth-refusals`, the admin Security page | `aimeat/src/services/auth-audit.ts`, `aimeat/src/routes/admin-security.ts` |
-| **Trail of changes** | Each MCP tool call, and each authenticated REST change (POST, PUT, PATCH, DELETE): when, who (person, their AI, agent, app, operator), what, on which target | Usage tables in the database | `aimeat_trail_list` (per account); `GET /v1/admin/usage/calls` for operators | `aimeat/src/middleware/trail-recorder.ts`, `aimeat/src/services/place-trail.ts`, `aimeat/src/routes/admin-usage.ts` |
+| **Refusal log** | One JSON line per 401 and 403, whichever route answered, and per wrong reset code (400): time, route, source address, credential kind, a truncated digest of the credential, the code the caller got. Never the credential itself | File `AIMEAT_AUTH_LOG_PATH` (default data/auth-failures.log under the working directory) | The file, `GET /v1/admin/auth-refusals`, the admin Security page | `aimeat/src/services/auth-audit.ts`, `aimeat/src/routes/admin/security.ts` |
+| **Trail of changes** | Each MCP tool call, and each authenticated REST change (POST, PUT, PATCH, DELETE): when, who (person, their AI, agent, app, operator), what, on which target | Usage tables in the database | `aimeat_trail_list` (per account); `GET /v1/admin/usage/calls` for operators | `aimeat/src/middleware/trail-recorder.ts`, `aimeat/src/services/place-trail.ts`, `aimeat/src/routes/admin/usage.ts` |
 | **Operator actions** | An operator's read or act in another person's account: a usage row in the operator's own stream naming the account, and an event on that account. A node setting change is a usage row `config.set` | Usage tables and account events | `GET /v1/admin/usage/calls?surface=operator`; the person's account events | `aimeat/src/services/operator-access-audit.ts`, [Incident response](../security/incident-response.md) |
 | **Account events** | What happened on one account that its holder should know: agent connected or removed, password changed, two-step sign-in armed or reset by an operator, passkey added, reused sign-in token, operator access, consent granted or revoked, app granted, AI key changed, and more | Database, per account | The person's "what has happened" view | `aimeat/src/services/account-events.ts`, `aimeat/src/storage/types/account-events.ts`, `aimeat/src/routes/account-events.ts` |
 | **Consent audit** | Each refused read and each consent grant or revoke. Allowed reads are not audited | Database, written within a second of the event | Consent views; `aimeat_consent_list` | [Security practices](../coding-guidelines/security.md), `aimeat/src/services/access-guard.ts`, `aimeat/src/services/consent-audit-buffer.ts` |
@@ -18,7 +18,7 @@ This page is for the sysadmin and the SOC that must watch a node. It lists what 
 | **AI usage** | Spend per model, app, agent and day; which tools were called and which refused or failed | Usage tables | `aimeat_usage_report` (per owner), `aimeat_admin_usage` (operator) | `aimeat/src/services/ai/usage-record.ts`, `aimeat/src/services/ai/usage-admin.ts` |
 | **Agent activity** | An agent's own counters and daily history | Database | `aimeat_agent_activity` (the agent itself); the owner reads the trail | `aimeat/src/routes/agent-activity.ts` |
 | **App audit log** | Per app, its own audit entries | Database; old entries move to one archive record per app per year | App page; `aimeat_app_manage` | `aimeat/src/services/app-audit.ts`, `AIMEAT_APP_AUDIT_KEEP` |
-| **Security incidents** | Data a start-time migration or check could not place, kept and quarantined for a decision | Database | Admin Security page, `aimeat_admin_security_overview`, `aimeat_admin_incident_resolve` | `aimeat/src/routes/admin-security.ts` |
+| **Security incidents** | Data a start-time migration or check could not place, kept and quarantined for a decision | Database | Admin Security page, `aimeat_admin_security_overview`, `aimeat_admin_incident_resolve` | `aimeat/src/routes/admin/security.ts` |
 | **Hook calls** | Each call to a bound hook and what came back | Database | `aimeat_admin_hooks`, admin Hooks tab | `aimeat/src/services/hooks.ts` |
 | **Rate limit hits** | Counted per tier; the caller gets 429. Not written as a log line per hit | Counters | `/v1/metrics`, `/v1/stats` | `aimeat/src/middleware/rate-limit.ts`, [observability guide](../../aimeat/docs/observability-guide.md) |
 | **Sign-in guessing** | Tarpit delays and blocks are written to the refusal log; reaching the block threshold writes a warning to the process log; counters `login_tarpit_delayed_total`, `login_tarpit_blocked_total` | Refusal log, process log, counters | as above | `aimeat/src/middleware/login-tarpit.ts`, [Incident response](../security/incident-response.md) |
@@ -30,13 +30,13 @@ Faults: an MCP tool that failed inside the node logs `[mcp-fault]`, a REST reque
 | Record | Default | Setting | Source |
 |---|---|---|---|
 | Process log | whatever journald or the container runtime keeps | outside the node | `aimeat/deploy/aimeat.service` |
-| Refusal log | rotates at 5 MiB and keeps one older generation | `AIMEAT_AUTH_LOG_MAX_BYTES` | `aimeat/src/config-security.ts` |
-| Consent audit | 365 days | `AIMEAT_CONSENT_AUDIT_RETENTION_DAYS` (1 to 3650) | `aimeat/src/config-data-access.ts` |
+| Refusal log | rotates at 5 MiB and keeps one older generation | `AIMEAT_AUTH_LOG_MAX_BYTES` | `aimeat/src/config/security.ts` |
+| Consent audit | 365 days | `AIMEAT_CONSENT_AUDIT_RETENTION_DAYS` (1 to 3650) | `aimeat/src/config/data-access.ts` |
 | Classification audit | 365 days, or none (keep all) | the classification policy's audit retention | `aimeat/src/services/core-jobs.ts` |
 | Account events | the newest 100 per account in the live window; older ones are archived, not deleted | `AIMEAT_ACCOUNT_EVENT_WINDOW` | `aimeat/src/services/account-events.ts` |
-| Usage rows (trail, AI usage, operator actions) | 90 days in the report tables, then moved to the archive. No scheduled job deletes them; an operator deletes archived rows before a chosen date with `POST /v1/admin/usage/archive/prune`. Hourly figures are kept 30 days | `AIMEAT_USAGE_HOT_DAYS`, `AIMEAT_USAGE_HOUR_ROLLUP_DAYS` | `aimeat/.env.example`, `aimeat/src/services/config-schema-runtime.ts`, `aimeat/src/routes/admin-usage.ts` |
+| Usage rows (trail, AI usage, operator actions) | 90 days in the report tables, then moved to the archive. No scheduled job deletes them; an operator deletes archived rows before a chosen date with `POST /v1/admin/usage/archive/prune`. Hourly figures are kept 30 days | `AIMEAT_USAGE_HOT_DAYS`, `AIMEAT_USAGE_HOUR_ROLLUP_DAYS` | `aimeat/.env.example`, `aimeat/src/services/config/schema-runtime.ts`, `aimeat/src/routes/admin/usage.ts` |
 | AI job logs | 30 days | `AIMEAT_AI_JOB_LOG_RETENTION_DAYS` | `aimeat/.env.example` |
-| Workflow and action run log | 30 days | `AIMEAT_EXECUTION_LOG_RETENTION_DAYS` | `aimeat/src/config-data-access.ts` |
+| Workflow and action run log | 30 days | `AIMEAT_EXECUTION_LOG_RETENTION_DAYS` | `aimeat/src/config/data-access.ts` |
 | Decision records | 365 days | `AIMEAT_DECIDE_RETENTION_DAYS` | `aimeat/.env.example` |
 | App audit log | keep all, older entries archived per year | `AIMEAT_APP_AUDIT_KEEP` (0 keeps all) | `aimeat/.env.example` |
 | Kept compliance reports | stored as records with their version history; the monthly job prunes nothing | none found | `aimeat/src/services/compliance/monthly-job.ts` |
@@ -86,7 +86,7 @@ The node has no syslog, OTLP or SIEM-specific exporter; a search of the node sou
 | One dead token retried, or many tokens tried | refusal log credential digest | many lines with one digest, or many digests from one source |
 | Rate limiting | metric aimeat_rate_limit_hits_total | warning above 20 per hour ([observability guide](../../aimeat/docs/observability-guide.md)) |
 | Scope denials | metric aimeat_scope_denials_total | sudden rise: an agent tries what it was not granted |
-| Startup posture | `SECURITY:` lines in the start log (`aimeat/src/config-posture.ts`) | any, on every start |
+| Startup posture | `SECURITY:` lines in the start log (`aimeat/src/config/posture.ts`) | any, on every start |
 | Internal faults | `[mcp-fault]` and `[500]` in the process log | any rise |
 | Operator access to a person's data | operator usage rows, `memory_accessed_by_operator` account events | every occurrence, reviewed |
 | Two-step sign-in reset by an operator | `two_factor_reset_by_operator` account event | every occurrence |
@@ -114,7 +114,7 @@ The compliance register and records of processing are described in [Data classif
 - Rate limit hits are counters only; there is no per-hit log line that names the caller.
 - Allowed reads of records are not audited by the consent audit. The classification audit records shows and uses only for labels with audit on, and only while classification is on (off by default).
 - Every record listed is stored on the node itself, where an operator with host or database access can change it. Tamper resistance needs an export to a store outside the operator's reach.
-- No scheduled job deletes usage rows, so watch their growth. The operator deletes archived rows before a chosen date with `POST /v1/admin/usage/archive/prune` (`aimeat/src/routes/admin-usage.ts`). When to do that is the organisation's decision.
+- No scheduled job deletes usage rows, so watch their growth. The operator deletes archived rows before a chosen date with `POST /v1/admin/usage/archive/prune` (`aimeat/src/routes/admin/usage.ts`). When to do that is the organisation's decision.
 - `/v1/health` answers 200 when degraded; a check that reads only the status code misses it. `/v1/health/ready` answers 503 instead, but it checks only that the process takes requests and reaches its database.
 - No job was found that prunes kept compliance reports; they accumulate.
 

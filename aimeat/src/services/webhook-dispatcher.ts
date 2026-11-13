@@ -79,7 +79,7 @@ import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { type WebhookEventType, buildWebhookEnvelope } from '../models/webhook-schemas.js';
-import { isStopped, isWakeWebhookEvent } from './agent-stop-rules.js';
+import { isStopped, isWakeWebhookEvent } from './agent/stop-rules.js';
 import { deliverWithRetries, registerOutboxHandler } from './outbox.js';
 import { deactivatedSince } from './account-deactivated.js';
 
@@ -174,7 +174,7 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
       return;
     }
 
-    // A stopped agent is not woken for new work over its webhook either (services/agent-stop-rules.ts).
+    // A stopped agent is not woken for new work over its webhook either (services/agent/stop-rules.ts).
     // Events about work it is already doing still go out.
     if (isStopped(agent) && isWakeWebhookEvent(event)) {
       logger.debug('Webhook dispatch: skipped (the agent is stopped)', { agentGaii, event });

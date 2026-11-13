@@ -747,7 +747,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         // PATCH /v1/agents/:name/{mode,tags,scopes,clearance}. Those routes carry the real authz: scopes admits the
         // owner, or an agent holding agent:permissions + agent:write that narrows, and adds only with
         // agent:permissions-add from its own words (the node MCP tool's rule,
-        // services/agent-scope-add.ts); mode/tags are same-owner with agent:write. display_name/description have no
+        // services/agent/scope-add.ts); mode/tags are same-owner with agent:write. display_name/description have no
         // route (shell-unsupported).
         name: 'aimeat_operator_agent_configure',
         handler: async ({ client }, input) => {

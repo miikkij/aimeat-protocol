@@ -32,7 +32,7 @@
 import type { Storage, AppRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { appIsPaced } from './app-pacing.js';
-import { signedInOnly, type ContentAccess } from '../config-visibility.js';
+import { signedInOnly, type ContentAccess } from '../config/visibility.js';
 import { parseAudience, audienceAllows, type Audience, type AudienceAuth } from './audience.js';
 import { isAppOpenToInternet } from './internet-opening/opening-registry.js';
 import { localAccountName } from '../utils/gaii.js';

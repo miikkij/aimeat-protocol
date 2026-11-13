@@ -50,7 +50,7 @@ import {
   decideForOwner, listDecisions, getDecision, reviewDecision, decisionStats, ruleCallerKind, DecideError, type DecideCaller,
 } from '../services/decide/service.js';
 import { getRule, useAllows, rulesRunnableBy, listRuleProposals, proposeRule } from '../services/decide/rules.js';
-import { agentNameOf } from '../services/agent-ai-keys.js';
+import { agentNameOf } from '../services/agent/ai-keys.js';
 import { decideSettingsView } from '../services/decide/settings.js';
 import {
   startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary, runViewerOf, type RunItem,

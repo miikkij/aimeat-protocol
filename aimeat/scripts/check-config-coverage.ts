@@ -42,7 +42,7 @@
  */
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { CONFIG_FIELDS } from '../src/services/config-schema.js';
+import { CONFIG_FIELDS } from '../src/services/config/schema.js';
 
 const ROOT = process.cwd();
 const SRC = join(ROOT, 'src');
@@ -63,9 +63,9 @@ const DIRECT = [/process\.env\.(AIMEAT_[A-Z0-9_]+)/g, /process\.env\[\s*['"`](AI
 const BY_NAME = /\(\s*['"`](AIMEAT_[A-Z0-9_]+)['"`]/g;
 
 /** The files that declare rows rather than read settings. */
-const isSchemaFile = (rel: string): boolean => /^src\/services\/config-(schema|field-def)[^/]*\.ts$/.test(rel);
+const isSchemaFile = (rel: string): boolean => /^src\/services\/config\/(schema|field-def)[^/]*\.ts$/.test(rel);
 /** The config loader: reading process.env is its job, before the database layer is applied. */
-const isLoader = (rel: string): boolean => /^src\/config[^/]*\.ts$/.test(rel);
+const isLoader = (rel: string): boolean => /^src\/config(?:[^/]*|\/[^/]*)\.ts$/.test(rel);
 /**
  * A changeable setting read from process.env on purpose, with the reason: before any config exists,
  * or because the question is what the environment itself holds. An answer, not a backlog.

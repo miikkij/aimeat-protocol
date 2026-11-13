@@ -27,7 +27,7 @@ import { AGENT_HANDBOOK } from '../../src/services/handbooks/agent.js';
 import { FULL_HANDBOOK } from '../../src/services/handbooks/full.js';
 import { ADMIN_HANDBOOK } from '../../src/services/handbooks/admin.js';
 import { BUILTIN_SKILLS } from '../../src/data/builtin-skills.js';
-import { proposalApprovalUrl, proposalNextStep } from '../../src/services/agent-proposals.js';
+import { proposalApprovalUrl, proposalNextStep } from '../../src/services/agent/proposals.js';
 
 /** Reads what the person already keeps: the organisms and their workspaces. */
 const READS_THEIR_DATA = /aimeat_workspace_list/;

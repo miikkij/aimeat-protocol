@@ -140,7 +140,7 @@ import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 import { registerScopeAllowanceRoutes } from './apps/scope-allowance.js';
 import { registerAppConfigRoutes } from './apps/app-config.js';
 import { registerAppOpenRoutes } from './apps/open.js';
-import { registerAdminSeoRoutes } from './admin-seo.js';
+import { registerAdminSeoRoutes } from './admin/seo.js';
 
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();

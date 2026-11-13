@@ -31,7 +31,7 @@ import { agentsRouter } from '../../src/routes/agents.js';
 import {
   readOwnerAgentAccessOrMarker, agentAccessFields, AGENT_ACCESS_UNREADABLE,
   initAgentRefusals, noteAgentRefusal, agentRefusalsKey,
-} from '../../src/services/agent-refusals.js';
+} from '../../src/services/agent/refusals.js';
 import { flushProcessBuffers } from '../../src/server-bootstrap/process-buffers.js';
 
 const NODE_ID = 'aimeat-refusals-unreadable-test';

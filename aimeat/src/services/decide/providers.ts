@@ -344,7 +344,7 @@ export function nodeProviders(config: AimeatConfig): DecisionProvider[] {
       const p = parseProvider(raw, 'node', { allowEnv: true, egress });
       if (!p.provider) { logger.error('[decide] an operator provider was refused', { problems: p.problems }); continue; }
       // THE KEY CHAIN BELONGS TO ONE ADDRESS. `auth: { type: 'key' }` means the agent's key, then
-      // the owner's, then the NODE's, and config-decide.ts has promised since it was written that
+      // the owner's, then the NODE's, and config/decide.ts has promised since it was written that
       // the node's key goes to `decideBaseUrl`'s host and nowhere else. An extra provider naming
       // `key` with an address of its own would quietly break that promise, so it is refused here
       // and the operator is told to name a variable instead (`auth: { type: 'env', env: … }`).

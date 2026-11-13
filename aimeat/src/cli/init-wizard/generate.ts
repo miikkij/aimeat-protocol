@@ -20,7 +20,7 @@
  */
 
 import ini from 'ini';
-import { ENV_TO_DOT_PATH } from '../../services/config-schema.js';
+import { ENV_TO_DOT_PATH } from '../../services/config/schema.js';
 import { envLine } from '../../utils/env-file.js';
 
 // ── .env generation ─────────────────────────────────────────────────

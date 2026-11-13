@@ -2,7 +2,7 @@
  * @file test/e2e-task-start.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A task starts on its own or waits for the owner's OK (services/agent-task-rules.ts).
+ * @description A task starts on its own or waits for the owner's OK (services/agent/task-rules.ts).
  *   Measured on freshly sold hosted places on 2026-10-01: every task a customer gave the concierge
  *   waited in `queued` for a Start press nobody had told them about. This suite holds the four
  *   things the fix promises:

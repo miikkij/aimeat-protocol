@@ -33,7 +33,7 @@
 import { randomUUID } from 'node:crypto';
 import { EventType, type BaseEvent } from '@ag-ui/core';
 import type { Storage, AgentV2TaskRecord } from '../storage/interface.js';
-import type { Principal } from './agent-v2-messaging-ops.js';
+import type { Principal } from './agent/v2-messaging-ops.js';
 
 /**
  * What this door speaks, said once so the route and the stream cannot disagree.

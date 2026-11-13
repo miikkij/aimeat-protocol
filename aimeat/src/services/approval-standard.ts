@@ -44,7 +44,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { notify } from './notify.js';
 import { listOperatorGhiis } from './operators.js';
-import { sendAgentV2Message } from './agent-v2-messaging.js';
+import { sendAgentV2Message } from './agent/v2-messaging.js';
 import { emitChange } from './event-bus.js';
 import { answerNotifications, type AnswerOutcome } from './notification-answers.js';
 import { localAccountName } from '../utils/gaii.js';

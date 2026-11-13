@@ -40,7 +40,7 @@ import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { appToll } from '../services/app-pacing.js';
 import { templateSourceApp } from '../services/appdev/template-source.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const errText = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });

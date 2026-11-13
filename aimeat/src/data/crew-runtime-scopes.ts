@@ -36,7 +36,7 @@
  *   and the node already gives memory:read to every agent that names no scopes.
  *
  *   ONE COPY, AND IT IS ADDED, NEVER ASKED FOR. The basic-agent templates, a proposal
- *   (services/agent-proposals.ts) and its approval (routes/agents-v2/agent-proposals.ts) all add
+ *   (services/agent/proposals.ts) and its approval (routes/agents-v2/agent-proposals.ts) all add
  *   these words whatever the proposer wrote, so no proposal can make an agent that cannot start.
  *   When the runtime's own
  *   `crew.menu` answers `required_scopes`, that answer is the authority and this list is the

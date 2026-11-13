@@ -16,7 +16,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { ActionRecord } from '../storage/interface.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { resolvePacingToll } from './metered-settlement.js';
 import { TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
 

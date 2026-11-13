@@ -3,11 +3,11 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator's search-engine status payload and the sentence an IndexNow run ends
- *   with. GET /v1/admin/seo/status and POST /v1/admin/seo/indexnow (routes/admin-seo.ts) and the MCP
- *   tools aimeat_seo_status and aimeat_seo_announce share them. Moved out of routes/admin-seo.ts
+ *   with. GET /v1/admin/seo/status and POST /v1/admin/seo/indexnow (routes/admin/seo.ts) and the MCP
+ *   tools aimeat_seo_status and aimeat_seo_announce share them. Moved out of routes/admin/seo.ts
  *   unchanged on 2026-11-13, so the MCP tools call them without importing a route file (CLAUDE.md,
  *   Backend; dependency-cruiser rule mcp-does-not-import-routes). The history of both is in
- *   routes/admin-seo.ts's header.
+ *   routes/admin/seo.ts's header.
  * @structure keyFileServed (module-private) · buildSeoStatus(config, storage) · announceNote(scope, urlCount, hosts, failed)
  * @usage const status = await buildSeoStatus(config, storage);
  * @version-history

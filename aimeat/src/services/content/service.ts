@@ -35,7 +35,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { allowAddressFor } from '../permission-ask.js';
-import { noteAgentRefusal } from '../agent-refusals.js';
+import { noteAgentRefusal } from '../agent/refusals.js';
 import { inspectSource, stagesToRun, ContentError, type InspectResult } from './pipeline.js';
 import { startScan, getScan, runningScanOf, type ScanOptions, type ScanState } from './scan.js';
 import { correctFacts } from './correct.js';

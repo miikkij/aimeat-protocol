@@ -2,7 +2,7 @@
 
 **EUDIW verification cannot be enabled in this release.**
 Setting `AIMEAT_EUDIW_ENABLED=true` makes configuration loading fail.
-The [startup guard](../aimeat/src/config-eudiw-guard.ts) records why: the SD-JWT path
+The [startup guard](../aimeat/src/config/eudiw-guard.ts) records why: the SD-JWT path
 does not yet verify holder binding, the request nonce and the verifier audience together.
 The earlier guide's claim of complete verification was incorrect.
 
@@ -36,7 +36,7 @@ successful provider verification are required before treating it as operational.
 ## Configuration that exists
 
 See [config.ts](../aimeat/src/config.ts) and
-[the field schema](../aimeat/src/services/config-schema.ts).
+[the field schema](../aimeat/src/services/config/schema.ts).
 
 | Variable | Purpose |
 |---|---|

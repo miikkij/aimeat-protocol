@@ -7,7 +7,7 @@
  *   code costs one regular-expression test. It never throws into the task path: a goal that cannot be
  *   updated is logged, and the minute sweep (goals-sweep.ts) moves it on later.
  * @structure onGoalTaskSettled()
- * @usage void onGoalTaskSettled({ storage, config }, task, 'done', message);   // services/agent-task-fanout.ts
+ * @usage void onGoalTaskSettled({ storage, config }, task, 'done', message);   // services/agent/task-fanout.ts
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */

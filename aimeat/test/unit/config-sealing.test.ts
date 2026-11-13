@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-08-18 — Initial. https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  */
 import { describe, it, expect } from 'vitest';
-import { sealedKeysFromEnv, isSealed, sealRefusal, sealedView, hasSealedKeys } from '../../src/services/config-sealing.js';
+import { sealedKeysFromEnv, isSealed, sealRefusal, sealedView, hasSealedKeys } from '../../src/services/config/sealing.js';
 import { applyConsulValues } from '../../src/services/consul-config.js';
 import { classifyValues } from '../../src/cli/config-import.js';
 import type { AimeatConfig } from '../../src/config-types.js';

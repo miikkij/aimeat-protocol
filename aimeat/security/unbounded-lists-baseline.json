@@ -99,34 +99,34 @@
     "listWorkspaceRowRevisions": "One row's kept revisions: both providers cap the read at 100, and services/workspace-rows/row-service.ts prunes a row to REVISIONS_PER_ROW (20) kept revisions."
   },
   "wholeTableCalls": {
-    "src/config-overrides.ts": {
+    "src/config/overrides.ts": {
       "getAllConfigValues": 1
     },
     "src/mcp/core-admin.ts": {
       "listAgents": 2
     },
-    "src/routes/admin-agent-integration.ts": {
+    "src/routes/admin/agent-integration.ts": {
       "listAgents": 2
     },
-    "src/routes/admin-agent-tasks.ts": {
+    "src/routes/admin/agent-tasks.ts": {
       "listOwners": 1
     },
-    "src/routes/admin-agents.ts": {
+    "src/routes/admin/agents.ts": {
       "listAgents": 1,
       "listAppGrants": 1
     },
-    "src/routes/admin-features.ts": {
+    "src/routes/admin/features.ts": {
       "listPushSubscriptions": 1,
       "listNotificationTemplates": 1
     },
-    "src/routes/admin-maintenance.ts": {
+    "src/routes/admin/maintenance.ts": {
       "listOwners": 1
     },
-    "src/routes/admin-monitoring.ts": {
+    "src/routes/admin/monitoring.ts": {
       "listAgents": 2,
       "listOwners": 2
     },
-    "src/routes/admin-sharing-groups.ts": {
+    "src/routes/admin/sharing-groups.ts": {
       "listOwners": 1
     },
     "src/routes/admin.ts": {
@@ -198,7 +198,7 @@
     "src/services/account-event-task-keep.ts": {
       "listAppGrants": 1
     },
-    "src/services/agent-port-redirect.ts": {
+    "src/services/agent/port-redirect.ts": {
       "listFederationPeers": 1
     },
     "src/services/ai-jobs/prune-job.ts": {
@@ -251,10 +251,10 @@
     "src/services/compliance/monthly-job.ts": {
       "listOwners": 1
     },
-    "src/services/config-at-rest-rows.ts": {
+    "src/services/config/at-rest-rows.ts": {
       "getAllConfigValues": 1
     },
-    "src/services/config-reload.ts": {
+    "src/services/config/reload.ts": {
       "getAllConfigValues": 1
     },
     "src/services/contacts-together.ts": {

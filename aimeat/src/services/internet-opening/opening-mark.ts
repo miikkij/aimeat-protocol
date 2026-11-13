@@ -12,7 +12,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { AppRecord } from '../../storage/interface.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { createT, type Locale } from '../../i18n.js';
 import type { InternetOpenBadgeSpec } from '../../utils/app-internet-open-badge.js';
 import { isAppOpenToInternet } from './opening-registry.js';

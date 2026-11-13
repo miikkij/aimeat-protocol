@@ -9,8 +9,8 @@
  *   v1.0.0 — 2026-10-11 — Initial (Jouni, 2026-10-11: a range is a recommended range).
  */
 import { describe, it, expect } from 'vitest';
-import { ALL_CONFIG_MAP } from '../../src/services/config-schema.js';
-import { rangeKindOf, numericRangeOf } from '../../src/services/config-schema-validators.js';
+import { ALL_CONFIG_MAP } from '../../src/services/config/schema.js';
+import { rangeKindOf, numericRangeOf } from '../../src/services/config/schema-validators.js';
 
 const row = (path: string) => {
     const f = ALL_CONFIG_MAP[path];

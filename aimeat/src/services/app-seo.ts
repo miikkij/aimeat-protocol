@@ -71,7 +71,7 @@ import { announceApp } from './indexnow.js';
 import { resolveAppOwnerScope } from './app-owner-scope.js';
 import { emitChange } from './event-bus.js';
 import { appToll } from './app-pacing.js';
-import { signedInOnly } from '../config-visibility.js';
+import { signedInOnly } from '../config/visibility.js';
 
 /**
  * Why an app is or is not search-visible, in terms an operator can act on. `appSeoIndexable` is the

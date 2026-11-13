@@ -34,8 +34,8 @@
 import type { Storage, AgentV2TaskRecord, AgentV2MessageRecord } from '../storage/interface.js';
 import type { Task } from '@a2a-js/sdk';
 import { onTaskMoved, offTaskMoved, type TaskMovedEvent } from './event-bus.js';
-import { getTask } from './agent-v2-tasks-ops.js';
-import type { Principal } from './agent-v2-messaging-ops.js';
+import { getTask } from './agent/v2-tasks-ops.js';
+import type { Principal } from './agent/v2-messaging-ops.js';
 import { toA2ATask } from './a2a-projection.js';
 import { isTerminal } from '../models/agent-v2-task.js';
 import { logger } from '../utils/logger.js';

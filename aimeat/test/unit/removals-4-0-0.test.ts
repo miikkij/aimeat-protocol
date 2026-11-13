@@ -55,7 +55,7 @@ import { legacyAiSettingsRoute, openrouterRouter } from '../../src/routes/openro
 import { aiRouter } from '../../src/routes/ai.js';
 import { turnEntryFor } from '../../src/services/turn-credentials.js';
 import { saveWorkflow } from '../../src/services/workflow/store.js';
-import { CONFIG_FIELDS } from '../../src/services/config-schema.js';
+import { CONFIG_FIELDS } from '../../src/services/config/schema.js';
 
 const NODE_ID = 'aimeat-removals-test';
 const OWNER = 'removalowner';

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where the public agent profile forwards a visitor for a ported agent
- *   (services/agent-port-redirect.ts): only to an active federation peer, at an address built from
+ *   (services/agent/port-redirect.ts): only to an active federation peer, at an address built from
  *   the peer record rather than from the string the pointer holds.
  * @version-history
  *   2026-10-15 — The fake storage holds the pointer where the porting route writes it now (NS_AGENT_PORT);
@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { portRedirectFor, putPortRedirect, NS_AGENT_PORT } from '../../src/services/agent-port-redirect.js';
+import { portRedirectFor, putPortRedirect, NS_AGENT_PORT } from '../../src/services/agent/port-redirect.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 
 const GAII = 'scout#alice@aimeat-test-001-dev';

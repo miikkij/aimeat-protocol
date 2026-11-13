@@ -76,7 +76,7 @@ copy('docs', 'dist/docs', { recursive: true });
 // /v1/msm/templates with an empty list and shows no bundled extensions in the admin view, both
 // silently, as an empty list rather than an error — which is why nobody reported it for months.
 // The routes that read them look at dist/docs in a package: src/routes/msm.ts,
-// src/routes/admin-extensions.ts.
+// src/routes/admin/extensions.ts.
 copy('../docs/msm-examples', 'dist/docs/msm-examples', { recursive: true });
 copy('../docs/extensions', 'dist/docs/extensions', { recursive: true });
 // The public record contracts GET /v1/specs/:name serves (src/services/contract-docs.ts), one by

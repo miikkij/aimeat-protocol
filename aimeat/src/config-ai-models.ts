@@ -6,9 +6,9 @@
  *   one: the node's OpenRouter key, the free allowance, the free fallback model and the per-role
  *   node defaults, read from the environment.
  *
- *   Its own file for the reason config-ai-jobs.ts and config-decide.ts are: config.ts is at the line
+ *   Its own file for the reason config/ai-jobs.ts and config/decide.ts are: config.ts is at the line
  *   ceiling, and everything here answers one question, which models the node itself offers. The
- *   fields are typed in config-types-ai.ts (AiCapabilityConfig), and the spread in loadConfig is
+ *   fields are typed in config/types-ai.ts (AiCapabilityConfig), and the spread in loadConfig is
  *   where the compiler checks the two agree.
  * @structure aiModelDefaults() · AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN · aiLegacySettingsRoutesAllowed()
  * @usage
@@ -41,7 +41,7 @@
  *   v1.0.0 — 2026-09-28 — Extracted from config.ts (pure extraction; no behaviour change), ahead of
  *     the recommended-models setting of the System 2 plan.
  */
-import type { AiCapabilityConfig } from './config-types-ai.js';
+import type { AiCapabilityConfig } from './config/types-ai.js';
 import { getSoftwareVersion, versionAtLeast } from './utils/version.js';
 
 /**

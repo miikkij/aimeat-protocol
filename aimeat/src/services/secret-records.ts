@@ -65,7 +65,7 @@ export const SECRET_RECORD_KEYS: ReadonlySet<string> = new Set([OPENROUTER_KEY_R
 
 /**
  * A key per agent, for both models: `openrouter.apikey.agent.<name>` and `decide.apikey.agent.<name>`
- * (services/agent-ai-keys.ts). The agent's name is the tail, so these two are matched by prefix.
+ * (services/agent/ai-keys.ts). The agent's name is the tail, so these two are matched by prefix.
  */
 export const AGENT_KEY_PREFIXES: readonly string[] = [
   `${OPENROUTER_KEY_RECORD}.agent.`, `${DECIDE_KEY_RECORD_KEY}.agent.`,

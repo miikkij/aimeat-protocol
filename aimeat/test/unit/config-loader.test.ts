@@ -31,7 +31,7 @@ import {
   parseConfigValue,
   serializeConfigValue,
   LEGACY_DOT_PATHS,
-} from '../../src/services/config-schema.js';
+} from '../../src/services/config/schema.js';
 
 test('MUTABLE_CONFIG_MAP only contains non-immutable fields', () => {
   for (const [, field] of Object.entries(MUTABLE_CONFIG_MAP)) {
@@ -117,7 +117,7 @@ test('serializeConfigValue("hello") → "hello"', () => {
 // ── Config Loader Tests ──
 
 
-import { loadFileSource, flattenToStrings } from '../../src/services/config-loader.js';
+import { loadFileSource, flattenToStrings } from '../../src/services/config/loader.js';
 
 test('flattenToStrings from flat object', () => {
   const result = flattenToStrings({ foo: 'bar', count: 42 });
@@ -165,7 +165,7 @@ test('loadFileSource returns null for missing file', () => {
 // ── Config Provenance Tests ──
 
 
-import { ConfigProvenance } from '../../src/services/config-provenance.js';
+import { ConfigProvenance } from '../../src/services/config/provenance.js';
 
 test('initDefaults sets all to "default"', () => {
   const prov = new ConfigProvenance();

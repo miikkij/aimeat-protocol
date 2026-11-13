@@ -91,7 +91,7 @@ export const agentsListOutput = {
 export const agentProfileOutput = {
     gaii: z.string(),
     display_name: z.string().optional(),
-    /** The agent's picture (services/agent-avatar.ts AvatarView), null when it has none. Loose on purpose. */
+    /** The agent's picture (services/agent/avatar.ts AvatarView), null when it has none. Loose on purpose. */
     avatar: looseRecord.nullable().optional(),
     /** Why a stored `agent.avatar` record cannot be shown; absent when there is none or it is fine. */
     avatar_problem: z.string().optional(),

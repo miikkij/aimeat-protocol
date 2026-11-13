@@ -56,7 +56,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
-import { settingLoosens, looseningRefusal } from './config-strictness.js';
+import { settingLoosens, looseningRefusal } from './config/strictness.js';
 import { twoStepArmed } from './passkeys.js';
 
 export const TWO_STEP_REQUIRED_PATH = 'auth.two_step_required';

@@ -49,7 +49,7 @@ export const AGENT_OFFLINE_GRACE_MS = 5 * 60_000;
  */
 export function isAgentReachable(agent: AgentRecord | null | undefined, nowMs: number, connected = false): boolean {
   if (!agent) return false;
-  // A stopped agent starts no work (services/agent-stop-rules.ts), so a step given to it would sit
+  // A stopped agent starts no work (services/agent/stop-rules.ts), so a step given to it would sit
   // until the step timed out. Not reachable is the answer the run can act on at once.
   if (agent.stoppedAt) return false;
   const webhookOk = !!(agent.webhookEnabled && agent.webhookUrl) && (agent.webhookFailCount ?? 0) < AGENT_WEBHOOK_DOWN_THRESHOLD;

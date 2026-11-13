@@ -33,7 +33,7 @@
  *   v1.0.0 — 2026-08-14 — Initial: MCP tool calls become a measured surface.
  */
 import { recordUsageCall } from '../services/usage/usage-buffer.js';
-import { noteAgentRefusal } from '../services/agent-refusals.js';
+import { noteAgentRefusal } from '../services/agent/refusals.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { requiredScopesForTool } from '../tool-catalog/scopes.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
@@ -53,7 +53,7 @@ function isErrorResult(value: unknown): boolean {
 }
 
 /**
- * Note an MCP permission refusal of an agent for its owner (services/agent-refusals.ts), as
+ * Note an MCP permission refusal of an agent for its owner (services/agent/refusals.ts), as
  * auth/deny.ts notes the REST one. Only an agent principal has a card to note it on; `words` empty
  * notes nothing. Shared with mcp/scope-denied-answer.ts, the refusal of an unregistered tool.
  */
@@ -83,7 +83,7 @@ export function resultErrorCode(text: string): string | undefined {
  * (aimeat_memory_write), and names the word in its sentence, quoted or not; a result that names none
  * is not noted, because a refusal the owner cannot act on helps nobody. A `Held: [...]` list is what
  * the caller has, not what it lacks, and is left out (services/ai/provenance.ts ProvenanceScopeError);
- * services/agent-refusals.ts also drops any word the agent's record holds.
+ * services/agent/refusals.ts also drops any word the agent's record holds.
  */
 export function scopeDeniedWords(value: unknown): string[] {
   const content = (value as { content?: Array<{ type?: string; text?: unknown }> }).content;
@@ -115,7 +115,7 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
         if (isErrorResult(result)) {
           outcome = 'error'; reason = 'tool_error_result';
           // A tool that refused the agent a permission is the MCP half of auth/deny.ts: the same
-          // note on the agent's card and open tasks (services/agent-refusals.ts).
+          // note on the agent's card and open tasks (services/agent/refusals.ts).
           noteMcpScopeRefusal(gaii, scopeDeniedWords(result), name);
         } else if (actorKindOf(gaii) === 'agent') {
           // The word this tool needs, for the narrowing a `*` agent's owner is offered

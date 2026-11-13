@@ -60,7 +60,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal, callerPrincipal } from '../utils/gaii.js';
 import { isOwnerInPerson } from '../auth/effective-scopes.js';
 import { AiCompletionError } from '../services/ai/completion.js';
-import { agentNameOf } from '../services/agent-ai-keys.js';
+import { agentNameOf } from '../services/agent/ai-keys.js';
 import {
   decideForOwner, listDecisions, getDecision, reviewDecision, DecideError,
   type DecideCaller, type DecideInput,

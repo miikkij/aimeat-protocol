@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { changeNodeSettings, resetNodeSettingRefusal } from '../../src/services/config-admin-view.js';
+import { changeNodeSettings, resetNodeSettingRefusal } from '../../src/services/config/admin-view.js';
 import { setClassificationSwitch, type SwitchCaller } from '../../src/services/classification-run/switch.js';
 
 const NODE_ID = 'aimeat-local-001-dev';

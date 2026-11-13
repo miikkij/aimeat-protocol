@@ -41,7 +41,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { ownerStoreId, type BlobSpec } from '../../storage/blob/blob-types.js';
 import type { StoreTakes } from '../../storage/blob/store-takes.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { decryptBound, encryptBound, getEncryptionKey } from '../encryption.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';

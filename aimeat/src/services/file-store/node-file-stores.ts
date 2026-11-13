@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The named stores an operator adds for the whole node, beside the one the environment
- *   names (config-file-store.ts). One record in the node's own namespace (`system@<node>`) holds the
+ *   names (config/file-store.ts). One record in the node's own namespace (`system@<node>`) holds the
  *   list and the name of the default: a new file goes to the default when its writer chooses no store.
  *   With no default named, new files go where the environment's store setting says, as before.
  *

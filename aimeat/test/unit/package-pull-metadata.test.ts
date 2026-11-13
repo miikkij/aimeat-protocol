@@ -27,7 +27,7 @@ import type { PeerInfo } from '../../src/services/federation.js';
 import { generateKeyPair, sign } from '../../src/auth/keypair.js';
 import { buildDescriptor, signAttestation, attestationSignString } from '../../src/services/packages/peer/package-attestation.js';
 import { buildZip } from '../../src/services/packages/compose/package-zip.js';
-import { UNSIGNED_PACKAGE_METADATA_REMOVED_IN } from '../../src/config-federation.js';
+import { UNSIGNED_PACKAGE_METADATA_REMOVED_IN } from '../../src/config/federation.js';
 import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
 
 /** The nightly also runs this file as node 4.0.0 (AIMEAT_TEST_SOFTWARE_VERSION), inside the window. */

@@ -45,7 +45,7 @@ import { chatEnabled } from '../chat-session.js';
 import { chatUsesSharedKey } from '../goose-env.js';
 import { CHAT_AGENT_NAME } from '../chat-agent.js';
 import { readRouting } from '../ai/routing.js';
-import { agentAiView } from '../agent-ai-keys.js';
+import { agentAiView } from '../agent/ai-keys.js';
 import { allowedModelsOf, modelsLocked } from '../ai/node-model-rules.js';
 import { regionChoiceFor, regionModelIds, regionModeOf, regionSettingsOf, type OpenRouterRegion } from '../ai/openrouter-region.js';
 import { queryModels, MAX_MODEL_ROWS } from '../ai/catalog/query.js';

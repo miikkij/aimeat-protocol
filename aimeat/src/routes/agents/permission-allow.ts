@@ -46,9 +46,9 @@ import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { isOneClickWord, agentPageUrl } from '../../services/permission-ask.js';
 import { announceScopes } from './announce-scopes.js';
 import { tellPermissionAnswer, closePermissionAsk } from '../../services/permission-ask-notice.js';
-import { readAgentAccess } from '../../services/agent-refusals.js';
+import { readAgentAccess } from '../../services/agent/refusals.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
-import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 import { logger } from '../../utils/logger.js';
 
 const IN_PERSON = 'Only you, signed in yourself, can allow what your agents may do.';

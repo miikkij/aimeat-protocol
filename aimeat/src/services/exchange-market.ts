@@ -71,7 +71,7 @@ import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
 import type { FreshnessBrief } from './datapackage/freshness.js';
 import { readCallTiming } from './call-timing.js';
 import { resolvePacingToll } from './metered-settlement.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 import { resolveDatapackagePricing } from './exchange-datapackage.js';

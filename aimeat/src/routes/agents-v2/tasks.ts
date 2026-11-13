@@ -15,7 +15,7 @@
  *   defines and A2A reads. Both exist; the reasoning is in storage/types/agent-v2-tasks.ts.
  *
  *   THIS FILE IS A SHAPE, NOT A DECISION. Who may move a task, what a terminal task refuses and how
- *   a race is resolved all live in services/agent-v2-tasks-ops.ts, which the MCP and CLI doors call
+ *   a race is resolved all live in services/agent/v2-tasks-ops.ts, which the MCP and CLI doors call
  *   too. A rule written here would be a rule the other three doors do not have.
  *
  * @structure registerAgentV2TaskRoutes(router, config, storage)
@@ -30,8 +30,8 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { publicTask } from '../../models/agent-v2-task.js';
-import { createTask, listTasks, getTask, setTaskStatus, cancelTask } from '../../services/agent-v2-tasks-ops.js';
-import type { OpResult } from '../../services/agent-v2-messaging-ops.js';
+import { createTask, listTasks, getTask, setTaskStatus, cancelTask } from '../../services/agent/v2-tasks-ops.js';
+import type { OpResult } from '../../services/agent/v2-messaging-ops.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 function refuse(res: Response, nodeId: string, out: Extract<OpResult<unknown>, { ok: false }>): void {

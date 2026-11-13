@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A host that seals a secret seals where the secret is sent with it
- *   (services/config-sealing.ts; secaudit2026oct26, config-schema:secret-destination-mutable-beside-immutable-secret).
+ *   (services/config/sealing.ts; secaudit2026oct26, config-schema:secret-destination-mutable-beside-immutable-secret).
  *   The host-set SMTP user and password and the FTN client secret are immutable rows, so naming them
  *   in AIMEAT_SEALED_CONFIG_KEYS changed nothing, and the operator could point them at a server of
  *   their own. Naming one now seals the rows that decide where it goes; a Casdoor secret, which is
@@ -14,7 +14,7 @@
  *   2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
-import { sealedKeysFromEnv } from '../../src/services/config-sealing.js';
+import { sealedKeysFromEnv } from '../../src/services/config/sealing.js';
 
 const SMTP_DESTINATION = ['email.smtp_host', 'email.smtp_port', 'email.smtp_secure', 'email.smtp_reject_unauthorized'];
 

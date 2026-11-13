@@ -6,7 +6,7 @@ How an operator configures document signing on an AIMEAT node: AIMEAT signatures
 
 ## Where the settings are
 
-Every setting below is in Admin › Config, domain Identity, group **docsign**, and in `GET /v1/admin/config` (an operator's AI reads it with `aimeat_admin_config`). A setting marked "start" is read from the environment when the node starts and is shown there read-only; change it in the node's `.env` and restart. The others can be changed in Admin › Config or with `PUT /v1/admin/config` and take effect at once. The defaults and the one-line meaning of each are also in [aimeat/.env.example](../aimeat/.env.example) and in the schema, [config-schema-docsign.ts](../aimeat/src/services/config-schema-docsign.ts).
+Every setting below is in Admin › Config, domain Identity, group **docsign**, and in `GET /v1/admin/config` (an operator's AI reads it with `aimeat_admin_config`). A setting marked "start" is read from the environment when the node starts and is shown there read-only; change it in the node's `.env` and restart. The others can be changed in Admin › Config or with `PUT /v1/admin/config` and take effect at once. The defaults and the one-line meaning of each are also in [aimeat/.env.example](../aimeat/.env.example) and in the schema, [config-schema-docsign.ts](../aimeat/src/services/config/schema-docsign.ts).
 
 | Setting | Environment variable | Default | Changed | What it does |
 |---|---|---|---|---|

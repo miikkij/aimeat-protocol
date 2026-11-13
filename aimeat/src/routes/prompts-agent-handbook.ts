@@ -8,7 +8,7 @@
  *
  *   THE TASK QUEUE IS THE CALLER'S OWN, AND A STOPPED AGENT'S HAS NOTHING THAT WAITS. The handbook
  *   is an agent's first read, so it is one of the reads a stopped agent is held on
- *   (services/agent-stop-rules.ts): the queued list is empty and `agent_stopped: true` says why.
+ *   (services/agent/stop-rules.ts): the queued list is empty and `agent_stopped: true` says why.
  *   The tasks it is already doing are listed.
  * @structure registerAgentHandbook(router, config, storage)
  * @usage registerAgentHandbook(router, config, storage);   // AFTER /v1/agents/me/handbook/:module
@@ -27,7 +27,7 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose, resolveIdentity } from '../utils/gaii.js';
-import { isStopped } from '../services/agent-stop-rules.js';
+import { isStopped } from '../services/agent/stop-rules.js';
 import { activeSystemPrompt } from '../services/prompts/prompt-read.js';
 
 export function registerAgentHandbook(router: Router, config: AimeatConfig, storage: Storage): void {

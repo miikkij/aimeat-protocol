@@ -36,7 +36,7 @@ import { emitChange } from '../services/event-bus.js';
 import { SiteService, SiteError } from '../services/site.js';
 import { siteLayoutRouter } from './site-layout.js';
 import { themesRouter } from './themes.js';
-import type { ConfigProvenance } from '../services/config-provenance.js';
+import type { ConfigProvenance } from '../services/config/provenance.js';
 import { isReservedSurfaceKey } from '../services/surface-layout/keys.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';

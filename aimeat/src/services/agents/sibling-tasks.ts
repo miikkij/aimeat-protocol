@@ -5,7 +5,7 @@
  * @description The task list of ANOTHER agent of the same owner, for an agent caller: what
  *   aimeat_task_list answers with target_agent_name.
  *
- *   The rule is services/agent-task-rules.ts mayManageSiblingTasks (task:read and agent:write),
+ *   The rule is services/agent/task-rules.ts mayManageSiblingTasks (task:read and agent:write),
  *   the one GET /v1/agents/:name/tasks applies to a sibling. The read is fenced by the owner's GHII,
  *   so a name that resolves to another account's agent finds nothing.
  * @structure SiblingTasksRefusal · listSiblingTasks()
@@ -18,7 +18,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import { buildGAII, localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
-import { mayManageSiblingTasks, type StartCaller } from '../agent-task-rules.js';
+import { mayManageSiblingTasks, type StartCaller } from '../agent/task-rules.js';
 
 export interface SiblingTasksRefusal { ok: false; status: number; code: string; message: string }
 

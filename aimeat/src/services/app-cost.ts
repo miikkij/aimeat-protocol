@@ -29,7 +29,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { commerceFeePercent } from './marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import { listEntitlementsByApp, type MeteredEntitlement } from './metered-entitlements.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 
 /** A refusal the caller renders: REST as the envelope error, MCP as `CODE: message`. */
 export interface AppCostRefusal {

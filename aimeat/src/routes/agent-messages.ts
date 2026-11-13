@@ -55,8 +55,8 @@ import { emitResourceUpdated } from '../services/resource-events.js';
 import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
 import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai/provenance-marks.js';
-import { sendAgentMessage } from '../services/agent-message-send.js';
-import { agentIsStopped } from '../services/agent-stop.js';
+import { sendAgentMessage } from '../services/agent/message-send.js';
+import { agentIsStopped } from '../services/agent/stop.js';
 import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
@@ -168,7 +168,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
 
     const agentGaii = resolveAgentGaii(req, agentName);
     // A stopped agent reading its OWN pending messages gets none, and is told why: they wait until
-    // it is started (services/agent-stop-rules.ts). The owner's read of the same list, and a
+    // it is started (services/agent/stop-rules.ts). The owner's read of the same list, and a
     // sibling agent's, are unchanged.
     if (resolveIdentity(req.auth!, config.nodeId) === agentGaii && await agentIsStopped(storage, agentGaii)) {
       res.json(success(config.nodeId, { messages: [], agent_stopped: true }));

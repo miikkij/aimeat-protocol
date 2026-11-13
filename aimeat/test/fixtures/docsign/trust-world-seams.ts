@@ -13,7 +13,7 @@
 import { beforeAll, afterAll } from 'vitest';
 import { _setTrustListFetcher, clearTrustListCache } from '../../../src/services/docsign/trust-list.js';
 import { _setRevocationFetcher } from '../../../src/services/docsign/revocation.js';
-import { docsignDefaults } from '../../../src/config-docsign.js';
+import { docsignDefaults } from '../../../src/config/docsign.js';
 import type { AimeatConfig } from '../../../src/config.js';
 import { buildTrustWorld, type TrustWorld } from './trust-world.js';
 

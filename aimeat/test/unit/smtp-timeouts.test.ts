@@ -15,7 +15,7 @@ import net from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { createTransport } from 'nodemailer';
 import { smtpTransportOptions } from '../../src/services/email.js';
-import { smtpDefaults } from '../../src/config-smtp.js';
+import { smtpDefaults } from '../../src/config/smtp.js';
 
 const base = {
   smtpHost: '127.0.0.1', smtpPort: 25, smtpSecure: false, smtpUser: null, smtpPass: null, smtpRejectUnauthorized: true,

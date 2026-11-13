@@ -101,7 +101,7 @@ import { runAsNode } from './utils/gaii.js';
 import { turnDeprecationWarning } from './services/turn-credentials.js';
 import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
 import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
-import { signedInOnly } from './config-visibility.js';
+import { signedInOnly } from './config/visibility.js';
 import { passwordOffLockoutWarning, twoStepWithoutTotpWarning } from './services/sign-in-policy.js';
 import { trackRequests, drainServer } from './server-bootstrap/drain.js';
 import { noteListeningServer } from './services/request-injector.js';

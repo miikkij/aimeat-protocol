@@ -8,7 +8,7 @@
  *   WHY. Until 2026-10-12 most suites signed an owner in with the account key: they signed
  *   `name + NODE_ID + timestamp` with the private key the registration returned and sent it to
  *   POST /v1/auth/token. That owner-key sign-in is deprecated (AIMEAT_OWNER_KEY_LOGIN) and node
- *   4.0.0 removes it (OWNER_KEY_LOGIN_REMOVED_IN, src/config-security.ts), so those suites would all
+ *   4.0.0 removes it (OWNER_KEY_LOGIN_REMOVED_IN, src/config/security.ts), so those suites would all
  *   have stopped at their first line on 4.0.0. The password sign-in is the one a person uses and the
  *   one 4.0.0 keeps. An agent still signs in with its own key (`gaii` + signature on the same route);
  *   that is not removed and is not here.

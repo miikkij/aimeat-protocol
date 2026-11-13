@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SSO connection management (BR-04), as ONE implementation. The admin HTTP routes
- *   (routes/admin-sso.ts) and the operator MCP tools (mcp/core-admin.ts) both call these
+ *   (routes/admin/sso.ts) and the operator MCP tools (mcp/core-admin.ts) both call these
  *   functions, so validation, the connections_locked freeze, the show-the-secret-once rule and
  *   the redacted read shape are written once — the same reason provisionOwner and eraseOwner
  *   exist. Results are discriminated unions the caller maps onto its own envelope.

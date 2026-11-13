@@ -30,7 +30,7 @@ import { legacyPacingWriteRefusal } from '../../src/services/legacy-pacing-write
 import { validateManifest } from '../../src/routes/knowledge/manifest-validator.js';
 import { createCapability, updateCapability } from '../../src/services/capability-record.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { MORSEL_PRICE_NAMES_REMOVED_IN } from '../../src/config-pacing.js';
+import { MORSEL_PRICE_NAMES_REMOVED_IN } from '../../src/config/pacing.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { CapabilityRecord } from '../../src/storage/interface.js';
 

@@ -1,0 +1,108 @@
+/**
+ * @file src/config/posture.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The startup security-posture self-check, extracted from config.ts by pure move when
+ *   that file reached the 800-line limit. Body verbatim.
+ *
+ *   It reads a resolved config and reports the unsafe combinations, so being insecure on the public
+ *   internet is a conscious operator choice rather than an accident. Warn-only by contract: the
+ *   caller logs what comes back and the node still starts, because an operator is allowed to run any
+ *   combination deliberately.
+ * @structure securityPostureWarnings(config) — one sentence per unsafe setting, empty on a local node
+ * @usage
+ *   import { securityPostureWarnings } from './posture.js';
+ *   for (const w of securityPostureWarnings(config)) logger.warn(w);
+ * @version-history
+ *   2026-11-05 — No data key warning while AIMEAT_ENCRYPTION_KEY_1 holds the secrets after the first key
+ *     was removed (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
+ *   2026-10-16 — POWERFUL_AGENT_SCOPES drops memory:delete and names memory:purge and agent:delete:
+ *     a delete into the bin may be a default, a removal that cannot come back may not (invariant 8 as
+ *     ruled by the developer on 2026-10-16). The start-up warning about the shipped default stops.
+ *   2026-10-16 — The admin-setup line of the public-node table is not written again: the test-switch
+ *     warning above already names AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR on any node others reach.
+ *   2026-10-16 — The other test-only settings (x402 test facilitator, test mode, dev mode, admin setup
+ *     open, Finvoice mock, fake connection address) are reported as ACTIVE on a non-loopback node, as
+ *     the test money handler is (utils/test-switches.ts; QA audit D8-01).
+ *   2026-10-16 — AIMEAT_TEST_MODE and AIMEAT_DEV_MODE on a non-loopback node are reported as ACTIVE
+ *     (QA audit S1-08, P1-01); on a public node the rest of the DNA knob table is reported too:
+ *     metrics access, extension install role, admin setup after the first operator, an empty AI
+ *     provider allowlist, and a powerful scope in the default agent scopes (QA audit S10-05, F7d-05).
+ *     POWERFUL_AGENT_SCOPES names invariant 8's list once.
+ *   v1.4.0 — 2026-10-13 — AIMEAT_TEST_MONEY_HANDLER on a non-loopback node is reported as ACTIVE, not
+ *     refused: the flag is in force on any node (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
+ *   v1.3.0 — 2026-10-12 — AIMEAT_AI_PROVENANCE=false on a public node is reported: refused from 4.0.0,
+ *     deprecated before it (Core 2026-11 PROV-07).
+ *   v1.2.0 — 2026-10-11 — AIMEAT_TEST_MONEY_HANDLER is reported as refused on any node whose public
+ *     URL is not a loopback address, whatever its profile (utils/test-money-guard.ts).
+ *   v1.1.0 — 2026-09-28 — AIMEAT_AI_FIXED_BASEURL_OVERRIDES is reported as refused on a public node
+ *     (System 2 plan, V3).
+ *   v1.0.0 — 2026-08-10 — Extracted from config.ts (max-file-lines), no behaviour change.
+ */
+import type { AimeatConfig } from '../config-types.js';
+import { testMoneyHandlerOnPublicNode } from '../utils/test-money-guard.js';
+import { testSwitchesOnPublicNode } from '../utils/test-switches.js';
+import { PROVENANCE_SWITCH_LOCAL_ONLY_IN } from './ai-label.js';
+
+/**
+ * The scopes invariant 8 calls powerful: explicit and separately consented, never part of the
+ * ambient default an agent gets when nobody names a list (security-development-dna.md, invariant 8).
+ * scripts/check-posture-defaults.ts holds the shipped default against this list.
+ *
+ * `memory:delete` is NOT here (Jouni, 2026-10-16): every memory delete it opens moves the record to
+ * the deleted-memory bin, where the owner restores it for the grace period, so it may be a default.
+ * What cannot come back is here: `memory:purge` (a workspace wiped, rows removed, an organism
+ * deleted, a Design Book part removed, each for good) and `agent:delete` (an agent ended, its
+ * records with it).
+ */
+export const POWERFUL_AGENT_SCOPES: readonly string[] = ['ai:use', 'task:write', 'memory:purge', 'agent:delete'];
+
+/**
+ * Startup posture self-check. When the resolved security profile is `public`, return a list of
+ * unsafe-combination warnings so being insecure on the internet is a conscious operator choice,
+ * not an accident. Warn-only by contract (the caller logs them) — never throws, so an operator can
+ * still run any combination deliberately. Empty list on a `local` node. See security-development-dna.md.
+ */
+export function securityPostureWarnings(config: AimeatConfig): string[] {
+  const w: string[] = [];
+  // Before the profile check: a node with a private LAN address is `local` and still serves people.
+  if (testMoneyHandlerOnPublicNode(config)) {
+    w.push(`AIMEAT_TEST_MONEY_HANDLER=true is ACTIVE on a public node — ${config.baseUrl} is not a loopback address, and any buyer can complete a EUR or USD checkout without paying through test.money. To turn it off, remove the variable from this node's environment and restart.`);
+  }
+  // The other test-only settings, the same way and for the same reason (utils/test-switches.ts; QA audit D8-01).
+  for (const s of testSwitchesOnPublicNode(config)) w.push(s.message);
+  if (config.securityProfile !== 'public') return w;
+  if (config.anonymousMode) w.push('AIMEAT_ANONYMOUS=true — anyone can act as the shared anonymous identity.');
+  if (config.allowPrivateEgress) w.push('AIMEAT_ALLOW_PRIVATE_EGRESS=true — server-side fetches can reach loopback/internal services (SSRF).');
+  if (config.federationOpenJoin) w.push('AIMEAT_FEDERATION_OPEN_JOIN=true — any peer can federate without operator approval.');
+  // A node whose first data key was removed after a rotation holds its secrets under the second.
+  if (!config.encryptionKey && !config.encryptionKey1) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
+  if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil footgun.');
+  if (config.statsAccess === 'public') w.push('AIMEAT_STATS_ACCESS=public — internal metrics are exposed to anyone.');
+  // The rest of the knob table in security-development-dna.md §3 (QA audit S10-05, F7d-05).
+  if (config.metricsAccess === 'public') w.push('AIMEAT_METRICS_ACCESS=public — the Prometheus metrics are exposed to anyone.');
+  if (config.extInstallRole !== 'operator') w.push(`AIMEAT_EXT_INSTALL_ROLE=${config.extInstallRole} — any account may install a sandboxed extension. A public node should set operator.`);
+  // AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR is named above by testSwitchesOnPublicNode, on any
+  // node others can reach, so it is not written a second time here.
+  if ((config.aiProviderAllowlist ?? []).length === 0) w.push('AIMEAT_AI_PROVIDER_ALLOWLIST is empty — an AI provider address may point at any host, and the decrypted key is sent there.');
+  const powerful = (config.defaultAgentScopes ?? []).filter(s => s === '*' || POWERFUL_AGENT_SCOPES.includes(s));
+  if (powerful.length > 0) w.push(`AIMEAT_DEFAULT_AGENT_SCOPES holds ${powerful.join(', ')} — an agent approved without a named list gets a scope invariant 8 keeps explicit and separately consented.`);
+  // Not "you chose something unsafe" but "your choice was not honoured" — the one entry here that
+  // reports a coercion rather than a risk, so an operator who set it never believes it took effect.
+  if (process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase() === 'off') {
+    w.push('AIMEAT_AI_LABEL_PUBLIC=off was REFUSED and reset to `strict` — a publicly reachable node may not hide the visible AI label (EU AI Act Art. 50). Use `light` to label only what the law requires.');
+  }
+  // The same kind from 4.0.0, and a notice before it: a public node records provenance whatever
+  // AIMEAT_AI_PROVENANCE says (config/ai-label.ts aiProvenanceFromEnv, Core 2026-11 PROV-07).
+  if (process.env.AIMEAT_AI_PROVENANCE === 'false') {
+    w.push(config.aiProvenance
+      ? `AIMEAT_AI_PROVENANCE=false was REFUSED — from ${PROVENANCE_SWITCH_LOCAL_ONLY_IN} a publicly reachable node records how its AI-generated content was made. Only a local node may switch it off.`
+      : `AIMEAT_AI_PROVENANCE=false switches provenance recording off on a public node. This is deprecated: from ${PROVENANCE_SWITCH_LOCAL_ONLY_IN} a public node records it whatever the setting says.`);
+  }
+  // The same kind: a coercion. A fixed provider type's address is why a key sent to it cannot leak,
+  // so a public node ignores the override (services/ai/providers.ts fixedBaseUrlOf).
+  if (config.aiFixedBaseUrlOverrides?.trim()) {
+    w.push('AIMEAT_AI_FIXED_BASEURL_OVERRIDES was REFUSED — on a public node openrouter, openai, anthropic, mistral and xai are reached only at their official addresses. Use an openai-compatible provider for any other address.');
+  }
+  return w;
+}

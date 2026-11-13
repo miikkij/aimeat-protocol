@@ -180,7 +180,7 @@ import type { AiCallOutcome, AiCallSettlement } from './call-outcome.js';
 import { textCallInputTokens } from './call-size.js';
 import { noticeBareNameMatch } from './app-name-notice.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './usage-record.js';
-import { agentCapRefusal, aiAskerOf } from '../agent-ai-keys.js';
+import { agentCapRefusal, aiAskerOf } from '../agent/ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
 import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './daily-budget.js';
 export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };

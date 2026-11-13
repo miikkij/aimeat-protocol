@@ -11,7 +11,7 @@
  *   `wait` as a task id. Nobody reported it in five months, because new work reaches a runtime over
  *   the connector socket or a webhook, and a runtime with neither reads this inbox. It was removed
  *   on 2026-10-11 on the developer's word rather than repaired: a third way to wake an agent would
- *   need every rule about waking one written into it as well (services/agent-stop-rules.ts).
+ *   need every rule about waking one written into it as well (services/agent/stop-rules.ts).
  * @structure
  *   - GET /v1/agents/:name/inbox            -- Consolidated inbox
  *   - GET /v1/agents/:name/integration-kit  -- Full integration kit JSON
@@ -33,7 +33,7 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, resolveIdentity, mayActOnAgent } from '../utils/gaii.js';
-import { isStopped } from '../services/agent-stop-rules.js';
+import { isStopped } from '../services/agent/stop-rules.js';
 
 /* ── Cursor helpers for inbox pagination ── */
 
@@ -118,7 +118,7 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
 
     // Fetch queued and active tasks + pending messages. A stopped agent reading its OWN inbox gets
     // only the work it is already doing: queued tasks and unread messages wait until it is started
-    // (services/agent-stop-rules.ts). The owner, or a sibling agent, reading the same inbox sees all of it.
+    // (services/agent/stop-rules.ts). The owner, or a sibling agent, reading the same inbox sees all of it.
     const held = isStopped(agent) && resolveIdentity(req.auth!, config.nodeId) === agentGaii;
     const [queuedResult, activeResult, pendingMessages] = await Promise.all([
       held ? { tasks: [] as Awaited<ReturnType<typeof storage.listAgentTasks>>['tasks'] } : storage.listAgentTasks(agentGaii, { status: 'queued', perPage: limit }),

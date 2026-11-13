@@ -55,7 +55,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type Server, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { ServiceSummary } from '../src/utils/service-summary.js';
-import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../src/config-federation.js';
+import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../src/config/federation.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import { getSoftwareVersion, versionAtLeast } from '../src/utils/version.js';
 import { sign, generateKeyPair } from '../src/auth/keypair.js';

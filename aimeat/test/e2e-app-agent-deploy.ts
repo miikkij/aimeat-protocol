@@ -48,7 +48,7 @@ import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 import { TunnelClient } from './helpers/tunnel-harness.js';
 import { removedOn } from './helpers/node-release.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';

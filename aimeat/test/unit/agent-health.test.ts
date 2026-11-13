@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import {
     computeAgentHealth, computeAgentHealthMany, isLiveState,
     AGENT_ONLINE_WINDOW_MS, AGENT_STALE_MS, AGENT_WEBHOOK_DOWN_THRESHOLD, BUCKET_RANK,
-} from '../../src/services/agent-health.js';
+} from '../../src/services/agent/health.js';
 import type { AgentOnboardingRecord } from '../../src/storage/types/agents-messaging.js';
 
 const NOW = Date.UTC(2026, 7, 9, 12, 0, 0);

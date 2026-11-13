@@ -43,7 +43,7 @@ import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { PII_CLASSES, type PiiClass } from './scrub.js';
 import { DecideError } from './errors.js';
-import { agentAiView } from '../agent-ai-keys.js';
+import { agentAiView } from '../agent/ai-keys.js';
 import { gateSettingOf, type GateSetting } from './gate.js';
 import { DECIDE_SETUP_ORDER, type SetupStep } from './setup-order.js';
 import { planProviderChoice, providersView, selectProvider, takesNoOwnerKey, writeProviderChoice } from './providers.js';

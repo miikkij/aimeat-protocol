@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description An agent's picture: served as an image, and set or removed by the owner or the agent
  *   itself. The picture is the `agent.avatar` memory record in the agent's own namespace
- *   (services/agent-avatar.ts); an agent normally sets it with aimeat_memory_write and needs nothing
+ *   (services/agent/avatar.ts); an agent normally sets it with aimeat_memory_write and needs nothing
  *   here except the GET.
  *
  *   - GET /v1/agents/:gaii/avatar.svg — the picture, to anyone. An emoji avatar is drawn as an SVG,
@@ -32,7 +32,7 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { emitChange, emitRecordChange } from '../../services/event-bus.js';
 import {
   AVATAR_KEY, AVATAR_SVG_HEADERS, avatarView, emojiAsSvg, parseAvatarValue, readAvatar,
-} from '../../services/agent-avatar.js';
+} from '../../services/agent/avatar.js';
 
 /** The agent a `:name` path names (a bare name is the caller's owner's), and whether this caller may change its picture. */
 async function targetFor(req: Request, config: AimeatConfig, storage: Storage):
@@ -85,7 +85,7 @@ export function registerAvatarRoutes(router: Router, config: AimeatConfig, stora
     const caller = callerOf(req, config.nodeId, storage);
     // Through the shared memory writer, so the value ceiling, the key ceiling, the quota and the
     // provenance stamp apply exactly as they do to aimeat_memory_write. The record is public by
-    // design (services/agent-avatar.ts), so the publish gate is not asked, as for an offers document.
+    // design (services/agent/avatar.ts), so the publish gate is not asked, as for an offers document.
     const written = await writeMemoryRecord({ storage, config }, {
       ...caller.principalView,
       targetGaii: target.agent.gaii,

@@ -2,27 +2,27 @@
   "about": "When each page of docs/it-adoption/ was last read against the code it describes, and which files that code is. pnpm check:it-adoption fails when a watched file changes after the review, so whoever changed the code re-reads the page an organisation's IT signs off against. The watches are the few files where a change most likely changes what IT is told; that a named setting or MCP tool still exists is checked separately on every page. Re-stamp after reading with: pnpm check:it-adoption --record <page>. Reasoning: aimeat/scripts/check-it-adoption.ts.",
   "pages": {
     "00-go-live-checklist.md": {
-      "reviewedOn": "2026-11-11",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/routes/setup.ts",
         "aimeat/src/services/setup-code.ts",
-        "aimeat/src/config-types-account-security.ts",
-        "aimeat/src/services/config-schema-email.ts",
-        "aimeat/src/services/config-schema-seo.ts",
-        "aimeat/src/config-posture.ts",
+        "aimeat/src/config/types-account-security.ts",
+        "aimeat/src/services/config/schema-email.ts",
+        "aimeat/src/services/config/schema-seo.ts",
+        "aimeat/src/config/posture.ts",
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/routes/admin/setup-register.ts"
       ],
-      "digest": "sha256:ce6231b587a4b78e684dd49e"
+      "digest": "sha256:b873fed8b935f2b7871070b5"
     },
     "01-overview.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-13",
       "watches": [
         ".github/SECURITY.md",
         "docs/coding-guidelines/environment-configs.md",
         "LICENSE"
       ],
-      "digest": "sha256:9823b75b60d5dd8f313cb74f"
+      "digest": "sha256:cb4f360a6f0187b8e72b5aff"
     },
     "02-architecture.md": {
       "reviewedOn": "2026-11-05",
@@ -38,21 +38,21 @@
       "digest": "sha256:d4f3a9cca9083afc02b09339"
     },
     "03-shared-responsibility.md": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-13",
       "watches": [
-        "aimeat/src/config-posture.ts",
+        "aimeat/src/config/posture.ts",
         "aimeat/src/auth/node-keys.ts"
       ],
-      "digest": "sha256:030434f37ecfc6b8e307b0d5"
+      "digest": "sha256:3cf35239817d6cb2c7c3987f"
     },
     "04-identity-access.md": {
-      "reviewedOn": "2026-11-11",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/services/external-login.ts",
         "aimeat/src/services/oidc-providers.ts",
         "aimeat/src/routes/scim.ts",
         "aimeat/src/routes/saml-login.ts",
-        "aimeat/src/config-types-account-security.ts",
+        "aimeat/src/config/types-account-security.ts",
         "aimeat/src/routes/setup.ts",
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/two-step-setup.ts",
@@ -61,7 +61,7 @@
         "aimeat/src/services/receivers/verify.ts",
         "aimeat/src/services/receivers/policy.ts"
       ],
-      "digest": "sha256:4ed412e1bee27c20b45255ab"
+      "digest": "sha256:b1de3df2589ca9939303389b"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-09",
@@ -87,16 +87,16 @@
       "digest": "sha256:d614ef16d1670fe28cf7b8f7"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-13",
       "watches": [
-        "aimeat/src/config-posture.ts",
+        "aimeat/src/config/posture.ts",
         "aimeat/src/middleware/cors.ts",
         "aimeat/src/utils/env-validator.ts",
         "docs/security/verification-matrix.md",
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/mcp-client/capability-use-setting.ts"
       ],
-      "digest": "sha256:a9d9bdbfca78821daf30f9b3"
+      "digest": "sha256:dcc2dfc49ce30d3895db149e"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-08",
@@ -107,14 +107,14 @@
       "digest": "sha256:6cfffd43ecb828c8eb236fda"
     },
     "09-hardening-guide.md": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-13",
       "watches": [
-        "aimeat/src/config-posture.ts",
+        "aimeat/src/config/posture.ts",
         "aimeat/src/utils/env-validator.ts",
         "docs/security/deployment-checklist.md",
         "aimeat/src/services/sign-in-policy.ts"
       ],
-      "digest": "sha256:6a3916d169d2d10d6597199d"
+      "digest": "sha256:30d1aeb156d8103b44c8e931"
     },
     "10-logging-monitoring.md": {
       "reviewedOn": "2026-11-01",
@@ -125,7 +125,7 @@
       "digest": "sha256:a3eec7b960928ad6b1577e84"
     },
     "11-backup-recovery.md": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "docs/operations/backup-and-restore.md",
         "aimeat/src/auth/node-keys.ts",
@@ -134,18 +134,18 @@
         "aimeat/src/storage/providers/postgres-kysely/read-retry.ts",
         "aimeat/src/server-bootstrap/bus-relay-start.ts"
       ],
-      "digest": "sha256:1ddf0000e2a1f962f719ebc6"
+      "digest": "sha256:82ad305780a6eafd6a8d5fbb"
     },
     "12-updates-releases.md": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-13",
       "watches": [
         ".github/SECURITY.md",
         "docs/operations/upgrading.md"
       ],
-      "digest": "sha256:3d9c7b9517edaeaa75f51cbc"
+      "digest": "sha256:413ee4cf7f722c829da8d7b8"
     },
     "13-apps-agents-endpoints.md": {
-      "reviewedOn": "2026-11-12",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/cli/connect/command-trust.ts",
         "aimeat/src/routes/connect-install.ts",
@@ -159,7 +159,7 @@
         "aimeat/src/static/sdk-libs/auth/last-identity.js",
         "aimeat/src/static/sdk-libs/offline/store.js"
       ],
-      "digest": "sha256:cd8122465427c479385a76ad"
+      "digest": "sha256:1ba30b4f81d8b369210a745c"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-04",
@@ -207,9 +207,9 @@
         "aimeat/src/services/passkeys.ts",
         "aimeat/src/middleware/rate-limit.ts",
         "aimeat/src/services/ai-jobs/service.ts",
-        "aimeat/src/services/config-apply.ts",
+        "aimeat/src/services/config/apply.ts",
         "aimeat/src/services/operator-access-audit.ts",
-        "aimeat/src/config-private-host.ts",
+        "aimeat/src/config/private-host.ts",
         "docs/operations/federation.md",
         "docs/coding-guidelines/environment-configs.md",
         "aimeat/security/process-local-baseline.json",
@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:ea60e2ab1f75a41e457195cf"
+      "digest": "sha256:ed2c748142550b6a5544a0ef"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -279,18 +279,18 @@
   },
   "fileDigests": {
     "00-go-live-checklist.md": {
-      "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
+      "aimeat/src/routes/setup.ts": "1838e10a0376e5b5",
       "aimeat/src/services/setup-code.ts": "c964751fae8c0c54",
-      "aimeat/src/config-types-account-security.ts": "25b793949938f783",
-      "aimeat/src/services/config-schema-email.ts": "be675d32baed906e",
-      "aimeat/src/services/config-schema-seo.ts": "b3bd0775806bfe24",
-      "aimeat/src/config-posture.ts": "b30452533b248e71",
-      "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
+      "aimeat/src/config/types-account-security.ts": "e285a070586fced5",
+      "aimeat/src/services/config/schema-email.ts": "d861ffacd319922e",
+      "aimeat/src/services/config/schema-seo.ts": "4e0f54788df2bdda",
+      "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
+      "aimeat/src/services/sign-in-policy.ts": "ab30fad3bb975f1d",
       "aimeat/src/routes/admin/setup-register.ts": "b31b2af26f35b077"
     },
     "01-overview.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
-      "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
+      "docs/coding-guidelines/environment-configs.md": "37b7a80399fc0f06",
       "LICENSE": "125eb0733ed6fbb1"
     },
     "02-architecture.md": {
@@ -303,7 +303,7 @@
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1"
     },
     "03-shared-responsibility.md": {
-      "aimeat/src/config-posture.ts": "b30452533b248e71",
+      "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
       "aimeat/src/auth/node-keys.ts": "5d991a21ccfa602e"
     },
     "04-identity-access.md": {
@@ -311,12 +311,12 @@
       "aimeat/src/services/oidc-providers.ts": "e784e39b32c1fe2a",
       "aimeat/src/routes/scim.ts": "2a7149ea1dc93d7c",
       "aimeat/src/routes/saml-login.ts": "59edd23fd037a225",
-      "aimeat/src/config-types-account-security.ts": "25b793949938f783",
-      "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
-      "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
+      "aimeat/src/config/types-account-security.ts": "e285a070586fced5",
+      "aimeat/src/routes/setup.ts": "1838e10a0376e5b5",
+      "aimeat/src/services/sign-in-policy.ts": "ab30fad3bb975f1d",
       "aimeat/src/services/two-step-setup.ts": "e8f73c13e7d1f680",
       "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c",
-      "aimeat/src/services/place-agent-scopes.ts": "dfc05b718b9315bc",
+      "aimeat/src/services/place-agent-scopes.ts": "2ff423732a4e4293",
       "aimeat/src/services/receivers/verify.ts": "e16675f72802f2d5",
       "aimeat/src/services/receivers/policy.ts": "be9c20d1ec9ab8bb"
     },
@@ -336,22 +336,22 @@
       "aimeat/src/services/ai/node-model-rules.ts": "270cb40ab665ef61"
     },
     "07-security.md": {
-      "aimeat/src/config-posture.ts": "b30452533b248e71",
+      "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
       "aimeat/src/middleware/cors.ts": "98494722f522e801",
-      "aimeat/src/utils/env-validator.ts": "c50a387efb49f030",
+      "aimeat/src/utils/env-validator.ts": "ccbc5f8f8169ffad",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
-      "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
-      "aimeat/src/services/mcp-client/capability-use-setting.ts": "c79f3a0670fd31eb"
+      "aimeat/src/services/sign-in-policy.ts": "ab30fad3bb975f1d",
+      "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec"
     },
     "08-threat-model.md": {
       "docs/security/threat-model.md": "211b04c0cc93e8fe",
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce"
     },
     "09-hardening-guide.md": {
-      "aimeat/src/config-posture.ts": "b30452533b248e71",
-      "aimeat/src/utils/env-validator.ts": "c50a387efb49f030",
+      "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
+      "aimeat/src/utils/env-validator.ts": "ccbc5f8f8169ffad",
       "docs/security/deployment-checklist.md": "9d2d4a4391821c1e",
-      "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b"
+      "aimeat/src/services/sign-in-policy.ts": "ab30fad3bb975f1d"
     },
     "10-logging-monitoring.md": {
       "aimeat/src/utils/logger.ts": "b8403e0859974c28",
@@ -363,18 +363,18 @@
       "aimeat/src/services/encryption.ts": "b0a16df9e1d5c2cb",
       "docs/operations/database-high-availability.md": "fb3b82782584e700",
       "aimeat/src/storage/providers/postgres-kysely/read-retry.ts": "9c1d34ab26d00182",
-      "aimeat/src/server-bootstrap/bus-relay-start.ts": "a77a01c5de30a627"
+      "aimeat/src/server-bootstrap/bus-relay-start.ts": "8dc6299a568ab76f"
     },
     "12-updates-releases.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
-      "docs/operations/upgrading.md": "6f13b15f715c813d"
+      "docs/operations/upgrading.md": "d07d02d3daf04c0e"
     },
     "13-apps-agents-endpoints.md": {
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce",
       "aimeat/src/routes/connect-install.ts": "9cccc922cd24769b",
       "aimeat/src/services/mcp-client/personal-sign-in.ts": "fd79749d63cbfc91",
-      "aimeat/src/services/mcp-client/capability-consent.ts": "0c5c747d1d1aafc7",
-      "aimeat/src/services/mcp-client/capability-use-setting.ts": "c79f3a0670fd31eb",
+      "aimeat/src/services/mcp-client/capability-consent.ts": "4dd52ae7253d0974",
+      "aimeat/src/services/mcp-client/capability-use-setting.ts": "5422586b25382fec",
       "aimeat/src/services/receivers/receive.ts": "23774d484171476e",
       "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
       "aimeat/src/services/organism-join-requests/requests.ts": "57e5b00c78bfe8e5",
@@ -428,22 +428,22 @@
       "aimeat/src/services/once-only-step.ts": "12c59204aa41d7f2",
       "aimeat/src/services/event-bus.ts": "c83f8530f18e045c",
       "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
-      "aimeat/src/mcp/legacy-sessions.ts": "e1e17ec26e540150",
+      "aimeat/src/mcp/legacy-sessions.ts": "d3e7dd1580854950",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "2938b630f02d3dff",
-      "aimeat/src/services/config-apply.ts": "9a4e295d031eff60",
+      "aimeat/src/services/ai-jobs/service.ts": "819892f156d11174",
+      "aimeat/src/services/config/apply.ts": "2c0879b78ab957cd",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
-      "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
+      "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
-      "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "529c17ddb46af0b5",
+      "docs/coding-guidelines/environment-configs.md": "37b7a80399fc0f06",
+      "aimeat/security/process-local-baseline.json": "b6ac415632ded0b7",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
       "aimeat/src/services/notification-sweeps.ts": "daa347e946222090",
       "aimeat/src/services/bus-relay.ts": "cd9d487584979f5e",
-      "aimeat/src/server-bootstrap/bus-relay-start.ts": "a77a01c5de30a627",
+      "aimeat/src/server-bootstrap/bus-relay-start.ts": "8dc6299a568ab76f",
       "aimeat/src/services/process-lease.ts": "56b5c28544c3d11b",
       "aimeat/src/services/ai-jobs/reclaim.ts": "46edaddf7925f44c",
       "aimeat/src/services/workflow/engine-lock.ts": "51637ef3a2de157d",

@@ -59,7 +59,7 @@
 import { logger } from '../../utils/logger.js';
 import { errorFields } from '../../utils/error-fields.js';
 import type { ContentReader } from '../classification/reader.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { openingOfApp } from '../internet-opening/opening-registry.js';
 import {
   type ExposureContext, type ExposureFound, type ExposureItem, type ExposureKind, type ExposureLevel,

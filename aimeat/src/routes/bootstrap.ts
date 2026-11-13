@@ -128,7 +128,7 @@ import { SurfaceLayoutService } from '../services/surface-layout/service.js';
 import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';
 import { coreDiscoveryFields } from '../services/core-discovery.js';
-import { signedInOnly } from '../config-visibility.js';
+import { signedInOnly } from '../config/visibility.js';
 import { createT } from '../i18n.js';
 
 /** The story's one line, from the one place it is written (locales, aimeatStory.oneLine). */

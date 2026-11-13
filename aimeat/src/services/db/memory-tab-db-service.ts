@@ -38,7 +38,7 @@ import { resolveOwnerIdentities, loadOwnerAgents } from './owner-identity.js';
 import { metaRowView, summarizeMemory, type MemorySummary } from './memory-tab-summary.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
-import { agentRecordView } from '../agent-record-view.js';
+import { agentRecordView } from '../agent/record-view.js';
 import { choiceIdOf } from '../file-store/file-store-resolver.js';
 import { parseBlobRef } from '../../storage/blob/blob-types.js';
 
@@ -130,7 +130,7 @@ export class MemoryTabService {
       });
 
       return {
-        // Without the webhook signing secret (services/agent-record-view.ts).
+        // Without the webhook signing secret (services/agent/record-view.ts).
         agents: agents.map(agentRecordView),
         memory,
         // The tab states the upload limit from this number. Hardcoding it in the form is how it

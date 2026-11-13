@@ -64,9 +64,9 @@ import { themeSheet, componentCssState, catalogueHooks, servedFaces, type Compon
 import { SHAPE_TOKENS, builtinShapes, checkShape } from './shapes.js';
 import { tiilitaivasTheme, TIILITAIVAS_ID } from './tiilitaivas.js';
 import type { ContrastResult } from './contrast.js';
-import type { ConfigProvenance } from '../config-provenance.js';
-import { applyConfigChanges } from '../config-apply.js';
-import { isSealed, sealRefusal } from '../config-sealing.js';
+import type { ConfigProvenance } from '../config/provenance.js';
+import { applyConfigChanges } from '../config/apply.js';
+import { isSealed, sealRefusal } from '../config/sealing.js';
 import { operatorName, type OperatorCaller } from '../operator-principal.js';
 import { THEME_WRITE_SCOPE } from '../../utils/scope-coverage.js';
 
@@ -513,7 +513,7 @@ export class ThemeService {
 
     /**
      * The operator's choices, changed through the same code the admin Config tab saves with
-     * (services/config-apply.ts): whether people choose, which themes are available (live theme ids,
+     * (services/config/apply.ts): whether people choose, which themes are available (live theme ids,
      * at least one), and the default theme (one of them). Every id is checked before anything is written.
      */
     async setPolicy(input: { personalChoice?: boolean; offered?: string[]; default?: string }, provenance?: ConfigProvenance): Promise<ThemeSnapshot> {

@@ -49,9 +49,9 @@ import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
-import { hasSealedKeys, sealedView } from '../services/config-sealing.js';
-import { buildConfigView, changeNodeSettings } from '../services/config-admin-view.js';
-import { provenanceOf } from '../services/config-provenance.js';
+import { hasSealedKeys, sealedView } from '../services/config/sealing.js';
+import { buildConfigView, changeNodeSettings } from '../services/config/admin-view.js';
+import { provenanceOf } from '../services/config/provenance.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { toolError } from './tool-error.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -62,7 +62,7 @@ import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { registerKeyReencryptTool } from './key-reencrypt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -169,7 +169,7 @@ export function registerCoreAdminTools(
         async ({ section, q }) => {
             if (!(await isOperator())) return notOperator;
             // The list the admin Config tab and GET /v1/admin/config show, built by the same function
-            // (services/config-admin-view.ts). This tool answered a flat twelve fields while the
+            // (services/config/admin-view.ts). This tool answered a flat twelve fields while the
             // connector's copy proxied the whole list, so an operator's AI on the node could not see
             // most of what it was asked about.
             const view = buildConfigView({ config, storage, provenance: provenanceOf(config) }, { section, q });
@@ -180,7 +180,7 @@ export function registerCoreAdminTools(
                         ...view,
                         // Settings whoever runs this node set, with their values (a secret as whether it
                         // is set): the answer an operator asking their AI what their limits are needs
-                        // in one place. services/config-sealing.ts.
+                        // in one place. services/config/sealing.ts.
                         ...(hasSealedKeys(config) ? {
                             sealed: sealedView(config),
                             sealed_note: 'Set by whoever runs this node. Readable here, changed by asking them.',

@@ -25,10 +25,10 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 
 | Variable | Default | Recommendation for an organisation node | Source |
 |---|---|---|---|
-| `AIMEAT_BASE_URL` | `http://localhost:<port>` | The final HTTPS address. Immutable at runtime; it fixes the passkey RP ID | `aimeat/src/services/config-schema.ts` |
+| `AIMEAT_BASE_URL` | `http://localhost:<port>` | The final HTTPS address. Immutable at runtime; it fixes the passkey RP ID | `aimeat/src/services/config/schema.ts` |
 | `AIMEAT_NODE_ID` | `aimeat-local-001-dev` | A unique id, set before the first start and never changed | `aimeat/.env.example`, [pitfalls §87](../pitfalls.md#87-a-node-that-changed-its-id-stops-receiving-its-own-seeded-upgrades) |
 | `AIMEAT_STORAGE` | `memory` (data lost at restart) | `postgres-kysely` | `aimeat/src/config.ts` |
-| `AIMEAT_SECURITY_PROFILE` | inferred: `public` when `AIMEAT_BIND_HOST` names an address beyond loopback. Otherwise `local` for a localhost, loopback, RFC 1918, link-local or IPv6 unique-local base URL or a personal node, and `public` for any other base URL | `public`, always, also on an internal network | `aimeat/src/config-private-host.ts` |
+| `AIMEAT_SECURITY_PROFILE` | inferred: `public` when `AIMEAT_BIND_HOST` names an address beyond loopback. Otherwise `local` for a localhost, loopback, RFC 1918, link-local or IPv6 unique-local base URL or a personal node, and `public` for any other base URL | `public`, always, also on an internal network | `aimeat/src/config/private-host.ts` |
 | `AIMEAT_REGISTRATION_MODE` | `open` | `oauth` (IdP sign-in creates accounts) or `invite` | [organisation node sign-in](../organisation-node-sign-in.md#1-two-gates-and-why-one-is-not-enough) |
 | `AIMEAT_CONTENT_ACCESS` | `open` | `signed-in` for an internal node | `aimeat/.env.example` |
 | `AIMEAT_PUBLISH_GATE` | `off` (code default; `aimeat init` writes `agents-and-apps`) | `agents-and-apps`: an agent or app asks the owner before it makes anything public | `aimeat/.env.example` |
@@ -39,16 +39,16 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 | `AIMEAT_TRUST_PROXY` | loopback trusted when the base URL is not localhost | A hop count (`1`) or the proxy's subnet; not `true` unless the outer proxy overwrites forwarded headers | [production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
 | `AIMEAT_APP_ORIGIN_ENABLED`, `AIMEAT_APP_HOST` | on with the public profile; host `apps.<base host>` | On, with wildcard DNS and certificate in place | `aimeat/.env.example` |
 | `AIMEAT_PAGE_HOST` | empty (HTML pages shown as text) | A separate host if workspace HTML pages are used | [the page host](../operations/production-deployment.md#the-page-host) |
-| `AIMEAT_SMTP_*` | no host (mail disabled); From `AIMEAT <noreply@localhost>` | The organisation's relay and a From address on a domain with SPF, DKIM and DMARC | `aimeat/src/config-smtp.ts` |
-| `AIMEAT_EMAIL_CONFIRMATION_REQUIRED` | `false` | `true` when accounts are created by password | `aimeat/src/config-smtp.ts` |
+| `AIMEAT_SMTP_*` | no host (mail disabled); From `AIMEAT <noreply@localhost>` | The organisation's relay and a From address on a domain with SPF, DKIM and DMARC | `aimeat/src/config/smtp.ts` |
+| `AIMEAT_EMAIL_CONFIRMATION_REQUIRED` | `false` | `true` when accounts are created by password | `aimeat/src/config/smtp.ts` |
 | `AIMEAT_ENTRA_ALLOWED_TENANTS` | empty | The organisation's tenant GUID and approved partners | [organisation node sign-in](../organisation-node-sign-in.md#4-configure-the-node) |
 | `AIMEAT_GOOGLE_OAUTH_ENABLED` | `false` | Keep off on an organisation node: no domain gate | [organisation node sign-in, section 6](../organisation-node-sign-in.md#6-what-the-gate-does-not-cover) |
 | `AIMEAT_SSO_ENABLED` | `false` | On when SAML or SCIM is used | [organisation node sign-in, section 7](../organisation-node-sign-in.md#7-saml-and-scim-the-organisations-own-identity-provider-br-04) |
 | `AIMEAT_TWO_STEP_REQUIRED` | `off` (required for nobody) | `operators`, or `everyone` when local accounts must also have two-step sign-in; keep `AIMEAT_TOTP_ENABLED` on | `aimeat/src/services/sign-in-policy.ts` |
 | `AIMEAT_PASSWORD_SIGN_IN` | `on` (every account) | `operators` with an IdP; `off` only when every operator has a passkey or an IdP link | `aimeat/src/services/sign-in-policy.ts` |
-| `AIMEAT_AI_PROVIDER_ALLOWLIST` | empty (any host) | The provider hosts in use, for example `openrouter.ai` | `aimeat/src/config-posture.ts` |
+| `AIMEAT_AI_PROVIDER_ALLOWLIST` | empty (any host) | The provider hosts in use, for example `openrouter.ai` | `aimeat/src/config/posture.ts` |
 | `AIMEAT_AI_OPENROUTER_REGION`, `AIMEAT_AI_OPENROUTER_REGION_FALLBACK` | `any`, `us` | The region the DPO approved, and fallback `off` if no other region is acceptable | [where AI calls are processed](../operations/openrouter-region.md#the-four-settings) |
-| `AIMEAT_EXT_INSTALL_ROLE` | `owner` (any account installs extensions) | `operator` | `aimeat/src/config-posture.ts` |
+| `AIMEAT_EXT_INSTALL_ROLE` | `owner` (any account installs extensions) | `operator` | `aimeat/src/config/posture.ts` |
 | `AIMEAT_STATS_ACCESS` | `public` in code (`operator` in the example file) | `operator` | `aimeat/src/config.ts` |
 | `AIMEAT_METRICS_ENABLED`, `AIMEAT_METRICS_ACCESS` | `false`, `operator` | On, `operator`, scraped by the monitoring system | [observability guide](../../aimeat/docs/observability-guide.md) |
 | `AIMEAT_CLASSIFICATION` | `off` | `owner` or `all` if the organisation classifies data | [data classification](../data-classification.md#the-switch) |
@@ -56,9 +56,9 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 | `AIMEAT_OPERATOR_*` | none (privacy and terms pages answer 503) | The controller's details, filled by the DPO | `aimeat/.env.example`, Operator info |
 | `AIMEAT_AI_SUPERVISORY_NAME`, `AIMEAT_AI_SUPERVISORY_URL` | empty (reported as unstated) | The AI Act market-surveillance authority | `aimeat/.env.example` |
 | `AIMEAT_FEDERATION_ROLE` | `standalone` | `standalone` unless the node joins a federation | [running federation](../operations/federation.md#the-settings-that-decide-it) |
-| `AIMEAT_UPDATE_CHECK` | on (asks the npm registry) | Off on a node without internet egress | `aimeat/src/config-update-check.ts` |
+| `AIMEAT_UPDATE_CHECK` | on (asks the npm registry) | Off on a node without internet egress | `aimeat/src/config/update-check.ts` |
 | `AIMEAT_SEALED_CONFIG_KEYS` | empty | The paths the hosting party fixes, when host and operator differ | [environment examples, host-sealed settings](../coding-guidelines/environment-configs.md#host-sealed-settings) |
-| `AIMEAT_LOG_LEVEL` | `info` | `info` or `warn` | `aimeat/src/config-runtime.ts` |
+| `AIMEAT_LOG_LEVEL` | `info` | `info` or `warn` | `aimeat/src/config/runtime.ts` |
 
 ## Routines
 
@@ -88,8 +88,8 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 | IdP sign-in fails or returns to the sign-in page | The redirect URI registered at the IdP differs from the one the node sends. The node computes it from `AIMEAT_BASE_URL` unless `AIMEAT_ENTRA_OAUTH_REDIRECT_URI` or `AIMEAT_GOOGLE_OAUTH_REDIRECT_URI` sets it (`aimeat/src/services/oidc-providers.ts`). Or people reach the node by another address than the base URL | Register exactly `<base>/v1/ghii/login/entra/callback` or `<base>/v1/ghii/login/google/callback`; publish one address | [organisation node sign-in, section 5](../organisation-node-sign-in.md#5-check-that-it-works) |
 | Client addresses in logs are all the proxy's, or rate limits hit everyone at once | `AIMEAT_TRUST_PROXY` does not match the proxy path | Set the hop count or subnet | [deployment checklist, network security](../security/deployment-checklist.md#network-security) |
 | Sign-in links and codes land in spam | The From domain has no SPF, DKIM or DMARC alignment; the node does not DKIM-sign | Publish the records at the mail provider, send through a relay that signs, test from the admin Email tab | [00 Go-live checklist, phase 5](00-go-live-checklist.md#phase-5-email) |
-| No mail at all, the Email tab says disabled | `AIMEAT_SMTP_HOST` is not set | Set the SMTP settings | `aimeat/src/config-smtp.ts` |
-| Passkeys stop working after a domain change | A passkey is bound to the RP ID, which is the old host | People register new passkeys on the new domain; to keep old ones, the RP ID must stay the old registrable domain (`AIMEAT_PASSKEY_RP_ID`) and the new origin must be under it | `aimeat/src/services/config-schema.ts`, [W3C WebAuthn, RP ID](https://www.w3.org/TR/webauthn-3/#relying-party-identifier) |
+| No mail at all, the Email tab says disabled | `AIMEAT_SMTP_HOST` is not set | Set the SMTP settings | `aimeat/src/config/smtp.ts` |
+| Passkeys stop working after a domain change | A passkey is bound to the RP ID, which is the old host | People register new passkeys on the new domain; to keep old ones, the RP ID must stay the old registrable domain (`AIMEAT_PASSKEY_RP_ID`) and the new origin must be under it | `aimeat/src/services/config/schema.ts`, [W3C WebAuthn, RP ID](https://www.w3.org/TR/webauthn-3/#relying-party-identifier) |
 | Chat answers, live updates or MCP sessions stop after some seconds | The proxy buffers or times out streams | Turn buffering off for the stream paths (the node sends `X-Accel-Buffering: no`, which nginx honours) and set a long read timeout | [what the proxy must pass through, streams](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
 | Uploads fail with the proxy's 413, not the node's `QUOTA_EXCEEDED` | The proxy's body limit is below the node's | Raise `client_max_body_size` to at least the largest node limit | [body size](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
 | The node refuses to start and names a key variable | The data key or key passphrase differs from the one the database was written with, and no matching key file exists | Restore the original values; the node never makes a new identity | [backup and restore, what a node is](../operations/backup-and-restore.md#what-a-node-is) |

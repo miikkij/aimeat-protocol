@@ -28,16 +28,16 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { CONFIG_FIELDS } from '../src/services/config-schema.js';
-import { numericRangeOf } from '../src/services/config-schema-validators.js';
-import { RATE_LIMIT_KEYS } from '../src/services/config-rate-limit-sync.js';
+import { CONFIG_FIELDS } from '../src/services/config/schema.js';
+import { numericRangeOf } from '../src/services/config/schema-validators.js';
+import { RATE_LIMIT_KEYS } from '../src/services/config/rate-limit-sync.js';
 
 const ROOT = process.cwd();
 const fields = CONFIG_FIELDS;
 const visible = fields.filter(f => f.adminDisplay !== 'hidden');
 /** The path the page shows: a secret is `<path>_configured`. */
 const shownPath = (f: (typeof fields)[number]): string => f.adminDisplay === 'configured' ? `${f.dotPath}_configured` : f.dotPath;
-/** Rows the route adds itself (routes/admin-config.ts). */
+/** Rows the route adds itself (routes/admin/config.ts). */
 const VIRTUAL_PATHS = ['push.vapid_configured'];
 const paths = [...visible.map(shownPath), ...VIRTUAL_PATHS];
 const under = (p: string): string => p.replace(/\./g, '_');
@@ -101,17 +101,17 @@ for (const tag of ['en', 'fi', 'es']) {
 
 // ── 4. Settings no code reads ──
 /** Config plumbing: reading a key here is not using the setting. */
-const PLUMBING = /^src[\\/](config[^\\/]*\.ts|services[\\/]config-[^\\/]*\.ts|utils[\\/]env-config[\\/]|cli[\\/]init-wizard[\\/]|generated[\\/])|[\\/]__tests__[\\/]/;
+const PLUMBING = /^src[\\/](config[^\\/]*\.ts|config[\\/][^\\/]*\.ts|services[\\/]config[\\/][^\\/]*\.ts|utils[\\/]env-config[\\/]|cli[\\/]init-wizard[\\/]|generated[\\/])|[\\/]__tests__[\\/]/;
 /**
  * Rows whose config key is not read by name, with the reason each is still a live setting.
  * An entry here is an answer, not a backlog: delete it when the code starts reading the key.
  */
 const READ_ANOTHER_WAY: Record<string, string> = {
-  'file_store.prefix': 'read through nodeFilePrefix() in config-file-store.ts, which services/file-store/file-store-specs.ts calls: an empty folder means aimeat/<node id>/files/',
+  'file_store.prefix': 'read through nodeFilePrefix() in config/file-store.ts, which services/file-store/file-store-specs.ts calls: an empty folder means aimeat/<node id>/files/',
   'decide.jeff_key': 'the provider reads AIMEAT_DECIDE_JEFF_KEY from the environment by name (services/decide/providers.ts); the row shows whether it is set',
   'decide.laya_key': 'the provider reads AIMEAT_DECIDE_LAYA_KEY from the environment by name; the row shows whether it is set',
   'decide.von_key': 'the provider reads AIMEAT_DECIDE_VON_KEY from the environment by name; the row shows whether it is set',
-  'security.owner_key_login': 'routes/auth.ts reads it through ownerKeyLoginAllowed (config-security.ts), which also asks whether the running version removed the sign-in',
+  'security.owner_key_login': 'routes/auth.ts reads it through ownerKeyLoginAllowed (config/security.ts), which also asks whether the running version removed the sign-in',
   'ai.legacy_settings_routes': 'routes/openrouter.ts reads it through aiLegacySettingsRoutesAllowed (config-ai-models.ts), which also asks whether the running version removed the routes',
   'security.allow_private_egress': 'utils/blocked-ip.ts and services/decide/providers.ts read AIMEAT_ALLOW_PRIVATE_EGRESS at call time from the environment, which config.ts sets from the security profile at start; the row is immutable, so the two hold the same value',
 };

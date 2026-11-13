@@ -25,9 +25,9 @@
  *   AIMEAT_APP_ORIGIN_ENABLED must be true/false; if true, AIMEAT_APP_HOST required.
  */
 
-import { ALL_CONFIG_MAP, parseConfigValue } from '../services/config-schema.js';
-import { REFUSE_ON_INVALID, dropEmptySettings, normaliseFixedSetSettings, startSettingProblems } from '../config-start-check.js';
-import { loadFileSource } from '../services/config-loader.js';
+import { ALL_CONFIG_MAP, parseConfigValue } from '../services/config/schema.js';
+import { REFUSE_ON_INVALID, dropEmptySettings, normaliseFixedSetSettings, startSettingProblems } from '../config/start-check.js';
+import { loadFileSource } from '../services/config/loader.js';
 import { logger } from '../utils/logger.js';
 
 interface ValidationResult {
@@ -417,7 +417,7 @@ export function validateEnv(): ValidationResult[] {
     results.push({ level: 'info', variable: 'AIMEAT_AI_COP_SECTIONS', message: `/v1/ai-transparency reports this node as a Code of Practice signatory for section(s) ${copSections.join(', ')}. Set it only after the AI Office confirmed your signature — it is a public compliance claim.` });
   }
 
-  // ── Every value the start sets aside (config-start-check.ts) ──
+  // ── Every value the start sets aside (config/start-check.ts) ──
   // The start runs the default of a setting whose value it does not accept, so this is the place an
   // operator sees all of them before starting. For a setting this pass covers, it says what the start
   // does, in place of an error a check above wrote by comparing the exact word.

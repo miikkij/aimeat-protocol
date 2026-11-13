@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An agent whose permissions cover organism:invite may invite people, and an invitation
- *   can create a new account. The node (services/agent-invites.ts) and the pages
+ *   can create a new account. The node (services/agent/invites.ts) and the pages
  *   (public/js/consent-vocab.js) read the same permissions the same way, and the page shows the
  *   sentence from the real en.json.
  * @version-history
@@ -12,9 +12,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { invitesPeople, withInvitesSentence, INVITES_SENTENCE } from '../../src/services/agent-invites.js';
+import { invitesPeople, withInvitesSentence, INVITES_SENTENCE } from '../../src/services/agent/invites.js';
 import { invitesPeople as pageInvitesPeople, invitesSentence } from '../../public/js/consent-vocab.js';
-import { proposalNextStep } from '../../src/services/agent-proposals.js';
+import { proposalNextStep } from '../../src/services/agent/proposals.js';
 
 const CASES: Array<[string, string[], boolean]> = [
   ['the word itself', ['memory:read', 'organism:invite'], true],

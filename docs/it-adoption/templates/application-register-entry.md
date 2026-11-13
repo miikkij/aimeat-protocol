@@ -63,7 +63,7 @@ Copy the rows into your application register, CMDB or ISMS form; most such forms
 | What a backup must contain | The database, the secrets (`.env`) and the node key file, taken together | [Backup and restore](../../operations/backup-and-restore.md) |
 | Backup method and schedule | [ORGANIZATION] *pg_dump or SQLite online backup, interval, retention, off-site encrypted copy.* | [Backup and restore](../../operations/backup-and-restore.md) |
 | Restore test | [ORGANIZATION] *Date of last test and result; the guide proposes monthly.* | [Backup and restore](../../operations/backup-and-restore.md), "Test the restore" |
-| The admin export is not a backup | `GET /v1/admin/backup` exports accounts, agents, actions, boards and each agent's own records and transactions; not people's own records, organisms, workspaces, apps or files | [Backup and restore](../../operations/backup-and-restore.md), "What is not a backup"; `aimeat/src/routes/admin-monitoring.ts` |
+| The admin export is not a backup | `GET /v1/admin/backup` exports accounts, agents, actions, boards and each agent's own records and transactions; not people's own records, organisms, workspaces, apps or files | [Backup and restore](../../operations/backup-and-restore.md), "What is not a backup"; `aimeat/src/routes/admin/monitoring.ts` |
 
 ## Personal data and transfers
 
@@ -87,7 +87,7 @@ Copy the rows into your application register, CMDB or ISMS form; most such forms
 | Account creation | `AIMEAT_REGISTRATION_MODE`: `open` (default), `oauth`, `invite` or `closed` | `aimeat/.env.example` |
 | Joiner and leaver process | [ORGANIZATION] *SCIM from the IdP, or the manual steps and who does them.* | SCIM per SSO connection (`aimeat_admin_sso_scim_token`) |
 | Disabling an account | An operator disables an owner | `aimeat_admin_owner_disable` |
-| AI agents | An agent connects by device authorization: the owner approves it and picks its permissions; the owner sees and removes every agent; an agent passes on only permissions it holds | `aimeat/src/routes/agents/device-auth.ts`, `aimeat/src/services/agent-scope-add.ts`, `aimeat_agents_list` |
+| AI agents | An agent connects by device authorization: the owner approves it and picks its permissions; the owner sees and removes every agent; an agent passes on only permissions it holds | `aimeat/src/routes/agents/device-auth.ts`, `aimeat/src/services/agent/scope-add.ts`, `aimeat_agents_list` |
 | Administrator accounts | The first operator is created either in the setup wizard (`/v1/setup/wizard`, `POST /v1/setup/init`; on a node whose address is not loopback, with the one-time setup code from the start log) or at `POST /v1/admin/setup/register` with `AIMEAT_ADMIN_PASSWORD` (or the generated secret in the `admin-setup-secret` file, mode 0600) and the same setup code; further operators are granted on the admin Owners page | `aimeat/.env.example`, `aimeat/src/routes/setup.ts`, `aimeat/src/routes/admin/setup-register.ts`, `aimeat/src/services/admin-setup-secret.ts` |
 | Named administrators | [ORGANIZATION] *Names of everyone with the operator role, and of everyone with shell or database access.* | Operator role and host access are separate trust boundaries ([threat model](../../security/threat-model.md)) |
 | Second factor for administrators | [ORGANIZATION] *Your rule.* The deployment checklist asks for TOTP on operator accounts; `AIMEAT_TWO_STEP_REQUIRED=operators` makes the node enforce it | [Deployment checklist](../../security/deployment-checklist.md), `aimeat/src/services/sign-in-policy.ts` |

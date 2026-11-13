@@ -31,7 +31,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { PublicPage } from '../../data/public-pages.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { openPackage } from './store.js';
 import { versionAudienceOf } from './odps-read.js';
 import { readPointer } from './version-audience.js';

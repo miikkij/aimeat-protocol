@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description From settings to a store a file can be written to. nodeStoreSpec reads the node's own
- *   store from the config (the S3 or Azure rows of config-file-store.ts) and says which setting is
+ *   store from the config (the S3 or Azure rows of config/file-store.ts) and says which setting is
  *   missing when it cannot; storeFor builds the client once per distinct setting and reuses it.
  *
  *   EVERY STORE GOES THROUGH safeFetch, with no redirects; what differs is which private origin it
@@ -25,7 +25,7 @@ import type { AzureSpec, BlobFetch, BlobSpec, BlobStore, S3Spec } from '../../st
 import { createS3Store } from '../../storage/blob/s3-client.js';
 import { createAzureStore, parseAzureConnection } from '../../storage/blob/azure-client.js';
 import { safeFetch } from '../../utils/url-validator.js';
-import { nodeFilePrefix } from '../../config-file-store.js';
+import { nodeFilePrefix } from '../../config/file-store.js';
 
 /** How long one request to a store may take. A 1 GB upload over a slow line is the longest case. */
 const REQUEST_TIMEOUT_MS = 10 * 60 * 1000;

@@ -34,7 +34,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { tokenIdOf, type VerifiedToken } from '../../auth/jwt.js';
-import { isStopped } from '../agent-stop-rules.js';
+import { isStopped } from '../agent/stop-rules.js';
 import { REGISTRY_RESYNC_MS } from '../bus-relay.js';
 import { logger } from '../../utils/logger.js';
 

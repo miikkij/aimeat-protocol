@@ -8,7 +8,7 @@
  *   callback now refuses another flow's state as unknown and leaves that round where it is.
  *
  *   A unit suite rather than E2E because neither door can be driven on a real node here: EUDIW
- *   refuses to boot at all (src/config-eudiw-guard.ts), and FTN needs a live OIDC client. The router
+ *   refuses to boot at all (src/config/eudiw-guard.ts), and FTN needs a live OIDC client. The router
  *   is the real one, on a real SQLite storage, with the two external services stubbed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/verification-nonce-type.test.ts
  * @version-history

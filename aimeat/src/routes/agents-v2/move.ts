@@ -37,7 +37,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
+import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { findConnector, setWanted } from '../../services/connector-registry.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -114,7 +114,7 @@ export function registerAgentMoveRoute(router: Router, config: AimeatConfig, sto
     const connector = { id: target.id, name: target.name };
     if (!out.ok) {
       // A waiting agent whose new connector is not connected has still been re-ordered: it gets its
-      // key when that connector connects (services/agent-pending-enrolment.ts).
+      // key when that connector connects (services/agent/pending-enrolment.ts).
       if (!keyed && NOT_CONNECTED.has(out.code)) {
         await applyRunMode();
         res.json(success(config.nodeId, {

@@ -38,13 +38,13 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
-import { listProposals } from './agent-proposals.js';
+import { listProposals } from './agent/proposals.js';
 import { listConnectors, wantedInstalls } from './connector-registry.js';
 import { readCrewState } from './crew-def-store.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { nodeTimeZone } from './display-prefs.js';
-import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent-ties.js';
-import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
+import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent/ties.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';
 import { logger } from '../utils/logger.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
@@ -57,7 +57,7 @@ export interface WatchedSpace { organism_id: string; ws: string; space: string }
 export interface HomeWorker {
   name: string;
   display_name: string;
-  /** The agent's picture (services/agent-avatar.ts), null when it has none. */
+  /** The agent's picture (services/agent/avatar.ts), null when it has none. */
   avatar: AvatarView | null;
   description: string;
   when: WorksWhen;
@@ -86,7 +86,7 @@ export interface HomeWorker {
   /** When one of its tasks last changed, and when one last failed. */
   last_at: string | null;
   last_failed_at: string | null;
-  /** The apps whose data map names this agent: the ones that show its work (services/agent-ties.ts). */
+  /** The apps whose data map names this agent: the ones that show its work (services/agent/ties.ts). */
   apps: AgentApp[];
   /** The workspace its finished work is shared with; null while the work stays in its own memory. */
   work_goes_to: AgentWorkplace | null;

@@ -93,14 +93,14 @@ import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { narrowAgent } from '../../services/scope-narrowing.js';
-import { putPortRedirect } from '../../services/agent-port-redirect.js';
+import { putPortRedirect } from '../../services/agent/port-redirect.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { removeAgent } from '../../services/agents/remove-agent.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
-import { checkScopeAddition, recordScopeAddition } from '../../services/agent-scope-add.js';
+import { checkScopeAddition, recordScopeAddition } from '../../services/agent/scope-add.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
@@ -114,9 +114,9 @@ import { presentMemories } from '../../services/classification/present-memory.js
 import { readerFor } from '../../services/classification/reader.js';
 import { leaveMemories } from '../../services/classification-exits.js';
 import { actionPricingFromRecord } from '../../services/action-pacing.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config/pacing.js';
 import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance } from '../../services/agent-clearance.js';
+import { newAgentClearance } from '../../services/agent/clearance.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 /** Why the read-through doors are the owner's in person: letting an agent read mail is consent. */
@@ -429,7 +429,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
   // aimeat_operator_agent_configure declares (agent:permissions, outside every wildcard, and
   // agent:write) NARROWS a sibling's list. It ADDS only when it also holds agent:permissions-add,
   // and then only words it holds itself, never that word, never to itself; each addition goes to
-  // the owner's account feed and bell (services/agent-scope-add.ts). The connector's copy of the
+  // the owner's account feed and bell (services/agent/scope-add.ts). The connector's copy of the
   // tool calls this route, so an owner-only gate refused there what the node MCP allowed.
   // requireRole('agent') keeps an app grant and an ecosystem app out (QA audit D2-02).
   router.patch('/v1/agents/:name/scopes', requireAuth(), requireRole('agent'), requireScope('agent:permissions', 'agent:write'), async (req, res) => {
@@ -464,7 +464,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }
 
     // An agent narrows, and adds only with agent:permissions-add and only words it holds itself
-    // (services/agent-scope-add.ts, the rule the MCP tool asks as well).
+    // (services/agent/scope-add.ts, the rule the MCP tool asks as well).
     const caller = callerOf(req, config.nodeId, storage);
     const check = checkScopeAddition(
       { gaii: caller.principal, scopes: caller.scopes, inPerson: caller.inPerson }, agent, scopes as string[]);

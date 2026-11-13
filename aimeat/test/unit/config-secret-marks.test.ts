@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description A Config row whose variable is named like a secret is marked secret. A row shows its
  *   value on the operator's Config page (GET /v1/admin/config) unless its `adminDisplay` is
- *   `configured` or `hidden` (services/config-sealing.ts isSecretField), and the default is to show
+ *   `configured` or `hidden` (services/config/sealing.ts isSecretField), and the default is to show
  *   it. check:config-coverage asks for a row for every variable the node reads, the data key and
  *   three OAuth client secrets among them, so the next row added for one of those would show it to
  *   the operator and the operator's agents unless somebody remembered the mark (secrets audit
@@ -30,8 +30,8 @@
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S2).
  */
 import { describe, it, expect } from 'vitest';
-import { CONFIG_FIELDS } from '../../src/services/config-schema.js';
-import { isSecretField } from '../../src/services/config-sealing.js';
+import { CONFIG_FIELDS } from '../../src/services/config/schema.js';
+import { isSecretField } from '../../src/services/config/sealing.js';
 
 const SECRET_LAST_WORDS = new Set(['SECRET', 'PASSWORD', 'PASSPHRASE', 'PASS', 'CREDENTIAL', 'CREDENTIALS', 'TOKEN', 'KEY']);
 

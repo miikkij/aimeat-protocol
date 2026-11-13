@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator doors the sweep reads but never WRITES through: the bundled-extension
- *   admin surface (src/routes/admin-extensions.ts, 13 % covered and touched by no other suite) and
- *   the write half of src/routes/admin-features.ts — email templates, the GHII CORS and email
+ *   admin surface (src/routes/admin/extensions.ts, 13 % covered and touched by no other suite) and
+ *   the write half of src/routes/admin/features.ts — email templates, the GHII CORS and email
  *   doors, push templates, CSM and MSM. Every write is followed by the read that proves it landed,
  *   because a 200 on its own says only that a handler returned.
  * @structure
@@ -105,7 +105,7 @@ await test('POST /v1/owners — a second, plain owner (the node already has an o
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// Section A — src/routes/admin-extensions.ts
+// Section A — src/routes/admin/extensions.ts
 // ══════════════════════════════════════════════════════════════════════════
 console.log('\nSection A — bundled extensions');
 
@@ -459,7 +459,7 @@ try {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// Section B — the write half of src/routes/admin-features.ts
+// Section B — the write half of src/routes/admin/features.ts
 // ══════════════════════════════════════════════════════════════════════════
 console.log('\nSection B — email templates');
 

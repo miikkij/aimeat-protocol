@@ -87,7 +87,7 @@ import { takeSendTurn } from '../services/message-send-limit.js';
 import { sendAsOwner } from '../services/message-send-as-owner.js';
 import { toolError } from './tool-error.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
-import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent-dm-reads.js';
+import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent/dm-reads.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { delegateReaderFor, readOwnerOverview, readOwnerThread, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';

@@ -102,35 +102,35 @@
  *   v1.3.0 -- 2026-07-14 -- mcpCardCommerceTools: AIMEAT_MCP_CARD_COMMERCE_TOOLS inline|pointer
  *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
  */
-import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
-import { siteLinksFromEnv, buildCodeFromEnv } from './config-site-contacts.js';
-import { loadConnectionsConfig } from './config-load-connections.js';
-import { securityDoorDefaults } from './config-security.js';
-import { aiJobDefaults } from './config-ai-jobs.js';
+import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config/hosts.js';
+import { siteLinksFromEnv, buildCodeFromEnv } from './config/site-contacts.js';
+import { loadConnectionsConfig } from './config/load-connections.js';
+import { securityDoorDefaults } from './config/security.js';
+import { aiJobDefaults } from './config/ai-jobs.js';
 import { aiModelDefaults } from './config-ai-models.js';
-import { decideDefaults } from './config-decide.js';
-import { visibilityDefaults } from './config-visibility.js';
-import { turnDefaults } from './config-turn.js';
-import { pagesDefaults } from './config-pages.js';
-import { nodeLimitsDefaults } from './config-node-limits.js';
-import { fileStoreDefaults } from './config-file-store.js';
-import { x402Defaults } from './config-x402.js';
-import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
-import { docsignDefaults } from './config-docsign.js';
-import { dataAccessDefaults } from './config-data-access.js';
-import { contentClassDefaults } from './config-content-class.js';
-import { smtpDefaults } from './config-smtp.js';
-import { updateCheckDefaults } from './config-update-check.js';
-import { themesDefaults } from './config-themes.js';
-import { federationDefaults } from './config-federation.js';
-import { accountSecurityDefaults } from './config-types-account-security.js';
-import { mcpCapabilityUseApprovalFrom } from './config-types-agent-access.js';
-import { seoDefaults } from './config-site-presence.js';
-import { runtimeConfigFromEnv, siteKvFromEnv } from './config-runtime.js';
-import { extensionLoadDefaults } from './config-extension-load.js';
-import { loadFileSource } from './services/config-loader.js';
-import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config-schema.js';
-import { sealedKeysFromEnv } from './services/config-sealing.js';
+import { decideDefaults } from './config/decide.js';
+import { visibilityDefaults } from './config/visibility.js';
+import { turnDefaults } from './config/turn.js';
+import { pagesDefaults } from './config/pages.js';
+import { nodeLimitsDefaults } from './config/node-limits.js';
+import { fileStoreDefaults } from './config/file-store.js';
+import { x402Defaults } from './config/x402.js';
+import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config/ai-label.js';
+import { docsignDefaults } from './config/docsign.js';
+import { dataAccessDefaults } from './config/data-access.js';
+import { contentClassDefaults } from './config/content-class.js';
+import { smtpDefaults } from './config/smtp.js';
+import { updateCheckDefaults } from './config/update-check.js';
+import { themesDefaults } from './config/themes.js';
+import { federationDefaults } from './config/federation.js';
+import { accountSecurityDefaults } from './config/types-account-security.js';
+import { mcpCapabilityUseApprovalFrom } from './config/types-agent-access.js';
+import { seoDefaults } from './config/site-presence.js';
+import { runtimeConfigFromEnv, siteKvFromEnv } from './config/runtime.js';
+import { extensionLoadDefaults } from './config/extension-load.js';
+import { loadFileSource } from './services/config/loader.js';
+import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config/schema.js';
+import { sealedKeysFromEnv } from './services/config/sealing.js';
 
 export type {
   ExtensionHooks,
@@ -144,23 +144,23 @@ export type {
   OperatorConfig,
   AimeatConfig,
 } from './config-types.js';
-export type { LoadConfigOptions, LoadConfigResult } from './config-load-types.js';
+export type { LoadConfigOptions, LoadConfigResult } from './config/load-types.js';
 import type {
   AimeatConfig,
   NodeType,
   FederationRole,
 } from './config-types.js';
-import type { LoadConfigOptions, LoadConfigResult } from './config-load-types.js';
+import type { LoadConfigOptions, LoadConfigResult } from './config/load-types.js';
 
-// isPrivateHost moved to config-private-host.ts when this file reached the line limit (2026-10-06).
-import { defaultSecurityProfile } from './config-private-host.js';
+// isPrivateHost moved to config/private-host.ts when this file reached the line limit (2026-10-06).
+import { defaultSecurityProfile } from './config/private-host.js';
 
-// Moved to config-posture.ts when this file hit the line limit. Re-exported so the dozen
+// Moved to config/posture.ts when this file hit the line limit. Re-exported so the dozen
 // modules that import it from here keep working; the move was not meant to be visible.
-export { securityPostureWarnings } from './config-posture.js';
-import { assertEudiwNotHalfBuilt } from './config-eudiw-guard.js';
-import { applyStartSettings, startSettingFallbacks, type StartSettingProblem } from './config-start-check.js';
-import { consulDefaults } from './config-consul.js';
+export { securityPostureWarnings } from './config/posture.js';
+import { assertEudiwNotHalfBuilt } from './config/eudiw-guard.js';
+import { applyStartSettings, startSettingFallbacks, type StartSettingProblem } from './config/start-check.js';
+import { consulDefaults } from './config/consul.js';
 
 /**
  * The scopes an agent is approved with when nobody names any (AIMEAT_DEFAULT_AGENT_SCOPES unset).
@@ -212,7 +212,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   }
 
   // ── Build config from process.env (now includes CLI + env + file layers) ──
-  // A value the Config tab would refuse is set aside and the default runs (config-start-check.ts);
+  // A value the Config tab would refuse is set aside and the default runs (config/start-check.ts);
   // only the settings in REFUSE_ON_INVALID refuse the start.
   const setAside: StartSettingProblem[] = checkSettings ? applyStartSettings(process.env) : [];
   const nodeType = (process.env.AIMEAT_NODE_TYPE ?? 'full') as NodeType;
@@ -220,7 +220,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     throw new Error(`Invalid AIMEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
   }
   // A flag whose feature is half built refuses rather than warns. The message is the specification
-  // of what has to be true before the guard is deleted — see src/config-eudiw-guard.ts.
+  // of what has to be true before the guard is deleted — see src/config/eudiw-guard.ts.
   assertEudiwNotHalfBuilt();
 
   const port = parseInt(process.env.AIMEAT_PORT ?? '40050', 10);
@@ -281,7 +281,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   // SERVED publicly, never what is stored. From 4.0.0 a public node cannot switch it off (PROV-07).
   const aiProvenance = aiProvenanceFromEnv(securityProfile);
   const aiProvenanceDetail: 'full' | 'minimal' = process.env.AIMEAT_AI_PROVENANCE_DETAIL === 'minimal' ? 'minimal' : 'full';
-  // Visible-label posture: `off` is refused on a public node (config-ai-label.ts has the reasons).
+  // Visible-label posture: `off` is refused on a public node (config/ai-label.ts has the reasons).
   const aiLabelPublic = aiLabelPublicFromEnv(securityProfile);
 
   const config: AimeatConfig = {
@@ -310,7 +310,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     nodeType,
     // Settings the party who STARTED this node nominated as read-only, for a node one party
     // runs on behalf of another. Empty on an ordinary self-hosted node, where every door then
-    // behaves exactly as it did. Throws on an unknown path: services/config-sealing.ts says why.
+    // behaves exactly as it did. Throws on an unknown path: services/config/sealing.ts says why.
     sealedConfigKeys: sealedKeysFromEnv(process.env.AIMEAT_SEALED_CONFIG_KEYS),
     dbUrl: process.env.DATABASE_URL ?? null,
     // Accept `postgres` / `postgresql` as aliases for `postgres-kysely` (the only Postgres
@@ -388,7 +388,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     ...aiModelDefaults(),
     screenshotOnDemandPerHour: parseInt(process.env.AIMEAT_SCREENSHOT_ONDEMAND_PER_HOUR ?? '20', 10),
 
-    // AI jobs — a model call with a handle (config-ai-jobs.ts, a pure move under the 800-line ceiling).
+    // AI jobs — a model call with a handle (config/ai-jobs.ts, a pure move under the 800-line ceiling).
     ...aiJobDefaults(),
     ...decideDefaults(),
     ...visibilityDefaults(),
@@ -501,7 +501,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // /.well-known/mcp.json (richest single-fetch discovery, the spec's lean); 'pointer' keeps
     // the card lean and points at /v1/commerce/tools instead (TARGET-034 phase D).
     mcpCardCommerceTools: process.env.AIMEAT_MCP_CARD_COMMERCE_TOOLS === 'pointer' ? 'pointer' as const : 'inline' as const,
-    // x402 stablecoin settlement (TARGET-042), config-x402.ts.
+    // x402 stablecoin settlement (TARGET-042), config/x402.ts.
     ...x402Defaults(),
     // Web Bot Auth (RFC 9421): sign the node's outbound safeFetch traffic with the node Ed25519
     // key so peers/CDNs can verify AIMEAT's agent traffic against the key directory at
@@ -531,7 +531,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // 'allow'. Anything other than the literal 'allow' denies.
     aiTraining: process.env.AIMEAT_AI_TRAINING?.trim().toLowerCase() === 'allow' ? 'allow' : 'deny',
     // Who this node says it is to a search engine or an unfurler, and whether it says it at all
-    // (src/config-site-presence.ts).
+    // (src/config/site-presence.ts).
     ...seoDefaults(),
     pushEnabled: process.env.AIMEAT_PUSH_ENABLED !== 'false',
     vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
@@ -543,7 +543,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     pushMaxFailures: parseInt(process.env.AIMEAT_PUSH_MAX_FAILURES ?? '3', 10),
     emailRateLimitMin: parseInt(process.env.AIMEAT_EMAIL_RATE_LIMIT_MIN ?? '30', 10),
     outboundDailyLimit: parseInt(process.env.AIMEAT_OUTBOUND_DAILY_LIMIT ?? '200', 10),
-    // The refusal log and the credential-door tarpit (src/config-security.ts).
+    // The refusal log and the credential-door tarpit (src/config/security.ts).
     ...securityDoorDefaults(),
     finvoiceOperator: process.env.AIMEAT_FINVOICE_OPERATOR ?? '',
     finvoiceOperatorUrl: process.env.AIMEAT_FINVOICE_OPERATOR_URL ?? null,
@@ -580,7 +580,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // env) turns the feature on; the admin connection-management routes work either way.
     ssoEnabled: process.env.AIMEAT_SSO_ENABLED === 'true',
     ssoConnectionsLocked: process.env.AIMEAT_SSO_CONNECTIONS_LOCKED === 'true',
-    // The outbound connect registrations and the two stdio settings: config-load-connections.ts,
+    // The outbound connect registrations and the two stdio settings: config/load-connections.ts,
     // moved there verbatim when this file crossed 800 lines again.
     ...loadConnectionsConfig(),
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
@@ -798,12 +798,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   };
 }
 
-// Pure extraction (2026-08-18, max-file-lines): applyConfigOverrides moved to config-overrides.ts
+// Pure extraction (2026-08-18, max-file-lines): applyConfigOverrides moved to config/overrides.ts
 // so the sealed-path skip had room to be explained. Re-exported here so every existing importer
 // is unaffected.
-export { applyConfigOverrides } from './config-overrides.js';
+export { applyConfigOverrides } from './config/overrides.js';
 
 // Pure extraction (2026-08-01, max-file-lines): the operator-identity helpers moved to
-// config-operator.ts. Re-exported here so every existing `from './config.js'` importer is unaffected.
-export { missingOperatorConfig, operatorTypeLabel } from './config-operator.js';
-import { operatorFromEnv } from './config-operator.js';
+// config/operator.ts. Re-exported here so every existing `from './config.js'` importer is unaffected.
+export { missingOperatorConfig, operatorTypeLabel } from './config/operator.js';
+import { operatorFromEnv } from './config/operator.js';

@@ -55,7 +55,7 @@ import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js'
 import { AiInputHiddenError } from './ai/read-viewer.js';
 import { aiScheduleFireViewer } from './schedule-ai-read.js';
 import { instructionHoldAtFire } from './schedule-instruction-hold.js';
-import { noteAgentRefusal } from './agent-refusals.js';
+import { noteAgentRefusal } from './agent/refusals.js';
 import { agentSessionCaller, callerFromAuth } from './caller-context.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
 import { memoryGroupRefusal } from '../storage/memory-sharing.js';

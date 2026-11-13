@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The level a write asking for public gets on a node that shows its content to its own
- *   signed-in accounts only (config contentAccess 'signed-in', config-visibility.ts signedInOnly;
+ *   signed-in accounts only (config contentAccess 'signed-in', config/visibility.ts signedInOnly;
  *   plan doc-mvcn6c7e4e5q, V1.6, ruled by Jouni on 2026-10-18).
  *
  *   THE RULE. A NEW write or a change that asks for public is stored at the kind's signed-in level
@@ -33,7 +33,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V1.6).
  */
-import { signedInOnly, type ContentAccess } from '../config-visibility.js';
+import { signedInOnly, type ContentAccess } from '../config/visibility.js';
 
 export const PUBLIC_IS_SIGNED_IN_HERE = 'PUBLIC_IS_SIGNED_IN_HERE' as const;
 

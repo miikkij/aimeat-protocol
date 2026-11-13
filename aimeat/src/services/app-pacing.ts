@@ -22,7 +22,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { AppManifest } from '../storage/interface.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
 
 /** The app's pacing amount in whole morsels; 0 when it has none. */

@@ -47,7 +47,7 @@ import { claimRun, finishRun, RUN_CLAIM_MS } from '../src/services/install-set-r
 import { publishSkill, setSkillVisibility } from '../src/services/skills.js';
 import { manifestKey, versionKey, scopeOwnerGhii } from '../src/services/skill-refs.js';
 import { mergePortfolioConfig, switchPortfolioOnUnlessTurnedOff, PORTFOLIO_CONFIG_KEY } from '../src/services/portfolio-config.js';
-import { agentRefusalsKey, AGENT_REFUSALS_SPEC, type AgentRefusalEntry } from '../src/services/agent-refusals.js';
+import { agentRefusalsKey, AGENT_REFUSALS_SPEC, type AgentRefusalEntry } from '../src/services/agent/refusals.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { registerOwner } from './helpers/owner-login.js';
 
@@ -393,8 +393,8 @@ await test('the owner switches the page off while an AI publish switches it on: 
 
 // ── Agent refusals, from two node processes ───────────────────────────────────────────────────
 
-type RefusalsModule = typeof import('../src/services/agent-refusals.js');
-const refusalsUrl = new URL('../src/services/agent-refusals.ts', import.meta.url).href;
+type RefusalsModule = typeof import('../src/services/agent/refusals.js');
+const refusalsUrl = new URL('../src/services/agent/refusals.ts', import.meta.url).href;
 const procA = await import(`${refusalsUrl}?process=a`) as RefusalsModule;
 const procB = await import(`${refusalsUrl}?process=b`) as RefusalsModule;
 const agentName = `racer${stamp}`;

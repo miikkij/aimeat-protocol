@@ -74,9 +74,9 @@ import { parseGAII, localAccountName, agentGaiiFromIdentifier } from '../utils/g
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { toolError } from './tool-error.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
-import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
+import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent/profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
-import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
+import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent/proposals.js';
 import { connectorListAnswer, renameConnector } from '../services/connector-registry.js';
 import { setProgramDecision } from '../services/connector-programs.js';
 import { annotationsFor } from './annotations.js';

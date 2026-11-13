@@ -67,14 +67,14 @@ import type { Storage, GenesisPeerRecord, FederationPeerRecord } from '../storag
 import { sign, verify } from '../auth/keypair.js';
 import { createHash } from 'node:crypto';
 import { newNonce, nonceAccepted, nonceAcceptedHere, NONCE_WINDOW_MS } from './request-nonce.js';
-import { AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, unprovenFormatLive } from '../config-federation.js';
+import { AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, unprovenFormatLive } from '../config/federation.js';
 import { noteDeprecatedUse } from './deprecation.js';
 import { logger } from '../utils/logger.js';
 
 /**
  * The two versions that end the unproven format: from AUDIENCE_REQUIRED_BY_DEFAULT_IN a node refuses
  * a message without its audience or delivery proof unless its operator turns that off, and from
- * UNPROVEN_FORMAT_REMOVED_IN no node takes one (config-federation.ts; secaudit 2026-10-10 I22).
+ * UNPROVEN_FORMAT_REMOVED_IN no node takes one (config/federation.ts; secaudit 2026-10-10 I22).
  */
 const UNPROVEN_NOTE = `Nodes refuse a message without the proof by default from ${AUDIENCE_REQUIRED_BY_DEFAULT_IN}, and none takes one from ${UNPROVEN_FORMAT_REMOVED_IN}.`;
 

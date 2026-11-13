@@ -21,7 +21,7 @@ import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = randomBytes(5).toString('hex'), EXT = 'freetool' + stamp, FILE = 'free-' + stamp + '.html';

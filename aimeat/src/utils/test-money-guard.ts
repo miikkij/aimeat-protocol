@@ -16,7 +16,7 @@
  *   [::1]); there the flag is ordinary and nothing warns. On any other address (a private LAN
  *   address and AIMEAT_SECURITY_PROFILE=local included, because both describe nodes other people
  *   use) any buyer can complete a money checkout without paying, so the start log says so
- *   (config-posture.ts) and the Security page shows it as critical (services/security-overview.ts).
+ *   (config/posture.ts) and the Security page shows it as critical (services/security-overview.ts).
  * @structure isLoopbackBaseUrl · testMoneyHandlerActive · testMoneyHandlerOnPublicNode
  * @usage if (testMoneyHandlerActive(config)) registerPaymentHandler(testMoneyPaymentHandler());
  * @version-history

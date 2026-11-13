@@ -1,6 +1,6 @@
 # 13 Apps, agents and endpoints
 
-> Checked against AIMEAT node 4.3.1 (commit 2a93a9e7d) on 2026-11-12. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit d76b3dac5) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page covers the code that runs on behalf of people: apps published on the node, extensions and packages installed into it, the connector on a person's own computer, AI chats that connect over MCP, outside MCP servers the node calls, and the `aimeat-crewai` agent runtime. It is for the security officer and the workstation and network owners. Each section says what runs where, who approves it, and how to remove it.
 

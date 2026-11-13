@@ -32,7 +32,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.2).
  */
-import type { PublishGate } from '../config-visibility.js';
+import type { PublishGate } from '../config/visibility.js';
 import type { CallerContext } from './caller-context.js';
 import { PUBLISH_PUBLIC_SCOPE } from '../utils/scope-coverage.js';
 

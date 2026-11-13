@@ -181,13 +181,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI settings record, read to update it."
     },
-    "src/routes/admin-features.ts": {
+    "src/routes/admin/features.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The operator's e-mail template configuration (__site__ _email_tpl/*)."
     },
-    "src/routes/admin-memory.ts": {
+    "src/routes/admin/memory.ts": {
       "reads": {
         "searchText": 1,
         "listAllDeletedMemory": 1,
@@ -197,13 +197,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review): the search and the one-record read pass the classification reader. The value-free listing and the bin listing are the operator's key and size lists; the version list gives only the version, time, actor and size of a record the operator was just shown through presentMemory."
     },
-    "src/routes/admin-monitoring.ts": {
+    "src/routes/admin/monitoring.ts": {
       "reads": {
         "listMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The operator's backup of the node, which must hold everything, and system trust and relay records."
     },
-    "src/routes/admin-security.ts": {
+    "src/routes/admin/security.ts": {
       "reads": {
         "getStorageFile": 1
       },
@@ -683,51 +683,51 @@
       },
       "why": "Reviewed 2026-10-18 (Comicland v3 A-3), the node's own read: the service-owned verified-adult record (identity.adult.status) of one account, read to update it and to answer yes or no. It holds no content and no personal data beyond the method and the time."
     },
-    "src/services/agent-ai-keys.ts": {
+    "src/services/agent/ai-keys.ts": {
       "reads": {
         "getMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Per-agent encrypted AI keys, usage counters and settings."
     },
-    "src/services/agent-avatar.ts": {
+    "src/services/agent/avatar.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-19: an agent's own picture at agent.avatar, public by design like its description (the agent's face on every listing), so it is profile metadata rather than classified content. The value is read only as one emoji or one SVG and served as an image; no other key is read."
     },
-    "src/services/agent-offers-write.ts": {
+    "src/services/agent/offers-write.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Offer declarations: the offers view and read-to-update."
     },
-    "src/services/agent-port-redirect.ts": {
+    "src/services/agent/port-redirect.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The port-redirect config record. 2026-10-15 (feature-list audit #35): two reads of the same pointer, its system namespace (NS_AGENT_PORT) and the older location under the agent; only the peer URL leaves, never the record."
     },
-    "src/services/agent-proposals.ts": {
+    "src/services/agent/proposals.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent proposal approval queue, listed and settled for its owner."
     },
-    "src/services/agent-refusals.ts": {
+    "src/services/agent/refusals.ts": {
       "reads": {
         "getMemory": 3,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-30, the node's own read: the node's refusal notes and approval records for an owner's agents (audit.agents.*, a reserved prefix only this service writes), read to update them and to show them to that owner and the agent itself; no content anybody authored."
     },
-    "src/services/agent-statistics.ts": {
+    "src/services/agent/statistics.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The statistics record, read to update it."
     },
-    "src/services/agent-task-fanout.ts": {
+    "src/services/agent/task-fanout.ts": {
       "reads": {
         "getMemory": 1
       },
@@ -739,14 +739,14 @@
       },
       "why": "Moved unchanged from src/routes/agent-tasks/helpers.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them."
     },
-    "src/services/agent-ties.ts": {
+    "src/services/agent/ties.ts": {
       "reads": {
         "getMemory": 1,
         "listMemory": 2
       },
-      "why": "Reviewed 2026-10-11, the node's own read: the owner's apps' data map documents (public by definition, apps.<id>.datamap), from which only the rows that name an agent are taken, and the owner's workplace records (agent-workplace.<name>, a reserved prefix only services/agent-workplace.ts writes). Shown to that owner on their home. No content anybody classified."
+      "why": "Reviewed 2026-10-11, the node's own read: the owner's apps' data map documents (public by definition, apps.<id>.datamap), from which only the rows that name an agent are taken, and the owner's workplace records (agent-workplace.<name>, a reserved prefix only services/agent/workplace.ts writes). Shown to that owner on their home. No content anybody classified."
     },
-    "src/services/agent-workplace.ts": {
+    "src/services/agent/workplace.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1

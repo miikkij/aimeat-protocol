@@ -30,8 +30,8 @@
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import type { TaskStartDecision } from './agent-task-rules.js';
-import { TASK_START_FLOOR } from './agent-task-rules.js';
+import type { TaskStartDecision } from './agent/task-rules.js';
+import { TASK_START_FLOOR } from './agent/task-rules.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 

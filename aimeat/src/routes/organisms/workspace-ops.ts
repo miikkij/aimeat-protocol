@@ -92,7 +92,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner, localAccountName, buildGAII } from '../../utils/gaii.js';
-import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyPassword } from '../../services/password.js';

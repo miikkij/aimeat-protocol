@@ -46,7 +46,7 @@ import { federationPeerRouter } from '../../src/routes/federation-peer.js';
 import { wellknownRouter } from '../../src/routes/wellknown.js';
 import { bootstrapRouter } from '../../src/routes/bootstrap.js';
 import { mcpRouter } from '../../src/mcp/index.js';
-import { securityPostureWarnings } from '../../src/config-posture.js';
+import { securityPostureWarnings } from '../../src/config/posture.js';
 
 const NODE_ID = 'aimeat-core-2026-11-test';
 const OWNER = 'coreowner';

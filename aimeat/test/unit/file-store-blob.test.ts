@@ -19,7 +19,7 @@ import { formatBlobRef, parseBlobRef, nodeStoreId, ownerStoreId, type BlobStore 
 import { uriEncode } from '../../src/storage/blob/blob-http.js';
 import { wrapStorageWithFileStores, relocateStorageFile, type FileStoreTarget } from '../../src/storage/blob/file-store-wrap.js';
 import { azureSpecFrom } from '../../src/services/file-store/file-store-specs.js';
-import { nodeFilePrefix, normalizePrefix } from '../../src/config-file-store.js';
+import { nodeFilePrefix, normalizePrefix } from '../../src/config/file-store.js';
 import type { Storage, StorageFileRecord } from '../../src/storage/interface.js';
 
 const EMPTY = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';

@@ -129,7 +129,7 @@ import { sendGroupMessage } from '../services/conversation-group.js';
 import { registerSendAsOwnerRoute } from './messages-as-owner.js';
 import { registerGroupRoutes } from './message-groups.js';
 import { registerMessageReactionRoutes } from './message-reactions.js';
-import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent-dm-reads.js';
+import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent/dm-reads.js';
 import { provenanceDeclarationRefusal } from '../services/ai/provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 import { mintMessageProvenance, withMessageProvenance } from '../services/message-provenance.js';

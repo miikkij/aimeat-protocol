@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The classification switch in a batch of setting changes (changeNodeSettings,
- *   services/config-admin-view.ts, behind PUT /v1/admin/config and aimeat_admin_config_set): an AI
+ *   services/config/admin-view.ts, behind PUT /v1/admin/config and aimeat_admin_config_set): an AI
  *   credential is refused every loosening step of the switch, also when the batch names the switch
  *   more than once and an earlier change tightens it; nothing of a refused batch is applied. The
  *   same credential still tightens the switch, alone or twice in one batch.
@@ -12,7 +12,7 @@
  *   2026-10-31 — Initial (secaudit 2026-10-31 inv-14).
  */
 import { describe, it, expect } from 'vitest';
-import { changeNodeSettings } from '../../src/services/config-admin-view.js';
+import { changeNodeSettings } from '../../src/services/config/admin-view.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { SwitchCaller } from '../../src/services/classification-run/switch.js';

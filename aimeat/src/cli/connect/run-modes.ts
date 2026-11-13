@@ -11,7 +11,7 @@
  *   says so by starting the connector with AIMEAT_RUN_MODES (`spawn,resident`), because the runtime
  *   is the party that knows. The node reads the header when an agent is proposed: a `resident`
  *   proposal for a connector that says `spawn` alone is stored as spawn and says so
- *   (services/agent-proposals.ts, 2026-10-02), and the owner's connector list shows what each
+ *   (services/agent/proposals.ts, 2026-10-02), and the owner's connector list shows what each
  *   machine can run.
  *
  *   A value that names no known mode is the default, not an empty list: a connector that presented

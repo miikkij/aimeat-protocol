@@ -55,7 +55,7 @@ import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
-import { readCardJws, verifyCardJws, cardUri, jwksUri } from '../../services/agent-card.js';
+import { readCardJws, verifyCardJws, cardUri, jwksUri } from '../../services/agent/card.js';
 import type { CardDefect } from '../../models/agent-card.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
 import { nodeContext } from '../../services/node-context.js';
@@ -191,7 +191,7 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
           defects.push({ field: 'name', reason: 'That agent has no key to replace.' });
         } else if (grant.kind !== 'migrate' && grant.kind !== 'move' && record.enrolledAt) {
           // Two offers can name one agent: the approve route's, and the one a connector's connect
-          // starts for pending agents (services/agent-pending-enrolment.ts). The second must not pin
+          // starts for pending agents (services/agent/pending-enrolment.ts). The second must not pin
           // a second key over the first, which is the attach route's ALREADY_ATTACHED rule.
           defects.push({ field: 'name', reason: 'That agent already has its own key.' });
         } else if (record.owner !== grant.owner) {

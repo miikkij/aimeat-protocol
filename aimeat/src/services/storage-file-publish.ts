@@ -36,7 +36,7 @@ import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from './publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
-import { signedInOnly } from '../config-visibility.js';
+import { signedInOnly } from '../config/visibility.js';
 import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 import {
     audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf, type LABEL_CAPS_AUDIENCE,

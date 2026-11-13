@@ -83,7 +83,7 @@ import type { A2ACaller } from '../services/a2a-handler.js';
 import { ForeignA2AHandler } from '../services/a2a-foreign-handler.js';
 import { identifyForeignCaller, FOREIGN_HEADERS } from '../services/a2a-foreign.js';
 import { offeringsForAgent } from '../services/a2a-offering.js';
-import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 import { logger } from '../utils/logger.js';
 
 

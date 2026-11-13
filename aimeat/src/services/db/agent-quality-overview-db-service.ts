@@ -18,7 +18,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Quality subtab's statistics + done-tasks reads into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
-import { recomputeAndCacheStatistics } from '../agent-statistics.js';
+import { recomputeAndCacheStatistics } from '../agent/statistics.js';
 import { logger } from '../../utils/logger.js';
 import type { ContentReader } from '../classification/reader.js';
 import { presentMemories } from '../classification/present-memory.js';

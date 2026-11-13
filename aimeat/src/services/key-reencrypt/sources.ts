@@ -42,7 +42,7 @@ import { credentialContext as nodeStoreContext, NODE_STORES_KEY } from '../file-
 import { credentialContext as ownerStoreContext, OWNER_STORE_PREFIX } from '../file-store/owner-file-store.js';
 import { contextOf as mailContext } from '../email-outbox.js';
 import { HELD_KEY_PREFIX, NS_HELD, heldContext } from '../key-credentials.js';
-import { contextOf as settingContext, SEALED_SETTING_PREFIX } from '../config-at-rest.js';
+import { contextOf as settingContext, SEALED_SETTING_PREFIX } from '../config/at-rest.js';
 import { extensionConfigSecrets, sharedBindingName, sharedBindingOwner } from '../owner-secrets.js';
 import { nodeKeyRowSealedWith, nodeKeySecretsNow, openNodePrivateKey } from '../../storage/node-key-at-rest.js';
 import { count, emptyTally, resealString, resealTree, type Tally } from './reseal.js';
@@ -270,7 +270,7 @@ function sharedMapOf(config: unknown, key: Buffer, extension: string): Record<st
 export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/commerce/psp-secrets.ts': 'payment provider secrets',
   'src/routes/openrouter.ts': 'OpenRouter keys',
-  'src/services/agent-ai-keys.ts': 'OpenRouter keys, decision provider keys',
+  'src/services/agent/ai-keys.ts': 'OpenRouter keys, decision provider keys',
   'src/services/ai/provider-store.ts': 'AI provider keys',
   'src/services/decide/providers.ts': 'decision provider keys',
   'src/services/decide/settings.ts': 'decision provider keys',
@@ -284,7 +284,7 @@ export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/services/company/company-smtp.ts': 'company SMTP passwords',
   'src/services/owner-secrets.ts': 'secrets vault',
   'src/services/totp.ts': 'two-step sign-in secrets',
-  'src/services/config-at-rest.ts': 'secret Config settings',
+  'src/services/config/at-rest.ts': 'secret Config settings',
   'src/services/extension-secrets.ts': 'extension settings, extension instance settings',
   'src/services/oauth-round-secrets.ts': 'none: a sign-in round lives 10 to 15 minutes and opens with either key while it lives',
   'src/utils/app-protect.ts': 'none: the watermark is sealed into the copy a person downloads, not stored here',

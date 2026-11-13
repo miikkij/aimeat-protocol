@@ -1172,7 +1172,7 @@ const ALL_SUITES = [
     // An agent's clearance: what ranks above it is hidden on every read, and who may set it (plan doc-mvdipuyqraas, L2).
     'test/e2e-classification-clearance.ts',
     // agent:permissions-add: an agent adds the permissions it holds to another of the owner's agents,
-    // and the owner reads each addition on the feed and in the bell (services/agent-scope-add.ts).
+    // and the owner reads each addition on the feed and in the bell (services/agent/scope-add.ts).
     'test/e2e-agent-scope-add.ts',
     // An agent's own picture at agent.avatar: the list and profile field, the picture address, what is
     // refused, who may set it, the onboarding step and the Design Book templates.

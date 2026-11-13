@@ -2,7 +2,7 @@
  * @file test/unit/owner-sign-in-guidance.test.ts
  * @description What the node tells an owner, or an AI working for one, about signing in: the password
  *   sign-in (POST /v1/ghii/login), never the owner-key sign-in that node 4.0.0 removes
- *   (OWNER_KEY_LOGIN_REMOVED_IN, src/config-security.ts).
+ *   (OWNER_KEY_LOGIN_REMOVED_IN, src/config/security.ts).
  *
  *   WHY. Two texts still sent an owner to POST /v1/auth/token with the account key after the tests,
  *   the sandbox and the sign-in library had moved to the password: the next action in the answer of

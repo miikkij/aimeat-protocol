@@ -57,13 +57,13 @@ import { isValidGAII, isForeignPrincipal } from '../../utils/gaii.js';
 import {
   readCardJws, verifyCardJws, publicCardProjection, signWithNodeKey, jwkThumbprint, base64KeyToJwkX,
   cardUri, jwksUri, nodeKeyUri, type PublicAgentCard,
-} from '../../services/agent-card.js';
+} from '../../services/agent/card.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { getNodeCryptoKeys } from '../../auth/jwt.js';
 import type { AgentCard } from '../../models/agent-card.js';
 import { logger } from '../../utils/logger.js';
-import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 
 /**
  * Is this reader on the same side of the fence as the agent's owner?
@@ -108,7 +108,7 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
    * because one is a JWS and the other is JSON.
    */
   async function projectionOf(card: AgentCard, gaii: string): Promise<{ projection: PublicAgentCard; jws: string | null }> {
-    // The avatar is public by design (services/agent-avatar.ts); a card answers for any reader, so
+    // The avatar is public by design (services/agent/avatar.ts); a card answers for any reader, so
     // its address is absolute.
     const avatar = (await readAvatarsOrEmpty(storage, [gaii], logger.warn.bind(logger), 'GET /v1/agents/:gaii/card')).get(gaii);
     const iconUrl = avatar ? `${config.baseUrl.replace(/\/+$/, '')}${avatar.url}` : undefined;

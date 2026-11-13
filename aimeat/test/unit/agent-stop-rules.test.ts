@@ -2,7 +2,7 @@
  * @file test/unit/agent-stop-rules.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What "stopped" means for an agent, as the pure rules (services/agent-stop-rules.ts):
+ * @description What "stopped" means for an agent, as the pure rules (services/agent/stop-rules.ts):
  *   which fields a list shows, and which deliveries and webhook events would start new work and are
  *   therefore held. The line the two lists draw is the feature: a stopped agent must still hear
  *   that a task it is doing was cancelled, and must not be woken for a new one.
@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, expect, it } from 'vitest';
-import { isStopped, stoppedView, isWakeDelivery, isWakeWebhookEvent } from '../../src/services/agent-stop-rules.js';
+import { isStopped, stoppedView, isWakeDelivery, isWakeWebhookEvent } from '../../src/services/agent/stop-rules.js';
 
 describe('whether an agent is stopped', () => {
     it('is the presence of stoppedAt, and nothing else', () => {

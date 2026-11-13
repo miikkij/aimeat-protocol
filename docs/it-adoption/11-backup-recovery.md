@@ -1,6 +1,6 @@
 # 11 Backup and recovery
 
-> Checked against AIMEAT node 4.2.0 (commit 93a5ffba1) on 2026-11-08. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit d76b3dac5) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page is for the sysadmin who owns backups and the continuity planner who sets recovery targets. It lists what must be backed up for a node to come back as the same node, gives the procedure in short, proposes RTO and RPO values for the organisation to decide, and describes the restore test. The commands for each storage backend are in [Backup and restore](../operations/backup-and-restore.md), which stays the single home for them.
 
@@ -16,7 +16,7 @@ A node is its data, its secrets and its identity key. Back up all three at the s
 | Key passphrase | `AIMEAT_KEY_PASSPHRASE` | The sealed copy of the node key in the database and the encrypted key file cannot be opened | `aimeat/.env.example` |
 | Node identity key | `AIMEAT_NODE_KEY_PATH`, default `~/.aimeat/nodes/<node id>/node-key.json` | The node's identity. A node whose sealed copy does not open and that finds no key file refuses to start rather than make a new identity, which would break every issued token and every federation peer | [Backup and restore](../operations/backup-and-restore.md) |
 | The rest of `.env` | The working directory or the process manager | Every other setting: base URL, sign-in providers, SMTP, file store credentials | [Backup and restore](../operations/backup-and-restore.md) |
-| Refusal log | `AIMEAT_AUTH_LOG_PATH` | Refusal history (optional; it is a log, not state) | `aimeat/src/config-security.ts` |
+| Refusal log | `AIMEAT_AUTH_LOG_PATH` | Refusal history (optional; it is a log, not state) | `aimeat/src/config/security.ts` |
 
 Rules that follow from this:
 

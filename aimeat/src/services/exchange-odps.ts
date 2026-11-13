@@ -60,7 +60,7 @@ import { formatMoneyMajor } from '../commerce/money.js';
 import type { Offering, OfferingStats } from './exchange-market.js';
 import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension, Provenance } from '../models/odps-schemas.js';
 import { AiProvenanceSchema } from '../models/ai-provenance-schemas.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 
 /** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
 export const ODPS_VERSION = '4.1';

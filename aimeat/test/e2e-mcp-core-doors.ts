@@ -55,7 +55,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';

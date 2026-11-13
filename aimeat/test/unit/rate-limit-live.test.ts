@@ -11,8 +11,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Request, Response } from 'express';
 import { rateLimit } from '../../src/middleware/rate-limit.js';
-import { syncRateLimitTiers, RATE_LIMIT_KEYS } from '../../src/services/config-rate-limit-sync.js';
-import { applyConfigChanges } from '../../src/services/config-apply.js';
+import { syncRateLimitTiers, RATE_LIMIT_KEYS } from '../../src/services/config/rate-limit-sync.js';
+import { applyConfigChanges } from '../../src/services/config/apply.js';
 import type { AimeatConfig } from '../../src/config-types.js';
 import type { Storage } from '../../src/storage/interface.js';
 

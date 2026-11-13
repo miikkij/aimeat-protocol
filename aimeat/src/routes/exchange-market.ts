@@ -67,7 +67,7 @@ import {
 } from '../services/exchange-market.js';
 import { listingTerms } from '../services/exchange-source-terms.js';
 import { TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
 import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-odps.js';
 import { AppToolsDocSchema, appToolsKey, toolMoneyPrices } from '../models/app-tool-schemas.js';

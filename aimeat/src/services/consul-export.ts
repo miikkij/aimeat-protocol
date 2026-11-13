@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which config values a push to Consul KV writes. One answer for both callers: the
- *   operator's POST /v1/admin/consul/export (routes/admin-config.ts) and the CLI
+ *   operator's POST /v1/admin/consul/export (routes/admin/config.ts) and the CLI
  *   `aimeat config export --format consul` (cli/config-export.ts), which each had their own loop.
  *   Secret rows stay out unless the operator asks for them (secrets audit 2026-10-09, S3).
  * @structure ConsulExportPlan · planConsulExport
@@ -13,8 +13,8 @@
  *     out unless `includeSecrets` is true.
  */
 import type { AimeatConfig } from '../config.js';
-import { MUTABLE_CONFIG_MAP, serializeFieldValue, readConfigField } from './config-schema.js';
-import { isSealed, isSecretField } from './config-sealing.js';
+import { MUTABLE_CONFIG_MAP, serializeFieldValue, readConfigField } from './config/schema.js';
+import { isSealed, isSecretField } from './config/sealing.js';
 
 export interface ConsulExportPlan {
   /** dot-path → serialized value, in the order of the schema. */

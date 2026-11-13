@@ -45,14 +45,14 @@ import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
 import { isOwnerInPerson, mayActOnAgent, ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
-import { createTask } from '../../services/agent-task-write.js';
-import { mayLoosenStart, mayManageSiblingTasks } from '../../services/agent-task-rules.js';
+import { createTask } from '../../services/agent/task-write.js';
+import { mayLoosenStart, mayManageSiblingTasks } from '../../services/agent/task-rules.js';
 import { startAnswer } from '../../services/task-start-notice.js';
 import { taskWithFileHandles } from '../../services/task-files.js';
 import { taskOutcome } from '../../services/task-outcome.js';
 import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
 import { respondDeduplicated } from './dedupe.js';
-import { agentIsStopped } from '../../services/agent-stop.js';
+import { agentIsStopped } from '../../services/agent/stop.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerTaskCreateReadRoutes(
@@ -129,7 +129,7 @@ export function registerTaskCreateReadRoutes(
       }
     }
 
-    // The write itself is services/agent-task-write.ts, because it belongs to CREATING a task rather
+    // The write itself is services/agent/task-write.ts, because it belongs to CREATING a task rather
     // than to this door: the body validation, the one-live-commission guard, the record (whose
     // ownerGaii is always the OWNER's GHII, never the calling agent's GAII), the task-runner
     // auto-activation, the agent webhook and the connector-tunnel wake. aimeat_task_create built its
@@ -187,7 +187,7 @@ export function registerTaskCreateReadRoutes(
     // path (listAgentTasksByOwner filters by the app's owner GHII — never another owner's tasks).
     const isAppReading = req.auth!.roles.includes('app') && tokenHasScope(req, 'task:read');
     // Another of the owner's agents holding task:read and agent:write reads a sibling's list (the
-    // person's own AI answering "what is that agent working on"; services/agent-task-rules.ts
+    // person's own AI answering "what is that agent working on"; services/agent/task-rules.ts
     // mayManageSiblingTasks). It takes the owner-scoped path too, fenced by the owner's GHII.
     const agentGaii = resolveAgentGaii(req, agentName);
     const isSiblingReading = !isOwnerSession && !isAppReading

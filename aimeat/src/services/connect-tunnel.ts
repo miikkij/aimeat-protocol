@@ -119,7 +119,7 @@ import { setTokenRevokedHook, tokenIdOf, type VerifiedToken } from '../auth/jwt.
 import { SocketIndex, Fairness } from './connect-tunnel-multiplex.js';
 import { forwardRequest } from './connect-tunnel-forward.js';
 import { sendBacklog, pushTaskCancellations, onMemoryWrite, notifyScopesChanged } from './connect-tunnel-push.js';
-import { isWakeDelivery } from './agent-stop-rules.js';
+import { isWakeDelivery } from './agent/stop-rules.js';
 import { dmPayloadForReach } from './connect-tunnel-dm-reach.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -699,7 +699,7 @@ export class ConnectTunnelManager implements TunnelControlTarget {
   revokeTokenIdHere(tokenId: string): void { revokeByTokenId(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), tokenId); }
 
   /** Deleting ONE agent: its socket goes, and nothing else on that daemon is touched. */
-  /** An agent was stopped or started (services/agent-stop.ts). On a start the backlog goes out again, so what waited reaches the runtime. */
+  /** An agent was stopped or started (services/agent/stop.ts). On a start the backlog goes out again, so what waited reaches the runtime. */
   /** Whether a connected agent is stopped, from memory; undefined when it holds no socket here, so the caller reads its record. */
   stoppedOf(gaii: string): boolean | undefined { return this.connections.get(gaii)?.stopped; }
   setStopped(gaii: string, stopped: boolean): void { this.setStoppedHere(gaii, stopped); tellOtherProcesses(this.config.nodeId, { op: 'stopped', gaii, stopped }); }

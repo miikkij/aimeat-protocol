@@ -374,7 +374,7 @@ Scope enforcement MUST occur on every agent/ecosystem request; a violation retur
 ## 8. Identity Assurance (Verification) — New in v4.0
 
 **Implementation status, 2026-09-16:** EUDIW verification is blocked at startup.
-`AIMEAT_EUDIW_ENABLED=true` is refused by `config-eudiw-guard.ts` until holder
+`AIMEAT_EUDIW_ENABLED=true` is refused by `config/eudiw-guard.ts` until holder
 binding, nonce consumption and audience verification are implemented together.
 The EUDIW design below is not a deployment capability. FTN and node-issued
 credentials are separate paths. See [identity wallet status](aimeat-eudiw-integration.md)
@@ -878,7 +878,7 @@ Legend: **P** primary/live · **E** evolved from v3.0 · **D** deprecated (mount
 ## Appendix B: Core Configuration Schema (Selected)
 
 The maintained [configuration reference](b-config.md) describes the implemented
-settings. The [field schema](../aimeat/src/services/config-schema.ts) and
+settings. The [field schema](../aimeat/src/services/config/schema.ts) and
 [environment example](../aimeat/.env.example) define their names.
 
 Selected variables: `AIMEAT_NODE_ID`, `AIMEAT_NODE_TYPE`, `AIMEAT_BASE_URL`,

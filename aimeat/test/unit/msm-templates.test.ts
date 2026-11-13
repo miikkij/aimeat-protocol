@@ -11,7 +11,7 @@
  *   arvoa). The route serves each template's raw YAML, so a `base_morsels` price in a template reached
  *   every client as advice. An action's pacing amount is `pricing.toll_morsels`, the field the action
  *   catalogue reads (models/schemas.ts ActionPricingSchema); the 3.x names are refused from 4.0.0
- *   (config-pacing.ts MORSEL_PRICE_FIELDS_REMOVED_IN), so no template may carry one.
+ *   (config/pacing.ts MORSEL_PRICE_FIELDS_REMOVED_IN), so no template may carry one.
  * @usage cd aimeat && pnpm exec vitest run test/unit/msm-templates.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-11 — Initial (docs audit phase 2: the examples follow the pacing model).

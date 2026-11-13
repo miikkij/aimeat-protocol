@@ -33,7 +33,7 @@ vi.mock('../../src/auth/middleware.js', () => ({
 }));
 
 import { authenticateUpgrade, mintSocketTicket, refuseUpgrade } from '../../src/auth/ws-upgrade.js';
-import { WS_QUERY_TOKEN_REMOVED_IN } from '../../src/config-security.js';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../../src/config/security.js';
 import { removedFrom } from '../../src/services/deprecation.js';
 
 function req(query: string, authorization?: string): { request: IncomingMessage; url: URL } {

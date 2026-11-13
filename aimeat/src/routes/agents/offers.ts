@@ -53,7 +53,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { chargePacing, pacingReceipt, resolvePacingToll } from '../../services/metered-settlement.js';
 import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
 import { paymentChallenge } from '../../commerce/x402.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../../config/pacing.js';
 import { listWorkflows } from '../../services/workflow/store.js';
 import { reconcileAfterSourceWrite, exchangeOutcome } from '../../services/exchange-projection.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description PATCH /v1/agents/:name/clearance: the highest classification label one agent may read
  *   (plan doc-mvdipuyqraas, L2). Body `{ clearance: "<label id>" | null }`; null removes the limit.
- *   The rules are services/agent-clearance.ts, which the MCP tool aimeat_operator_agent_configure
+ *   The rules are services/agent/clearance.ts, which the MCP tool aimeat_operator_agent_configure
  *   calls as well: the owner, or the owner's agent holding `agent:permissions`; never the agent
  *   itself; raising or removing it needs the owner in person (403 PERSON_REQUIRED).
  * @structure registerClearanceRoutes(router, config, storage)
@@ -18,7 +18,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
-import { clearanceView, setAgentClearance } from '../../services/agent-clearance.js';
+import { clearanceView, setAgentClearance } from '../../services/agent/clearance.js';
 import { policyFor } from '../../services/classification/policy.js';
 
 export function registerClearanceRoutes(router: Router, config: AimeatConfig, storage: Storage): void {

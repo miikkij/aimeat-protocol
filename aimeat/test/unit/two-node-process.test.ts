@@ -39,7 +39,7 @@ import http from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
-import { WS_QUERY_TOKEN_REMOVED_IN } from '../../src/config-security.js';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../../src/config/security.js';
 import { removedFrom } from '../../src/services/deprecation.js';
 
 type Pass = (req: unknown, res: unknown, next: () => void) => void;

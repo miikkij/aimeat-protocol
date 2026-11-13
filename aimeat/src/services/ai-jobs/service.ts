@@ -191,7 +191,7 @@ export class AiJobService implements AiJobStarter {
         this.emailService = emailService;
         // Round-robin by OWNER, not FIFO. One person's burst of fifty must not leave another
         // person's single job behind all of them, and a per-owner concurrency cap is the wrong way
-        // to get that — see config-types-ai.ts for why fairness lives in the order and nowhere else.
+        // to get that — see config/types-ai.ts for why fairness lives in the order and nowhere else.
         this.pool = new SlotPool(config.aiJobSlots);
     }
 
@@ -513,7 +513,7 @@ export class AiJobService implements AiJobStarter {
 
             // The job and its result stay in the CALLER's namespace; the money is the human's. An
             // agent's job is paid by its owner, in the agent's name, exactly as POST /v1/ai/complete
-            // pays (services/agent-ai-keys.ts aiPayerOf, applied in run-op.ts), so the two code
+            // pays (services/agent/ai-keys.ts aiPayerOf, applied in run-op.ts), so the two code
             // paths cannot disagree on a key. No token cap: see run-op.ts.
             const outcome = await runJobOp(
                 { storage: this.storage, config: this.config }, entry.job, entry.prompt, entry.controller.signal,

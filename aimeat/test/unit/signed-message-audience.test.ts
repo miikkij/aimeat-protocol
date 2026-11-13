@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { audienceProof, audienceRefusal } from '../../src/services/signed-node-request.js';
-import { unprovenFormatLive } from '../../src/config-federation.js';
+import { unprovenFormatLive } from '../../src/config/federation.js';
 
 describe('an older-format message names the node it is for', () => {
     let keys: { publicKey: string; privateKey: string };

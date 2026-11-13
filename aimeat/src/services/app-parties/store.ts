@@ -15,8 +15,8 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
-import { signedInOnly } from '../../config-visibility.js';
-import type { PartySelfRegistration } from '../../config-data-access.js';
+import { signedInOnly } from '../../config/visibility.js';
+import type { PartySelfRegistration } from '../../config/data-access.js';
 import { appPartiesKey, parseAppPartiesValue, type AppPartiesValue, type AppPartyRegistration } from './contract.js';
 
 /** `owner/filename`, the app id the roster and the record key use. */

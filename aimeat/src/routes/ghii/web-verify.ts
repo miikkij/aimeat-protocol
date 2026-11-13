@@ -115,7 +115,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
 import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
 import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance } from '../../services/agent-clearance.js';
+import { newAgentClearance } from '../../services/agent/clearance.js';
 import { checkSecondFactor } from '../../services/password-check.js';
 import { recoveryAddressIs, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';

@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AgentRecord } from '../../src/storage/interface.js';
-import { initAgentRefusals, noteAgentRefusal, flushAgentRefusals, readAgentAccess } from '../../src/services/agent-refusals.js';
+import { initAgentRefusals, noteAgentRefusal, flushAgentRefusals, readAgentAccess } from '../../src/services/agent/refusals.js';
 import { scopeDeniedWords } from '../../src/mcp/tool-usage-wrap.js';
 import { ProvenanceScopeError } from '../../src/services/ai/provenance.js';
 import { permissionPageNotice, permissionQuestionRef } from '../../src/services/permission-ask-notice.js';

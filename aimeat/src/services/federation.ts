@@ -58,7 +58,7 @@ import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from './sign
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { recordHeartbeatOutcome } from './federation-availability.js';
 import { getSoftwareVersion } from '../utils/version.js';
-import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../config-federation.js';
+import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../config/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 import { forgetPeer } from './peer-origin.js';

@@ -36,7 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 import { nodeDirectory } from '../services/directory.js';
 import { toolError } from './tool-error.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
@@ -82,7 +82,7 @@ export function registerCatalogueTools(
                 }
                 return true;
             });
-            // The agent's picture is public like its description (services/agent-avatar.ts): one read for the list.
+            // The agent's picture is public like its description (services/agent/avatar.ts): one read for the list.
             const avatars = await readAvatarsOrEmpty(storage, filtered.map(a => a.gaii), logger.warn.bind(logger), 'aimeat_catalogue_agents');
 
             return {

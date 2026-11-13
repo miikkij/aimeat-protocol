@@ -18,7 +18,7 @@ vi.mock('../../src/utils/logger.js', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { defaultSecurityProfile, listensBeyondLoopback } from '../../src/config-private-host.js';
+import { defaultSecurityProfile, listensBeyondLoopback } from '../../src/config/private-host.js';
 import { loadConfig } from '../../src/config.js';
 
 const VARS = ['AIMEAT_BASE_URL', 'AIMEAT_SECURITY_PROFILE', 'AIMEAT_NODE_TYPE', 'AIMEAT_ALLOW_PRIVATE_EGRESS', 'AIMEAT_BIND_HOST'] as const;

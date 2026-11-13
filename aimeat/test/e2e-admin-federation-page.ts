@@ -67,7 +67,7 @@ import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
-import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config-federation.js';
+import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config/federation.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));

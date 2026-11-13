@@ -1,0 +1,170 @@
+/**
+ * @file src/routes/admin/agents.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Operator-only admin routes for agents — list all agents with full detail and
+ *   set/clear an agent's CORS allowed-origins (validated http(s) URLs or '*').
+ *
+ * @structure
+ *   - adminAgentsRouter(config, storage): Router factory
+ *   - GET /v1/admin/agents: list agents (gaii, owner, trust, balance, origins, federate, timestamps)
+ *   - PUT /v1/admin/agents/:gaii/cors: refuse a missing agent, then services/cors-overview.ts setCorsList
+ *
+ * @version-history
+ *   v1.5.0 — 2026-10-19 — GET /v1/admin/agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read.
+ *   v1.4.0 — 2026-10-06 — GET /v1/admin/agents reads `limit`, as aimeat_admin_agents does on the
+ *     node's MCP (secaudit 2026-10 follow-up, Part B).
+ *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
+ *   v1.2.1 — 2026-09-26 — The app owner behind a grant comes from localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
+ *   v1.2.0 — 2026-09-08 — The agent CORS write goes through services/cors-overview.ts (setCorsList),
+ *     the one implementation the aimeat_admin_cors_set tool calls too.
+ *   v1.1.0 — 2026-08-18 — The operator can see what a principal MAY DO, not only that it exists.
+ *     /v1/admin/agents carries each agent's approved scopes, and the new /v1/admin/app-grants lists
+ *     every live app grant on the node beside the app's CURRENT declaration, naming the words the
+ *     grant carries that the app no longer asks for. Both questions were unanswerable from any route:
+ *     grants were owner-scoped and scopes were absent from every operator surface, so a decision about
+ *     tightening a gate was a decision taken on one owner's data.
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+import { Router } from 'express';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
+import { success, error } from '../../middleware/envelope.js';
+import { setCorsList } from '../../services/cors-overview.js';
+import { parseAppScopes } from '../../services/protected-resource.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
+
+/**
+ * What the app behind a grant target declares TODAY, or null when it declares nothing.
+ *
+ * Same reading as the grant path itself (routes/app-grants.ts): the meta tag is the app's own
+ * statement and lives only in its bytes, so this is one row and no HTTP. Null rather than the empty
+ * list, because "made no statement" and "asks for nothing" are different answers and only the second
+ * makes a wide grant suspicious.
+ */
+async function declaredScopesOfApp(storage: Storage, target: string): Promise<string[] | null> {
+    const slash = target.indexOf('/');
+    if (slash <= 0 || slash === target.length - 1) return null;   // portfolio: or malformed
+    const owner = target.slice(0, slash);
+    const filename = target.slice(slash + 1);
+    const bare = localAccountName(owner);
+    const app = await storage.getAppByOwnerName(bare, filename).catch(err => {
+        logger.warn('admin-agents: could not read the app behind a grant', { target, error: String(err) });
+        return null;
+    });
+    if (!app) return null;
+    const data = app.data as Buffer | Uint8Array | string;
+    const html = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+    const declared = parseAppScopes(html);
+    return declared.length ? declared : null;
+}
+
+export function adminAgentsRouter(
+    config: AimeatConfig,
+    storage: Storage,
+): Router {
+    const router = Router();
+
+    // GET /v1/admin/agents — list all agents with full details (operator only)
+    router.get('/v1/admin/agents', requireAuth(), requireOperator(storage), async (req, res) => {
+        const agents = await storage.listAgents();
+        // `limit` is what aimeat_admin_agents publishes and the node's MCP applies; the route ignored
+        // it, so the connector, which calls this route, could not (secaudit 2026-10 follow-up, Part B).
+        const limit = Number.parseInt(String(req.query.limit ?? ''), 10);
+        const shown = Number.isFinite(limit) && limit > 0 ? agents.slice(0, limit) : agents;
+        const avatars = await readAvatarsOrEmpty(storage, shown.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/admin/agents');
+
+        res.json(success(config.nodeId, {
+            agents: shown.map(a => ({
+                gaii: a.gaii,
+                owner: a.owner,
+                display_name: a.displayName,
+                avatar: avatars.get(a.gaii) ?? null,
+                trust_score: a.trustScore,
+                morsel_balance: a.morselBalance,
+                allowed_origins: a.allowedOrigins ?? null,
+                federate: a.federate ?? false,
+                created_at: a.createdAt,
+                last_seen: a.lastSeen,
+                // What the owner approved. Absent from every operator surface until now, which made
+                // "how many agents would a new scope gate refuse" a question with no answer.
+                default_scopes: a.defaultScopes ?? null,
+            })),
+            total: agents.length,
+        }));
+    });
+
+    /**
+     * GET /v1/admin/app-grants — every live app grant on the node, next to what the app asks for TODAY.
+     *
+     * An app grant is a snapshot of the app's `<meta name="aimeat-scopes">` at the moment of the
+     * handshake. Narrowing now follows automatically (routes/app-grants.ts), but a grant made before
+     * that, or written by the scope-vocabulary migration, still carries words its app never asks for —
+     * and until this route there was no way to see it: /v1/app-grants answers for ONE owner, and the
+     * admin dashboard counts nothing of the sort. A decision about tightening a gate was therefore a
+     * decision taken on whichever owner happened to be logged in.
+     *
+     * `extra` is the answer: the scopes this grant carries that the app no longer declares.
+     */
+    router.get('/v1/admin/app-grants', requireAuth(), requireOperator(storage), async (_req, res) => {
+        const grants = await storage.listAppGrants();
+
+        // One read per distinct app, not per grant: an app with sixty grants is one lookup.
+        const declaredByApp = new Map<string, string[] | null>();
+        for (const app of new Set(grants.map(g => g.app))) {
+            declaredByApp.set(app, await declaredScopesOfApp(storage, app));
+        }
+
+        const rows = grants.map(g => {
+            const declared = declaredByApp.get(g.app) ?? null;
+            return {
+                grant_id: g.grantId,
+                app: g.app,
+                app_name: g.appName,
+                owner: g.owner,
+                scopes: g.scopes,
+                // null when the app declares nothing at all — which is a different state from "asks for
+                // nothing", and the one case where a difference means nothing is wrong.
+                declared_scopes: declared,
+                extra_scopes: declared ? g.scopes.filter(sc => !declared.includes(sc)) : [],
+                missing_scopes: declared ? declared.filter(sc => !g.scopes.includes(sc)) : [],
+                created_at: g.createdAt,
+                last_used_at: g.lastUsedAt ?? null,
+            };
+        });
+        const drifted = rows.filter(r => r.extra_scopes.length > 0);
+
+        res.json(success(config.nodeId, {
+            grants: rows,
+            total: rows.length,
+            // The two numbers an operator actually acts on.
+            drifted: drifted.length,
+            undeclared: rows.filter(r => r.declared_scopes === null).length,
+        }));
+    });
+
+    // PUT /v1/admin/agents/:gaii/cors — Operator sets/clears CORS for any agent. The check, the
+    // write and the change event live in services/cors-overview.ts, which aimeat_admin_cors_set
+    // calls too; the door here refuses a missing agent before anything is checked, as it always has.
+    router.put('/v1/admin/agents/:gaii/cors', requireAuth(), requireOperator(storage), async (req, res) => {
+        const gaii = req.params.gaii as string;
+        const agent = await storage.getAgent(gaii);
+        if (!agent) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent not found: ${gaii}`));
+            return;
+        }
+        const r = await setCorsList(storage, config, gaii, (req.body ?? {}).allowed_origins);
+        if (!r.ok) {
+            res.status(r.code === 'NOT_FOUND' ? 404 : r.code === 'INVALID_INPUT' ? 400 : 500).json(error(config.nodeId, r.code, r.message));
+            return;
+        }
+        res.json(success(config.nodeId, { gaii: r.kind === 'agent' ? r.gaii : gaii, allowed_origins: r.allowed_origins }));
+    });
+
+    return router;
+}

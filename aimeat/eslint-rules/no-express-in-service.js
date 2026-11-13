@@ -46,7 +46,7 @@
  */
 const EXEMPT = new Set([
   // Renders an HTML face for a request; genuinely HTTP-shaped output, not a capability.
-  'src/services/agent-face.ts',
+  'src/services/agent/face.ts',
   // Reads Accept headers to decide a representation. Content negotiation IS the request.
   'src/services/markdown-negotiation.ts',
   // Per-request timing spans, attached to the request object by design.

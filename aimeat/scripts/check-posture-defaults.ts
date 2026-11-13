@@ -12,7 +12,7 @@
  *     - a `(default: X)` the file states for the knob is the value the code resolves with nothing
  *       set, because an operator decides on that sentence;
  *     - a node on the public profile with nothing set either runs the safe value or says so at
- *       start-up (securityPostureWarnings in src/config-posture.ts), so an unsafe default is never
+ *       start-up (securityPostureWarnings in src/config/posture.ts), so an unsafe default is never
  *       silent.
  *   INVARIANT 8: the scopes an agent gets when nobody names any (SHIPPED_DEFAULT_AGENT_SCOPES) hold
  *   none of the powerful scopes the invariant keeps explicit (POWERFUL_AGENT_SCOPES). A delete that
@@ -156,7 +156,7 @@ export async function resolvedPublicDefaults(): Promise<AimeatConfig> {
 async function main(): Promise<void> {
     const aimeat = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
     const { SHIPPED_DEFAULT_AGENT_SCOPES } = await import('../src/config.js');
-    const { securityPostureWarnings, POWERFUL_AGENT_SCOPES } = await import('../src/config-posture.js');
+    const { securityPostureWarnings, POWERFUL_AGENT_SCOPES } = await import('../src/config/posture.js');
     const publicConfig = await resolvedPublicDefaults();
     const findings = postureFindings({
         knobs: postureKnobs(POWERFUL_AGENT_SCOPES),
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
         for (const k of stale) console.log(`    ${k}`);
     }
     if (fresh.length) {
-        console.error(`\n✖ ${fresh.length} posture default(s) disagree. Make .env.example, the code default and the start-up self-check (src/config-posture.ts) agree, or add the finding to ALLOWED in this script with the sentence that decides it.`);
+        console.error(`\n✖ ${fresh.length} posture default(s) disagree. Make .env.example, the code default and the start-up self-check (src/config/posture.ts) agree, or add the finding to ALLOWED in this script with the sentence that decides it.`);
         process.exit(1);
     }
     console.log('  ✓ no new disagreement between .env.example, the code default and the self-check');

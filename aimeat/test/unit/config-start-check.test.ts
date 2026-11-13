@@ -22,8 +22,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadConfig } from '../../src/config.js';
-import { ConfigStartError, REFUSE_ON_INVALID, startSettingProblems } from '../../src/config-start-check.js';
-import { CONFIG_FIELDS, readConfigField } from '../../src/services/config-schema.js';
+import { ConfigStartError, REFUSE_ON_INVALID, startSettingProblems } from '../../src/config/start-check.js';
+import { CONFIG_FIELDS, readConfigField } from '../../src/services/config/schema.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { validateEnv } from '../../src/utils/env-validator.js';
 

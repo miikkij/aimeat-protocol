@@ -172,7 +172,7 @@ export interface AgentRecord {
    * same-owner sibling such as the concierge agent that created this one, writes it once. It exists
    * because the person who asked a chat for an agent gets told the agent is running and then has
    * nowhere to go to look at it. Display only, never fetched by the node — an http(s) URL is the
-   * whole contract, checked where it is written (services/agent-profile-write.ts).
+   * whole contract, checked where it is written (services/agent/profile-write.ts).
    */
   consoleUrl?: string | null;
   /**
@@ -213,7 +213,7 @@ export interface AgentRecord {
    * Whether this agent's tasks start on their own: `automatic` (it proposes its plan and goes on)
    * or `confirm` (each task waits for the owner's OK). The owner's standing answer; a task may
    * override it when it is given, and the permission floor overrides both
-   * (services/agent-task-rules.ts).
+   * (services/agent/task-rules.ts).
    *
    * `null` = nobody has said, and the old rule applies: `task-runner` starts, every other mode
    * waits. That keeps every agent created before 2026-10-02 exactly as it was. Null is also how a
@@ -228,7 +228,7 @@ export interface AgentRecord {
    * A stopped agent starts no new work: a task given to it stays queued, a scheduled run is
    * skipped, a message is stored and does not wake it, and work it is already doing finishes. Its
    * key and its permissions are untouched, so starting it again is one write and no enrolment
-   * (services/agent-stop.ts says where each of those is enforced).
+   * (services/agent/stop.ts says where each of those is enforced).
    *
    * Not `taskStart: 'confirm'`: that one makes each task wait for an OK and still wakes the agent to
    * plan it, which is a model call per task. Stopped wakes nothing.
@@ -296,14 +296,14 @@ export interface AgentRecord {
    *
    * Set by the owner, or by a same-owner agent holding `agent:permissions`, and then only lowered:
    * raising it or removing it gives reach away and needs the owner in person, and an agent never
-   * changes its own (services/agent-clearance.ts). Null clears it on both providers (see runMode).
+   * changes its own (services/agent/clearance.ts). Null clears it on both providers (see runMode).
    */
   clearance?: string | null;
   /**
    * THE FLOOR PERMISSIONS THE OWNER LETS THIS AGENT START WORK WITH, BY NAME (migration 0115).
    *
    * An agent holding a floor permission (`exchange:write`, `commerce:buy`, sending or deleting as
-   * the owner; services/agent-task-rules.ts TASK_START_FLOOR) never starts a task by itself: each
+   * the owner; services/agent/task-rules.ts TASK_START_FLOOR) never starts a task by itself: each
    * one waits for the owner's press. When the owner has decided that this agent's work should run on
    * its own anyway, paid or free, they name those permissions here, and the floor stops holding the
    * agent for them (Jouni, 2026-10-23: "Oli se maksullinen tai ilmainen niin pitää olla mahdollista
@@ -311,7 +311,7 @@ export interface AgentRecord {
    * here still holds, and so does a stopped agent.
    *
    * Set and cleared by the owner in person only: not by an app, not by another agent, never by the
-   * agent itself (services/agent-task-start-write.ts). Stored as a JSON list of scope words; null or
+   * agent itself (services/agent/task-start-write.ts). Stored as a JSON list of scope words; null or
    * absent = none accepted, which is every agent until its owner says otherwise.
    */
   taskStartFloor?: string[] | null;

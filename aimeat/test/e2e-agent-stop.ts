@@ -2,8 +2,8 @@
  * @file test/e2e-agent-stop.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The owner stops an agent, and starts it again (services/agent-stop.ts,
- *   services/agent-stop-rules.ts). Ruled by Jouni on 2026-10-11: work that is running finishes,
+ * @description The owner stops an agent, and starts it again (services/agent/stop.ts,
+ *   services/agent/stop-rules.ts). Ruled by Jouni on 2026-10-11: work that is running finishes,
  *   scheduled runs are skipped while the agent is stopped, and tasks and messages it is given wait
  *   and are handled after it is started. Its key is not revoked. This suite holds each part:
  *     1. the state is written once, shown on the agent list, and a second press changes nothing;

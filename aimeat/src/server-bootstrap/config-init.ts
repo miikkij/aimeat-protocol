@@ -62,8 +62,8 @@ import { applyConfigOverrides } from '../config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import { instrumentStorage } from '../services/perf-trace.js';
 import { installRequestMemo } from '../services/request-memo.js';
-import { ConfigProvenance, bindConfigProvenance } from '../services/config-provenance.js';
-import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from '../services/config-schema.js';
+import { ConfigProvenance, bindConfigProvenance } from '../services/config/provenance.js';
+import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from '../services/config/schema.js';
 import { createConsulConfigService, applyConsulValues } from '../services/consul-config.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { initRevocationStorage } from '../auth/jwt.js';
@@ -72,7 +72,7 @@ import { settleStoredHookBindings, moveAccountNameHookBindings } from '../servic
 import { openHeldNamesIncident, settleInstallsAtStart, settleCredentialsAtStart } from '../services/held-account-names.js';
 import { settleWorkspaceSchemasAtStart } from '../services/workspace-schema-relock.js';
 import { settleRefreshCookieWindowAtStart } from '../services/owner-session.js';
-import { settleSettingIncidentsAtStart } from '../services/config-setting-incidents.js';
+import { settleSettingIncidentsAtStart } from '../services/config/setting-incidents.js';
 import { settleDefaultCapsAtStart } from '../services/classification/default-caps.js';
 import { bindAppAuditConfig } from '../services/app-audit-archive.js';
 import type { Storage } from '../storage/interface.js';
@@ -175,7 +175,7 @@ export async function initializeConfig(
   }
 
   // Apply DB overrides (highest precedence — applied after env/file/consul, and NOT above the
-  // paths this node's host sealed: services/config-sealing.ts).
+  // paths this node's host sealed: services/config/sealing.ts).
   const { applied: dbApplied, skipped: dbSkipped, sealed: dbSealed } = await applyConfigOverrides(config, storage, provenance);
   if (config.sealedConfigKeys.length > 0) {
     logger.info(`${config.sealedConfigKeys.length} setting(s) sealed by this node's host: ${config.sealedConfigKeys.join(', ')}`);

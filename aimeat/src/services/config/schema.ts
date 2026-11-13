@@ -1,0 +1,812 @@
+/**
+ * @file src/services/config/schema.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Single source of truth for AIMEAT's tunable config fields — each entry maps an
+ *   AimeatConfig key to its admin dot-path, AIMEAT_* env var, type, validator, mutability, and admin
+ *   display mode. Consumed by the admin config API, startup overrides, live Consul updates, the config
+ *   loader, and CLI export/import.
+ *
+ * @structure
+ *   - ConfigFieldDef: the field-definition interface (key, dotPath, envVar, type, validate, immutable, adminDisplay)
+ *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
+ *
+ * @version-history
+ *   2026-11-08 — quota.memory_max_archived_keys_per_agent (AIMEAT_MEMORY_MAX_ARCHIVED_KEYS), mutable,
+ *     default 10000, 0 = no limit: archived memory keys get a ceiling of their own (secaudit2026nov08b
+ *     round 15b, storage/memory-totals:postgres-archived-rows-count-no-bytes).
+ *   2026-11-07 — extensions.microservices_central_url (AIMEAT_MSC_CENTRAL_URL), mutable, empty by default:
+ *     the Microservices Central aimeat_appdev_overview names (services/appdev/microservices.ts).
+ *   2026-11-06 — extensions.zip_max_files (AIMEAT_EXT_ZIP_MAX_FILES, 1-10000), the ZIP file cap 5e367ec01
+ *     added to config.ts, so the Config tab shows it.
+ *   2026-10-29 — The file_store rows (config-schema-file-store.ts) after the storage quota; the marketplace
+ *     and commerce core rows move to config-schema-commerce.ts unchanged (max-file-lines).
+ *   2026-10-25 — extensions.install_role says what operator means: only the operator's account, its
+ *     agents included, writes extension code (secaudit2026oct22 lead 128).
+ *   2026-10-25 — personal_nodes.max_per_owner (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, 0 = no
+ *     limit; secaudit2026oct22, personal-anchor-no-per-owner-slot-limit). The node limits rows
+ *     (config-schema-node-limits.ts) are spread after the MCP rows.
+ *   2026-10-25 — security.secret_host_ask_default (AIMEAT_SECRET_HOST_ASK_DEFAULT), mutable, default on (secaudit2026oct22).
+ *   2026-10-25 — The extension load rows (config-schema-extension-load.ts), spread last (secaudit2026oct22).
+ *   2026-10-25 — Every AIMEAT_* setting the node reads has a row (check:config-coverage now reads all of
+ *     src/): the runtime, access and feature groups (config-schema-runtime.ts, -access.ts, -features.ts).
+ *     `applies: 'restart'` marks a stored row the code reads at start; totp.issuer, totp.backup_code_count,
+ *     passkey.rp_name, indexing.indexnow_key, push.vapid_subject, metrics.enabled and mcp.session_sweep_ms
+ *     are stored that way instead of immutable. The hidden rows are shown: storage.database_url and
+ *     setup.admin_password as whether they are set, storage.sqlite_path and the VAPID public key as values
+ *     (their old paths stay in LEGACY_DOT_PATHS).
+ *   2026-10-25 — auth.refresh_cookie_legacy_until, mutable: the migration window of the refresh cookie
+ *     rename to __Host-aimeat_rt (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
+ *   2026-10-25 — auth.casdoor_link_domains and auth.entra_link_domains, mutable: the domains whose
+ *     addresses each provider may vouch for (secaudit2026oct22, oidc-email-verified-without-idp-proof).
+ *   2026-10-20 — content_class.mode, content_class.ffprobe_path, content_class.ffmpeg_path
+ *     (config-schema-content-class.ts; wish-sis-ll-n-purku-luokittelu-ja-owl). The email rows move
+ *     to config-schema-email.ts, unchanged (max-file-lines).
+ *   2026-10-18 — The consent, account-events and classification rows moved unchanged to config-schema-data-access.ts (max-file-lines), where classification.agent_clearance_default joined them (plan doc-mvdipuyqraas, L2.1).
+ *   2026-10-16 — node.page_host, the host the HTML pages of workspaces run on (config-schema-pages.ts).
+ *   2026-10-16 — node.type takes mirror, as the loader does; the start check (config-start-check.ts) runs these validators over the environment (QA audit D8-02).
+ *   2026-10-16 — eudiw.enabled refuses true on every write path (the config route, a stored value and Consul at start), with the reason in `refusal` (QA audit D6-01, F21b-01).
+ *   2026-10-15 — metrics.enabled is immutable (restart-required): server-bootstrap/routes-loader.ts reads it once at start to mount the metrics middleware (feature-list audit #181).
+ *   v1.33.0 — 2026-10-15 — connections.facebook_*, instagram_* and reddit_* client settings; the provider
+ *     client rows moved to config-schema-connections.ts (max-file-lines), in the same place in the list.
+ *   v1.32.1 — 2026-10-14 — work.otk_grace_ms removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
+ *   v1.32.0 — 2026-10-12 — federation.relay_claim, federation.audience_required, security.ws_query_token and security.owner_key_login refuse the value that kept a 4.0.0 removal alive, from that release (config-schema-validators.ts; Core 2026-11 HTTP-08), and their descriptions say so.
+ *   v1.31.1 — 2026-10-11 — geoHeaders names its guide by the GitHub address; docs/visitor-geography.md
+ *     is not a path the node serves.
+ *   v1.31.0 — 2026-10-11 — Six rows the node holds as a list are `list` rows of type object (cors.allowed_origins, scopes.default_agent_scopes, scopes.max_agent_scopes, push.notify_types, realtime.stun_servers, federation.default_scopes): they were typed string, so a save wrote text into a field the code reads as an array. serializeFieldValue() writes a list as comma-separated text. Thirteen whole-number rows refuse a fraction. The five quota descriptions say whose usage is counted.
+ *   v1.30.0 — 2026-10-11 — Seven rows removed because no code read them: consent.max_per_user, marketplace.listing_fee, marketplace.escrow_enabled, federation_sync.replication_queue_max, work.otk_ttl_ms, work.max_url_length, personal_nodes.mailbox_retention_days (Jouni, 2026-10-11).
+ *   v1.29.0 — 2026-10-11 — Fifteen capacity rows lose their upper bound, so their `range` is a recommendation and a larger number is accepted (Jouni, 2026-10-11; the list is in docs/b-config.md). The rate-limit rows moved to config-schema-rate-limits.ts unchanged (max-file-lines).
+ *   v1.28.1 — 2026-10-10 —The descriptions say the versions: realtime.turn_username and turn_credential are removed in 4.0.0; federation.audience_required is on by default from 3.27.0 and the older message format is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23, I22).
+ *   v1.28.0 — 2026-10-09 — security.ws_query_token (AIMEAT_WS_QUERY_TOKEN), mutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, d3).
+ *   v1.28.0 — 2026-10-24 — The operator identity rows moved unchanged to config-schema-operator.ts, with three new rows
+ *     for data processing agreements (operator.dpo_contact, signer_name, signer_role; plan doc-mvmr4i2wdk0p).
+ *   v1.27.0 — 2026-10-09 — The document signing rows (config-schema-docsign.ts), beside identity verification.
+ *   v1.26.0 — 2026-10-09 — security.owner_key_login (AIMEAT_OWNER_KEY_LOGIN), immutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, S2).
+ *   v1.25.0 — 2026-10-09 — security.admin_setup_open_after_first_operator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR), immutable, default off: test nodes only (secrets audit 2026-10-09, 1.4).
+ *   v1.24.0 — 2026-10-09 — realtime.turn_secret (a secret row) and realtime.turn_ttl_seconds; the static TURN pair is marked deprecated.
+ *   v1.23.0 — 2026-10-08 — The visibility rows (config-schema-visibility.ts), beside the visitor geography.
+ *   v1.22.0 — 2026-10-06 — The site-link rows moved to config-schema-site-links.ts unchanged (max-file-lines), where site.store_status and the store notes joined them.
+ *   v1.21.0 — 2026-10-02 — federation.package_peer_cap (AIMEAT_PACKAGE_PEER_CAP): the most packages-only
+ *     peers a repository registers (package sale design, finding F).
+ *   v1.20.0 — 2026-10-01 — apps.audit_keep_default (AIMEAT_APP_AUDIT_KEEP): the node's default limit
+ *     on each app's audit log, 0 = keep all. The morsel policy rows moved unchanged to
+ *     config-schema-morsels.ts (max-file-lines).
+ *   v1.19.0 — 2026-09-30 — node.update_check and node.update_check_source (AIMEAT_UPDATE_CHECK*).
+ *   v1.18.0 — 2026-09-29 — The mutable fixed-set string rows take oneOf(): the same check, and
+ *     `choices` served to the Config tab, which offers a pick instead of a text field.
+ *   v1.17.0 — 2026-09-29 — classification.mode (AIMEAT_CLASSIFICATION): off, owner or all (TARGET-082).
+ *   v1.16.1 — 2026-09-29 — federation.relay_claim: the description says the default is 'required'
+ *     from 3.20.0 and that 'optional' is still taken when set, until 4.0.0.
+ *   v1.15.3 — 2026-09-28 — The search-engine presence rows moved to config-schema-seo.ts unchanged
+ *     (max-file-lines), spread where they stood.
+ *   v1.15.2 — 2026-09-28 — packages.install_set and packages.install_set_secrets (AIMEAT_INSTALL_SET,
+ *     AIMEAT_INSTALL_SET_SECRETS): the install set a new node applies at start-up.
+ *   v1.15.1 — 2026-09-28 — federation.package_repository (AIMEAT_PACKAGE_REPOSITORY), the package repository role.
+ *   v1.15.0 — 2026-09-28 — The operator's AI providers (System 2, V3): ai.providers,
+ *     ai.builtin_providers, ai.provider_egress, ai.provider_types, ai.fixed_baseurl_overrides, and
+ *     ai.legacy_settings_routes (the deprecated settings routes: on by default, removed in 4.0.0).
+ *     The three value validators moved to config-schema-validators.ts (a pure move, max-file-lines).
+ *   v1.16.0 — 2026-09-28 — The System 2 rows moved to config-schema-ai.ts, spread in their place (a
+ *     pure move, max-file-lines); the model catalogue's three settings are added there (V4).
+ *   v1.14.0 — 2026-09-28 — ai.recommended_models: the operator's recommended models (System 2, V2).
+ *   v1.13.2 — 2026-09-25 — federation.relay_claim names its two versions: the default becomes
+ *     'required' in 3.20.0 and 'optional' is removed in 4.0.0; one peer can keep its own answer.
+ *   v1.13.1 — 2026-09-24 — decide.jeff_key, decide.laya_key, decide.von_key: the built-in local
+ *     models' bearer keys, shown as whether each is set.
+ *   v1.13.0 — 2026-09-24 — The `themes.` group (Themes & Styles): whether people choose, which themes
+ *     are available to them, and the default theme. The row's shape moved to config-field-def.ts
+ *     (with no imports, so no cycle) to make room.
+ *   v1.12.1 — 2026-09-23 — decide.provider_egress: the exact addresses of the operator's own local
+ *     decision models.
+ *   v1.12.0 — 2026-09-19 — The `decide.` group (TARGET-080): the decision provider's switch, key,
+ *     pinned model, price and limits. decideBaseUrl is immutable: the node's key goes there.
+ *   v1.11.0 — 2026-09-17 —ai.chat_agent_env_passthrough (AIMEAT_GOOSE_ENV_PASSTHROUGH), immutable: the
+ *     environment names the chat agent may see beside its allow-list.
+ *   v1.10.0 — 2026-09-05 — mcp.session_sweep_ms (AIMEAT_MCP_SESSION_SWEEP_MS), immutable: the idle
+ *     sweep's interval is read once at boot.
+ *   v1.9.0 — 2026-09-03 — features.capability_call_counting (AIMEAT_CAPABILITY_CALL_COUNTING): whether
+ *     a direct extension action call counts into the capability registry's statistics.
+ *   v1.8.0 — 2026-08-30 — boards.public_per_owner_max (AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX): how many
+ *     public notice boards one account may keep, now that opening one is no longer the operator's.
+ *   v1.7.0 — 2026-08-29 — The ai.label_public row (AIMEAT_AI_LABEL_PUBLIC), out of the coverage
+ *     backlog: the visible-label policy an operator has to be able to see and set, now that a named
+ *     reviewer's effect on an app and its legal pages depends on it.
+ *   v1.6.0 — 2026-08-28 — The site links get their rows (site.learn_url … site.contacts): twelve
+ *     addresses, the store, the incubator and the contact list, all mutable. They are the first
+ *     nested group, addressed as 'siteLinks.<name>' through readConfigField / writeConfigField,
+ *     which every consumer now uses instead of indexing config[field.key] itself.
+ *   v1.5.0 — 2026-08-25 — The `seo.` group and `apps.seo_mode`. Every value in it was a literal in
+ *     public/spa.html naming aimeat.io and its operator, so any other node running this software
+ *     said in its own structured data that it WAS that company. Mutable rather than immutable
+ *     because the first thing an operator does is paste a Search Console token and check whether
+ *     it is being served, and that is worthless if it needs a restart and a shell.
+ *   v1.4.0 — 2026-08-22 — proactive.guidance_enabled: the operator half of the proactive-guidance
+ *     switch, which overrules every owner's own setting when it is off.
+ *   v1.3.0 — 2026-08-18 — The node.sealed_config_keys row. Its `immutable: true` is load-bearing
+ *     rather than descriptive: it is what stops the seal list from being sealed or unsealed
+ *     through applyConfigOverrides(), which is the door the mechanism exists to close.
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
+ *   v1.2.0 — 2026-08-16 — The `ai.` group: whose key pays, which model answers each role, the
+ *     free allowance, and the chat agent's binary/provider/model. Every one of them decides what
+ *     the node spends and every one of them was .env-and-restart only, so an operator could not
+ *     see whether the house key was set, let alone change a model.
+ *   v1.1.0 — 2026-07-14 — mcpCardCommerceTools row (TARGET-034 phase D)
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+
+// From config-types.ts, not config.ts: config.ts imports this file, and config/start-check.ts and
+// config/consul.ts, which config.ts also imports, would close a cycle through it (check:deps).
+import type { AimeatConfig } from '../../config-types.js';
+import type { SiteLinksConfig } from '../../config/types-site-links.js';
+import type { OperatorConfig } from '../../config/types-operator.js';
+import type { ConfigFieldShape } from './field-def.js';
+import { oneOf, isStringList, asList, relayClaimSetting, REMOVAL_SWITCHES } from './schema-validators.js';
+import { eudiwSettingAllowed, EUDIW_SETTING_REFUSAL } from '../../config/eudiw-guard.js';
+import { SITE_LINK_CONFIG_FIELDS } from './schema-site-links.js';
+import { VISIBILITY_CONFIG_FIELDS } from './schema-visibility.js';
+import { DOCSIGN_CONFIG_FIELDS } from './schema-docsign.js';
+import { OPERATOR_CONFIG_FIELDS } from './schema-operator.js';
+import { PAGES_CONFIG_FIELDS } from './schema-pages.js';
+import { SYSTEM2_AI_CONFIG_FIELDS } from './schema-ai.js';
+import { SEO_CONFIG_FIELDS } from './schema-seo.js';
+import { MORSEL_CONFIG_FIELDS } from './schema-morsels.js';
+import { RATE_LIMIT_CONFIG_FIELDS } from './schema-rate-limits.js';
+import { CONNECT_CLIENT_CONFIG_FIELDS } from './schema-connections.js';
+import { DATA_ACCESS_CONFIG_FIELDS } from './schema-data-access.js';
+import { CONTENT_CLASS_CONFIG_FIELDS } from './schema-content-class.js';
+import { EMAIL_CONFIG_FIELDS } from './schema-email.js';
+import { RUNTIME_CONFIG_FIELDS } from './schema-runtime.js';
+import { ACCESS_CONFIG_FIELDS } from './schema-access.js';
+import { FEATURE_CONFIG_FIELDS } from './schema-features.js';
+import { EXTENSION_LOAD_CONFIG_FIELDS } from './schema-extension-load.js';
+import { NODE_LIMITS_CONFIG_FIELDS } from './schema-node-limits.js';
+import { COMMERCE_CONFIG_FIELDS } from './schema-commerce.js';
+import { FILE_STORE_CONFIG_FIELDS } from './schema-file-store.js';
+
+// ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
+
+/**
+ * The site links are the one nested group a row may address: `siteLinks.learn` and its siblings.
+ * Every reader and writer of a row's value goes through readConfigField / writeConfigField below,
+ * which is what lets a row point one level down without each consumer learning to.
+ */
+export type SiteLinkFieldKey = `siteLinks.${keyof SiteLinksConfig}`;
+
+/** The operator identity block, addressed the same way: `operator.name` and its siblings. */
+export type OperatorFieldKey = `operator.${keyof OperatorConfig}`;
+
+export type ConfigFieldDef = ConfigFieldShape<keyof AimeatConfig | SiteLinkFieldKey | OperatorFieldKey>;
+
+// ── All Known Config Fields ──
+
+export const CONFIG_FIELDS: ConfigFieldDef[] = [
+
+  // ── Node (immutable) ──
+  { key: 'nodeId', dotPath: 'node.id', envVar: 'AIMEAT_NODE_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Unique node identifier' },
+  { key: 'port', dotPath: 'node.port', envVar: 'AIMEAT_PORT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 65535, immutable: true, description: 'HTTP listen port', range: '1-65535' },
+  { key: 'nodeType', dotPath: 'node.type', envVar: 'AIMEAT_NODE_TYPE', type: 'string', validate: v => ['full', 'relay', 'mirror', 'personal'].includes(v as string), immutable: true, description: 'Node type: full, relay, mirror, or personal' },
+  { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE', type: 'string', validate: v => ['sqlite', 'memory', 'postgres', 'postgresql', 'postgres-kysely'].includes(v as string), immutable: true, description: 'Storage backend type' },
+  // Shown on the Config tab since 2026-10-25, under storage and setup; the old paths still name them
+  // in a config file and on the command line (LEGACY_DOT_PATHS below).
+  { key: 'dbUrl', dotPath: 'storage.database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'PostgreSQL connection address. It holds the database password (secret)', adminDisplay: 'configured' },
+  { key: 'sqlitePath', dotPath: 'storage.sqlite_path', envVar: 'AIMEAT_SQLITE_PATH', type: 'string', validate: () => true, immutable: true, description: 'SQLite database file path' },
+  { key: 'adminPassword', dotPath: 'setup.admin_password', envVar: 'AIMEAT_ADMIN_PASSWORD', type: 'string', validate: () => true, immutable: true, description: 'Password of the first operator account, used when the node is set up (secret)', adminDisplay: 'configured' },
+  // Sealed configuration. `immutable: true` is doing real work here rather than describing a
+  // boot-time-only value: it is what stops the seal list from being sealed or unsealed through
+  // applyConfigOverrides(), which is the door the whole mechanism exists to close. Visible, not
+  // hidden, because an operator who cannot change a setting is still entitled to know which of
+  // their settings those are. See services/config/sealing.ts.
+  { key: 'sealedConfigKeys', dotPath: 'node.sealed_config_keys', envVar: 'AIMEAT_SEALED_CONFIG_KEYS', type: 'object',
+    validate: v => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: true,
+    description: 'Settings whoever runs this node set and nobody here can change. Readable, not writable. Empty on a node that runs itself' },
+
+  // ── Operator identity (mutable) ──
+  // The rows are in config-schema-operator.ts (moved unchanged on 2026-10-24).
+  ...OPERATOR_CONFIG_FIELDS,
+
+  ...MORSEL_CONFIG_FIELDS,
+  { key: 'appAuditKeepDefault', dotPath: 'apps.audit_keep_default', envVar: 'AIMEAT_APP_AUDIT_KEEP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Entries of each app\'s audit log an owner keeps when they set no limit of their own (0 = all)', range: '0-1000000' },
+  { key: 'boardPublicPerOwnerMax', dotPath: 'boards.public_per_owner_max', envVar: 'AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Public notice boards one account may keep (system boards stay operator-only)', range: '0-1000' },
+
+  // ── Auth (mutable) ──
+  { key: 'jwtTtlSeconds', dotPath: 'auth.jwt_ttl_seconds', envVar: 'AIMEAT_JWT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60, immutable: false, description: 'JWT token time-to-live in seconds', range: '60-86400' },
+  // Agent v2. Short on purpose: a key-holding agent mints a credential whenever it needs one, so a
+  // long life buys nothing and costs an attacker's replay window. The upper bound is a day rather
+  // than the ninety the v1 agent gets, because a node that sets this to ninety days has quietly
+  // rebuilt the credential model this one replaces.
+  { key: 'agentV2TokenTtlSeconds', dotPath: 'auth.agent_v2_token_ttl_seconds', envVar: 'AIMEAT_AGENT_V2_TOKEN_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 300 && (v as number) <= 86400, immutable: false, description: 'How long a key-and-card agent\'s credential lives, in seconds', range: '300-86400' },
+  // How long an unspent basic-agents enrolment grant stays usable. The daemon that will spend it is
+  // connected at the moment the button is pressed, so a longer window only lengthens the time a
+  // stolen grant id is worth something.
+  { key: 'appOriginSignInRefuse', dotPath: 'auth.app_origin_sign_in_refuse', envVar: 'AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Refuse sign-in and registration from an app, so an app never holds the owner session. Off: each such request is logged and let through; turn it on once the log is quiet.' },
+  { key: 'agentEnrolmentGrantTtlSeconds', dotPath: 'auth.agent_enrolment_grant_ttl_seconds', envVar: 'AIMEAT_AGENT_ENROLMENT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 3600, immutable: false, description: 'How long an unspent agent-enrolment grant stays usable, in seconds', range: '60-3600' },
+  // Immutable on purpose, and not only because the loader would hand this string-typed door a
+  // string where the node reads a list: which organisations may sign in is a decision that belongs
+  // to whoever runs the node, not to an operator session that could widen it in one PUT.
+  { key: 'entraAllowedTenants', dotPath: 'auth.entra_allowed_tenants', envVar: 'AIMEAT_ENTRA_ALLOWED_TENANTS', type: 'string', validate: () => true, immutable: true, description: 'Microsoft Entra tenant GUIDs allowed to sign in (comma-separated). Empty = the gate comes from AIMEAT_ENTRA_OAUTH_TENANT alone: a GUID there admits that one tenant, common/organizations admit any Microsoft account.' },
+  // Read at each refresh (services/owner-session.ts legacyRefreshCookieAccepted). Set once at first
+  // start when empty (settleRefreshCookieWindowAtStart), so the window does not move on a restart.
+  { key: 'refreshCookieLegacyUntil', dotPath: 'auth.refresh_cookie_legacy_until', envVar: 'AIMEAT_REFRESH_COOKIE_LEGACY_UNTIL', type: 'string', validate: v => typeof v === 'string' && /^(\d{4}-\d{2}-\d{2})?$/.test((v as string).trim()), immutable: false, description: 'Last day (YYYY-MM-DD, UTC) an https node still reads the old refresh cookie name aimeat_rt and moves the browser to __Host-aimeat_rt. Set to 30 days after the first start when empty. A past date: the old name is ignored now, and a browser that only has it signs in again.' },
+  // Read at each sign-in (services/oidc-providers.ts makeCasdoorLinkFence / makeEntraLinkFence), so
+  // a change applies to the next sign-in without a restart (secaudit2026oct22).
+  { key: 'casdoorLinkDomains', dotPath: 'auth.casdoor_link_domains', envVar: 'AIMEAT_CASDOOR_LINK_DOMAINS', type: 'string', validate: v => typeof v === 'string' && /^[\s*a-zA-Z0-9.,-]*$/.test(v as string), immutable: false, description: 'Domains whose Casdoor addresses count as verified (comma-separated, * = every domain). Only such an address links a Casdoor sign-in to an existing account or becomes a new account\'s verified address. Empty = no domain.' },
+  { key: 'entraLinkDomains', dotPath: 'auth.entra_link_domains', envVar: 'AIMEAT_ENTRA_LINK_DOMAINS', type: 'string', validate: v => typeof v === 'string' && /^[\s*a-zA-Z0-9.,-]*$/.test(v as string), immutable: false, description: 'Domains whose Microsoft Entra addresses count as verified (comma-separated, * = every domain). Empty = every domain when one tenant may sign in, no domain when the allowed-tenants list names several.' },
+
+  // ── Features (mutable) ──
+  { key: 'extendedFeaturesEnabled', dotPath: 'features.extended_features_enabled', envVar: 'AIMEAT_EXTENDED_FEATURES', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable extended feature set' },
+  // A call that goes through the capability registry's own invoke proxy is always counted; this
+  // decides whether a direct extension call (the door most agents use) counts too.
+  { key: 'capabilityCallCounting', dotPath: 'features.capability_call_counting', envVar: 'AIMEAT_CAPABILITY_CALL_COUNTING', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Count direct extension action calls into the capability registry\'s call statistics (calls through the registry always count)' },
+
+  // ── Work (mutable) ──
+  { key: 'workQueueMaxPending', dotPath: 'work.queue_max_pending', envVar: 'AIMEAT_WORK_QUEUE_MAX_PENDING', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max pending work items per provider', range: '1-1000' },
+  { key: 'webhookMaxRetries', dotPath: 'work.webhook_max_retries', envVar: 'AIMEAT_WEBHOOK_MAX_RETRIES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Max webhook delivery retry attempts', range: '0-10' },
+
+  // ── Quotas (mutable) ──
+  { key: 'memoryQuotaMb', dotPath: 'quota.memory_mb', envVar: 'AIMEAT_MEMORY_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Memory quota in MB, for each owner and for each agent separately', range: '1-10000' },
+  { key: 'storageQuotaMb', dotPath: 'quota.storage_mb', envVar: 'AIMEAT_STORAGE_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'File storage quota in MB, for each owner and for each agent separately', range: '1-100000' },
+  // ── Where stored files keep their bytes ── config-schema-file-store.ts
+  ...FILE_STORE_CONFIG_FIELDS,
+
+  // ── Federation (mutable) ──
+  { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
+  { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', ...relayClaimSetting(), immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' lets an older peer through and is a migration position rather than protection. The default is 'required' from 3.20.0; 'optional' is still taken when set, and is removed in 4.0.0, from which it is refused and has no effect. Until then one peer can keep its own answer (relay_claim on the peer), and the federation overview names the peers that still relay without a claim", range: 'optional | required' },
+
+  // ── Rate Limits (mutable, per-endpoint with global fallback) ── config-schema-rate-limits.ts
+  ...RATE_LIMIT_CONFIG_FIELDS,
+
+  // ── Email (Phase 1.1) and its secrets ── config-schema-email.ts
+  ...EMAIL_CONFIG_FIELDS,
+
+  // ── Consent (Phase 0.3) and classification (TARGET-082), mutable ──
+  ...DATA_ACCESS_CONFIG_FIELDS,
+
+  // ── Content classes (wish-sis-ll-n-purku-luokittelu-ja-owl), mutable ──
+  ...CONTENT_CLASS_CONFIG_FIELDS,
+
+  // ── TOTP (Phase 0.5, mutable) ──
+  { key: 'totpEnabled', dotPath: 'totp.enabled', envVar: 'AIMEAT_TOTP_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'TOTP two-factor authentication enabled' },
+  { key: 'totpPeriod', dotPath: 'totp.period', envVar: 'AIMEAT_TOTP_PERIOD', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 15 && (v as number) <= 120, immutable: false, description: 'TOTP code rotation period in seconds', range: '15-120' },
+  { key: 'totpWindow', dotPath: 'totp.window', envVar: 'AIMEAT_TOTP_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5, immutable: false, description: 'TOTP validation window (codes before/after)', range: '0-5' },
+  { key: 'totpMaxFailedAttempts', dotPath: 'totp.max_failed_attempts', envVar: 'AIMEAT_TOTP_MAX_FAILED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: false, description: 'Max failed TOTP attempts before lockout', range: '1-20' },
+  { key: 'totpLockoutSeconds', dotPath: 'totp.lockout_seconds', envVar: 'AIMEAT_TOTP_LOCKOUT_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 30 && (v as number) <= 3600, immutable: false, description: 'TOTP lockout duration in seconds', range: '30-3600' },
+
+  // ── Passkeys (WebAuthn) ──
+  //
+  // The relying party id is IMMUTABLE at runtime on purpose: a passkey is bound to it forever, so
+  // changing it while the node is up makes every registered device stop working, and the operator
+  // would have no way back. It is derived from the node's own address; the env override exists for
+  // a node under a subdomain that wants its keys to work across the parent domain.
+  { key: 'passkeyEnabled', dotPath: 'passkey.enabled', envVar: 'AIMEAT_PASSKEY_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Passkeys (WebAuthn) offered as a sign-in method' },
+  { key: 'passkeyRpId', dotPath: 'passkey.rp_id', envVar: 'AIMEAT_PASSKEY_RP_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'The domain a passkey is bound to (derived from the node address)' },
+  { key: 'passkeyRpName', dotPath: 'passkey.rp_name', envVar: 'AIMEAT_PASSKEY_RP_NAME', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, applies: 'restart', description: 'The name shown in the device prompt' },
+  { key: 'passkeyExtraOrigins', dotPath: 'passkey.extra_origins', envVar: 'AIMEAT_PASSKEY_EXTRA_ORIGINS', type: 'object', validate: v => Array.isArray(v) && v.every(o => typeof o === 'string' && /^https?:\/\//i.test(o)), immutable: true, description: 'Extra origins a passkey ceremony may come from (the node address always counts)' },
+
+  // ── TOTP secrets (immutable) ──
+  { key: 'totpSecretEncryptionKey', dotPath: 'totp.encryption_key', envVar: 'AIMEAT_TOTP_ENCRYPTION_KEY', type: 'string', validate: () => true, immutable: true, description: 'TOTP encryption key (secret)', adminDisplay: 'configured' },
+
+  // ── Matching (Phase 2.1, mutable) ──
+
+  // ── Proactive guidance (mutable) ──
+  { key: 'proactiveGuidanceEnabled', dotPath: 'proactive.guidance_enabled', envVar: 'AIMEAT_PROACTIVE_GUIDANCE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Connected AIs are told what this node makes possible, so they can offer it when it fits (each owner still has their own switch; off here is off for everybody)' },
+
+  // ── Visitor geography ── the switch is immutable on purpose: it says what the reverse proxy in
+  //    front of this node does, and that is a fact about the deployment, not a preference to flip
+  //    from a browser. Turned on with no such proxy, the place headers would be the visitor's own.
+  { key: 'geoHeaders', dotPath: 'geo.headers', envVar: 'AIMEAT_GEO_HEADERS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'The reverse proxy reports where each request came from (X-Geo-Country, -Region, -City, -Lat, -Lon), so an app owner can see visitors by place. Leave off unless the proxy sets and overwrites these headers: https://github.com/miikkij/aimeat-protocol/blob/main/docs/visitor-geography.md. No address is stored either way' },
+  { key: 'geoAttribution', dotPath: 'geo.attribution', envVar: 'AIMEAT_GEO_ATTRIBUTION', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false, description: 'The credit line your proxy\'s address database asks for (DB-IP Lite is CC BY 4.0), shown under the visitor map. Empty shows nothing' },
+  // ── Visibility and visitors ── one switch per layer (config-schema-visibility.ts).
+  ...VISIBILITY_CONFIG_FIELDS,
+
+  // ── Marketplace and the commerce core ── config-schema-commerce.ts
+  ...COMMERCE_CONFIG_FIELDS,
+  { key: 'contentSignal', dotPath: 'site.content_signal', envVar: 'AIMEAT_CONTENT_SIGNAL', type: 'string', validate: v => typeof v === 'string' && (v.trim() === '' || /^(off|(search|ai-input|ai-train)=(yes|no)(\s*,\s*(search|ai-input|ai-train)=(yes|no)){0,2})$/i.test(v.trim())), immutable: false, description: 'robots.txt Content Signals Policy directive (contentsignals.org), e.g. "search=yes, ai-input=yes, ai-train=no"; "off" removes it; empty pairs it to AIMEAT_AI_TRAINING' },
+  { key: 'aiTraining', dotPath: 'site.ai_training', envVar: 'AIMEAT_AI_TRAINING', type: 'string', ...oneOf('allow', 'deny'), immutable: false, description: 'Allow AI training crawlers in robots.txt ("allow" | "deny"). Search and retrieval bots are always allowed' },
+  { key: 'appBadge', dotPath: 'site.app_badge', envVar: 'AIMEAT_APP_BADGE', type: 'string', ...oneOf('aimeat', 'off'), immutable: false, description: 'The "aimeat.io · Publish your own app for free" badge on every served app: "aimeat" keeps it (default), "off" removes it from every app on this node. An owner can still switch it off per app' },
+  { key: 'frontPage', dotPath: 'site.front_page', envVar: 'AIMEAT_FRONT_PAGE', type: 'string', ...oneOf('classic', 'demo', 'os', 'start'), immutable: false, description: 'Which front page the root serves to browsers: "classic" (the SPA landing), "demo" (the static showroom, public/front-demo.html), "os" (the static OS page, public/front-os.html) or "start" (the "accelerate your AI" page, public/front-start.html)' },
+  { key: 'webBotAuthSign', dotPath: 'federation.web_bot_auth_sign', envVar: 'AIMEAT_WEB_BOT_AUTH_SIGN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sign outbound HTTP with the node Ed25519 key (RFC 9421 Web Bot Auth); the key directory is always served' },
+  { key: 'installSetPath', dotPath: 'packages.install_set', envVar: 'AIMEAT_INSTALL_SET', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'An install set file (JSON, spec aimeat.install-set/1) this node applies at start-up: the owner user, a bundle\'s packages, its organisms, the other users and the crew agents. Applying again creates nothing twice, so the file may stay. Unset: nothing is applied' },
+  { key: 'installSetSecretsPath', dotPath: 'packages.install_set_secrets', envVar: 'AIMEAT_INSTALL_SET_SECRETS', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'A JSON file of the secret config values for that install set; read at start-up and never stored in the record of the apply' },
+  { key: 'packagePeerCap', dotPath: 'federation.package_peer_cap', envVar: 'AIMEAT_PACKAGE_PEER_CAP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'On a package repository: the most nodes registered as packages-only peers through grants, sales and named sellers. Beyond it a new node is refused and the operator is told once', range: '1-100000' },
+  { key: 'packageRepository', dotPath: 'federation.package_repository', envVar: 'AIMEAT_PACKAGE_REPOSITORY', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Package repository role: serve a private package to the peer nodes entitled to it (signed requests; entitlements per package). Off: private packages reach their author only' },
+
+  // ── Search-engine presence (mutable) ── config-schema-seo.ts
+  ...SEO_CONFIG_FIELDS,
+
+  // ── Themes (mutable) ── the look of the node's own interface (Themes & Styles, services/themes/).
+  // An id that names no theme is dropped where the values are read, so a stale setting never offers
+  // a theme that does not exist; the Themes & Styles view offers only real ids.
+  { key: 'themesPersonalChoice', dotPath: 'themes.personal_choice', envVar: 'AIMEAT_THEMES_PERSONAL_CHOICE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'People choose a theme and a style in the pill. Off: every page wears the default theme in its default style, and the pill shows no choice' },
+  { key: 'themesOffered', dotPath: 'themes.offered', envVar: 'AIMEAT_THEMES_OFFERED', type: 'string', validate: v => typeof v === 'string' && /^([a-z0-9-]{2,40}(\s*,\s*[a-z0-9-]{2,40})*)?$/.test(v.trim()), immutable: false, description: 'The themes available to people, comma separated theme ids; empty means the two built-in themes, AIMEAT and Tiilitaivas, and aimeat offers AIMEAT alone' },
+  { key: 'themesDefault', dotPath: 'themes.default', envVar: 'AIMEAT_THEMES_DEFAULT', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9-]{2,40}$/.test(v), immutable: false, description: 'The default theme: what a person sees before choosing, and what everybody sees when people do not choose (a theme id among the available)' },
+
+  // ── Extensions (Phase 2.7, mutable) ──
+  { key: 'extensionsEnabled', dotPath: 'extensions.enabled', envVar: 'AIMEAT_EXTENSIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sandboxed extension system enabled' },
+  { key: 'extensionMaxMemoryMb', dotPath: 'extensions.max_memory_mb', envVar: 'AIMEAT_EXT_MAX_MEMORY_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 8 && (v as number) <= 512, immutable: false, description: 'Max memory per extension sandbox (MB)', range: '8-512' },
+  { key: 'extensionTimeoutMs', dotPath: 'extensions.timeout_ms', envVar: 'AIMEAT_EXT_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100, immutable: false, description: 'Extension execution timeout (ms)', range: '100-60000' },
+  // 10000, not 500: an extension that walks a list of external documents spends one call per
+  // document, and 500 capped such work at a few hundred items per run for no reason anyone had
+  // measured. The real brakes are the wall clock and the per-call timeout, both of which bound a
+  // run regardless of how many calls it is allowed to attempt.
+  { key: 'extensionMaxApiCalls', dotPath: 'extensions.max_api_calls', envVar: 'AIMEAT_EXT_MAX_API_CALLS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max API calls per extension execution', range: '1-10000' },
+  { key: 'extensionMaxCodeSizeKb', dotPath: 'extensions.max_code_size_kb', envVar: 'AIMEAT_EXT_MAX_CODE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16 && (v as number) <= 2048, immutable: false, description: 'Max code size per extension (KB)', range: '16-2048' },
+  // upload-zip.ts reads it on every upload, so a change applies to the next ZIP without a restart.
+  { key: 'extensionZipMaxFiles', dotPath: 'extensions.zip_max_files', envVar: 'AIMEAT_EXT_ZIP_MAX_FILES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max files in one extension or cortex ZIP, manifest included', range: '1-10000' },
+  // Read on every aimeat_appdev_overview call, so a change applies at once; '' names none.
+  { key: 'microservicesCentralUrl', dotPath: 'extensions.microservices_central_url', envVar: 'AIMEAT_MSC_CENTRAL_URL', type: 'string', validate: v => v === '' || (typeof v === 'string' && v.length <= 300 && /^https?:\/\/[^\s/@]+(\/\S*)?$/.test(v)), immutable: false, description: 'A Microservices Central this node offers its people, named to app builders when an app outgrows an extension; empty for none. The node never connects to it' },
+  { key: 'extensionMaxInstalled', dotPath: 'extensions.max_installed', envVar: 'AIMEAT_EXT_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max installed extensions', range: '1-100' },
+  { key: 'extInstallRole', dotPath: 'extensions.install_role', envVar: 'AIMEAT_EXT_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Who installs extensions and changes their code: operator (only the operator\'s account, its agents included) or owner (every account holder, and an agent holding ext:write)' },
+  { key: 'maxExtensionsPerOwner', dotPath: 'extensions.max_per_owner', envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max extensions per owner', range: '1-100' },
+
+
+  // ── Push Notifications (Phase 3.1, mutable) ──
+  { key: 'pushEnabled', dotPath: 'push.enabled', envVar: 'AIMEAT_PUSH_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Web push notifications enabled' },
+
+  // ── Push secrets (immutable) ──
+  { key: 'vapidPublicKey', dotPath: 'push.vapid_public_key', envVar: 'AIMEAT_VAPID_PUBLIC_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID public key, which browsers receive when they subscribe to push' },
+  { key: 'vapidPrivateKey', dotPath: 'push.vapid_private_key', envVar: 'AIMEAT_VAPID_PRIVATE_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID private key (secret)', adminDisplay: 'configured' },
+
+  // ── EUDIW / Identity (Phase 3.3, mutable) ──
+  { key: 'eudiwEnabled', dotPath: 'eudiw.enabled', envVar: 'AIMEAT_EUDIW_ENABLED', type: 'boolean', validate: eudiwSettingAllowed, refusal: EUDIW_SETTING_REFUSAL, immutable: false, description: 'EUDIW identity verification. Cannot be switched on in this release: the node refuses to start with it on, and a change here to on is refused (config-eudiw-guard.ts)' },
+  { key: 'ftnEnabled', dotPath: 'eudiw.ftn_enabled', envVar: 'AIMEAT_FTN_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Finnish Trust Network enabled' },
+  ...DOCSIGN_CONFIG_FIELDS,
+
+  // ── Cross-Federation (Phase 3.4, mutable) ──
+  { key: 'crossFederationEnabled', dotPath: 'cross_federation.enabled', envVar: 'AIMEAT_CROSS_FEDERATION_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Cross-federation peering enabled' },
+  { key: 'maxGenesisPeers', dotPath: 'cross_federation.max_genesis_peers', envVar: 'AIMEAT_MAX_GENESIS_PEERS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max genesis peers for cross-federation', range: '1-100' },
+  { key: 'genesisSyncIntervalHours', dotPath: 'cross_federation.sync_interval_hours', envVar: 'AIMEAT_GENESIS_SYNC_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between genesis sync rounds', range: '1-168' },
+
+  // ── Federation Data Sync (mutable) ──
+  { key: 'syncMode', dotPath: 'federation_sync.mode', envVar: 'AIMEAT_SYNC_MODE', type: 'string', ...oneOf('bulk', 'instant', 'hybrid'), immutable: false, description: 'Sync mode: bulk sends changes only in the scheduled round; instant and hybrid also send each change at once. The scheduled round runs in every mode, so instant and hybrid behave the same today.' },
+  { key: 'syncIntervalHours', dotPath: 'federation_sync.interval_hours', envVar: 'AIMEAT_SYNC_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between scheduled sync rounds', range: '1-168' },
+  { key: 'syncBatchDelayMs', dotPath: 'federation_sync.batch_delay_ms', envVar: 'AIMEAT_SYNC_BATCH_DELAY_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 60000, immutable: false, description: 'Event batching window in ms (instant/hybrid mode)', range: '100-60000' },
+  { key: 'replicationQueueTtlHours', dotPath: 'federation_sync.replication_queue_ttl_hours', envVar: 'AIMEAT_REPLICATION_QUEUE_TTL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 720, immutable: false, description: 'Max age of replication queue entries in hours', range: '1-720' },
+  { key: 'maxConcurrentSyncs', dotPath: 'federation_sync.max_concurrent_syncs', envVar: 'AIMEAT_MAX_CONCURRENT_SYNCS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max parallel outbound sync operations', range: '1-50' },
+  { key: 'federationTimeoutMs', dotPath: 'federation_sync.timeout_ms', envVar: 'AIMEAT_FEDERATION_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000 && (v as number) <= 60000, immutable: false, description: 'Timeout for outbound federation requests in ms', range: '1000-60000' },
+  { key: 'genesisMemoryCache', dotPath: 'federation_sync.genesis_memory_cache', envVar: 'AIMEAT_GENESIS_MEMORY_CACHE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Cache routed genesis memory results locally' },
+  { key: 'genesisMemoryCacheTtlHours', dotPath: 'federation_sync.genesis_memory_cache_ttl_hours', envVar: 'AIMEAT_GENESIS_MEMORY_CACHE_TTL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Genesis memory cache TTL in hours', range: '1-168' },
+
+  // ── Personal Nodes (mutable) ──
+  { key: 'personalNodesEnabled', dotPath: 'personal_nodes.enabled', envVar: 'AIMEAT_PERSONAL_NODES_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Personal node hosting enabled' },
+  { key: 'personalNodeMaxSlots', dotPath: 'personal_nodes.max_slots', envVar: 'AIMEAT_PERSONAL_NODE_MAX_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max personal node slots', range: '1-10000' },
+  { key: 'personalNodeMaxPerOwner', dotPath: 'personal_nodes.max_per_owner', envVar: 'AIMEAT_PERSONAL_NODE_MAX_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Personal nodes one owner may anchor here, so the shared slots stay open to every owner. 0 = no limit. Anchors that exist stay', range: '0-10000' },
+
+  // ── Match Notifications (Phase 1.6, mutable) ──
+
+  // ── Encrypted Chat (mutable) ──
+  { key: 'echatAnonymous', dotPath: 'echat.anonymous', envVar: 'AIMEAT_ECHAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous encrypted chat WebSocket connections' },
+
+  // ── Node (immutable, additional) ──
+  { key: 'baseUrl', dotPath: 'node.base_url', envVar: 'AIMEAT_BASE_URL', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Public base URL of this node' },
+  ...PAGES_CONFIG_FIELDS,
+  { key: 'devMode', dotPath: 'node.dev_mode', envVar: 'AIMEAT_DEV_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Development mode (localhost webhooks, credential reset preserves data)', adminDisplay: 'visible' },
+  { key: 'testMode', dotPath: 'node.test_mode', envVar: 'AIMEAT_TEST_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test mode (re-registration wipes account for E2E test isolation)', adminDisplay: 'visible' },
+  { key: 'updateCheck', dotPath: 'node.update_check', envVar: 'AIMEAT_UPDATE_CHECK', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Ask npm for a newer AIMEAT (at most every six hours, when an operator opens a page) and show operators a notice in the header when there is one. Off: no request leaves this node and no notice appears' },
+  { key: 'updateCheckSource', dotPath: 'node.update_check_source', envVar: 'AIMEAT_UPDATE_CHECK_SOURCE', type: 'string', validate: v => typeof v === 'string' && (v.trim() === '' || /^https?:\/\/\S+$/.test(v.trim())), immutable: false, description: 'Where the version check asks. Empty uses registry.npmjs.org and unpkg.com. A base URL replaces both, for a node behind a package mirror' },
+  { key: 'anonymousMode', dotPath: 'node.anonymous_mode', envVar: 'AIMEAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous access without authentication' },
+
+  // ── Federation (mutable, additional) ──
+  { key: 'depeeringGracePeriodHours', dotPath: 'federation.depeering_grace_hours', envVar: 'AIMEAT_DEPEERING_GRACE_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Grace period before depeering in hours', range: '1-720' },
+  { key: 'keyCacheRefreshMinutes', dotPath: 'federation.key_cache_refresh_minutes', envVar: 'AIMEAT_KEY_CACHE_REFRESH_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Minutes between key cache refreshes', range: '1-60' },
+  { key: 'federationRole', dotPath: 'federation.role', envVar: 'AIMEAT_FEDERATION_ROLE', type: 'string', ...oneOf('operator', 'contributor', 'standalone'), immutable: false, description: 'Federation role: operator, contributor, or standalone' },
+  { key: 'genesisUrl', dotPath: 'federation.genesis_url', envVar: 'AIMEAT_GENESIS_URL', type: 'string', validate: () => true, immutable: false, description: 'Genesis node URL for federation' },
+  { key: 'federationAuthPolicy', dotPath: 'federation.auth_policy', envVar: 'AIMEAT_FEDERATION_AUTH_POLICY', type: 'string', ...oneOf('disabled', 'all_peers', 'specific_peers'), immutable: false, description: 'Federation auth policy: disabled, all_peers, or specific_peers' },
+  { key: 'federationDefaultScopes', dotPath: 'federation.default_scopes', envVar: 'AIMEAT_FEDERATION_DEFAULT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Default scopes for federated users, one per line (comma-separated in the environment)' },
+  { key: 'federationOpenJoin', dotPath: 'federation.open_join', envVar: 'AIMEAT_FEDERATION_OPEN_JOIN', type: 'boolean', validate: () => true, immutable: false, description: 'Open join: a signed introduce self-admits as a low-trust visiting peer (no manual approval)' },
+  { key: 'federationBookListed', dotPath: 'federation.book_listed', envVar: 'AIMEAT_FEDERATION_BOOK_LISTED', type: 'boolean', validate: () => true, immutable: false, description: 'List this node (operators + resources) in the federation book; off = privacy opt-out' },
+  { key: 'federationAudienceRequired', dotPath: 'federation.audience_required', envVar: 'AIMEAT_FEDERATION_AUDIENCE_REQUIRED', type: 'boolean', validate: REMOVAL_SWITCHES.audienceRequired, immutable: false, description: 'Refuse a message from another node that does not name this node as the one it is for. Off: a node on an older version, which names none, is still heard; a message that names another node is refused either way. On by default from 3.27.0; the older message format, without the audience proof, is removed in 4.0.0, from which this is on whatever it is set to' },
+
+  // ── Security limits (mutable) ──
+  { key: 'screenshotEgress', dotPath: 'security.screenshot_egress', envVar: 'AIMEAT_SCREENSHOT_EGRESS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'Exact addresses (scheme, host, port) of your own private servers that a page the node renders (a screenshot, a playtest, a Design Book bench) may reach, comma separated. Empty: public addresses and the node\'s own only', range: 'http://intranet.local:8080,http://192.168.1.20:3000' },
+  { key: 'loginRateLimitMax', dotPath: 'security.login_rate_limit_max', envVar: 'AIMEAT_LOGIN_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max login attempts per minute per IP', range: '1-1000' },
+  { key: 'loginRateLimitWindowMs', dotPath: 'security.login_rate_limit_window_ms', envVar: 'AIMEAT_LOGIN_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Login rate limit window in ms', range: '1000-3600000' },
+  { key: 'agentTokenRateLimitMax', dotPath: 'security.agent_token_rate_limit_max', envVar: 'AIMEAT_AGENT_TOKEN_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Agent credentials minted per minute per IP. Each agent a computer runs mints one when it starts, so this caps how many agents one computer can start in a minute', range: '1-10000' },
+  { key: 'registrationRateLimitMax', dotPath: 'security.registration_rate_limit_max', envVar: 'AIMEAT_REGISTRATION_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max registration attempts per minute per IP', range: '1-100' },
+  { key: 'registrationRateLimitWindowMs', dotPath: 'security.registration_rate_limit_window_ms', envVar: 'AIMEAT_REGISTRATION_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Registration rate limit window in ms', range: '1000-3600000' },
+  { key: 'adminAuthRateLimitMax', dotPath: 'security.admin_auth_rate_limit_max', envVar: 'AIMEAT_ADMIN_AUTH_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max admin auth attempts per minute per IP', range: '1-100' },
+  { key: 'adminAuthRateLimitWindowMs', dotPath: 'security.admin_auth_rate_limit_window_ms', envVar: 'AIMEAT_ADMIN_AUTH_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Admin auth rate limit window in ms', range: '1000-3600000' },
+  { key: 'passwordLockoutAttempts', dotPath: 'security.password_lockout_attempts', envVar: 'AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Failed password attempts before lockout', range: '1-100' },
+  { key: 'passwordLockoutMinutes', dotPath: 'security.password_lockout_minutes', envVar: 'AIMEAT_PASSWORD_LOCKOUT_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Password lockout duration in minutes', range: '1-1440' },
+  { key: 'jsonBodyLimitMb', dotPath: 'security.json_body_limit_mb', envVar: 'AIMEAT_JSON_BODY_LIMIT_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Default JSON body size limit in MB', range: '1-100' },
+  { key: 'jsonBodyLimitLargeMb', dotPath: 'security.json_body_limit_large_mb', envVar: 'AIMEAT_JSON_BODY_LIMIT_LARGE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Large JSON body size limit in MB (apps, extensions)', range: '1-100' },
+
+  // ── Quotas (mutable, additional) ──
+  { key: 'memoryMaxValueSizeKb', dotPath: 'quota.memory_max_value_size_kb', envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory value size in KB', range: '1-10240' },
+  { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'The most memory keys each owner and each agent may hold', range: '1-100000' },
+  // Archived rows are outside the key ceiling above, so an archive frees live room; without a ceiling
+  // of their own, write, archive, write stored past every limit (secaudit2026nov08b round 15b).
+  { key: 'memoryMaxArchivedKeysPerAgent', dotPath: 'quota.memory_max_archived_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_ARCHIVED_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000000, immutable: false, description: 'The most archived memory keys each owner and each agent may hold. Archiving takes keys out of the memory keys cap and into this one; an archive that would pass it is refused and nothing is archived. Delete archived content that is no longer needed, or raise this value. This limit never refuses bringing content back from the archive or deleting it. 0: no limit', range: '0-10000000' },
+  // How long a deleted memory record can still be taken back. 0 makes a delete immediate and
+  // final, which is a legitimate choice an operator should have to make rather than inherit.
+  { key: 'memoryDeleteGraceDays', dotPath: 'quota.memory_delete_grace_days', envVar: 'AIMEAT_MEMORY_DELETE_GRACE_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Days a deleted memory record stays takeable back before it is removed for good', range: '0-365' },
+  // ── Outbound connections (aimeat-connect) ──
+  // The applications this node registers AS, so a person can connect their own account elsewhere.
+  // Deliberately NOT the sign-in credentials: signing in here and acting in somebody's mailbox
+  // there are different consent. The client ids are not secrets and show as themselves; the secrets
+  // show only as configured-or-not, and are immutable so a running node cannot have one swapped
+  // under connections that were minted with it.
+  { key: 'connectionsEnabled', dotPath: 'connections.enabled', envVar: 'AIMEAT_CONNECTIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Outbound connections master switch: off offers nothing, whoever brought what' },
+  // Running a local MCP server process is the one part of the MCP proxy that is code execution
+  // rather than a network call, so it is a setting and not a field on a record. Immutable: an
+  // operator who could turn this on through the admin API could start a process by writing two
+  // values, and the second one is already writable. It changes at a restart, deliberately.
+  { key: 'mcpStdioEnabled', dotPath: 'mcp.stdio_enabled', envVar: 'AIMEAT_MCP_STDIO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Allow local MCP server PROCESSES on this host. Off by default, because it runs code that is not ours.' },
+  { key: 'mcpStdioAllowedCommands', dotPath: 'mcp.stdio_allowed_commands', envVar: 'AIMEAT_MCP_STDIO_ALLOWED_COMMANDS', type: 'object', validate: v => Array.isArray(v) && (v as unknown[]).every(c => typeof c === 'string'), immutable: true, description: 'The exact commands a stdio server may name, compared whole. Empty means nothing runs.' },
+  // The provider client rows and the callback address: config-schema-connections.ts.
+  ...CONNECT_CLIENT_CONFIG_FIELDS,
+
+  // Workspace row spaces. Charged to the workspace and the organism, never to the member who wrote
+  // the row — that asymmetry is the reason the row store exists at all, so it is visible here
+  // beside the memory ceilings rather than buried in an env var nobody reads.
+  { key: 'wsRowsMaxPerWorkspace', dotPath: 'quota.ws_rows_max_per_workspace', envVar: 'AIMEAT_WS_ROWS_MAX_PER_WORKSPACE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max rows one workspace may hold across its row spaces', range: '1-10000000' },
+  { key: 'wsRowsQuotaMb', dotPath: 'quota.ws_rows_quota_mb', envVar: 'AIMEAT_WS_ROWS_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Workspace row store quota per organism in MB', range: '1-10000' },
+  { key: 'wsRowsMaxRowKb', dotPath: 'quota.ws_rows_max_row_kb', envVar: 'AIMEAT_WS_ROWS_MAX_ROW_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max size of a single workspace row in KB', range: '1-1024' },
+  { key: 'storageMaxFileSizeMb', dotPath: 'quota.storage_max_file_size_mb', envVar: 'AIMEAT_STORAGE_MAX_FILE_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max file size for storage in MB', range: '1-1024' },
+  { key: 'storageMaxChunkedFileSizeGb', dotPath: 'quota.storage_max_chunked_file_size_gb', envVar: 'AIMEAT_STORAGE_MAX_CHUNKED_FILE_SIZE_GB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max chunked file size in GB', range: '1-100' },
+  { key: 'maxActionsPerAgent', dotPath: 'quota.max_actions_per_agent', envVar: 'AIMEAT_MAX_ACTIONS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'The most actions one owner or one agent may offer', range: '1-1000' },
+  { key: 'minTrustForPaidActions', dotPath: 'quota.min_trust_paid_actions', envVar: 'AIMEAT_MIN_TRUST_PAID_ACTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Min trust score for paid actions', range: '0-100' },
+  { key: 'appMaxSizeMb', dotPath: 'quota.app_max_size_mb', envVar: 'AIMEAT_APP_MAX_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max app package size in MB', range: '1-100' },
+  { key: 'maxAppsPerAgent', dotPath: 'quota.max_apps_per_agent', envVar: 'AIMEAT_MAX_APPS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'The most published apps one owner may have', range: '1-1000' },
+
+  // ── Morsel Policy (mutable, additional) ──
+  { key: 'agentPortingFeeMorsels', dotPath: 'morsel_policy.agent_porting_fee', envVar: 'AIMEAT_AGENT_PORTING_FEE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsel fee for agent porting', range: '0-10000' },
+  { key: 'memoryOverageMorselsPerMbMonth', dotPath: 'morsel_policy.memory_overage_morsels', envVar: 'AIMEAT_MEMORY_OVERAGE_MORSELS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsel cost per MB/month overage', range: '0-1000' },
+  { key: 'storageOverageMorselsPerGbMonth', dotPath: 'morsel_policy.storage_overage_morsels', envVar: 'AIMEAT_STORAGE_OVERAGE_MORSELS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsel cost per GB/month overage', range: '0-10000' },
+
+  // ── Work (mutable, additional) ──
+  { key: 'appAnnouncementBoardId', dotPath: 'work.app_announcement_board_id', envVar: 'AIMEAT_APP_ANNOUNCEMENT_BOARD_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Board ID for app announcements' },
+
+  // ── Indexing (stored, from the next start) ──
+  { key: 'indexNowKey', dotPath: 'indexing.indexnow_key', envVar: 'AIMEAT_INDEXNOW_KEY', type: 'string', validate: () => true, immutable: false, applies: 'restart', description: 'IndexNow API key for SEO (secret)', adminDisplay: 'configured' },
+
+  // ── TOTP (stored, from the next start) ──
+  { key: 'totpIssuer', dotPath: 'totp.issuer', envVar: 'AIMEAT_TOTP_ISSUER', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, applies: 'restart', description: 'TOTP issuer name shown in authenticator apps' },
+  { key: 'totpBackupCodeCount', dotPath: 'totp.backup_code_count', envVar: 'AIMEAT_TOTP_BACKUP_CODE_COUNT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: false, applies: 'restart', description: 'Number of TOTP backup codes to generate', range: '1-20' },
+
+  // ── MSM (mutable) ──
+  { key: 'msmInstallRole', dotPath: 'msm.install_role', envVar: 'AIMEAT_MSM_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Role required to install MSM modules: operator or owner' },
+
+  // ── Personal Nodes (mutable, additional) ──
+  { key: 'personalNodeMailboxQuotaMb', dotPath: 'personal_nodes.mailbox_quota_mb', envVar: 'AIMEAT_PERSONAL_MAILBOX_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Personal node mailbox quota in MB', range: '1-1000' },
+  { key: 'personalNodeHeartbeatIntervalMs', dotPath: 'personal_nodes.heartbeat_interval_ms', envVar: 'AIMEAT_PERSONAL_HEARTBEAT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Personal node heartbeat interval in ms', range: '1000-300000' },
+  { key: 'personalNodeOfflineThresholdMs', dotPath: 'personal_nodes.offline_threshold_ms', envVar: 'AIMEAT_PERSONAL_OFFLINE_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10000, immutable: false, description: 'Personal node offline threshold in ms', range: '10000-3600000' },
+  { key: 'personalNodeRequestTimeoutMs', dotPath: 'personal_nodes.request_timeout_ms', envVar: 'AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Personal node request timeout in ms', range: '1000-300000' },
+
+  // ── Connector Forward Tunnel (mutable) ──
+  { key: 'connectTunnelEnabled', dotPath: 'connect_tunnel.enabled', envVar: 'AIMEAT_CONNECT_TUNNEL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Connector forward tunnel (agent ⇄ server WS) enabled' },
+  { key: 'connectTunnelHeartbeatIntervalMs', dotPath: 'connect_tunnel.heartbeat_interval_ms', envVar: 'AIMEAT_CONNECT_TUNNEL_HEARTBEAT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Connector tunnel heartbeat interval in ms', range: '1000-300000' },
+  { key: 'connectTunnelOfflineThresholdMs', dotPath: 'connect_tunnel.offline_threshold_ms', envVar: 'AIMEAT_CONNECT_TUNNEL_OFFLINE_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10000, immutable: false, description: 'Connector tunnel offline threshold in ms', range: '10000-3600000' },
+  { key: 'connectTunnelRequestTimeoutMs', dotPath: 'connect_tunnel.request_timeout_ms', envVar: 'AIMEAT_CONNECT_TUNNEL_REQUEST_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Connector tunnel forward-request timeout in ms', range: '1000-300000' },
+  { key: 'agentMigrateMaxPerPress', dotPath: 'agents.migrate_max_per_press', envVar: 'AIMEAT_AGENT_MIGRATE_MAX_PER_PRESS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Agents ONE bulk-migration call may move; the button chunks itself against this', range: '1-500' },
+  { key: 'connectTunnelMaxInflightPerIdentity', dotPath: 'connect_tunnel.max_inflight_per_identity', envVar: 'AIMEAT_CONNECT_TUNNEL_MAX_INFLIGHT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Concurrent forwarded calls ONE agent may have on a shared tunnel socket', range: '1-1024' },
+  { key: 'connectTunnelMaxResponseBytes', dotPath: 'connect_tunnel.max_response_bytes', envVar: 'AIMEAT_CONNECT_TUNNEL_MAX_RESPONSE_BYTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 65536, immutable: false, description: 'Largest single response ONE agent may put on a shared tunnel socket, in bytes', range: '65536-268435456' },
+  { key: 'crewTryTimeoutMs', dotPath: 'connect_tunnel.crew_try_timeout_ms', envVar: 'AIMEAT_CREW_TRY_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10_000, immutable: false, description: 'How long the Crew tab "Try" waits for a running crew to finish one trial run, in ms', range: '10000-1800000' },
+
+  // ── Push Notifications (mutable, additional) ──
+  { key: 'vapidSubject', dotPath: 'push.vapid_subject', envVar: 'AIMEAT_VAPID_SUBJECT', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, applies: 'restart', description: 'VAPID subject (mailto: or https: URI)' },
+  { key: 'pushNotifyTypes', dotPath: 'push.notify_types', envVar: 'AIMEAT_PUSH_NOTIFY_TYPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Notification types to push, one per line (comma-separated in the environment)' },
+  { key: 'pushCooldownMin', dotPath: 'push.cooldown_min', envVar: 'AIMEAT_PUSH_COOLDOWN_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Push notification cooldown in minutes', range: '1-1440' },
+  { key: 'pushMaxSubscriptionsPerNode', dotPath: 'push.max_subscriptions_per_node', envVar: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max push subscriptions per node', range: '1-100' },
+  { key: 'pushMaxFailures', dotPath: 'push.max_failures', envVar: 'AIMEAT_PUSH_MAX_FAILURES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max push failures before disabling', range: '1-50' },
+
+  // ── Door defences: what happens when somebody is refused (src/config/security.ts) ──
+  // Every one of these is mutable on purpose. An operator watching a campaign should be able to
+  // tighten the screw without a restart, and loosen it again when the office behind one address
+  // turns out to be the thing being squeezed.
+  { key: 'authLogPath', dotPath: 'security.auth_log_path', envVar: 'AIMEAT_AUTH_LOG_PATH', type: 'string', validate: () => true, immutable: false, description: 'Refusal log file (every 401/403, one JSON line each). Empty disables it.' },
+  { key: 'authLogMaxBytes', dotPath: 'security.auth_log_max_bytes', envVar: 'AIMEAT_AUTH_LOG_MAX_BYTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1_073_741_824, immutable: false, description: 'Refusal log rotates past this size, keeping one older generation', range: '0-1073741824' },
+  { key: 'loginTarpitEnabled', dotPath: 'security.login_tarpit_enabled', envVar: 'AIMEAT_LOGIN_TARPIT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Delay repeated credential failures from one address' },
+  { key: 'loginTarpitFreeFailures', dotPath: 'security.login_tarpit_free', envVar: 'AIMEAT_LOGIN_TARPIT_FREE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100, immutable: false, description: 'Refusals that cost nothing, so a mistyped password is not punished', range: '0-100' },
+  { key: 'loginTarpitStepMs', dotPath: 'security.login_tarpit_step_ms', envVar: 'AIMEAT_LOGIN_TARPIT_STEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 60_000, immutable: false, description: 'Delay added per refusal beyond the free ones', range: '0-60000' },
+  { key: 'loginTarpitMaxDelayMs', dotPath: 'security.login_tarpit_max_delay_ms', envVar: 'AIMEAT_LOGIN_TARPIT_MAX_DELAY_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 120_000, immutable: false, description: 'Longest any single request is held before the door refuses instead', range: '0-120000' },
+  { key: 'loginTarpitBlockAfter', dotPath: 'security.login_tarpit_block_after', envVar: 'AIMEAT_LOGIN_TARPIT_BLOCK_AFTER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Refusals after which the door answers 429 without holding the connection', range: '1-1000' },
+  { key: 'loginTarpitWindowMs', dotPath: 'security.login_tarpit_window_ms', envVar: 'AIMEAT_LOGIN_TARPIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60_000 && (v as number) <= 86_400_000, immutable: false, description: 'How long a penalty takes to decay if nothing else arrives', range: '60000-86400000' },
+  { key: 'loginTarpitMaxConcurrent', dotPath: 'security.login_tarpit_max_concurrent', envVar: 'AIMEAT_LOGIN_TARPIT_MAX_CONCURRENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10_000, immutable: false, description: 'Requests that may be delayed at once before the door sheds instead of holding', range: '1-10000' },
+  // Immutable: the setup register route reads it on every request, but turning it on is a decision
+  // about what kind of node this is, so it takes a restart and never a live write.
+  // Immutable for the same reason: which sign-in methods a node accepts is decided at start.
+  { key: 'ownerKeyLogin', dotPath: 'security.owner_key_login', envVar: 'AIMEAT_OWNER_KEY_LOGIN', type: 'boolean', validate: REMOVAL_SWITCHES.ownerKeyLogin, immutable: true, description: 'Deprecated, removed in 4.0.0, from which it is off whatever it is set to. When on (the default in 3.x), an owner can sign in at POST /v1/auth/token with the signing key the account was given at registration. An account with two-step sign-in is refused there either way, and a password reset replaces the key. Turn it off when nobody signs in that way.' },
+  { key: 'wsQueryToken', dotPath: 'security.ws_query_token', envVar: 'AIMEAT_WS_QUERY_TOKEN', type: 'boolean', validate: REMOVAL_SWITCHES.wsQueryToken, immutable: false, description: 'Deprecated, removed in 4.0.0, from which it is off whatever it is set to. When on (the default in 3.x), a realtime room, personal node tunnel or connector tunnel connection may carry its session token in the URL (?token=), which reverse proxies write to their access logs. Current clients use a single-use ticket (POST /v1/ws/ticket). GET /v1/stats counts the uses (ws_query_token); turn it off when that stays at zero.' },
+  { key: 'secretHostAskDefault', dotPath: 'security.secret_host_ask_default', envVar: 'AIMEAT_SECRET_HOST_ASK_DEFAULT', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'The default, for every account that has not chosen, of "Ask me before my secret is sent to a new address for the first time". On (the default): when code one of the account\'s agents wrote, or an address such an agent set, sends a stored secret to an address it has never gone to, the owner is asked first with one press, unless that agent holds secrets:manage. Off: it is sent and the address is kept, as before. Each owner can switch their own on or off.' },
+  { key: 'adminSetupOpenAfterFirstOperator', dotPath: 'security.admin_setup_open_after_first_operator', envVar: 'AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test servers only; keep it off on a public server. When on, the admin password can still create operators through /v1/admin/setup/register after the first operator exists. When off (the default), that route refuses with 410 once an operator exists, and an operator adds another on the Owners page.' },
+
+  // ── Email (mutable, additional) ──
+  { key: 'emailRateLimitMin', dotPath: 'email.rate_limit_min', envVar: 'AIMEAT_EMAIL_RATE_LIMIT_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Email rate limit cooldown in minutes', range: '1-1440' },
+
+  // ── EUDIW / Identity (mutable, additional) ──
+  { key: 'eudiwClientId', dotPath: 'eudiw.client_id', envVar: 'AIMEAT_EUDIW_CLIENT_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'EUDIW verifier client ID' },
+  { key: 'eudiwRedirectUri', dotPath: 'eudiw.redirect_uri', envVar: 'AIMEAT_EUDIW_REDIRECT_URI', type: 'string', validate: () => true, immutable: false, description: 'EUDIW redirect URI' },
+  { key: 'ftnProviderUrl', dotPath: 'eudiw.ftn_provider_url', envVar: 'AIMEAT_FTN_PROVIDER_URL', type: 'string', validate: () => true, immutable: false, description: 'Finnish Trust Network provider URL' },
+  { key: 'vcIssuerDid', dotPath: 'eudiw.vc_issuer_did', envVar: 'AIMEAT_VC_ISSUER_DID', type: 'string', validate: () => true, immutable: false, description: 'Verifiable credential issuer DID' },
+  { key: 'ftnClientId', dotPath: 'eudiw.ftn_client_id', envVar: 'AIMEAT_FTN_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'FTN broker OIDC client ID' },
+  { key: 'ftnClientSecret', dotPath: 'eudiw.ftn_client_secret', envVar: 'AIMEAT_FTN_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'FTN broker OIDC client secret (secret)', adminDisplay: 'configured' },
+  { key: 'nonceTtlSeconds', dotPath: 'eudiw.nonce_ttl_seconds', envVar: 'AIMEAT_NONCE_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 3600, immutable: false, description: 'Verification nonce TTL in seconds', range: '60-3600' },
+  { key: 'nationalEidPidClaim', dotPath: 'eudiw.national_eid_pid_claim', envVar: 'AIMEAT_NATIONAL_EID_PID_CLAIM', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'National eID PID claim name (e.g., personal_identity_code)' },
+
+  // ── Setup (immutable) ──
+  { key: 'setupAllowedIps', dotPath: 'setup.allowed_ips', envVar: 'AIMEAT_SETUP_ALLOWED_IPS', type: 'string', validate: () => true, immutable: true, description: 'Comma-separated IPs allowed for setup', adminDisplay: 'configured' },
+
+  // ── Moderation (mutable) ──
+  { key: 'autoHideThreshold', dotPath: 'moderation.auto_hide_threshold', envVar: 'AIMEAT_AUTO_HIDE_THRESHOLD', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Flag count to auto-hide content', range: '1-100' },
+
+  // ── Stats & Metrics (mutable) ──
+  { key: 'statsEnabled', dotPath: 'stats.enabled', envVar: 'AIMEAT_STATS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable stats API' },
+  { key: 'statsAccess', dotPath: 'stats.access', envVar: 'AIMEAT_STATS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Stats API visibility: public, authenticated, or operator' },
+  { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, applies: 'restart', description: 'Enable Prometheus metrics endpoint. Read at start: the request counter mounts before any route, so a change takes effect after a restart' },
+  { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
+
+  // ── MCP sessions (mutable) ──
+  { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
+  { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 250 && (v as number) <= 600000, immutable: false, applies: 'restart', description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
+  // The limits on what one account takes of what the node shares (config-schema-node-limits.ts).
+  ...NODE_LIMITS_CONFIG_FIELDS,
+
+  // ── Registration (mutable) ──
+  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
+  { key: 'membersSeeEachOther', dotPath: 'registration.members_see_each_other', envVar: 'AIMEAT_MEMBERS_SEE_EACH_OTHER', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Members see each other (for a company node): every person of this node is in every other person\'s contacts, the member directory lists everyone, and a first message between two people of this node arrives without a request. Agents and apps still ask first; a block still applies. Off by default' },
+
+  // ── Scoped Agent Capabilities (mutable) ──
+  { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Default agent capability scopes, one per line (comma-separated in the environment; default memory:read, memory:write, memory:delete, catalogue:read, organism:read, agent:read, messages:send, storage:write)' },
+  { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'The most scopes an agent can be given, one per line (comma-separated in the environment; * = all)' },
+
+  // ── Enterprise SSO (BR-04; mutable — an organisation node's host seals these) ──
+  { key: 'ssoEnabled', dotPath: 'sso.enabled', envVar: 'AIMEAT_SSO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable organisation sign-in (SAML) and provisioning (SCIM) doors' },
+  { key: 'ssoConnectionsLocked', dotPath: 'sso.connections_locked', envVar: 'AIMEAT_SSO_CONNECTIONS_LOCKED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Freeze SSO connection management (every admin write answers 403)' },
+
+  // ── Cortex Extensions (mutable) ──
+  { key: 'cortexEnabled', dotPath: 'cortex.enabled', envVar: 'AIMEAT_CORTEX_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable manifest-based cortex extensions' },
+  { key: 'cortexMaxInstalled', dotPath: 'cortex.max_installed', envVar: 'AIMEAT_CORTEX_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max installed cortex modules', range: '1-1000' },
+  { key: 'cortexMaxLibSizeKb', dotPath: 'cortex.max_lib_size_kb', envVar: 'AIMEAT_CORTEX_MAX_LIB_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16, immutable: false, description: 'Max cortex library size in KB', range: '16-4096' },
+
+  // ── Portfolio (mutable) ──
+  { key: 'portfolioEnabled', dotPath: 'portfolio.enabled', envVar: 'AIMEAT_PORTFOLIO', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable portfolio feature' },
+  { key: 'portfolioMaxSizeKb', dotPath: 'portfolio.max_size_kb', envVar: 'AIMEAT_PORTFOLIO_MAX_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max portfolio size in KB', range: '1-10240' },
+  { key: 'portfolioMaxImages', dotPath: 'portfolio.max_images', envVar: 'AIMEAT_PORTFOLIO_MAX_IMAGES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max images per portfolio', range: '1-100' },
+
+  // ── Cookie Consent (mutable) ──
+  { key: 'cookieConsentEnabled', dotPath: 'cookies.consent_enabled', envVar: 'AIMEAT_COOKIE_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable cookie consent banner' },
+  { key: 'cookieConsentCategories', dotPath: 'cookies.consent_categories', envVar: 'AIMEAT_COOKIE_CONSENT_CATEGORIES', type: 'object', validate: v => Array.isArray(v) && v.length > 0 && v.every(c => typeof c === 'string' && /^[a-z][a-z0-9_-]{0,30}$/.test(c)), immutable: false, description: 'The categories the cookie banner asks about, one word each (necessary, analytics, marketing). A list: until 2026-10-11 this row took the typed text, and the banner then showed one category per letter. A page with its owner\'s analytics always asks about analytics' },
+  { key: 'cookieConsentPolicyUrl', dotPath: 'cookies.consent_policy_url', envVar: 'AIMEAT_COOKIE_CONSENT_POLICY_URL', type: 'string', validate: () => true, immutable: false, description: 'Cookie consent privacy policy URL' },
+
+  // ── CORS (mutable) ──
+  { key: 'corsAllowedOrigins', dotPath: 'cors.allowed_origins', envVar: 'AIMEAT_CORS_ALLOWED_ORIGINS', type: 'object', list: true, validate: isStringList, immutable: false, description: 'CORS allowed origins, one per line (comma-separated in the environment; * = all). An origin is matched whole: scheme, host and port' },
+
+  // ── Realtime P2P (mutable) ──
+  { key: 'realtimeEnabled', dotPath: 'realtime.enabled', envVar: 'AIMEAT_REALTIME_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable realtime P2P signaling' },
+  { key: 'realtimeMaxRooms', dotPath: 'realtime.max_rooms', envVar: 'AIMEAT_REALTIME_MAX_ROOMS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max P2P rooms', range: '1-10000' },
+  { key: 'realtimeMaxPeersPerRoom', dotPath: 'realtime.max_peers_per_room', envVar: 'AIMEAT_REALTIME_MAX_PEERS_PER_ROOM', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max peers per P2P room', range: '1-100' },
+  { key: 'realtimeRoomIdleTimeoutMs', dotPath: 'realtime.room_idle_timeout_ms', envVar: 'AIMEAT_REALTIME_ROOM_IDLE_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'P2P room idle timeout in ms', range: '1000-86400000' },
+  { key: 'realtimeMaxMessageSizeBytes', dotPath: 'realtime.max_message_size_bytes', envVar: 'AIMEAT_REALTIME_MAX_MESSAGE_SIZE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 256, immutable: false, description: 'Max P2P message size in bytes', range: '256-1048576' },
+  { key: 'realtimeRateLimitPerSecond', dotPath: 'realtime.rate_limit_per_second', envVar: 'AIMEAT_REALTIME_RATE_LIMIT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'P2P messages per second rate limit', range: '1-1000' },
+  { key: 'stunServers', dotPath: 'realtime.stun_servers', envVar: 'AIMEAT_STUN_SERVERS', type: 'object', list: true, validate: isStringList, immutable: false, description: 'STUN servers for P2P, one per line (comma-separated in the environment)' },
+  { key: 'turnServer', dotPath: 'realtime.turn_server', envVar: 'AIMEAT_TURN_SERVER', type: 'string', validate: () => true, immutable: false, description: 'TURN server URL for P2P relay' },
+  { key: 'turnUsername', dotPath: 'realtime.turn_username', envVar: 'AIMEAT_TURN_USERNAME', type: 'string', validate: () => true, immutable: false, description: 'Deprecated, removed in 4.0.0. TURN server username: set the TURN shared secret instead; served only while that is empty', adminDisplay: 'configured' },
+  { key: 'turnCredential', dotPath: 'realtime.turn_credential', envVar: 'AIMEAT_TURN_CREDENTIAL', type: 'string', validate: () => true, immutable: false, description: 'Deprecated, removed in 4.0.0. TURN server credential: set the TURN shared secret instead; served only while that is empty', adminDisplay: 'configured' },
+  { key: 'turnSecret', dotPath: 'realtime.turn_secret', envVar: 'AIMEAT_TURN_SECRET', type: 'string', validate: v => v === null || typeof v === 'string', immutable: false, description: 'TURN shared secret (secret): the coturn static-auth-secret. It never leaves the node; each client receives a credential derived from it that expires', adminDisplay: 'configured' },
+  { key: 'turnTtlSeconds', dotPath: 'realtime.turn_ttl_seconds', envVar: 'AIMEAT_TURN_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 86400, immutable: false, description: 'How long a TURN credential handed to a client stays valid, in seconds', range: '60-86400' },
+
+  // ── Site / Portal (mutable) ──
+  { key: 'siteEnabled', dotPath: 'site.enabled', envVar: 'AIMEAT_SITE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable site portal' },
+  { key: 'siteMaxTemplateSizeKb', dotPath: 'site.max_template_size_kb', envVar: 'AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max site template size in KB', range: '1-4096' },
+  { key: 'siteCacheTtlSeconds', dotPath: 'site.cache_ttl_seconds', envVar: 'AIMEAT_SITE_CACHE_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Site template cache TTL in seconds (0 = no cache)', range: '0-86400' },
+  { key: 'siteLbEnabled', dotPath: 'site.lb_enabled', envVar: 'AIMEAT_SITE_LB_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable site load balancing' },
+  { key: 'siteLbOriginUrl', dotPath: 'site.lb_origin_url', envVar: 'AIMEAT_SITE_LB_ORIGIN_URL', type: 'string', validate: () => true, immutable: false, description: 'Load balancer origin URL' },
+  { key: 'siteLbSyncIntervalMin', dotPath: 'site.lb_sync_interval_min', envVar: 'AIMEAT_SITE_LB_SYNC_INTERVAL_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'LB template sync interval in minutes', range: '1-1440' },
+  { key: 'siteLbSyncOnStartup', dotPath: 'site.lb_sync_on_startup', envVar: 'AIMEAT_SITE_LB_SYNC_ON_STARTUP', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sync templates from origin on startup' },
+
+  // ── Consul (immutable — set before startup) ──
+  { key: 'consulEnabled', dotPath: 'consul.enabled', envVar: 'AIMEAT_CONSUL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Enable Consul integration' },
+  { key: 'consulUrl', dotPath: 'consul.url', envVar: 'AIMEAT_CONSUL_URL', type: 'string', validate: () => true, immutable: true, description: 'Consul HTTP URL' },
+  { key: 'consulPrefix', dotPath: 'consul.prefix', envVar: 'AIMEAT_CONSUL_PREFIX', type: 'string', validate: () => true, immutable: true, description: 'Consul KV prefix' },
+  { key: 'consulToken', dotPath: 'consul.token', envVar: 'AIMEAT_CONSUL_TOKEN', type: 'string', validate: () => true, immutable: true, description: 'Consul ACL token', adminDisplay: 'configured' },
+  { key: 'consulWatchIntervalSeconds', dotPath: 'consul.watch_interval_seconds', envVar: 'AIMEAT_CONSUL_WATCH_INTERVAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 5 && (v as number) <= 3600, immutable: true, description: 'Consul watch poll interval in seconds', range: '5-3600' },
+  { key: 'consulDatacenter', dotPath: 'consul.datacenter', envVar: 'AIMEAT_CONSUL_DATACENTER', type: 'string', validate: () => true, immutable: true, description: 'Consul datacenter name' },
+
+  // ── Agent Directives (Phase 1, mutable) ──
+  { key: 'agentSystemPrinciples', dotPath: 'agent.system_principles', envVar: 'AIMEAT_AGENT_SYSTEM_PRINCIPLES', type: 'object', validate: (v: unknown) => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: false, description: 'System-level principles injected into all agent directives' },
+  { key: 'agentMaxTokensPerTask', dotPath: 'agent.max_tokens_per_task', envVar: 'AIMEAT_AGENT_MAX_TOKENS_PER_TASK', type: 'number', validate: (v: unknown) => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000 && (v as number) <= 10000000, immutable: false, description: 'Maximum token budget per agent task', range: '1000-10000000' },
+  { key: 'agentMandatoryLogging', dotPath: 'agent.mandatory_logging', envVar: 'AIMEAT_AGENT_MANDATORY_LOGGING', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Require agents to log all significant actions' },
+  { key: 'agentAimeatFirstEnabled', dotPath: 'agent.aimeat_first', envVar: 'AIMEAT_AGENT_AIMEAT_FIRST', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Enable AIMEAT-first principle in agent directives' },
+
+  // ── Agent Tasks triage (Phase 1, mutable) ──
+  { key: 'taskAutoArchive', dotPath: 'tasks.auto_archive', envVar: 'AIMEAT_TASK_AUTO_ARCHIVE', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Auto-archive completed tasks older than the archive window (Tasks tab)' },
+  { key: 'taskArchiveAfterHours', dotPath: 'tasks.archive_after_hours', envVar: 'AIMEAT_TASK_ARCHIVE_AFTER_HOURS', type: 'number', validate: (v: unknown) => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 8760, immutable: false, description: 'Hours a completed task stays in Recent before auto-archiving', range: '1-8760' },
+
+  // ── AI: whose key pays, which model answers, what the house grants (mutable) ──
+  //
+  // These decide what the node SPENDS, and until now every one of them was reachable only by
+  // editing .env and restarting. An operator changing a model had to deploy; an operator wondering
+  // whether the house key was even set had no way to look. Both are the wrong shape for a setting
+  // that costs money.
+  //
+  // The two keys are `configured` rather than `visible`: the admin API answers whether a key is set
+  // and never what it is. A mutable field takes effect on the next read of `config`, so a model
+  // default applies to the very next completion. The chat agent's own settings are the exception
+  // worth knowing: the goose child reads them from its environment at spawn, so a change reaches
+  // the next agent process rather than the one already running.
+  { key: 'openrouterInstanceKey', dotPath: 'ai.instance_key', envVar: 'AIMEAT_OPENROUTER_INSTANCE_KEY', type: 'string', validate: () => true, immutable: false, description: "This node's own OpenRouter key, spent by anyone who has not brought their own (metered per person by the allowance below)", adminDisplay: 'configured' },
+  { key: 'chatFreeAllowanceUsd', dotPath: 'ai.free_allowance_usd', envVar: 'AIMEAT_CHAT_FREE_ALLOWANCE_USD', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1000, immutable: false, description: "Free starting allowance in USD on the node's key, granted ONCE per person and never renewed. 0 grants nothing", range: '0-1000' },
+  { key: 'modelFreeFallback', dotPath: 'ai.model_free_fallback', envVar: 'AIMEAT_MODEL_FREE_FALLBACK', type: 'string', validate: () => true, immutable: false, description: 'Model used when a person on the node key has spent their allowance. Empty refuses instead of degrading' },
+  { key: 'modelDefaultChat', dotPath: 'ai.model_default_chat', envVar: 'AIMEAT_MODEL_DEFAULT_CHAT', type: 'string', validate: () => true, immutable: false, description: 'Default chat model when the owner has not chosen one' },
+  { key: 'modelDefaultReasoning', dotPath: 'ai.model_default_reasoning', envVar: 'AIMEAT_MODEL_DEFAULT_REASONING', type: 'string', validate: () => true, immutable: false, description: 'Default reasoning model when the owner has not chosen one' },
+  { key: 'modelDefaultExecution', dotPath: 'ai.model_default_execution', envVar: 'AIMEAT_MODEL_DEFAULT_EXECUTION', type: 'string', validate: () => true, immutable: false, description: 'Default execution model when the owner has not chosen one' },
+  { key: 'modelDefaultVision', dotPath: 'ai.model_default_vision', envVar: 'AIMEAT_MODEL_DEFAULT_VISION', type: 'string', validate: () => true, immutable: false, description: 'Default model for reading images. Must accept image input' },
+  { key: 'modelDefaultStt', dotPath: 'ai.model_default_stt', envVar: 'AIMEAT_MODEL_DEFAULT_STT', type: 'string', validate: () => true, immutable: false, description: 'Default speech-to-text model. Empty means nobody can use the microphone until they set one themselves' },
+  // Presentation only: the provenance record, the AI-Disclosure header and the JSON-LD are never
+  // touched by this. `off` is accepted here as a value and REFUSED at runtime on a node whose
+  // security profile is public (config.ts coerces it to strict and says so in the posture
+  // warnings), so the one combination that must be unreachable by accident stays unreachable.
+  { key: 'aiLabelPublic', dotPath: 'ai.label_public', envVar: 'AIMEAT_AI_LABEL_PUBLIC', type: 'string', ...oneOf('strict', 'light', 'off'), immutable: false, description: 'How eagerly a VISIBLE AI label is shown ("strict" | "light" | "off"). strict also labels what Article 50 exempts, so an app or a legal page with a named reviewer keeps the light "a model was involved" label; light shows only what the law requires, so the reviewer lifts it; off shows none and is refused on a public node. The interactive notice and the machine planes never change' },
+  { key: 'modelDefaultImage', dotPath: 'ai.model_default_image', envVar: 'AIMEAT_MODEL_DEFAULT_IMAGE', type: 'string', validate: () => true, immutable: false, description: 'Default model for generating images. Must produce image output' },
+  { key: 'sttLanguageDefault', dotPath: 'ai.stt_language_default', envVar: 'AIMEAT_STT_LANGUAGE_DEFAULT', type: 'string', validate: () => true, immutable: false, description: 'Language hint for transcription (e.g. fi) when the owner has not set one' },
+  // The System 2 rows (providers, recommended models, the model catalogue) live in
+  // config-schema-ai.ts since 2026-09-28 (a pure move, max-file-lines), spread here in their place.
+  ...SYSTEM2_AI_CONFIG_FIELDS,
+
+  // ── AI jobs (a model call with a handle, running in the background) ──
+  // Every range here is deliberately WIDER than the number an operator is likely to want, because
+  // extensionTimeoutMs above is the cautionary tale: its 60000 ceiling (lifted 2026-10-11) is why a
+  // production node could not raise the extension timeout even when it wanted to. Do not enforce a
+  // maximum you will one day need to exceed.
+  { key: 'aiJobSlots', dotPath: 'ai.job_slots', envVar: 'AIMEAT_AI_JOB_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'How many AI jobs may be calling a provider at once, node-wide. Protects the process, not a budget: money is controlled by the daily budget and the per-app quota', range: '1-10000' },
+  { key: 'aiJobMaxQueued', dotPath: 'ai.job_max_queued', envVar: 'AIMEAT_AI_JOB_MAX_QUEUED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: "The node-wide wait line. Past it a start is refused with AI_JOB_QUEUE_FULL and a Retry-After — the one refusal that means 'come back shortly'", range: '1-100000' },
+  { key: 'aiJobMaxPromptBytes', dotPath: 'ai.job_max_prompt_bytes', envVar: 'AIMEAT_AI_JOB_MAX_PROMPT_BYTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1024 && (v as number) <= 268435456, immutable: false, description: 'The biggest assembled prompt (prompt text plus every input_keys record read into it) one job may carry. This is the number that multiplies with concurrency', range: '1024-268435456' },
+  { key: 'aiJobMaxQueuedPerOwner', dotPath: 'ai.job_max_queued_per_owner', envVar: 'AIMEAT_AI_JOB_MAX_QUEUED_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'How many jobs one owner may have queued. An abuse brake, not a fairness knob — fairness is the round-robin order in the pool', range: '1-100000' },
+  { key: 'aiJobMaxChain', dotPath: 'ai.job_max_chain', envVar: 'AIMEAT_AI_JOB_MAX_CHAIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How deep an on_done chain may go before it is stopped and the parent records why', range: '1-1000' },
+  { key: 'aiJobLogRetentionDays', dotPath: 'ai.job_log_retention_days', envVar: 'AIMEAT_AI_JOB_LOG_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'How many days of folded ai.jobs.log.<day> records to keep before the nightly prune removes them', range: '1-3650' },
+
+  // ── AI: the decision provider (TARGET-080, AIMEAT.decide — TypeSafe Jev) ──
+  // Beside the text provider, never inside it: nothing here reaches the model picker or the chat.
+  // The key is `configured`, never shown, and is sent to decideBaseUrl's host only.
+  { key: 'decideEnabled', dotPath: 'decide.enabled', envVar: 'AIMEAT_DECIDE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Whether anyone on this node may ask the decision model. Off refuses every decide call' },
+  { key: 'decideInstanceKey', dotPath: 'decide.instance_key', envVar: 'AIMEAT_TYPESAFE_INSTANCE_KEY', type: 'string', validate: () => true, immutable: false, description: "This node's own TypeSafe key, spent by anyone who has not brought their own, from the same per-person allowance as the OpenRouter key", adminDisplay: 'configured' },
+  // Shown, never editable here: the node's key is sent to this address, so an admin screen that could
+  // change it could redirect the key. Set in the environment, read at boot.
+  { key: 'decideBaseUrl', dotPath: 'decide.base_url', envVar: 'AIMEAT_DECIDE_BASE_URL', type: 'string', validate: v => typeof v === 'string' && /^https?:\/\//.test(v as string), immutable: true, description: 'The decision model endpoint. The node key goes to this address only; change it in the environment' },
+  { key: 'decideModel', dotPath: 'decide.model', envVar: 'AIMEAT_DECIDE_MODEL', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9][a-z0-9._-]{1,63}$/.test(v as string), immutable: false, description: 'The pinned decision model version (e.g. jev-1.13.0). Pin a versioned id, not an alias: a threshold tuned on one version can move under an alias' },
+  { key: 'decidePricePerMtok', dotPath: 'decide.price_per_mtok', envVar: 'AIMEAT_DECIDE_PRICE_PER_MTOK', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1000, immutable: false, description: 'USD per million input tokens; output is free. Prices a decision into the usage ledger', range: '0-1000' },
+  { key: 'decideMaxRequestTokens', dotPath: 'decide.max_request_tokens', envVar: 'AIMEAT_DECIDE_MAX_REQUEST_TOKENS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000 && (v as number) <= 1000000, immutable: false, description: 'Estimated tokens one decide request may carry, state and questions together. A larger one is refused before it is sent', range: '1000-1000000' },
+  { key: 'decideMaxChoiceOptions', dotPath: 'decide.max_choice_options', envVar: 'AIMEAT_DECIDE_MAX_CHOICE_OPTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 2 && (v as number) <= 10000, immutable: false, description: 'Options one choice question may offer. A larger taxonomy is walked in stages', range: '2-10000' },
+  { key: 'decideRequestsPerMinute', dotPath: 'decide.requests_per_minute', envVar: 'AIMEAT_DECIDE_REQUESTS_PER_MINUTE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000000, immutable: false, description: 'Requests per minute this node sends to the decision model, everyone together. TypeSafe changes its own limit without notice', range: '1-1000000' },
+  { key: 'decideConcurrency', dotPath: 'decide.concurrency', envVar: 'AIMEAT_DECIDE_CONCURRENCY', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Parallel requests one run over many records may have open', range: '1-1000' },
+  { key: 'decideCacheHours', dotPath: 'decide.cache_hours', envVar: 'AIMEAT_DECIDE_CACHE_HOURS', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 8760, immutable: false, description: 'How long an identical decision is answered from the record instead of asking again. 0 never reuses', range: '0-8760' },
+  // The providers (services/decide/providers.ts). Addresses and variable names, never keys; shown and
+  // set in the environment only, because an address is where the state and a key would be sent.
+  { key: 'decideProviderId', dotPath: 'decide.provider_id', envVar: 'AIMEAT_DECIDE_PROVIDER_ID', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9][a-z0-9-]{1,62}$/.test(v as string), immutable: true, description: 'The id the provider at decide.base_url is recorded under (default typesafe)' },
+  { key: 'decideProviderKind', dotPath: 'decide.provider_kind', envVar: 'AIMEAT_DECIDE_PROVIDER_KIND', type: 'string', validate: v => v === 'hosted' || v === 'local', immutable: true, description: 'hosted, or local when decide.base_url is a model on this machine: then no key, no price, no allowance', range: 'hosted | local' },
+  { key: 'decideProviders', dotPath: 'decide.providers', envVar: 'AIMEAT_DECIDE_PROVIDERS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'More decision providers, as a JSON array of provider records. Auth is none or the NAME of an environment variable, never a key' },
+  { key: 'decideBuiltinProviders', dotPath: 'decide.builtin_providers', envVar: 'AIMEAT_DECIDE_BUILTIN_PROVIDERS', type: 'string', validate: v => typeof v === 'string' && /^[a-z,\s]*$/.test(v as string), immutable: true, description: 'Built-in local examples to switch on, comma separated: laya, von, jeff. For a development machine that runs them', range: 'laya,von,jeff' },
+  { key: 'decideDefaultProvider', dotPath: 'decide.default_provider', envVar: 'AIMEAT_DECIDE_DEFAULT_PROVIDER', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'The provider an owner who chose none gets. Empty means decide.provider_id' },
+  { key: 'decideProviderEgress', dotPath: 'decide.provider_egress', envVar: 'AIMEAT_DECIDE_PROVIDER_EGRESS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'Exact addresses (scheme, host, port) of the operator\'s own local decision models, comma separated. Only the decision call may reach them, so a public node needs no AIMEAT_ALLOW_PRIVATE_EGRESS', range: 'http://127.0.0.1:8801,http://laya:8000' },
+  // The built-in local models' bearer keys: set in the environment, shown only as whether each is set.
+  { key: 'decideJeffKey', dotPath: 'decide.jeff_key', envVar: 'AIMEAT_DECIDE_JEFF_KEY', type: 'string', validate: () => true, immutable: true, description: "The built-in jeff's bearer key, its JEFF_API_KEYS value (required when jeff is on)", adminDisplay: 'configured' },
+  { key: 'decideLayaKey', dotPath: 'decide.laya_key', envVar: 'AIMEAT_DECIDE_LAYA_KEY', type: 'string', validate: () => true, immutable: true, description: "The built-in laya's bearer key, its LAYA_API_KEY value (empty sends none)", adminDisplay: 'configured' },
+  { key: 'decideVonKey', dotPath: 'decide.von_key', envVar: 'AIMEAT_DECIDE_VON_KEY', type: 'string', validate: () => true, immutable: true, description: "The built-in von's bearer key, its VON_API_KEY value (empty sends none)", adminDisplay: 'configured' },
+  { key: 'decideRetentionDays', dotPath: 'decide.retention_days', envVar: 'AIMEAT_DECIDE_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 36500, immutable: false, description: 'Days a decision record is kept before the nightly prune removes it', range: '1-36500' },
+
+  // ── AI: the built-in chat agent (a `goose acp` child process) ──
+  { key: 'gooseBin', dotPath: 'ai.chat_agent_bin', envVar: 'AIMEAT_GOOSE_BIN', type: 'string', validate: () => true, immutable: false, description: 'Path to the goose binary. EMPTY DISABLES THE CHAT ENTIRELY. Takes effect on the next agent start' },
+  { key: 'goosePathRoot', dotPath: 'ai.chat_agent_path_root', envVar: 'AIMEAT_GOOSE_PATH_ROOT', type: 'string', validate: () => true, immutable: false, description: "The agent's own config and session store, away from any human's goose profile" },
+  { key: 'gooseProvider', dotPath: 'ai.chat_agent_provider', envVar: 'AIMEAT_GOOSE_PROVIDER', type: 'string', validate: () => true, immutable: false, description: "Provider the chat agent runs on when the chat agent key below is set (e.g. openrouter). Without that key the chat calls this node's /v1/llm and this setting is not used" },
+  { key: 'gooseModel', dotPath: 'ai.chat_agent_model', envVar: 'AIMEAT_GOOSE_MODEL', type: 'string', validate: () => true, immutable: false, description: 'Model the chat agent runs on. With the shared chat key it is also what the node records as the model that answered a turn; without it, the owner\'s providers choose each call' },
+  // Names, never values, and immutable: an operator who could add DATABASE_URL here from the admin
+  // screen would hand it to the agent again (services/goose-env.ts).
+  { key: 'gooseEnvPassthrough', dotPath: 'ai.chat_agent_env_passthrough', envVar: 'AIMEAT_GOOSE_ENV_PASSTHROUGH', type: 'object',
+    validate: v => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: true,
+    description: 'Environment variable names the chat agent may see beside its allow-list, for a provider key passed in the environment. Set by whoever runs this node' },
+  { key: 'gooseProviderApiKey', dotPath: 'ai.chat_agent_key', envVar: 'AIMEAT_GOOSE_PROVIDER_API_KEY', type: 'string', validate: () => true, immutable: false, description: "For a special case only. When set, EVERY chat turn is spent from this key and BYPASSES METERING: no allowance, daily budget or model policy applies to the chat. Empty (the default): each person's chat calls this node's /v1/llm, and the use is metered to that person", adminDisplay: 'configured' },
+  { key: 'chatMaxLiveThreads', dotPath: 'ai.chat_max_live_threads', envVar: 'AIMEAT_CHAT_MAX_LIVE_THREADS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'How many conversations stay open before the oldest rolls into a per-month archive record', range: '1-1000' },
+
+  // The site links (the apps, the store and the people the public pages point at) are in
+  // config-schema-site-links.ts, spread here in the place they always stood.
+  ...SITE_LINK_CONFIG_FIELDS,
+
+  // The settings that were read with no row until 2026-10-25 (check:config-coverage, widened to src/).
+  ...RUNTIME_CONFIG_FIELDS,
+  ...ACCESS_CONFIG_FIELDS,
+  ...FEATURE_CONFIG_FIELDS,
+  // The operator's limits on extension load (secaudit2026oct22).
+  ...EXTENSION_LOAD_CONFIG_FIELDS,
+];
+
+/**
+ * Paths a row had before it moved into a section of the Config tab (2026-10-25). A config file and
+ * the command line (--db-url, --db-path, --admin-password) may still name a setting by them.
+ */
+export const LEGACY_DOT_PATHS: Readonly<Record<string, string>> = {
+  database_url: 'storage.database_url',
+  sqlite_path: 'storage.sqlite_path',
+  admin_password: 'setup.admin_password',
+};
+
+// isJsonObject, isEmptyOrHttpUrl and isContactList live in config-schema-validators.ts (a pure move).
+
+// ── Derived Lookup Maps ──
+
+/** dotPath -> ConfigFieldDef (mutable fields only) */
+export const MUTABLE_CONFIG_MAP: Record<string, ConfigFieldDef> = {};
+
+/** dotPath -> ConfigFieldDef (all fields) */
+export const ALL_CONFIG_MAP: Record<string, ConfigFieldDef> = {};
+
+/** AIMEAT_* env var name -> dotPath */
+export const ENV_TO_DOT_PATH: Record<string, string> = {};
+
+/** dotPath -> AIMEAT_* env var name */
+export const DOT_PATH_TO_ENV: Record<string, string> = {};
+
+for (const field of CONFIG_FIELDS) {
+  ALL_CONFIG_MAP[field.dotPath] = field;
+  if (!field.immutable) MUTABLE_CONFIG_MAP[field.dotPath] = field;
+  ENV_TO_DOT_PATH[field.envVar] = field.dotPath;
+  DOT_PATH_TO_ENV[field.dotPath] = field.envVar;
+}
+// An old path reads as its row everywhere a path is looked up (a config file, the CLI, the seal list).
+for (const [old, now] of Object.entries(LEGACY_DOT_PATHS)) {
+  DOT_PATH_TO_ENV[old] = DOT_PATH_TO_ENV[now] as string;
+  ALL_CONFIG_MAP[old] = ALL_CONFIG_MAP[now] as ConfigFieldDef;
+}
+
+// ── Helper Functions ──
+
+/**
+ * The value a row addresses on the live config. The one place that knows a key may be one level
+ * down ('siteLinks.learn'): every consumer that used to index config[field.key] goes through here,
+ * so the nested group is not a special case they each have to remember.
+ */
+export function readConfigField(config: AimeatConfig, field: ConfigFieldDef): unknown {
+  const dot = field.key.indexOf('.');
+  if (dot < 0) return (config as unknown as Record<string, unknown>)[field.key];
+  const group = (config as unknown as Record<string, unknown>)[field.key.slice(0, dot)];
+  return group && typeof group === 'object' ? (group as Record<string, unknown>)[field.key.slice(dot + 1)] : undefined;
+}
+
+/** The writing half of readConfigField: sets the value where the row's key says it lives. */
+export function writeConfigField(config: AimeatConfig, field: ConfigFieldDef, value: unknown): void {
+  const dot = field.key.indexOf('.');
+  const target = config as unknown as Record<string, unknown>;
+  if (dot < 0) { target[field.key] = value; return; }
+  const groupKey = field.key.slice(0, dot);
+  const group = target[groupKey];
+  if (!group || typeof group !== 'object') target[groupKey] = {};
+  (target[groupKey] as Record<string, unknown>)[field.key.slice(dot + 1)] = value;
+}
+
+/** Check if a dot-path is immutable (unknown fields default to immutable for safety) */
+export function isImmutable(dotPath: string): boolean {
+  return ALL_CONFIG_MAP[dotPath]?.immutable ?? true;
+}
+
+/** Parse a raw string value using the field's type definition */
+export function parseConfigValue(field: ConfigFieldDef, raw: string): unknown {
+  switch (field.type) {
+    case 'number': return parseInt(raw, 10);
+    case 'float':  return parseFloat(raw);
+    case 'boolean': return raw === 'true';
+    case 'object': {
+      // A list arrives as comma-separated text from the environment, a file, Consul or a stored row.
+      if (field.list) return asList(raw);
+      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+    case 'string':
+    default:
+      return raw;
+  }
+}
+
+/** Serialize a typed value to raw string for storage */
+export function serializeConfigValue(value: unknown): string {
+  if (typeof value === 'object' && value !== null) return JSON.stringify(value);
+  return String(value);
+}
+
+/**
+ * A field's value as the raw text every reader takes: a `list` row is comma-separated, which is what
+ * its environment variable holds and what parseConfigValue splits; everything else as
+ * serializeConfigValue writes it. The env export wrote a list as a JSON array, which the config
+ * loader then read as one entry.
+ */
+export function serializeFieldValue(field: ConfigFieldDef, value: unknown): string {
+  return field.list && Array.isArray(value) ? value.join(',') : serializeConfigValue(value);
+}

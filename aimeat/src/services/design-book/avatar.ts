@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Design Book's AVATAR kind: an SVG picture an agent starts from when it makes its
- *   own avatar (services/agent-avatar.ts). The body is `{ svg }`, benched by the same reader the
+ *   own avatar (services/agent/avatar.ts). The body is `{ svg }`, benched by the same reader the
  *   agent's own `agent.avatar` record is read with, so a template that passes here can be written to
  *   agent.avatar as it is.
  *
@@ -22,7 +22,7 @@
  *   v1.0.0 — 2026-10-19 — Initial (wish-agenteille-oma-avatar-jonka-agentti-asettaa-itse).
  */
 import { DesignBookError } from './errors.js';
-import { AVATAR_KEY, parseAvatarValue } from '../agent-avatar.js';
+import { AVATAR_KEY, parseAvatarValue } from '../agent/avatar.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 
 export interface AvatarBody { svg: string }

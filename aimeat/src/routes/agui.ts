@@ -33,9 +33,9 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { buildGAII } from '../utils/gaii.js';
-import { createTask } from '../services/agent-v2-tasks-ops.js';
+import { createTask } from '../services/agent/v2-tasks-ops.js';
 import { streamTaskAsAgui } from '../services/agui-run.js';
-import type { Principal } from '../services/agent-v2-messaging-ops.js';
+import type { Principal } from '../services/agent/v2-messaging-ops.js';
 import { logger } from '../utils/logger.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 

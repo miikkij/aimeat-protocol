@@ -23,7 +23,7 @@ import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { recordOperatorAction } from './operator-access-audit.js';
-import { clearanceBoundByApprover } from './agent-clearance.js';
+import { clearanceBoundByApprover } from './agent/clearance.js';
 
 type Kind = 'owners' | 'agents' | 'actions' | 'boards' | 'memories' | 'transactions';
 type Counts = Record<Kind, number>;

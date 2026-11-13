@@ -66,7 +66,7 @@ import { writePrivateFile } from '../utils/private-file.js';
 import { parseSetupNodeSettings, buildSetupEnv, setupSettingOutcomes, setupMessage, type SetupEnvWrite } from '../services/setup-env.js';
 import { setupCodeGateFor, setupCodeRequired, setupCodeRefusal, SETUP_CODE_USED_MESSAGE } from '../services/setup-code.js';
 import { agentListingTags } from '../services/content-defaults.js';
-import { newAgentClearance } from '../services/agent-clearance.js';
+import { newAgentClearance } from '../services/agent/clearance.js';
 
 const __dirname_setup = dirname(fileURLToPath(import.meta.url));
 

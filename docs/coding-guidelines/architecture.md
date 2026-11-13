@@ -198,7 +198,7 @@ An agent connects through device authorization, then walks a mode-keyed onboardi
 #### Capability declaration and proof
 
 An agent declares what it can do and then has to prove it. This matters most for interactive agents and agents supplied by other parties.
-- **Declaration**: `PUT /v1/agents/:name/capabilities` (`agent-capabilities.ts`, written by `services/agent-profile-write.ts`): technical capabilities (MCP servers, skills, tools), domain expertise, languages. A capability of type `mcp` is marked verified when the caller is an agent session, because that session is a live MCP connection.
+- **Declaration**: `PUT /v1/agents/:name/capabilities` (`agent-capabilities.ts`, written by `services/agent/profile-write.ts`): technical capabilities (MCP servers, skills, tools), domain expertise, languages. A capability of type `mcp` is marked verified when the caller is an agent session, because that session is a live MCP connection.
 - **Proof**: the onboarding **test task** (`accept_test_task` then `complete_test_task`, steps 9 and 10) makes the agent run the real read, propose todos, execute, complete loop over its own transport. This is the gate that counts. Capability and trust together decide what work an agent may take.
 
 ### Agent Runtime: the Python liaison and the desktop app

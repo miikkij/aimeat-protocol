@@ -85,7 +85,7 @@ import { signedPackageHeaders } from './package-node-auth.js';
 import { logger } from '../../../utils/logger.js';
 import {
     PACKAGE_METADATA_SIGNATURE_PEER_FROM, UNSIGNED_PACKAGE_METADATA_REMOVED_IN, unsignedPackageMetadataAccepted,
-} from '../../../config-federation.js';
+} from '../../../config/federation.js';
 
 export interface PackagePullDeps {
     storage: Storage;
@@ -408,7 +408,7 @@ export async function pullPackage(
         return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: metadata.reason };
     }
     // 8c. An attestation without the metadata signature is taken only inside the window
-    //     (config-federation.ts): from a peer whose signed heartbeat named a release older than
+    //     (config/federation.ts): from a peer whose signed heartbeat named a release older than
     //     PACKAGE_METADATA_SIGNATURE_PEER_FROM, or of unknown version, and only before this node runs
     //     UNSIGNED_PACKAGE_METADATA_REMOVED_IN (secaudit 2026-10-31 inv-26).
     if (!metadata.checked) {

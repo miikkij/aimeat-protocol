@@ -35,7 +35,7 @@ import type { ConnectFrame, ConnectTunnelStats } from './connect-tunnel-wire.js'
 import { logger } from '../utils/logger.js';
 import type { MemoryWriteEvent } from './event-bus.js';
 import { parseWorkspaceRecordKey, spaceKeyOf } from './connect-tunnel-wire.js';
-import { isStopped } from './agent-stop-rules.js';
+import { isStopped } from './agent/stop-rules.js';
 import { retiredFromWorkspace, type WorkspaceEngagement } from './workspace-engagements.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { recordAt } from './workspace-record-key.js';

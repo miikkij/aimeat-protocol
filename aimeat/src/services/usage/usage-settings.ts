@@ -12,7 +12,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial.
  */
-import type { RuntimeConfig } from '../../config-runtime.js';
+import type { RuntimeConfig } from '../../config/runtime.js';
 
 export type UsageSettings = Pick<RuntimeConfig, 'usageHotDays' | 'usageHourRollupDays' | 'usageArchiveBatch' | 'usageRollupBatch' | 'usageRollupPasses'>;
 

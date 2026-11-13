@@ -62,8 +62,8 @@
   {
     "type": "cycle",
     "from": "src/config-types.ts",
-    "to": "src/services/config-sealing.ts",
-    "unresolvedTo": "./services/config-sealing.js",
+    "to": "src/services/config/sealing.ts",
+    "unresolvedTo": "./services/config/sealing.js",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -75,7 +75,7 @@
     },
     "cycle": [
       {
-        "name": "src/services/config-sealing.ts",
+        "name": "src/services/config/sealing.ts",
         "dependencyTypes": [
           "local",
           "type-only",
@@ -83,7 +83,7 @@
         ]
       },
       {
-        "name": "src/services/config-schema.ts",
+        "name": "src/services/config/schema.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -102,8 +102,8 @@
   {
     "type": "cycle",
     "from": "src/config.ts",
-    "to": "src/config-overrides.ts",
-    "unresolvedTo": "./config-overrides.js",
+    "to": "src/config/overrides.ts",
+    "unresolvedTo": "./config/overrides.js",
     "dependencyTypes": [
       "local",
       "export"
@@ -114,7 +114,7 @@
     },
     "cycle": [
       {
-        "name": "src/config-overrides.ts",
+        "name": "src/config/overrides.ts",
         "dependencyTypes": [
           "local",
           "export"
@@ -6923,7 +6923,7 @@
         ]
       },
       {
-        "name": "src/config-overrides.ts",
+        "name": "src/config/overrides.ts",
         "dependencyTypes": [
           "local",
           "export"

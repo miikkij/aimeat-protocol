@@ -19,7 +19,7 @@
  *   person's own words.
  *
  *   WHICH WORDS ONE PRESS MAY GIVE. A word "Full access" carries and the node does not call powerful
- *   (config-posture.ts POWERFUL_AGENT_SCOPES). A word outside every wildcard (utils/scope-coverage.ts)
+ *   (config/posture.ts POWERFUL_AGENT_SCOPES). A word outside every wildcard (utils/scope-coverage.ts)
  *   is a decision the person makes on its own tick on the agent's page, so for those the AI hands the
  *   agent's page instead; the operator's words never reach a person's page at all.
  * @structure OPERATOR_WORDS · isOneClickWord · oneClickWords · allowUrl · agentPageUrl · allowAddressFor ·
@@ -42,7 +42,7 @@ import {
   COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE,
 } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
-import { POWERFUL_AGENT_SCOPES } from '../config-posture.js';
+import { POWERFUL_AGENT_SCOPES } from '../config/posture.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { memoGetAgent } from './request-memo.js';
 import { createT, type Locale } from '../i18n.js';

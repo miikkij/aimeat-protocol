@@ -20,7 +20,7 @@ import type { CallerContext } from '../caller-context.js';
 import { readerFor } from '../classification/reader.js';
 import { storedFileShownTo } from '../datapackage/source-labels.js';
 import { DocsignError, type DocsignCtx } from './records.js';
-import { docsignMaxBytes } from '../../config-docsign.js';
+import { docsignMaxBytes } from '../../config/docsign.js';
 
 export async function readOwnFile(ctx: DocsignCtx, caller: CallerContext, key: string): Promise<{ data: Buffer; name: string; mimeType: string }> {
   if (!caller.has('storage:read')) throw new DocsignError('SCOPE_DENIED', 403, 'Reading a stored file needs storage:read.');

@@ -68,7 +68,7 @@ export type AccountTurn = { ok: true; account: string } | AccountLimitRefusal;
  *
  * The window is the one services/rate-buckets.ts keeps: it starts at the first call and a call after
  * its end starts a new one. The key names the window and the limit, so a changed number starts a new
- * count (the operator can change the AI call limit while the node runs, config-overrides.ts).
+ * count (the operator can change the AI call limit while the node runs, config/overrides.ts).
  */
 export interface AccountLimiter {
   (principal: string): Promise<AccountTurn>;
@@ -159,7 +159,7 @@ const aiCallSentence = (m: number, s: number): string =>
   `This account has started ${m} AI calls in the last minute, which is the most one account may start. Try again in ${s} seconds.`;
 
 /** The limiter for the configured AI call limit. Its key names the window and the limit, so a new
- *  number (the operator can change it while the node runs, config-overrides.ts) starts a new count. */
+ *  number (the operator can change it while the node runs, config/overrides.ts) starts a new count. */
 function aiCallLimiter(config: AiCallLimitConfig): AccountLimiter {
   const { windowMs, max } = config.rateLimits?.openrouter ?? AI_CALL_DEFAULT_LIMIT;
   return accountLimiter('limit:ai-call', { windowMs, max }, aiCallSentence);

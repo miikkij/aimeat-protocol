@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { setAgentCapabilities } from '../services/agent-profile-write.js';
+import { setAgentCapabilities } from '../services/agent/profile-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 import { toolError } from './tool-error.js';

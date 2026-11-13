@@ -5,7 +5,7 @@
  * @description The node hands a finished task's result to its owner itself, for a task made by an
  *   agent_task schedule that says `deliver: "owner"` (services/schedule-write.ts). The scheduler stamps
  *   that on the task as one scope entry (DELIVERY_SCOPE, services/scheduler-agent-task.ts) for the agent
- *   to read, and the completion fan-out (services/agent-task-fanout.ts) calls deliverTaskResult(). The
+ *   to read, and the completion fan-out (services/agent/task-fanout.ts) calls deliverTaskResult(). The
  *   decision is the schedule's own record (deliveringSchedule), never the scope entry: a task's scope
  *   is written by its agent too.
  *
@@ -172,7 +172,7 @@ function withoutHeading(text: string): string {
  * The schedule that asked the node to deliver this task's result, or null. Read from the node's own
  * records, never from the task's scope, which its agent may write (PATCH and the self-create door):
  * the task must be one no principal's door made (every door records its creator in `createdBy`,
- * services/agent-task-write.ts; the scheduler records none), its parent must be an agent_task
+ * services/agent/task-write.ts; the scheduler records none), its parent must be an agent_task
  * schedule of the same agent and owner, and that schedule must say `deliver: "owner"` now.
  */
 export async function deliveringSchedule(storage: Storage, task: AgentTaskRecord): Promise<ScheduledJobRecord | null> {

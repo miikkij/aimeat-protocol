@@ -53,7 +53,7 @@ import {
   receiveWalletResponseByState,
 } from '../services/docsign/eudi.js';
 import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
-import { docsignMaxBytes } from '../config-docsign.js';
+import { docsignMaxBytes } from '../config/docsign.js';
 import { rawBodyBytes } from '../utils/raw-body.js';
 import { logger } from '../utils/logger.js';
 

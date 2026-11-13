@@ -40,10 +40,10 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, ownerGhiiOf, mayActOnAgent } from '../utils/gaii.js';
-import { readAgentAccess, refusalView, scopeRequestView, declineRefusals } from '../services/agent-refusals.js';
+import { readAgentAccess, refusalView, scopeRequestView, declineRefusals } from '../services/agent/refusals.js';
 import { tellPermissionAnswer, closePermissionAsk } from '../services/permission-ask-notice.js';
 import { requireOwnerPrincipal } from '../auth/account-security.js';
-import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
+import { recomputeAndCacheStatistics } from '../services/agent/statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
 import { createAgentQualityOverviewService } from '../services/db/agent-quality-overview-db-service.js';
 import { logger } from '../utils/logger.js';
@@ -188,7 +188,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
   /* ── GET /v1/agents/:name/refusals -- What the node refused this agent, still unresolved ──
    *
    * The calls the node answered 403 SCOPE_DENIED for a permission the agent still lacks, and what it
-   * asked for and was granted at its last approval (services/agent-refusals.ts). `since` (ISO time)
+   * asked for and was granted at its last approval (services/agent/refusals.ts). `since` (ISO time)
    * keeps only refusals at or after it: a runtime asks this after a run with the run's start, and a
    * refusal there means the run did not do everything it tried to, whatever its exit code says.
    * Owner-or-self, like the other reads here: the agent may know what it was refused.

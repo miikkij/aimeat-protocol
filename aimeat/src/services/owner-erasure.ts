@@ -152,7 +152,7 @@ type OrganismOutcome = 'none' | 'removed' | 'handed-on' | 'orphaned';
  * then to the first member, and that account's membership becomes `creator`. When nobody at all is
  * left, the holder becomes the erasure pseudonym: no account can equal it (erased-party.ts), so the
  * organism is held by nobody rather than by a name somebody can register, and the operator's
- * break-glass (routes/admin-organisms.ts) seats a new owner.
+ * break-glass (routes/admin/organisms.ts) seats a new owner.
  */
 async function removeAccountFromOrganism(
   storage: Storage, organism: OrganismRecord, name: string, ghii: string,

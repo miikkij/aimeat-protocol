@@ -25,7 +25,7 @@ import {
   type ChangeEvent, type DeliveryEvent, type PublicActivityEvent, type MemoryWriteEvent,
 } from '../../src/services/event-bus.js';
 import { reloadPeers } from '../../src/services/federation-peer-reload.js';
-import { createStoredConfigReload } from '../../src/services/config-reload.js';
+import { createStoredConfigReload } from '../../src/services/config/reload.js';
 import { createMaintenanceCache } from '../../src/services/maintenance-cache.js';
 import type { FederationPeerRecord, MaintenanceState } from '../../src/storage/interface.js';
 import type { PeerInfo } from '../../src/services/federation.js';

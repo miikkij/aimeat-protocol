@@ -18,13 +18,13 @@
  *   POST /local/subscribe and GET /local/records/next), and section 5 now leads with it. The
  *   activity route it promised (`/activity?since=`) never existed; GET
  *   /v1/organisms/{id}/workspace/activity?ws= answers the newest 300 events. Agent tags may carry a
- *   colon (services/agent-profile-write.ts TAG_PATTERN), and whether an adopted task starts on its own
- *   is the agent's task-start answer (services/agent-task-rules.ts), not its mode alone.
+ *   colon (services/agent/profile-write.ts TAG_PATTERN), and whether an adopted task starts on its own
+ *   is the agent's task-start answer (services/agent/task-rules.ts), not its mode alone.
  *
  *   WHAT IT MUST AGREE WITH. services/connect-tunnel-push.ts and connect-tunnel-wire.ts (the event
  *   and its payload), cli/connect/mcp/local-server.ts (subscribe and the long-polls),
  *   routes/organisms/workspace-ops.ts (engagements, activity), routes/organisms/workspace-access.ts
- *   (grant), services/agent-profile-write.ts (tags), services/agent-task-rules.ts (task start),
+ *   (grant), services/agent/profile-write.ts (tags), services/agent/task-rules.ts (task start),
  *   public/js/services/agents.js adoptContractTask (the adopt-contract task the People panel queues),
  *   services/kpi-rollup.ts and services/manifest-schema.ts (objectives, KPIs, servesObjective).
  * @structure WORKSPACE_CONTRACTS_SKILL_ENTRY

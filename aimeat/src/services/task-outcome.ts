@@ -34,7 +34,7 @@
  *     completed task-runner leaves its output where the caller cannot read it.
  */
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import { placeNames } from './agent-ties.js';
+import { placeNames } from './agent/ties.js';
 
 /** What a finished task produced. Null while it is still running — an unfinished task has no
  *  outcome, and reporting an empty one would read as "finished with nothing". */
@@ -51,7 +51,7 @@ export interface TaskOutcome {
     /** A ready-to-follow address for that key, so a caller does not have to assemble one. */
     deliverable_url?: string;
     /**
-     * The workspaces the result is shared with, when it is (services/agent-workplace.ts shares a
+     * The workspaces the result is shared with, when it is (services/agent/workplace.ts shares a
      * finished task's result with the workspace the owner named). Only on a read that asked for
      * it with `withPlace`, because it costs a memory read and a name lookup per task; absent when
      * the result is private, public, or was not found.

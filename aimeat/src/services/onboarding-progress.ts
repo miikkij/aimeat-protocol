@@ -31,7 +31,7 @@ import type { Storage, AgentOnboardingRecord, AgentOnboardingStep, AgentRecord }
 import { checkAutoSteps, validateStep } from './onboarding-validator.js';
 import { calculateReadiness } from './readiness-scorer.js';
 import { emitChange } from './event-bus.js';
-import { recordSelfReportedPlatform } from './agent-profile-write.js';
+import { recordSelfReportedPlatform } from './agent/profile-write.js';
 import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, deriveStepsForMode, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 
 /**

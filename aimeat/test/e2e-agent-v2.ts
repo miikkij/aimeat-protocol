@@ -1493,7 +1493,7 @@ async function run() {
     });
 
     await test('with no connector connected, a `resident` ask stands: nothing can say it cannot run', async () => {
-        // The correction to spawn (services/agent-proposals.ts proposalRunModeFor) reads the connected
+        // The correction to spawn (services/agent/proposals.ts proposalRunModeFor) reads the connected
         // connectors' run modes; this node has none connected, so the ask is stored as made.
         const r = await json('/v1/agents/v2/agent-proposals', {
             method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
@@ -2005,7 +2005,7 @@ async function run() {
                 const r = await json(`/v1/agents/${encodeURIComponent(theirs)}`, { headers: auth1 });
                 assert(r.status === 200, `the public card should be readable, got ${r.status}`);
                 // `avatar` (and `avatar_problem`) joined on 2026-10-19: the agent's picture is directory
-                // material by design, public like the description (services/agent-avatar.ts).
+                // material by design, public like the description (services/agent/avatar.ts).
                 const allowed = new Set(['gaii', 'display_name', 'avatar', 'avatar_problem', 'description', 'capabilities', 'trust',
                     'actions_published', 'tags', 'federate', 'home_node', 'created_at', 'last_seen']);
                 const extra = Object.keys(r.body.data).filter(k => !allowed.has(k));

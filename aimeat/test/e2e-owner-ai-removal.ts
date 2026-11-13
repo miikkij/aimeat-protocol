@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The person's own AI clears away what it set up, over REST and over MCP
- *   (services/agents/remove-agent.ts, services/agents/remove-task.ts, services/agent-task-rules.ts
+ *   (services/agents/remove-agent.ts, services/agents/remove-task.ts, services/agent/task-rules.ts
  *   mayManageSiblingTasks, and the aimeat_skill_delete tool).
  *
  *   Measured on aimeat.io on 2026-11-12: the person's AI had proposed an agent, the person approved

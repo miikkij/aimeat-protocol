@@ -16,7 +16,7 @@
 import type { AgentTaskRecord } from '../../storage/interface.js';
 import type { createWebhookDispatcher } from '../../services/webhook-dispatcher.js';
 import { isOwnerInPerson, heldScopes } from '../../auth/effective-scopes.js';
-import type { StartCaller } from '../../services/agent-task-rules.js';
+import type { StartCaller } from '../../services/agent/task-rules.js';
 
 export type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 

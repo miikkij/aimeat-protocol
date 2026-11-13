@@ -10,7 +10,7 @@
  *   its own `agent.avatar` record. The built-in skill agent-avatar says how.
  *
  *   Every template is one <svg> element on a 128 by 128 view box, with no script, no external
- *   reference and no DOCTYPE, so it passes services/agent-avatar.ts as it is. The colours sit in a
+ *   reference and no DOCTYPE, so it passes services/agent/avatar.ts as it is. The colours sit in a
  *   <style> block at the top as named classes, which is the one place to change them. A template that
  *   moves stops moving under prefers-reduced-motion, and its motion is slow and small, because an
  *   avatar sits beside many others on a list.

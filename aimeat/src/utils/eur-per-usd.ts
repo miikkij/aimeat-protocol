@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The check for site.ai_credit_eur_per_usd, the euros of AI credit per dollar of a
  *   store-sold node's key. Its own module because both the environment reader
- *   (config-site-contacts.ts) and the settings row (services/config-schema-site-links.ts) use it,
+ *   (config/site-contacts.ts) and the settings row (services/config/schema-site-links.ts) use it,
  *   and the second already reaches the first through config-types.ts: a shared import in either
  *   direction is a cycle.
  * @structure isEurPerUsd(v)

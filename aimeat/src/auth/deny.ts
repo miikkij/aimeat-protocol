@@ -47,7 +47,7 @@ import { getPromMetrics } from '../services/prometheus.js';
 import { recordAuthFailure, markRefusalRecorded, type AuthFailureContext } from '../services/auth-audit.js';
 import { resourceMetadataUrl } from '../services/protected-resource.js';
 import { sessionConfig } from './node-auth.js';
-import { noteAgentRefusal } from '../services/agent-refusals.js';
+import { noteAgentRefusal } from '../services/agent/refusals.js';
 import { error } from '../middleware/envelope.js';
 import { currentNodeId, parseGaiiLoose, isOwnerInPerson } from '../utils/gaii.js';
 import { allowUrl, agentPageUrl, oneClickWords } from '../services/permission-ask.js';
@@ -177,7 +177,7 @@ export function deny403(req: Request, res: Response, code: string, message: stri
  * scope denials" was reading an unwired counter, not a quiet fence. Found 2026-09-12.
  *
  * THE AGENT'S REFUSAL IS NOTED HERE TOO, for the same reason: an agent refused a scope is noted on
- * its card and its open tasks (services/agent-refusals.ts), and every scope refusal passes this line.
+ * its card and its open tasks (services/agent/refusals.ts), and every scope refusal passes this line.
  * `anyOf` says that any one of `needed` would have been enough (requireAnyScope), which decides when
  * the refusal counts as resolved.
  */

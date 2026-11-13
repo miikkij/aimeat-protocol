@@ -14,7 +14,7 @@
  *   FTN, which is `AIMEAT_FTN_ENABLED` at BOOT and off on the shared one.
  *
  *   THE FOUR EUDIW DOORS CANNOT BE DRIVEN AT ALL, and this suite proves why rather than assuming it.
- *   `src/config-eudiw-guard.ts` refuses to START a node with `AIMEAT_EUDIW_ENABLED=true`, because
+ *   `src/config/eudiw-guard.ts` refuses to START a node with `AIMEAT_EUDIW_ENABLED=true`, because
  *   the SD-JWT verification behind those doors has no holder binding and never reads back its own
  *   nonce, so a presented credential is replayable. Test 14 spawns a node with the flag on and
  *   asserts the boot refusal; test 15 asserts that with the flag off all four doors answer 503. The
@@ -252,7 +252,7 @@ try {
     });
 
     // ─── Phase 2 and 5: a node of our own, empty, with FTN on ───
-    // EUDIW is NOT turned on here, and cannot be: src/config-eudiw-guard.ts refuses to start a node
+    // EUDIW is NOT turned on here, and cannot be: src/config/eudiw-guard.ts refuses to start a node
     // with AIMEAT_EUDIW_ENABLED=true. Phase 6 drives that refusal and the 503 it leaves behind.
     const setupNode = await spawnNode(SETUP_PORT, { AIMEAT_FTN_ENABLED: 'true' });
     let setupOwnerToken = '';
@@ -507,7 +507,7 @@ try {
     console.log('\nPhase 4 — issuers, credentials and consent receipts');
 
     await test('14. A node will not start at all with EUDIW switched on', async () => {
-        // src/config-eudiw-guard.ts, and the reason the four EUDIW doors below cannot be driven by
+        // src/config/eudiw-guard.ts, and the reason the four EUDIW doors below cannot be driven by
         // this suite or by anybody: the SD-JWT verification behind them has no holder binding and
         // never reads back its own nonce, so a presented credential is replayable. The flag refuses
         // at boot rather than letting an operator turn on a replayable login. THIS is what makes

@@ -7,7 +7,7 @@
  *   the incident closes by itself at the first start with a value the node accepts. A storage type
  *   it does not know still stops the start, with the reason (Jouni, decision 2026-10-16, reversing
  *   the refusal of QA audit D8-02 for every setting outside REFUSE_ON_INVALID in
- *   src/config-start-check.ts).
+ *   src/config/start-check.ts).
  *
  *   HOW. Three starts of one node on one database: first with AIMEAT_METRICS_ACCESS=everyone (the
  *   default is operator) and AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS=five (the default is 5); then with the

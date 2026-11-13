@@ -61,7 +61,7 @@ import { createHash } from 'node:crypto';
 import { compactVerify, importJWK, decodeProtectedHeader } from 'jose';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { readCardJws, verifyCardJws } from './agent-card.js';
+import { readCardJws, verifyCardJws } from './agent/card.js';
 import { spendAssertion } from './assertion-spend.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readJson } from '../utils/read-capped.js';

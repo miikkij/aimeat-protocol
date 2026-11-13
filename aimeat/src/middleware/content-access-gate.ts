@@ -88,7 +88,7 @@
  */
 import type { Request, RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
-import { signedInOnly } from '../config-visibility.js';
+import { signedInOnly } from '../config/visibility.js';
 import { isNodeAccount } from '../services/audience.js';
 import { mirroredPages } from '../data/public-pages.js';
 import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';

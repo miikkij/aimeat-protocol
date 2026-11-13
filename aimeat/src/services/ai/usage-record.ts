@@ -29,7 +29,7 @@ import { logger } from '../../utils/logger.js';
 import { recordUsageEvent } from '../usage-metering.js';
 import { recordAccountEvent } from '../account-events.js';
 import { canonicalAiAppId, mergePerApp } from './app-id.js';
-import { addAgentSpend, aiAskerOf } from '../agent-ai-keys.js';
+import { addAgentSpend, aiAskerOf } from '../agent/ai-keys.js';
 import { emitChange } from '../event-bus.js';
 
 export interface UsageRecord {
@@ -43,7 +43,7 @@ export interface UsageRecord {
   audio_seconds?: number;
   per_app: Record<string, { cost_usd: number; calls: number; tokens: number; audio_seconds?: number }>;
   /** Spend by the owner's agents, by bare agent name: what the per-agent daily cap is checked
-   *  against (services/agent-ai-keys.ts). Absent on a day no agent spent. */
+   *  against (services/agent/ai-keys.ts). Absent on a day no agent spent. */
   per_agent?: Record<string, {
     cost_usd: number; calls: number; tokens: number;
     /** The same agent's spend split by app, or by endpoint for a call that named no app. */

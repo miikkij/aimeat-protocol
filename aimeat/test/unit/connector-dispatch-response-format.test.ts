@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';
-import { legacyMorselFieldsLive } from '../../src/config-pacing.js';
+import { legacyMorselFieldsLive } from '../../src/config/pacing.js';
 
 type Sent = { method: string; path: string; body?: unknown };
 

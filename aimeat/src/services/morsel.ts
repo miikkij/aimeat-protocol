@@ -49,7 +49,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 import { addedToday } from './mint-ceiling.js';
 
 

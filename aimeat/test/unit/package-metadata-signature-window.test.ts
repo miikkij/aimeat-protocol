@@ -71,7 +71,7 @@ const { pullPackage } = await import('../../src/services/packages/peer/package-p
 const { upstreamFromZip } = await import('../../src/services/packages/compose/package-import.js');
 const {
     PACKAGE_METADATA_SIGNATURE_PEER_FROM, UNSIGNED_PACKAGE_METADATA_REMOVED_IN, unsignedPackageMetadataAccepted,
-} = await import('../../src/config-federation.js');
+} = await import('../../src/config/federation.js');
 
 const config = { packageFederationEnabled: true, packageMaxSizeMb: 5, packageMaxComponents: 50, federationTimeoutMs: 5000 } as unknown as AimeatConfig;
 /** alice's own copy of shop, when a case gives her one (getPackageFor reads it through getLatestPublished). */

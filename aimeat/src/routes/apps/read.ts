@@ -145,7 +145,7 @@ import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
 import { currentAppRow } from '../../services/app-served-protection.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
-import { serveAppAgentFace } from '../../services/agent-face.js';
+import { serveAppAgentFace } from '../../services/agent/face.js';
 import { formatMdLang } from '../../services/app-format-md.js';
 import { appOriginUrl, appTargetOr, withForwardedQuery, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { runnableAnswer, sendFrameHost, sandboxedCsp, withFrameShim, type RunnableAnswer } from './inline-frame.js';

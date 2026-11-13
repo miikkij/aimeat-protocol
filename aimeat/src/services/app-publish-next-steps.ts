@@ -52,7 +52,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { agentFaceKey } from './agent-face.js';
+import { agentFaceKey } from './agent/face.js';
 import { getOwnerScopePublicMemory } from './owner-memory.js';
 import { listSkillsByBinding } from './skills.js';
 import { appSizeHealth, type AppSizeHealth } from './app-size-health.js';

@@ -19,7 +19,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { submitToIndexNow } from '../indexnow.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { datasetLandingUrl } from './catalogue-facts.js';
 import { logger } from '../../utils/logger.js';
 

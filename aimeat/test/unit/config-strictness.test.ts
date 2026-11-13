@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description "An AI may only make this setting stricter" lives on the setting's row
- *   (`aiMayOnlyTighten`, services/config-field-def.ts) and every path that writes settings applies it
+ *   (`aiMayOnlyTighten`, services/config/field-def.ts) and every path that writes settings applies it
  *   (codebase analysis 2026-11-03, item B4; security-architecture finding 5). Until then the rule was a
  *   hand list of five paths: a sixth setting needed a new check written into each write path, and the
  *   path that was not given one did not apply it (d1f37bb4a: DELETE reset such a setting for an AI
@@ -21,9 +21,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP } from '../../src/services/config-schema.js';
-import { changeNodeSettings } from '../../src/services/config-admin-view.js';
-import * as apply from '../../src/services/config-apply.js';
+import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP } from '../../src/services/config/schema.js';
+import { changeNodeSettings } from '../../src/services/config/admin-view.js';
+import * as apply from '../../src/services/config/apply.js';
 
 const NODE_ID = 'aimeat-local-001-dev';
 const OP = 'strictop';

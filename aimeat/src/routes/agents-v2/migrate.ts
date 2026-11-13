@@ -49,14 +49,14 @@ import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { success, error } from '../../middleware/envelope.js';
-import { credentialHealthForOwner } from '../../services/agent-credential-health.js';
+import { credentialHealthForOwner } from '../../services/agent/credential-health.js';
 import { connectedDaemons } from '../../services/basic-agents.js';
-import { enrolTarget } from '../../services/agent-enrolment-offer.js';
+import { enrolTarget } from '../../services/agent/enrolment-offer.js';
 import { nodeContext } from '../../services/node-context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ENROL_CAPABILITY } from './basic-agents.js';
 import { MAX_CARDS_PER_SUBMIT } from './enrolment.js';
-import { cardUri, jwksUri } from '../../services/agent-card.js';
+import { cardUri, jwksUri } from '../../services/agent/card.js';
 import { logger } from '../../utils/logger.js';
 
 /** The same wait the basic-agents button allows: keypairs, signatures and one round trip. */

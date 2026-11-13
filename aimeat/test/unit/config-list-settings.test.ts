@@ -14,9 +14,9 @@
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { CONFIG_FIELDS, ALL_CONFIG_MAP, parseConfigValue, serializeFieldValue } from '../../src/services/config-schema.js';
-import { asList, isStringList, listFromText } from '../../src/services/config-schema-validators.js';
-import { applyConfigChanges } from '../../src/services/config-apply.js';
+import { CONFIG_FIELDS, ALL_CONFIG_MAP, parseConfigValue, serializeFieldValue } from '../../src/services/config/schema.js';
+import { asList, isStringList, listFromText } from '../../src/services/config/schema-validators.js';
+import { applyConfigChanges } from '../../src/services/config/apply.js';
 import type { AimeatConfig } from '../../src/config-types.js';
 import type { Storage } from '../../src/storage/interface.js';
 

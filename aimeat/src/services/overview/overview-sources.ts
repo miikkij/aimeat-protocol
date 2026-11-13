@@ -31,7 +31,7 @@ import type { AgentRecord } from '../../storage/types/identity.js';
 import { queryUsageRollupLive } from '../usage/usage-read.js';
 import { ownPublicManifests } from '../../commerce/app-tool-catalog.js';
 import { isToolPriced } from '../../models/app-tool-schemas.js';
-import { offersKeyFor } from '../agent-offers-write.js';
+import { offersKeyFor } from '../agent/offers-write.js';
 import { listOfferings, appToolCoordinate } from '../exchange-market.js';
 import { listEntitlementsByProvider } from '../metered-entitlements.js';
 import { logger } from '../../utils/logger.js';
@@ -145,7 +145,7 @@ const WS_ID = /\bws-[a-z0-9]+\b/i;
 
 /**
  * The organisms and workspaces each of the owner's apps keeps data in, read from the apps' data maps
- * (one tagged memory query, the read services/agent-ties.ts makes). A row in an organism states the
+ * (one tagged memory query, the read services/agent/ties.ts makes). A row in an organism states the
  * place in its free-text `whereExactly`; the ids found there are kept only when they name one of
  * `known` (the reader's own places), so a map cannot draw a line to somewhere the reader is not.
  * An app with no data map has no line, which is what its card then says.

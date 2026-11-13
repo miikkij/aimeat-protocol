@@ -1,6 +1,6 @@
 # 01 Overview
 
-> Checked against AIMEAT node 4.2.0 (commit a463a1e3b) on 2026-11-03. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit d76b3dac5) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page tells an evaluating IT or security team what AIMEAT is, what it is not, under which licence it comes, how its versions work, which versions get security fixes, who maintains it, and which organisations it fits. Read it first. The other pages of this package go deeper on each subject.
 

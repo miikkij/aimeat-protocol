@@ -18,7 +18,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { deriveAppHost } from '../config-hosts.js';
+import { deriveAppHost } from '../config/hosts.js';
 import { appIsolationMode, peopleWhoPublish, type AppIsolationMode } from './app-isolation.js';
 
 export interface AppIsolationStatus {

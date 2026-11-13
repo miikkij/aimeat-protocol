@@ -39,9 +39,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { loadOwnerAgents } from '../db/owner-identity.js';
-import { standingWorkOf, noticeStandingWork } from '../agent-standing-work.js';
+import { standingWorkOf, noticeStandingWork } from '../agent/standing-work.js';
 import { receiversMadeBy, noticeReceiversKept } from '../receivers/makers.js';
-import { forgetAgentAccess } from '../agent-refusals.js';
+import { forgetAgentAccess } from '../agent/refusals.js';
 import { evictAgentTelemetry } from '../telemetry-buffer.js';
 import { nodeContext } from '../node-context.js';
 import { emitChange } from '../event-bus.js';
@@ -122,7 +122,7 @@ export async function removeAgent(deps: AgentRemoveDeps, caller: AgentRemoveCall
     // credential for a record nobody can look up any more.
     const endedSessions = await storage.revokeSessionsByGaii(agent.gaii);
     // What the agent made that keeps standing: it stops with the agent, and a new agent under the
-    // same name runs it again; the owner is told both (services/agent-standing-work.ts).
+    // same name runs it again; the owner is told both (services/agent/standing-work.ts).
     const standing = await standingWorkOf(storage, ownerGhiiOf(agent.gaii), agent.gaii);
     // The receivers it made are the owner's and keep working; the answer and a notice say so (ruling 3, 2026-11-08).
     const receiversKept = await receiversMadeBy(storage, ownerGhiiOf(agent.gaii), agent.gaii);

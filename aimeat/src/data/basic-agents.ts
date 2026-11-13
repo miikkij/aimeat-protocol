@@ -101,7 +101,7 @@ export interface BasicAgentTemplate {
    * Server-side operational mode. THE NODE OWNS THIS FIELD, AND THE RUNTIME MUST NOT SET IT.
    *
    * It looks like a description of how an agent runs, which is why two writers seemed reasonable.
-   * It is not. `mode` is a BEHAVIOURAL SWITCH ON THE NODE: services/agent-task-rules.ts activates a
+   * It is not. `mode` is a BEHAVIOURAL SWITCH ON THE NODE: services/agent/task-rules.ts activates a
    * queued task without the owner if and only if the target's mode is `task-runner`, and that
    * file's own words are that setting it is "the person saying start without asking me each time".
    * It also decides which Hello Integration flow a new agent gets.
@@ -120,7 +120,7 @@ export interface BasicAgentTemplate {
    * Whether its tasks start on their own ('automatic': it proposes its plan and goes on, and the
    * owner sees what was done) or wait for the owner's OK ('confirm'). The owner's answer from the
    * first day, changeable on the agent card or from the chat. Neither basic agent holds a permission
-   * on the safety floor (services/agent-task-rules.ts), so 'automatic' actually starts their work;
+   * on the safety floor (services/agent/task-rules.ts), so 'automatic' actually starts their work;
    * a template that ever adds one would wait whatever this says, which is the point of the floor.
    */
   taskStart: 'automatic' | 'confirm';
@@ -290,7 +290,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     // `task-runner`, not `coordinator`. This one runs on `spawn`: nothing is sitting there to accept
     // work, so a queued task must activate on its own or it waits for a person who was never told.
     // Seeded as `coordinator`, every task for the three basic agents stayed `queued` — the node
-    // auto-activates only for `task-runner` (services/agent-task-rules.ts). `coordinator` describes
+    // auto-activates only for `task-runner` (services/agent/task-rules.ts). `coordinator` describes
     // what it DOES; this field decides whether its work starts.
     mode: 'task-runner',
     taskStart: 'automatic',

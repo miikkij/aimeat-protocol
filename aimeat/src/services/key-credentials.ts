@@ -93,7 +93,7 @@ export interface IssuedKeyCredentials {
 
 /**
  * Pseudo-owner namespace of the held credentials, one record per account. It has no '@', so no memory
- * route or tool addresses it (as services/agent-port-redirect.ts NS_AGENT_PORT).
+ * route or tool addresses it (as services/agent/port-redirect.ts NS_AGENT_PORT).
  */
 export const NS_HELD = 'key-credentials-held';
 

@@ -19,7 +19,7 @@
  *     - An app's `extension` schedule made before the kind asked ext:invoke, from a grant without the
  *       word, keeps firing when the once-only step kept it (services/schedule-extension-keep.ts).
  *     - An agent missing the word is refused, and the refusal is noted on the agent
- *       (services/agent-refusals.ts noteAgentRefusal), which asks the owner in the bell and by email:
+ *       (services/agent/refusals.ts noteAgentRefusal), which asks the owner in the bell and by email:
  *       an Allow button for a word one press may give, the agent's page for a powerful word such as
  *       task:write (services/permission-ask-notice.ts). The sentence in the run log carries the same
  *       address. A deleted agent is not asked about: it is gone, and the plain sentence says so.
@@ -38,7 +38,7 @@
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { noteAgentRefusal } from './agent-refusals.js';
+import { noteAgentRefusal } from './agent/refusals.js';
 import { agentSessionCaller } from './caller-context.js';
 import { agentPageUrl, allowUrl, oneClickWords } from './permission-ask.js';
 import { SCHEDULE_KIND_SCOPE, type ScheduleKind } from './schedule-gate.js';

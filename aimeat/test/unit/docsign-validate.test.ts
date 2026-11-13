@@ -14,7 +14,7 @@ import { extractPdfSignatures, pdfDateToIso } from '../../src/services/docsign/p
 import { verifyCms } from '../../src/services/docsign/cms-verify.js';
 import { validatePdf } from '../../src/services/docsign/validate.js';
 import { _setTrustListFetcher } from '../../src/services/docsign/trust-list.js';
-import { docsignDefaults } from '../../src/config-docsign.js';
+import { docsignDefaults } from '../../src/config/docsign.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const FIX = join(__dirname, '..', 'fixtures', 'docsign');

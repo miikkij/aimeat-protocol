@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description One agent's AI settings, as its owner sets them: a key of its own for the decision
  *   model and for the text model, a daily cap, and the gate switch. Work is in
- *   services/agent-ai-keys.ts and services/decide/gate.ts.
+ *   services/agent/ai-keys.ts and services/decide/gate.ts.
  *
  *   NO DOOR HERE RETURNS A KEY. The read answers whether one is set, when, and the NAME of the
  *   environment variable that holds it where the agent runs its own calls. The node never sends a key
@@ -38,7 +38,7 @@ import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { AiCompletionError, completeForOwner } from '../services/ai/completion.js';
 import {
   agentAiView, writeAgentKey, clearAgentKey, writeAgentCap, AgentAiKeyError, type AgentAiModel,
-} from '../services/agent-ai-keys.js';
+} from '../services/agent/ai-keys.js';
 import { gateSettingOf, writeAgentGate } from '../services/decide/gate.js';
 import { setAgentProviderKey, agentProviderKeys } from '../services/ai/provider-store.js';
 import { testDecideKey } from '../services/decide/key-test.js';

@@ -1,0 +1,295 @@
+/**
+ * @file src/services/agent/enrolment-offer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Give agents that already exist on this node their credentials, by offering them to
+ *   the owner's running connector over a socket it is already holding.
+ *
+ *   WHY THIS IS A SERVICE AND NOT A THIRD COPY. The sequence is four steps that only work in this
+ *   order — sweep expired grants, mint one grant naming exactly these agents, hand the offer to one
+ *   connected daemon, then re-read the records to see what it actually enrolled — and it lived
+ *   inside the basic-agents button. So the ONE path that could create any other agent, the proposal
+ *   approve route, created records with no keys: no grant, no offer, no token, never in `serve.json`,
+ *   never in the spawner's roster. The agent existed and nothing ran it. Measured 2026-09-08, six
+ *   days after that route shipped. A second copy would have been the same defect waiting.
+ *
+ *   THE GRANT IS THE WHOLE AUTHORITY, AND IT IS NARROW ON PURPOSE. It names the owner, the exact
+ *   agent names, and expires in minutes. A daemon holding one cannot mint a sibling that is not on
+ *   the list, cannot spend it twice, and cannot spend it for another owner — see
+ *   AgentEnrolmentGrantRecord. This service never widens that: the caller passes the records it
+ *   already created, and the scopes come from those records rather than from anything a request
+ *   said.
+ *
+ *   THE RECORDS ARE THE TRUTH, NOT THE REPLY. The daemon enrols through POST /v1/agents/v2/enrol
+ *   while this call waits, so `enrolled` is read back from storage afterwards. A daemon that
+ *   answers ok and enrols nothing is a real state (an older connector with no handler), and it is
+ *   reported as CONNECTOR_TOO_OLD rather than as success.
+ *
+ *   WHAT IT DOES NOT DO. Create agents, seed definitions, or decide what happens when there is no
+ *   daemon. The caller owns that: the basic-agents button refuses before writing anything, while an
+ *   approved proposal keeps the agent and says it is unconnected, because those are two different
+ *   promises to the person pressing.
+ * @structure ENROL_CAPABILITY · ENROL_INVOKE_TIMEOUT_MS · EnrolCandidate · EnrolmentOutcome ·
+ *   offerEnrolment() · isBeingOffered() · offerOnDaemon()
+ * @usage
+ *   const out = await offerEnrolment({ config, storage }, owner, candidates, { installId });
+ *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
+ * @version-history
+ *   2026-11-13 — cardUri and jwksUri come from services/agent-card.ts, not from a route file
+ *     (structure programme 2026-11, unit 4).
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
+ *   v1.4.0 — 2026-10-13 — enrolTarget: the offer goes to a daemon principal that holds agent:write when
+ *     the daemon has one. POST /v1/agents/v2/enrol asks that word from 4.0.0 and the basic agents hold
+ *     none, so a daemon whose first principal was a basic agent did not take on an approved proposal
+ *     (the 4.0.0 sweep, e2e-connect-enrol-loopback and e2e-basic-agents-first-task).
+ *   v1.3.0 — 2026-10-10 — After an enrolment the connector registry records that the agents live on
+ *     the connector that took them (services/connector-registry.ts recordPlacement). Kind 'move':
+ *     an enrolled agent offered to another connector, read back by its key having changed.
+ *   v1.2.0 — 2026-10-08 — The agents an offer names are recorded while it runs (isBeingOffered), so
+ *     the offer a connector's connect starts for pending agents does not name them twice.
+ *   v1.1.0 — 2026-10-02 — The offer carries the node's public key, which the connector compares with
+ *     the card it reads at its own address (a hosted node's crew reaches it on loopback).
+ *   v1.0.0 — 2026-09-08 — Extracted from routes/agents-v2/basic-agents.ts so the proposal approve
+ *     route can give a newly created agent its credentials through the same sequence.
+ */
+import { randomBytes } from 'node:crypto';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { EnrolmentGrantKind } from '../../storage/types/identity.js';
+import { connectedDaemons } from '../basic-agents.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { nodeContext } from '../node-context.js';
+import { recordPlacement } from '../connector-registry.js';
+import { cardUri, jwksUri } from './card.js';
+import { logger } from '../../utils/logger.js';
+
+/** The capability name the enrolment offer travels under, on the tunnel's existing `invoke` frame. */
+export const ENROL_CAPABILITY = 'aimeat.agents.enrol';
+
+/**
+ * How long the node waits for the daemon to enrol before answering the owner. Long enough for a
+ * keypair, a signature and one round trip per agent; short enough that a daemon that cannot do this
+ * (an older connector) is reported as such rather than as a spinner.
+ */
+export const ENROL_INVOKE_TIMEOUT_MS = 45_000;
+
+/** One agent to be credentialled. Every field comes from the record, never from a request body. */
+export interface EnrolCandidate {
+  name: string;
+  gaii: string;
+  displayName: string;
+  description: string;
+  runMode: string | null;
+  mode: string | null;
+  /** What the record grants. Sent so the daemon can put it in the card it signs; the node reads the
+   *  record either way, so a card that asks for more still gets this. */
+  scopes: string[];
+}
+
+/** What came back credentialled, read from the records rather than from the daemon's answer. */
+export interface EnrolledAgent {
+  name: string;
+  gaii: string;
+  run_mode: string;
+  card_url: string;
+}
+
+export type EnrolmentOutcome =
+  | { ok: true; enrolled: EnrolledAgent[]; grant_id: string; served_by: string }
+  | { ok: false; status: number; code: string; message: string; details?: Record<string, unknown> };
+
+/**
+ * Credential `agents` on the owner's connected daemon.
+ *
+ * `kind` decides what the enrolment route accepts: 'create' requires the record to be v2 already
+ * and keyless, 'migrate' accepts a v1 record and upgrades it, 'move' requires an agent that holds a
+ * key and pins the new one over it. Here it decides one thing: after a move, an agent counts as
+ * enrolled only when its key changed. Anything this service is asked to do for a freshly created
+ * agent is 'create'.
+ */
+export async function offerEnrolment(
+  deps: { config: AimeatConfig; storage: Storage },
+  owner: string,
+  agents: EnrolCandidate[],
+  opts: { installId?: string; kind?: EnrolmentGrantKind } = {},
+): Promise<EnrolmentOutcome> {
+  if (agents.length === 0) {
+    return { ok: false, status: 400, code: 'NOTHING_TO_ENROL', message: 'No agents were named.' };
+  }
+
+  // WHICH daemon, when there are two. Each machine presents an install id, so two laptops are two
+  // entries rather than one undifferentiated set of principals. The caller may name one; without
+  // that the first by sorted id is taken, which is stable across retries. A named id that is not
+  // connected is refused rather than quietly served by the other machine, because "run this on my
+  // laptop" answered by the server is not a smaller version of the request.
+  const daemons = connectedDaemons(owner);
+  const askedFor = (opts.installId ?? '').trim();
+  const chosen = askedFor ? daemons.find(d => d.installId === askedFor) : daemons[0];
+  if (!chosen) {
+    return {
+      ok: false,
+      status: 409,
+      code: askedFor ? 'DAEMON_NOT_CONNECTED' : 'NO_DAEMON',
+      message: askedFor
+        ? 'That connector is not connected right now. Start it, or leave install_id out to use whichever one is.'
+        : 'Your connector is not running, so there is nothing here to hold the new keys. Start it with `aimeat connect serve` and try again.',
+      details: { connected: daemons.map(d => ({ install_id: d.installId, principals: d.principals.length })) },
+    };
+  }
+
+  // Named as being offered until this call returns, so the offer a connector's connect starts for
+  // pending agents (agent-pending-enrolment.ts) does not name them a second time meanwhile.
+  const keys = agents.map(a => offeringKey(owner, a.name));
+  for (const k of keys) offering.add(k);
+  try {
+    return await offerOnDaemon(deps, owner, agents, { ...chosen, target: await enrolTarget(deps.storage, chosen) }, opts.kind ?? 'create');
+  } finally {
+    for (const k of keys) offering.delete(k);
+  }
+}
+
+/** Agents an offer names right now, as `owner\nname`. Process-local, like the tunnel it rides. */
+const offering = new Set<string>();
+const offeringKey = (owner: string, name: string) => `${owner}\n${name}`;
+
+/** Whether an offer naming this agent is under way in this process. */
+export function isBeingOffered(owner: string, name: string): boolean {
+  return offering.has(offeringKey(owner, name));
+}
+
+/**
+ * Which of a daemon's principals forwards the enrolment to POST /v1/agents/v2/enrol. That route asks
+ * agent:write from node 4.0.0 (REST_SCOPE_GATES_ENFORCED_IN), and the basic agents deliberately hold
+ * none (data/basic-agents.ts), so the daemon's first principal could be a basic agent the route then
+ * refuses: on a 4.0.0 node an approved proposal was "not taken on" by a connector that also served
+ * the owner's own agent. A principal whose record covers agent:write is taken first; with none, the
+ * first principal stays, which a 3.x node lets through with the Deprecation headers.
+ */
+export async function enrolTarget(storage: Storage, daemon: { principals: string[]; target: string }): Promise<string> {
+  for (const principal of daemon.principals) {
+    const rec = await storage.getAgent(principal);
+    if (rec && scopeIsCovered(rec.defaultScopes ?? [], 'agent:write')) return principal;
+  }
+  return daemon.target;
+}
+
+/** The grant, the offer and the read-back, for a daemon already chosen. */
+async function offerOnDaemon(
+  deps: { config: AimeatConfig; storage: Storage },
+  owner: string,
+  agents: EnrolCandidate[],
+  chosen: { target: string; installId: string | null },
+  kind: EnrolmentGrantKind,
+): Promise<EnrolmentOutcome> {
+  const { config, storage } = deps;
+  await storage.cleanupExpiredAgentEnrolmentGrants();
+
+  // A MOVE pins a new key over an old one, so "has it enrolled" is already true before the offer
+  // and says nothing afterwards. The key each agent holds now is what the read-back compares with.
+  const keysBefore = new Map<string, string>();
+  if (kind === 'move') {
+    for (const a of await storage.getAgentsByOwner(owner)) keysBefore.set(a.name, a.publicKey ?? '');
+  }
+
+  // The grant: exactly these agents, for this owner, for a few minutes, once.
+  const grantId = `aeg-${randomBytes(16).toString('hex')}`;
+  await storage.createAgentEnrolmentGrant({
+    id: grantId,
+    owner,
+    agents: agents.map(a => a.name),
+    kind,
+    createdBy: owner,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + config.agentEnrolmentGrantTtlSeconds * 1000).toISOString(),
+    usedAt: null,
+    usedBy: null,
+  });
+
+  // The node's key rides along so the connector can prove the offer by identity: it reads the card
+  // at the address IT reaches this node on, which on a hosted node is loopback and not baseUrl.
+  const nodeKey = await storage.getNodeKey();
+  const offer = {
+    grant_id: grantId,
+    node_url: config.baseUrl,
+    node_id: config.nodeId,
+    node_public_key: nodeKey?.publicKey ?? null,
+    owner,
+    enrol_url: '/v1/agents/v2/enrol',
+    token_url: '/v1/agents/v2/token',
+    agents: agents.map(a => ({
+      name: a.name,
+      gaii: a.gaii,
+      display_name: a.displayName,
+      description: a.description,
+      run_mode: a.runMode,
+      mode: a.mode,
+      scopes: a.scopes,
+      card_url: cardUri(config.baseUrl, a.gaii),
+      jwks_url: jwksUri(config.baseUrl, a.gaii),
+    })),
+  };
+
+  let enrolResult: { ok: boolean; result: unknown };
+  try {
+    enrolResult = await nodeContext().tunnel!.invokeOnPrincipal(
+      chosen.target,
+      { capability: ENROL_CAPABILITY, input: offer, caller: `${owner}@${config.nodeId}` },
+      ENROL_INVOKE_TIMEOUT_MS,
+    );
+  } catch (err) {
+    const code = (err as { code?: string }).code ?? 'ENROL_FAILED';
+    logger.warn('Enrolment offer failed', {
+      event: 'agent_v2.offer_failed', owner, target: chosen.target, grantId, error: (err as Error).message,
+    });
+    return {
+      ok: false,
+      status: 502,
+      code: code === 'ECOSYSTEM_TIMEOUT' ? 'ENROL_TIMEOUT' : 'ENROL_FAILED',
+      message: code === 'ECOSYSTEM_TIMEOUT'
+        ? 'Your connector did not answer in time. The agents are here and unconnected; try again once it is responding.'
+        : 'Your connector could not be reached to finish this. The agents are here and unconnected.',
+      details: { grant_id: grantId },
+    };
+  }
+
+  // The daemon enrolled through POST /v1/agents/v2/enrol while we waited, so the record is the truth
+  // about what happened — not the reply. Re-read it.
+  const wanted = new Set(agents.map(a => a.name));
+  const after = await storage.getAgentsByOwner(owner);
+  const enrolled: EnrolledAgent[] = after
+    .filter(a => wanted.has(a.name) && a.enrolledAt
+      && (kind !== 'move' || (a.publicKey ?? '') !== keysBefore.get(a.name)))
+    .map(a => ({
+      name: a.name,
+      gaii: a.gaii,
+      run_mode: a.runMode ?? 'spawn',
+      card_url: cardUri(config.baseUrl, a.gaii),
+    }));
+
+  if (enrolled.length === 0) {
+    const detail = (enrolResult.result as { code?: string; message?: string } | null) ?? null;
+    return {
+      ok: false,
+      status: 502,
+      code: detail?.code === 'NO_HANDLER' ? 'CONNECTOR_TOO_OLD' : 'ENROL_FAILED',
+      message: detail?.code === 'NO_HANDLER'
+        ? 'Your connector is connected but does not know how to take on new agents yet. Update it (npm i -g aimeat) and try again.'
+        : 'Your connector did not take on the agents. They are here and unconnected.',
+      details: { grant_id: grantId, connector_said: detail },
+    };
+  }
+
+  // The enrolled agents live on this connector now, and no longer wait for one. A failure here is
+  // logged and nothing more: the keys are pinned, and the record catches up at the next connect.
+  try {
+    await recordPlacement(deps, owner, enrolled.map(e => e.name), chosen.installId);
+  } catch (err) {
+    logger.warn('Enrolment: the connector record was not updated', { event: 'connector.placement_failed', owner, error: String(err) });
+  }
+
+  logger.info('Agents enrolled through an offer', {
+    event: 'agent_v2.enrolled', owner, count: enrolled.length, served_by: chosen.target, grantId,
+  });
+  return { ok: true, enrolled, grant_id: grantId, served_by: chosen.target };
+}

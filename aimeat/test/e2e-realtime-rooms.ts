@@ -42,7 +42,7 @@ import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { registerOwner } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
-import { WS_QUERY_TOKEN_REMOVED_IN } from '../src/config-security.js';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../src/config/security.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const WS_BASE = BASE.replace(/^http/, 'ws').replace(/\/+$/, '');

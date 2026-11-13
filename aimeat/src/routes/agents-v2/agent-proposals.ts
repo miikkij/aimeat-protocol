@@ -73,23 +73,23 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
 import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
-import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
+import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { findConnector, setWanted, clearWanted, type ConnectorView } from '../../services/connector-registry.js';
 import { emitChange } from '../../services/event-bus.js';
 import { executeHooks } from '../../services/hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { recordAccountEvent } from '../../services/account-events.js';
-import { giveFirstRun } from '../../services/agent-first-run.js';
-import { withDefaultOffer, firstRequestOf } from '../../services/agent-default-offer.js';
+import { giveFirstRun } from '../../services/agent/first-run.js';
+import { withDefaultOffer, firstRequestOf } from '../../services/agent/default-offer.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { checkLlmChoice, writeLlmChoice } from '../../services/crew-menu.js';
 import {
   proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
   proposalRunModeFor, proposalScopesFor, type ProposerPrincipal,
-} from '../../services/agent-proposals.js';
+} from '../../services/agent/proposals.js';
 import { logger } from '../../utils/logger.js';
 import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance } from '../../services/agent-clearance.js';
+import { newAgentClearance } from '../../services/agent/clearance.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
@@ -103,7 +103,7 @@ const VALID_RUN_MODES = ['resident', 'spawn'];
  *
  * `waiting` is the case with no connector connected at all. Since 2026-10-08 that one IS true to
  * say "it starts when your connector connects": the connect offers the key on its own
- * (services/agent-pending-enrolment.ts). A connector that was reached and did not take the agent
+ * (services/agent/pending-enrolment.ts). A connector that was reached and did not take the agent
  * is a different case, and it still needs the person.
  */
 function nextStep(displayName: string, defined: boolean, attached: boolean, waiting: boolean): string {
@@ -243,7 +243,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
 
     const now = new Date().toISOString();
     const gaii = buildGAII(proposal.name, owner, config.nodeId);
-    // What any crew agent needs to start, whatever the proposer wrote (services/agent-proposals.ts
+    // What any crew agent needs to start, whatever the proposer wrote (services/agent/proposals.ts
     // proposalScopesFor: the runtime's words, and ai:use when the owner's crews think through the
     // node). A proposal stored before 2026-10-02 can lack them, and an agent approved with
     // memory:write alone could not read its own definition and never ran. Proposing adds them too,
@@ -282,7 +282,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       registeredBy: proposal.proposed_by,
     });
     // Recorded as soon as the agent exists, so no other connector of this owner is offered it in
-    // the meantime (services/agent-pending-enrolment.ts reads this).
+    // the meantime (services/agent/pending-enrolment.ts reads this).
     if (target) await setWanted({ config, storage }, owner, proposal.name, target.id);
 
     // ── Something to BE, or nothing at all ──
@@ -295,7 +295,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
         pipeline: 'rest.agent-proposal.seed',
       };
       const record = (await storage.getAgentsByOwner(owner)).find(a => a.name === proposal.name);
-      // The definition is seeded with one offer in it (services/agent-default-offer.ts): the crew
+      // The definition is seeded with one offer in it (services/agent/default-offer.ts): the crew
       // runtime publishes a definition's first offer when the agent starts, which is what puts the
       // agent on the owner's Offerings page. What the proposer wrote is kept and completed.
       const definition = withDefaultOffer(proposal.crew_def as unknown as Record<string, unknown>, {
@@ -373,7 +373,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
 
     await settleProposal({ config, storage }, owner, proposal, 'approved');
 
-    // ── Its work, once, now (services/agent-first-run.ts) ──
+    // ── Its work, once, now (services/agent/first-run.ts) ──
     // Only an agent that was given something to run, and unless the caller says `first_run: false`.
     // A failure here is reported in the answer and undoes nothing: the agent is made.
     const firstRun = proposal.crew_def && req.body?.first_run !== false
@@ -382,7 +382,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
           displayName: proposal.display_name,
           purpose: proposal.purpose,
           // One real request, when the definition's offer carries one: an agent that needs an input
-          // has none in its purpose (services/agent-default-offer.ts firstRequestOf).
+          // has none in its purpose (services/agent/default-offer.ts firstRequestOf).
           request: firstRequestOf(proposal.crew_def),
           // The resolved identity of the person approving, which on this route is always the owner.
           creator: { gaii: resolveIdentity(req.auth!, config.nodeId), sub: req.auth!.sub, owner, reader: readerFor({ storage, config }, req.auth) },

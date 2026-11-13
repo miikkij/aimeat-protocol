@@ -20,7 +20,7 @@ import { TOTP, Secret } from 'otpauth';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkPassword, checkSecondFactor, checkTotpManagementCode } from '../../src/services/password-check.js';
 import { hashPassword } from '../../src/services/password.js';
-import { accountSecurityDefaults } from '../../src/config-types-account-security.js';
+import { accountSecurityDefaults } from '../../src/config/types-account-security.js';
 import type { GHIIRecord } from '../../src/storage/interface.js';
 
 const NODE = 'aimeat-local-001-dev';

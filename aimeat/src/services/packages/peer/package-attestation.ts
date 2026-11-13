@@ -173,7 +173,7 @@ export async function signAttestation(
  * Step three: does the metadata that arrived in manifest.yaml match what the node signed? An
  * attestation from a node that signs no metadata (made before 2026-10-27) answers `checked: false`,
  * which proves nothing about the metadata: the caller decides it. The pull takes it only inside the
- * window in config-federation.ts (unsignedPackageMetadataAccepted), and a ZIP import lands it as
+ * window in config/federation.ts (unsignedPackageMetadataAccepted), and a ZIP import lands it as
  * unverified (secaudit 2026-10-31 inv-26). One that signs it must match, or the pull stops before
  * any write.
  */

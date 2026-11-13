@@ -47,7 +47,7 @@
  *   stop), and for an agent whose gate is on, an outcome under `act` becomes an item on the owner's
  *   list and `proceed: false` (services/decide/gate.ts).
  *
- *   THE KEY, STRONGEST FIRST: the agent's own (services/agent-ai-keys.ts), the owner's own, the
+ *   THE KEY, STRONGEST FIRST: the agent's own (services/agent/ai-keys.ts), the owner's own, the
  *   node's. `key_source` and the record's keyScope say which one paid.
  * @structure
  *   DecideInput · DecideCaller · DecideResult · decideForOwner · listDecisions · getDecision ·
@@ -115,7 +115,7 @@ import {
 import { takeSlot } from './pacer.js';
 import { readDecidePolicy, readOwnDecideKey } from './settings.js';
 import { DecideError } from './errors.js';
-import { agentNameOf, readAgentKey, agentCapRefusal } from '../agent-ai-keys.js';
+import { agentNameOf, readAgentKey, agentCapRefusal } from '../agent/ai-keys.js';
 import { ruleForCaller, type RuleCallerKind } from './rules.js';
 import { evaluateRule, fieldsOutside, type DecisionRule } from './rule-validate.js';
 import { gateSettingOf, gateApplies, openGateItem } from './gate.js';

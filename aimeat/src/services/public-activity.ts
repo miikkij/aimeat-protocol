@@ -18,7 +18,7 @@
  *   flag change" (a workspace share whose access is 'organism', 'password' or 'account' turns the
  *   public flag on and opens nothing: services/workspace-share.ts) and not "is some related record
  *   public" (a task completion named any public record of the agent to carry the task's private
- *   title out: services/agent-task-fanout.ts). Every field put in `summary`, `detail` and `link`
+ *   title out: services/agent/task-fanout.ts). Every field put in `summary`, `detail` and `link`
  *   answers the same question on its own, field by field.
  * @structure recordPublicActivity() + readPublicActivity() helper for the REST feed.
  * @usage import { recordPublicActivity } from '../services/public-activity.js';

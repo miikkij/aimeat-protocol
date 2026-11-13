@@ -153,7 +153,7 @@ async function main(): Promise<void> {
   const totpOnly = totp.totpConfigOf({ totpIssuer: 'AIMEAT', totpPeriod: 30, totpWindow: 1, totpBackupCodeCount: 2, totpSecretEncryptionKey: TOTP_KEY_HEX, encryptionKey: null });
   const setupBoth = await totp.setupTotp(OWNER, totpBoth);
   const setupOnly = await totp.setupTotp(OWNER, totpOnly);
-  const atRest = await import('../../../src/services/config-at-rest.js');
+  const atRest = await import('../../../src/services/config/at-rest.js');
   const transport = await import('../../../src/services/mcp-client/transport-secrets.js');
   const ext = await import('../../../src/services/extension-secrets.js');
   const protect = await import('../../../src/utils/app-protect.js');

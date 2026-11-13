@@ -11,7 +11,7 @@
  *   2026-10-16 — Initial (QA audit D8-01).
  */
 import { describe, expect, it } from 'vitest';
-import { securityPostureWarnings } from '../../src/config-posture.js';
+import { securityPostureWarnings } from '../../src/config/posture.js';
 import { testSwitchesOnPublicNode } from '../../src/utils/test-switches.js';
 import { buildSecurityOverview } from '../../src/services/security-overview.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';

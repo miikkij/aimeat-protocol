@@ -165,7 +165,7 @@ function checkDefinition(name: string, def: CrewDefDoc, mode: string): void {
   // rule about one field's interaction with one node behaviour, not a general property of crew
   // definitions, and it is here because the two disagreed in the shipped set.
   //
-  // `interactive` means the node does NOT auto-activate a queued task (services/agent-task-rules.ts
+  // `interactive` means the node does NOT auto-activate a queued task (services/agent/task-rules.ts
   // does that only for `task-runner`). So an interactive agent's tasks sit there by design — and
   // `concierge` was shipped with `listen_for` unset, which defaults to `["tasks"]`. It waited for
   // the one thing that would never arrive, and not for the one that would.

@@ -28,7 +28,7 @@
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V3.10).
  */
 import type { Storage } from '../storage/interface.js';
-import type { ContentAccess } from '../config-visibility.js';
+import type { ContentAccess } from '../config/visibility.js';
 import { parseAppAccessInput, appAccessOf, appAudience, type AppAccess } from './app-access.js';
 import { audienceAllows, type AudienceAuth } from './audience.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';

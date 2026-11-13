@@ -519,7 +519,7 @@ async function completeSessionInner(
   // A session with nothing to pay in money needs no handler. A money session names one: there is no
   // morsel handler to fall back to, because a morsel is not a payment (ruling decision-morseli-on-
   // tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). The morsel handler id a 3.x client may still send is
-  // accepted and ignored on a free session until 4.0.0 (config-pacing.ts).
+  // accepted and ignored on a free session until 4.0.0 (config/pacing.ts).
   const handler = session.total > 0 ? moneyHandler(session, handlerId) : null;
 
   const ctx: PaymentContext = { config, storage };

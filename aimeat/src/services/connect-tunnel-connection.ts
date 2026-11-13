@@ -45,7 +45,7 @@ export interface ConnectConnection {
   /** What the connector said its crew runtime honours beyond its tools (X-AIMEAT-Features), or null when it did not say. */
   features?: string[] | null;
   /**
-   * Whether the agent behind this identity is stopped (services/agent-stop-rules.ts). Read from its
+   * Whether the agent behind this identity is stopped (services/agent/stop-rules.ts). Read from its
    * record when the backlog is sent, at connect and at attach, and written by the stop and start
    * writes after that, so the synchronous delivery fan-out can hold a wake without a storage read.
    */

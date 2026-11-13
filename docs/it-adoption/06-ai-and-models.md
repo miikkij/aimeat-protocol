@@ -40,7 +40,7 @@ A provider record has no field for a custom header, an `api-key` header, a token
 | Source | Who sets it | Where the key is | Source |
 |---|---|---|---|
 | The node's OpenRouter key (`node-openrouter`) | operator | `AIMEAT_OPENROUTER_INSTANCE_KEY`. It goes only to OpenRouter's own hosts, never to an address a person or app named | `aimeat/src/services/ai/node-openrouter-key.ts`, `aimeat/src/services/ai/allowance.ts` |
-| The node's other providers | operator | `AIMEAT_AI_PROVIDERS`: a JSON array of records whose `auth` names an environment variable (`AIMEAT_AI_KEY_<NAME>`, a vendor-style `*_API_KEY`), never the key itself. A record naming any other variable is refused | `aimeat/src/services/config-schema-ai.ts`, `aimeat/src/services/ai/provider-common.ts` |
+| The node's other providers | operator | `AIMEAT_AI_PROVIDERS`: a JSON array of records whose `auth` names an environment variable (`AIMEAT_AI_KEY_<NAME>`, a vendor-style `*_API_KEY`), never the key itself. A record naming any other variable is refused | `aimeat/src/services/config/schema-ai.ts`, `aimeat/src/services/ai/provider-common.ts` |
 | Built-in local servers | operator | `AIMEAT_AI_BUILTIN_PROVIDERS`: `lmstudio` (1234), `ollama` (11434), `llamacpp` (8080) on loopback, no key | `aimeat/src/services/ai/providers.ts` |
 | A person's own providers | the person in person (their session or an owner-level personal access token), or an agent they gave `account:security`; there is no MCP tool for it (`aimeat/src/routes/ai-providers.ts`) | a memory record `ai.providers.<id>`; the key in a separate encrypted record `ai.apikey.provider.<id>` (AES-256-GCM, `AIMEAT_ENCRYPTION_KEY`) | `aimeat/src/services/ai/provider-store.ts` |
 | An agent's own key | the person, for one agent | `ai.apikey.agent.<agent>.<id>`, encrypted | `aimeat/src/services/ai/provider-store.ts` |
@@ -51,8 +51,8 @@ Which key pays for a call: the person's (or agent's) own key first, then the nod
 
 | Setting | Default | What it does | Source |
 |---|---|---|---|
-| `AIMEAT_AI_PROVIDER_TYPES` | empty: all five fixed types allowed | which fixed vendor types the node allows (`openrouter,openai,anthropic,mistral,xai`). Set it to keep data to named vendors | `aimeat/src/services/config-schema-ai.ts` |
-| `AIMEAT_AI_PROVIDER_ALLOWLIST` | empty: any public host | the hosts a non-fixed provider address may point at before a key is sent. It applies to every `openai-compatible` and `local` address, loopback included, so list `127.0.0.1` or the internal host too when it is set. The start-up posture check warns on a public node while it is empty | `aimeat/src/services/ai/route-plan.ts`, `aimeat/src/services/ai/call-guards.ts`, `aimeat/src/config-posture.ts` |
+| `AIMEAT_AI_PROVIDER_TYPES` | empty: all five fixed types allowed | which fixed vendor types the node allows (`openrouter,openai,anthropic,mistral,xai`). Set it to keep data to named vendors | `aimeat/src/services/config/schema-ai.ts` |
+| `AIMEAT_AI_PROVIDER_ALLOWLIST` | empty: any public host | the hosts a non-fixed provider address may point at before a key is sent. It applies to every `openai-compatible` and `local` address, loopback included, so list `127.0.0.1` or the internal host too when it is set. The start-up posture check warns on a public node while it is empty | `aimeat/src/services/ai/route-plan.ts`, `aimeat/src/services/ai/call-guards.ts`, `aimeat/src/config/posture.ts` |
 | `AIMEAT_AI_PROVIDER_EGRESS` | empty | exact origins (scheme, host, port) of the operator's own model servers on a private network. Only the node's own providers reach them; a person's provider never does | `aimeat/src/services/ai/providers.ts` |
 | `AIMEAT_ALLOW_PRIVATE_EGRESS` | `false` on a public profile | whether server-side fetches may reach loopback at all. RFC 1918, link-local and cloud metadata addresses are refused regardless, except an origin listed in an egress list | `aimeat/.env.example` |
 | `AIMEAT_AI_FIXED_BASEURL_OVERRIDES` | empty | tests only; refused on a public node | `aimeat/.env.example` |
@@ -81,7 +81,7 @@ Sources: `aimeat/src/services/ai/roles.ts`, `aimeat/src/services/ai/policy.ts`, 
 | Transcription (STT) | the microphone, `aimeat_ai_transcribe` | refused with `NO_STT_MODEL`; a new person cannot use the microphone until a model is set | `aimeat/src/services/ai/unset-model.ts` |
 | Image | `aimeat_image_generate` | refused with `NO_IMAGE_MODEL` | `aimeat/src/services/ai/unset-model.ts` |
 | Speech (TTS) | voice answers | refused with `NO_TTS_MODEL` | `aimeat/src/services/ai/unset-model.ts` |
-| Embedding | `aimeat_ai_embed`, for apps and agents that store vectors | refused with `NO_EMBED_MODEL`. The node's own memory search does not use embeddings, so search keeps working. Changing the embedding model makes stored vectors incomparable | `aimeat/src/services/ai/embed.ts`, `aimeat/src/services/config-schema-ai.ts` |
+| Embedding | `aimeat_ai_embed`, for apps and agents that store vectors | refused with `NO_EMBED_MODEL`. The node's own memory search does not use embeddings, so search keeps working. Changing the embedding model makes stored vectors incomparable | `aimeat/src/services/ai/embed.ts`, `aimeat/src/services/config/schema-ai.ts` |
 | Decision model (System 1) | typed decisions (`aimeat_decide`), mail classification in the refinery | refused when no decision provider is usable: no hosted key (node or person) and no local decision provider | `aimeat/src/services/decide/service.ts` |
 
 ## Decision provider (System 1) and ordinary model calls (System 2)
@@ -95,7 +95,7 @@ Sources: `aimeat/src/services/ai/roles.ts`, `aimeat/src/services/ai/policy.ts`, 
 | Local option | `AIMEAT_DECIDE_BUILTIN_PROVIDERS` and `AIMEAT_DECIDE_PROVIDER_EGRESS` | `local` providers |
 | Retention | `AIMEAT_DECIDE_RETENTION_DAYS` (365) | usage records ([05 Data protection](05-data-protection.md)) |
 
-Sources: `aimeat/src/services/decide/scrub.ts`, `aimeat/src/config-decide.ts`.
+Sources: `aimeat/src/services/decide/scrub.ts`, `aimeat/src/config/decide.ts`.
 
 ## What data reaches a model, and when
 

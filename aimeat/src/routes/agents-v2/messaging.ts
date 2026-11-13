@@ -16,7 +16,7 @@
  *   unchanged; the reasoning for a sixth is in storage/types/agent-v2-messaging.ts.
  *
  *   THIS FILE IS A SHAPE, NOT A DECISION. Every gate, resolution and refusal lives in
- *   services/agent-v2-messaging-ops.ts, which the MCP and CLI doors call too. What is here is the
+ *   services/agent/v2-messaging-ops.ts, which the MCP and CLI doors call too. What is here is the
  *   HTTP of it: which scope the middleware checks, which status a refusal takes, what the envelope
  *   looks like. Put a rule in here and the other three doors will not have it.
  *
@@ -34,7 +34,7 @@ import { MESSAGE_SPEC } from '../../models/agent-v2-message.js';
 import {
   sendTurn, listTurns, getTurn, setPushTarget, listPushTargets, deletePushTarget,
   type OpResult,
-} from '../../services/agent-v2-messaging-ops.js';
+} from '../../services/agent/v2-messaging-ops.js';
 
 /** One refusal, in HTTP. The operation already decided the status and the words. */
 function refuse(res: Response, nodeId: string, out: Extract<OpResult<unknown>, { ok: false }>): void {

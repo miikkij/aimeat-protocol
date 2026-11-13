@@ -1,0 +1,372 @@
+/**
+ * @file src/services/agent/task-rules.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The task decisions that are the same decision whichever route or tool the call came
+ *   through: whether a task starts on its own, may a plan be proposed now, and what accepting a plan
+ *   does to the status.
+ *
+ *   Both were written out twice for a while — once in the HTTP handler and once in the MCP tool
+ *   beside it — and both got there the same way: the tool was missing the rule, and the quickest
+ *   repair is to paste the rule in. The copies agree today. They agree until somebody edits one.
+ *
+ *   THE START DECISION. A task either starts AUTOMATICALLY (the agent proposes its plan and goes on;
+ *   the owner sees what was done) or WAITS FOR THE OWNER'S OK. Until 2026-10-02 the only thing that
+ *   decided it was `mode === 'task-runner'`, and `mode` also picks the Hello Integration flow, so the
+ *   concierge (an `interactive` front door) could not start a task without becoming something else.
+ *   Measured on freshly sold hosted places: every task a customer gave it sat in `queued` for good,
+ *   because nobody tells a new customer to press Start. The answer now has its own field:
+ *
+ *     1. THE SAFETY FLOOR. An agent that can spend money, send mail as the owner, or speak or delete
+ *        as the owner never starts a task by itself. Read from its permissions, live, on every call.
+ *        UNLESS THE OWNER DECIDED OTHERWISE: the owner in person may name, per agent, the floor
+ *        permissions it may start work with (`taskStartFloor`), and those stop holding it, paid or
+ *        free (Jouni, 2026-10-23). A floor permission they did not name still holds.
+ *     2. THE PLAN'S OWN WORD. A proposed todo that declares a guarded effect holds the task too,
+ *        except an effect whose floor permissions the owner accepted for this agent.
+ *     3. The task's `startPolicy`, the creator's own word when the task was given ("check with me
+ *        first", "just do it"). Absent on a task given without one.
+ *     4. The agent's `taskStart`, the owner's standing answer, read when the decision is made, so a
+ *        task given before the owner changed it follows the new answer when its plan arrives.
+ *     5. Nobody has said: `task-runner` starts, every other mode waits. Every agent that existed
+ *        before the field behaves exactly as it did.
+ *
+ *   THE LIVE-PLAN GUARD protects work already done. The preserve step on a re-proposal keeps only
+ *   todos already marked 'outdated', so proposing a second plan mid-run drops every in-progress and
+ *   completed todo, their completedAt stamps included — the plan the owner approved and the record
+ *   of what was finished, both gone. Mid-execution changes go through PATCH instead.
+ * @structure
+ *   - TASK_START_FLOOR / floorScopesOf() — the permissions that always hold a task for the owner
+ *   - agentStartDefault() — the agent's own answer, or the mode-derived one
+ *   - decideTaskStart() — does this task start now, and if not, why
+ *   - mayLoosenStart() / mayStartWaitingTask() — who may set `automatic`, who may lift a wait
+ *   - mayManageSiblingTasks() — who may read or remove the tasks of another agent of the same owner
+ *   - resolveAutoActivation() — the create-time status, from decideTaskStart
+ *   - autoStartEvent() / startedOnItsOwn() — the marked 'started' event of a task the node started
+ *   - canProposeTodos() — may a plan be proposed on this task right now
+ *   - statusAfterProposal() — what accepting a plan does to the status
+ *   - taskWakeId() — the delivery id of one "this task is runnable" push
+ * @usage
+ *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
+ *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
+ * @version-history
+ *   v2.6.0 — 2026-11-12 — mayManageSiblingTasks(): another agent of the same owner reads or removes
+ *     an agent's tasks with the task word and agent:write (services/agents/remove-task.ts,
+ *     wish-the-owner-s-ai-can-remove-an-agent-end-its-task-and-delete-a).
+ *   v2.5.1 — 2026-11-02 — The floor's note names exchange:invoke, which is not on it. A store place's default for an
+ *     agent leaves every floor word out (services/place-agent-scopes.ts).
+ *   v2.5.0 — 2026-10-28 — `*` never reaches the floor and `wildcardReady` is gone: the node no longer
+ *     narrows an agent holding `*` by itself, so there is no failed narrowing to fall back on. An
+ *     agent keeps the permissions its owner gave it, and its tasks are decided on them (Jouni
+ *     2026-10-28, after the node narrowed his own interactive agent and it was refused at once).
+ *   v2.4.0 — 2026-10-23 — The owner's accepted floor (`taskStartFloor`): the floor permissions the
+ *     owner in person named for an agent stop holding its tasks, and so do the plan's effects of
+ *     those kinds. floorScopesOf() answers the permissions that still hold; acceptedFloorOf() the
+ *     ones the owner accepted (Jouni 2026-10-23, after the daily CVE agent waited every morning).
+ *   v2.3.0 — 2026-10-18 — `*` stays on the floor only as the fallback for a narrowing that failed:
+ *     a ready `*` agent is narrowed before the decision (services/scope-auto-narrow.ts, Jouni
+ *     2026-10-18 superseding the hold half of ruling C).
+ *   v2.2.0 — 2026-10-11 — `waitsBecause: 'stopped'`, ahead of every other reason: no task of a stopped
+ *     agent starts, and nobody may start one by hand (mayStartWaitingTask). See agent-stop-rules.ts.
+ *   v2.1.0 — 2026-10-02 — Rulings B and C: `memory:purge` (deleting shared records for good) is on the
+ *     floor, and `*` counts once the agent's usage record is ready (services/scope-use.ts).
+ *   v2.0.0 — 2026-10-02 — The start decision leaves `mode`: the agent's `taskStart`, the task's
+ *     `startPolicy`, the permission floor and the plan's declared effects. `taskWakeId()`: the tunnel
+ *     skipped a second `task_assigned` that reused the task id as its delivery id, so Start on a
+ *     proposed task did not wake the agent (found on hosted places, ~90 s to the spawner's re-list).
+ *   v1.0.0 — 2026-08-11 — Extracted after the audit's own diff was checked for duplication and both
+ *     rules were found copied into the tool surface rather than shared.
+ */
+import type { AgentTaskRecord, AgentRecord, AgentTaskTodo } from '../../storage/interface.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { isValidGAII, isSameOwner } from '../../utils/gaii.js';
+
+/** Starts on its own, or waits for the owner's OK. */
+export type TaskStartPolicy = 'automatic' | 'confirm';
+export const TASK_START_POLICIES: readonly TaskStartPolicy[] = ['automatic', 'confirm'];
+
+/** What a todo may declare it does that the owner must see before it happens. */
+export type TaskEffect = 'spend' | 'send_as_owner' | 'delete';
+export const TASK_EFFECTS: readonly TaskEffect[] = ['spend', 'send_as_owner', 'delete'];
+
+/**
+ * THE SAFETY FLOOR: an agent holding any of these permissions never starts a task by itself,
+ * whatever its own setting or the task's says.
+ *
+ * Written in permissions because a permission is the one thing the node knows for certain about
+ * what an agent can do. A task is free text, and a check that reads intent from it is a guess.
+ *
+ * NOT HERE, ON PURPOSE:
+ *   - `memory:delete`. Every agent holds it by default (AIMEAT_DEFAULT_AGENT_SCOPES), and a deleted
+ *     memory entry can be restored for a grace window. Deleting shared workspace records FOR GOOD took
+ *     its own word on 2026-10-02, `memory:purge`, and that one is on the floor.
+ *   - `work:request`. It calls capabilities under contracts the owner already accepted, metered
+ *     against the owner's own budget. Starting a new paid relationship takes `exchange:write`.
+ *   - `exchange:invoke`. The same for an app tool: split out of `exchange:write` so that calling a tool
+ *     under what is already accepted does not hold a task (Jouni, 2026-11-02).
+ */
+export const TASK_START_FLOOR: ReadonlyArray<{ scope: string; kind: TaskEffect }> = [
+    { scope: 'commerce:buy', kind: 'spend' },
+    { scope: 'exchange:write', kind: 'spend' },
+    { scope: 'connections:use', kind: 'send_as_owner' },
+    { scope: 'outbound:send', kind: 'send_as_owner' },
+    { scope: 'messages:send-as-owner', kind: 'send_as_owner' },
+    { scope: 'messages:delete-as-owner', kind: 'delete' },
+    // Deleting shared workspace records for good (ruling B, 2026-10-02).
+    { scope: 'memory:purge', kind: 'delete' },
+];
+
+/** The agent as the start rules read it: its record as the owner left it. */
+type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'stoppedAt' | 'taskStartFloor'>>;
+
+type FloorAgent = Partial<Pick<AgentRecord, 'defaultScopes' | 'taskStartFloor'>>;
+
+/**
+ * The floor permissions this agent holds AND its owner in person accepted for it (`taskStartFloor`):
+ * the ones that no longer hold its tasks. A word the owner named that the agent does not hold is
+ * not answered, and `*` is never acceptable, so a wildcard agent cannot slip past the floor this way.
+ */
+export function acceptedFloorOf(agent: FloorAgent | null | undefined): string[] {
+    const accepted = new Set((agent?.taskStartFloor ?? []).filter(w => w !== '*'));
+    if (accepted.size === 0) return [];
+    const named = (agent?.defaultScopes ?? []).filter(s => s !== '*');
+    return TASK_START_FLOOR.filter(f => accepted.has(f.scope) && scopeIsCovered(named, f.scope)).map(f => f.scope);
+}
+
+/**
+ * The floor permissions this agent's record grants BY NAME: the word itself or its domain wildcard
+ * (`commerce:*`). The record is the ceiling a token is narrowed to (auth/effective-scopes.ts).
+ *
+ * THE GLOBAL `*` is not on the floor. The owner gave it, and the agent keeps it (Jouni, 2026-10-28).
+ * Ruling C (2026-10-02) put `*` on the floor once two weeks of its use were on record; when that
+ * held every task of 14 scheduled agents on aimeat.io on 2026-10-16..18, the follow-up of 2026-10-18
+ * had the node narrow such an agent by itself instead. That narrowed the owner's own interactive
+ * agent past a permission it used, and it was refused three minutes later, so both halves are gone:
+ * the node notes what a `*` agent uses and offers the narrowing on its card (services/scope-use.ts),
+ * and only the owner applies it. The words a `*` agent's record names are read like any agent's.
+ *
+ * A floor permission the owner in person accepted for this agent (acceptedFloorOf) is not in the
+ * answer: it no longer holds the agent. Everything that reads "what holds this agent" reads this.
+ */
+export function floorScopesOf(agent: FloorAgent | null | undefined): string[] {
+    const held = agent?.defaultScopes ?? [];
+    const named = held.filter(s => s !== '*');
+    const accepted = new Set(acceptedFloorOf(agent));
+    return TASK_START_FLOOR.filter(f => scopeIsCovered(named, f.scope) && !accepted.has(f.scope)).map(f => f.scope);
+}
+
+/** The agent's own answer, or, when nobody has said, the one its mode always gave. */
+export function agentStartDefault(agent: StartAgent | null | undefined): TaskStartPolicy {
+    if (agent?.taskStart === 'automatic' || agent?.taskStart === 'confirm') return agent.taskStart;
+    return agent?.mode === 'task-runner' ? 'automatic' : 'confirm';
+}
+
+/** The guarded effects the live plan declares. Outdated todos are history and declare nothing. */
+export function declaredEffects(todos: ReadonlyArray<Pick<AgentTaskTodo, 'status'> & { effects?: string[] }> | undefined): TaskEffect[] {
+    const out = new Set<TaskEffect>();
+    for (const t of todos ?? []) {
+        if (t.status === 'outdated') continue;
+        for (const e of t.effects ?? []) if ((TASK_EFFECTS as readonly string[]).includes(e)) out.add(e as TaskEffect);
+    }
+    return [...out];
+}
+
+export interface TaskStartDecision {
+    /** What the setting says: the task's own word, else the agent's. */
+    policy: TaskStartPolicy;
+    /** Whose word `policy` is: the task's, the agent's setting, or the mode when nobody has said. */
+    source: 'task' | 'agent' | 'mode';
+    startsNow: boolean;
+    /**
+     * Why it waits, when it waits. `stopped`: the agent itself is stopped (services/agent/stop.ts),
+     * and nothing starts until it is started again; it comes before every other reason, because no
+     * setting and no OK makes a stopped agent work. `setting`: the owner asked to confirm. `floor`:
+     * the agent can spend, send or delete as the owner. `effects`: the plan says it will. Only
+     * `setting` may be lifted by another of the owner's agents; `floor` and `effects` wait for the
+     * owner in person, and `stopped` is lifted by starting the agent, never by starting the task.
+     */
+    waitsBecause: null | 'stopped' | 'setting' | 'floor' | 'effects';
+    floorScopes: string[];
+    effects: TaskEffect[];
+}
+
+/** Does this task start now, and if not, why. Precedence: stopped, floor, effects, task, agent, mode. */
+export function decideTaskStart(
+    agent: StartAgent | null | undefined,
+    opts: { policy?: TaskStartPolicy | null; todos?: ReadonlyArray<Pick<AgentTaskTodo, 'status'> & { effects?: string[] }> } = {},
+): TaskStartDecision {
+    const fromTask = opts.policy === 'automatic' || opts.policy === 'confirm';
+    const policy = fromTask ? opts.policy as TaskStartPolicy : agentStartDefault(agent);
+    const source = fromTask ? 'task' : (agent?.taskStart === 'automatic' || agent?.taskStart === 'confirm') ? 'agent' : 'mode';
+    const floorScopes = floorScopesOf(agent);
+    // An effect of a kind the owner accepted a floor permission for does not hold the task. Any
+    // other floor permission of the same kind still held is in floorScopes and holds it there.
+    const acceptedKinds = new Set(TASK_START_FLOOR.filter(f => acceptedFloorOf(agent).includes(f.scope)).map(f => f.kind));
+    const effects = declaredEffects(opts.todos).filter(e => !acceptedKinds.has(e));
+    const waitsBecause = agent?.stoppedAt ? 'stopped'
+        : floorScopes.length > 0 ? 'floor'
+        : effects.length > 0 ? 'effects'
+        : policy === 'confirm' ? 'setting'
+        : null;
+    return { policy, source, startsNow: waitsBecause === null, waitsBecause, floorScopes, effects };
+}
+
+/** A wait the owner in person has to lift: the floor or a declared effect, never the setting. */
+export function isHeldForOwner(d: Pick<TaskStartDecision, 'waitsBecause'>): boolean {
+    return d.waitsBecause === 'floor' || d.waitsBecause === 'effects';
+}
+
+/** Who is asking, as far as the start rules care. Built by the route or tool from its session. */
+export interface StartCaller {
+    /** The account holder in person (auth/effective-scopes.ts isOwnerInPerson). */
+    ownerInPerson: boolean;
+    /** A same-owner app grant that already passed its own task:write check. */
+    app: boolean;
+    /** The caller's principal (GAII for an agent). */
+    principal: string;
+    /** Every scope the caller holds, already narrowed to its record. */
+    scopes: readonly string[];
+}
+
+/**
+ * May this caller loosen how an agent's work starts: set the agent's `taskStart`, or give a task
+ * `start: 'automatic'`? The owner in person, an app they granted task:write, or another of their
+ * agents holding `agent:write` (the word that can change the agent anyway, so this widens nothing).
+ * Never the agent itself: an agent does not loosen its own leash.
+ */
+export function mayLoosenStart(caller: StartCaller, targetGaii: string): boolean {
+    if (caller.ownerInPerson || caller.app) return true;
+    return caller.principal !== targetGaii && scopeIsCovered(caller.scopes, 'agent:write');
+}
+
+/**
+ * May this caller start a task that waits? The owner in person and their app: always. Another of
+ * the owner's agents holding task:write (the person's own chat AI, acting on their word): only a
+ * task that waits because of the setting. Never the task's own agent, and never a task the floor
+ * or a declared effect holds; those wait for the owner in person.
+ */
+export function mayStartWaitingTask(caller: StartCaller, targetGaii: string, decision: Pick<TaskStartDecision, 'waitsBecause'>): boolean {
+    // Nobody starts a task of a stopped agent: the agent is started, and its waiting tasks follow.
+    if (decision.waitsBecause === 'stopped') return false;
+    if (caller.ownerInPerson || caller.app) return true;
+    if (caller.principal === targetGaii || !scopeIsCovered(caller.scopes, 'task:write')) return false;
+    return !isHeldForOwner(decision);
+}
+
+/**
+ * May this caller read (`task:read`) or remove (`task:write`) the tasks of ANOTHER agent of the
+ * same owner? Only with `agent:write` beside the task word: the word that already stops, starts
+ * and re-routes that agent (mayLoosenStart), so seeing what it works on and ending work it has not
+ * started widens nothing. The task word alone is not enough: every crew holds task:read for its own
+ * list, and a sibling's task titles are the owner's, not the fleet's. An agent's OWN tasks are not
+ * this question (its own routes answer it), and neither are the owner in person or an app grant.
+ * The caller is an AGENT of the same account: an ecosystem app, which is a consented third party,
+ * and a visitor from another node are neither, whatever words they hold.
+ */
+export function mayManageSiblingTasks(caller: StartCaller, targetGaii: string, word: 'task:read' | 'task:write'): boolean {
+    if (caller.ownerInPerson || caller.app || caller.principal === targetGaii) return false;
+    if (!isValidGAII(caller.principal) || !isSameOwner(caller.principal, targetGaii)) return false;
+    return scopeIsCovered(caller.scopes, word) && scopeIsCovered(caller.scopes, 'agent:write');
+}
+
+/**
+ * The create-time status: a queued task whose decision says start becomes active. `draft` is the
+ * owner's "let me look first" and never moves on its own.
+ */
+export function resolveAutoActivation(
+    decision: Pick<TaskStartDecision, 'startsNow'>,
+    requestedStatus: AgentTaskRecord['status'] | undefined,
+): { autoActivated: boolean; effectiveStatus: AgentTaskRecord['status'] } {
+    const status = requestedStatus ?? 'queued';
+    const autoActivated = status === 'queued' && decision.startsNow;
+    return { autoActivated, effectiveStatus: autoActivated ? 'active' : status };
+}
+
+/**
+ * The 'started' event a task gets when the node starts it on its own: a message naming whose word
+ * it was, and a detail that marks it. The marker is what lets a plan that declares an effect send
+ * the task back to wait (statusAfterProposal): a task the owner started, or one the node makes for
+ * itself (the onboarding smoke test, a workflow step), carries no marker and is never sent back.
+ */
+export function autoStartEvent(decision: Pick<TaskStartDecision, 'source'>, when = ''): { message: string; details: Record<string, unknown> } {
+    const why = decision.source === 'mode' ? 'agent mode: task-runner'
+        : decision.source === 'task' ? 'this task was given to start on its own'
+        : 'the agent starts its tasks automatically';
+    return { message: `Task started on its own${when} (${why})`, details: { started_by: AUTO_START_MARK, source: decision.source } };
+}
+export const AUTO_START_MARK = 'start-setting';
+
+/** Did the node start this task on its own? Read from the task's own 'started' events. */
+export function startedOnItsOwn(events: ReadonlyArray<{ type: string; details?: Record<string, unknown> }>): boolean {
+    return events.some(e => e.type === 'started' && e.details?.started_by === AUTO_START_MARK);
+}
+
+/**
+ * The delivery id of one "this task is runnable now" push.
+ *
+ * NOT THE TASK ID. The connector tunnel remembers every delivery id the agent acknowledged and skips
+ * a later delivery with the same id (services/connect-tunnel.ts, onDelivery). The create push used
+ * the task id, so the Start push that followed it carried an id the agent had already acknowledged
+ * and was dropped: the agent woke on its runtime's own re-list about 90 s later. The connector reads
+ * the task id from the payload, never from the frame id, so a per-transition id changes nothing else.
+ */
+export function taskWakeId(taskId: string, status: string, at: string): string {
+    return `${taskId}:${status}:${at}`;
+}
+
+/**
+ * May a TODO plan be proposed on this task right now?
+ *
+ * Queued and revision_requested always; an ACTIVE task only while it has no live plan. A todo that
+ * is not already 'outdated' is a live plan.
+ */
+export function canProposeTodos(task: Pick<AgentTaskRecord, 'status' | 'todos'>): boolean {
+    const hasLivePlan = (task.todos ?? []).some(t => t.status !== 'outdated');
+    return task.status === 'queued'
+        || task.status === 'revision_requested'
+        || (task.status === 'active' && !hasLivePlan);
+}
+
+/** The refusal every route and tool gives, so the wording does not drift either. */
+export function todoProposeRefusal(status: string): string {
+    return `TODOs can only be proposed on queued, revision_requested, or plan-less active tasks (current: ${status})`;
+}
+
+/**
+ * What a plan proposal does to the status.
+ *
+ *   - revision_requested -> queued. The owner asked to review this plan, so it waits for them again.
+ *   - queued -> active when the start decision says so (the agent proposes and goes on).
+ *   - active, plan-less, started on its own -> queued when the floor or the plan's declared effects
+ *     hold it (`heldBack`). A task the node started automatically has had nobody's OK, and the plan
+ *     is the first moment the node can see that it will spend, send or delete as the owner.
+ *     Only a task whose 'started' event carries the marker (autoStartEvent) can be held back: one
+ *     the owner started, the onboarding smoke test and a workflow step are never sent back.
+ *
+ * `waits` is true whenever the result is a task waiting for the owner with a plan in hand, which is
+ * the moment the owner is told.
+ */
+export async function statusAfterProposal(
+    getAgent: (gaii: string) => Promise<StartAgent | null | undefined>,
+    task: Pick<AgentTaskRecord, 'status' | 'agentGaii' | 'startPolicy'>,
+    newTodos: ReadonlyArray<Pick<AgentTaskTodo, 'status'> & { effects?: string[] }>,
+    autoStarted = false,
+): Promise<{ nextStatus: AgentTaskRecord['status']; autoActivated: boolean; heldBack: boolean; waits: boolean; decision: TaskStartDecision | null }> {
+    if (task.status === 'revision_requested') {
+        return { nextStatus: 'queued', autoActivated: false, heldBack: false, waits: true, decision: null };
+    }
+    if (task.status === 'queued') {
+        const decision = decideTaskStart(await getAgent(task.agentGaii), { policy: task.startPolicy, todos: newTodos });
+        return decision.startsNow
+            ? { nextStatus: 'active', autoActivated: true, heldBack: false, waits: false, decision }
+            : { nextStatus: 'queued', autoActivated: false, heldBack: false, waits: true, decision };
+    }
+    if (task.status === 'active' && autoStarted) {
+        const decision = decideTaskStart(await getAgent(task.agentGaii), { policy: task.startPolicy, todos: newTodos });
+        if (isHeldForOwner(decision)) {
+            return { nextStatus: 'queued', autoActivated: false, heldBack: true, waits: true, decision };
+        }
+        return { nextStatus: 'active', autoActivated: false, heldBack: false, waits: false, decision };
+    }
+    return { nextStatus: task.status, autoActivated: false, heldBack: false, waits: false, decision: null };
+}

@@ -22,7 +22,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { BlobSpec } from '../../storage/blob/blob-types.js';
-import { normalizePrefix } from '../../config-file-store.js';
+import { normalizePrefix } from '../../config/file-store.js';
 import { takesOrDefault, type StoreTakes } from '../../storage/blob/store-takes.js';
 import { azureSpecFrom, ownerEndpointAllowed } from './file-store-specs.js';
 

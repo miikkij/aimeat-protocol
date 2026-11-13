@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The five Agent v2 task tools on the node's MCP surface.
  *
- *   EVERY ONE OF THEM CALLS services/agent-v2-tasks-ops.ts, the same functions the REST doors call.
+ *   EVERY ONE OF THEM CALLS services/agent/v2-tasks-ops.ts, the same functions the REST doors call.
  *   Nothing here decides who may move a task, what a terminal task refuses, or how a race between a
  *   completer and a canceller resolves.
  *
@@ -28,8 +28,8 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
 import { publicTask } from '../models/agent-v2-task.js';
-import { createTask, listTasks, getTask, setTaskStatus, cancelTask } from '../services/agent-v2-tasks-ops.js';
-import type { Principal, OpResult } from '../services/agent-v2-messaging-ops.js';
+import { createTask, listTasks, getTask, setTaskStatus, cancelTask } from '../services/agent/v2-tasks-ops.js';
+import type { Principal, OpResult } from '../services/agent/v2-messaging-ops.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 

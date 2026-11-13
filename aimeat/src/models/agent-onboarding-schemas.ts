@@ -116,7 +116,7 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 'declare_offerings', order: 14, title: 'Declare Offerings', description: STEP_DESCRIPTIONS.declare_offerings, required: false, validationMethod: 'automatic' },
   { id: 'make_workflow_compatible', order: 15, title: 'Make an Offer Workflow-Compatible', description: STEP_DESCRIPTIONS.make_workflow_compatible, required: false, validationMethod: 'automatic' },
   { id: 'price_offer', order: 16, title: 'Price an Offer', description: STEP_DESCRIPTIONS.price_offer, required: false, validationMethod: 'automatic' },
-  // The agent's own picture at agent.avatar (services/agent-avatar.ts). Optional and in every flow,
+  // The agent's own picture at agent.avatar (services/agent/avatar.ts). Optional and in every flow,
   // because a workstation Claude or Codex is exactly the agent a person most wants to recognise.
   { id: 'set_avatar', order: 17, title: 'Set Your Avatar', description: STEP_DESCRIPTIONS.set_avatar, required: false, validationMethod: 'automatic' },
 ];

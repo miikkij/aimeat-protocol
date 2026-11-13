@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The level a piece of content gets when its caller names none (plan doc-mvcn6c7e4e5q,
- *   V5): one reader per setting of config-content-defaults.ts, so every door that creates a record,
+ *   V5): one reader per setting of config/content-defaults.ts, so every door that creates a record,
  *   a file, a board, an organism, a share, a data package or an agent asks the same question. A level
  *   the caller names always wins; these are asked only when it is absent.
  *
@@ -28,7 +28,7 @@
 import type {
   ContentDefaultsConfig, DefaultAppUploadVisibility, DefaultBoardVisibility, DefaultCsmVisibility,
   DefaultDatapackageVisibility, DefaultMemoryVisibility, DefaultOrganismVisibility, DefaultShareAccess,
-} from '../config-content-defaults.js';
+} from '../config/content-defaults.js';
 
 type Defaults = Partial<ContentDefaultsConfig>;
 

@@ -959,7 +959,7 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
     // still get IN at both, and then meet the SAME PAYER behind them. Until 2026-09-20 that payer was
     // the agent itself (resolveIdentity), so an agent with no provider settings of its own was
     // refused for the KEY at both doors, and this case asserted that refusal. The payer is the human
-    // now (services/agent-ai-keys.ts aiPayerOf): the agent runs on its OWNER's settings, which this
+    // now (services/agent/ai-keys.ts aiPayerOf): the agent runs on its OWNER's settings, which this
     // suite aims at the stub, so both doors do the work. The synchronous door says so in its
     // response and the asynchronous one says so on the job. A door that still paid from the agent's
     // own namespace would answer NO_API_KEY here, which is what turns this red.

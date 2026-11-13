@@ -222,7 +222,7 @@ async function startNode(): Promise<void> {
             AIMEAT_INACTIVITY_NUDGE: 'true',
             // core:nonce-cleanup was seeded only with a wallet-verification flow on until 2026-10-09;
             // it is seeded on every node now. FTN stays on here for the verification doors it opens,
-            // and it is FTN and not EUDIW because src/config-eudiw-guard.ts refuses to BOOT with
+            // and it is FTN and not EUDIW because src/config/eudiw-guard.ts refuses to BOOT with
             // AIMEAT_EUDIW_ENABLED=true (holder binding is unfinished).
             AIMEAT_FTN_ENABLED: 'true',
             // Outbound connections, for the one door that mints a verification nonce without a live

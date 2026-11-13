@@ -75,7 +75,7 @@ import { NETWORK_HOST_FIELDS_KEY, hostRefusal, parseNetworkDeclaration } from '.
 import { USES_SECRETS_KEY, parseUsesSecrets } from './extension-secret-uses.js';
 import { localAccountName } from '../utils/gaii.js';
 import { EXTENSION_FETCH_MAX_BYTES_CEILING } from '../utils/read-capped.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import {
   AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
   type ExtensionAiOp, type ExtensionAiProviderDeclaration,

@@ -13,7 +13,7 @@
  *   utils/scope-coverage.ts): account security, secrets, payment credentials, permission changes,
  *   sharing groups and shares, the as-owner reads, MCP management, publishing to the internet, operator
  *   and compliance words. Second, every word on the task start floor (TASK_START_FLOOR,
- *   services/agent-task-rules.ts), read from that list so the two cannot drift: an agent holding one
+ *   services/agent/task-rules.ts), read from that list so the two cannot drift: an agent holding one
  *   never starts a task by itself, so a default that held one left every scheduled run queued for the
  *   owner (crew76 on guestkoey3wfwk, 2.11; Jouni's option A, 10.25). The owner gives one per agent.
  *   Third, PLACE_OWNER_KEEPS below: words a wildcard carries that belong to the same five areas.
@@ -29,7 +29,7 @@
  *     web identity proof's app agent. The list it answers is the list the door stores.
  *   - givePlaceDefaultToEveryAgent, the step for the agents that already exist: at every start of a
  *     store place (server-bootstrap/once-only-keep-steps.ts) and when `site.purchase_plan` is set while
- *     the node runs (services/config-apply.ts, the Consul import and watch). One write of
+ *     the node runs (services/config/apply.ts, the Consul import and watch). One write of
  *     PLACE_DEFAULT_KEY claims every agent that has not had the default, so of two processes starting
  *     together each agent is claimed by one; that one adds the words to the list it read
  *     (services/scope-list-swap.ts), which only adds, and tells the agent's live connector to fetch a
@@ -60,7 +60,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { TOOL_SCOPES } from '../tool-catalog/scopes.js';
 import { exceedsCeiling, isOutsideWildcard, scopeIsCovered } from '../utils/scope-coverage.js';
-import { TASK_START_FLOOR } from './agent-task-rules.js';
+import { TASK_START_FLOOR } from './agent/task-rules.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
 import { changeScopeList } from './scope-list-swap.js';
 import { isSharedAnonymous } from './rest-scope-gates-migration.js';

@@ -19,7 +19,7 @@ const registerChatInstance = vi.fn(async () => ({ ok: true }));
 const markAgentMcpUse = vi.fn(async () => undefined);
 const recordFirstMcpCall = vi.fn(async () => undefined);
 vi.mock('../../src/services/chat-instance-write.js', () => ({ registerChatInstance }));
-vi.mock('../../src/services/agent-mcp-touch.js', () => ({ markAgentMcpUse }));
+vi.mock('../../src/services/agent/mcp-touch.js', () => ({ markAgentMcpUse }));
 vi.mock('../../src/services/onboarding-funnel.js', () => ({ recordFirstMcpCall }));
 
 const { modernAuthInfo } = await import('../../src/mcp/modern-endpoint.js');

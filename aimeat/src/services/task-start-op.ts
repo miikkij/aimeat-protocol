@@ -9,7 +9,7 @@
  *   stalled task of the owner's. Another of the owner's agents holding task:write (the person's own
  *   chat AI, acting on their word): only a QUEUED task, never its own (the propose-before-start rule),
  *   and never one held by the permission floor or by a plan that declared it will spend, send or
- *   delete as the owner (services/agent-task-rules.ts mayStartWaitingTask). Until 2026-10-02 only the
+ *   delete as the owner (services/agent/task-rules.ts mayStartWaitingTask). Until 2026-10-02 only the
  *   browser could start a task, so a person working through their AI had no way to say "go ahead".
  *
  *   THE WAKE. The push carries a delivery id of its own (taskWakeId). With the task id, the tunnel
@@ -32,7 +32,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
-import { decideTaskStart, mayStartWaitingTask, taskWakeId, type StartCaller } from './agent-task-rules.js';
+import { decideTaskStart, mayStartWaitingTask, taskWakeId, type StartCaller } from './agent/task-rules.js';
 import { waitReason } from './task-start-notice.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { emitChange, emitDelivery } from './event-bus.js';
@@ -73,7 +73,7 @@ export async function startWaitingTask(
     }
 
     // A STOPPED AGENT STARTS NOTHING, whoever asks, the owner in person included. The task is not
-    // refused for good: it stays where it is, and starting the agent releases it (services/agent-stop.ts).
+    // refused for good: it stays where it is, and starting the agent releases it (services/agent/stop.ts).
     const runner = await storage.getAgent(task.agentGaii);
     if (runner?.stoppedAt) {
         return { ok: false, status: 409, code: 'AGENT_STOPPED',

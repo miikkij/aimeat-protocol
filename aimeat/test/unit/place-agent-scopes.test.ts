@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { placeAgentScopes } from '../../src/services/place-agent-scopes.js';
-import { TASK_START_FLOOR, decideTaskStart, floorScopesOf } from '../../src/services/agent-task-rules.js';
+import { TASK_START_FLOOR, decideTaskStart, floorScopesOf } from '../../src/services/agent/task-rules.js';
 import { intersectScopes } from '../../src/auth/effective-scopes.js';
 import { scopeIsCovered } from '../../src/utils/scope-coverage.js';
 import type { AimeatConfig } from '../../src/config.js';

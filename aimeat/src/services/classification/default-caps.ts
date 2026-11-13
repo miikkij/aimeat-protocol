@@ -171,7 +171,7 @@ export async function settleDefaultCapsAtStart(config: Pick<AimeatConfig, 'nodeI
 
 /**
  * The classification switch moved from off to owner or all: a node that ran before whose offer waits
- * gets it now. Both endpoints that move the switch call it (switch.ts, routes/admin-config.ts).
+ * gets it now. Both endpoints that move the switch call it (switch.ts, routes/admin/config.ts).
  * Never throws.
  */
 export async function offerDefaultCapsWhenSwitchedOn(config: Pick<AimeatConfig, 'nodeId'>, storage: Storage, from: string, to: string): Promise<void> {

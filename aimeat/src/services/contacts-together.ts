@@ -22,7 +22,7 @@ import type { ConversationSummary } from '../storage/repositories/direct-message
 import { canReadWorkspace } from './workspace-access.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
-import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';
 
 /** An organism both are active members of, with the CONTACT's role in it. */
 export interface SharedOrganism { id: string; name: string; role: OrganismMembershipRecord['role']; }

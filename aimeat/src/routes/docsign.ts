@@ -50,7 +50,7 @@ import {
 import { validateDocument } from '../services/docsign/validate-input.js';
 import { ValidationInputError } from '../services/docsign/validate.js';
 import { documentFromStorage } from '../services/docsign/files.js';
-import { docsignMaxBytes } from '../config-docsign.js';
+import { docsignMaxBytes } from '../config/docsign.js';
 import { docsignWalletRouter } from './docsign-wallet.js';
 import { rawBodyBytes } from '../utils/raw-body.js';
 

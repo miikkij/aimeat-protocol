@@ -66,7 +66,7 @@ import { SignJWT } from 'jose';
 import type { CallerContext } from '../caller-context.js';
 import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
 import { logger } from '../../utils/logger.js';
-import { docsignMaxBytes } from '../../config-docsign.js';
+import { docsignMaxBytes } from '../../config/docsign.js';
 import { validatePdf, type SignatureReport } from './validate.js';
 import { caveat, type StatementCaveat } from './statement.js';
 import { readVerifiedName } from '../verified-name.js';

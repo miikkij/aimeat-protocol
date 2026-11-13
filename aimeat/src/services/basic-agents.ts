@@ -41,7 +41,7 @@ import type { Storage } from '../storage/interface.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
 import { nodeContext } from './node-context.js';
 import { addItem, listItems } from './open-items.js';
-import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';
 import { logger } from '../utils/logger.js';
 
 /** Where the owner presses. A deep link into their own profile, not an API address. */
@@ -63,7 +63,7 @@ export interface BasicAgentsView {
     run_mode: string;
     exists: boolean;
     enrolled: boolean;
-    /** Its picture (services/agent-avatar.ts), only for one that is an agent record already. */
+    /** Its picture (services/agent/avatar.ts), only for one that is an agent record already. */
     avatar: AvatarView | null;
   }>;
   /** The page the owner opens to press the button. */

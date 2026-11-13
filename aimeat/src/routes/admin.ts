@@ -83,7 +83,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
 // i18n imports removed — admin UI is now a client-side SPA
 // admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
-import type { ConfigProvenance } from '../services/config-provenance.js';
+import type { ConfigProvenance } from '../services/config/provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
 import { deactivateOwnerByOperator, reactivateOwnerByOperator } from '../services/owner-lifecycle.js';
@@ -93,25 +93,25 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Sub-routers (domain-split from admin.ts)
-import { adminConfigRouter } from './admin-config.js';
-import { adminKeyReencryptRouter } from './admin-key-reencrypt.js';
-import { adminNodeUpdateRouter } from './admin-node-update.js';
-import { adminMonitoringRouter } from './admin-monitoring.js';
-import { adminAgentsRouter } from './admin-agents.js';
-import { adminMaintenanceRouter } from './admin-maintenance.js';
-import { adminEconomyRouter } from './admin-economy.js';
-import { adminMemoryRouter } from './admin-memory.js';
+import { adminConfigRouter } from './admin/config.js';
+import { adminKeyReencryptRouter } from './admin/key-reencrypt.js';
+import { adminNodeUpdateRouter } from './admin/node-update.js';
+import { adminMonitoringRouter } from './admin/monitoring.js';
+import { adminAgentsRouter } from './admin/agents.js';
+import { adminMaintenanceRouter } from './admin/maintenance.js';
+import { adminEconomyRouter } from './admin/economy.js';
+import { adminMemoryRouter } from './admin/memory.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { ADMIN_LOGIN_HTML, ADMIN_SETUP_HTML } from './admin/setup-html.js';
 import { registerSetupRegisterRoute } from './admin/setup-register.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorCaller } from '../services/operator-override.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
-import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config-security.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
+import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config/security.js';
 import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
 import { listAllMemoryPages } from '../storage/memory-pages.js';
 import { sumPlatformFees } from '../commerce/platform-fee.js';
-import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 
 export function adminRouter(
     config: AimeatConfig,

@@ -39,7 +39,7 @@ import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { isRaiseToPublic } from '../publish-gate.js';
 import { memoryVisibilityDefault } from '../content-defaults.js';
 import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from '../publish-requests/ask.js';
 import { memoryCapRefusal } from '../memory-publish-gate.js';
 import { memoryTarget } from '../classification/label-rows.js';

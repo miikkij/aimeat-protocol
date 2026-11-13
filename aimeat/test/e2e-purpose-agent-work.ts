@@ -15,7 +15,7 @@
  *   permissions still gets its work done. Each test here names the use and fails when it is gone.
  *
  *   FAIL FIRST, 2026-10-21, both backends: with services/schedule-fire-refusal.ts refusing every
- *   agent-made schedule at its fire, tests 2 and 3 are red; with services/agent-task-rules.ts holding
+ *   agent-made schedule at its fire, tests 2 and 3 are red; with services/agent/task-rules.ts holding
  *   a task runner's tasks for the owner's OK, test 5 is red; restored byte for byte. Test 4's use is
  *   proved by e2e-workflow-extension-step 13a to 13c in the same tier.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-purpose-agent-work

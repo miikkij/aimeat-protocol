@@ -39,7 +39,7 @@ import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/port
 import { localAccountName } from '../utils/gaii.js';
 import { indexedDatasetPages } from '../services/datapackage/copy-origin.js';
 import { escapeHtml } from '../utils/html-escape.js';
-import { signedInOnly } from '../config-visibility.js';
+import { signedInOnly } from '../config/visibility.js';
 import type { SiteService } from '../services/site.js';
 import { templateAddress, templateAlternates } from '../services/site/template-languages.js';
 

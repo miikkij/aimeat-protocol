@@ -24,7 +24,7 @@ import { STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
 import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { bufferedTelemetryCount } from './telemetry-buffer.js';
-import { AVATAR_KEY, readAvatar } from './agent-avatar.js';
+import { AVATAR_KEY, readAvatar } from './agent/avatar.js';
 
 export interface StepValidationResult {
   passed: boolean;
@@ -369,7 +369,7 @@ async function validatePriceOffer(agentGaii: string, storage: Storage): Promise<
 
 /**
  * set_avatar (optional) — passes when the agent's own `agent.avatar` record holds an emoji or an SVG
- * the node can show (services/agent-avatar.ts). A record that is there and cannot be shown fails with
+ * the node can show (services/agent/avatar.ts). A record that is there and cannot be shown fails with
  * the reason, so the agent learns what to fix rather than that it is missing.
  */
 async function validateSetAvatar(agentGaii: string, storage: Storage): Promise<StepValidationResult> {

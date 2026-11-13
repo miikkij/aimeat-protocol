@@ -123,7 +123,7 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/refinery.ts': 'services/refinery/runs.ts, which runs pipeline.ts: every row a batch files '
         + 'goes through appendRows (workspace-rows/row-service.ts emits organisms) and every record it '
         + 'writes through writeMemoryRecord (memory-write.ts emits memory), two hops below the tool.',
-    'src/mcp/agent-v2-tasks.ts': 'services/agent-v2-tasks-ops.ts, and for the same reason as '
+    'src/mcp/agent-v2-tasks.ts': 'services/agent/v2-tasks-ops.ts, and for the same reason as '
         + 'the v2 messaging tools beside it: a v2 task is addressed to a PRINCIPAL rather than to '
         + 'a view. Whoever needs to know is told on the tunnel socket it is holding (emitDelivery, '
         + 'kinds v2.task.assigned and v2.task.updated) and polls the task back with the same call '
@@ -131,8 +131,8 @@ const DELEGATES: Record<string, string> = {
         + 'which is a different store and is untouched — so an emitChange here would wake every '
         + 'open page for something none of them shows. Verified by reading notify() out of '
         + 'agent-v2-tasks-ops.ts. When a view for them is built, this entry becomes an emit.',
-    'src/mcp/agent-v2-messaging.ts': 'services/agent-v2-messaging-ops.ts, then '
-        + 'services/agent-v2-messaging.ts, and the announcement it makes is deliberately NOT a '
+    'src/mcp/agent-v2-messaging.ts': 'services/agent/v2-messaging-ops.ts, then '
+        + 'services/agent/v2-messaging.ts, and the announcement it makes is deliberately NOT a '
         + 'change domain. A v2 turn is addressed to a PRINCIPAL, not to a view: the recipient is '
         + 'told on the tunnel socket it is holding (emitDelivery, kind v2.message) or by a POST to '
         + 'the delivery target it registered, and it reads the turn back with the same call either '
@@ -172,8 +172,8 @@ const DELEGATES: Record<string, string> = {
         + 'service, same emit, as the REST routes in routes/organisms/workspace-rows.ts, which is the '
         + 'point: the tool holds no write of its own to be silent about. Verified by reading the '
         + 'domain out of the service rather than trusting the delegation.',
-    'src/mcp/agent-capabilities.ts': "services/agent-profile-write.ts, which emits 'agent-capabilities'",
-    'src/mcp/agent-management.ts': "services/agent-profile-write.ts, which emits 'agents'",
+    'src/mcp/agent-capabilities.ts': "services/agent/profile-write.ts, which emits 'agent-capabilities'",
+    'src/mcp/agent-management.ts': "services/agent/profile-write.ts, which emits 'agents'",
     'src/mcp/appdev-pitfalls.ts': "services/memory-write.ts and services/appdev-kb.ts, both emitting 'memory'",
     'src/mcp/appdev-proofs.ts': "services/contribution-proofs.ts, which writes through "
         + "services/memory-write.ts and emits 'memory' there. No REST twin exists for this one: the "
@@ -190,8 +190,8 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/compliance.ts': "services/compliance/register.ts, whose one write helper emits "
         + "'compliance' — so the HTTP route, this tool surface and the scheduled monthly job all "
         + 'emit the same domain from the same line, and none of them can be the door that forgets.',
-    'src/mcp/commerce.ts': "services/memory-write.ts ('memory') and services/agent-offers-write.ts ('agents')",
-    'src/mcp/operator-config.ts': "services/memory-write.ts ('memory') and services/agent-profile-write.ts ('agents')",
+    'src/mcp/commerce.ts': "services/memory-write.ts ('memory') and services/agent/offers-write.ts ('agents')",
+    'src/mcp/operator-config.ts': "services/memory-write.ts ('memory') and services/agent/profile-write.ts ('agents')",
     'src/mcp/packages.ts': "services/packages/install/package-install.ts, which emits 'instances' where it creates "
         + 'the instance record — the same line POST /v1/packages/:groupId/install reaches, since '
         + 'that route is a door onto the same function. Verified by reading the emit out of the '
@@ -209,9 +209,9 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/dm-messages.ts': "services/message-send.ts, which emits 'messages'",
     'src/mcp/feedback.ts': "services/feedback.ts, which emits 'feedback'",
     'src/mcp/flags.ts': "services/moderation-flags.ts, which emits 'flags'",
-    'src/mcp/agent-messages.ts': "services/agent-message-send.ts, which emits 'agent-messages' scoped to the owner",
-    'src/mcp/agent-tasks.ts': "services/agent-task-write.ts (create, event, plan and todo) and "
-        + "services/agent-task-fanout.ts (completion and failure), both emitting 'agent-tasks' scoped to the owner",
+    'src/mcp/agent-messages.ts': "services/agent/message-send.ts, which emits 'agent-messages' scoped to the owner",
+    'src/mcp/agent-tasks.ts': "services/agent/task-write.ts (create, event, plan and todo) and "
+        + "services/agent/task-fanout.ts (completion and failure), both emitting 'agent-tasks' scoped to the owner",
     'src/mcp/agent-telemetry.ts': "services/telemetry-buffer.ts ('agents') and usage-metering.ts ('agent-usage')",
     'src/mcp/core.ts': "services/work-lifecycle.ts ('work' on accept and deliver), routes/work.ts "
         + "createWorkItem ('work'), services/memory-write.ts ('memory') and services/board-post.ts ('boards')",

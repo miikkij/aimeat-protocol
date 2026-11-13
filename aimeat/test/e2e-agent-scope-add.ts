@@ -2,7 +2,7 @@
  * @file test/e2e-agent-scope-add.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description E2E for agent:permissions-add (services/agent-scope-add.ts): the owner's agent that
+ * @description E2E for agent:permissions-add (services/agent/scope-add.ts): the owner's agent that
  *   holds it adds to another of the owner's agents the permissions it holds itself, and the owner is
  *   told of each addition. Asserted over PATCH /v1/agents/:name/scopes and the node MCP tool
  *   aimeat_operator_agent_configure:

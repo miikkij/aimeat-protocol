@@ -34,8 +34,8 @@ import type { Storage, ScheduledJobRecord, AgentTaskRecord, AgentTaskScope } fro
 import { isTerminalTaskStatus } from '../storage/interface.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { emitChange, emitDelivery } from './event-bus.js';
-import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
-import { isStopped } from './agent-stop-rules.js';
+import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent/task-rules.js';
+import { isStopped } from './agent/stop-rules.js';
 import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import { deliveryScopeEntry } from './task-result-delivery.js';
 import type { AimeatConfig } from '../config.js';
@@ -127,7 +127,7 @@ export async function runAgentTaskJob(
     };
   }
 
-  // The same start decision every created task gets (services/agent-task-rules.ts): the agent's
+  // The same start decision every created task gets (services/agent/task-rules.ts): the agent's
   // own answer, never past the permission floor. It read `mode === 'task-runner'` inline until
   // 2026-10-02, a copy of the old rule that would have kept a concierge's schedules waiting.
   const autoActivated = decideTaskStart(agent).startsNow;

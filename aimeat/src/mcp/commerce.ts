@@ -7,7 +7,7 @@
  *   manifests; offer money pricing) and for BUYING through checkout sessions. Every tool wraps an
  *   EXISTING commerce mechanism — the commerce.psp / apps.{appId}.tools memory-record conventions
  *   the sellable resolvers read, the agents.{name}.offers document (published through
- *   services/agent-offers-write.ts, the same function the REST route's publish uses), and
+ *   services/agent/offers-write.ts, the same function the REST route's publish uses), and
  *   src/commerce/session-service.ts — no new business logic, and no write of its own: every record
  *   this file stores goes through services/memory-write.ts. Ownership is always the CALLER's own
  *   owner (derived from the session GAII, never from
@@ -106,9 +106,9 @@ import { canonicalAppToolsId } from '../services/app-tools-key.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
 import { AppToolsDocSchema, appToolsKey, isToolPriced, legacyToolPriceRefusal, normalizeToolPacing, toolTollMorsels } from '../models/app-tool-schemas.js';
-import { loadAgentOffers, publishAgentOffers } from '../services/agent-offers-write.js';
+import { loadAgentOffers, publishAgentOffers } from '../services/agent/offers-write.js';
 import { normalizeOfferPacing, presentOfferPacing, TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
@@ -405,7 +405,7 @@ export function registerCommerceTools(
             if (clear_money) offer.priceMoney = null;
             if (visibility) offer.visibility = visibility;
 
-            // ONE implementation, and it is not this one. services/agent-offers-write.ts owns the
+            // ONE implementation, and it is not this one. services/agent/offers-write.ts owns the
             // whole-document validation, the version bump, the record shape, the memory rules the
             // record answers to and the change event — the same sequence PUT /v1/agents/:name/offers
             // runs, because publishing an offers document is the same act either way. What stays

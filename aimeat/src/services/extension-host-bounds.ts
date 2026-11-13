@@ -30,7 +30,7 @@
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
-import { EXT_FETCH_INFLIGHT_MB_DEFAULT } from '../config-extension-load.js';
+import { EXT_FETCH_INFLIGHT_MB_DEFAULT } from '../config/extension-load.js';
 
 /** The most answer bytes one run's fetches may hold in flight together when the setting is absent. */
 export const EXT_FETCH_INFLIGHT_BYTES = EXT_FETCH_INFLIGHT_MB_DEFAULT * 1024 * 1024;

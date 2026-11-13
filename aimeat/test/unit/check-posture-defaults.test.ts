@@ -7,7 +7,7 @@
  *
  *   Fail-first: the .env.example line this commit corrected ("(default: operator)" for
  *   AIMEAT_EXT_INSTALL_ROLE, where the code default is owner) is one of the fixtures below and is
- *   refused, and before src/config-posture.ts named them the real tree had unwarned findings for
+ *   refused, and before src/config/posture.ts named them the real tree had unwarned findings for
  *   the extension install role, the admin setup setting and the AI provider allowlist
  *   (QA audit S10-05, S1-08, F7d-05).
  * @version-history
@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALLOWED, envExampleFacts, postureFindings, postureKnobs, resolvedPublicDefaults } from '../../scripts/check-posture-defaults.js';
-import { POWERFUL_AGENT_SCOPES, securityPostureWarnings } from '../../src/config-posture.js';
+import { POWERFUL_AGENT_SCOPES, securityPostureWarnings } from '../../src/config/posture.js';
 import { SHIPPED_DEFAULT_AGENT_SCOPES } from '../../src/config.js';
 import type { AimeatConfig } from '../../src/config-types.js';
 

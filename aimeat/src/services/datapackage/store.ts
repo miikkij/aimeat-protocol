@@ -126,7 +126,7 @@ import { writeLatest, upsertCatalogueEntry, setVersionAudience, readPointer, rea
 import { trustedAudienceOf } from './audience-record.js';
 import { readerFor, type ReaderAuth } from '../classification/reader.js';
 import { fileTarget } from '../classification/labels.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { closedNodeLevel } from '../closed-node-level.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
 import { personalPublicGuard, PERSONAL_DATA_PUBLIC } from './personal-guard.js';

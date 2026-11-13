@@ -35,7 +35,7 @@ import { bookPayable } from '../src/commerce/payable-book.js';
 import { getSession } from '../src/commerce/session-service.js';
 import { readGuestCheckout, onUcpTaskDone, deliverOrderWebhook } from '../src/commerce/ucp-guest-checkout.js';
 import { setCatalogueEntry, recordReview, putSubscription, readCatalogue, subscriptionsOf, NS_PACKAGE_SALES, type Subscription } from '../src/services/packages/sale/package-sale-catalogue.js';
-import { writeAgentKey, writeAgentCap, agentKeyRecord } from '../src/services/agent-ai-keys.js';
+import { writeAgentKey, writeAgentCap, agentKeyRecord } from '../src/services/agent/ai-keys.js';
 import { deleteOwnerAiProvider, persistHealth } from '../src/services/ai/provider-store.js';
 import { PROVIDER_PREFIX } from '../src/services/ai/providers.js';
 import { registerOperatorConfigTools } from '../src/mcp/operator-config.js';

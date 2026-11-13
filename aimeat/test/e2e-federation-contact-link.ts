@@ -53,7 +53,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
-import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config-federation.js';
+import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config/federation.js';
 import { removedOn } from './helpers/node-release.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { setupOperator } from './helpers/owner-login.js';

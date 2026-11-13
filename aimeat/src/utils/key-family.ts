@@ -107,7 +107,7 @@ const CREWS_KEY = /^crews\.([^.]+)\./;
  * read like platform families and are written by NO node code, so they are deliberately absent.
  */
 export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: string }[] = [
-  { prefix: 'agents.', writtenBy: 'services/agent-statistics.ts, services/agent-offers-write.ts' },
+  { prefix: 'agents.', writtenBy: 'services/agent/statistics.ts, services/agent/offers-write.ts' },
   { prefix: 'apps.', writtenBy: 'services/app-tool-interfaces.ts (apps.{appId}.tools)' },
   { prefix: 'apptool.', writtenBy: 'services/app-tool-interfaces.ts' },
   { prefix: 'app-catalog.', writtenBy: 'routes/apps (promoted + favourites docs)' },

@@ -8,7 +8,7 @@
  *   WHAT NO SURFACE COULD ANSWER. A connection can be complete — the company created, their
  *   identity provider's metadata read, a provisioning token minted, the connection listed — and
  *   nobody can sign in, because `sso.enabled` is off and both public doors answer 503. That
- *   ordering is deliberate (config-types-enterprise-sso.ts: "a node is configured first and
+ *   ordering is deliberate (config/types-enterprise-sso.ts: "a node is configured first and
  *   switched on second"), which is exactly why a surface has to say which of the two phases the
  *   node is in. The page showed five setup steps; the real sequence has six, and the sixth is a
  *   setting on another page.

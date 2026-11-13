@@ -76,7 +76,7 @@ import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 import { selfNodeIdMessage } from '../../services/federation-peer-gate.js';
 import { askPeerReplacement } from '../../services/peer-replace-ask.js';
 import { sweepExpiredPeeringRequests, peeringRequestExpired, expiredRequestMessage } from '../../services/peering-request-expiry.js';
-import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config-federation.js';
+import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config/federation.js';
 
 /** Peers whose unsigned service summary request was answered since this process started, logged once each. */
 const unsignedSummaryPeersLogged = new Set<string>();

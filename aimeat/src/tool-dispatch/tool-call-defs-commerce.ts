@@ -25,7 +25,7 @@
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalRecord } from './tool-call-helpers.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 
 export const commerceCliTools: ConnectCliToolDefinition[] = [
     {

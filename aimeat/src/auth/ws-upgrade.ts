@@ -14,7 +14,7 @@
  *   - `?token=<jwt>`: DEPRECATED. A URL is written to every reverse proxy's access log, so this put a
  *     live session token in those logs (secrets audit 2026-10-09, d3). Controlled by
  *     AIMEAT_WS_QUERY_TOKEN (config.wsQueryToken): default on in 3.x. From WS_QUERY_TOKEN_REMOVED_IN
- *     (4.0.0, config-security.ts) it is refused whatever the setting says. When refused the answer is
+ *     (4.0.0, config/security.ts) it is refused whatever the setting says. When refused the answer is
  *     WS_QUERY_TOKEN_DISABLED. Each accepted use is counted in the stats counter family
  *     `ws_query_token` (by socket kind, GET /v1/stats), logged at most once a day, and its 101 answer
  *     carries the Deprecation headers (upgradeDeprecationHeaderLines), so the switch-off can be
@@ -46,7 +46,7 @@ import { credentialRevoked } from './middleware.js';
 import { createSingleUseTicketStore } from '../services/single-use-tickets.js';
 import { getStats } from '../services/stats.js';
 import { logger } from '../utils/logger.js';
-import { WS_QUERY_TOKEN_REMOVED_IN } from '../config-security.js';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../config/security.js';
 import { deprecationHeaders, removedFrom } from '../services/deprecation.js';
 
 /** The WebSocket endpoints a ticket can be minted for. One ticket opens one kind and no other. */

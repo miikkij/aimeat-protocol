@@ -28,8 +28,8 @@
  *     asks; the answers are the same (codebase analysis 2026-11-03, item B4).
  *   v1.0.0 — 2026-11-03 — Initial (secaudit2026nov02d round 13b).
  */
-import { CAPABILITY_USE_APPROVAL_LABEL } from '../../config-types-agent-access.js';
-import { settingLoosens, looseningRefusal } from '../config-strictness.js';
+import { CAPABILITY_USE_APPROVAL_LABEL } from '../../config/types-agent-access.js';
+import { settingLoosens, looseningRefusal } from '../config/strictness.js';
 import type { PolicyCaller, PolicyRefusal } from '../sign-in-policy.js';
 
 export const CAPABILITY_USE_APPROVAL_PATH = 'mcp.capability_use_approval';

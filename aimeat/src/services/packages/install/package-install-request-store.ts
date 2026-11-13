@@ -50,7 +50,7 @@ import type { Storage, PackageRecord } from '../../../storage/interface.js';
 import type { MigrationRequest } from './package-migrate.js';
 import { addItem, closeItem, getItem } from '../../open-items.js';
 import { notify } from '../../notify.js';
-import { sendAgentV2Message } from '../../agent-v2-messaging.js';
+import { sendAgentV2Message } from '../../agent/v2-messaging.js';
 import { emitChange } from '../../event-bus.js';
 import { stableStringify } from '../../../utils/stable-json.js';
 import { serialByKey } from '../../../utils/serial-by-key.js';

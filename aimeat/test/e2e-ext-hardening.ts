@@ -80,7 +80,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import { ownerSignIn } from './helpers/owner-login.js';
 import { makeAgent } from './helpers/mcp-session.js';
 import { removedOn } from './helpers/node-release.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 async function setupOwner(label: string) {
   const name = `eh${label}${Date.now()}`;
   const reg0 = () => json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Hardening', password: 'Hardening1234' }) });

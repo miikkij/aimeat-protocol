@@ -38,7 +38,7 @@
 import { createHmac } from 'node:crypto';
 import {
   TURN_STATIC_PAIR_REMOVED_IN, TURN_TTL_DEFAULT_SECONDS, TURN_TTL_MAX_SECONDS, TURN_TTL_MIN_SECONDS, type TurnConfig,
-} from '../config-turn.js';
+} from '../config/turn.js';
 import { noteDeprecatedUse, removedFrom } from './deprecation.js';
 
 /** One RTCIceServer entry as the route serves it. */

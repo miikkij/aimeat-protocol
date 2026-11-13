@@ -31,7 +31,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
+import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 

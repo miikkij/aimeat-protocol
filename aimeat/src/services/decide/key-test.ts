@@ -25,7 +25,7 @@ import { getTodayUsage, recordAiUsage } from '../ai/completion.js';
 import { logger } from '../../utils/logger.js';
 import { callSystemOne, SystemOneError } from './systemone-client.js';
 import { readOwnDecideKey } from './settings.js';
-import { readAgentKey } from '../agent-ai-keys.js';
+import { readAgentKey } from '../agent/ai-keys.js';
 import { DecideError } from './errors.js';
 
 const PROBE = {

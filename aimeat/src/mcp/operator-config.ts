@@ -11,7 +11,7 @@
  *   Tool: aimeat_operator_agent_configure — update a SAME-OWNER agent's display_name /
  *   description / mode / tags / scopes / clearance. Scope changes NARROW the granted set; they add
  *   only for a caller holding agent:permissions-add, which the owner gives in person, and then only
- *   words the caller holds itself and never to itself (services/agent-scope-add.ts), so an agent
+ *   words the caller holds itself and never to itself (services/agent/scope-add.ts), so an agent
  *   can never talk itself into more privilege through this tool.
  * @structure registerOperatorConfigTools() — registers the tools on an McpServer
  * @usage
@@ -71,7 +71,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { logger } from '../utils/logger.js';
-import { checkScopeAddition, recordScopeAddition } from '../services/agent-scope-add.js';
+import { checkScopeAddition, recordScopeAddition } from '../services/agent/scope-add.js';
 import { resolveMcpWriteTarget } from '../services/write-target.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { CAS_ATTEMPTS } from '../services/record-cas.js';
@@ -79,9 +79,9 @@ import { recommendedModelsOf } from '../services/ai/policy-store.js';
 import {
     normaliseAgentProfile, loadSameOwnerAgent, setAgentProfile,
     type AgentProfileFields,
-} from '../services/agent-profile-write.js';
+} from '../services/agent/profile-write.js';
 import type { CallerContext } from '../services/caller-context.js';
-import { setAgentClearance } from '../services/agent-clearance.js';
+import { setAgentClearance } from '../services/agent/clearance.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
 
@@ -106,7 +106,7 @@ function currentView(agent: AgentRecord): AgentConfigChange {
     };
 }
 
-/** The tool's snake_case payload in the field names services/agent-profile-write.ts writes. */
+/** The tool's snake_case payload in the field names services/agent/profile-write.ts writes. */
 function profileFieldsOf(change: AgentConfigChange): AgentProfileFields {
     return {
         ...(change.display_name !== undefined ? { displayName: change.display_name } : {}),
@@ -190,7 +190,7 @@ export function registerOperatorConfigTools(
             // addition, whatever its current scopes look like.
             //
             // An addition passes only on the rule PATCH /v1/agents/:name/scopes asks
-            // (services/agent-scope-add.ts): the caller holds agent:permissions-add, which only the
+            // (services/agent/scope-add.ts): the caller holds agent:permissions-add, which only the
             // owner in person gives, and adds words it holds itself, never that word, never to
             // itself. Asked at propose time and again at confirm, on the session's scopes narrowed to
             // the caller's record, so a word the owner took away in between stops the change. The '*'
@@ -206,7 +206,7 @@ export function registerOperatorConfigTools(
                 scopesAdded = check.added;
             }
 
-            // The field vocabulary is services/agent-profile-write.ts, and it runs HERE as well as
+            // The field vocabulary is services/agent/profile-write.ts, and it runs HERE as well as
             // on the write, so a malformed tag or an empty scope list is refused before a token is
             // minted and the diff the owner reads is the value that will be stored. Tags come back
             // trimmed, lowercased and de-duplicated; the token binds to that form, and it has to,
@@ -214,7 +214,7 @@ export function registerOperatorConfigTools(
             const normalised = normaliseAgentProfile(config, profileFieldsOf(proposed));
             if (!normalised.ok) return err(`${normalised.code}: ${normalised.message}`);
 
-            // The clearance has its own writer and its own rules (services/agent-clearance.ts): an
+            // The clearance has its own writer and its own rules (services/agent/clearance.ts): an
             // agent lowers another agent's only, never its own, and a raise or a removal is the
             // owner's in person, which an MCP session never is. Asked at propose time too, as a dry
             // run, so a refused change is never shown as approvable.
@@ -253,7 +253,7 @@ export function registerOperatorConfigTools(
                 throw e;
             }
 
-            // ONE implementation. services/agent-profile-write.ts owns the same-owner check, the
+            // ONE implementation. services/agent/profile-write.ts owns the same-owner check, the
             // field rules and the Hello Integration step-list re-derive a mode change owes, the same
             // way PATCH /v1/agents/:name/tags and /mode do. This door used to write the record
             // itself, so a tag nobody else would accept got stored and a mode change left the

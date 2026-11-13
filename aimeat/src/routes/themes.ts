@@ -53,7 +53,7 @@ import { THEME_WRITE_SCOPE } from '../utils/scope-coverage.js';
 import { ThemeService, ThemeError, type ThemeInput, type Theme } from '../services/themes/service.js';
 import { FontError, type FontInput } from '../services/themes/fonts.js';
 import type { StyleInput } from '../services/themes/styles.js';
-import type { ConfigProvenance } from '../services/config-provenance.js';
+import type { ConfigProvenance } from '../services/config/provenance.js';
 import { requireOwnerSession } from './home/welcome-mat.js';
 import { onChangeEvent } from '../services/event-bus.js';
 

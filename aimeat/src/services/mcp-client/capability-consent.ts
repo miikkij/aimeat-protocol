@@ -45,7 +45,7 @@
 import type { Storage, CapabilityRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { McpServerRecord } from '../../models/mcp-server-schemas.js';
-import type { McpCapabilityUseApproval } from '../../config-types-agent-access.js';
+import type { McpCapabilityUseApproval } from '../../config/types-agent-access.js';
 import { localAccountName, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 import { CAPABILITY_USE_APPROVAL_PATH, CAPABILITY_USE_APPROVAL_LABEL } from './capability-use-setting.js';

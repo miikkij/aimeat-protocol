@@ -31,7 +31,7 @@ Every fact on this page was read from the code. If the code and this page disagr
   ```
 
 - **Owner keys are generated on the server.** `POST /v1/owners` (`src/routes/owners.ts`) and `POST /v1/ghii` (`src/routes/ghii/register-login.ts`) call `generateKeyPair()`, store the public key on the owner record and return the private key once in the response. The node keeps no copy of the private key. The owner key no longer signs anyone in (removed in 4.0.0), and the operator route that issued a new pair was removed on 2026-10-15.
-- **Owner-key sign-in is removed in 4.0.0.** `POST /v1/auth/token` with an owner name and a signature made with that key answers `410 OWNER_KEY_LOGIN_OFF` from 4.0.0 and points to `POST /v1/ghii/login`, whatever `AIMEAT_OWNER_KEY_LOGIN` says (`OWNER_KEY_LOGIN_REMOVED_IN` in `src/config-security.ts`). On a 3.x node the setting still switches it on or off, and an account with two-step sign-in armed is refused even when it is on. New code signs owners in with a password session, never with the account key.
+- **Owner-key sign-in is removed in 4.0.0.** `POST /v1/auth/token` with an owner name and a signature made with that key answers `410 OWNER_KEY_LOGIN_OFF` from 4.0.0 and points to `POST /v1/ghii/login`, whatever `AIMEAT_OWNER_KEY_LOGIN` says (`OWNER_KEY_LOGIN_REMOVED_IN` in `src/config/security.ts`). On a 3.x node the setting still switches it on or off, and an account with two-step sign-in armed is refused even when it is on. New code signs owners in with a password session, never with the account key.
 - The node's own key pair signs JWTs and federation messages. `AIMEAT_KEY_PASSPHRASE` encrypts the node key on disk. It is read in `src/auth/node-keys.ts`, not in a config file, so it is not on the Config tab.
 
 ### JWT Tokens
@@ -56,7 +56,7 @@ Every fact on this page was read from the code. If the code and this page disagr
 
 ### TOTP 2FA
 
-Library: `otpauth`. Each setting is read in `src/config-types-account-security.ts` (`accountSecurityDefaults`):
+Library: `otpauth`. Each setting is read in `src/config/types-account-security.ts` (`accountSecurityDefaults`):
 
 | Env var | What it controls | Field |
 |---|---|---|
@@ -220,7 +220,7 @@ Middleware: `rateLimit()` in `src/middleware/rate-limit.ts`. The bucket key is t
 | `AIMEAT_RL_REGISTRATION_INVITES` | Registration invitations sent. Not on the Config tab | one hour | `rateLimits.registrationInvites` |
 | `AIMEAT_RL_OPENROUTER` | Calls to the OpenRouter proxy. Not on the Config tab | one minute | `rateLimits.openrouter` |
 
-The other per-area limits (GHII, flags, appeals, admin setup, federation, catalogue, auth challenge) are `rate_limits.*` rows in `src/services/config-schema-rate-limits.ts`, each with its own environment variable.
+The other per-area limits (GHII, flags, appeals, admin setup, federation, catalogue, auth challenge) are `rate_limits.*` rows in `src/services/config/schema-rate-limits.ts`, each with its own environment variable.
 
 Sign-in attempts and password lockout have their own settings: `AIMEAT_LOGIN_RATE_LIMIT_MAX` (`loginRateLimitMax`) and `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (`passwordLockoutAttempts`), both in `src/config.ts`. The lockout counts only with `AIMEAT_SIGN_IN_LOCKOUT=on` (`signInLockout`); it is off by default (Jouni, 2026-11-02).
 
@@ -236,7 +236,7 @@ The limit is multiplied by a factor for the caller's role: operator, owner, any 
 
 - `encrypt(plaintext, key)` / `decrypt(data, key)`.
 - `encryptBound(plaintext, key, context)` / `decryptBound(data, key, context)` bind the ciphertext to a context string (AES-GCM additional data), so the value opens only where that context is named.
-- `getEncryptionKey(config)` reads `AIMEAT_ENCRYPTION_KEY` (`encryptionKey` in `src/config-types-account-security.ts`, not on the Config tab), then falls back to `AIMEAT_TOTP_ENCRYPTION_KEY` (`totpSecretEncryptionKey`). The key is 64 hex characters (32 bytes); any other length gives `null`.
+- `getEncryptionKey(config)` reads `AIMEAT_ENCRYPTION_KEY` (`encryptionKey` in `src/config/types-account-security.ts`, not on the Config tab), then falls back to `AIMEAT_TOTP_ENCRYPTION_KEY` (`totpSecretEncryptionKey`). The key is 64 hex characters (32 bytes); any other length gives `null`.
 
 The rules for secrets (never returned, never logged, destination allowlisted) are invariant 7.
 

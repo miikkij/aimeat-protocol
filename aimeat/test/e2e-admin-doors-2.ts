@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The second half of the operator doors the sweep never writes through:
- *   src/routes/admin-monitoring.ts (work, federation, stats, restore, role grant and revoke, trust
+ *   src/routes/admin/monitoring.ts (work, federation, stats, restore, role grant and revoke, trust
  *   advisories, relay earnings), the setup and seeding doors in src/routes/admin.ts, and
  *   src/routes/knowledge/admin.ts (import, delete, review). Split from e2e-admin-doors.ts for the
  *   800-line rule; the two share no state and each stands up its own operator.
@@ -151,7 +151,7 @@ await test('An operator, a plain owner and an agent', async () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════
-// Section C — src/routes/admin-monitoring.ts
+// Section C — src/routes/admin/monitoring.ts
 // ══════════════════════════════════════════════════════════════════════════
 console.log('\nSection C — monitoring reads');
 

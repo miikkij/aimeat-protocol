@@ -1,6 +1,6 @@
 # 12 Updates and releases
 
-> Checked against AIMEAT node 4.2.0 (commit 2d94bf903) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit d76b3dac5) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page is for the people who approve and apply updates: the system owner, the sysadmin and the security officer. It says how the project makes a release, what a release consists of, what you can verify about its integrity and what you cannot, how an update and a rollback work, and how security fixes are announced. The step-by-step procedure stays in [Upgrading](../operations/upgrading.md).
 
@@ -78,7 +78,7 @@ What you can verify yourself:
 | Channel | What it gives | Source |
 |---|---|---|
 | Notice in the node | An operator sees a header notice when npm has a newer version. `aimeat_admin_node_update` (`GET /v1/admin/node-update`) gives the running and newest versions, what is new, the detected install method and the steps for it | [Upgrading](../operations/upgrading.md#find-out-what-is-available), `aimeat/src/services/node-update-check.ts` |
-| Turning it off | `AIMEAT_UPDATE_CHECK=false`; `AIMEAT_UPDATE_CHECK_SOURCE` points it at an internal mirror | `aimeat/src/config-update-check.ts` |
+| Turning it off | `AIMEAT_UPDATE_CHECK=false`; `AIMEAT_UPDATE_CHECK_SOURCE` points it at an internal mirror | `aimeat/src/config/update-check.ts` |
 | Change log | `/changelog.json` and `/v1/changelog` on every node; entries of kind `security` carry an impact sentence | `aimeat/public/changelog.json` |
 | npm | `npm view aimeat version` | `.github/SECURITY.md` |
 

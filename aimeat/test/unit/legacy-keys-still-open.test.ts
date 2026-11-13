@@ -207,7 +207,7 @@ describe('stored secrets sealed at 0c741df55 still open', () => {
   });
 
   it('a secret Config setting, an MCP server header and an extension secret', async () => {
-    const { openStoredSetting } = await import('../../src/services/config-at-rest.js');
+    const { openStoredSetting } = await import('../../src/services/config/at-rest.js');
     const { openTransportSecrets } = await import('../../src/services/mcp-client/transport-secrets.js');
     const { decryptSecretFields } = await import('../../src/services/extension-secrets.js');
     const { getEncryptionKey } = await import('../../src/services/encryption.js');

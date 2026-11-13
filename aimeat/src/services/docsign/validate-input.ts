@@ -21,7 +21,7 @@ import type { CallerContext } from '../caller-context.js';
 import { validatePdf, validateCmsFile, ValidationInputError, type ValidationReport } from './validate.js';
 import { lookupByHash, DocsignError, type DocsignCtx, type PublicRequestView } from './records.js';
 import { readOwnFile } from './files.js';
-import { docsignMaxBytes } from '../../config-docsign.js';
+import { docsignMaxBytes } from '../../config/docsign.js';
 
 export interface ValidateInput {
   /** The file: a PDF, an attached CMS (.p7m), or any document to look up by hash. */

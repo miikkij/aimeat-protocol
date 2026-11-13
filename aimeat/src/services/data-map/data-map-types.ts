@@ -218,7 +218,7 @@ export interface DataMapRow {
    *
    * OPTIONAL, AND THE WHOLE TIE BETWEEN AN APP AND AN AGENT. A row that names an agent says "this
    * app shows what that agent produces", and that one statement is what the agent's page lists as
-   * its apps and what the app's page lists as its agents (services/agent-ties.ts). It lives here
+   * its apps and what the app's page lists as its agents (services/agent/ties.ts). It lives here
    * because the map is already the app's own statement of where its data is: the tie goes when the
    * app goes, and no second list has to be kept true. It grants nothing: what the app may read is
    * decided by its permissions, as before.

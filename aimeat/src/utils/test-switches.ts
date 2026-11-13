@@ -6,7 +6,7 @@
  *   the sentence the operator is told. The same treatment the test money handler has
  *   (utils/test-money-guard.ts): the setting keeps working wherever it is set, so a test or staging
  *   value carried over to a live node is not refused, but on a node whose public URL is not a
- *   loopback address the start log says so (config-posture.ts) and the Security page shows it as
+ *   loopback address the start log says so (config/posture.ts) and the Security page shows it as
  *   critical (services/security-overview.ts). A loopback node, which is what the E2E runner and
  *   `pnpm sandbox` start, gets no warning. Before this, five of these had no warning anywhere and dev
  *   mode had one start-log line (QA audit D8-01).

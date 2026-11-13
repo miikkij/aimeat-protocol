@@ -1,0 +1,783 @@
+/**
+ * @file src/routes/admin/monitoring.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Operator-only admin routes for monitoring and federation control — listing all work
+ *   items, inspecting federation peers/peering requests, and initiating a federation join
+ *   (key exchange) with a genesis/target node.
+ *
+ * @structure
+ *   - adminMonitoringRouter(config, storage, peers): builds the operator-gated router
+ *   - GET /v1/admin/work: lists all work items with status and cost
+ *   - GET /v1/admin/federation: lists peering requests/peers
+ *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
+ *
+ * @version-history
+ *   2026-10-27 — secaudit2026oct26: POST /v1/admin/restore hands the restoring actor to restoreBackup,
+ *     which writes the operator trail per person and bounds the clearance an operator's agent restores.
+ *   Backup reader — 2026-10-25 — GET /v1/admin/backup reads a delegated caller's memory records through
+ *     the classification reader and names what stayed behind in `withheld`; the operator in person gets
+ *     the whole file. Each person whose entries the file holds gets one export line in their account
+ *     feed (secaudit2026oct22, get-admin-backup:memory-values-without-reader-or-trail).
+ *   2026-10-25 — The federation key pair is read from the config (federation.public_key, .private_key), and a pair made here is kept there too.
+ *   Trust advisory sent — 2026-10-16 — POST /v1/admin/federation/trust-advisory sends the stored
+ *     advisory to the active peers at once as a signed notice (services/federation-trust-notice.ts)
+ *     and answers each peer's outcome; it said the advisory would be broadcast on the next sync cycle,
+ *     which nothing did (QA audit S6-06).
+ *   Restore outcome — 2026-10-16 — POST /v1/admin/restore runs services/admin-restore.ts: a record that
+ *     already exists is counted as a duplicate, any other failure is counted and logged at error level,
+ *     and `restored` is false when one occurred; a body whose lists are not lists is refused with 400.
+ *     Every create error was logged as a skipped duplicate and the answer always said `restored: true`
+ *     (QA audit P6-07).
+ *   Roles — 2026-10-16 — Granting or revoking the operator role writes the operator trail: a usage row,
+ *     a log line and the account event operator_acted on the person's feed (QA audit S1-02).
+ *   Work cost — 2026-10-11 — The admin work list's `cost` carries `toll` (the escrowed pacing amount) and
+ *     the deprecated `base_price` mirror, through presentWorkCost (services/morsel.ts).
+ *   Backup — 2026-10-09 — GET /v1/admin/backup writes owners and agents through an allowlist and
+ *     leaves credential memory records out, and says what it omitted; the webhook secret was in the
+ *     file (secrets audit 2026-10-09, finding 1.9).
+ *   Join form — 2026-10-05 — The join form's three requests to the URL the operator typed go through
+ *     safeFetch, which checks every redirect hop, and read their answers under a ceiling; they were
+ *     bare fetch() calls that followed redirects after one check (secaudit 2026-10, C6).
+ *   Operator agent — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
+ *   Join keys first — 2026-10-01 — completeJoin exchanges keys before it saves the peer, saves nothing
+ *     when the exchange fails, and never replaces a peer this node already has: the id came from the
+ *     target's own card, and a keyless active peer took the first key any caller sent to
+ *     /v1/federation/key-exchange (incident federation-join-the-target-s-card-names-the-peer-id-an-exist-muptit8h).
+ *   Revoke order — 2026-09-09 — The last-operator check runs before the self-revoke check; behind it
+ *     the guard could never fire, because the caller holds the role and so the count was always two.
+ *   Join completion — 2026-09-06 — Review items 4.4 and 4.5. The approved-join completion is awaited
+ *     inside its own try: the poller is cleared before it, so a failure there used to fall into a
+ *     catch that logs "continuing after a suppressed failure" — a sentence about a poll that would
+ *     try again, printed for a join that never would. The auto-approved path catches instead of
+ *     floating, because the 200 has already gone out and the only thing left is to say so.
+ *   Funnel — 2026-08-27 — The `switched` column left the onboarding funnel with the home-or-profile
+ *     switch it counted.
+ *   Operator revoke — 2026-08-14 — POST /v1/admin/roles/revoke takes the operator role back, refusing
+ *     self-revoke and the last operator so the node keeps at least one administrator.
+ *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ */
+import { Router } from 'express';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
+import { success, error } from '../../middleware/envelope.js';
+import { RoleGrantSchema, validateBody } from '../../models/schemas.js';
+import { randomBytes } from 'node:crypto';
+import { generateKeyPair, sign } from '../../auth/keypair.js';
+import { emitChange } from '../../services/event-bus.js';
+import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
+import { readJson } from '../../utils/read-capped.js';
+
+/** A node card, an introduction answer or a join status: a few kilobytes (secaudit 2026-10, C6). */
+const JOIN_ANSWER_MAX_BYTES = 256 * 1024;
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import type { PeerInfo } from '../../services/federation.js';
+import { deriveTierFlags } from '../../services/federation-tiers.js';
+import { performKeyExchange } from '../../services/federation-helpers.js';
+import { logger } from '../../utils/logger.js';
+import { recordOperatorAction, recordOperatorAccess } from '../../services/operator-access-audit.js';
+import { resolveIdentity, ownerGhiiOf, isOwnerInPerson } from '../../utils/gaii.js';
+import { readerFor } from '../../services/classification/reader.js';
+import type { VerifiedToken } from '../../auth/jwt.js';
+import { ROOMS } from '../../services/home-rooms.js';
+import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED, BACKUP_WITHHELD_NOTE, readableBackupMemories } from '../../services/admin-backup-projection.js';
+import { restoreBackup } from '../../services/admin-restore.js';
+import { presentWorkCost } from '../../services/morsel.js';
+import { sendTrustNotice, type TrustAdvisoryType } from '../../services/federation-trust-notice.js';
+
+const POLL_INTERVAL_MS = 10_000;
+const MAX_POLL_DURATION_MS = 30 * 60_000;
+
+export function adminMonitoringRouter(
+    config: AimeatConfig,
+    storage: Storage,
+    peers?: Map<string, PeerInfo>,
+): Router {
+    const router = Router();
+
+    /** The operator trail for an operator role given or taken (services/operator-access-audit.ts). */
+    const recordRoleChange = async (auth: VerifiedToken, owner: string, action: 'grant' | 'revoke'): Promise<void> => {
+        const actorGaii = resolveIdentity(auth, config.nodeId);
+        await recordOperatorAction(storage, config, {
+            operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf: `${owner}@${config.nodeId}`,
+            area: 'role', action, subject: 'operator',
+        });
+    };
+
+    // GET /v1/admin/work — list all work items (operator only)
+    router.get('/v1/admin/work', requireAuth(), requireOperator(storage), async (_req, res) => {
+        const allWork = await storage.listAllWork();
+        res.json(success(config.nodeId, {
+            work: allWork.map(w => ({
+                tracking_code: w.trackingCode,
+                status: w.status,
+                action_id: w.actionId,
+                provider_gaii: w.providerGaii,
+                requester_gaii: w.requesterGaii,
+                // Spelled the way every other field on the row is, and the way GET /v1/work/:tc
+                // already spells the same object. It went out as the raw record, so one object in
+                // the middle of a snake_case row answered in camelCase and a reader folding
+                // `in_escrow` over it silently counted nothing.
+                cost: presentWorkCost({
+                    toll: w.cost?.toll ?? 0, networkFee: w.cost?.networkFee ?? 0,
+                    total: w.cost?.total ?? 0, inEscrow: w.cost?.inEscrow ?? 0,
+                }, 'snake'),
+                created_at: w.createdAt,
+                updated_at: w.updatedAt,
+                ttl_expires_at: w.ttlExpiresAt,
+            })),
+            total: allWork.length,
+        }));
+    });
+
+    // GET /v1/admin/federation — federation info (operator only)
+    router.get('/v1/admin/federation', requireAuth(), requireOperator(storage), async (_req, res) => {
+        const peers = await storage.listPeeringRequests();
+        res.json(success(config.nodeId, {
+            peers: peers.map(p => ({
+                id: p.id,
+                from_node_url: p.fromNodeUrl,
+                from_node_id: p.fromNodeId,
+                target_url: p.targetUrl,
+                status: p.status,
+                message: p.message,
+                created_at: p.createdAt,
+            })),
+            total: peers.length,
+        }));
+    });
+
+    // POST /v1/admin/federation/join — introduce this node to a genesis/target node (operator only)
+    router.post('/v1/admin/federation/join', requireAuth(), requireOperator(storage), async (req, res) => {
+        const { genesis_url, role } = req.body ?? {};
+        if (!genesis_url || typeof genesis_url !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'genesis_url is required'));
+            return;
+        }
+        const joinRole = (role === 'operator' || role === 'contributor') ? role : 'contributor';
+        const targetUrl = genesis_url.replace(/\/+$/, '');
+
+        // SSRF validation before outbound fetch
+        const ssrfCheck = await validateOutboundUrl(targetUrl);
+        if (!ssrfCheck.valid) {
+            res.status(400).json(error(config.nodeId, 'INVALID_URL', `URL blocked: ${ssrfCheck.reason}`));
+            return;
+        }
+
+        // 1. Discovery
+        let targetInfo: { node_id?: string; type?: string; protocol?: string; version?: string | number; capabilities?: string[] };
+        try {
+            // safeFetch, not fetch: the URL is the one the operator typed, checked above, and every
+            // redirect hop is checked again (secaudit 2026-10, C6). The answer is read under a ceiling.
+            const disc = await safeFetch(`${targetUrl}/.well-known/aimeat`, { signal: AbortSignal.timeout(10_000) });
+            if (!disc.ok) throw new Error(`HTTP ${disc.status}`);
+            const body = await readJson(disc, JOIN_ANSWER_MAX_BYTES) as { data?: typeof targetInfo };
+            targetInfo = body.data!;
+            if (!targetInfo?.protocol || targetInfo.protocol !== 'aimeat') {
+                res.status(502).json(error(config.nodeId, 'NOT_AIMEAT', 'Target is not an AIMEAT node'));
+                return;
+            }
+        } catch (e) {
+            res.status(502).json(error(config.nodeId, 'DISCOVERY_FAILED',
+                `Cannot reach ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
+            return;
+        }
+
+        // 2. Ensure this node has a keypair. The config holds the pair the environment gave
+        // (federation.public_key, federation.private_key on the admin Config tab).
+        let publicKey = config.federationPublicKey;
+        let privateKey = config.federationPrivateKey ?? '';
+        if (!publicKey || !privateKey) {
+            const keys = await generateKeyPair();
+            publicKey = keys.publicKey;
+            privateKey = keys.privateKey;
+            process.env.AIMEAT_PUBLIC_KEY = publicKey;
+            process.env.AIMEAT_PRIVATE_KEY = privateKey;
+            config.federationPublicKey = publicKey;
+            config.federationPrivateKey = privateKey;
+        }
+
+        // 3. Sign and send introduction
+        const timestamp = new Date().toISOString();
+        const messageToSign = `${config.nodeId}${config.baseUrl}${timestamp}`;
+        const signature = await sign(privateKey, messageToSign);
+
+        try {
+            const introResp = await safeFetch(`${targetUrl}/v1/federation/peer/introduce`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    node_id: config.nodeId,
+                    node_url: config.baseUrl,
+                    node_type: config.nodeType,
+                    public_key: publicKey,
+                    role: joinRole,
+                    message: '',
+                    signature,
+                    timestamp,
+                }),
+                signal: AbortSignal.timeout(15_000),
+            });
+
+            const introBody = await readJson(introResp, JOIN_ANSWER_MAX_BYTES) as { data?: { request_id: string; status: string; message?: string }; error?: { message?: string } };
+            if (!introResp.ok) {
+                const msg = introBody?.error?.message ?? `HTTP ${introResp.status}`;
+                res.status(introResp.status).json(error(config.nodeId, 'INTRODUCTION_FAILED', msg));
+                return;
+            }
+
+            // Store local peering request so we recognize the peer during key exchange
+            const requestId = introBody.data?.request_id ?? `local-${Date.now()}`;
+            await storage.createPeeringRequest({
+                id: requestId,
+                fromNodeId: targetInfo.node_id ?? targetUrl,
+                fromNodeUrl: targetUrl,
+                toNodeId: config.nodeId,
+                status: 'approved',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const remoteStatus = introBody.data?.status ?? 'pending';
+
+            res.json(success(config.nodeId, {
+                target_node_id: targetInfo.node_id,
+                target_url: targetUrl,
+                request_id: requestId,
+                status: remoteStatus,
+                message: introBody.data?.message ?? 'Introduction sent. Awaiting genesis operator approval.',
+            }));
+            emitChange('config');
+
+            const targetNodeId = targetInfo.node_id ?? targetUrl;
+
+            if (remoteStatus === 'auto_approved') {
+                // The answer above already said `auto_approved`, so this cannot be reported to the
+                // caller — but it can be reported. Unawaited and uncaught, a failure here was an
+                // unhandled rejection: the operator was told the join went through and this node
+                // held no peer record, with nothing in any log between the two.
+                void completeJoin(targetUrl, targetNodeId, config, storage, peers).catch((err: unknown) => {
+                    logger.error('admin-monitoring: the join was auto-approved but completing it failed', {
+                        targetUrl, targetNodeId, error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            } else {
+                pollForApprovalAndComplete(targetUrl, targetNodeId, requestId, config, storage, peers);
+            }
+        } catch (e) {
+            res.status(502).json(error(config.nodeId, 'INTRODUCTION_FAILED',
+                `Failed to introduce to ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
+        }
+    });
+
+    // GET /v1/admin/stats — aggregate statistics (operator only)
+    router.get('/v1/admin/stats', requireAuth(), requireOperator(storage), async (_req, res) => {
+        const agents = await storage.listAgents();
+        const actions = await storage.listActions();
+
+        const trustBuckets = { low: 0, medium: 0, high: 0 };
+        for (const a of agents) {
+            if (a.trustScore < 30) trustBuckets.low++;
+            else if (a.trustScore < 70) trustBuckets.medium++;
+            else trustBuckets.high++;
+        }
+
+        res.json(success(config.nodeId, {
+            agents: {
+                total: agents.length,
+                trust_distribution: trustBuckets,
+            },
+            actions: {
+                total: actions.length,
+                categories: [...new Set(actions.map(a => a.category).filter(Boolean))],
+            },
+        }));
+    });
+
+    // GET /v1/admin/onboarding-funnel — the activation funnel (05-mittaus.md), operator only.
+    // Rows = accounts newest first (uxtest-* excluded), each with the four markers, plus one
+    // weekly-cohort rollup: created, activated (count + rate), median TTFV, activation kinds,
+    // hello-page opens, MCP connections, rescues sent. Deliberately a TABLE and not a chart:
+    // the decision it supports is "did the change move activation", not a dashboard.
+    // ?since=<ISO> narrows the window, ?limit caps the row count (default 200, max 1000).
+    router.get('/v1/admin/onboarding-funnel', requireAuth(), requireOperator(storage), async (req, res) => {
+        const { readOnboardingFunnel } = await import('../../services/onboarding-funnel.js');
+        const since = typeof req.query.since === 'string' ? req.query.since : undefined;
+        const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
+        const rows = await readOnboardingFunnel(storage, { since, limit });
+
+        // ISO week key (YYYY-Www) — the cohort grain 05-mittaus.md specifies.
+        const weekOf = (iso: string): string => {
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return 'unknown';
+            const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+            t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));           // ISO: Thursday decides the year
+            const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+            const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+            return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+        };
+        const median = (xs: number[]): number | null => {
+            if (xs.length === 0) return null;
+            const s = [...xs].sort((a, b) => a - b);
+            const mid = Math.floor(s.length / 2);
+            return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+        };
+
+        // Cohorts are grouped by week × TRACK (05-mittaus.md). One row group per path per week:
+        // mixing the old and the new path into one number means neither can be judged, which is
+        // the whole reason the track marker exists. Sorted newest week first, remake before legacy
+        // within a week so the path under evaluation reads first.
+        const byWeekTrack = new Map<string, typeof rows>();
+        for (const r of rows) {
+            const k = `${weekOf(r.createdAt)} ${r.track}`;
+            const list = byWeekTrack.get(k) ?? [];
+            list.push(r);
+            byWeekTrack.set(k, list);
+        }
+        const cohorts = [...byWeekTrack.entries()]
+            .sort((a, b) => {
+                const [wa, ta] = a[0].split(' ');
+                const [wb, tb] = b[0].split(' ');
+                // Within a week the remake reads above legacy: the remake is the thing being
+                // judged, and the legacy row is the comparison it is judged against.
+                return wb.localeCompare(wa) || (ta === tb ? 0 : ta === 'remake' ? -1 : 1);
+            })
+            .map(([key, list]) => {
+                const [week, track] = key.split(' ');
+                const activated = list.filter(r => !!r.activatedAt);
+                const ttfvs = activated.map(r => r.ttfvMinutes).filter((n): n is number => typeof n === 'number');
+                return {
+                    week,
+                    track,
+                    created: list.length,
+                    hello_page_opened: list.filter(r => !!r.helloOpenedAt).length,
+                    mcp_connected: list.filter(r => !!r.firstMcpCallAt).length,
+                    activated: activated.length,
+                    // Rate as a percentage with one decimal — comparable to the external benchmarks
+                    // the remake was measured against (03-ulkoinen-vertailu.md).
+                    activation_rate_pct: list.length ? Math.round((activated.length / list.length) * 1000) / 10 : 0,
+                    ttfv_median_minutes: median(ttfvs),
+                    activation_kinds: {
+                        app: activated.filter(r => r.activationKind === 'app').length,
+                        workspace: activated.filter(r => r.activationKind === 'workspace').length,
+                        agent: activated.filter(r => r.activationKind === 'agent').length,
+                    },
+                    rescue_sent: list.filter(r => !!r.rescueSentAt).length,
+                    // ── the remake funnel, left to right as a person walks it ──
+                    mat_ok: list.filter(r => r.matResult === 'ok').length,
+                    mat_failed: list.filter(r => r.matResult === 'failed').length,
+                    // Total attempts across the cohort: mat_attempts / mat_ok is how hard the
+                    // prompt is, and it is the number the prompt gets edited against.
+                    mat_attempts: list.reduce((n, r) => n + r.matAttempts, 0),
+                    branch: {
+                        A: list.filter(r => r.branch === 'A').length,
+                        B: list.filter(r => r.branch === 'B').length,
+                        agent: list.filter(r => r.branch === 'agent').length,
+                    },
+                    first_agent_connected: list.filter(r => !!r.firstAgentConnectedAt).length,
+                    home_initialized: list.filter(r => !!r.homeInitializedAt).length,
+                    // The one number the whole remake is judged by.
+                    home_initialized_rate_pct: list.length
+                        ? Math.round((list.filter(r => !!r.homeInitializedAt).length / list.length) * 1000) / 10 : 0,
+                    room_entered: list.filter(r => !!r.room).length,
+                    // Derived from ROOMS, not hand-listed: this used to be four literal lines, and
+                    // a fifth room would have been counted by room_entered above while missing
+                    // here — the totals stop adding up and nothing says so.
+                    rooms: Object.fromEntries(
+                        ROOMS.map(def => [def.id, list.filter(r => r.room === def.id).length]),
+                    ) as Record<string, number>,
+                };
+            });
+
+        res.json(success(config.nodeId, { cohorts, rows, total: rows.length }));
+    });
+
+    // GET /v1/admin/messages/stats — direct-message delivery telemetry (operator only).
+    // Operator visibility into whether sends land or pile up in errors. Carries NO message content
+    // and NO participant identities — only routing/outcome metadata.
+    router.get('/v1/admin/messages/stats', requireAuth(), requireOperator(storage), async (_req, res) => {
+        const stats = await storage.getMessageDeliveryStats();
+        const recent = await storage.listMessageDeliveryLogs(50);
+        res.json(success(config.nodeId, { stats, recent }));
+    });
+
+    // GET /v1/admin/backup — export all data as JSON (operator only)
+    router.get('/v1/admin/backup', requireAuth(), requireOperator(storage), async (req, res) => {
+        const owners = await storage.listOwners();
+        const agents = await storage.listAgents();
+        const actions = await storage.listActions();
+        const boards = await storage.listBoards();
+
+        // The operator in person gets the whole file: it is what a restore loads. A delegated caller
+        // (the operator's agent holding operator:admin) reads the records through the classification
+        // reader, as GET /v1/admin/memory/:owner/:key does, and `withheld` names what stayed behind
+        // (secaudit2026oct22).
+        const reader = isOwnerInPerson(req.auth) ? null : readerFor({ storage, config }, req.auth);
+        const withheld: Array<{ owner: string; key: string }> = [];
+        const carried = new Map<string, number>();
+
+        // Collect all memories and transactions per agent
+        const agentData: Record<string, { memories: unknown[]; transactions: unknown[] }> = {};
+        for (const a of agents) {
+            let memories = backupMemories(await storage.listMemory(a.gaii));
+            if (reader) {
+                const read = await readableBackupMemories(reader, memories);
+                memories = read.kept;
+                for (const key of read.withheld) withheld.push({ owner: a.gaii, key });
+            }
+            if (memories.length) carried.set(ownerGhiiOf(a.gaii), (carried.get(ownerGhiiOf(a.gaii)) ?? 0) + memories.length);
+            const transactions = await storage.getTransactions(a.gaii, 100_000);
+            agentData[a.gaii] = { memories, transactions };
+        }
+
+        // The operator trail: one export line for each person whose entries the file holds, with the
+        // count, before the answer (services/operator-access-audit.ts; the operator's own write none).
+        const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+        for (const [ownerOf, count] of carried) {
+            await recordOperatorAccess(storage, config, { operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf, action: 'export', count });
+        }
+
+        // Owner and agent rows go through an allowlist (services/admin-backup-projection.ts): the
+        // whole-row spread put every agent's plaintext webhook secret in the file (secrets audit
+        // 2026-10-09, 1.9). `omitted` says what a restore has to set again.
+        res.json(success(config.nodeId, {
+            version: '1.3',
+            exported_at: new Date().toISOString(),
+            node_id: config.nodeId,
+            owners: owners.map(backupOwner),
+            agents: agents.map(backupAgent),
+            actions,
+            boards,
+            agent_data: agentData,
+            omitted: withheld.length ? [...BACKUP_OMITTED, BACKUP_WITHHELD_NOTE] : BACKUP_OMITTED,
+            withheld,
+        }));
+    });
+
+    // POST /v1/admin/restore — import data from backup (operator only)
+    // A record that already exists is counted as a duplicate; any other failure is counted, logged at
+    // error level, and makes `restored` false (services/admin-restore.ts; QA audit P6-07).
+    router.post('/v1/admin/restore', requireAuth(), requireOperator(storage), async (req, res) => {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const notList = ['owners', 'agents', 'actions', 'boards'].filter(k => body[k] !== undefined && !Array.isArray(body[k]));
+        if (notList.length > 0 || (body.agent_data !== undefined && (typeof body.agent_data !== 'object' || body.agent_data === null))) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'The restore body is not an aimeat backup: owners, agents, actions and boards must be lists, and agent_data an object. Send the `data` part of the file `aimeat backup` wrote.',
+                400, { fields: notList }));
+            return;
+        }
+        // The restoring actor: the operator trail per person written into, and the clearance bound
+        // for the operator's agent (services/admin-restore.ts; secaudit2026oct26).
+        const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+        const outcome = await restoreBackup(storage, body, {
+            config, operatorGhii: ownerGhiiOf(actorGaii), actorGaii, inPerson: isOwnerInPerson(req.auth),
+        });
+        res.json(success(config.nodeId, outcome));
+        emitChange('config');
+    });
+
+    // POST /v1/admin/roles/grant — grant operator role (operator only)
+    router.post('/v1/admin/roles/grant', requireAuth(), requireOperator(storage), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
+        const { owner } = req.body ?? {};
+
+        const ownerRecord = await storage.getOwner(owner);
+        if (!ownerRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${owner}`));
+            return;
+        }
+
+        if (isOperatorAccount(ownerRecord)) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', `Owner "${owner}" already has operator role`));
+            return;
+        }
+
+        await storage.updateOwner(owner, { roles: [...ownerRecord.roles, 'operator'] });
+        // The largest privilege change on a node leaves a record: the operator's usage row, a log
+        // line and a line on the person's feed (QA audit S1-02).
+        await recordRoleChange(req.auth!, owner, 'grant');
+
+        res.json(success(config.nodeId, {
+            owner,
+            role: 'operator',
+            granted: true,
+        }));
+        emitChange('config');
+    });
+
+    // POST /v1/admin/roles/revoke — take the operator role away (operator only)
+    router.post('/v1/admin/roles/revoke', requireAuth(), requireOperator(storage), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
+        const { owner } = req.body ?? {};
+
+        const ownerRecord = await storage.getOwner(owner);
+        if (!ownerRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${owner}`));
+            return;
+        }
+
+        if (!isOperatorAccount(ownerRecord)) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', `Owner "${owner}" does not have operator role`));
+            return;
+        }
+
+        // Two doors that would lock the node out of its own administration. The last-operator
+        // check goes first: the caller's account holds the role (requireOperator, which reads the
+        // account live; the operator's agent with operator:admin acts for that account), so when the
+        // target is the only operator the target IS the caller's account, and "last operator"
+        // is the reason that matters. Behind the self-revoke check it could never be reached.
+        const operators = (await storage.listOwners()).filter(isOperatorAccount);
+        if (operators.length <= 1) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'The last operator cannot be revoked'));
+            return;
+        }
+
+        if (req.auth!.owner === owner) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'You cannot revoke your own operator role'));
+            return;
+        }
+
+        await storage.updateOwner(owner, { roles: ownerRecord.roles.filter(r => r !== 'operator') });
+        await recordRoleChange(req.auth!, owner, 'revoke');
+
+        res.json(success(config.nodeId, {
+            owner,
+            role: 'operator',
+            revoked: true,
+        }));
+        emitChange('config');
+    });
+
+    // D.2: Trust advisory broadcast endpoint (operator only)
+    router.post('/v1/admin/federation/trust-advisory', requireAuth(), requireOperator(storage), async (req, res) => {
+        const { target_node, advisory_type, reason, evidence_hash } = req.body ?? {};
+
+        if (!target_node || !advisory_type || !reason) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node, advisory_type, and reason are required'));
+            return;
+        }
+
+        const validTypes = ['warning', 'suspend', 'ban'];
+        if (!validTypes.includes(advisory_type)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `advisory_type must be one of: ${validTypes.join(', ')}`));
+            return;
+        }
+
+        if (typeof target_node !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(target_node)
+            || typeof reason !== 'string' || reason.length > 1000) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node must be a node id and the reason at most 1000 characters.'));
+            return;
+        }
+
+        // Stored first, then sent to every active peer as a signed notice (services/federation-trust-
+        // notice.ts), each peer's answer read. The receiving node stores it for its operator and acts on
+        // nothing. Until 2026-10-16 the answer said it would be broadcast on the next sync cycle, and
+        // nothing sent it (QA audit S6-06).
+        const advisoryRecord: Record<string, unknown> = {
+            id: `adv-${randomBytes(8).toString('hex')}`,
+            target_node,
+            advisory_type,
+            reason,
+            evidence_hash: evidence_hash ?? null,
+            issued_by: config.nodeId,
+            created_at: new Date().toISOString(),
+            status: 'issued',
+        };
+
+        // Store as memory for persistence and querying
+        const systemGaii = `system@${config.nodeId}`;
+        const store = async (version: number) => storage.setMemory({
+            key: `trust_advisory:${advisoryRecord.id}`,
+            ownerGaii: systemGaii,
+            value: advisoryRecord,
+            visibility: 'private',
+            tags: ['trust_advisory', `target:${target_node}`, `type:${advisory_type}`],
+            ttlHours: null,
+            version,
+            createdAt: advisoryRecord.created_at as string,
+            updatedAt: new Date().toISOString(),
+        });
+        await store(1);
+
+        const notices = peers
+            ? await sendTrustNotice({ config, storage, peers }, {
+                target_node, advisory_type: advisory_type as TrustAdvisoryType, reason, evidence_hash: evidence_hash ?? null,
+            })
+            : [];
+        const accepted = notices.filter(n => n.accepted).map(n => n.node);
+        advisoryRecord.sent_to = accepted;
+        await store(2);
+
+        res.status(201).json(success(config.nodeId, {
+            advisory: advisoryRecord,
+            notices,
+            network_notified: notices.length > 0 && accepted.length === notices.length,
+            note: notices.length === 0
+                ? 'Advisory stored. No active peer to send it to.'
+                : `Advisory stored and sent: ${accepted.length} of ${notices.length} peers accepted it.`,
+        }));
+        emitChange('config');
+    });
+
+    // D.2: List trust advisories (received + issued)
+    router.get('/v1/admin/federation/trust-advisories', requireAuth(), requireOperator(storage), async (req, res) => {
+        const systemGaii = `system@${config.nodeId}`;
+        // Query trust advisory memories
+        const memories = await storage.listMemory(systemGaii, { prefix: 'trust_advisory:' });
+
+        const advisories = memories.map(m => ({
+            id: (m.value as Record<string, unknown>)?.id ?? m.key.replace('trust_advisory:', ''),
+            ...(m.value as Record<string, unknown>),
+            stored_at: m.createdAt,
+        }));
+
+        // Sort by most recent first
+        advisories.sort((a, b) => {
+            const aTime = (a as { created_at?: string }).created_at ?? '';
+            const bTime = (b as { created_at?: string }).created_at ?? '';
+            return bTime.localeCompare(aTime);
+        });
+
+        res.json(success(config.nodeId, {
+            advisories,
+            total: advisories.length,
+        }));
+    });
+
+    // B.3: Sync health metrics (operator only)
+    router.get('/v1/admin/federation/sync-health', requireAuth(), requireOperator(storage), async (_req, res) => {
+        const queueSize = await storage.replicationQueueSize();
+
+        res.json(success(config.nodeId, {
+            queue_depth: queueSize,
+            timestamp: new Date().toISOString(),
+        }));
+    });
+
+    // F.4: Relay earnings query (operator only)
+    router.get('/v1/admin/federation/relay-earnings', requireAuth(), requireOperator(storage), async (req, res) => {
+        const since = req.query.since as string | undefined;
+        const until = req.query.until as string | undefined;
+
+        const systemGaii = `system@${config.nodeId}`;
+        const memories = await storage.listMemory(systemGaii, { prefix: 'relay_earning:' });
+
+        let earnings = memories.map(m => m.value as Record<string, unknown>);
+
+        if (since) {
+            earnings = earnings.filter(e => (e.timestamp as string) >= since);
+        }
+        if (until) {
+            earnings = earnings.filter(e => (e.timestamp as string) <= until);
+        }
+
+        const totalMorsels = earnings.reduce((sum, e) => sum + ((e.amount as number) ?? 0), 0);
+
+        res.json(success(config.nodeId, {
+            earnings,
+            total_morsels: totalMorsels,
+            total_entries: earnings.length,
+            period: { since: since ?? null, until: until ?? null },
+        }));
+    });
+
+    return router;
+}
+
+/** Save the remote node as a local peer and perform key exchange. */
+async function completeJoin(
+    targetUrl: string,
+    targetNodeId: string,
+    config: AimeatConfig,
+    storage: Storage,
+    peers?: Map<string, PeerInfo>,
+): Promise<void> {
+    // An existing peer is never replaced by a join: the id comes from the target's own card, and a
+    // target claiming the id of a peer this node already has would take over its url and key.
+    if (peers?.has(targetNodeId)) {
+        logger.warn(`Join: ${targetNodeId} is already a peer of this node; nothing was changed`, { targetUrl });
+        return;
+    }
+    // The key first, the peer after: a peer saved active with no key took the first key any caller
+    // sent to POST /v1/federation/key-exchange (that route checks rotation only against a key it has).
+    const result = await performKeyExchange(targetUrl, config, storage, targetNodeId);
+    if (!result.success || !result.peerPublicKey) {
+        logger.warn(`Join: key exchange with ${targetNodeId} failed, so no peer was saved: ${result.error ?? 'no public key received'}`, { targetUrl });
+        return;
+    }
+    if (peers?.has(targetNodeId)) {
+        logger.warn(`Join: ${targetNodeId} became a peer while the keys were exchanged; nothing was changed`, { targetUrl });
+        return;
+    }
+    const now = new Date().toISOString();
+    const newPeer: PeerInfo = {
+        nodeId: targetNodeId,
+        url: targetUrl,
+        publicKey: result.peerPublicKey,
+        status: 'active',
+        addedAt: now,
+        lastSeen: now,
+        // The flags were spelled out here, which made this the fifth copy of the member literals and
+        // the one that silently missed every flag added since. Derive them.
+        ...deriveTierFlags('member'),
+        tier: 'member',
+    };
+    if (peers) peers.set(targetNodeId, newPeer);
+    await storage.saveFederationPeer(newPeer);
+    logger.info(`Join complete: peer ${targetNodeId} added and keys exchanged`);
+    emitChange('federation');
+}
+
+/** Background poll for remote approval, then complete the join. */
+function pollForApprovalAndComplete(
+    targetUrl: string,
+    targetNodeId: string,
+    requestId: string,
+    config: AimeatConfig,
+    storage: Storage,
+    peers?: Map<string, PeerInfo>,
+): void {
+    const startedAt = Date.now();
+
+    const timer = setInterval(async () => {
+        if (Date.now() - startedAt > MAX_POLL_DURATION_MS) {
+            clearInterval(timer);
+            logger.warn(`Join poll for ${targetNodeId} timed out after ${MAX_POLL_DURATION_MS / 60_000}min`);
+            return;
+        }
+        try {
+            const resp = await safeFetch(
+                `${targetUrl}/v1/federation/peer/introduce/${requestId}/status`,
+                { signal: AbortSignal.timeout(10_000) },
+            );
+            if (!resp.ok) return;
+            const body = await readJson(resp, JOIN_ANSWER_MAX_BYTES) as { data?: { status: string } };
+            const status = body.data?.status;
+
+            if (status === 'approved' || status === 'auto_approved') {
+                clearInterval(timer);
+                logger.info(`Join request ${requestId} approved by ${targetNodeId}`);
+                // THE POLLER IS ALREADY GONE BY HERE, so this failure is terminal and has to say so.
+                // It used to fall through to the catch below, which logs "continuing after a
+                // suppressed failure" — a sentence about a poll that would try again, printed for a
+                // join that never would. Clearing the timer before the await it protects is what
+                // made the two indistinguishable.
+                try {
+                    await completeJoin(targetUrl, targetNodeId, config, storage, peers);
+                } catch (err) {
+                    logger.error('The join was approved but completing it failed. It will NOT be retried: the poll has stopped.', {
+                        requestId, targetUrl, targetNodeId, error: err instanceof Error ? err.message : String(err),
+                    });
+                }
+                return;
+            } else if (status === 'rejected') {
+                clearInterval(timer);
+                logger.info(`Join request ${requestId} rejected by ${targetNodeId}`);
+                await storage.updatePeeringRequest(requestId, { status: 'rejected' });
+                emitChange('federation');
+            }
+        } catch (err) {
+            // Network error during poll -- keep trying
+          logger.warn('pollForApprovalAndComplete: continuing after a suppressed failure', { error: String(err) });
+        }
+    }, POLL_INTERVAL_MS);
+}

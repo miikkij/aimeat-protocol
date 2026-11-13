@@ -11,10 +11,10 @@
  *   - machines and which agents live on each: services/connector-registry.ts (the Computers page);
  *   - an agent that no machine runs but an AI chat client brings in: its `mcpClient`;
  *   - calls per agent: the usage cut `call.actor`; done tasks: storage.countTasksByOwner;
- *   - the apps that show an agent's work, and the workspace its work goes to: services/agent-ties.ts;
+ *   - the apps that show an agent's work, and the workspace its work goes to: services/agent/ties.ts;
  *   - the owner's apps and their use: the app listing and the usage cut `call.app`;
  *   - where an app keeps its data: its data map (overview-sources.ts appPlaces);
- *   - the organisms and workspaces the owner belongs to: services/agent-ties.ts readTieChoices;
+ *   - the organisms and workspaces the owner belongs to: services/agent/ties.ts readTieChoices;
  *   - writes per workspace and by which agent: storage.listKeyActivity;
  *   - offerings: the app tool manifests, the agent offers and the EXCHANGE listings.
  *
@@ -36,7 +36,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { AgentRecord } from '../../storage/types/identity.js';
 import { listConnectors, wantedInstalls } from '../connector-registry.js';
-import { readAgentTies, readTieChoices } from '../agent-ties.js';
+import { readAgentTies, readTieChoices } from '../agent/ties.js';
 import { resolveAppUrls } from '../app-urls.js';
 import { logger } from '../../utils/logger.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';

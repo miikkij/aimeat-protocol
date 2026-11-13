@@ -24,10 +24,10 @@
 
 import { existsSync } from 'node:fs';
 import * as readline from 'node:readline';
-import { loadFileSource } from '../services/config-loader.js';
-import { MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/config-schema.js';
-import { isSealed } from '../services/config-sealing.js';
-import { storeConfigValue } from '../services/config-apply.js';
+import { loadFileSource } from '../services/config/loader.js';
+import { MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/config/schema.js';
+import { isSealed } from '../services/config/sealing.js';
+import { storeConfigValue } from '../services/config/apply.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import type { AimeatConfig } from '../config.js';
@@ -162,7 +162,7 @@ export async function runConfigImport(
   let imported = 0;
   for (const dotPath of stats.mutable) {
     try {
-      // A secret row is stored encrypted, as the Config page stores it (services/config-at-rest.ts), through
+      // A secret row is stored encrypted, as the Config page stores it (services/config/at-rest.ts), through
       // the one writer of a setting row. The person at the server's shell runs this, so the tighten-only
       // rule an AI credential meets on the Config API is not asked here.
       await storeConfigValue(storage, config, dotPath, values[dotPath]);

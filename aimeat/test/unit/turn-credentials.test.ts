@@ -15,7 +15,7 @@ import { createHmac } from 'node:crypto';
 import {
   deriveTurnCredential, turnOpaqueId, turnEntryFor, turnDeprecationWarning, type TurnSettings,
 } from '../../src/services/turn-credentials.js';
-import { TURN_STATIC_PAIR_REMOVED_IN, turnTtlFrom } from '../../src/config-turn.js';
+import { TURN_STATIC_PAIR_REMOVED_IN, turnTtlFrom } from '../../src/config/turn.js';
 import { removedFrom } from '../../src/services/deprecation.js';
 
 const SECRET = 'unit-turn-secret';

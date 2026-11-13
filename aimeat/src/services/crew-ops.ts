@@ -48,7 +48,7 @@ import {
 } from './crew-def-store.js';
 import { logger } from '../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
-import { isStopped } from './agent-stop-rules.js';
+import { isStopped } from './agent/stop-rules.js';
 
 export interface CrewDeps { storage: Storage; config: AimeatConfig }
 

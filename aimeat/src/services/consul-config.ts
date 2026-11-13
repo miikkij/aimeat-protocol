@@ -36,10 +36,10 @@
  */
 
 import type { AimeatConfig } from '../config.js';
-import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue, writeConfigField, readConfigField } from './config-schema.js';
-import { syncRateLimitTiers } from './config-rate-limit-sync.js';
-import { isSealed } from './config-sealing.js';
-import { looseningRefusal, tightenOnlyOf } from './config-strictness.js';
+import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue, writeConfigField, readConfigField } from './config/schema.js';
+import { syncRateLimitTiers } from './config/rate-limit-sync.js';
+import { isSealed } from './config/sealing.js';
+import { looseningRefusal, tightenOnlyOf } from './config/strictness.js';
 import type { ReaderCredential } from './classification/reader-kind.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 

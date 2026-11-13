@@ -272,7 +272,7 @@ export const PUBLISH_PUBLIC_SCOPE = 'publish:public';
 
 /**
  * Add permissions to another of the owner's agents: from the words this agent holds itself, never
- * this word, and never to itself (services/agent-scope-add.ts). Without it an agent holding
+ * this word, and never to itself (services/agent/scope-add.ts). Without it an agent holding
  * agent:permissions only narrows a sibling's list. The owner gives it on the agent's page, signed in
  * themselves, because no agent may pass it on; every addition made with it is written to the
  * owner's account feed and bell (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin,

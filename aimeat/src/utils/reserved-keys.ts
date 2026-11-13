@@ -198,7 +198,7 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // changes. Measured 2026-08-29: nothing wrote an `audit.*` key through the memory API.
   'audit.',
   // 2026-09-02: `agents.proposals.<id>` is a proposed AGENT waiting for the owner
-  // (services/agent-proposals.ts), and the approve route ACTS on it: it reads the scopes, the mode
+  // (services/agent/proposals.ts), and the approve route ACTS on it: it reads the scopes, the mode
   // and the run mode out of that record and creates a principal carrying them. The proposer's
   // scope ceiling is checked when the proposal is WRITTEN, so a granted app that could write the
   // key directly would skip the ceiling entirely -- forge a proposal carrying any scopes it liked,
@@ -214,7 +214,7 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // renames and forgets through /v1/agents/v2/connectors.
   'agents.connectors.',
   // 2026-10-11: `agent-workplace.<name>` says which workspace one agent's finished work is shared
-  // with (services/agent-workplace.ts). The node ACTS on it: when a task of that agent completes,
+  // with (services/agent/workplace.ts). The node ACTS on it: when a task of that agent completes,
   // the task's result records change from private to readable by that workspace's members. A
   // granted app that could write the key could point an agent's results at a workspace of its
   // choosing, and the owner's private results would be shared without the owner deciding it. Only
@@ -392,7 +392,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * writer, straight to storage.
  *
  * `agent-workplace.` (2026-10-11) says which workspace one agent's finished work is shared with
- * (services/agent-workplace.ts). The node acts on it when a task completes, by making the task's
+ * (services/agent/workplace.ts). The node acts on it when a task completes, by making the task's
  * private result readable to that workspace's members. Its one writer checks that the owner is an
  * active member of the organism and that the workspace exists; a record written past it, by an
  * owner PAT, an agent or a granted app, would skip both. The owner sets and clears it through

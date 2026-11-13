@@ -163,7 +163,7 @@ const LINT_RULE = join(ROOT, 'eslint-rules', 'no-storage-in-mcp.js');
  *
  * 2 on 2026-08-11 after step 8. Nineteen capabilities moved in one pass.
  *
- * 1 on 2026-08-11 after aimeat_operator_agent_configure moved onto services/agent-profile-write.ts,
+ * 1 on 2026-08-11 after aimeat_operator_agent_configure moved onto services/agent/profile-write.ts,
  * where PATCH /v1/agents/:name/tags and /mode already were. Three rules it had been writing around:
  * tags were stored verbatim, a mode change skipped the Hello Integration step-list re-derive, and an
  * empty scope list was accepted where REST refuses it.
@@ -175,7 +175,7 @@ const LINT_RULE = join(ROOT, 'eslint-rules', 'no-storage-in-mcp.js');
  * could not report the work it finished, which is the same narrowing agent-task-fanout.ts was written
  * to close on the failure path. REST took a deliverable_key and the tool had no way to send one, so
  * an MCP completion never reached the public feed. And the provenance stamp depended on which door
- * was used rather than on who was writing. completeTask() in services/agent-task-fanout.ts is the
+ * was used rather than on who was writing. completeTask() in services/agent/task-fanout.ts is the
  * shared home, beside the failTask() of the same shape, and both doors call it.
  *
  * ZERO IS NOT THE END OF THE RULE. 38 tool-surface files still READ through storage directly. A read

@@ -55,7 +55,7 @@ const MIN_LINES = 6;
  * it, and each predated that work.
  *
  * The original list, for what it is worth: the audit's own four copies
- * (services/install-quotas.ts, services/agent-task-rules.ts, services/memory-ceilings.ts and the
+ * (services/install-quotas.ts, services/agent/task-rules.ts, services/memory-ceilings.ts and the
  * board post). What is left predates this work and is the backlog, not the rule being broken today.
  *
  * Lower it as pairs are cleared. Never raise it: a new pair means somebody repaired a difference by
@@ -200,7 +200,7 @@ function main(): void {
         console.error('  and returns a refusal or a result, then call it from both doors. Each door still');
         console.error('  renders its own answer — that part is meant to differ. Worked examples:');
         console.error('  services/memory-write.ts, services/board-post.ts, services/install-quotas.ts,');
-        console.error('  services/agent-task-rules.ts, services/memory-ceilings.ts.');
+        console.error('  services/agent/task-rules.ts, services/memory-ceilings.ts.');
         if (strict) process.exit(1);
         return;
     }

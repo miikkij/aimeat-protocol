@@ -60,7 +60,7 @@ import { bindUsageSettings } from '../services/usage/usage-settings.js';
 import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
-import { initAgentRefusals } from '../services/agent-refusals.js';
+import { initAgentRefusals } from '../services/agent/refusals.js';
 import { sendPermissionAsk } from '../services/permission-ask-notice.js';
 import { initScopeUse } from '../services/scope-use.js';
 import { startBuildWithYou } from '../services/build-with-you.js';
@@ -108,7 +108,7 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // and changed, merged per reader, item, action and minute.
   initClassificationAudit(storage);
   // The agent refusal notes: a scope refusal of an agent goes on its card and its open tasks
-  // (services/agent-refusals.ts). Armed with the refusal log, before any route can refuse. A newly
+  // (services/agent/refusals.ts). Armed with the refusal log, before any route can refuse. A newly
   // opened refusal the person can allow with one press asks them in the bell and by email
   // (services/permission-ask-notice.ts).
   initAgentRefusals(storage, (owner, agent, words, call) => sendPermissionAsk({ storage, config }, owner, agent, words, call));
@@ -157,6 +157,6 @@ export async function flushProcessBuffers(): Promise<void> {
   await shutdownConsentAuditBuffer();
   const { shutdownClassificationAudit } = await import('../services/classification/audit.js');
   await shutdownClassificationAudit();
-  const { flushAgentRefusals } = await import('../services/agent-refusals.js');
+  const { flushAgentRefusals } = await import('../services/agent/refusals.js');
   await flushAgentRefusals();
 }

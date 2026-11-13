@@ -68,7 +68,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../src/utils/rest-scope-release.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function setupOwner(label: string) {

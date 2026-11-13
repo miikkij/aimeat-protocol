@@ -6,7 +6,7 @@
  *   node's own participant id and did:web, the verifiers in force, the trusted issuers of each data
  *   space, the static tokens, the callback origins, whether the TCK mode is in force, and each owner's
  *   per-package choice to agree on their own (`dsp.settings`). The raw values live in the config
- *   (config-dataspace.ts) and are parsed on each use, so a save on the Config page needs no restart.
+ *   (config/dataspace.ts) and are parsed on each use, so a save on the Config page needs no restart.
  *
  *   THE TCK MODE IS NEVER ON IN PRODUCTION. It is in force only when it is set AND the node's public
  *   address is a loopback address AND the node is a test node (AIMEAT_TEST_MODE, AIMEAT_DEV_MODE, the
@@ -26,7 +26,7 @@
 import { timingSafeEqual, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { DEFAULT_MAX_PROCESSES_PER_PARTICIPANT, parseDataspaceAuth, type DataspaceAuthMethod } from '../../config-dataspace.js';
+import { DEFAULT_MAX_PROCESSES_PER_PARTICIPANT, parseDataspaceAuth, type DataspaceAuthMethod } from '../../config/dataspace.js';
 import { isLoopbackBaseUrl } from '../../utils/test-money-guard.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { MAX_LIVE_PROCESSES, SETTINGS_KEY } from './contract.js';

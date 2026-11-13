@@ -35,7 +35,7 @@
  */
 
 import type { Router } from 'express';
-import { applyProposedPlan, type ProposedTodoInput } from '../../services/agent-task-write.js';
+import { applyProposedPlan, type ProposedTodoInput } from '../../services/agent/task-write.js';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from '../../storage/interface.js';
@@ -50,7 +50,7 @@ import { recordTaskStarted } from '../../services/activity-recorder.js';
 import { AgentTaskUpdateSchema, AgentTaskRequestChangesSchema } from '../../models/agent-task-schemas.js';
 import {
   resolveAutoActivation, autoStartEvent, decideTaskStart, taskWakeId,
-} from '../../services/agent-task-rules.js';
+} from '../../services/agent/task-rules.js';
 import { startWaitingTask } from '../../services/task-start-op.js';
 import { removeTask } from '../../services/agents/remove-task.js';
 import { resolveTaskFileInputs } from '../../services/task-files.js';
@@ -227,7 +227,7 @@ export function registerTaskLifecycleRoutes(
    * same authority as starting it, and the agent the task is FOR must not be able to let itself off
    * the leash.
    *
-   * A task whose start decision says start (services/agent-task-rules.ts) goes straight to 'active'
+   * A task whose start decision says start (services/agent/task-rules.ts) goes straight to 'active'
    * here, for the same reason it does at create time — the owner has already said this agent (or
    * this task) begins without asking, and making the release path the one exception would mean a
    * released draft sat waiting for a second click that no other route asks for.
@@ -370,7 +370,7 @@ export function registerTaskLifecycleRoutes(
       return;
     }
     // The whole acceptance — the live-plan guard, the preserved history, the renumbering, the status
-    // move and the auto-activation tail — is services/agent-task-write.ts, because it belongs to
+    // move and the auto-activation tail — is services/agent/task-write.ts, because it belongs to
     // ACCEPTING A PLAN rather than to this door. aimeat_task_propose_todos wrote its own copy.
     const proposeBody = req.body as { todos?: ProposedTodoInput[] };
     const result = await applyProposedPlan(

@@ -42,7 +42,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { isValidGAII } from '../../utils/gaii.js';
-import { verifyCardJws, base64KeyToJwkX } from '../../services/agent-card.js';
+import { verifyCardJws, base64KeyToJwkX } from '../../services/agent/card.js';
 import { spendAssertion } from '../../services/assertion-spend.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
 import { rateLimit } from '../../middleware/rate-limit.js';

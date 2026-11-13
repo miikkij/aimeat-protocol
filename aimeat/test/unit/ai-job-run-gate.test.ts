@@ -388,7 +388,7 @@ describe('the starter\'s permission to start, asked again (runGate:start-permiss
         await until(() => logged(w, job_id).length > 0);
         expect(model.calls).toBe(0);
         expect(logged(w, job_id)[0]).toMatchObject({ state: 'failed', error: { code: 'SCOPE_DENIED' } });
-        // ai:use is a word the person ticks on the agent's own page (config-posture.ts POWERFUL_AGENT_SCOPES).
+        // ai:use is a word the person ticks on the agent's own page (config/posture.ts POWERFUL_AGENT_SCOPES).
         expect(logged(w, job_id)[0].error.message).toMatch(/helper.*AI.*\/v1\/profile\?tab=agents&agent=helper.*yourself/);
         expect(answerOf(w, 'out.noai')).toBeUndefined();
     });

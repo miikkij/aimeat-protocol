@@ -9,7 +9,7 @@
  *   paths. Nothing here writes the result: service.ts does that, for every op the same way.
  *
  *   WHO PAYS AND WHERE THINGS ARE. The job and its result stay in the CALLER's namespace; the money
- *   is the human's (services/agent-ai-keys.ts aiPayerOf), exactly as on POST /v1/ai/complete. So:
+ *   is the human's (services/agent/ai-keys.ts aiPayerOf), exactly as on POST /v1/ai/complete. So:
  *     - a picture lands in the PAYER's storage, where POST /v1/ai/image and the MCP tool put it;
  *     - the audio is read from the CALLER's storage, where POST /v1/ai/transcribe reads it, so one
  *       account cannot transcribe another's file.

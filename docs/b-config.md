@@ -4,7 +4,7 @@ What a node actually reads, where each value comes from, and how an operator cha
 
 This appendix used to carry an aspirational JSON schema from the v1 era, with roughly seventy-five
 settings that exist nowhere in the code. It now describes the reference implementation, checked
-against `aimeat/src/services/config-schema.ts` and `aimeat/.env.example` on 3 September 2026.
+against `aimeat/src/services/config/schema.ts` and `aimeat/.env.example` on 3 September 2026.
 
 **One sentence version:** every setting has a dot path (`morsel_policy.daily_allowance`) and an
 environment variable (`AIMEAT_DAILY_ALLOWANCE`); `aimeat config` prints what the CLI process

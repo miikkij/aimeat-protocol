@@ -81,7 +81,7 @@ export const AgentTaskCreateSchema = z.object({
   status: z.enum(['draft', 'queued']).optional().default('queued'),
   // How THIS task starts: 'automatic' (the agent proposes its plan and goes on) or 'confirm' (it
   // waits for the owner's OK). Absent = the agent's own setting. 'automatic' is refused unless the
-  // caller may loosen the agent's leash (services/agent-task-write.ts), and the permission floor
+  // caller may loosen the agent's leash (services/agent/task-write.ts), and the permission floor
   // holds a task for the owner whatever this says.
   start: z.enum(['automatic', 'confirm']).optional(),
   parent_task_id: z.string().max(INPUT_LIMITS.id).optional(),

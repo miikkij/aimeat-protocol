@@ -10,7 +10,7 @@
  *     - `toll_morsels` alone: taken as it is.
  *     - the old name alone: taken, stored as `toll_morsels`, and counted as a deprecated use
  *       (deprecated_use_by_type: knowledge_morsel_price, capability_cost_morsels) with the Deprecation
- *       headers on the response. From MORSEL_PRICE_NAMES_REMOVED_IN (config-pacing.ts) it is refused
+ *       headers on the response. From MORSEL_PRICE_NAMES_REMOVED_IN (config/pacing.ts) it is refused
  *       with 400 MORSEL_PRICE_REMOVED.
  *     - both names: they must say the same amount, or 400 TOLL_MORSELS_MISMATCH; the old name still
  *       counts as used.
@@ -29,7 +29,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-13 — Initial (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  */
-import { MORSEL_PRICE_NAMES_REMOVED_IN } from '../config-pacing.js';
+import { MORSEL_PRICE_NAMES_REMOVED_IN } from '../config/pacing.js';
 import { TOLL_MORSELS, tollNameOnRead } from '../utils/toll-name.js';
 import { noteDeprecatedUse, removedFrom } from './deprecation.js';
 

@@ -18,7 +18,7 @@
  *   it does not have, and stores `manifest.formatMd`. The address form also lands the extension in
  *   the app's dependency map (services/dependency-map.ts), so the catalogue lists it as a need.
  *
- *   THE RUN. buildAppAgentFace (services/agent-face.ts) calls renderAppMarkdown first. The action runs
+ *   THE RUN. buildAppAgentFace (services/agent/face.ts) calls renderAppMarkdown first. The action runs
  *   unattended in the owner's name (runExtensionActionAsSystem: only the owner's own extension, no
  *   wallet, no paywall) with the input `{ format: 'md', app, lang? }` (`lang` is the reader's
  *   `?lang=`, given only when it reads as a language tag), and returns `{ markdown }` (a bare
@@ -58,7 +58,7 @@ import { logger } from '../utils/logger.js';
 
 export interface FormatMdDeclaration { extension: string; action: string }
 
-/** The same cap a stored agent face has (services/agent-face.ts AGENT_FACE_MAX_BYTES). */
+/** The same cap a stored agent face has (services/agent/face.ts AGENT_FACE_MAX_BYTES). */
 const MAX_BYTES = 256 * 1024;
 /** The extension's name, or `<owner>/<name>` as an install is named since 2026-10-25. */
 const NAME = /^(?:[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\/)?[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;

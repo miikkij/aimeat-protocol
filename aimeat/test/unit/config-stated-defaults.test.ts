@@ -18,7 +18,7 @@ import { platformSections } from '../../src/utils/env-config/sections-platform.j
 import { featureSections } from '../../src/utils/env-config/sections-features.js';
 import { federationSections } from '../../src/utils/env-config/sections-federation.js';
 import { CONFIG_DEFAULTS } from '../../src/cli/init-wizard/presets.js';
-import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH, readConfigField, serializeFieldValue } from '../../src/services/config-schema.js';
+import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH, readConfigField, serializeFieldValue } from '../../src/services/config/schema.js';
 
 let saved: NodeJS.ProcessEnv;
 let config: AimeatConfig;

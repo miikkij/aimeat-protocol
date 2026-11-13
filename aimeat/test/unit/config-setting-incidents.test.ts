@@ -14,8 +14,8 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import type { StartSettingFallback } from '../../src/config-start-check.js';
-import { CONFIG_SETTING_INCIDENT_TYPE, settleSettingIncidentsAtStart } from '../../src/services/config-setting-incidents.js';
+import type { StartSettingFallback } from '../../src/config/start-check.js';
+import { CONFIG_SETTING_INCIDENT_TYPE, settleSettingIncidentsAtStart } from '../../src/services/config/setting-incidents.js';
 import { listSecurityIncidents, resolveSecurityIncident } from '../../src/services/security-incident.js';
 
 const config = { nodeId: 'aimeat-test-001-settings' } as AimeatConfig;

@@ -18,7 +18,7 @@
  *   v1.0.0 — 2026-09-01 — Initial, with the guard.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { assertEudiwNotHalfBuilt } from '../../src/config-eudiw-guard.js';
+import { assertEudiwNotHalfBuilt } from '../../src/config/eudiw-guard.js';
 
 const KEY = 'AIMEAT_EUDIW_ENABLED';
 
@@ -56,7 +56,7 @@ describe('AIMEAT_EUDIW_ENABLED refuses to turn on', () => {
     // writes it runs the row's check, so each is asserted here.
     it('the runtime setting refuses true at the config route, and the running node and the store stay off', async () => {
         const { loadConfig } = await import('../../src/config.js');
-        const { applyConfigChanges } = await import('../../src/services/config-apply.js');
+        const { applyConfigChanges } = await import('../../src/services/config/apply.js');
         const config = { ...loadConfig().config };
         const writes: string[] = [];
         const storage = { setConfigValue: async (p: string) => { writes.push(p); } } as never;
@@ -72,8 +72,8 @@ describe('AIMEAT_EUDIW_ENABLED refuses to turn on', () => {
 
     it('a stored true from before is skipped at start, after the boot refusal has run', async () => {
         const { loadConfig } = await import('../../src/config.js');
-        const { applyConfigOverrides } = await import('../../src/config-overrides.js');
-        const { ConfigProvenance } = await import('../../src/services/config-provenance.js');
+        const { applyConfigOverrides } = await import('../../src/config/overrides.js');
+        const { ConfigProvenance } = await import('../../src/services/config/provenance.js');
         const config = { ...loadConfig().config };
         const storage = { supportsConfigPersistence: () => true, getAllConfigValues: async () => ({ 'eudiw.enabled': 'true' }) } as never;
         const r = await applyConfigOverrides(config, storage, new ConfigProvenance());

@@ -42,7 +42,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
 import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
-import { signedInOnly } from '../../config-visibility.js';
+import { signedInOnly } from '../../config/visibility.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
 import { resolveIdentity, isForeignPrincipal, ownerGhiiOf } from '../../utils/gaii.js';

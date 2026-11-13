@@ -3,7 +3,7 @@
  * @description No test, script or Python test signs an OWNER in with the account key: a POST to
  *   /v1/auth/token whose body is `{ owner, timestamp, signature }`, the signature made over
  *   `owner + node id + timestamp`. Node 4.0.0 removes that sign-in (OWNER_KEY_LOGIN_REMOVED_IN in
- *   src/config-security.ts), so a file that still uses it stops at its first request on 4.0.0.
+ *   src/config/security.ts), so a file that still uses it stops at its first request on 4.0.0.
  *   An owner signs in with the password instead: test/helpers/owner-login.ts (registerOwner,
  *   ownerSignIn, ownerToken) for a suite, POST /v1/ghii/login anywhere else.
  *

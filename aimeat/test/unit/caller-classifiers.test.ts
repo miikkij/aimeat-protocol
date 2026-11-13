@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { Storage } from '../../src/storage/interface.js';
 import { callerFromAuth, principalCaller, type CallerAuth, type CallerVia } from '../../src/services/caller-context.js';
-import { aiAskerOf } from '../../src/services/agent-ai-keys.js';
+import { aiAskerOf } from '../../src/services/agent/ai-keys.js';
 import { collectCallerAnswers, CREDENTIALS, NAMED, NODE_ID, PRINCIPALS } from './caller-classifiers-harness.js';
 
 const BEFORE = JSON.parse(readFileSync(new URL('./fixtures/caller-classifiers-answers.json', import.meta.url), 'utf-8')) as Record<string, unknown>;

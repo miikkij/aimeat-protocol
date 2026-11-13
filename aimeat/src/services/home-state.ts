@@ -58,11 +58,11 @@ import { resolveAiClient, decideBranch } from './ai/tool-branch.js';
 import { portfolioStandaloneUrl } from './portfolio/standalone-url.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
 import { logger } from '../utils/logger.js';
-import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
+import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent/health.js';
 import { nodeContext } from './node-context.js';
 import { loadOwnerAgents, loadOwnerOnboardings } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
-import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';
 
 /** The connection prerequisite; useful tasks and the optional webpage are available alongside it. */
 export const HOME_STEPS = ['first-agent'] as const;
@@ -106,14 +106,14 @@ export interface HomeState {
     /**
      * The agent the card shows, plus how many there are and how many are in trouble.
      *
-     * `health` is the SAME verdict the Agents tab renders (services/agent-health.ts). The card used
+     * `health` is the SAME verdict the Agents tab renders (services/agent/health.ts). The card used
      * to carry no status at all — it was derived from `agents.length`, so the home said "connected
      * and at home" about an agent the Agents tab was calling a problem, one click away.
      */
     agent: {
         name: string;
         gaii: string;
-        /** The agent's picture (services/agent-avatar.ts), null when it has none. */
+        /** The agent's picture (services/agent/avatar.ts), null when it has none. */
         avatar: AvatarView | null;
         connectedAt: string | null;
         health: AgentHealth;

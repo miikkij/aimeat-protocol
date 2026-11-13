@@ -88,7 +88,7 @@ export async function createOnboardingTestTask(
  * marks it, deliberately: a flag there would be a second copy of the same fact, on the storage
  * layer, needing both providers and a migration to say what one read already says.
  *
- * Called only on the plan-less completion path (services/agent-task-fanout.ts), so a normal
+ * Called only on the plan-less completion path (services/agent/task-fanout.ts), so a normal
  * completion pays nothing for it.
  */
 export async function isOnboardingTestTask(

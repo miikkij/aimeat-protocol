@@ -31,7 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppRecord } from '../storage/types/apps.js';
 import type { CrewDefDoc } from '../data/basic-agents.js';
-import { proposeAgent, proposerIsOwnerSession, type ProposerPrincipal } from './agent-proposals.js';
+import { proposeAgent, proposerIsOwnerSession, type ProposerPrincipal } from './agent/proposals.js';
 import { proposedAgentName, crewDefHash } from '../models/crew-def-schemas.js';
 import { withCrewRuntimeScopes, CREW_RUNTIME_SCOPES } from '../data/crew-runtime-scopes.js';
 import { isOutsideWildcard, scopeIsCovered } from '../utils/scope-coverage.js';

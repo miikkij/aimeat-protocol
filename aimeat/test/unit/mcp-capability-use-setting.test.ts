@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CAPABILITY_USE_APPROVAL_PATH, CAPABILITY_USE_APPROVAL_LABEL, capabilityUseApprovalLoosens, capabilityUseApprovalChangeRefusal,
 } from '../../src/services/mcp-client/capability-use-setting.js';
-import { mcpCapabilityUseApprovalFrom, MCP_CAPABILITY_USE_APPROVAL_VALUES } from '../../src/config-types-agent-access.js';
+import { mcpCapabilityUseApprovalFrom, MCP_CAPABILITY_USE_APPROVAL_VALUES } from '../../src/config/types-agent-access.js';
 import en from '../../locales/en.json' with { type: 'json' };
 
 const person = { roles: ['owner', 'operator'] };

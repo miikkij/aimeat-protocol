@@ -65,20 +65,20 @@ import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
 import { describeBasicAgents, requestBasicAgents, daemonPrincipals } from '../../services/basic-agents.js';
 import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
-import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
+import { offerEnrolment } from '../../services/agent/enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
 import { executeHooks } from '../../services/hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { logger } from '../../utils/logger.js';
 import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance } from '../../services/agent-clearance.js';
+import { newAgentClearance } from '../../services/agent/clearance.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 // The capability name and the wait live with the sequence that uses them
-// (services/agent-enrolment-offer.ts). Re-exported here because the migration route imported them
+// (services/agent/enrolment-offer.ts). Re-exported here because the migration route imported them
 // from this file when this was the only place either existed.
-export { ENROL_CAPABILITY, ENROL_INVOKE_TIMEOUT_MS } from '../../services/agent-enrolment-offer.js';
+export { ENROL_CAPABILITY, ENROL_INVOKE_TIMEOUT_MS } from '../../services/agent/enrolment-offer.js';
 
 export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── GET — what the set is, and whether it can be created right now ──
@@ -292,7 +292,7 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
     }
 
     // Mint the grant and hand it to the daemon over a socket it is already holding.
-    // services/agent-enrolment-offer.ts owns that sequence, because the ONE other path that creates
+    // services/agent/enrolment-offer.ts owns that sequence, because the ONE other path that creates
     // an agent (an approved proposal) skipped it entirely and produced records with no keys.
     emitChange('agents');
     const enrolment = await offerEnrolment({ config, storage }, owner, toEnrol.map(name => {

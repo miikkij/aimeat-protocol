@@ -238,7 +238,7 @@ export async function releaseWork(deps: GoalDeps, access: GoalAccess, goalId: st
 
 /**
  * A goal's task settled. Called from the task completion, failure and decline paths
- * (services/agent-task-fanout.ts) for every task; a task with no goal code returns at once.
+ * (services/agent/task-fanout.ts) for every task; a task with no goal code returns at once.
  */
 export async function settleFromTask(
   deps: GoalDeps, task: AgentTaskRecord, outcome: 'done' | 'failed' | 'declined', message: string,

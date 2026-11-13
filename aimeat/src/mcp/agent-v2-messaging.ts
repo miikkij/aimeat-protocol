@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The five Agent v2 messaging tools on the node's MCP surface.
  *
- *   EVERY ONE OF THEM CALLS services/agent-v2-messaging-ops.ts, the same functions the REST doors
+ *   EVERY ONE OF THEM CALLS services/agent/v2-messaging-ops.ts, the same functions the REST doors
  *   call. Nothing here reaches storage, resolves a recipient or decides who may do what: this file
  *   declares parameters and turns an answer into text, which is what the protocol makes it own.
  *
@@ -32,7 +32,7 @@ import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
 import {
   sendTurn, listTurns, setPushTarget, listPushTargets, deletePushTarget,
   type Principal, type OpResult,
-} from '../services/agent-v2-messaging-ops.js';
+} from '../services/agent/v2-messaging-ops.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 

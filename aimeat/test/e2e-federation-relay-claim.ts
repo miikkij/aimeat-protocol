@@ -48,7 +48,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
-import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config-federation.js';
+import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config/federation.js';
 import { removedOn } from './helpers/node-release.js';
 import type { Server } from 'node:http';
 import { ownNodeDb } from './helpers/own-node-db.js';

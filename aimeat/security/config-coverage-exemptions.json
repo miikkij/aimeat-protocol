@@ -9,7 +9,7 @@
     "AIMEAT_OP_TOKEN": "Not a node setting: `aimeat screenshot-worker` reads the operator token it calls the node with (src/cli/screenshot-worker.ts).",
     "AIMEAT_RUNTIME_FEATURES": "Not a node setting: the `aimeat connect` program reports which runtime features its machine has (src/cli/connect/runtime-features.ts).",
     "AIMEAT_RUN_MODES": "Not a node setting: the `aimeat connect` program reports which run modes its machine offers (src/cli/connect/run-modes.ts).",
-    "AIMEAT_SITE_KV_": "A name prefix, not a variable: every AIMEAT_SITE_KV_<NAME> adds one site value (src/config-runtime.ts siteKvFromEnv). The Config tab row is site.kv (AIMEAT_SITE_KV), which holds the same pairs.",
+    "AIMEAT_SITE_KV_": "A name prefix, not a variable: every AIMEAT_SITE_KV_<NAME> adds one site value (src/config/runtime.ts siteKvFromEnv). The Config tab row is site.kv (AIMEAT_SITE_KV), which holds the same pairs.",
     "AIMEAT_SITE_CONTACT_EMAIL": "The single-contact fallback, read only when AIMEAT_SITE_CONTACTS is unset or unparseable. The Config tab row is site.contacts (the list); a second row for the same people would be two places to edit one fact.",
     "AIMEAT_SITE_CONTACT_LINKEDIN": "The single-contact fallback, read only when AIMEAT_SITE_CONTACTS is unset or unparseable. The Config tab row is site.contacts (the list); a second row for the same people would be two places to edit one fact.",
     "AIMEAT_SITE_CONTACT_NAME": "The single-contact fallback, read only when AIMEAT_SITE_CONTACTS is unset or unparseable. The Config tab row is site.contacts (the list); a second row for the same people would be two places to edit one fact.",

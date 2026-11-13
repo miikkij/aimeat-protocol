@@ -45,7 +45,7 @@ export async function dispatchInspector(deps: InspectorDeps, ownerGhii: string, 
   const inspector = await deps.storage.getAgent(inspectorGaii);
   if (!inspector) return null;
   // A stopped inspector inspects nothing, the same answer as no inspector: the task below is born
-  // active, and a stopped agent starts no work (services/agent-stop-rules.ts).
+  // active, and a stopped agent starts no work (services/agent/stop-rules.ts).
   if (inspector.stoppedAt) return null;
 
   const rk = runKey(run.workflowId, run.runId);

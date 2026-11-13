@@ -12,7 +12,7 @@
  *
  *   The card is SIGNED by the agent's own key and served as a compact JWS beside a JWKS, so a second
  *   node can verify it without asking us whether to believe it. The signing and verification live in
- *   services/agent-card.ts; this file is the shape and the rules, with no crypto and no I/O, so the
+ *   services/agent/card.ts; this file is the shape and the rules, with no crypto and no I/O, so the
  *   same validation runs on the node, in a test, and in the connector.
  *
  *   WHAT IS NOT DECIDED HERE. A card is a CLAIM. `gaii`, `owner` and `scopes` in a card are what the

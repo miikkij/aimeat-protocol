@@ -33,8 +33,8 @@ import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
 import { emitChange } from '../../services/event-bus.js';
 import { readHomeAgents } from '../../services/home-agents.js';
-import { setWorkplace, clearWorkplace, workplaceView, type WorkplaceCaller } from '../../services/agent-workplace.js';
-import { readTieChoices, readWatchableSpaces } from '../../services/agent-ties.js';
+import { setWorkplace, clearWorkplace, workplaceView, type WorkplaceCaller } from '../../services/agent/workplace.js';
+import { readTieChoices, readWatchableSpaces } from '../../services/agent/ties.js';
 import { readWorkspaceOp, workspaceCallerOf } from '../../services/workspace-tool-ops.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
@@ -101,7 +101,7 @@ export function registerHomeAgentsRoutes(router: Router, ctx: HomeRouteCtx): voi
         }));
     });
 
-    /** Who is asking, in the terms services/agent-workplace.ts takes. */
+    /** Who is asking, in the terms services/agent/workplace.ts takes. */
     const workplaceCaller = (req: Request): WorkplaceCaller => {
         const caller = callerOf(req, config.nodeId, storage);
         return { principal: caller.principal, ownerName: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] };

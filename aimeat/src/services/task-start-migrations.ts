@@ -13,7 +13,7 @@
  *      owner chose "wait" keeps it. Positive evidence only: the template's name AND its `crew.basic`
  *      tag AND no setting. Each owner it touches gets one notification saying what changed and where
  *      the switch is. The floor still holds for spending, sending and deleting, which is why this is
- *      safe (services/agent-task-rules.ts).
+ *      safe (services/agent/task-rules.ts).
  *
  *   2. APPS KEEP DELETING THEIR RECORDS (ruling B). Deleting shared workspace records for good took
  *      its own word, `memory:purge`; until then `memory:delete` reached it. An app grant holding
@@ -21,7 +21,7 @@
  *      reach an app already had and gives none it did not. Agents are NOT given it: the word holds
  *      every task of an agent that has it, so handing it to every agent with `memory:delete` (the
  *      default) would stop every task-runner. An agent that needs it is refused once, and its card
- *      offers the word with one press (services/agent-refusals.ts).
+ *      offers the word with one press (services/agent/refusals.ts).
  * @structure migrateBasicAgentsTaskStartOnce() · grantPurgeToAppGrantsOnce() · basicAgentsStartNotice()
  * @usage
  *   migrateBasicAgentsTaskStartOnce(storage, config).catch(err => logger.error(…));

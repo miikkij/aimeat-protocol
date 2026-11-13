@@ -38,12 +38,12 @@
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review: the switch over MCP, and recorded).
  */
 import type { AimeatConfig } from '../../config.js';
-import type { ClassificationMode } from '../../config-data-access.js';
+import type { ClassificationMode } from '../../config/data-access.js';
 import type { Storage } from '../../storage/interface.js';
-import type { ConfigProvenance } from '../config-provenance.js';
-import { applyConfigChanges } from '../config-apply.js';
-import { settingLoosens, looseningRefusal } from '../config-strictness.js';
-import { isSealed, sealRefusal } from '../config-sealing.js';
+import type { ConfigProvenance } from '../config/provenance.js';
+import { applyConfigChanges } from '../config/apply.js';
+import { settingLoosens, looseningRefusal } from '../config/strictness.js';
+import { isSealed, sealRefusal } from '../config/sealing.js';
 import { emitChange } from '../event-bus.js';
 import { askOperator } from '../operator-principal.js';
 import { callerPrincipal } from '../../utils/gaii.js';

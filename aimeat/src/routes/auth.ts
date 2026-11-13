@@ -104,7 +104,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
-import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config-security.js';
+import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config/security.js';
 import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { issueJWT, revokeToken, generateSessionId, verifyJWT } from '../auth/jwt.js';

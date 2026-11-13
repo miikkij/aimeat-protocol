@@ -22,7 +22,7 @@ import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { generateKeyPair, exportJWK, CompactSign } from 'jose';
 import { spendAssertion } from '../../src/services/assertion-spend.js';
-import { verifyCardJws } from '../../src/services/agent-card.js';
+import { verifyCardJws } from '../../src/services/agent/card.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 const NODE = 'aimeat-unit-001-test';

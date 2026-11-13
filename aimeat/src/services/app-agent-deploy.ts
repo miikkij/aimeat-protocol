@@ -62,19 +62,19 @@ import { emitResourceUpdated } from './resource-events.js';
 import { nodeContext } from './node-context.js';
 import { deployedAgentName, proposedAgentName, crewDefHash } from '../models/crew-def-schemas.js';
 import { presentOfferPacing, type Offer } from '../models/offer-schemas.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 import { buildGAII, validateAgentName, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { proposeBundledAgent, bundledCrewDef, bundledAgentScopes } from './app-agent-propose.js';
 import {
   proposerIsOwnerSession, proposalScopesFor, proposalApprovalUrl, recordProposalDefinition, type ProposerPrincipal,
-} from './agent-proposals.js';
+} from './agent/proposals.js';
 import { findOwnBundledAgent, type OwnBundledAgent } from './app-agents/app-agent-link.js';
-import { setAgentStopped } from './agent-stop.js';
+import { setAgentStopped } from './agent/stop.js';
 import { crewPublish, type CrewCaller } from './crew-ops.js';
-import { withDefaultOffer } from './agent-default-offer.js';
+import { withDefaultOffer } from './agent/default-offer.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { decideTaskStart, resolveAutoActivation, autoStartEvent, taskWakeId, type TaskStartDecision } from './agent-task-rules.js';
+import { decideTaskStart, resolveAutoActivation, autoStartEvent, taskWakeId, type TaskStartDecision } from './agent/task-rules.js';
 import { notifyTaskWaiting, waitReason } from './task-start-notice.js';
 
 /** Default runner-agent name: crewaimeat's crew-forge daemon registers under this name. */
@@ -145,7 +145,7 @@ export async function createAppAgentTask(
     scope.push({ name: 'organism_id', value: organismId, type: 'text', description: 'Organism the deployed agent should serve' });
   }
 
-  // The shared start decision (services/agent-task-rules.ts), the one the task-create route and the
+  // The shared start decision (services/agent/task-rules.ts), the one the task-create route and the
   // scheduler ask: a stopped runner waits for its own start, a runner holding a permission-floor scope
   // waits for the owner in person, a runner whose owner set taskStart 'confirm' waits for the owner's
   // OK, and only then does task-runner mode start the task at once (the one-click deploy). The deploy

@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { isSecretRecordKey, shownMemoryValue, secretRecordWriteRefusal } from '../../src/services/secret-records.js';
-import { agentKeyRecord } from '../../src/services/agent-ai-keys.js';
+import { agentKeyRecord } from '../../src/services/agent/ai-keys.js';
 
 describe('secret records', () => {
   it('the owner\'s two AI keys and the payment record are credentials', () => {

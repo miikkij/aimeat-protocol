@@ -8,7 +8,7 @@
  *   _task_cancel).
  *
  *   WHY THIS SUITE EXISTS. test/e2e-mcp-v2.ts checks which tools each /v2/mcp surface LISTS; no suite
- *   CALLED these ten. Their handlers call services/agent-v2-messaging-ops.ts and agent-v2-tasks-ops.ts,
+ *   CALLED these ten. Their handlers call services/agent/v2-messaging-ops.ts and agent-v2-tasks-ops.ts,
  *   which hold four decisions a REST suite of the A2A routes does not reach through MCP: a turn or a
  *   task stays inside one account, a delivery target is its own principal's (only the account holder
  *   names another), a task's status is the assignee's testimony, and only its creator cancels it. Each

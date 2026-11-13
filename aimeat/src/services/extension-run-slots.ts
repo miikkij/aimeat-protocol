@@ -34,7 +34,7 @@
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, lead 817).
  */
 import type { AimeatConfig } from '../config.js';
-import { EXT_RUN_SLOTS_DEFAULT, EXT_RUN_SLOTS_PER_ACCOUNT_DEFAULT } from '../config-extension-load.js';
+import { EXT_RUN_SLOTS_DEFAULT, EXT_RUN_SLOTS_PER_ACCOUNT_DEFAULT } from '../config/extension-load.js';
 import { ipRateKey } from '../middleware/rate-limit.js';
 
 /** Seconds a refused caller is told to wait: a run ends within seconds, so a short wait is enough. */

@@ -52,7 +52,7 @@ The five registers below are drafted for the installation with the operator as c
 | Legal basis | Legal obligation (draft) | same |
 | Data subjects | Account holders (draft) | same |
 | Personal data | Who granted what to whom, when, when revoked (draft) | same |
-| Retention | From `AIMEAT_CONSENT_AUDIT_RETENTION_DAYS`, 365 days unless set (draft, in months) | `aimeat/src/config-data-access.ts` |
+| Retention | From `AIMEAT_CONSENT_AUDIT_RETENTION_DAYS`, 365 days unless set (draft, in months) | `aimeat/src/config/data-access.ts` |
 
 ### B4. AI usage ledger
 

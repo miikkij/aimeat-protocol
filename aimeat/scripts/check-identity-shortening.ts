@@ -359,7 +359,7 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   },
 
   // ── An email address, not an identity ──
-  'src/routes/admin-features.ts': {
+  'src/routes/admin/features.ts': {
     "[local, domain] = u.notificationEmail.split('@')": 'Masks a notification email for the operator\'s owner list (a***@example.com); an email, not an identity.',
   },
   'src/routes/saml-login.ts': {

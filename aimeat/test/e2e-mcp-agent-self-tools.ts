@@ -9,7 +9,7 @@
  *   aimeat_agent_scope_narrow).
  *
  *   WHY THIS SUITE EXISTS. Each of these handlers makes a decision no REST suite reaches: the
- *   same-owner check on a sibling (services/agent-profile-write.ts), the input vocabulary of a run
+ *   same-owner check on a sibling (services/agent/profile-write.ts), the input vocabulary of a run
  *   mode or a console address, and the narrowing rule that replaces '*' with the words an agent
  *   actually used (services/scope-narrowing.ts). A handler that dropped one of those checks stayed
  *   green everywhere. Each tool gets a call that succeeds, read back over REST where a REST read

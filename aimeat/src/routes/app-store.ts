@@ -68,7 +68,7 @@ import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { publicAppManifest } from '../services/app-public-manifest.js';
 import { appToll, presentAppManifest } from '../services/app-pacing.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { appPurchaseGate } from '../services/app-purchase-gate.js';
 

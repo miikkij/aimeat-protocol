@@ -22,7 +22,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../../src/config.js';
-import { CONFIG_FIELDS } from '../../src/services/config-schema.js';
+import { CONFIG_FIELDS } from '../../src/services/config/schema.js';
 import { compareVersions } from '../../src/services/federation-overview.js';
 import {
     RELAY_CLAIM_REQUIRED_BY_DEFAULT_IN, RELAY_CLAIM_OPTIONAL_REMOVED_IN, parsePeerRelayClaim,

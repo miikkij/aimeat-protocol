@@ -27,7 +27,7 @@ import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { registerOwner, ownerSignIn, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
-import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
 import { removedOn } from './helpers/node-release.js';
 
 // ─── Boot embedded server ───

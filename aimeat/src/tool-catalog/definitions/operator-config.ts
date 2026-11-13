@@ -26,7 +26,7 @@ export const operatorConfigTools = [
         annotations: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // Rewriting an agent's PERMISSIONS is its own word, and no wildcard carries it. PATCH
         // /v1/agents/:name/scopes asks an agent the same two words and lets it narrow, and add only
-        // with agent:permissions-add on top (QA audit D2-02; services/agent-scope-add.ts, asked in the
+        // with agent:permissions-add on top (QA audit D2-02; services/agent/scope-add.ts, asked in the
         // handler), and the propose-then-confirm dance here binds the
         // token to the CALLER — so the same agent mints and redeems it in two consecutive calls, and
         // the "show this diff to the owner" text is instruction rather than a gate.

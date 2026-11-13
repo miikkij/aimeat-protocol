@@ -500,7 +500,7 @@ individually overridable so unusual use cases stay possible.
 
 **Derivation:** `AIMEAT_SECURITY_PROFILE = local | public`, resolved in `src/config.ts`. When it is
 unset, the profile is `local` when the host of `AIMEAT_BASE_URL` is private (`localhost`, `127.0.0.1`, an
-RFC1918 address; `isPrivateHost` in `src/config-private-host.ts`) **or** `AIMEAT_NODE_TYPE=personal`, and
+RFC1918 address; `isPrivateHost` in `src/config/private-host.ts`) **or** `AIMEAT_NODE_TYPE=personal`, and
 `public` otherwise. The profile sets the default of two knobs: `AIMEAT_ALLOW_PRIVATE_EGRESS` (`true` on
 `local`, `false` on `public`) and `AIMEAT_APP_ORIGIN_ENABLED` (`true` on `public`). On a `public` node it
 also refuses `AIMEAT_AI_LABEL_PUBLIC=off` and arms the startup self-check below. An explicit `AIMEAT_*`
@@ -524,7 +524,7 @@ two columns say what a local and a public node should run.
 **Reserved-key guard (Invariant 2) is NOT a posture knob: it is always on.** Even a local node with
 third-party apps benefits; the denylist is a code invariant.
 
-**Startup self-check:** on boot, `securityPostureWarnings(config)` (`src/config-posture.ts`, called from
+**Startup self-check:** on boot, `securityPostureWarnings(config)` (`src/config/posture.ts`, called from
 `src/index-start.ts`) logs one `SECURITY:` warning per unsafe setting when the profile resolves to
 `public`: `AIMEAT_ANONYMOUS=true`, `AIMEAT_ALLOW_PRIVATE_EGRESS=true`, `AIMEAT_FEDERATION_OPEN_JOIN=true`,
 no `AIMEAT_ENCRYPTION_KEY`, `*` in `AIMEAT_CORS_ALLOWED_ORIGINS`, `AIMEAT_STATS_ACCESS=public`,

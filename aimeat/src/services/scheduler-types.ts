@@ -36,7 +36,7 @@ export interface JobRunResult {
  *   ran      — a non-task job (ai/extension/core) executed successfully
  *   busy     — skipped: a previous occurrence is still running, or the job was
  *              already executing
- *   stopped  — skipped: the agent the schedule gives work to is stopped (services/agent-stop.ts).
+ *   stopped  — skipped: the agent the schedule gives work to is stopped (services/agent/stop.ts).
  *              Nothing is queued for later; the next run happens at its time once it is started.
  *              Also: the account the job acts for is deactivated (services/account-deactivated.ts);
  *              the next run happens at its time once the account is reactivated

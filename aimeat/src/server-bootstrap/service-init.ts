@@ -138,7 +138,7 @@ import { assembleBook, pullBook } from '../services/federation-book.js';
 import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { ConnectTunnelManager } from '../services/connect-tunnel.js';
-import { startPendingEnrolment } from '../services/agent-pending-enrolment.js';
+import { startPendingEnrolment } from '../services/agent/pending-enrolment.js';
 import { startConnectorRegistry } from '../services/connector-registry.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
 import { seedCsmTemplates } from '../services/csm/seed.js';
@@ -194,7 +194,7 @@ import { sealLegacyTransportSecrets } from '../services/mcp-client/transport-sec
 import { removeDeletedAgentsConnections } from '../services/connections/agent-orphans.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { sealPlaintextTotpSecrets } from '../services/totp.js';
-import { sealPlaintextConfigSecrets } from '../services/config-at-rest-rows.js';
+import { sealPlaintextConfigSecrets } from '../services/config/at-rest-rows.js';
 import { resumeReencryptAtBoot } from '../services/key-reencrypt/job.js';
 
 export interface ServiceInitResult {
@@ -324,7 +324,7 @@ export async function initializeServices(
   await removeDeletedAgentsConnections(storage, config.nodeId);
 
   // Secrets stored in plain text before 2026-10-09 are encrypted when the node has a key: TOTP
-  // secrets (services/totp.ts) and secret Config rows (services/config-at-rest-rows.ts). Each acts only
+  // secrets (services/totp.ts) and secret Config rows (services/config/at-rest-rows.ts). Each acts only
   // on a value it can prove is plain, reads its rewrite back first, and never throws.
   await sealPlaintextTotpSecrets(storage, config);
   await sealPlaintextConfigSecrets(storage, config);

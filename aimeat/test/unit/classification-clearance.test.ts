@@ -19,7 +19,7 @@ import { memoryTarget } from '../../src/services/classification/labels.js';
 import { workspaceTarget } from '../../src/services/classification/containers.js';
 import { readerFor, readerForAgent } from '../../src/services/classification/reader.js';
 import { clearanceFor } from '../../src/services/classification/clearance.js';
-import { setAgentClearance, newAgentClearance } from '../../src/services/agent-clearance.js';
+import { setAgentClearance, newAgentClearance } from '../../src/services/agent/clearance.js';
 import { callerFromAuth } from '../../src/services/caller-context.js';
 import type { AimeatConfig } from '../../src/config.js';
 

@@ -25,7 +25,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import type { DataIntermediationMode } from '../../config-data-access.js';
+import type { DataIntermediationMode } from '../../config/data-access.js';
 import { listDocs, type ComplianceScope } from '../compliance/docs.js';
 import type { IntermediationNotification } from '../compliance/docs-schemas.js';
 import { isOrgManager } from '../workspace-access.js';

@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { parseAppPartiesValue, emailHashOf, partyDataKey, sharedDataKey } from '../../src/services/app-parties/contract.js';
 import { registrationMode, signupOpen } from '../../src/services/app-parties/store.js';
 import { validatePartyName, takesPartyToken } from '../../src/services/parties/contract.js';
-import { parsePartySelfRegistration } from '../../src/config-data-access.js';
+import { parsePartySelfRegistration } from '../../src/config/data-access.js';
 import { checkMap, statesRegisters } from '../../src/services/data-map/data-map-check.js';
 import type { DataMap } from '../../src/services/data-map/data-map-types.js';
 

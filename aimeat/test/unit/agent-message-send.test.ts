@@ -14,7 +14,7 @@
  *   v1.0.0 — 2026-08-11 — Written with services/agent-message-send.ts.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { sendAgentMessage } from '../../src/services/agent-message-send.js';
+import { sendAgentMessage } from '../../src/services/agent/message-send.js';
 import { onChangeEvent, offChangeEvent, type ChangeEvent } from '../../src/services/event-bus.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, AgentMessageRecord, AiProvenanceRecordRow } from '../../src/storage/interface.js';

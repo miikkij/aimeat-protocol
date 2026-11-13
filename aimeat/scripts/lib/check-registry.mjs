@@ -149,7 +149,7 @@ export const FAST_CHECKS = [
     { script: 'check:family-index', label: 'A family index exports no file that reaches a module importing the family back' },
     // Codebase analysis 2026-11-03, D-h: src/services/ grew 66 % in four weeks, half of it in the
     // top level. The flat-file count may only fall; new service code goes in a domain folder.
-    { script: 'check:services-flat', label: 'No new flat file in src/services/: new service code goes in a domain folder' },
+    { script: 'check:services-flat', label: 'No new flat file in src/services/, src/routes/ or src/config-*.ts: new code goes in a domain folder' },
     { script: 'check:owner-agent-reads', label: "An owner's agent list is read through loadOwnerAgents, once per read scope; the direct calls only fall" },
     { script: 'check:sse-parity', label: 'An agent writes, and the open page hears about it' },
     { script: 'check:imports-tracked', label: 'Every relative import points at a tracked file' },

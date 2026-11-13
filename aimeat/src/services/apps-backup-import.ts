@@ -260,7 +260,7 @@ async function uniqueCopyExtName(storage: Storage, name: string): Promise<string
  * The manifest a restored version is stored with. The author is the caller. The search settings are
  * the live app's when the version stacks on one, as a publish carries them (services/app-publish.ts);
  * a new app keeps the owner's own search switches from the ZIP but no operator's approval, which only
- * the operator's review sets (routes/admin-seo.ts).
+ * the operator's review sets (routes/admin/seo.ts).
  */
 function restoredManifest(manifest: AppManifest, owner: string, live: AppRecord | null): AppManifest {
   const out: AppManifest = { ...manifest, authorDisplay: owner };

@@ -61,7 +61,7 @@ describe('tools/list_changed', () => {
             // approveDeviceAuth moved out of device-auth.ts on 2026-10-20, when the fix for the
             // sibling re-approval takeover pushed that file over the 800-line limit.
             ['routes/agents/device-auth-approve.ts', 're-approval', 'emitToolListChanged('],
-            ['services/agent-profile-write.ts', 'the shared profile write (operator configure)', 'emitToolListChanged('],
+            ['services/agent/profile-write.ts','the shared profile write (operator configure)', 'emitToolListChanged('],
             ['services/chat-agent.ts', 'the chat agent widening', 'emitToolListChanged('],
         ] as const;
         for (const [file, what, call] of doors) {

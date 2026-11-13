@@ -15,7 +15,7 @@
  *   an identifier first.
  *
  *   NO EXISTENCE DISCLOSURE. `GET /v1/provenance/:id` returns an IDENTICAL 404 for "no such record"
- *   and "that record is not yours" — the same discipline services/agent-face.ts uses. A caller must
+ *   and "that record is not yours" — the same discipline services/agent/face.ts uses. A caller must
  *   not be able to probe which ids exist.
  *
  *   A DECLARATION IS NOT AN OBSERVATION. `POST /v1/provenance` writes `stampedBy: 'principal'` and

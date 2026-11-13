@@ -21,7 +21,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { exceedsCeiling } from '../../src/utils/scope-coverage.js';
-import { normaliseAgentProfile } from '../../src/services/agent-profile-write.js';
+import { normaliseAgentProfile } from '../../src/services/agent/profile-write.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 describe('exceedsCeiling', () => {

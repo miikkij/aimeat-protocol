@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { countryName, operatorPlaceVars } from '../../src/services/operator-place.js';
-import { missingOperatorConfig } from '../../src/config-operator.js';
+import { missingOperatorConfig } from '../../src/config/operator.js';
 import type { OperatorConfig } from '../../src/config-types.js';
 import type { Locale } from '../../src/i18n.js';
 

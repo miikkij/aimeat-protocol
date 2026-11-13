@@ -54,7 +54,7 @@ import { emitToolListChanged } from './resource-events.js';
 import { mcpResourceOf } from '../utils/mcp-resource.js';
 import { logger } from '../utils/logger.js';
 import { agentListingTags } from './content-defaults.js';
-import { newAgentClearance } from './agent-clearance.js';
+import { newAgentClearance } from './agent/clearance.js';
 
 /** The agent's name component. One place, because it appears in a GAII, a UI and a log line. */
 export const CHAT_AGENT_NAME = 'chat';

@@ -202,7 +202,7 @@ import { ownerTagsFor, withOwnerTags, ownerTagsIntoHtml } from '../services/visi
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
-import { serveAppAgentFace } from '../services/agent-face.js';
+import { serveAppAgentFace } from '../services/agent/face.js';
 import { formatMdLang } from '../services/app-format-md.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';

@@ -95,27 +95,27 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
-import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent-task-write.js';
-import { mayLoosenStart, type StartCaller } from '../services/agent-task-rules.js';
+import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent/task-write.js';
+import { mayLoosenStart, type StartCaller } from '../services/agent/task-rules.js';
 import { listSiblingTasks } from '../services/agents/sibling-tasks.js';
 import { startAnswer } from '../services/task-start-notice.js';
 import { startWaitingTask } from '../services/task-start-op.js';
 import { removeTask } from '../services/agents/remove-task.js';
 import { removeAgent } from '../services/agents/remove-agent.js';
 import { closeMcpSessionsForGaii } from './session-registry.js';
-import { setAgentTaskStart, taskStartView } from '../services/agent-task-start-write.js';
+import { setAgentTaskStart, taskStartView } from '../services/agent/task-start-write.js';
 import { narrowAgent } from '../services/scope-narrowing.js';
-import { setAgentStopped } from '../services/agent-stop.js';
-import { stoppedView } from '../services/agent-stop-rules.js';
+import { setAgentStopped } from '../services/agent/stop.js';
+import { stoppedView } from '../services/agent/stop-rules.js';
 import { toolError } from './tool-error.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGAII, buildGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';
-import { setWorkplace, clearWorkplace, workplaceView } from '../services/agent-workplace.js';
+import { setWorkplace, clearWorkplace, workplaceView } from '../services/agent/workplace.js';
 import type { CallerContext } from '../services/caller-context.js';
-import { completeTask, failTask, declineTask } from '../services/agent-task-fanout.js';
+import { completeTask, failTask, declineTask } from '../services/agent/task-fanout.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -181,7 +181,7 @@ export function registerAgentTaskTools(
                     isError: true,
                 };
             }
-            // The write is services/agent-task-write.ts: the same validation, the same
+            // The write is services/agent/task-write.ts: the same validation, the same
             // one-live-commission guard, the same record, the same task-runner auto-activation and
             // the same tunnel wake POST /v1/agents/:name/tasks performs. This tool used to build its
             // own, which is how it ended up accepting an unbounded title, failing a racing pair with
@@ -386,7 +386,7 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            // Accepting a plan is services/agent-task-write.ts: the live-plan guard that stops a
+            // Accepting a plan is services/agent/task-write.ts: the live-plan guard that stops a
             // mid-run re-proposal from dropping every in-progress and completed todo, the preserved
             // history, the renumbering, the task-runner auto-activation and its tail. This tool kept
             // a copy of all of it.
@@ -512,7 +512,7 @@ export function registerAgentTaskTools(
 
     // ── Tools 3b-2 and 3b-3: aimeat_agent_stop, aimeat_agent_start ──
     // The owner's AI stopping an agent on the person's word, and starting it again. Same
-    // implementation as POST /v1/agents/:name/stop and /start (services/agent-stop.ts); never the
+    // implementation as POST /v1/agents/:name/stop and /start (services/agent/stop.ts); never the
     // calling agent's own state.
     for (const [tool, stop] of [['aimeat_agent_stop', true], ['aimeat_agent_start', false]] as const) {
         mcp.registerTool(
@@ -535,7 +535,7 @@ export function registerAgentTaskTools(
     // ── Tool 3b-4: aimeat_agent_workplace_set ──
     // Where the finished work of one of the owner's agents goes: a workspace, or with no ids the
     // agent's own memory. Same implementation as PUT and DELETE /v1/agents/:name/workplace
-    // (services/agent-workplace.ts).
+    // (services/agent/workplace.ts).
     mcp.registerTool(
         'aimeat_agent_workplace_set',
         {
@@ -600,7 +600,7 @@ export function registerAgentTaskTools(
             }
 
             // The auto-resume for an agent that briefly crashed and came back, the state gate, the
-            // event and the telemetry roll-up are services/agent-task-write.ts. The copy here
+            // event and the telemetry roll-up are services/agent/task-write.ts. The copy here
             // OVERWROTE the task's telemetry totals with the last event's numbers, so an agent
             // reporting one AI call per event finished a forty-call task showing one.
             const result = await recordTaskEvent({ storage, config }, task, { type, message, details }, agentGaii);
@@ -687,7 +687,7 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            // The whole completion is services/agent-task-fanout.ts, which POST /v1/agents/:name/
+            // The whole completion is services/agent/task-fanout.ts, which POST /v1/agents/:name/
             // tasks/:id/complete calls as well: which states may complete, the record, the provenance
             // stamp on the message the owner reads, the 'completed' event, and the eight things a
             // completion sets off. The copy that used to live here had narrowed and thinned it in
@@ -742,7 +742,7 @@ export function registerAgentTaskTools(
             }
 
             // The whole failure — the allowed states, the record, the event and the fan-out — is
-            // services/agent-task-fanout.ts. This copy had NARROWED it to an active task, so an
+            // services/agent/task-fanout.ts. This copy had NARROWED it to an active task, so an
             // agent whose task had STALLED, which is the ordinary case for one that crashed, could
             // not report the failure at all: the task sat stalled, the workflow run that dispatched
             // it stayed on that step, and nothing said why.
@@ -770,7 +770,7 @@ export function registerAgentTaskTools(
 
     // ── Tool 9: aimeat_task_decline ──
     // A refusal with a reason is a correct answer, so it ends the task as 'declined' and moves no
-    // failure counter (services/agent-task-fanout.ts declineTask, which POST …/decline calls too).
+    // failure counter (services/agent/task-fanout.ts declineTask, which POST …/decline calls too).
     mcp.registerTool(
         'aimeat_task_decline',
         {

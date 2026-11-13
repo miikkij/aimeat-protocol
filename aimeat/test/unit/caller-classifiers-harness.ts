@@ -23,7 +23,7 @@ import { readerKindOf } from '../../src/services/classification/reader-kind.js';
 import { isOwnerPrincipal as isAccountOwnerPrincipal } from '../../src/auth/account-security.js';
 import { isOwnerPrincipal as isSseOwnerPrincipal } from '../../src/auth/sse-domain-scopes.js';
 import { askerKind } from '../../src/services/approval-standard.js';
-import { aiPayerOf } from '../../src/services/agent-ai-keys.js';
+import { aiPayerOf } from '../../src/services/agent/ai-keys.js';
 import { aiCallerFromCredential, aiCallerOfPrincipal } from '../../src/services/ai/caller-context.js';
 import { actorKindOf as toolActorKindOf } from '../../src/mcp/tool-usage-wrap.js';
 import { actorKindOf as appOpenActorKindOf } from '../../src/services/usage/record-app-open.js';

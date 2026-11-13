@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-10-11 — Initial (awaitsRestart).
  */
 import { describe, it, expect } from 'vitest';
-import { ConfigProvenance } from '../../src/services/config-provenance.js';
+import { ConfigProvenance } from '../../src/services/config/provenance.js';
 
 describe('ConfigProvenance.awaitsRestart', () => {
     it('is true after a database override is removed, with the source below it', () => {

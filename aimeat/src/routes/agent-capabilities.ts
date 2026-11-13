@@ -31,7 +31,7 @@ import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
-import { setAgentCapabilities } from '../services/agent-profile-write.js';
+import { setAgentCapabilities } from '../services/agent/profile-write.js';
 
 export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -60,7 +60,7 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
       return;
     }
 
-    // Validation, the record shape and the verified flag are services/agent-profile-write.ts,
+    // Validation, the record shape and the verified flag are services/agent/profile-write.ts,
     // shared with aimeat_agent_capabilities_report. An agent session implies a live MCP
     // connection, which is what makes an mcp-type capability verified.
     const outcome = await setAgentCapabilities({ storage, config }, agentGaii, req.body,

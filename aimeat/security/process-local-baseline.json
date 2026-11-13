@@ -5,7 +5,7 @@
       "count": 1,
       "reason": "Each process shares its own computes of one cache key; a second process computes its own once."
     },
-    "src/services/config-strictness.ts :: let :: ranks": {
+    "src/services/config/strictness.ts :: let :: ranks": {
       "count": 1,
       "reason": "Derived from the config schema in the code; every process builds the same table."
     },
@@ -193,7 +193,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/routes/admin-monitoring.ts :: interval :: pollForApprovalAndComplete": {
+    "src/routes/admin/monitoring.ts :: interval :: pollForApprovalAndComplete": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -289,39 +289,39 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-enrolment-offer.ts :: set :: offering": {
+    "src/services/agent/enrolment-offer.ts :: set :: offering": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-face.ts :: map :: facesInFlight": {
+    "src/services/agent/face.ts :: map :: facesInFlight": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-mcp-touch.ts :: map :: lastWrite": {
+    "src/services/agent/mcp-touch.ts :: map :: lastWrite": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-pending-enrolment.ts :: map :: scheduled": {
+    "src/services/agent/pending-enrolment.ts :: map :: scheduled": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-pending-enrolment.ts :: set :: inFlight": {
+    "src/services/agent/pending-enrolment.ts :: set :: inFlight": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-refusals.ts :: let :: openedListener": {
+    "src/services/agent/refusals.ts :: let :: openedListener": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-refusals.ts :: let :: storageRef": {
+    "src/services/agent/refusals.ts :: let :: storageRef": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-refusals.ts :: map :: chains": {
+    "src/services/agent/refusals.ts :: map :: chains": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/agent-refusals.ts :: map :: slots": {
+    "src/services/agent/refusals.ts :: map :: slots": {
       "count": 1,
       "reason": "DEBT"
     },

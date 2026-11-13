@@ -13,7 +13,7 @@
  * @structure nodeVersion(base) · removedOn(base, removedIn) · versionAtLeast
  * @usage
  *   import { removedOn } from './helpers/node-release.js';
- *   import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+ *   import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config/pacing.js';
  *   if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) { ...expect 400 MORSEL_PRICE_REMOVED } else { ...expect 3.x }
  * @version-history
  *   v1.0.0 — 2026-10-12 — Initial: the 4.0.0 sweep (AIMEAT_TEST_SOFTWARE_VERSION=4.0.0).

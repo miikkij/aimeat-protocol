@@ -67,7 +67,7 @@ import { agentAccessOf, agentBarred } from '../../services/organism-agent-access
 import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../../services/organism-agents/attach.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 import { readJoinRequests, decideJoinRequest } from '../../services/organism-join-requests/requests.js';
 import { logger } from '../../utils/logger.js';
 

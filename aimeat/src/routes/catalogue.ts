@@ -57,8 +57,8 @@ import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
 import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
 import { actionPricingFromRequest, presentActionPricing } from '../services/action-pacing.js';
-import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
-import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
+import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
 import { logger } from '../utils/logger.js';
@@ -165,7 +165,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const agents = listedAgents(await cachedAgents());
     const start = (page - 1) * perPage;
     const paged = agents.slice(start, start + perPage);
-    // The agent's picture is public like its description (services/agent-avatar.ts): one read for the page.
+    // The agent's picture is public like its description (services/agent/avatar.ts): one read for the page.
     const avatars = await readAvatarsOrEmpty(storage, paged.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/catalogue/agents');
 
     res.json(success(config.nodeId, {

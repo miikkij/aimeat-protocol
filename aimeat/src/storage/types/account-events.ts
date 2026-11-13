@@ -173,7 +173,7 @@ export type AccountEventKind =
   // a route their aimeat-scopes declaration does not name (services/app-scope-allowance.ts).
   | 'app_scope_words_kept'
   // One of the owner's agents, holding agent:permissions-add, added permissions to another
-  // (services/agent-scope-add.ts): `data.by` the agent that added, `data.name` the agent that got
+  // (services/agent/scope-add.ts): `data.by` the agent that added, `data.name` the agent that got
   // them, `data.words` the words. The actor is the adding agent's GAII.
   | 'agent_permissions_added'
   | 'consent_granted'

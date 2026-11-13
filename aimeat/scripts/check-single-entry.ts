@@ -189,7 +189,7 @@ export const RULES: Rule[] = [
   },
   {
     id: 'config-write',
-    label: 'A setting row is written and removed through services/config-apply.ts (applyConfigChanges, storeConfigValue, resetConfigValue), where the rule that an AI may only make a setting stricter is read from the setting\'s row; a write elsewhere skips it, as DELETE did before d1f37bb4a (codebase analysis 2026-11-03, B4)',
+    label: 'A setting row is written and removed through services/config/apply.ts (applyConfigChanges, storeConfigValue, resetConfigValue), where the rule that an AI may only make a setting stricter is read from the setting\'s row; a write elsewhere skips it, as DELETE did before d1f37bb4a (codebase analysis 2026-11-03, B4)',
     pattern: /\.(setConfigValue|deleteConfigValue)\(/,
     skipDirs: ['src/storage/'],
   },
@@ -231,7 +231,7 @@ export const RULES: Rule[] = [
     pattern: /\b(aiPayerOf|payerOfPrincipal)\(/,
     // caller-facts.ts holds the rule; agent-ai-keys.ts keeps aiPayerOf as its one-line read for the
     // tests that import it. services/ai/caller-context.ts maps the payer onto the planner's caller class.
-    skipDirs: ['src/services/caller-facts.ts', 'src/services/agent-ai-keys.ts'],
+    skipDirs: ['src/services/caller-facts.ts', 'src/services/agent/ai-keys.ts'],
   },
   {
     id: 'scope-widen-at-mint',

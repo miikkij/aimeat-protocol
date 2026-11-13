@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A secret Config row set on the operator's Config page is stored encrypted
- *   (services/config-at-rest.ts). Secrets audit 2026-10-09, node configuration S4b: the node's AI
+ *   (services/config/at-rest.ts). Secrets audit 2026-10-09, node configuration S4b: the node's AI
  *   keys and the TURN credential went into SystemSetting in plain text.
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial.
@@ -17,11 +17,11 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { loadConfig } from '../../src/config.js';
-import { applyConfigChanges } from '../../src/services/config-apply.js';
-import { applyConfigOverrides } from '../../src/config-overrides.js';
-import { ConfigProvenance } from '../../src/services/config-provenance.js';
-import { openStoredSetting, SEALED_SETTING_PREFIX } from '../../src/services/config-at-rest.js';
-import { sealSettingForStorage, sealPlaintextConfigSecrets } from '../../src/services/config-at-rest-rows.js';
+import { applyConfigChanges } from '../../src/services/config/apply.js';
+import { applyConfigOverrides } from '../../src/config/overrides.js';
+import { ConfigProvenance } from '../../src/services/config/provenance.js';
+import { openStoredSetting, SEALED_SETTING_PREFIX } from '../../src/services/config/at-rest.js';
+import { sealSettingForStorage, sealPlaintextConfigSecrets } from '../../src/services/config/at-rest-rows.js';
 
 const KEY = randomBytes(32).toString('hex');
 // A file database: an in-memory SQLite says it does not persist config, and the boot reads nothing.

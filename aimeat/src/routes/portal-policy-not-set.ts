@@ -8,7 +8,7 @@
  *
  *   THE FIELDS ARE SET ON THE CONFIG PAGE. They were environment-only once, and this page said "set
  *   the environment variables below and restart the node". Since the operator block became a
- *   Config group (services/config-schema.ts) a save applies on the next request, so the page sends
+ *   Config group (services/config/schema.ts) a save applies on the next request, so the page sends
  *   the operator there and names each field by the label that page shows. The environment variable
  *   stays beside it for an installation configured from a file.
  *
@@ -21,7 +21,7 @@
  *     place of "set the environment variables and restart", the terms page named as itself, Spanish.
  */
 import { createT, type Locale } from '../i18n.js';
-import { CONFIG_FIELDS } from '../services/config-schema.js';
+import { CONFIG_FIELDS } from '../services/config/schema.js';
 import { escapeHtml } from '../utils/html-escape.js';
 
 interface Words {

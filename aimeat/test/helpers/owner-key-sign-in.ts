@@ -7,7 +7,7 @@
  *   answer instead of "one of two".
  *
  *   WHY. The sign-in is deprecated and removed in OWNER_KEY_LOGIN_REMOVED_IN (4.0.0) whatever
- *   security.owner_key_login says; before that release the setting decides (src/config-security.ts
+ *   security.owner_key_login says; before that release the setting decides (src/config/security.ts
  *   ownerKeyLoginAllowed). Two suites accepted "403 or 410" and "401 or 410" without asking which
  *   applied, so a 3.x node that answered 410 with the sign-in on, or a 4.0.0 node that still checked
  *   the signature, passed them (docs-audit 2026-10, 4.0-testimuutokset.md §4 item 2). The release is
@@ -21,7 +21,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-13 — Initial (4.0-testimuutokset.md §4 item 2).
  */
-import { OWNER_KEY_LOGIN_REMOVED_IN } from '../../src/config-security.js';
+import { OWNER_KEY_LOGIN_REMOVED_IN } from '../../src/config/security.js';
 import { removedOn } from './node-release.js';
 
 export { OWNER_KEY_LOGIN_REMOVED_IN };

@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
     decideTaskStart, agentStartDefault, floorScopesOf, mayLoosenStart, mayStartWaitingTask,
     statusAfterProposal, taskWakeId, autoStartEvent, startedOnItsOwn, type StartCaller,
-} from '../../src/services/agent-task-rules.js';
+} from '../../src/services/agent/task-rules.js';
 import { BASIC_AGENTS } from '../../src/data/basic-agents.js';
 
 const A = 'worker#alice@n';

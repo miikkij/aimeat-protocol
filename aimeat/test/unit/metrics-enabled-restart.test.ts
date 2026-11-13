@@ -16,8 +16,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { MUTABLE_CONFIG_MAP } from '../../src/services/config-schema.js';
-import { applyConfigChanges } from '../../src/services/config-apply.js';
+import { MUTABLE_CONFIG_MAP } from '../../src/services/config/schema.js';
+import { applyConfigChanges } from '../../src/services/config/apply.js';
 import type { AimeatConfig } from '../../src/config-types.js';
 import type { Storage } from '../../src/storage/interface.js';
 

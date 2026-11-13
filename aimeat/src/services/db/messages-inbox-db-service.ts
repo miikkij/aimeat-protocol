@@ -37,8 +37,8 @@ import { conversationIdFor, messagePreview } from '../../utils/messaging.js';
 import { listTrackedResponses } from '../tracked-response.js';
 import { MessagingDbService, type OwnerConversation } from './messaging-db-service.js';
 import { logger } from '../../utils/logger.js';
-import { agentRecordView, type AgentRecordView } from '../agent-record-view.js';
-import { readAvatarsOrEmpty, type AvatarView } from '../agent-avatar.js';
+import { agentRecordView, type AgentRecordView } from '../agent/record-view.js';
+import { readAvatarsOrEmpty, type AvatarView } from '../agent/avatar.js';
 
 /** The `message-flag.<id>` key prefix marks a message the owner flagged "important" (record-presence =
  *  flagged; un-flag deletes it). Mirrors public/js/services/tracked-responses.js FLAG_PREFIX. */
@@ -122,12 +122,12 @@ export class MessagesInboxService {
 
       const peerNames = await this.resolvePeerNames(convos.conversations, requests);
       // Every on-screen agent's picture, the owner's own and the peers', in one read
-      // (services/agent-avatar.ts), so the list draws them without a request per row.
+      // (services/agent/avatar.ts), so the list draws them without a request per row.
       const agentIds = [...agents.map(a => a.gaii), ...Object.keys(peerNames).filter(id => id.includes('#'))];
       const avatars = await readAvatarsOrEmpty(this.storage, agentIds, logger.warn.bind(logger), 'GET /v1/messages/overview');
       const peerAvatars = Object.fromEntries(avatars);
 
-      // The agents without their webhook signing secret (services/agent-record-view.ts).
+      // The agents without their webhook signing secret (services/agent/record-view.ts).
       return { requests, conversations: convos.conversations, important, tracked, agents: agents.map(agentRecordView), groups, peerNames, peerAvatars };
     });
   }

@@ -89,9 +89,9 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
-import { setAgentTaskStart, setAgentTaskStartFloor, taskStartView, scopeUseLookup } from '../../services/agent-task-start-write.js';
+import { setAgentTaskStart, setAgentTaskStartFloor, taskStartView, scopeUseLookup } from '../../services/agent/task-start-write.js';
 import { callerOf } from '../../middleware/caller.js';
-import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../../services/agent-refusals.js';
+import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../../services/agent/refusals.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
@@ -99,19 +99,19 @@ import { listByAgent as listEngagementsByAgent } from '../../services/workspace-
 import {
   setAgentTags, setAgentMode, setAgentConsoleUrl, setAgentRunMode, setAgentRuntimeSource, setAgentDescription,
   type AgentWriteRefusal,
-} from '../../services/agent-profile-write.js';
+} from '../../services/agent/profile-write.js';
 import { logger } from '../../utils/logger.js';
-import { computeAgentHealthMany } from '../../services/agent-health.js';
+import { computeAgentHealthMany } from '../../services/agent/health.js';
 import { nodeContext } from '../../services/node-context.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
-import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
-import { portRedirectFor } from '../../services/agent-port-redirect.js';
+import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent/credential-health.js';
+import { portRedirectFor } from '../../services/agent/port-redirect.js';
 import { agentInstalls } from '../../services/connector-registry.js';
-import { stoppedView } from '../../services/agent-stop-rules.js';
-import { invitesPeople } from '../../services/agent-invites.js';
-import { avatarView, readAvatar, readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { stoppedView } from '../../services/agent/stop-rules.js';
+import { invitesPeople } from '../../services/agent/invites.js';
+import { avatarView, readAvatar, readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 
-/** HTTP status for a refusal from services/agent-profile-write.ts. */
+/** HTTP status for a refusal from services/agent/profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
   if (code === 'AGENT_NOT_FOUND') return 404;
   if (code === 'ACCESS_DENIED') return 403;
@@ -128,7 +128,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     const agent = await storage.getAgent(gaii);
     if (!agent) {
       // A ported agent's pointer, honoured only towards an active federation peer and built from that
-      // peer's own URL (services/agent-port-redirect.ts). This answer goes to anyone, so an address
+      // peer's own URL (services/agent/port-redirect.ts). This answer goes to anyone, so an address
       // the node does not already trust is treated as no pointer at all.
       const moved = await portRedirectFor(storage, gaii);
       if (moved) {
@@ -153,7 +153,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // Update cached trust score
     await storage.updateAgent(gaii, { trustScore: trust.score });
 
-    // The agent's picture (services/agent-avatar.ts). A record that is there and cannot be shown says
+    // The agent's picture (services/agent/avatar.ts). A record that is there and cannot be shown says
     // why, so an agent that wrote its own avatar can read back what went wrong.
     const avatar = await readAvatar(storage, gaii);
 
@@ -226,7 +226,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     const wantStats = include.includes('stats');
     // ?include=credentials — can each of these agents still authenticate. Computed, never stored:
     // a stored verdict goes stale in exactly the way the thing it describes does. One extra query
-    // for the whole fleet (services/agent-credential-health.ts), and only when asked for.
+    // for the whole fleet (services/agent/credential-health.ts), and only when asked for.
     const wantCredentials = include.includes('credentials');
 
     let taskCounts: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
@@ -260,7 +260,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         : {};
 
     // What the node refused each agent for a missing permission, and what it asked for when it was
-    // approved (services/agent-refusals.ts): one list read for the whole fleet. The owner and the
+    // approved (services/agent/refusals.ts): one list read for the whole fleet. The owner and the
     // owner's own agents see it; an app grant, an ecosystem app or a visitor does not, because none of
     // them manages these agents' permissions.
     const seesAccess = !isForeignPrincipal(req.auth!) && !req.auth!.roles.some(r => r === 'app' || r === 'ecosystem');
@@ -295,7 +295,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
 
     const useOf = await scopeUseLookup(storage, agents);
     // Every agent's picture in one read; the list carries the emoji or the picture's address, never
-    // the SVG itself (services/agent-avatar.ts).
+    // the SVG itself (services/agent/avatar.ts).
     const avatars = await readAvatarsOrEmpty(storage, agents.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/agents');
     res.json(success(config.nodeId, {
       agents: agents.map(a => ({
@@ -311,7 +311,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         languages: a.languages ?? [],
         default_scopes: a.defaultScopes ?? ['*'],
         // May it invite people into organisms, where an invitation can create an account? Read from
-        // the permissions above on every call, so it is always true (services/agent-invites.ts).
+        // the permissions above on every call, so it is always true (services/agent/invites.ts).
         invites_people: invitesPeople(a.defaultScopes ?? ['*']),
         trust_score: a.trustScore,
         morsel_balance: a.morselBalance,
@@ -319,10 +319,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         last_seen: a.lastSeen,
         // The tool this agent last spoke from over MCP and when, written only by the MCP door: the
         // MCP page lists the AIs a person connected by these, agent by agent. Null until the
-        // first session (services/agent-mcp-touch.ts).
+        // first session (services/agent/mcp-touch.ts).
         mcp_client: a.mcpClient ?? null,
         mcp_last_seen: a.mcpLastSeen ?? null,
-        // The account-level verdict, computed once on the server (services/agent-health.ts). The
+        // The account-level verdict, computed once on the server (services/agent/health.ts). The
         // frontend used to derive this itself from fields this response does not carry, so two of
         // its three problem conditions could never fire and a broken webhook read as healthy.
         health: health[a.gaii],
@@ -349,9 +349,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // null on an agent nobody has said anything about, which is not the same as 'spawn'.
         run_mode: a.runMode ?? null,
         // Whether its tasks start on their own: the owner's setting, what applies, and the permissions
-        // that make every task wait whatever the setting (services/agent-task-start-write.ts).
+        // that make every task wait whatever the setting (services/agent/task-start-write.ts).
         ...taskStartView(a, useOf(a)),
-        // Whether the owner stopped it, when and who did (services/agent-stop-rules.ts). A stopped
+        // Whether the owner stopped it, when and who did (services/agent/stop-rules.ts). A stopped
         // agent starts no new work until it is started again; a runtime reads its roster here.
         ...stoppedView(a),
         // The highest classification label it may read, as a label id; null = no limit (plan
@@ -399,7 +399,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // The shared anonymous agent sets no tags: every holder of the minted token is that one agent.
   router.patch('/v1/agents/:name/tags', requireAuth(), refuseAnonymousPrincipal(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
     const identifier = (req.params.name as string);
-    // Ownership, normalisation and the write are services/agent-profile-write.ts, shared with
+    // Ownership, normalisation and the write are services/agent/profile-write.ts, shared with
     // aimeat_agent_tags_set.
     const outcome = await setAgentTags({ storage, config }, req.auth!.owner, identifier, req.body?.tags);
     if (!outcome.ok) {
@@ -463,7 +463,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   router.patch('/v1/agents/:name/mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const identifier = (req.params.name as string);
     // Ownership, the mode vocabulary, the write and the Hello Integration step-list re-derive are
-    // services/agent-profile-write.ts, shared with aimeat_agent_mode_set.
+    // services/agent/profile-write.ts, shared with aimeat_agent_mode_set.
     const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode, resolveIdentity(req.auth!, config.nodeId));
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
@@ -563,7 +563,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // PATCH /v1/agents/:name/task-start-floor — the floor permissions this agent may start work with
   // (body `{ task_start_floor: ["exchange:write"] | null }`): those stop holding its tasks, paid or
   // free (Jouni 2026-10-23). The owner in person only, like pressing Start on a held task, so no MCP
-  // tool sets it; the rules are services/agent-task-start-write.ts setAgentTaskStartFloor.
+  // tool sets it; the rules are services/agent/task-start-write.ts setAgentTaskStartFloor.
   router.patch('/v1/agents/:name/task-start-floor', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     if (!('task_start_floor' in body)) {

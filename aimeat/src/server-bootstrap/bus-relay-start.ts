@@ -8,7 +8,7 @@
  *     federation peers   `federation`          services/federation-peer-reload.ts reloadPeers
  *     internet openings  `internet-openings`   services/internet-opening/opening-registry.ts refreshOpenings
  *     maintenance mode   `maintenance`         services/maintenance-cache.ts refresh (the 5 s re-read stays)
- *     stored settings    `config`              services/config-reload.ts
+ *     stored settings    `config`              services/config/reload.ts
  *   Each registry was loaded at boot before this runs. On SQLite (one process per database) it starts
  *   nothing.
  * @structure startNodeBusRelay(deps)
@@ -26,7 +26,7 @@ import type { MaintenanceCache } from '../services/maintenance-cache.js';
 import { startBusRelay, type RemoteReload } from '../services/bus-relay.js';
 import { reloadPeers } from '../services/federation-peer-reload.js';
 import { refreshOpenings } from '../services/internet-opening/opening-registry.js';
-import { createStoredConfigReload } from '../services/config-reload.js';
+import { createStoredConfigReload } from '../services/config/reload.js';
 import { singleProcess } from '../services/process-lease.js';
 import { logger } from '../utils/logger.js';
 

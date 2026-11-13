@@ -368,12 +368,12 @@ integration, same two values, metadata address from the Sign On tab.
 | Tenant gate, claim mapping, provider registry | `aimeat/src/services/oidc-providers.ts` |
 | Sign-in callback and the account-mapping decisions | `aimeat/src/routes/oauth-login.ts` |
 | Registration-mode rule table | `aimeat/src/services/owner-provisioning.ts` |
-| Config keys and defaults | `aimeat/src/config.ts`, `aimeat/src/config-types-social-login.ts` |
+| Config keys and defaults | `aimeat/src/config.ts`, `aimeat/src/config/types-social-login.ts` |
 | Tests | `aimeat/test/unit/registration-gate.test.ts`, `aimeat/test/e2e-registration-mode.ts` |
 | Shared account-mapping tree (OIDC + SAML) | `aimeat/src/services/external-login.ts` |
 | SAML SP wrapper + IdP metadata parsing | `aimeat/src/services/saml-sp.ts` |
 | SAML login routes (authorize/ACS/finalize) | `aimeat/src/routes/saml-login.ts` |
-| SSO connection management (one implementation) | `aimeat/src/services/sso-connections.ts`, routes `aimeat/src/routes/admin-sso.ts`, MCP `aimeat/src/mcp/admin-sso.ts` |
+| SSO connection management (one implementation) | `aimeat/src/services/sso-connections.ts`, routes `aimeat/src/routes/admin/sso.ts`, MCP `aimeat/src/mcp/admin-sso.ts` |
 | SCIM door + resource handlers | `aimeat/src/routes/scim.ts`, `aimeat/src/services/scim-users.ts` |
 | Account deactivation (one implementation) | `aimeat/src/services/owner-lifecycle.ts` |
 | BR-04 tests | `aimeat/test/unit/saml-assertion.test.ts`, `aimeat/test/unit/scim-entra-compat.test.ts`, `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/test/e2e-saml-login.ts`, `aimeat/test/e2e-scim-users.ts` |

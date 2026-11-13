@@ -18,7 +18,7 @@
  *   isolation off and every one of these warnings silent, and nothing tested it: no test called
  *   isPrivateHost, and the one test that loaded a profile always set it explicitly. Writing this
  *   test found that isPrivateHost never matched an IPv6 literal, because URL.hostname keeps the
- *   brackets (fixed in config-private-host.ts v1.0.1).
+ *   brackets (fixed in config/private-host.ts v1.0.1).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-profile.test.ts
  * @version-history
  *   2026-10-16 — The posture fixtures carry the four knobs W20 added to the public-node warnings
@@ -31,9 +31,9 @@ vi.mock('../../src/utils/logger.js', () => ({
     logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { isPrivateHost } from '../../src/config-private-host.js';
+import { isPrivateHost } from '../../src/config/private-host.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { securityPostureWarnings } from '../../src/config-posture.js';
+import { securityPostureWarnings } from '../../src/config/posture.js';
 
 /** The variables the profile reads or writes; every case sets each of them, unset or not. */
 const PROFILE_VARS = [

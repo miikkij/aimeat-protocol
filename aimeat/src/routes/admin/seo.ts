@@ -1,0 +1,230 @@
+/**
+ * @file src/routes/admin/seo.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What an operator needs in order to run this node's search-engine presence: one
+ *   status answer, the whole-site instant update, and the two per-app moderation doors.
+ *
+ *   The status route exists because no other endpoint answers the question an operator actually
+ *   has, which is "is this node findable, and what is still undone". That question is answered by
+ *   several documents at once — robots.txt, the two sitemaps, the verification tags in the head,
+ *   the IndexNow key, the per-app switches — and reading them one at a time is how it stayed
+ *   unanswered. It reports what is BEING SERVED rather than what the config says, wherever the two
+ *   could differ, because a configured verification token that never reaches the page looks exactly
+ *   like a working one from inside the config. The key file is read the same way: fetched from the
+ *   node's own public address, because a key that is configured and a key file that answers are
+ *   two different claims and IndexNow only honours the second.
+ *
+ *   It is not a wrapper over an existing API: nothing else aggregates this, and a second reader —
+ *   a monitor, the operator's own agent through aimeat_seo_status — wants the same answer.
+ *
+ * @structure
+ *   - buildSeoStatus(config, storage) — the status payload, shared with the MCP tool; in
+ *     services/seo/seo-status.ts since 2026-11-13 with announceNote
+ *   - registerAdminSeoRoutes(...)     — GET  /v1/admin/seo/status
+ *                                       GET  /v1/admin/seo/indexnow/plan
+ *                                       POST /v1/admin/seo/indexnow
+ *                                       POST /v1/admin/apps/:owner/:filename/seo-block
+ *                                       POST /v1/admin/apps/:owner/:filename/seo-approve
+ * @usage registerAdminSeoRoutes(router, config, storage, canonicalOwner);
+ * @version-history
+ *   v1.6.1 — 2026-11-13 — buildSeoStatus, its key-file check and announceNote moved unchanged to
+ *     services/seo/seo-status.ts, so the MCP SEO tools import no route file (structure programme unit 2).
+ *   v1.6.0 — 2026-11-09 — sitemap.page_count counts the pages this node lists (less the ones handed to
+ *     the main node), and sitemap.primary_node names that node (seo.primary_node_url, TARGET-094).
+ *   v1.5.1 — 2026-11-07 — apps.without_description asks for the description itself again: since the
+ *     150-word rule it also caught thin apps that have one.
+ *   v1.5.0 — 2026-11-06 — apps.thin_text: the search-visible apps whose page carries fewer than 150
+ *     words of their own text, with the count and whether a text about the app is set (TARGET-093).
+ *   v1.4.0 — 2026-11-06 — The status lists the search-visible apps with no description of their own
+ *     (apps.without_description), and app_host_count leaves them out, as the sitemap index does
+ *     (TARGET-089 Y2).
+ *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
+ *   v1.2.0 — 2026-10-01 — The status reports seo.announce_apps, and app_host_count follows it.
+ *   v1.1.1 — 2026-09-26 — The app owner in the two per-app doors comes from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-09-11 — The key file checked from outside, the newest five notices and what a
+ *     whole-site notice would carry in the status; the plan and the send doors for it. The MCP tool
+ *     aimeat_seo_announce calls the same two service functions the doors call.
+ *   v1.0.0 — 2026-08-25 — Initial.
+ */
+import type { Router } from 'express';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
+import { success, error } from '../../middleware/envelope.js';
+import { emitChange } from '../../services/event-bus.js';
+import { appSeoState } from '../../services/app-seo.js';
+import { planAnnouncement, announceEverything, type AnnounceScope } from '../../services/indexnow-site.js';
+import { localAccountName } from '../../utils/gaii.js';
+import type { CanonicalOwner } from '../apps/helpers.js';
+import { buildSeoStatus, announceNote } from '../../services/seo/seo-status.js';
+
+/** "all" or "pages", or null for anything else. Absent means all. */
+function parseScope(raw: unknown): AnnounceScope | null {
+  if (raw === undefined || raw === null || raw === '') return 'all';
+  return raw === 'all' || raw === 'pages' ? raw : null;
+}
+
+export function registerAdminSeoRoutes(
+  router: Router,
+  config: AimeatConfig,
+  storage: Storage,
+  canonicalOwner: CanonicalOwner,
+): void {
+  router.get('/v1/admin/seo/status', requireAuth(), requireOperator(storage), async (_req, res) => {
+    res.json(success(config.nodeId, await buildSeoStatus(config, storage), [
+      { description: 'Change a setting', method: 'PUT', url: '/v1/admin/config' },
+      { description: 'Tell the search engines about the whole site now', method: 'POST', url: '/v1/admin/seo/indexnow' },
+    ]));
+  });
+
+  /** What a whole-site notice would carry, host by host. Sends nothing. */
+  router.get('/v1/admin/seo/indexnow/plan', requireAuth(), requireOperator(storage), async (req, res) => {
+    const scope = parseScope(req.query.scope);
+    if (!scope) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope must be "all" or "pages"'));
+      return;
+    }
+    const plan = await planAnnouncement(config, storage, scope);
+    res.json(success(config.nodeId, {
+      scope,
+      url_count: plan.urls.length,
+      host_count: plan.hosts.length,
+      hosts: plan.hosts,
+      urls: plan.urls,
+      apps: plan.apps.map((a) => ({ owner: a.ownerName, filename: a.filename, subdomain: a.subdomain ?? null })),
+    }, [
+      { description: 'Send it', method: 'POST', url: '/v1/admin/seo/indexnow' },
+    ]));
+  });
+
+  /**
+   * The whole site to IndexNow, now. Explicit, so the auto switch does not apply; the key and the
+   * discovery switch still do, and the refusal names which one. The MCP tool calls the same
+   * announceEverything, so the grouping, the stamp on each app and the log happen in one place.
+   */
+  router.post('/v1/admin/seo/indexnow', requireAuth(), requireOperator(storage), async (req, res) => {
+    const scope = parseScope((req.body ?? {}).scope);
+    if (!scope) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope must be "all" or "pages"'));
+      return;
+    }
+    const { owner: operatorName } = await canonicalOwner(req);
+    const out = await announceEverything(config, storage, { scope, by: operatorName });
+    if (!out.sent) {
+      const [code, message] = out.reason === 'no_key'
+        ? ['NO_INDEXNOW_KEY', 'No IndexNow key is set on this node. It is one server setting (AIMEAT_INDEXNOW_KEY) and needs a restart, so whoever installed this is the one to ask.']
+        : out.reason === 'indexing_off'
+          ? ['INDEXING_OFF', 'Search engines are turned away on this node (seo.indexing is off), so there is nothing to announce. Welcome them first.']
+          : ['NOTHING_TO_SEND', 'There is nothing to send: no pages and no findable application.'];
+      res.status(409).json(error(config.nodeId, code, message, 409, { scope, url_count: out.plan.urls.length }));
+      return;
+    }
+    // The apps carry a new announcedAt, and the status page reads the log: both re-read on 'apps'.
+    emitChange('apps');
+    const { run } = out;
+    if (run.failed.length === run.hosts) {
+      res.status(502).json(error(config.nodeId, 'INDEXNOW_REFUSED',
+        `IndexNow refused every batch (${run.status ?? 'no answer'}). The key file has to answer on each host with the key as its body.`,
+        502, { scope, run }));
+      return;
+    }
+    res.json(success(config.nodeId, {
+      scope,
+      url_count: run.urlCount,
+      host_count: run.hosts,
+      run,
+      note: announceNote(scope, run.urlCount, run.hosts, run.failed),
+    }, [
+      { description: 'Where things stand now', method: 'GET', url: '/v1/admin/seo/status' },
+    ]));
+  });
+
+  /**
+   * Block or unblock ONE app's search visibility. Narrower than /moderate, deliberately: the app
+   * keeps working, keeps its listing and keeps its link, and only stops being findable through a
+   * search engine. That is the proportionate answer to an app origin being used to farm keywords
+   * on the operator's domain.
+   */
+  router.post('/v1/admin/apps/:owner/:filename/seo-block', requireAuth(), requireOperator(storage),
+    async (req, res) => {
+      const ownerParam = req.params.owner as string;
+      const filename = req.params.filename as string;
+      const owner = localAccountName(ownerParam);
+      const body = req.body ?? {};
+      if (typeof body.blocked !== 'boolean') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'blocked must be a boolean'));
+        return;
+      }
+      // The reason reaches the OWNER, not just the audit log: a block whose reason the owner
+      // cannot read is one they cannot fix.
+      const reason = typeof body.reason === 'string' ? body.reason.slice(0, 500) : undefined;
+
+      const app = await storage.getAppByOwnerName(owner, filename);
+      if (!app) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+        return;
+      }
+      const { owner: operatorName } = await canonicalOwner(req);
+      const ok = await storage.setAppOperatorSeoBlocked(app.ownerGaii, filename, body.blocked, {
+        by: operatorName, at: new Date().toISOString(), reason,
+      });
+      if (!ok) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+        return;
+      }
+      const after = await storage.getAppByOwnerName(owner, filename);
+      emitChange('apps');
+      res.json(success(config.nodeId, {
+        owner, filename,
+        seo_state: after ? appSeoState(after, config) : 'blocked',
+        note: body.blocked
+          ? 'This app is no longer findable in search engines. It still works, stays listed, and can be shared by link.'
+          : 'The search block is lifted. Whether the app is findable now depends on its owner\'s own setting.',
+      }));
+    });
+
+  /**
+   * Approve or withdraw approval in `review` mode. A no-op in `owner` mode, and it says so rather
+   * than writing a field that would silently start mattering if the mode were switched later.
+   */
+  router.post('/v1/admin/apps/:owner/:filename/seo-approve', requireAuth(), requireOperator(storage),
+    async (req, res) => {
+      const ownerParam = req.params.owner as string;
+      const filename = req.params.filename as string;
+      const owner = localAccountName(ownerParam);
+      const body = req.body ?? {};
+      if (typeof body.approved !== 'boolean') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'approved must be a boolean'));
+        return;
+      }
+      if (config.appsSeoMode !== 'review') {
+        res.status(409).json(error(config.nodeId, 'NOT_IN_REVIEW_MODE',
+          'This node lets app owners decide their own search visibility, so there is nothing to approve. Set apps.seo_mode to "review" first.'));
+        return;
+      }
+      const app = await storage.getAppByOwnerName(owner, filename);
+      if (!app) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+        return;
+      }
+      const { owner: operatorName } = await canonicalOwner(req);
+      const now = new Date().toISOString();
+      await storage.updateAppMeta(app.ownerGaii, filename, {
+        seo: body.approved
+          ? { approvedBy: operatorName, approvedAt: now }
+          : { approvedBy: undefined, approvedAt: undefined },
+      });
+      const after = await storage.getAppByOwnerName(owner, filename);
+      emitChange('apps');
+      res.json(success(config.nodeId, {
+        owner, filename,
+        seo_state: after ? appSeoState(after, config) : 'pending',
+        note: body.approved
+          ? 'Approved. The app is in this node\'s sitemap; search engines usually take a few days.'
+          : 'Approval withdrawn. The app is back to waiting for a decision.',
+      }));
+    });
+}

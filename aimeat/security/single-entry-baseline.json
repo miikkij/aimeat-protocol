@@ -169,7 +169,7 @@
         "count": 1,
         "why": "Reads the role list the route built with rolesWithOperator, which asked askOperator."
       },
-      "src/services/agent-proposals.ts": {
+      "src/services/agent/proposals.ts": {
         "count": 1,
         "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
       },
@@ -261,7 +261,7 @@
         "count": 1,
         "why": "Asks whether the caller is an agent session."
       },
-      "src/services/agent-proposals.ts": {
+      "src/services/agent/proposals.ts": {
         "count": 1,
         "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
       },
@@ -371,11 +371,11 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/agent-proposals.ts": {
+      "src/services/agent/proposals.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/agent-refusals.ts": {
+      "src/services/agent/refusals.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -425,7 +425,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/config-posture.ts": {
+      "src/config/posture.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -441,7 +441,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/agent-task-start-write.ts": {
+      "src/services/agent/task-start-write.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -651,11 +651,11 @@
       }
     },
     "config-write": {
-      "src/services/config-apply.ts": {
+      "src/services/config/apply.ts": {
         "count": 2,
         "why": "The one writer and the one reset: storeConfigValue and resetConfigValue, behind the tighten-only rule of applyConfigChanges and resetRefusal."
       },
-      "src/services/config-at-rest-rows.ts": {
+      "src/services/config/at-rest-rows.ts": {
         "count": 1,
         "why": "The start-up pass that encrypts a secret row stored in plain text: it rewrites the same value sealed, so no setting changes and there is no caller."
       },
@@ -722,11 +722,11 @@
         "count": 1,
         "why": "THE STEP FOR EXISTING AGENTS at start: every agent not yet given the place's default gets it, once per agent, claimed in one write so two processes do not both give it (decision 8b of 2026-11-05)."
       },
-      "src/services/config-apply.ts": {
+      "src/services/config/apply.ts": {
         "count": 1,
         "why": "THE STEP FOR EXISTING AGENTS when site.purchase_plan is set through PUT /v1/admin/config, aimeat_admin_config_set or the CLI (decision 8b of 2026-11-05)."
       },
-      "src/routes/admin-config.ts": {
+      "src/routes/admin/config.ts": {
         "count": 1,
         "why": "THE STEP FOR EXISTING AGENTS when the Consul import applies site.purchase_plan (decision 8b of 2026-11-05)."
       },
@@ -804,7 +804,7 @@
         "count": 1,
         "why": "The connector signs its agent's own assertion with the agent's own key; the node verifies it with the public key on the agent's record."
       },
-      "src/services/agent-card.ts": {
+      "src/services/agent/card.ts": {
         "count": 1,
         "why": "The signed agent card: a JWS that callers outside the node verify with the published key, so it is signed with that key."
       },

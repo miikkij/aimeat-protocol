@@ -2,7 +2,7 @@
  * @file test/unit/agent-default-offer.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The offer a new agent's crew definition carries (services/agent-default-offer.ts):
+ * @description The offer a new agent's crew definition carries (services/agent/default-offer.ts):
  *   a definition with none gets one made from the agent's name and purpose, an entry a proposer
  *   wrote is completed with every key the crew runtime reads, and nothing gives the offer a price
  *   or a visibility.
@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { defaultOfferFor, withDefaultOffer, firstRequestOf, offerSignalError } from '../../src/services/agent-default-offer.js';
+import { defaultOfferFor, withDefaultOffer, firstRequestOf, offerSignalError } from '../../src/services/agent/default-offer.js';
 
 const AGENT = { name: 'morning-news', displayName: 'Morning news', purpose: 'Reads the morning news and writes a short summary.' };
 

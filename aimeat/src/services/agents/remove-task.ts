@@ -7,7 +7,7 @@
  *
  *   WHO MAY REMOVE. The owner in person: any task of their account. The task's own agent: its own
  *   task, as before. Another of the owner's agents holding task:write and agent:write (the person's
- *   own chat AI, acting on their word): a task of a sibling (services/agent-task-rules.ts
+ *   own chat AI, acting on their word): a task of a sibling (services/agent/task-rules.ts
  *   mayManageSiblingTasks). An app grant is not admitted, as before. Nobody removes an ACTIVE task:
  *   it is paused or its agent is stopped first.
  *
@@ -25,7 +25,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
-import { mayManageSiblingTasks, type StartCaller } from '../agent-task-rules.js';
+import { mayManageSiblingTasks, type StartCaller } from '../agent/task-rules.js';
 import { emitChange } from '../event-bus.js';
 import { emitResourceUpdated } from '../resource-events.js';
 import { logger } from '../../utils/logger.js';

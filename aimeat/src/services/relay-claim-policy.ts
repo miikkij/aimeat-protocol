@@ -47,13 +47,13 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { logger } from '../utils/logger.js';
-import { RELAY_CLAIM_OPTIONAL_REMOVED_IN, relayClaimOptionalLive } from '../config-federation.js';
+import { RELAY_CLAIM_OPTIONAL_REMOVED_IN, relayClaimOptionalLive } from '../config/federation.js';
 
 export type RelayClaimSetting = 'optional' | 'required';
 
 /** The release in which the node-wide default becomes `required`. */
 export const RELAY_CLAIM_REQUIRED_BY_DEFAULT_IN = '3.20.0';
-/** The release in which `optional` stops being a setting, the node's and every peer's (declared in config-federation.ts). */
+/** The release in which `optional` stops being a setting, the node's and every peer's (declared in config/federation.ts). */
 export { RELAY_CLAIM_OPTIONAL_REMOVED_IN };
 /** At most one write of each relay time per peer in this window. */
 export const RELAY_SEEN_WRITE_INTERVAL_MS = 10 * 60_000;

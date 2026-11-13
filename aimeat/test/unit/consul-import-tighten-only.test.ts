@@ -28,7 +28,7 @@ import { initSessionAuth } from '../../src/auth/middleware.js';
 import { initStats } from '../../src/services/stats.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { requestIdMiddleware } from '../../src/middleware/request-id.js';
-import { adminConfigRouter } from '../../src/routes/admin-config.js';
+import { adminConfigRouter } from '../../src/routes/admin/config.js';
 import type { ConsulConfigService } from '../../src/services/consul-config.js';
 
 const NODE_ID = 'aimeat-consul-import-test';

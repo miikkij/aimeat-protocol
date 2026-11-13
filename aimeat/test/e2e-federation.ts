@@ -72,7 +72,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
-import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config-federation.js';
+import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config/federation.js';
 import { removedOn } from './helpers/node-release.js';
 import { genesisReadHeaders } from './helpers/genesis-read-headers.js';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';

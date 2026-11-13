@@ -21,7 +21,7 @@ vi.mock('../../src/services/mcp-client/registry.js', () => ({
 }));
 import {
     setAgentTags, setAgentMode, setAgentCapabilities,
-} from '../../src/services/agent-profile-write.js';
+} from '../../src/services/agent/profile-write.js';
 import { createDefaultSteps } from '../../src/models/agent-onboarding-schemas.js';
 import type { AgentRecord } from '../../src/storage/interface.js';
 

@@ -6,7 +6,7 @@
  *   two listing sources stored as memory: an app's tool manifest (`apps.{app}.tools`, a tool's
  *   `price.morsels`) and an agent's offers document (`agents.{agent}.offers`, an offer's `price`).
  *
- *   WHY. From MORSEL_PRICE_FIELDS_REMOVED_IN (src/config-pacing.ts) the node refuses the old morsel
+ *   WHY. From MORSEL_PRICE_FIELDS_REMOVED_IN (src/config/pacing.ts) the node refuses the old morsel
  *   price fields, and the dedicated routes did: aimeat_app_tools_publish (legacyToolPriceRefusal) and
  *   PUT /v1/agents/:name/offers answered 400 MORSEL_PRICE_REMOVED. The same document written through
  *   POST, PUT or PATCH /v1/memory or the bulk routes was stored, and the EXCHANGE projection then read
@@ -27,7 +27,7 @@
  *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.0.0 — 2026-10-12 — Initial (the 4.0.0 sweep).
  */
-import { MORSEL_PRICE_FIELDS_REMOVED_IN, legacyMorselFieldsLive } from '../config-pacing.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN, legacyMorselFieldsLive } from '../config/pacing.js';
 import { legacyToolPriceRefusal } from '../models/app-tool-schemas.js';
 import { normalizeKnowledgeSharing, type TollNameRefusal } from './toll-morsels-names.js';
 

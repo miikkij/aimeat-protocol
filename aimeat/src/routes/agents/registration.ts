@@ -55,9 +55,9 @@ import { createOnboardingTestTask } from '../../services/onboarding-test-task.js
 import { detectPlatform } from '../../services/platform-detector.js';
 import { exceedsCeiling } from '../../utils/scope-coverage.js';
 import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance } from '../../services/agent-clearance.js';
+import { newAgentClearance } from '../../services/agent/clearance.js';
 import { returnProven } from '../../services/device-return-proof.js';
-import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
+import { standingWorkOf, noticeStandingWork } from '../../services/agent/standing-work.js';
 import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 import { logger } from '../../utils/logger.js';
 
@@ -146,7 +146,7 @@ export function registerRegistrationRoutes(
     // Extension hook: post_agent_registration (fire-and-forget)
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
     // A new agent under a name an earlier agent had runs that agent's standing work again; the owner
-    // is told what (services/agent-standing-work.ts; secaudit2026oct26).
+    // is told what (services/agent/standing-work.ts; secaudit2026oct26).
     const ownerGhii = `${owner}@${config.nodeId}`;
     await noticeStandingWork(storage, ownerGhii, name, await standingWorkOf(storage, ownerGhii, agent.gaii), 'resumed')
       .catch(err => logger.warn('agent registration: standing work not counted', { gaii: agent.gaii, error: String(err) }));

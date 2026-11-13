@@ -53,7 +53,7 @@ export interface AgentTaskTodo {
   /**
    * What this step will do that the owner must see first: spend money, send as the owner, delete.
    * Declared by whoever proposed the plan. A live todo carrying one holds the task for the owner's
-   * OK whatever the start setting says (services/agent-task-rules.ts). Rides in the todos JSON.
+   * OK whatever the start setting says (services/agent/task-rules.ts). Rides in the todos JSON.
    */
   effects?: Array<'spend' | 'send_as_owner' | 'delete'>;
 }
@@ -198,7 +198,7 @@ export interface AgentTaskRecord {
    * `taskStart` decides, read when the decision is made: a task given before the owner switched
    * the agent follows the new answer when its plan arrives (a queued onboarding task once waited
    * 43 minutes for a click because the switch came after it). The permission floor is never
-   * folded in here; it is read live (services/agent-task-rules.ts).
+   * folded in here; it is read live (services/agent/task-rules.ts).
    */
   startPolicy?: 'automatic' | 'confirm' | null;
   parentTaskId?: string;
@@ -249,7 +249,7 @@ export interface AgentTaskEventRecord {
   // POST /tasks/:id/rate. `details` carries { stars, context, raterType,
   // sourceGrounded }.
   // 'scope_denied' (2026-09-30): written by the NODE only, when it refused the task's agent a call
-  // for a missing permission (services/agent-refusals.ts). `details` carries { needed, any_of, call }.
+  // for a missing permission (services/agent/refusals.ts). `details` carries { needed, any_of, call }.
   // The event route does not accept it from an agent, so an agent cannot forge or fake one away.
   type: 'started' | 'progress' | 'todo_completed' | 'todo_failed' |
         'memory_write' | 'extension_install' | 'app_publish' |

@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { aiCallerFromCredential, aiCallerOfPrincipal } from '../../src/services/ai/caller-context.js';
 import { scheduleActor } from '../../src/services/schedule-actor.js';
 import { aiCallerForStart, workflowAiCaller } from '../../src/services/workflow/ai-caller.js';
-import { aiPayerOf, aiAskerOf } from '../../src/services/agent-ai-keys.js';
+import { aiPayerOf, aiAskerOf } from '../../src/services/agent/ai-keys.js';
 import { normaliseOwnerGenRules, resolveGenRules, type OwnerGenRules } from '../../src/services/ai/gen-rules.js';
 
 const NODE = 'node-t';
