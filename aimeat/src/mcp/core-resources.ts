@@ -10,6 +10,8 @@
  * @structure registerCoreResources(mcp, storage, config, agentGaii)
  * @usage registerCoreResources(mcp, storage, config, agentGaii);  // from registerCoreTools
  * @version-history
+ *   2026-11-13 — The file list asks storedFilesShownTo, the function GET /v1/memory/files asks
+ *     (structure programme 2026-11, unit 7).
  *   2026-11-08 — The file read goes through the one ask of a stored file's read (datapackage/source-labels.ts
  *     storedFileShownTo), as GET /v1/pub reads (secaudit2026nov08b round 15b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -21,8 +23,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { presentMemory } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
-import { memoryTarget, fileTarget } from '../services/classification/labels.js';
-import { storedFileShownTo } from '../services/datapackage/source-labels.js';
+import { memoryTarget } from '../services/classification/labels.js';
+import { storedFileShownTo, storedFilesShownTo } from '../services/datapackage/source-labels.js';
 
 export function registerCoreResources(mcp: McpServer, storage: Storage, config: AimeatConfig, agentGaii: string): void {
     // Resource template: memory entries
@@ -58,8 +60,9 @@ export function registerCoreResources(mcp: McpServer, storage: Storage, config: 
         'agent-storage',
         new ResourceTemplate('aimeat://storage/{key}', {
             list: async () => {
-                const files = await readerForAgent({ storage, config }, agentGaii)
-                    .show(await storage.listStorageFiles(agentGaii), f => fileTarget(agentGaii, f.key, f.workspaceRef));
+                // The ask GET /v1/memory/files makes (datapackage/source-labels.ts storedFilesShownTo).
+                const files = await storedFilesShownTo({ storage, config }, readerForAgent({ storage, config }, agentGaii),
+                    await storage.listStorageFiles(agentGaii));
                 return {
                     resources: files.map(f => ({
                         uri: `aimeat://storage/${encodeURIComponent(f.key)}`,

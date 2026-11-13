@@ -39,12 +39,14 @@
  *   datapackage/source-labels:single-rank-picked-source-stands-for-all-labels).
  * @structure SOURCE_LABELS_PREFIX · SOURCE_TARGETS_KEPT · versionSourceTargets · onePerLabel · recordVersionLabelSource ·
  *   versionLabelSources · packageCopyTargets · fileCopyTargets · hiddenByLabelSources · hiddenBySourceLabel ·
- *   packageVersionOfFile · packageFileHiddenBySourceLabel · storedFileShownTo
+ *   packageVersionOfFile · packageFileHiddenBySourceLabel · storedFileShownTo · storedFilesShownTo
  * @usage
  *   const targets = await versionSourceTargets(deps, sources.flatMap(s => s.labelSources ?? []));
  *   if (await hiddenBySourceLabel(deps, reader, ownerGhii, name, hash)) return null;
  *   const file = meta ? await storedFileShownTo({ storage, config }, reader, gaii, key, meta) : undefined;
  * @version-history
+ *   v2.3.0 — 2026-11-13 — storedFilesShownTo: the same ask for a list of stored files (structure
+ *     programme 2026-11, unit 7).
  *   v2.2.0 — 2026-11-08 — storedFileShownTo: the file's own label and the version's labels in one ask, for
  *     the reads of a stored file other than GET /v1/pub; packageFileHiddenBySourceLabel asks nothing for a
  *     file in an agent's or an app's namespace, whose service namespace does not exist (secaudit2026nov08b
@@ -216,4 +218,19 @@ export async function storedFileShownTo<F extends { workspaceRef?: string | null
     const [shown] = await reader.show([file], () => fileTarget(ownerGaii, key, file.workspaceRef));
     if (!shown || deps.config.classificationMode === 'off') return shown;
     return await packageFileHiddenBySourceLabel(deps, reader, ownerGaii, key) ? undefined : shown;
+}
+
+/**
+ * The stored files of a list this reader may see, in their order: the ask storedFileShownTo makes for
+ * one file, made for a list, so a file the read answers as absent is not named by a list either.
+ * GET /v1/memory/files and the MCP storage resource list ask here; until 2026-11-13 the route listed
+ * an agent the files its own download refused (structure programme 2026-11, unit 7).
+ */
+export async function storedFilesShownTo<F extends { key: string; ownerGaii: string; workspaceRef?: string | null }>(
+    deps: Deps, reader: Pick<ContentReader, 'show' | 'kind'>, files: F[],
+): Promise<F[]> {
+    const shown = await reader.show(files, f => fileTarget(f.ownerGaii, f.key, f.workspaceRef));
+    if (deps.config.classificationMode === 'off') return shown;
+    const hidden = await Promise.all(shown.map(f => packageFileHiddenBySourceLabel(deps, reader, f.ownerGaii, f.key)));
+    return shown.filter((_, i) => !hidden[i]);
 }

@@ -5,6 +5,10 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.3 -- 2026-11-13 -- SECURITY: GET /v1/memory/files lists only the files the caller's
+ *     classification reader shows, as GET /v1/memory/files/:key and the MCP storage resource do
+ *     (storedFilesShownTo; structure programme 2026-11, unit 7). The count of every file
+ *     (?count=true alone) stays one aggregate: a count is not a name.
  *   v1.16.2 -- 2026-11-11 -- GET /v1/memory/files names a caller other than the owner in person by
  *     resolveIdentity, as the routes beside it do, not by raw `sub`. The value is the same for every
  *     caller (verifyJWT already gives a visitor its home GHII as `sub`); the resolve-identity rules
@@ -98,7 +102,7 @@ import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-pro
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
 import type { MemoryRouteCtx } from './shared.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { storedFileShownTo } from '../../services/datapackage/source-labels.js';
+import { storedFileShownTo, storedFilesShownTo } from '../../services/datapackage/source-labels.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../../services/content-defaults.js';
 import { choiceIdOf, resolveChoice } from '../../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../../storage/blob/blob-types.js';
@@ -388,6 +392,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       files = await storage.listStorageFiles(holders[0]);
     }
     if (excludePrefix) files = files.filter(f => !f.key.startsWith(excludePrefix));
+    // The classification reader, as the download beside this route and the MCP storage resource ask
+    // it: a file this caller's read answers as absent is not named here either (storedFilesShownTo;
+    // structure programme 2026-11, unit 7). With classification off it passes every file and reads nothing.
+    files = await storedFilesShownTo({ storage, config }, readerFor({ storage, config }, req.auth), files);
 
     if (req.query.count === 'true') {
       res.json(success(config.nodeId, {
