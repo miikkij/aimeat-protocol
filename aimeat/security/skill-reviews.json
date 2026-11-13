@@ -372,7 +372,7 @@
       "digest": "sha256:7b87ce72e7ca22f85a93a500"
     },
     "node:aimeat-html-page": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/services/html-page.ts",
         "aimeat/src/services/page-frame.ts",
@@ -380,7 +380,7 @@
         "aimeat/src/services/workspace-opened.ts",
         "aimeat/src/routes/page-host.ts"
       ],
-      "digest": "sha256:11a9377edaf227298d4e425c",
+      "digest": "sha256:0937cb53f81f78d9384b7ed3",
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-receivers": {
@@ -842,7 +842,7 @@
     "node:aimeat-html-page": {
       "aimeat/src/services/html-page.ts": "4017c2f005e63477",
       "aimeat/src/services/page-frame.ts": "96108b74f3403752",
-      "aimeat/src/services/workspace-share.ts": "2190682b2cb6d2ee",
+      "aimeat/src/services/workspace-share.ts": "41089cb6de17948e",
       "aimeat/src/services/workspace-opened.ts": "5a9837a77b3b4530",
       "aimeat/src/routes/page-host.ts": "86c22f2613bdc310"
     },
