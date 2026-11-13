@@ -30,10 +30,19 @@
  *     BOARD-MEMBERS  an owner's agent holding social:members changes a shared board's reader list
  *                    (a question: REST takes the owner in person only, the tool admits the agent on
  *                    purpose).
+ *     ORG-READ       who reads a private organism on GET /v1/organisms/:id, aimeat_organism_get and
+ *                    the aimeat://organisms resource: one answer per caller.
+ *     ROSTER-PRIVATE who reads a private organism's member list (a question: REST admits the
+ *                    operator's agent, the tool does not).
+ *     ARCHIVED-LIST  an archived organism in the owner's own list, for the owner's agent.
+ *     WS-UPDATE      an attached agent whose owner left changes a workspace's structure.
+ *   JOIN-PRIVATE, BOARD-MEMBERS and ROSTER-PRIVATE assert today's two answers and name the question.
  *   The operator (the suite's first account) turns classification on for the FILES section only and
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.4.0 — 2026-11-14 — ORG-READ, ROSTER-PRIVATE, ARCHIVED-LIST and WS-UPDATE; the question sections
+ *     assert today's two answers (structure programme 2026-11, unit 2b, phase B).
  *   v1.3.0 — 2026-11-13 — BOARD-RES, JOIN-PRIVATE and BOARD-MEMBERS (structure programme 2026-11,
  *     unit 2b, phase B).
  *   v1.2.0 — 2026-11-13 — WS-ROLE asserts the decided rule instead of today's answer.
@@ -405,14 +414,14 @@ await test('Setup: alice\'s private organism with an open join policy; bob\'s ag
     jpOrg = await organism(alice.token, `U2b join ${stamp}`, { visibility: 'private' });
 });
 
-await test('DIFFERS TODAY (a question, not a defect): POST /v1/organisms/:id/join and aimeat_organism_join answer bob\'s agent alike', async () => {
+await test('QUESTION for the developer (today\'s two answers): an outside agent joins a private organism by id on REST; aimeat_organism_join answers it not found, on purpose per the tool', async () => {
     // Both agents hold social:write, the word both surfaces ask for a join, so neither answer is a scope refusal.
     const restAgent = await makeAgent(BASE, bob, ['organism:read', 'organism:write', 'social:write'], N('jprest'));
     const rest = await call('POST', `/v1/organisms/${jpOrg}/join`, restAgent.token, {});
     const toolAgent = await makeAgent(BASE, carol, ['organism:read', 'organism:write', 'social:write'], N('jptool'));
     const tool = await callTool(await openSession(BASE, toolAgent.token, 'u2b-join'), 'aimeat_organism_join', { organism_id: jpOrg });
-    // The outcome is compared, not a status: a direct join and a join request are both an admission.
-    assert((rest.body.ok === true) === !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
+    assert(rest.status === 201, `REST today joins: ${show(rest)}`);
+    assert(tool.isError && /Organism not found/.test(tool.text), `tool today answers not found: ${tool.text.slice(0, 200)}`);
 });
 
 // ─── BOARD-MEMBERS ───
@@ -427,11 +436,100 @@ await test('Setup: alice\'s shared board; an agent of alice holding social:membe
     bmAgent = await makeAgent(BASE, alice, ['social:read', 'social:write', 'social:members'], N('bmag'));
 });
 
-await test('DIFFERS TODAY (a question, not a defect): PATCH /v1/boards/:id/members and aimeat_board_members answer alice\'s agent alike', async () => {
+await test('QUESTION for the developer (today\'s two answers): REST refuses alice\'s agent a board\'s reader list; aimeat_board_members lets it change the list, on purpose per the tool', async () => {
     const add = `ext-${stamp}#someone@aimeat-fi-001-test`;
     const rest = await call('PATCH', `/v1/boards/${bmBoard}/members`, bmAgent.token, { add: [add] });
     const tool = await callTool(await openSession(BASE, bmAgent.token, 'u2b-board-members'), 'aimeat_board_members', { board_id: bmBoard, add: [add] });
-    assert((rest.status === 200) === !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
+    assert(rest.status === 403, `REST today refuses the agent: ${show(rest)}`);
+    assert(!tool.isError && tool.text.includes(add), `tool today changes the list: ${tool.text.slice(0, 200)}`);
+});
+
+// ─── ORG-READ ───
+console.log('\nORG-READ: who reads a private organism, on GET /v1/organisms/:id, aimeat_organism_get and its resource');
+
+let orOrg = '';
+let orMember!: McpAgent, orOutsider!: McpAgent, orOperator!: McpAgent;
+await test('Setup: alice\'s private organism; bob joins it; an agent each of bob, carol and the operator', async () => {
+    orOrg = await organism(alice.token, `U2b read ${stamp}`, { visibility: 'private' });
+    await join(bob.token, orOrg);
+    orMember = await makeAgent(BASE, bob, ['*'], N('ormem'));
+    orOutsider = await makeAgent(BASE, carol, ['*'], N('orout'));
+    // operator:admin named: the operator's reach is a word the operator ticks for one agent.
+    orOperator = await makeAgent(BASE, op, ['*', 'operator:admin'], N('orop'));
+});
+
+/** Whether each of the three doors admits the caller: REST, the tool, the resource. */
+async function orgReadDoors(agent: McpAgent): Promise<{ rest: boolean; tool: boolean; resource: boolean; detail: string }> {
+    const rest = await call('GET', `/v1/organisms/${orOrg}`, agent.token);
+    const s = await openSession(BASE, agent.token, 'u2b-org-read');
+    const tool = await callTool(s, 'aimeat_organism_get', { organism_id: orOrg });
+    const res = await mcpRpc(s, 'resources/read', { uri: `aimeat://organisms/${encodeURIComponent(orOrg)}` });
+    const resText = String(res?.result?.contents?.[0]?.text ?? JSON.stringify(res?.error ?? res));
+    return {
+        rest: rest.status === 200, tool: !tool.isError, resource: resText.trim().startsWith('{'),
+        detail: `REST ${rest.status}; tool ${tool.text.slice(0, 120)}; resource ${resText.slice(0, 120)}`,
+    };
+}
+
+await test('USE KEPT: the member\'s agent reads the private organism on all three', async () => {
+    const d = await orgReadDoors(orMember);
+    assert(d.rest && d.tool && d.resource, d.detail);
+});
+
+await test('REFUSED: an outsider\'s agent is refused on all three', async () => {
+    const d = await orgReadDoors(orOutsider);
+    assert(!d.rest && !d.tool && !d.resource, d.detail);
+});
+
+await test('SAME ANSWER: the operator\'s agent, not a member, gets one answer on all three', async () => {
+    const d = await orgReadDoors(orOperator);
+    assert(d.rest === d.tool && d.tool === d.resource, d.detail);
+});
+
+// ─── ROSTER-PRIVATE ───
+console.log('\nROSTER-PRIVATE: who reads a private organism\'s member list');
+
+await test('QUESTION for the developer (today\'s two answers): the operator\'s agent reads a private roster on GET /v1/organisms/:id/members; aimeat_organism_members (and GET /v1/organisms/:id, ORG-READ) refuse it', async () => {
+    const rest = await call('GET', `/v1/organisms/${orOrg}/members`, orOperator.token);
+    const tool = await callTool(await openSession(BASE, orOperator.token, 'u2b-roster'), 'aimeat_organism_members', { organism_id: orOrg });
+    assert(rest.status === 200, `REST today admits the operator's agent: ${show(rest)}`);
+    assert(tool.isError && /Access denied/.test(tool.text), `tool today refuses it: ${tool.text.slice(0, 200)}`);
+});
+
+await test('USE KEPT: the member\'s agent reads the list on both; the outsider\'s agent on neither', async () => {
+    const mRest = await call('GET', `/v1/organisms/${orOrg}/members`, orMember.token);
+    const mTool = await callTool(await openSession(BASE, orMember.token, 'u2b-roster-m'), 'aimeat_organism_members', { organism_id: orOrg });
+    assert(mRest.status === 200 && !mTool.isError, `member: REST ${show(mRest)} vs tool ${mTool.text.slice(0, 200)}`);
+    const oRest = await call('GET', `/v1/organisms/${orOrg}/members`, orOutsider.token);
+    const oTool = await callTool(await openSession(BASE, orOutsider.token, 'u2b-roster-o'), 'aimeat_organism_members', { organism_id: orOrg });
+    assert(oRest.status === 404 && oTool.isError, `outsider: REST ${show(oRest)} vs tool ${oTool.text.slice(0, 200)}`);
+});
+
+// ─── ARCHIVED-LIST ───
+console.log('\nARCHIVED-LIST: an archived organism in the owner\'s own list, as the owner\'s agent sees it');
+
+let arOrg = '';
+let arAgent!: McpAgent;
+await test('Setup: alice\'s organism, archived; an agent of alice', async () => {
+    arOrg = await organism(alice.token, `U2b archived ${stamp}`);
+    const a = await call('POST', `/v1/organisms/${arOrg}/archive`, alice.token, { level: 'organism' });
+    assert(a.status === 200, `archive: ${show(a)}`);
+    arAgent = await makeAgent(BASE, alice, ['*'], N('arag'));
+});
+
+await test('SAME ANSWER: GET /v1/organisms?member=alice and aimeat_organism_list both list, or both leave out, the archived organism for alice\'s agent', async () => {
+    const rest = await call('GET', `/v1/organisms?${q({ member: alice.name })}`, arAgent.token);
+    const tool = await callTool(await openSession(BASE, arAgent.token, 'u2b-archived'), 'aimeat_organism_list', {});
+    assert(rest.text.includes(arOrg) === tool.text.includes(arOrg), `REST lists it: ${rest.text.includes(arOrg)}; tool lists it: ${tool.text.includes(arOrg)}`);
+});
+
+// ─── WS-UPDATE ───
+console.log('\nWS-UPDATE: an attached agent whose owner left changes a workspace\'s structure');
+
+await test('SAME ANSWER: PUT /v1/organisms/:id/workspace and aimeat_workspace_update answer carol\'s attached agent alike after carol left', async () => {
+    const rest = await call('PUT', `/v1/organisms/${roleOrg}/workspace`, carolAgent.token, { ws: bobWs, readme: `u2b ${stamp}` });
+    const tool = await callTool(carolMcp, 'aimeat_workspace_update', { organism_id: roleOrg, ws: bobWs, readme: `u2b ${stamp}` });
+    assert((rest.body.ok === true) === !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
 });
 
 // ─── FILES ───
