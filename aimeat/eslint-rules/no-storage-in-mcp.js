@@ -41,6 +41,8 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.3.3 — 2026-11-14 — Unit 2b part 2, phase B: apps-fork.ts leaves EXEMPT; its source read and the
+ *     three fork gates moved to services/app/fork-gate.ts, which POST .../fork calls too.
  *   v1.3.2 — 2026-11-14 — Unit 2b part 2, phase B: consent.ts leaves EXEMPT; its record read and the
  *     owner-or-operator check moved to services/consent/consent-read.ts, which GET /v1/consent/:id calls too.
  *   v1.3.1 — 2026-11-13 — Structure programme unit 2b, batch 3: agent-capabilities.ts, agent-onboarding.ts,
@@ -81,7 +83,6 @@ const EXEMPT = new Set([
   'src/mcp/agent-schedules.ts',
   'src/mcp/agent-tasks.ts',
   'src/mcp/apps.ts',
-  'src/mcp/apps-fork.ts',              // pure extraction out of apps.ts (max-file-lines), same backlog
   'src/mcp/boards.ts',
   'src/mcp/capabilities.ts',
   'src/mcp/chat-instances.ts',

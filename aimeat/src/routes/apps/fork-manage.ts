@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — POST .../fork reads the source and asks its gates through forkSourceFor
+ *     (services/app/fork-gate.ts), which aimeat_app_fork now asks too (structure programme 2026-11, unit 2b, B9).
  *   2026-11-06 — `seo: { index: true }` on an app not yet in search is refused before the first write
  *     when the page would carry fewer than 150 words of the app's own text, counting the text the same
  *     request writes (TARGET-093, Jouni 2026-11-06).
@@ -73,7 +75,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app/lifecycle.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
-import { resolveIdentity, ownerGhiiOf, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
+import { resolveIdentity, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import {
     applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput, appAccessMembershipRefusal,
     SETTINGS_PRESENTATION_FIELDS, SETTINGS_OFFERING_FIELDS, type AppSettingsField, type AppSettingsInput,
@@ -88,9 +90,7 @@ import {
 import { recordAppAudit, type AppAuditAction } from '../../services/app/audit.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
-import { operatorOverride } from '../../services/operator-override.js';
-import { appIsPaced, appToll } from '../../services/app/pacing.js';
-import { currentAppRow } from '../../services/app/served-protection.js';
+import { forkSourceFor } from '../../services/app/fork-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 import { fileAppPublishAsk, appAskedNote, publishAskedFields, askedStatus } from '../../services/app/publish-gate.js';
 import { appSettingsGate, appSettingsCapRefusal } from '../../services/app/settings-gate.js';
@@ -193,52 +193,30 @@ export function registerForkManageRoutes(
         const newFilename = typeof body.new_filename === 'string' ? body.new_filename.trim() : '';
         const version = body.version !== undefined ? parseInt(String(body.version), 10) : undefined;
 
-        // Load the source app (specific version if given, else latest).
-        const source = await storage.getAppByOwnerName(sourceOwner, sourceFilename, version);
-        if (!source) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${sourceFilename}" not found for owner "${sourceOwner}"${version ? ` (version ${version})` : ''}`));
-            return;
-        }
-
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner: callerOwner, ownerGhii: callerGhii } = await canonicalOwner(req);
-        const sameOwner = callerOwner === source.ownerName;
-        // The operator check is asked only where one of the gates below would refuse a caller who is
-        // not the owner, so the operator trail is written only for a fork that needed the override.
-        // The pacing amount is the latest version's, also when an older version is forked: a publish
-        // writes it on its new row only (QA audit F10a-01).
-        const current = await currentAppRow(storage, source, version);
-        const paidSource = appIsPaced(config, current.manifest);
-        const isOperator = !sameOwner && (!!source.operatorHidden || !source.forkable || paidSource)
-            && await operatorOverride(storage, config, req.auth, {
-                ownerOf: source.ownerName, area: 'app', action: 'fork', subject: sourceFilename,
-            });
-
-        // Operator-hidden apps are unreachable to everyone but their owner/operator —
-        // mirror the read gate's 404 so moderation status is not leaked via fork.
-        if (source.operatorHidden && !isOperator && !sameOwner) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${sourceFilename}" not found for owner "${sourceOwner}"`));
-            return;
-        }
-
-        // Gate 1 — derivative permission.
-        if (!isOperator && !sameOwner && !source.forkable) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not open for forking by others. Ask the owner to enable forking.'));
-            return;
-        }
-
-        // Gate 2 — a paced source's bytes are not copied before the app is taken. The licence keys on the buyer's
-        // OWNER GHII, the same coordinate the purchase receipt stored (app-store.ts) and the wallet
-        // debited — not the raw `sub`, which on an owner session is a bare name that no receipt holds
-        // (audit AI-triage 2026-08-23, invariant 1).
-        if (paidSource && !sameOwner && !isOperator) {
-            // The version copied: a single licence covers the version bought (feature-list audit #110).
-            const hasLicense = await storage.hasValidLicense(ownerGhiiOf(callerGaii), source.ownerGaii, sourceFilename, undefined, source.versionNumber);
-            if (!hasLicense) {
-                res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app has ${appToll(current.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase, then fork it.`));
-                return;
+        // The source read and its gates, in order: a source the operator hid answers the read gate's
+        // 404 so moderation status is not leaked through a fork; one not open for forking refuses; a
+        // paced source needs a licence on the caller's owner GHII, the coordinate the purchase receipt
+        // stored (audit AI-triage 2026-08-23, invariant 1). The source's owner passes all three, and the
+        // operator passes them through operatorOverride, which writes the trail only for a fork that
+        // needed it. aimeat_app_fork asks the same function (services/app/fork-gate.ts).
+        const gate = await forkSourceFor(storage, config, { owner: callerOwner, gaii: callerGaii, auth: req.auth },
+            { owner: sourceOwner, filename: sourceFilename, version });
+        if (!gate.ok) {
+            const { refusal } = gate;
+            if (refusal.gate === 'missing' || refusal.gate === 'hidden') {
+                // A missing source names the version asked for; a hidden one answers as the read gate does.
+                const suffix = refusal.gate === 'missing' && version ? ` (version ${version})` : '';
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${sourceFilename}" not found for owner "${sourceOwner}"${suffix}`));
+            } else if (refusal.gate === 'not-forkable') {
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not open for forking by others. Ask the owner to enable forking.'));
+            } else {
+                res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app has ${refusal.toll} morsels of pacing. Take it first via POST /v1/app-store/purchase, then fork it.`));
             }
+            return;
         }
+        const source = gate.source;
 
         // Past the gates it is services/app/lifecycle.ts — the same copy aimeat_app_fork performs:
         // the target-name check, the shadowing check, the per-owner quota, the manifest with the

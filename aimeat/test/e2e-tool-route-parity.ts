@@ -865,5 +865,52 @@ await test('B10 FIXED: the operator\'s agent reads alice\'s private capability o
     assert(afterTool === afterRest + 1, `tool trail: ${afterRest} -> ${afterTool}`);
 });
 
+// B9: forking alice's app (not open for forking) and her app the operator hid, on POST
+// /v1/apps/:owner/:filename/fork and aimeat_app_fork.
+const PB_APP = `${N('pbapp')}.html`, PB_HIDDEN = `${N('pbhid')}.html`;
+const pbHtml = (t: string) => Buffer.from(`<!doctype html><html><head><title>${t}</title></head><body>${t}</body></html>`).toString('base64');
+const forkRoute = (owner: string, filename: string, token: string, newName: string) =>
+    call('POST', `/v1/apps/${owner}/${encodeURIComponent(filename)}/fork`, token, { new_filename: newName });
+await test('Setup (B9): alice in person publishes two apps; the operator hides the second', async () => {
+    for (const f of [PB_APP, PB_HIDDEN]) {
+        const p = await call('POST', '/v1/apps', pbAlice.token, { filename: f, content: pbHtml(f), mime_type: 'text/html', description: 'phase B parity' });
+        assert(p.status === 201 || p.status === 200, `publish ${f}: ${show(p)}`);
+    }
+    const hide = await call('POST', `/v1/admin/apps/${pbAlice.name}/${encodeURIComponent(PB_HIDDEN)}/moderate`, op.token, { hidden: true, reason: 'phase B parity' });
+    assert(hide.status === 200, `hide: ${show(hide)}`);
+});
+
+await test('B9 REFUSED: bob\'s agent may not fork alice\'s app on the route or the tool, and her hidden app is not found on either', async () => {
+    const rest = await forkRoute(pbAlice.name, PB_APP, pbBobAg.token, `${N('pbf1')}.html`);
+    assert(rest.status === 403, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_app_fork', { owner: pbAlice.name, filename: PB_APP, new_filename: `${N('pbf2')}.html` });
+    assert(tool.isError && tool.text.includes('not open for forking'), `tool: ${tool.text.slice(0, 200)}`);
+    const hidRest = await forkRoute(pbAlice.name, PB_HIDDEN, pbBobAg.token, `${N('pbf3')}.html`);
+    assert(hidRest.status === 404, `route, hidden: ${show(hidRest)}`);
+    const hidTool = await callTool(pbBobMcp, 'aimeat_app_fork', { owner: pbAlice.name, filename: PB_HIDDEN, new_filename: `${N('pbf4')}.html` });
+    assert(hidTool.isError && hidTool.text.includes('not found'), `tool, hidden: ${hidTool.text.slice(0, 200)}`);
+});
+
+await test('B9 USE KEPT: alice\'s agent forks her own app on the route and the tool', async () => {
+    const rest = await forkRoute(pbAlice.name, PB_APP, pbAliceAg.token, `${N('pbf5')}.html`);
+    assert(rest.status === 201 || rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_app_fork', { owner: pbAlice.name, filename: PB_APP, new_filename: `${N('pbf6')}.html` });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B9 FIXED: alice\'s agent forks her own app the operator hid on the route and the tool alike', async () => {
+    const rest = await forkRoute(pbAlice.name, PB_HIDDEN, pbAliceAg.token, `${N('pbf7')}.html`);
+    assert(rest.status === 201 || rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_app_fork', { owner: pbAlice.name, filename: PB_HIDDEN, new_filename: `${N('pbf8')}.html` });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B9 FIXED: the operator\'s agent forks alice\'s app that is not open for forking on the route and the tool alike', async () => {
+    const rest = await forkRoute(pbAlice.name, PB_APP, pbOpWide.token, `${N('pbf9')}.html`);
+    assert(rest.status === 201 || rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbOpWideMcp, 'aimeat_app_fork', { owner: pbAlice.name, filename: PB_APP, new_filename: `${N('pbfa')}.html` });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);

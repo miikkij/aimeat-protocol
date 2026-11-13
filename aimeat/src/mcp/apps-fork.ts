@@ -8,6 +8,9 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged, caller)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-11-14 — The source read and its gates are forkSourceFor (services/app/fork-gate.ts), as on
+ *     POST .../fork: the owner's agent forks its own app the operator hid, and the operator's agent
+ *     holding operator:admin passes the gates, with the operator trail (unit 2b, B9).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — The fork passes the publish gate (services/app-publish-gate.ts): a fork the node's
@@ -37,9 +40,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { forkApp, resolveAppOwnerScope } from '../services/app/lifecycle.js';
 import { logger } from '../utils/logger.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { appIsPaced, appToll } from '../services/app/pacing.js';
-import { currentAppRow } from '../services/app/served-protection.js';
+import { forkSourceFor } from '../services/app/fork-gate.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { publishAskOf } from '../services/publish-requests/ask.js';
@@ -69,30 +70,20 @@ export function registerAppForkTool(
                 return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
             }
 
-            const source = await storage.getAppByOwnerName(owner, filename, version);
-            if (!source || source.operatorHidden) {
-                return { content: [{ type: 'text' as const, text: `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}` }], isError: true };
-            }
-
             const { ownerName: callerOwner, ownerGhii: callerGhii } = scope;
-            const sameOwner = callerOwner === source.ownerName;
-
-            // Gate 1 — derivative permission (agents are never operators here).
-            if (!sameOwner && !source.forkable) {
-                return { content: [{ type: 'text' as const, text: 'This app is not open for forking by others. Ask the owner to enable forking.' }], isError: true };
+            // The source read and its three gates (hidden, open for forking, licence), with the
+            // operator's pass, are the ones POST .../fork asks (services/app/fork-gate.ts).
+            const gate = await forkSourceFor(storage, config, { owner: callerOwner, gaii: agentGaii, auth: caller().auth }, { owner, filename, version });
+            if (!gate.ok) {
+                const { refusal } = gate;
+                const text = refusal.gate === 'missing' || refusal.gate === 'hidden'
+                    ? `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`
+                    : refusal.gate === 'not-forkable'
+                        ? 'This app is not open for forking by others. Ask the owner to enable forking.'
+                        : `This app has ${refusal.toll} morsels of pacing. Take it first (POST /v1/app-store/purchase), then fork it.`;
+                return { content: [{ type: 'text' as const, text }], isError: true };
             }
-            // Gate 2 — a paced source's bytes are not copied before the app is taken. A licence is
-            // keyed on the buyer's OWNER GHII (app-store.ts), so it is asked of ownerGhiiOf(agentGaii),
-            // the coordinate POST .../fork asks; an agent's own GAII holds no receipt.
-            // The pacing amount is the latest version's, also for an older version (QA audit F10a-01).
-            const current = await currentAppRow(storage, source, version);
-            if (appIsPaced(config, current.manifest) && !sameOwner) {
-                // The version copied: a single licence covers the version bought (feature-list audit #110).
-                const hasLicense = await storage.hasValidLicense(ownerGhiiOf(agentGaii), source.ownerGaii, filename, undefined, source.versionNumber);
-                if (!hasLicense) {
-                    return { content: [{ type: 'text' as const, text: `This app has ${appToll(current.manifest)} morsels of pacing. Take it first (POST /v1/app-store/purchase), then fork it.` }], isError: true };
-                }
-            }
+            const source = gate.source;
 
             try {
                 // From here it is services/app/lifecycle.ts — the same copy POST .../fork performs,
