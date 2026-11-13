@@ -15,34 +15,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/mcp/core.ts",
-    "to": "src/routes/memory/shared.ts",
-    "unresolvedTo": "../routes/memory/shared.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/mcp/core.ts",
-    "to": "src/routes/work.ts",
-    "unresolvedTo": "../routes/work.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/mcp/cortex.ts",
     "to": "src/routes/cortex.ts",
     "unresolvedTo": "../routes/cortex.js",

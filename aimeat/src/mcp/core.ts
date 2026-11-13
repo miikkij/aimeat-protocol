@@ -211,10 +211,10 @@ import { presentMemory, classificationWarningOf } from '../services/classificati
 import { readerForAgent } from '../services/classification/reader.js';
 import { memoryTarget } from '../services/classification/labels.js';
 import { registerCoreResources } from './core-resources.js';
-import { createWorkItem, workErrorText } from '../routes/work.js';
+import { createWorkItem, workErrorText } from '../services/work/create-work-item.js';
 // Imported, not restated. The route ENFORCES this cap and this surface only announces it; the two
 // disagreeing is how a published number becomes a promise nobody keeps.
-import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
+import { MEMORY_LIST_MAX_LIMIT } from '../models/tool-input-vocabulary.js';
 import type { PeerInfo } from '../services/federation.js';
 import { taskStartView, scopeUseLookup } from '../services/agent-task-start-write.js';
 import { stoppedView } from '../services/agent-stop-rules.js';
