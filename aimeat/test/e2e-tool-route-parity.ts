@@ -941,6 +941,49 @@ await test('B7 FIXED: the anonymous credential is refused own and building on th
     }
 });
 
+// B8: one app read by GET /v1/apps/:owner/:filename (serves the app) and aimeat_app_get (its detail).
+const PB_CODED = `${N('pbcode')}.html`, PB_CODE = 'pb-parity-code-42';
+const appRoute = (filename: string, token: string, code?: string) =>
+    call('GET', `/v1/apps/${pbAlice.name}/${encodeURIComponent(filename)}${code ? `?code=${encodeURIComponent(code)}` : ''}`, token);
+await test('Setup (B8): alice in person publishes an app behind an access code', async () => {
+    const p = await call('POST', '/v1/apps', pbAlice.token, { filename: PB_CODED, content: pbHtml(PB_CODED), mime_type: 'text/html', description: 'phase B parity', access_code: PB_CODE });
+    assert(p.status === 201 || p.status === 200, `publish: ${show(p)}`);
+});
+
+await test('B8 USE KEPT: bob\'s agent opens alice\'s listed app on the route and reads its detail on the tool', async () => {
+    const rest = await appRoute(PB_APP, pbBobAg.token);
+    assert(rest.status === 200, `route: ${rest.status} ${rest.text.slice(0, 200)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_app_get', { owner: pbAlice.name, filename: PB_APP });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B8 REFUSED: alice\'s hidden app is not found for bob\'s agent on both; the operator\'s agent reads it on both', async () => {
+    const rest = await appRoute(PB_HIDDEN, pbBobAg.token);
+    assert(rest.status === 404, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_app_get', { owner: pbAlice.name, filename: PB_HIDDEN });
+    assert(tool.isError && tool.text.includes('not found'), `tool: ${tool.text.slice(0, 200)}`);
+    const opRest = await appRoute(PB_HIDDEN, pbOpWide.token);
+    assert(opRest.status === 200, `operator, route: ${opRest.status} ${opRest.text.slice(0, 200)}`);
+    const opTool = await callTool(pbOpWideMcp, 'aimeat_app_get', { owner: pbAlice.name, filename: PB_HIDDEN });
+    assert(!opTool.isError, `operator, tool: ${opTool.text.slice(0, 200)}`);
+});
+
+await test('B8 RECORDED DIFFERENCE (question: should aimeat_app_get take the access code the route takes): bob\'s agent holding the code opens alice\'s coded app on the route, and the tool, which has no code, answers not found', async () => {
+    const without = await appRoute(PB_CODED, pbBobAg.token);
+    assert(without.status === 403, `route without the code: ${show(without)}`);
+    const rest = await appRoute(PB_CODED, pbBobAg.token, PB_CODE);
+    assert(rest.status === 200, `route with the code: ${rest.status} ${rest.text.slice(0, 200)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_app_get', { owner: pbAlice.name, filename: PB_CODED });
+    assert(tool.isError && tool.text.includes('not found'), `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B8 USE KEPT: alice\'s agent reads her coded app on the route and the tool without the code', async () => {
+    const rest = await appRoute(PB_CODED, pbAliceAg.token);
+    assert(rest.status === 200, `route: ${rest.status} ${rest.text.slice(0, 200)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_app_get', { owner: pbAlice.name, filename: PB_CODED });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
 await test('B7 USE KEPT: the anonymous credential lists the catalogue on the route and the tool', async () => {
     const rest = await call('GET', '/v1/apps', pbAnonToken);
     assert(rest.status === 200, `route: ${show(rest)}`);
