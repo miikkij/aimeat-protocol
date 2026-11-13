@@ -286,7 +286,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerChatInstancesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerFlagsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerPromptsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, deps.role ?? 'all', caller);
-    registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken, scopes);
+    registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken, scopes, caller);
     // The second primitive, beside aimeat_discover: run what you found. Needs the session's
     // raw bearer, because the call is dispatched as the caller through the node's own routes.
     registerInvokeTool(mcp, config, getToken, agentGaii);

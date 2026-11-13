@@ -828,5 +828,42 @@ await test('B17 RECORDED DIFFERENCE (question: may an agent that may set the bud
     assert(rest.status === 403, `route: ${show(rest)}`);
 });
 
+// B10: alice's private capability, read by bob's agent and the operator's agent. The operator's pass
+// into another person's account writes a line on that person's account feed (services/operator-override.ts).
+let pbCap = '';
+const capReadTrail = async (): Promise<number> => {
+    const r = await call('GET', '/v1/account/events?limit=200', pbAlice.token);
+    assert(r.status === 200, `account events: ${show(r)}`);
+    return (r.body.data.events as Body[]).filter(e => e.kind === 'operator_acted' && e.data?.area === 'capability' && e.data?.action === 'read').length;
+};
+await test('Setup (B10): alice in person makes a private capability', async () => {
+    const r = await call('POST', '/v1/capabilities', pbAlice.token, { name: N('pbcap'), summary: 'phase B parity', visibility: 'private' });
+    assert(r.status === 201, `capability: ${show(r)}`);
+    pbCap = r.body.data.id;
+});
+
+await test('B10 REFUSED: bob\'s agent is answered "not found" for alice\'s private capability on the get and invoke routes and tools', async () => {
+    const get = await call('GET', `/v1/capabilities/${pbCap}`, pbBobAg.token);
+    assert(get.status === 404, `route get: ${show(get)}`);
+    const inv = await call('POST', `/v1/capabilities/${pbCap}/invoke`, pbBobAg.token, { input: {} });
+    assert(inv.status === 404, `route invoke: ${show(inv)}`);
+    const tget = await callTool(pbBobMcp, 'aimeat_capabilities_get', { id: pbCap });
+    assert(tget.isError && tget.text.startsWith('Capability not found'), `tool get: ${tget.text.slice(0, 200)}`);
+    const tinv = await callTool(pbBobMcp, 'aimeat_capabilities_invoke', { id: pbCap, input: {} });
+    assert(tinv.isError && tinv.text.startsWith('Capability not found'), `tool invoke: ${tinv.text.slice(0, 200)}`);
+});
+
+await test('B10 FIXED: the operator\'s agent reads alice\'s private capability on the route and the tool, and each read writes one operator line on alice\'s account feed', async () => {
+    const before = await capReadTrail();
+    const rest = await call('GET', `/v1/capabilities/${pbCap}`, pbOpWide.token);
+    assert(rest.status === 200 && rest.body.data.id === pbCap, `route: ${show(rest)}`);
+    const afterRest = await capReadTrail();
+    assert(afterRest === before + 1, `route trail: ${before} -> ${afterRest}`);
+    const tool = await callTool(pbOpWideMcp, 'aimeat_capabilities_get', { id: pbCap });
+    assert(!tool.isError && tool.data.id === pbCap, `tool: ${tool.text.slice(0, 200)}`);
+    const afterTool = await capReadTrail();
+    assert(afterTool === afterRest + 1, `tool trail: ${afterRest} -> ${afterTool}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);

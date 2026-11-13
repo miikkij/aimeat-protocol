@@ -10,6 +10,9 @@
  * @usage Registered by mcp/index.ts per agent session; the shared write lives in
  *   services/capability-record.ts, which the REST routes call as well.
  * @version-history
+ *   2026-11-14 — aimeat_capabilities_get and _invoke reach a capability through capabilityFor
+ *     (services/capabilities/capability-for.ts), as the REST routes do: the operator's pass into another
+ *     person's capability writes the operator trail on MCP too (unit 2b, B10).
  *   2026-11-13 — aimeat_capabilities_update hands callable, inputSchema, outputSchema,
  *     deprecationMessage, replacedBy and the record fields to updateCapability, as PUT
  *     /v1/capabilities/:id does (structure programme 2026-11, unit 3b).
@@ -52,8 +55,9 @@ import {
     type CapabilityCreateInput,
 } from '../services/capability-record.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { capabilityHiddenFrom } from '../services/capability-reach.js';
+import type { Storage } from '../storage/interface.js';
+import { capabilityFor } from '../services/capabilities/capability-for.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
@@ -73,6 +77,8 @@ export function registerCapabilitiesTools(
      *  REST twin does, and the operator's two powers here are asked of it; left out, the session
      *  holds nothing there. */
     scopes: string[] = [],
+    /** The session's caller (register-all.ts). Without one, an agent of its own account with `scopes`. */
+    sessionCaller?: () => CallerContext,
 ): void {
 
     /**
@@ -93,10 +99,14 @@ export function registerCapabilitiesTools(
         return { gaii, isOperator: (await resolveOperatorAgentName(storage, gaii, scopes)) !== null };
     }
 
-    /** True when this session may not reach `cap` by its id: closed to it, and not the operator's agent. */
-    async function hiddenFromThisSession(cap: CapabilityRecord): Promise<boolean> {
-        if (!capabilityHiddenFrom(cap, getAgentGaii())) return false;
-        return !(await caller()).isOperator;
+    /**
+     * The capability `id` when this session may reach it by its id (services/capabilities/capability-for.ts,
+     * the function GET /v1/capabilities/:id and POST /v1/capabilities/:id/invoke ask): open to it, on
+     * its owner's side, or the operator's agent holding operator:admin, whose pass writes the trail.
+     */
+    function capabilityForSession(id: string, action: 'read' | 'invoke') {
+        const session = sessionCaller ? sessionCaller() : agentSessionCaller(getAgentGaii(), '', scopes, config.nodeId, storage);
+        return capabilityFor(storage, config, { identity: getAgentGaii(), auth: session.auth }, id, action);
     }
 
     mcp.registerTool(
@@ -130,13 +140,11 @@ export function registerCapabilitiesTools(
             annotations: annotationsFor('aimeat_capabilities_get'),
         },
         async ({ id }) => {
-            const cap = await storage.getCapability(id);
-            if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
             // The REST twin's rule (services/capability-reach.ts): this tool served any capability by
             // id, a private one or a draft of another owner included (secaudit2026oct22).
-            if (await hiddenFromThisSession(cap)) {
-                return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
-            }
+            const found = await capabilityForSession(id, 'read');
+            if (!found.ok) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
+            const cap = found.capability;
             return { content: [{ type: 'text' as const, text: JSON.stringify(cap, null, 2) }] };
         },
     );
@@ -149,9 +157,6 @@ export function registerCapabilitiesTools(
             annotations: annotationsFor('aimeat_capabilities_invoke'),
         },
         async (args) => {
-            const cap = await storage.getCapability(args.id);
-            if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
-
             const callerGhii = getAgentGaii();
 
             // What the read path hides, invoke hides too, and it answers "not found" rather than
@@ -159,9 +164,9 @@ export function registerCapabilitiesTools(
             // and a capability never published reach the owner's side and the operator only
             // (services/capability-reach.ts; secaudit2026oct22). This tool once invoked anything by
             // id, including another owner's private manual webhook capability.
-            if (await hiddenFromThisSession(cap)) {
-                return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
-            }
+            const found = await capabilityForSession(args.id, 'invoke');
+            if (!found.ok) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
+            const cap = found.capability;
 
             if (cap.source.type === 'cortex') {
                 return { content: [{ type: 'text' as const, text: `This capability is browser-only. Use it in an AIMEAT app: ${cap.usage}` }], isError: true };

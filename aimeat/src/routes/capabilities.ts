@@ -9,6 +9,9 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   v1.7.1 — 2026-11-14 — GET /v1/capabilities/:id and POST /v1/capabilities/:id/invoke reach the
+ *     capability through capabilityFor (services/capabilities/capability-for.ts), which the two MCP
+ *     tools now ask too (structure programme 2026-11, unit 2b, B10).
  *   v1.7.0 — 2026-11-13 — PUT passes the body to updateCapability and decides nothing itself. The list
  *     of fields the node owns and the webhook policy of an update moved to
  *     services/capability-record.ts (PATCHABLE_CAPABILITY_FIELDS, webhookPolicyRefusal), where they
@@ -73,7 +76,7 @@ import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
-import { capabilityHiddenFrom } from '../services/capability-reach.js';
+import { capabilityFor } from '../services/capabilities/capability-for.js';
 
 /** A self-reported client-side call cannot legitimately claim to have taken longer than this, and
  *  an unbounded number moves the published average by any amount the reporter chooses. One hour. */
@@ -125,18 +128,15 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   router.get('/v1/capabilities/:id', async (req, res) => {
-    const cap = await storage.getCapability(req.params.id as string);
-    if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
-
     // A private capability, an unknown visibility word, and a capability never published (draft,
     // pending_review, rejected) are served to the owner's side and the operator only, and answer
-    // everyone else as a missing id does (services/capability-reach.ts; secaudit2026oct22).
-    if (capabilityHiddenFrom(cap, req.auth ? resolve(req) : null) && !(req.auth && await operatorOverride(storage, config, req.auth,
-      { ownerOf: cap.ownerGhii, area: 'capability', action: 'read', subject: cap.name }))) {
-      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
-    }
+    // everyone else as a missing id does (services/capability-reach.ts; secaudit2026oct22). The same
+    // function answers aimeat_capabilities_get.
+    const found = await capabilityFor(storage, config, { identity: req.auth ? resolve(req) : null, auth: req.auth },
+      req.params.id as string, 'read');
+    if (!found.ok) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
 
-    res.json(success(config.nodeId, cap));
+    res.json(success(config.nodeId, found.capability));
   });
 
   // ── CRUD (the owner, or the owner's agent holding capability:write, manages its own capabilities) ──
@@ -183,17 +183,14 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   // ── Invoke (Tier 1) ──
 
   router.post('/v1/capabilities/:id/invoke', requireAuth(), requireScope('work:request'), async (req, res) => {
-    const cap = await storage.getCapability(req.params.id as string);
-    if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
-
     const callerGhii = resolve(req);
     // Ownership (SECURITY): what the read route hides, invoke hides too, with the same 404: a private
     // capability, an unknown visibility word, and a capability never published reach the owner's side
-    // and the operator only (services/capability-reach.ts; secaudit2026oct22).
-    if (capabilityHiddenFrom(cap, callerGhii) && !(await operatorOverride(storage, config, req.auth,
-      { ownerOf: cap.ownerGhii, area: 'capability', action: 'invoke', subject: cap.name }))) {
-      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
-    }
+    // and the operator only (services/capability-reach.ts; secaudit2026oct22). The same function
+    // answers aimeat_capabilities_invoke.
+    const found = await capabilityFor(storage, config, { identity: callerGhii, auth: req.auth }, req.params.id as string, 'invoke');
+    if (!found.ok) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
+    const cap = found.capability;
     const jwt = (req.headers.authorization || '').replace('Bearer ', '');
     const mode = (req.query.mode as string) === 'raw' ? 'raw' as const : 'normal' as const;
     const input = req.body.input || {};
