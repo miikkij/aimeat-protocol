@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { installCortex } from '../../src/services/cortex-lifecycle.js';
-import { upsertCortex } from '../../src/routes/cortex/upsert.js';
+import { upsertCortex } from '../../src/services/cortex/upsert.js';
 import { bundledCortexNames } from '../../src/services/cortex-seeder.js';
 import { BUILTIN_EXTENSIONS } from '../../src/data/builtin-extensions/index.js';
 import { nodePrefixRefusal, hasNodePrefix } from '../../src/services/component-name-prefix.js';

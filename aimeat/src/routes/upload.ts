@@ -9,7 +9,7 @@
  *   A handler here reads the signed token's meta, unpacks whatever shape the bytes arrive in, and
  *   renders the answer. The decisions belong to the service each capability already has, so the
  *   app, storage and cortex-install paths call services/app-publish.ts, storage-file-write.ts and
- *   cortex-lifecycle.ts, and a cortex replace calls routes/cortex/upsert.ts, rather than restating
+ *   cortex-lifecycle.ts, and a cortex replace calls services/cortex/upsert.ts, rather than restating
  *   their gates. Presigned upload is the endpoint an author is told to use for anything over ~1 kB,
  *   which makes a gate that is missing here a gate that is missing for most real traffic.
  * @structure
@@ -174,7 +174,7 @@ import type { Storage, ExtensionRecord, CortexExtensionRecord } from '../storage
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { installCortex } from '../services/cortex-lifecycle.js';
-import { upsertCortex } from './cortex/upsert.js';
+import { upsertCortex } from '../services/cortex/upsert.js';
 import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
 import { handleStorageUpload, declaredFromMeta, completeDirectStorageUpload } from './upload-storage.js';
 import { handleSkillUpload } from './upload-skill.js';
@@ -722,7 +722,7 @@ async function handleCortexUpload(
     }
 
     // ── EXISTING NAME — the redeploy PUT /v1/cortex/:name and aimeat_cortex_install update:true run
-    //    (routes/cortex/upsert.ts upsertCortex). Re-uploading is how a cortex bundle over ~1 kB is
+    //    (services/cortex/upsert.ts upsertCortex). Re-uploading is how a cortex bundle over ~1 kB is
     //    iterated on, so this endpoint replaces the cortex in place the same way: a lib the manifest names
     //    arrives or is already stored, a kept version never takes other bytes, and an ACTIVE cortex is
     //    taken down and activated again from the new manifest, so no action, board, schema lock or

@@ -371,7 +371,7 @@ the new manifest and libs to:
 PUT /v1/cortex/{name}
 ```
 It replaces the cortex in place, without a gap where the lib is missing, and re-runs activation for
-an active cortex (`upsertCortex` in `src/routes/cortex/upsert.ts`). Over MCP, the same redeploy is
+an active cortex (`upsertCortex` in `src/services/cortex/upsert.ts`). Over MCP, the same redeploy is
 `aimeat_cortex_install` with `update: true`. Deactivate then activate is not needed.
 
 ---
@@ -389,5 +389,5 @@ an active cortex (`upsertCortex` in `src/routes/cortex/upsert.ts`). Over MCP, th
 | `src/routes/memory/public-read.ts` (`registerPublicReadRoute`) | Public memory read route `GET /v1/memory/:gaii/:key` (no auth) |
 | `src/static/sdk-libs/data/index.js` (`get`, `getPublic`) | `AIMEAT.data.get()` with its creator fallback, and `AIMEAT.data.getPublic()` |
 | `src/services/cortex-lifecycle.ts` (`installCortex`, `activateCortex`) | Cortex install (expects the `libs` dict) and activate (no-op when already active) |
-| `src/routes/cortex/upsert.ts` (`upsertCortex`) | `PUT /v1/cortex/:name`: redeploy in place, re-run activation |
+| `src/services/cortex/upsert.ts` (`upsertCortex`) | `PUT /v1/cortex/:name`: redeploy in place, re-run activation |
 | `src/services/cortex/activation.ts` (`activateExtension`) | What an activation writes, `seed-data` included |

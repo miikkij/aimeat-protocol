@@ -67,7 +67,8 @@ import {
     type CortexCaller, type CortexRefusal,
 } from '../services/cortex-lifecycle.js';
 import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
-import { upsertCortex, cortexLibUrls } from '../routes/cortex.js';
+import { upsertCortex } from '../services/cortex/upsert.js';
+import { cortexLibUrls } from '../services/cortex/lib-urls.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from '../tool-catalog/shape.js';

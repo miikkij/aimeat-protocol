@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect } from 'vitest';
-import { upsertCortex } from '../../src/routes/cortex/upsert.js';
+import { upsertCortex } from '../../src/services/cortex/upsert.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, CortexExtensionRecord } from '../../src/storage/interface.js';
 

@@ -1,19 +1,5 @@
 [
   {
-    "type": "dependency",
-    "from": "src/mcp/cortex.ts",
-    "to": "src/routes/cortex.ts",
-    "unresolvedTo": "../routes/cortex.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
     "type": "cycle",
     "from": "src/static/sdk-libs/auth/modal.js",
     "to": "src/static/sdk-libs/auth/session.js",

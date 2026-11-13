@@ -7,10 +7,12 @@
  *   uninstall (DELETE), and public lib-file serving. Cortex extensions materialise schemas,
  *   prompts, actions, boards, ontologies, seed-data, and browser lib bundles.
  * @structure cortexRouter() — all /v1/cortex* routes; activateExtension()/deactivateExtension() — init helpers;
- *   upsertCortex() (./cortex/upsert.ts, re-exported): the redeploy, shared with aimeat_cortex_install
- *   update:true; cortexLibUrls(): each lib's address.
+ *   upsertCortex() (services/cortex/upsert.ts): the redeploy, shared with aimeat_cortex_install
+ *   update:true; cortexLibUrls() (services/cortex/lib-urls.ts): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-11-13 — upsertCortex (from ./cortex/upsert.ts) and cortexLibUrls move unchanged to
+ *     services/cortex/, so mcp/cortex.ts imports no route file (structure programme 2026-11, unit 2).
  *   2026-11-13 — activateExtension is re-exported from services/cortex/activation.ts, where the
  *     activation logic moved from ./cortex/activation.ts (structure programme 2026-11, unit 4).
  *   2026-10-29 — A lib request from an app that loaded the name from an earlier holder answers 404 until
@@ -67,7 +69,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { cortexCallerOf } from './cortex/caller.js';
@@ -76,14 +78,15 @@ import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex,
 } from '../services/cortex-lifecycle.js';
 import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
-import { upsertCortex } from './cortex/upsert.js';
+import { upsertCortex } from '../services/cortex/upsert.js';
+import { cortexLibUrls } from '../services/cortex/lib-urls.js';
 import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { heldForRequest } from '../services/cortex-holder-change.js';
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
-import { findCortex, cortexLibPath } from '../services/component-address.js';
+import { findCortex } from '../services/component-address.js';
 import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { callerOf as requestCaller } from '../middleware/caller.js';
@@ -93,30 +96,6 @@ import type { PublishGateInput } from '../services/publish-requests/door.js';
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
 // `activateExtension` from '../routes/cortex.js' unchanged after the activation logic moved out.
 export { activateExtension } from '../services/cortex/activation.js';
-// …and the redeploy, which mcp/cortex.ts imports from here (./cortex/upsert.ts, max-file-lines).
-export { upsertCortex, type CortexUpsertResult } from './cortex/upsert.js';
-
-/**
- * Where each lib of this cortex is served: the exact `<script src>` an app loads, keyed by filename.
- *
- * The address follows the record's NAME: a cortex installed since 2026-10-25 is named
- * `<owner>/<thing>` and serves from `/v1/cortex/<owner>/<thing>/libs/…`, a bare one from
- * `/v1/cortex/<thing>/libs/…` (services/component-address.ts cortexLibPath). No answer said which, so
- * an author guessed, and a wrong guess is a 404 inside an app that shows nothing. Absolute, because
- * apps run on their own origins.
- */
-export function cortexLibUrls(
-  baseUrl: string,
-  cortex: Pick<CortexExtensionRecord, 'name' | 'components'>,
-): Record<string, string> {
-  const urls: Record<string, string> = {};
-  for (const comp of cortex.components) {
-    if (comp.type === 'lib') {
-      urls[comp.filename] = `${baseUrl}${cortexLibPath(cortex.name, encodeURIComponent(comp.filename))}`;
-    }
-  }
-  return urls;
-}
 
 export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

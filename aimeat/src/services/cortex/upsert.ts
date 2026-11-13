@@ -1,14 +1,17 @@
 /**
- * @file src/routes/cortex/upsert.ts
+ * @file src/services/cortex/upsert.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The cortex redeploy: create a cortex, or replace an installed one in place. PUT
  *   /v1/cortex/:name, aimeat_cortex_install with update:true and a presigned cortex ZIP under an
  *   installed name (routes/upload.ts) all call upsertCortex(). Extracted from src/routes/cortex.ts to
- *   satisfy max-file-lines; routes/cortex.ts re-exports it, so its importers are unchanged.
+ *   satisfy max-file-lines, and moved from src/routes/cortex/upsert.ts to this service folder on
+ *   2026-11-13 so the MCP tool imports no route file.
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   2026-11-13 — Moved unchanged from src/routes/cortex/upsert.ts, so mcp/cortex.ts imports no route
+ *     file (structure programme 2026-11, unit 2).
  *   2026-11-13 — The activation functions come from services/cortex/activation.ts, where ./activation.ts
  *     moved (structure programme 2026-11, unit 4).
  *   v1.7.3 — 2026-10-29 — The create branch under a bare name an erasure or the held-name settlement
@@ -53,27 +56,27 @@
  *   v1.0.0 — 2026-09-24 — Extracted from src/routes/cortex.ts v1.6.1 (pure move, max-file-lines).
  */
 import type { CortexExtensionRecord } from '../../storage/interface.js';
-import { emitChange } from '../../services/event-bus.js';
-import { parseCortexManifest, validateNamespaceOwnership } from '../../services/cortex-manifest.js';
-import { cortexInstallRefusal } from '../../services/install-quotas.js';
+import { emitChange } from '../event-bus.js';
+import { parseCortexManifest, validateNamespaceOwnership } from '../cortex-manifest.js';
+import { cortexInstallRefusal } from '../install-quotas.js';
 import {
   libsWithoutContent, missingLibsMessage, reservedNameRefusal, type CortexCaller,
   type CortexDeps, type CortexOutcome, type CortexRefusal,
-} from '../../services/cortex-lifecycle.js';
-import { activateExtension, activationRefusal, deactivateExtension } from '../../services/cortex/activation.js';
-import { refreshCortexDependencies } from '../../services/dependency-map.js';
-import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
-import { cortexPublishAsk, fileCortexAsk } from '../../services/cortex-visibility.js';
-import type { DoorAsk, PublishGateInput } from '../../services/publish-requests/door.js';
+} from '../cortex-lifecycle.js';
+import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
+import { refreshCortexDependencies } from '../dependency-map.js';
+import { managedChangeRefusal } from '../packages/install/package-managed.js';
+import { cortexPublishAsk, fileCortexAsk } from '../cortex-visibility.js';
+import type { DoorAsk, PublishGateInput } from '../publish-requests/door.js';
 import {
   snapshotCortexVersion, keptVersionRefusal, cortexCodeOf, cortexLibsAfterDeploy,
-} from '../../services/component-versions.js';
+} from '../component-versions.js';
 import { logger } from '../../utils/logger.js';
 import {
   findCortex, ownComponent, placeCortexInstall, settleReclaimed, splitComponentAddress, shortNameOf,
-} from '../../services/component-address.js';
-import { nodePrefixRefusal } from '../../services/component-name-prefix.js';
-import { noteCortexHolderChange } from '../../services/cortex-holder-change.js';
+} from '../component-address.js';
+import { nodePrefixRefusal } from '../component-name-prefix.js';
+import { noteCortexHolderChange } from '../cortex-holder-change.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
 export type CortexUpsertResult =
