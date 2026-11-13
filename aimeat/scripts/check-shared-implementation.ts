@@ -136,7 +136,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/agent-tasks.ts': 2,
     'src/mcp/apps.ts': 6,
     'src/mcp/apps-fork.ts': 2,
-    'src/mcp/boards.ts': 3,
+    'src/mcp/boards.ts': 1,
     'src/mcp/capabilities.ts': 3,
     'src/mcp/chat-instances.ts': 4,
     'src/mcp/commerce.ts': 4,

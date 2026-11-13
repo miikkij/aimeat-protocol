@@ -11,6 +11,10 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — The aimeat://boards/{id} resource reads through services/boards/posts-page.ts, the
+ *     read and the gate GET /v1/boards/:id/posts and aimeat_board_read ask: a reader holding the
+ *     board owner's consent reads the posts there too, and a refused read writes the consent-denial
+ *     row (structure programme 2026-11, unit 2b, phase B).
  *   2026-11-13 — aimeat_board_list and the resource's list ask services/boards/board-list.ts, and
  *     aimeat_board_rules_set calls services/boards/board-rules.ts, as GET /v1/boards and PATCH
  *     /v1/boards/:id/rules do (structure programme 2026-11, unit 2b).
@@ -71,11 +75,9 @@ import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
-import { withoutHiddenPosts } from '../services/board-moderation.js';
-import { classifiedBoardPosts } from '../services/board-read-access.js';
-import { readerFor } from '../services/classification/reader.js';
+import { boardPostsPage } from '../services/boards/posts-page.js';
 import {
-    boardVisibleToCaller, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers,
+    createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
 } from '../services/board-write.js';
 import { boardsVisibleTo } from '../services/boards/board-list.js';
@@ -152,11 +154,6 @@ export function registerBoardsTools(
     // as signed out (routes/boards.ts), so it sees public and system boards only, without the roster.
     const anonymous = isAnonymousPrincipal({ sub: agentGaii });
 
-    /** Check if the agent can see a board (visibility rules; an organism board by membership). */
-    function canSeeBoard(board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis'>): Promise<boolean> {
-        if (anonymous) return Promise.resolve(board.visibility === 'public' || board.visibility === 'system');
-        return boardVisibleToCaller(storage, board, { gaii: agentGaii, auth: caller().auth });
-    }
     /** The boards this agent can see, in order: services/boards/board-list.ts, which GET /v1/boards
      *  asks too. The anonymous principal is asked as a caller with no identity. */
     function visibleBoards(): Promise<BoardRecord[]> {
@@ -192,15 +189,18 @@ export function registerBoardsTools(
         { mimeType: 'application/json', description: 'Board posts' },
         async (uri, variables) => {
             const boardId = decodeURIComponent(variables.boardId as string);
-            const board = await storage.getBoard(boardId);
-            if (!board) return { contents: [{ uri: uri.toString(), text: 'Board not found' }] };
-            if (!(await canSeeBoard(board))) {
+            // The board read, who may read it (boardReadRefusal: a reader holding the owner's consent
+            // for the board passes, and a refused read writes the consent-denial row), the hiding rule
+            // and the board's classification: services/boards/posts-page.ts, the same read
+            // GET /v1/boards/:id/posts and aimeat_board_read run. The resource keeps its own refusal.
+            const read = await boardPostsPage({ storage, config }, { reader: anonymous ? undefined : agentGaii, viewer: agentGaii, auth: caller().auth },
+                boardId, { limit: 50 });
+            if ('missing' in read) return { contents: [{ uri: uri.toString(), text: 'Board not found' }] };
+            if ('refusal' in read) {
                 return resourceRefusal(uri, 'ACCESS_DENIED', 'This board is not shared with you, so its posts cannot be read here. '
                     + 'Ask the board\'s owner to let you in, or list the boards you can read instead.');
             }
-            // A post reads as its board's classification (plan doc-mvdipuyqraas, L1.3), after the flags.
-            const posts = await classifiedBoardPosts(readerFor({ storage, config }, caller().auth), board,
-                await withoutHiddenPosts({ storage, config }, board, agentGaii, await storage.listPosts(boardId, { limit: 50 })));
+            const posts = read.posts;
             return {
                 contents: [{
                     uri: uri.toString(),
