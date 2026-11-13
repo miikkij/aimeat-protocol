@@ -6,7 +6,7 @@
  *   around it (structure programme 2026-11, unit 2b). Browsing without a member filter shows what the
  *   directory shows ('public' and 'listed'; only an operator browses past that) and leaves archived
  *   organisms out. A member filter lists the member's organisms: the member themself or an operator
- *   sees every visibility and the archived ones, anyone else the public ones; and for an agent an
+ *   sees every visibility (and, in person, the archived ones), anyone else the public ones; and for an agent an
  *   organism that does not admit it is left out (organismsAdmitting, its name is its own).
  *
  *   GET /v1/organisms (buildOrganismList, routes/organisms/crud.ts) calls it and then adds the counts
@@ -15,6 +15,9 @@
  * @structure listedOrganisms(deps, auth, params) → OrganismRecord[]
  * @usage const organisms = await listedOrganisms({ storage, config }, req.auth, { visibility, member });
  * @version-history
+ *   v1.1.0 — 2026-11-14 — A member list carries the archived organisms only for the owner or the
+ *     operator in person; an agent gets the list aimeat_organism_list gives it (parity section
+ *     ARCHIVED-LIST; finding u2b-archived-organisms-listed-to-agent-rest).
  *   v1.0.0 — 2026-11-13 — Moved from routes/organisms/crud.ts buildOrganismList, unchanged; the MCP
  *     list read the same browse query on its own (structure programme 2026-11, unit 2b).
  */
@@ -22,7 +25,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { VerifiedToken } from '../../auth/jwt.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
-import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
+import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { organismsAdmitting } from '../organism-agent-access.js';
 import { isOperatorCaller } from '../operator-override.js';
 
@@ -66,7 +69,9 @@ export async function listedOrganisms(
         perPage: params.perPage,
         // The owner's OWN list includes archived (the client splits them into an "Archived" section);
         // browsing/discovery excludes archived — retired organisms are read-only and not discoverable.
-        archived: (params.member && selfOrOperator) ? 'include' : 'exclude',
+        // Only for the owner or the operator in person: an archived organism drops out of every
+        // AI-facing material assembly (services/archive.ts), as aimeat_organism_list leaves it out.
+        archived: (params.member && selfOrOperator && isOwnerInPerson(auth)) ? 'include' : 'exclude',
     });
 
     // A member list leaves out, for an agent, an organism that does not admit it, as
