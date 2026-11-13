@@ -1032,6 +1032,44 @@ await test('B15 RECORDED DIFFERENCE (question: does memory:read-as-owner reach t
     assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
 });
 
+// B3: alice's wallet while one of her agents has work in flight, read by another of her agents on
+// GET /v1/wallet and aimeat_wallet_balance.
+const PB_ACTION = N('pbaction');
+let pbWorker!: McpAgent, pbWorkerMcp!: McpSession;
+await test('Setup (B3): bob\'s agent offers an action with a pacing amount; alice\'s worker agent asks for it, so its cost is held in escrow', async () => {
+    const publish = await call('POST', '/v1/actions', pbBobAg.token, {
+        id: PB_ACTION, display_name: 'Phase B probe', description: 'Holds a cost in escrow for the wallet sections',
+        input_schema: { type: 'object', properties: { text: { type: 'string' } } },
+        output_schema: { type: 'object', properties: { result: { type: 'string' } } },
+        pricing: { toll_morsels: 10 },
+    });
+    assert(publish.status === 201, `action: ${show(publish)}`);
+    pbWorker = await makeAgent(BASE, pbAlice, ['*'], N('pbworker'));
+    pbWorkerMcp = await openSession(BASE, pbWorker.token, 'u2b2 phase B worker');
+    const mint = await call('POST', '/v1/admin/mint', op.token, { gaii: pbWorker.gaii, amount: 100 });
+    assert(mint.status === 200, `mint: ${show(mint)}`);
+    const work = await call('POST', '/v1/work', pbWorker.token, { action_id: PB_ACTION, provider_gaii: pbBobAg.gaii, input: { text: 'probe' }, ttl_hours: 24 });
+    assert(work.status === 201, `work: ${show(work)}`);
+});
+
+await test('B3 USE KEPT: the worker agent sees the same balance and escrow on the route and the tool', async () => {
+    const rest = await call('GET', '/v1/wallet', pbWorker.token);
+    assert(rest.status === 200 && rest.body.data.in_escrow > 0, `route: ${show(rest)}`);
+    const tool = await callTool(pbWorkerMcp, 'aimeat_wallet_balance', {});
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+    assert(tool.data.balance === rest.body.data.balance && tool.data.in_escrow === rest.body.data.in_escrow,
+        `tool ${JSON.stringify(tool.data)} / route balance ${rest.body.data.balance} escrow ${rest.body.data.in_escrow}`);
+});
+
+await test('B3 FIXED: another of alice\'s agents sees the escrow of the shared wallet on the route and the tool alike', async () => {
+    const rest = await call('GET', '/v1/wallet', pbAliceAg.token);
+    assert(rest.status === 200 && rest.body.data.in_escrow > 0, `route: ${show(rest)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_wallet_balance', {});
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+    assert(tool.data.in_escrow === rest.body.data.in_escrow && tool.data.available === rest.body.data.available,
+        `tool ${JSON.stringify(tool.data)} / route escrow ${rest.body.data.in_escrow} available ${rest.body.data.available}`);
+});
+
 // B8: one app read by GET /v1/apps/:owner/:filename (serves the app) and aimeat_app_get (its detail).
 const PB_CODED = `${N('pbcode')}.html`, PB_CODE = 'pb-parity-code-42';
 const appRoute = (filename: string, token: string, code?: string) =>

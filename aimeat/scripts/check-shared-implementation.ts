@@ -30,6 +30,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.6.7 — 2026-11-14 — Unit 2b part 2, phase B: core.ts 7 → 6 (B3, walletStanding).
  *   v1.6.6 — 2026-11-14 — Unit 2b part 2, phase B: apps.ts 6 → 3 (B7, catalogueAppPage).
  *   v1.6.5 — 2026-11-14 — Unit 2b part 2, phase B: apps-fork.ts 2 → 0, its entry deleted (B9, forkSourceFor).
  *   v1.6.4 — 2026-11-14 — Unit 2b part 2, phase B: capabilities.ts 3 → 1 (B10, capabilityFor).
@@ -146,7 +147,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/commerce.ts': 4,
     'src/mcp/core-admin.ts': 3,
     'src/mcp/core-resources.ts': 3,
-    'src/mcp/core.ts': 7,
+    'src/mcp/core.ts': 6,
     'src/mcp/exchange-run.ts': 1,
     'src/mcp/extensions.ts': 2,
     'src/mcp/knowledge.ts': 1,

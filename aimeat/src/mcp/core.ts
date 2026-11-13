@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-14 — aimeat_wallet_balance reads the owner's wallet through walletStanding
+ *     (services/wallet/wallet-standing.ts), as GET /v1/wallet does: the escrow is the account's, its
+ *     person's and every agent's work, not the calling agent's alone (unit 2b, B3).
  *   2026-11-13 — aimeat_agents_list reads the roster through services/agent/owner-roster.ts, the gate,
  *     the read and the run-mode filter GET /v1/agents calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — SECURITY: aimeat_discover decides with the session's permissions, built by
@@ -189,6 +192,7 @@ import type { ResourceChangeEvent } from '../services/resource-events.js';
 import { resourceEvents } from '../services/resource-events.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, structuredResult } from '../tool-catalog/shape.js';
+import { walletStanding } from '../services/wallet/wallet-standing.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, discoveryCaller, DISCOVERY_TYPES, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skill-agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
@@ -773,14 +777,14 @@ export function registerCoreTools(
         async () => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
-            const ghii = await storage.getGHIIByOwner(agent.owner);
-            const balance = ghii?.morselBalance ?? 0;
-            const { calculateEscrow } = await import('../services/morsel.js');
-            const inEscrow = await calculateEscrow(storage, agentGaii);
+            // The owner's shared wallet and the escrow of the person and all their agents, as GET
+            // /v1/wallet reads it (services/wallet/wallet-standing.ts). An account with no GHII record
+            // answers an empty wallet here, as it did.
+            const standing = await walletStanding(storage, agent.owner);
             return structuredResult('aimeat_wallet_balance', undefined, {
-                balance,
-                in_escrow: inEscrow,
-                available: balance - inEscrow,
+                balance: standing?.balance ?? 0,
+                in_escrow: standing?.inEscrow ?? 0,
+                available: standing?.available ?? 0,
             });
         },
     );

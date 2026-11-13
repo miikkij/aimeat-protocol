@@ -11,6 +11,9 @@
  *   - GET  /v1/wallet/history      — deprecated alias for /transactions
  *   - POST /v1/wallet/request      — request daily allowance morsels
  * @version-history
+ *   2026-11-14 — GET /v1/wallet reads the balance and the account's escrow through walletStanding
+ *     (services/wallet/wallet-standing.ts), which aimeat_wallet_balance now asks too (structure
+ *     programme 2026-11, unit 2b, B3).
  *   2026-11-09 — GET /v1/wallet computes `lifetime` from per-type totals the database sums
  *     (lifetimeFromTypeSums) instead of reading up to 100 000 rows; the answer is the same. The escrow
  *     is one read of the person's and their agents' work (calculateEscrowMany), not one per identity.
@@ -44,11 +47,10 @@ import type { Storage, WalletTransaction } from '../storage/interface.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
-import { calculateEscrowMany } from '../services/morsel.js';
+import { walletStanding } from '../services/wallet/wallet-standing.js';
 import { grantDailyAllowance } from '../services/daily-allowance.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
-import { cached, TTL } from '../services/cache.js';
 import { createWalletTabService } from '../services/db/wallet-tab-db-service.js';
 import { lifetimeFromTypeSums } from '../services/wallet-stats.js';
 import { resolvePacingToll } from '../services/extension-access/pacing.js';
@@ -73,30 +75,19 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   // GET /v1/wallet — check balance (single GHII-based balance)
   router.get('/v1/wallet', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const ownerName = req.auth!.owner as string;
-    const ghiiRecord = await storage.getGHIIByOwner(ownerName);
-    if (!ghiiRecord) {
+    // The balance and the escrow of the person and all their agents (services/wallet/wallet-standing.ts,
+    // which aimeat_wallet_balance asks too).
+    const standing = await walletStanding(storage, ownerName);
+    if (!standing) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'GHII record not found'));
       return;
     }
 
-    const identity = ghiiRecord.ghii;
-    const balance = ghiiRecord.morselBalance ?? 0;
+    const identity = standing.ghii.ghii;
+    const { balance, inEscrow } = standing;
     // Per-type totals summed by the database: every page's header asks this route, and reading the
     // rows (up to 100 000) to add them up cost 172 ms at 50 000 rows on PostgreSQL (2026-11-09).
     const typeSums = await storage.sumTransactionsByType(undefined, identity);
-
-    // Escrow is tracked per identity (work items name the person's GHII or an agent's GAII), so iterate
-    // both. Cached 60s per owner — this is a full work-item scan per identity and the wallet polls on
-    // every load. The 'work' and 'wallet' write paths broadcast their domain (no owner), so the broad
-    // domain tags drop it.
-    const inEscrow = await cached(
-      `escrow:${ownerName}`, TTL.dashboard,
-      async () => {
-        const agents = await storage.getAgentsByOwner(ownerName);
-        return calculateEscrowMany(storage, [identity, ...agents.map(a => a.gaii)]);
-      },
-      ['domain:work', 'domain:wallet'],
-    );
 
     // Lifetime figures from every row kind, the same ones the tab's composite computes from its rows.
     const lifetime = lifetimeFromTypeSums(typeSums, balance);
