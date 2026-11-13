@@ -330,20 +330,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/home-state.ts",
-    "to": "src/routes/portfolio.ts",
-    "unresolvedTo": "../routes/portfolio.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/subdomain-sites.ts",
     "to": "src/routes/subdomains.ts",
     "unresolvedTo": "../routes/subdomains.js",

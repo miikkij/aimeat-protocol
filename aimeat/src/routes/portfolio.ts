@@ -9,6 +9,9 @@
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  *   (both in services/portfolio-config.ts, re-exported here)
  * @version-history
+ *   2026-11-13 — portfolioStandaloneUrl moves unchanged to services/portfolio/standalone-url.ts and is
+ *     re-exported here, so the home state service no longer imports a route file (structure
+ *     programme 2026-11, unit 4).
  *   2026-11-12 — GET and POST /v1/portfolio/:username/access-request: a person the page refuses
  *     because it is opened to one organism's members asks that organism's owners for access
  *     (routes/access-request.ts). resolvePublishedPortfolio and PortfolioResolution move unchanged
@@ -103,6 +106,7 @@ import { answerPageOpen } from './page-open.js';
 import { answerAccessRequest, answerAccessRequestState, type AccessRequestTarget } from './access-request.js';
 import { portfolioAccessTarget } from '../services/organism-join-requests/access-targets.js';
 import { resolvePublishedPortfolio } from '../services/portfolio/published.js';
+import { portfolioStandaloneUrl } from '../services/portfolio/standalone-url.js';
 import { validateBody } from '../models/schemas.js';
 import { AccessRequestBody } from '../models/write-body-schemas.js';
 import {
@@ -115,6 +119,9 @@ import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js
 import { notePortfolioWriter, portfolioReadHold } from '../services/portfolio-read-hold.js';
 
 export { resolvePublishedPortfolio, type PortfolioResolution } from '../services/portfolio/published.js';
+// The standalone address lives in services/portfolio/standalone-url.ts, so a service builds it
+// without importing this route file; re-exported for every importer of this file.
+export { portfolioStandaloneUrl };
 
 // The keys, the identities and the switch writes live in services/portfolio-config.ts (a service
 // switches the page on too); re-exported here for every importer of this file.
@@ -170,30 +177,6 @@ export async function writePortfolioHtml(
 // resolvePublishedPortfolio (username → published page and owner identities) lives in
 // services/portfolio/published.ts since 2026-11-12, so a service reads it without importing this
 // route file; it is re-exported above for every importer of this file.
-
-/** Valid DNS label for a portfolio subdomain (same shape as SUBDOMAIN_RE; kept local
- *  to avoid a portfolio ↔ subdomains import cycle). */
-const PORTFOLIO_LABEL_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
-
-/**
- * Standalone portfolio-origin URL (`<username>.portfolio.<apex>`) for a username,
- * or null when the portfolio origin is disabled or the username is not a usable
- * DNS label (OWNER_RE allows up to 64 chars; DNS labels cap at 63 — such names
- * simply keep the apex URL only).
- */
-export function portfolioStandaloneUrl(config: AimeatConfig, username: string): string | null {
-  if (!config.portfolioOriginEnabled || !config.portfolioHost) return null;
-  const label = username.toLowerCase();
-  if (!PORTFOLIO_LABEL_RE.test(label)) return null;
-  let scheme = 'https', portSuffix = '';
-  try {
-    const b = new URL(config.baseUrl);
-    scheme = b.protocol.replace(':', '');
-    portSuffix = b.port ? `:${b.port}` : '';
-  // eslint-disable-next-line aimeat/no-silent-catch -- keep https, no port
-  } catch { /* keep https, no port */ }
-  return `${scheme}://${label}.${config.portfolioHost}${portSuffix}/`;
-}
 
 export function portfolioRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

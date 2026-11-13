@@ -545,9 +545,9 @@
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/routes/portfolio.ts": {
+    "src/services/portfolio/standalone-url.ts": {
       "count": 1,
-      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+      "reason": "Moved unchanged from src/routes/portfolio.ts on 2026-11-13 with portfolioStandaloneUrl, the directive it counts (structure programme 2026-11, unit 4). SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
     "src/routes/schedules.ts": {
       "count": 1,
