@@ -15,12 +15,14 @@
  * @structure AgentIntegrationOverviewService.overview(agentGaii, agent, agentName, opts?) → { webhook, deliveries, onboarding }
  * @usage const ov = await createAgentIntegrationOverviewService(storage).overview(agentGaii, agent, agentName);
  * @version-history
+ *   2026-11-13 — buildPostOnboardingChecklist comes from services/onboarding/post-checklist.ts, not from a
+ *     route file (structure programme 2026-11, unit 4).
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Integration subtab's 3 plain reads into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AgentRecord } from '../../storage/types/identity.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { buildPostOnboardingChecklist } from '../../routes/agent-onboarding.js';
+import { buildPostOnboardingChecklist } from '../onboarding/post-checklist.js';
 
 export interface AgentIntegrationOverview {
   webhook: Record<string, unknown>;

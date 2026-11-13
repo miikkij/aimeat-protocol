@@ -229,13 +229,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's self-reported metric counters."
     },
-    "src/routes/agent-onboarding.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence checks on commands, config and tag records; no values are returned."
-    },
     "src/routes/agent-tasks/lifecycle.ts": {
       "reads": {
         "listMemory": 1
@@ -2473,6 +2466,13 @@
         "getMemory": 1
       },
       "why": "Moved unchanged from src/services/onboarding-funnel.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: writeMarkerOnce reads a marker key only to learn whether it exists before it writes it."
+    },
+    "src/services/onboarding/post-checklist.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 2
+      },
+      "why": "Moved unchanged from src/routes/agent-onboarding.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence checks on commands, config and tag records; no values are returned."
     },
     "src/services/once-only-step.ts": {
       "reads": {

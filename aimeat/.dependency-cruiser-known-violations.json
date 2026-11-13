@@ -212,20 +212,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/db/agent-integration-overview-db-service.ts",
-    "to": "src/routes/agent-onboarding.ts",
-    "unresolvedTo": "../../routes/agent-onboarding.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/subdomain-sites.ts",
     "to": "src/routes/subdomains.ts",
     "unresolvedTo": "../routes/subdomains.js",

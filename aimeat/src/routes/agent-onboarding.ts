@@ -12,6 +12,9 @@
  *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
+ *   2026-11-13 — buildPostOnboardingChecklist moved unchanged to services/onboarding/post-checklist.ts,
+ *     so the agent integration overview service no longer imports this route file (structure
+ *     programme 2026-11, unit 4).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.9.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 -- 2026-08-28 -- hints.test_task_status and hints.test_task_has_plan say the state a driver
@@ -74,51 +77,7 @@ import { detectPlatform } from '../services/platform-detector.js';
 import { createT, detectLocale } from '../i18n.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { logger } from '../utils/logger.js';
-
-/**
- * Build the post-onboarding checklist surfaced via GET /onboarding. Mirrors the
- * SKILL.md "After Onboarding" items as a machine-readable signal:
- *   - commands_registered: agents.{name}.commands memory exists with non-empty array
- *   - config_published:    any agents.config.{name}.* memory entry exists
- *   - shared_tags_in_use:  null if owner has assigned no shared tag areas (n/a);
- *                          otherwise true if at least one agents.tag.{tag}.* entry exists
- *   - knowledge_packages_published: count of packages authored by this agent (>0 = true)
- */
-export async function buildPostOnboardingChecklist(
-  agentGaii: string,
-  agentName: string,
-  storage: Storage,
-): Promise<{
-  commands_registered: boolean;
-  config_published: boolean;
-  shared_tags_in_use: boolean | null;
-  knowledge_packages_published: boolean;
-}> {
-  const commandsRecord = await storage.getMemory(agentGaii, `agents.${agentName}.commands`);
-  const commands_registered = !!commandsRecord
-    && Array.isArray(commandsRecord.value)
-    && commandsRecord.value.length > 0;
-
-  const configRecords = await storage.listMemory(agentGaii, { prefix: `agents.config.${agentName}.` });
-  const config_published = configRecords.length > 0;
-
-  // Shared tags: only applicable when owner has assigned shared memory areas with tags.
-  const directives = await storage.getAgentDirectives(agentGaii);
-  const assignedTags = (directives?.memoryAreas ?? [])
-    .flatMap(a => Array.isArray((a as { tags?: unknown }).tags) ? (a as { tags?: string[] }).tags! : [])
-    .filter(Boolean);
-  let shared_tags_in_use: boolean | null = null;
-  if (assignedTags.length > 0) {
-    const tagRecords = await storage.listMemory(agentGaii, { prefix: 'agents.tag.' });
-    shared_tags_in_use = tagRecords.length > 0;
-  }
-
-  // Knowledge packages authored by this agent.
-  const pkg = await storage.listPackages({ author: agentGaii, limit: 1 });
-  const knowledge_packages_published = pkg.total > 0;
-
-  return { commands_registered, config_published, shared_tags_in_use, knowledge_packages_published };
-}
+import { buildPostOnboardingChecklist } from '../services/onboarding/post-checklist.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
