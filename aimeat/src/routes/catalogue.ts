@@ -65,6 +65,7 @@ import { logger } from '../utils/logger.js';
 import { datasetFactsOf } from '../services/datapackage/catalogue-facts.js';
 import { visiblePackages, viewerOf } from '../services/datapackage/visible.js';
 import { mountCatalogueDcat } from './catalogue-dcat.js';
+import { listedAgents, publicBoards } from '../services/catalogue/catalogue-read.js';
 import {
   LIBRARY_REACHES, LIBRARY_KINDS, answerLibraryReach, reachCounts, knowledgeItemOf, freshnessOfFacts, matchesQuery,
   manifestTexts, datasetTexts, type LibraryReach, type LibraryKind, type KnowledgePackageManifest,
@@ -161,7 +162,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
     // Hide `unlisted` agents from the public directory (e.g. the per-owner Secretary, which is
     // visible to its owner via /v1/agents but is not a marketplace agent). Generic convention.
-    const agents = (await cachedAgents()).filter(a => !(a.tags ?? []).includes('unlisted'));
+    const agents = listedAgents(await cachedAgents());
     const start = (page - 1) * perPage;
     const paged = agents.slice(start, start + perPage);
     // The agent's picture is public like its description (services/agent-avatar.ts): one read for the page.
@@ -185,19 +186,18 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
   // GET /v1/catalogue/boards — public boards (Tier 0)
   router.get('/v1/catalogue/boards', async (_req, res) => {
-    const boards = await cachedBoards();
-    const publicBoards = boards.filter(b => b.visibility === 'public');
+    const listed = publicBoards(await cachedBoards());
 
     res.json(success(config.nodeId, {
       '@context': DEFAULT_CONTEXT,
-      boards: publicBoards.map(b => ({
+      boards: listed.map(b => ({
         id: b.id,
         name: b.name,
         description: b.description,
         semantic: b.semantic,
         created_at: b.createdAt,
       })),
-      total: publicBoards.length,
+      total: listed.length,
     }));
   });
 

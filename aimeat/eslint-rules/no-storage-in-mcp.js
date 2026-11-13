@@ -76,7 +76,6 @@ const EXEMPT = new Set([
   'src/mcp/apps-fork.ts',              // pure extraction out of apps.ts (max-file-lines), same backlog
   'src/mcp/boards.ts',
   'src/mcp/capabilities.ts',
-  'src/mcp/catalogue.ts',
   'src/mcp/chat-instances.ts',
   'src/mcp/commerce.ts',
   'src/mcp/consent.ts',

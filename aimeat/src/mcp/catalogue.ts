@@ -39,6 +39,7 @@ import { nodeDirectory } from '../services/directory.js';
 import { toolError } from './tool-error.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 import { logger } from '../utils/logger.js';
+import { listListedAgents, listPublicBoards } from '../services/catalogue/catalogue-read.js';
 
 export function registerCatalogueTools(
     mcp: McpServer,
@@ -61,7 +62,7 @@ export function registerCatalogueTools(
             // An agent tagged `unlisted` (the per-owner Secretary, for one) is out of the public
             // directory, as it is on GET /v1/catalogue/agents. This door had not applied the rule,
             // so the same listing hid an agent on REST and named it over MCP (secaudit 2026-10).
-            const agents = (await storage.listAgents()).filter(a => !(a.tags ?? []).includes('unlisted'));
+            const agents = await listListedAgents(storage);
 
             const q = search?.toLowerCase();
             const cat = category?.toLowerCase();
@@ -108,13 +109,12 @@ export function registerCatalogueTools(
             annotations: annotationsFor('aimeat_catalogue_boards'),
         },
         async () => {
-            const boards = await storage.listBoards();
-            const publicBoards = boards.filter(b => b.visibility === 'public');
+            const listed = await listPublicBoards(storage);
 
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify(publicBoards.map(b => ({
+                    text: JSON.stringify(listed.map(b => ({
                         id: b.id,
                         name: b.name,
                         description: b.description,
