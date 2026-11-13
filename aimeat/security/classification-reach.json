@@ -1464,7 +1464,7 @@
     },
     "src/services/crew-def-store.ts": {
       "reads": {
-        "getMemory": 6,
+        "getMemory": 5,
         "getMemoryByKeys": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's own crew configuration envelopes. Reviewed 2026-10-16 (QA audit F07b-02): crewSitesWriteRefusal reads the stored live definition's browser site list to compare it with a write; nothing is returned to the caller."
@@ -1474,6 +1474,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: LLM-choice settings and the agent's published LLM catalogue."
+    },
+    "src/services/crews/def-envelope.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Moved unchanged from src/services/crew-def-store.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-10-16 (QA audit F07b-02), the node's own read: crewSitesWriteRefusal reads the stored live definition's browser site list to compare it with a write; nothing is returned to the caller."
     },
     "src/services/dangling-refs.ts": {
       "reads": {

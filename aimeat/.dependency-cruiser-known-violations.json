@@ -219,36 +219,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/crew-def-store.ts",
-    "to": "src/services/memory-write.ts",
-    "unresolvedTo": "./memory-write.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/services/memory-write.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/crew-def-store.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/services/home-state.ts",
     "to": "src/services/onboarding-funnel.ts",
     "unresolvedTo": "./onboarding-funnel.js",

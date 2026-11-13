@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-13 — misdirectedCrewKey and crewSitesWriteRefusal come from crews/def-envelope.ts, not from
+ *     crew-def-store.ts, which publishes through this file (structure programme 2026-11, unit 4).
  *   2026-11-13 — memoryContentBytes and isAnonymousGaii are imported from utils/, where they live, and
  *     not through the re-export in routes/memory/shared.ts (structure programme 2026-11, unit 4).
  *   2026-11-09 — An update that names no tags keeps the record's tags (`tags: []` clears them), as
@@ -166,7 +168,7 @@ import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
-import { misdirectedCrewKey, crewSitesWriteRefusal } from './crew-def-store.js';
+import { misdirectedCrewKey, crewSitesWriteRefusal } from './crews/def-envelope.js';
 import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
