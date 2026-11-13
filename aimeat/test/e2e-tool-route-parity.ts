@@ -749,5 +749,84 @@ await test('B13 FIXED: the operator\'s agent holding operator:admin reads alice\
     assert(res.includes(pbConsent) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
 });
 
+await test('B13b RECORDED DIFFERENCE (question: may an agent read the consents its owner gave in person): alice\'s agent reads her consent on the resource and gets 403 on the route', async () => {
+    const r = await call('GET', `/v1/consent/${encodeURIComponent(pbConsent)}`, pbAliceAg.token);
+    assert(r.status === 403, `route: ${show(r)}`);
+    const res = await consentResource(pbAliceMcp, pbConsent);
+    assert(res.includes(pbConsent) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
+});
+
+// B16: alice's public, members and private records read by bob's agent on aimeat_memory_read_public
+// and GET /v1/memory/:gaii/:key.
+const PB_PUBLIC = `${N('pbmem')}.public`, PB_MEMBERS = `${N('pbmem')}.members`, PB_PRIVATE = `${N('pbmem')}.private`;
+const publicRead = (key: string, token: string) => call('GET', `/v1/memory/${encodeURIComponent(pbAlice.ghii)}/${encodeURIComponent(key)}`, token);
+await test('Setup (B16): alice in person writes a public, a members and a private record', async () => {
+    for (const [key, visibility] of [[PB_PUBLIC, 'public'], [PB_MEMBERS, 'members'], [PB_PRIVATE, 'private']] as const) {
+        const w = await call('POST', '/v1/memory', pbAlice.token, { key, value: { note: key }, visibility });
+        assert(w.status === 201 || w.status === 200, `write ${key}: ${show(w)}`);
+    }
+});
+
+await test('B16 USE KEPT: bob\'s agent reads alice\'s public record on the tool and the route alike', async () => {
+    const rest = await publicRead(PB_PUBLIC, pbBobAg.token);
+    assert(rest.status === 200 && rest.body.data.value.note === PB_PUBLIC, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_memory_read_public', { gaii: pbAlice.ghii, key: PB_PUBLIC });
+    assert(!tool.isError && tool.data.value.note === PB_PUBLIC, `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B16 USE KEPT: a key that does not exist is not found on both', async () => {
+    const rest = await publicRead(`${PB_PUBLIC}.none`, pbBobAg.token);
+    assert(rest.status === 404, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_memory_read_public', { gaii: pbAlice.ghii, key: `${PB_PUBLIC}.none` });
+    assert(tool.isError && tool.text === 'Memory entry not found', `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B16 REFUSED: alice\'s private record is refused to bob\'s agent on both (the route with CONSENT_DENIED, the tool as not public)', async () => {
+    const rest = await publicRead(PB_PRIVATE, pbBobAg.token);
+    assert(rest.status === 403 && rest.body.error.code === 'CONSENT_DENIED', `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_memory_read_public', { gaii: pbAlice.ghii, key: PB_PRIVATE });
+    assert(tool.isError && tool.text === 'Access denied: entry is not public', `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B16 RECORDED DIFFERENCE (by the tool\'s description: only public entries): alice\'s members record, the route gives it to bob\'s agent and the tool refuses it', async () => {
+    const rest = await publicRead(PB_MEMBERS, pbBobAg.token);
+    assert(rest.status === 200 && rest.body.data.value.note === PB_MEMBERS, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_memory_read_public', { gaii: pbAlice.ghii, key: PB_MEMBERS });
+    assert(tool.isError && tool.text === 'Access denied: entry is not public', `tool: ${tool.text.slice(0, 200)}`);
+});
+
+// B17: aimeat_operator_ai_config against its REST twins, POST and GET /v1/ai/settings (the catalog
+// names POST as the route the connector's copy of the tool calls).
+let pbAiAg!: McpAgent, pbAiMcp!: McpSession;
+await test('Setup (B17): alice\'s agent holding memory:write-reserved and memory:write-as-owner', async () => {
+    pbAiAg = await makeAgent(BASE, pbAlice, ['*', 'memory:write-reserved', 'memory:write-as-owner'], N('pbaiag'));
+    pbAiMcp = await openSession(BASE, pbAiAg.token, 'u2b2 phase B ai settings');
+});
+
+await test('B17 USE KEPT: that agent sets alice\'s daily budget on the route and on the tool (proposal, then the token)', async () => {
+    const rest = await call('POST', '/v1/ai/settings', pbAiAg.token, { daily_budget_usd: 2 });
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const proposal = await callTool(pbAiMcp, 'aimeat_operator_ai_config', { daily_budget_usd: 3 });
+    assert(!proposal.isError && proposal.data.mode === 'proposal' && proposal.data.current.daily_budget_usd === 2, `proposal: ${proposal.text.slice(0, 300)}`);
+    const applied = await callTool(pbAiMcp, 'aimeat_operator_ai_config', { daily_budget_usd: 3, confirm_token: proposal.data.confirm_token });
+    assert(!applied.isError && applied.data.mode === 'applied', `apply: ${applied.text.slice(0, 300)}`);
+    const mine = await call('GET', '/v1/ai/settings', pbAlice.token);
+    assert(mine.status === 200 && mine.body.data.daily_budget_usd === 3, `alice reads: ${show(mine)}`);
+});
+
+await test('B17 REFUSED: alice\'s agent without memory:write-reserved is refused the write on the route and the tool', async () => {
+    const rest = await call('POST', '/v1/ai/settings', pbAliceAg.token, { daily_budget_usd: 4 });
+    assert(rest.status === 403, `route: ${show(rest)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_operator_ai_config', { daily_budget_usd: 4 });
+    assert(tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B17 RECORDED DIFFERENCE (question: may an agent that may set the budget also read it on REST): the tool shows the agent alice\'s budget, GET /v1/ai/settings refuses the same agent', async () => {
+    const tool = await callTool(pbAiMcp, 'aimeat_operator_ai_config', {});
+    assert(!tool.isError && tool.data.current.daily_budget_usd === 3, `tool: ${tool.text.slice(0, 300)}`);
+    const rest = await call('GET', '/v1/ai/settings', pbAiAg.token);
+    assert(rest.status === 403, `route: ${show(rest)}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);
