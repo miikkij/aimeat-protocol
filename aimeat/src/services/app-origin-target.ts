@@ -17,6 +17,8 @@
  *   resolveAppOriginTarget · resolveFrameAppTarget · appRecordForAuthorize
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   2026-11-13 — resolvePublishedPortfolio is imported from services/portfolio/published.ts, where it
+ *     lives, and not through the re-export in routes/portfolio.ts (structure programme 2026-11, unit 4).
  *   v1.8.0 — 2026-11-02 — appRecordForAuthorize: authorize from an app's draft origin reads the draft
  *     when the app was never published; it answered 404 APP_NOT_FOUND.
  *   v1.7.0 — 2026-10-06 — appOfRequestOrigin: the app a request's per-app origin serves, and whether
@@ -45,7 +47,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppManifest } from '../storage/types/apps.js';
-import { resolvePublishedPortfolio } from '../routes/portfolio.js';
+import { resolvePublishedPortfolio } from './portfolio/published.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from './subdomain-names.js';
 
 /**
