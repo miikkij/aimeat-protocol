@@ -17,6 +17,9 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-14 — roleOf asks organismMemberGate, the role the REST workspace routes ask; an attached
+ *     agent's owner who left takes its agents with it, so no caller's answer changes (parity section
+ *     WS-UPDATE; structure programme 2026-11, unit 2b phase B).
  *   2026-11-13 — denyReason and aimeat_workspace_revert_to_draft's role read the organism through
  *     services/organism-read/member.ts, the gate the REST workspace routes ask (requireMember); the
  *     revert reads the organism once (structure programme 2026-11, unit 2b).
@@ -347,10 +350,12 @@ export function registerWorkspaceTools(
         if (!entry) return null;
         return { createdBy: entry.createdBy ?? bareOwner(entry.ownerGaii), ownerGaii: entry.ownerGaii, ...(entry.name ? { name: entry.name } : {}) };
     };
-    /** Active membership role of the agent's owner in an org, or null. */
+    /** The caller's role in an org, or null: services/organism-read/member.ts organismMemberGate, the
+     *  role the REST workspace routes ask (requireMember, requireWsManager). The owner's active role,
+     *  else 'member' for an agent on the organism's agent list (parity section WS-UPDATE). */
     const roleOf = async (orgId: string): Promise<string | null> => {
-        const m = await storage.getMembership(orgId, ownerName);
-        return m && m.status === 'active' ? m.role : null;
+        const gate = await organismMemberGate(storage, orgId, { sub: agentGaii, owner: ownerName });
+        return gate.ok ? gate.role : null;
     };
     /** Create a consent grant if no equivalent active one exists (idempotent) — the same function the
      *  workspace-access REST routes call, so the request half of membership has one implementation. */

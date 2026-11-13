@@ -10,6 +10,9 @@
  * @structure createOrganismHelpers(config, storage) → createOrganismGate(config, storage) + the Express forms
  * @usage const H = createOrganismHelpers(config, storage); const role = await H.memberRole(req, organism, id);
  * @version-history
+ *   2026-11-14 — requireWsManager takes the organism and the role from requireMember, the role
+ *     aimeat_workspace_update and the access tools ask (roleOf); the answers are unchanged (structure
+ *     programme 2026-11, unit 2b phase B).
  *   2026-11-13 — requireOrgAdmin asks services/organism-read/manager.ts organismForManager, the read
  *     and the rule the email invitation tools ask; refuseOrgAdmin is its refusal (structure programme
  *     2026-11, unit 2b). The answers are unchanged. requireMember asks services/organism-read/member.ts,
@@ -41,15 +44,16 @@ export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
 /** The closure-bound helpers shared by every organism route group. Created once per router. */
 export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   const gate = createOrganismGate(config, storage);
-  const { memberRole, findWsEntry, bareOwner } = gate;
+  const { findWsEntry, bareOwner } = gate;
 
   /** Shared gate for the grant/revoke routes — returns the workspace creator's name, or sends the
    *  error response and returns null. Only the workspace creator or an org admin may manage access. */
   const requireWsManager = async (req: Request, res: Response, id: string, ws: unknown): Promise<string | null> => {
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
-    const callerRole = await memberRole(req, organism, id);
-    if (!callerRole) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return null; }
+    // The organism and the caller's role: requireMember (services/organism-read/member.ts), the role
+    // the workspace MCP tools ask (roleOf, denyReason).
+    const member = await requireMember(req, res, id);
+    if (!member) return null;
+    const callerRole = member.role;
     if (!ws || typeof ws !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return null; }
     const entry = await findWsEntry(id, ws);
     if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return null; }

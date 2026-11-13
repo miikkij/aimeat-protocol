@@ -97,7 +97,6 @@ const EXEMPT = new Set([
   'src/mcp/organisms.ts',
   'src/mcp/skills.ts',
   'src/mcp/wallet-extended.ts',
-  'src/mcp/workspaces.ts',
 ]);
 
 export const noStorageInMcp = {

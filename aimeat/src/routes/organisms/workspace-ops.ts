@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — PUT /v1/organisms/:id/workspace asks requireMember, the role aimeat_workspace_update
+ *     asks; the answers are unchanged (structure programme 2026-11, unit 2b phase B).
  *   2026-11-13 — POST /v1/organisms/:id/workspaces asks requireMember (services/organism-read/member.ts),
  *     the organism read and the role aimeat_workspace_create asks; the answers are unchanged (structure
  *     programme 2026-11, unit 2b).
@@ -386,10 +388,11 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   router.put('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : (req.body?.ws as string | undefined);
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const role = await memberRole(req, organism, id);
-    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    // The organism and the caller's role: services/organism-read/member.ts, which
+    // aimeat_workspace_update asks too (roleOf).
+    const member = await H.requireMember(req, res, id);
+    if (!member) return;
+    const { role } = member;
     if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
     // Archived workspace/organism is read-only — block structure/name/readme edits.
     const wsGuard = await isKeyArchived(storage, `organism.${id}.w.${ws}.`);

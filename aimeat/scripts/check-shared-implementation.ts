@@ -152,7 +152,6 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/organisms.ts': 4,
     'src/mcp/skills.ts': 1,
     'src/mcp/wallet-extended.ts': 2,
-    'src/mcp/workspaces.ts': 1,
 };
 
 /** A direct storage call: the bare `storage` or a member receiver (`deps.storage`, `this.storage`). */
