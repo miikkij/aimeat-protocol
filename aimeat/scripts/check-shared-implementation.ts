@@ -133,7 +133,6 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/core-admin.ts': 9,
     'src/mcp/core-resources.ts': 4,
     'src/mcp/core.ts': 9,
-    'src/mcp/cortex.ts': 1,
     'src/mcp/exchange-run.ts': 2,
     'src/mcp/extensions.ts': 2,
     'src/mcp/knowledge.ts': 1,

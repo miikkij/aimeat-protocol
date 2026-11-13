@@ -84,7 +84,6 @@ const EXEMPT = new Set([
   'src/mcp/core-admin.ts',
   'src/mcp/core-resources.ts',         // extraction out of core.ts (max-file-lines): the same four storage reads
   'src/mcp/core.ts',
-  'src/mcp/cortex.ts',
   'src/mcp/exchange-run.ts',
   'src/mcp/extensions.ts',
   'src/mcp/knowledge.ts',

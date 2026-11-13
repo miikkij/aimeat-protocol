@@ -64,8 +64,9 @@ import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex,
-    visibleCortexes, type CortexCaller, type CortexRefusal,
+    type CortexCaller, type CortexRefusal,
 } from '../services/cortex-lifecycle.js';
+import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
 import { upsertCortex, cortexLibUrls } from '../routes/cortex.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
@@ -160,7 +161,7 @@ export function registerCortexTools(
             }
             // The same fence GET /v1/cortex applies: public, the node's own bundled ones, and the
             // caller's own. This tool listed every owner's private cortex until 2026-09-05.
-            const extensions = visibleCortexes(agentCaller(), await storage.listCortexExtensions({}), config.nodeId);
+            const extensions = await listVisibleCortexes(storage, agentCaller(), config.nodeId, {});
             // Who loads each cortex, from the dependency map (the rows GET /v1/cortex carries too).
             const deps = await dependencyIndex(storage);
             const viewerOwner = localAccountName(getAgentGaii());

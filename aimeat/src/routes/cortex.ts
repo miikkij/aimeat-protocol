@@ -73,8 +73,9 @@ import { success, error } from '../middleware/envelope.js';
 import { cortexCallerOf } from './cortex/caller.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import {
-  installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes,
+  installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex,
 } from '../services/cortex-lifecycle.js';
+import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
 import { upsertCortex } from './cortex/upsert.js';
 import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -135,11 +136,11 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     // return every owner's private cortexes, because nothing between the query string and storage
     // asked whose they were. The filter still narrows; canSeeCortex decides what it may narrow
     // over — public, the node's own bundled ones, the caller's own, and everything for an operator.
-    const extensions = visibleCortexes(await callerOf(req), await storage.listCortexExtensions({
+    const extensions = await listVisibleCortexes(storage, await callerOf(req), config.nodeId, {
       status: status || undefined,
       namespace: namespace || undefined,
       visibility: visibility || undefined,
-    }), config.nodeId);
+    });
     // Who loads each cortex, from the dependency map: one read for the whole list.
     const deps = await dependencyIndex(storage);
     const { visible } = await visibleAppRefs(storage, `${req.auth!.owner}@${config.nodeId}`);
