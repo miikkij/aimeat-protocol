@@ -261,13 +261,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:e5bb7af9f5f88e3f4098b88f"
+      "digest": "sha256:cc0326a327dd5a3fceca5d03"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-11-08",
@@ -300,7 +300,7 @@
       "digest": "sha256:4c41735e286441cee00507fc"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/tool-catalog/scopes.ts",
@@ -308,7 +308,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:3309104fae51701723859ec0"
+      "digest": "sha256:88c66654788b299aedeac398"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-11-04",
@@ -360,7 +360,7 @@
       "digest": "sha256:b4cc80c9b398658e9fa46c9e"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-11-11",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -369,7 +369,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:6346ee8b178d10b411c21cfb"
+      "digest": "sha256:8ace9ad999e1aaf6d5611b53"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-05",
@@ -443,14 +443,15 @@
       "digest": "sha256:78682957a81f98ad42f3f9b8"
     },
     "node:aimeat-bookkeeping": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/routes/finance.ts",
         "aimeat/src/routes/finance-ledger.ts",
         "aimeat/src/services/finance/invoice-service.ts",
+        "aimeat/src/services/finance/fiscal-years.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:1994a7afd52d120eea44f19d",
+      "digest": "sha256:43163fd060f6cd09be202062",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -662,7 +663,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "59195162d900eb5f",
+      "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
       "aimeat/src/routes/ghii/register-login.ts": "1e875fad86029fb2",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
@@ -681,7 +682,7 @@
       "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "59195162d900eb5f",
+      "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
       "aimeat/src/tool-catalog/scopes.ts": "d88f12bd89523563",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "ba6f5c775d7ed2f4",
@@ -787,7 +788,7 @@
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
       "aimeat/src/routes/organisms/workspace-ops.ts": "ec02e0022926955d",
       "aimeat/src/routes/organisms/workspace-access.ts": "1d6f6c1b54f87409",
-      "aimeat/src/services/agent-profile-write.ts": "d01d8242acdae568",
+      "aimeat/src/services/agent-profile-write.ts": "68cd3967df5f91e4",
       "aimeat/src/services/agent-task-rules.ts": "207afa09788c8a11"
     },
     "node:aimeat-extension-builder": {
@@ -825,7 +826,8 @@
     "node:aimeat-bookkeeping": {
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
-      "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
+      "aimeat/src/services/finance/invoice-service.ts": "1551deaafe4f051c",
+      "aimeat/src/services/finance/fiscal-years.ts": "5e6ee26e0883809b",
       "aimeat/src/routes/odata.ts": "adb0ec05fc647d8f"
     },
     "node:aimeat-agent-capability": {
