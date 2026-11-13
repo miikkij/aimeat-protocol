@@ -19,6 +19,7 @@
  * @structure RecordsGapsSection · RecordsSection · recordsCsv() · buildRecordsPrompt() · RecordsPromptSection
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v1.4.0 — 2026-11-13 — The row "Balancing tests": how many are written and how many a person approved.
  *   v1.3.0 — 2026-10-26 — Every row of section 08 opens its gaps, each with the app or place it
  *     names and a way to it; the registers row counts the node's drafts with the stored ones.
  *   v1.2.0 — 2026-10-26 — The registers row says how many drafts the node made and nobody stored.
@@ -149,6 +150,7 @@ export function RecordsSection({ processing, registers, nodeId, onOpen }) {
             row('requests', R('requests'), R('requestsWhy', { open: num(p.requests?.open ?? 0) }), num(p.requests?.total ?? 0)),
             row('breaches', R('breaches'), R('breachesWhy', { open: num(p.breaches?.open ?? 0) }), num(p.breaches?.total ?? 0)),
             row('dpias', R('dpias'), R('dpiasWhy'), num(p.dpias ?? 0)),
+            row('lias', R('lias'), R('liasWhy', { approved: num(p.lias?.approved ?? 0) }), num(p.lias?.total ?? 0)),
             row('processors', R('processors'), transfers.length
               ? R('processorsWhy', { n: num(transfers.length) }) : R('processorsNone'), num((p.processors || []).length)),
             row('packs', R('packs'), packsOn.length ? packsOn.map(packWord).join(' · ') : R('packsNone'), num(packsOn.length), true),

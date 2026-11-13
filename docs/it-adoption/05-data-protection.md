@@ -1,6 +1,6 @@
 # 05 Data protection
 
-> Checked against AIMEAT node 4.2.0 (commit 90adc38fa) on 2026-11-09. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit def156c0e) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page is for the DPO, the security officer and the database administrator. It answers: which data the node keeps, where it keeps it, whether it is personal data, how long it stays and how it is deleted; what the node encrypts itself and what it leaves to the operator; how data classification works and how to set it for an organisation; what the GDPR export and the account deletion do; and which data leaves the operator's own systems.
 
@@ -28,7 +28,7 @@ This page is for the DPO, the security officer and the database administrator. I
 | Sessions and tokens | `Session`, `OAuthRefreshToken`, `PersonalAccessToken`, `RevokedToken`, `DeviceAuth` | yes | owner session access token `AIMEAT_ACCESS_TTL` (900 s); agent tokens `AIMEAT_AGENT_JWT_TTL` and ecosystem app tokens `AIMEAT_ECO_JWT_TTL` (90 days each); other JWTs `AIMEAT_JWT_TTL` (3600 s) (`aimeat/src/config.ts`); refresh idle `AIMEAT_REFRESH_IDLE_DAYS` (30) and absolute `AIMEAT_REFRESH_ABSOLUTE_DAYS` (90). Tokens are stored as hashes. Expired device codes are deleted every 5 minutes; unused MCP client registrations after `AIMEAT_MCP_UNUSED_CLIENT_DAYS` (30) | revocation sets a flag; account deletion removes them | `aimeat/src/storage/providers/postgres-kysely/methods/sessions.ts`, `aimeat/.env.example` |
 | Node keys (the node's Ed25519 signing key) | `NodeKey` (a copy, encrypted when `AIMEAT_KEY_PASSPHRASE` or `AIMEAT_ENCRYPTION_KEY` is set) and a key file (`AIMEAT_NODE_KEY_PATH`) | no | life of the node | operator | `aimeat/src/storage/node-key-at-rest.ts` |
 | Encrypted secrets (AI provider keys, connected mail account tokens, SMTP and payment secrets, file store credentials) | memory records under reserved prefixes, encrypted | yes (they open a person's accounts) | until the person or operator removes them | the person or operator; account deletion | `aimeat/src/services/encryption.ts`, `aimeat/src/services/ai/provider-store.ts`, `aimeat/src/services/connections/credential.ts` |
-| Compliance documents (records of processing, DSR requests, breaches, DPIAs, agreements) | memory records of the node's system identity | yes | no time limit | operator | `aimeat/src/services/compliance/docs.ts`, `aimeat/src/services/compliance/agreements.ts` |
+| Compliance documents (records of processing, DSR requests, breaches, DPIAs, balancing tests, trial marks, agreements) | memory records of the node's system identity | yes | no time limit | operator | `aimeat/src/services/compliance/docs.ts`, `aimeat/src/services/compliance/agreements.ts` |
 | Backups | not made by the node. The operator backs up the database, `.env` and the key file | yes | the operator's backup policy | the operator. Deleted data stays in older backups until they expire | [Backup and restore](../operations/backup-and-restore.md), [11 Backup and recovery](11-backup-recovery.md) |
 
 ## Encryption

@@ -16,6 +16,8 @@
  * @structure meta · agentsOfMap(map) · DataMapSection({ d })
  * @usage const mod = await import('./sections/datamap.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.3.0 — 2026-11-13 — "Balancing test", for the app's owner: where the test of each register on
+ *     legitimate interests stands, its PDF and Excel file, and the owner's approval.
  *   v1.2.0 — 2026-10-24 — "Personal data this app keeps": the app's records of processing as the map
  *     read answers them, and whether it has a privacy notice (plan doc-mvlftkh9zmc9, C1.7).
  *   v1.1.0 — 2026-10-11 — The agents whose work the app shows, above the map
@@ -35,7 +37,9 @@ import { Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import { readHomeAgents } from '/js/services/agent-draft.js';
 import { untieApp } from '/js/services/agent-ties.js';
-import { x } from '/views/appcat/i18n.js';
+import { readBalancingTests, approveBalancingTest, downloadBalancingTest } from '/js/services/balancing-test.js';
+import { x, lang } from '/views/appcat/i18n.js';
+import { date } from '/js/format.js';
 import { tOr } from '/js/i18n.js';
 
 const html = htm.bind(h);
@@ -133,6 +137,70 @@ function PersonalData({ records, privacyNotice, map }) {
     <//>`;
 }
 
+/**
+ * The balancing test of the app's registers that rest on legitimate interests, for the app's owner:
+ * where each test stands, its PDF and Excel file, and the owner's approval. An app that needs no
+ * test (data only its user sees, no such register) shows nothing here. The owner's AI fills the
+ * test with them; this block shows the state and holds the approval, which is the person's.
+ */
+function BalancingTests({ d }) {
+  const own = !!d.isOwn;
+  const [data, setData] = useState(null);
+  const [round, setRound] = useState(0);
+  const [said, setSaid] = useState(null);
+  useEffect(() => {
+    if (!own || !d.filename) return undefined;
+    let live = true;
+    readBalancingTests(d.filename, lang())
+      .then((out) => { if (live) setData(out); })
+      .catch((err) => { swallowed('appcat datamap: balancing test', err); });
+    return () => { live = false; };
+  }, [own, d.filename, round]);
+  const items = data?.items || [];
+  const special = data?.not_allowed || [];
+  if (!own || (!items.length && !special.length)) return null;
+
+  const run = async (work, done) => {
+    setSaid(null);
+    try {
+      await work();
+      if (done) { setSaid({ ok: true, text: done }); setRound((n) => n + 1); }
+    } catch (err) { setSaid({ ok: false, text: err?.message || String(err) }); }
+  };
+  // What is still open in a test: each unanswered question, and the outcome with its summary as one.
+  const open = (it) => (it.unfinished?.unanswered?.length || 0) + (it.unfinished?.outcome || it.unfinished?.summary ? 1 : 0);
+  const day = (iso) => (iso ? date(iso) : '');
+  const words = (it) => {
+    if (!it.stored) return x('dataMap.liaNotStarted');
+    const state = it.standing?.state;
+    if (state === 'draft') return open(it) ? x('dataMap.liaDraftOpen', { n: String(open(it)) }) : x('dataMap.liaDraftReady');
+    const approved = x('dataMap.liaApproved', { by: it.approvedBy || '', date: day(it.approvedAt), review: day(it.reviewAt) });
+    if (state === 'reopened') return `${approved} ${x('dataMap.liaReopened')}`;
+    if (state === 'review-due') return `${approved} ${x('dataMap.liaReviewDue')}`;
+    return approved;
+  };
+  const mayApprove = (it) => it.stored && !open(it) && (it.standing?.state === 'draft' || it.standing?.state === 'reopened');
+  return html`
+    <${Space} below="part">
+      <${SubHeading} level=${3}>${x('dataMap.liaTitle')}<//>
+      <${Note} kind="quiet">${x('dataMap.liaLead')}<//>
+      ${items.length ? html`<${Facts} wide rows=${items.map((it) => ({
+        k: it.register_title || it.registerId,
+        v: words(it),
+        state: !it.stored || it.standing?.state !== 'approved' ? 'attention' : undefined,
+        action: it.stored ? html`
+          <${Actions}>
+            ${mayApprove(it) ? html`<${Action} small onClick=${() => run(() => approveBalancingTest(d.filename, it.id), x('dataMap.liaApprovedNow'))}>${x('dataMap.liaApprove')}<//>` : null}
+            <${Action} small soft onClick=${() => run(() => downloadBalancingTest(d.filename, it.id, 'pdf'))}>PDF<//>
+            <${Action} small soft onClick=${() => run(() => downloadBalancingTest(d.filename, it.id, 'xlsx'))}>Excel<//>
+          <//>` : undefined,
+      }))} />` : null}
+      ${special.map((s) => html`<${Note} kind="hint">${x('dataMap.liaSpecial', { register: s.register?.title || '' })}<//>`)}
+      ${said ? html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>` : null}
+      ${items.some((it) => !it.stored || it.standing?.state !== 'approved') ? html`<${Note} kind="quiet">${x('dataMap.liaHow', { app: d.filename })}<//>` : null}
+    <//>`;
+}
+
 export default function DataMapSection({ d }) {
   const [state, setState] = useState({ loading: true, map: null, findings: [], records: [], privacyNotice: false });
   const [round, setRound] = useState(0);
@@ -159,5 +227,6 @@ export default function DataMapSection({ d }) {
   return html`
     ${state.map ? html`<${TiedAgents} d=${d} map=${state.map} onChanged=${() => setRound((n) => n + 1)} />` : null}
     ${state.loading ? null : html`<${PersonalData} records=${state.records} privacyNotice=${state.privacyNotice} map=${state.map} />`}
+    ${state.loading ? null : html`<${BalancingTests} d=${d} />`}
     <${DataMap} loading=${state.loading} map=${state.map} findings=${state.findings} say=${(k) => x(k)} />`;
 }

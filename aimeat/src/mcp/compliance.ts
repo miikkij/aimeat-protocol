@@ -25,6 +25,9 @@
  *   import { registerComplianceTools } from './compliance.js';
  *   registerComplianceTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-11-13 — The read's part "lia_draft" (whether an app needs a balancing test, with the draft),
+ *     and the write's item_id with set on part "lias": this session asks the owner to approve the test
+ *     (services/compliance/lia-ops.ts). The group takes the session's caller for that question.
  *   2026-10-24 — The read takes scope "all" (every place that keeps a kind, operator only), and the
  *     write takes item_id with set to change one entry in place (plan doc-mvlftkh9zmc9, C7.7).
  *   2026-10-23 — The register tools also read and replace the documents of plan doc-mvlftkh9zmc9
@@ -62,6 +65,8 @@ import {
   ComplianceDocError, catalogOp, draftOp, gapsOp, patchItemOp, readDocOp, writeDocOp,
 } from '../services/compliance/docs-ops.js';
 import { readAllPlacesOp } from '../services/compliance/docs-places.js';
+import { liaApproveOp, liaDraftOp, liaLang } from '../services/compliance/lia-ops.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 /** The parts that are the operator's AI Act register; every other part is a scoped document. */
 const OPERATOR_PARTS = new Set(['draft', 'usecases', 'questionnaire']);
@@ -78,6 +83,8 @@ export function registerComplianceTools(
   _emitResourceListChanged?: (agentGaii: string) => void,
   /** This session's granted scopes. Checked at CALL time as well as at registration — see gate(). */
   sessionScopes: string[] = [],
+  /** The session's caller (services/caller-context.ts): who asks the owner to approve a balancing test. */
+  caller?: () => CallerContext,
 ): void {
   const agentGaii = getAgentGaii();
 
@@ -131,7 +138,7 @@ export function registerComplianceTools(
         inputSchema: zodShapeFor('aimeat_compliance_register_read'),
         annotations: annotationsFor('aimeat_compliance_register_read'),
     },
-    async ({ part, since_days, scope, organism_id, app, app_owner }) => {
+    async ({ part, since_days, scope, organism_id, app, app_owner, lang }) => {
       // The documents of plan doc-mvlftkh9zmc9: the scope's own rule decides (compliance-docs-ops.ts).
       if (!OPERATOR_PARTS.has(part)) {
         const where = { scope, organism_id, app, app_owner };
@@ -139,6 +146,7 @@ export function registerComplianceTools(
           if (part === 'catalog') return text(await catalogOp(docDeps));
           if (part === 'registers_draft') return text(await draftOp(docDeps, docCaller, where));
           if (part === 'gaps') return text(await gapsOp(docDeps, docCaller, where));
+          if (part === 'lia_draft') return text(await liaDraftOp(docDeps, docCaller, where, liaLang(lang)));
           if (scope === 'all') return text(await readAllPlacesOp(docDeps, docCaller, part));
           return text(await readDocOp(docDeps, docCaller, part, where));
         } catch (err) {
@@ -171,6 +179,12 @@ export function registerComplianceTools(
         try {
           const where = { scope, organism_id, app, app_owner };
           // item_id + set changes one entry; value replaces the whole document.
+          if (part === 'lias' && (item_id !== undefined || set !== undefined)) {
+            // The one change in place a balancing test has: its owner's approval. This session is an
+            // agent, so the owner's question is filed and nothing is approved until they allow it.
+            if (!caller) return toolError('NOT_AVAILABLE', 'This session cannot ask the owner to approve a balancing test.');
+            return text(await liaApproveOp(docDeps, caller(), where, item_id, set, { dryRun: !!dry_run }));
+          }
           if (item_id !== undefined || set !== undefined) {
             return text(await patchItemOp(docDeps, docCaller, part, where, item_id, set, { dryRun: !!dry_run }));
           }

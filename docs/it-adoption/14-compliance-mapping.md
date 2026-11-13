@@ -1,6 +1,6 @@
 # 14 Compliance mapping
 
-> Checked against AIMEAT node 4.2.0 (commit e2be032fb) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit def156c0e) on 2026-11-13. Maintained with the code: see the README for how.
 
 This page is for the DPO, the compliance officer and the auditor. It maps GDPR, the EU AI Act, ISO/IEC 27001:2022 Annex A and NIS2 Article 21 to what the AIMEAT node does, and says what stays with the organisation. AIMEAT is not certified, and the repository holds no external audit or attestation. "Yes" below means the node has the mechanism; it never means the organisation is compliant by running it. The node's own compliance features say the same: every risk or framework verdict is served with a not-legal-advice note (`aimeat/src/data/compliance-questionnaire.ts`).
 
@@ -13,6 +13,7 @@ This page is for the DPO, the compliance officer and the auditor. It maps GDPR, 
 | Data subject requests | requests with a one-month deadline; the account export and the erasure log themselves | same tools, `requests` | `aimeat/src/services/compliance/docs.ts` |
 | Breaches | personal data breaches with the 72-hour clock | same tools, `breaches` | `aimeat/src/services/compliance/docs.ts` |
 | DPIAs (Art. 35) | impact assessments; a data domain that needs one makes a missing one a gap | same tools, `dpias` | `aimeat/src/data/compliance-domains.ts` |
+| Balancing test (Art. 6(1)(f)) | the legitimate interests assessment of an app whose register names that basis and whose data others can see or is regulated; the node drafts it from the app's register and data map, the app's owner answers and approves it signed in themselves (an agent can only ask), and a missing, unapproved or reopened one is a gap. An app only its user sees, and a shared app marked a trial (at most 180 days) with no regulated data, is asked none. Special category data on this basis is refused a test | same tools, `lias`, `lia_draft`, `trial` | `aimeat/src/services/compliance/lia-need.ts` |
 | Framework question sets | GDPR, NIS2, DORA, CRA, EAA, DSA, HIPAA, export control; an unanswered set reads unclassified, never "does not apply" | same tools, `frameworks` | `aimeat/src/data/compliance-frameworks.ts` |
 | Register of AI uses and risk classification | use cases with systems, models, purpose and data subjects, classified by a questionnaire (prohibited, high, limited, minimal; unanswered reads unclassified). The question set is a record the operator edits | `aimeat_compliance_register_read`, `aimeat_compliance_register_write`, admin Compliance page | `aimeat/src/services/compliance/register.ts`, `aimeat/src/data/compliance-questionnaire.ts` |
 | Compliance report | joins the register to what the node logged (provenance, consent, AI usage) and lists the gaps and what the report does not cover; a monthly job stores the previous month | `aimeat_compliance_report`, `aimeat_compliance_snapshot` | `aimeat/src/services/compliance/report.ts`, `aimeat/src/services/compliance/monthly-job.ts` |
@@ -105,6 +106,7 @@ Directive (EU) 2022/2555, Article 21(2) ([EUR-Lex](https://eur-lex.europa.eu/eli
 | Records of processing | admin Compliance page, `aimeat_compliance_register_write` | complete the drafts; add each organism's and app's processing | [Processing record](templates/processing-record.md) |
 | Processors and sub-processors | `processors` part | hosting, database and object store provider, mail relay, each AI model provider and region, the decision provider; contract, country, transfer basis, DPA | |
 | DPIAs | `dpias` part | for every data domain or AI use that needs one | [Risk assessment](templates/risk-assessment.md) |
+| Balancing tests | `lias` part, per app | the answers of judgement and the conclusion of each test; the node fills in what it reads from the app and concludes nothing | |
 | Transfers outside the EU | `processors` and the register's `transfers` | OpenRouter: the `eu` region still keeps account, billing and security records in the United States (SCC); `us` and `any` need SCC ([OpenRouter region](../operations/openrouter-region.md)). Each direct model provider's region. The decision provider's default address is in the United States (`AIMEAT_DECIDE_BASE_URL`) | |
 | AI uses | register of AI uses | each use case, answered questionnaire, reviewed result | [Application register entry](templates/application-register-entry.md) |
 | Framework answers | `frameworks` part | GDPR, NIS2 and others that apply | [Regulated sector addendum](templates/regulated-sector-addendum.md) |

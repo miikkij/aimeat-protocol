@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.23.0 — 2026-11-13 — The balancing test of an app, approved by its owner in person when an agent
+ *     or an app asked (apply-lia-approval.ts).
  *   v1.22.0 — 2026-11-02 — Another account's capability running a tool on a remote MCP server with the
  *     account holder's own sign-in, allowed by them (apply-mcp-capability-use.ts; secaudit2026nov02d round 13).
  *   v1.21.0 — 2026-11-01 — A writer without company:write changing a company's page through the file
@@ -94,6 +96,7 @@ import { applyConnectorProgram, declineConnectorProgram } from './apply-connecto
 import { applyLivingAiSpend } from './apply-living-ai-spend.js';
 import { applyCompanyPageWrite } from './apply-company-page-write.js';
 import { applyMcpCapabilityUse } from './apply-mcp-capability-use.js';
+import { applyLiaApproval } from './apply-lia-approval.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -130,6 +133,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'living-ai-spend': applyLivingAiSpend,
   'company-page-write': applyCompanyPageWrite,
   'mcp-capability-use': applyMcpCapabilityUse,
+  'lia-approval': applyLiaApproval,
 };
 
 /**

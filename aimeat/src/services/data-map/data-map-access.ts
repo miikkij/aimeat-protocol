@@ -12,6 +12,8 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-11-13 — stateProgramMap answers `balancingTest` when the written map makes the app need a
+ *     balancing test it has no approved one of (services/compliance/lia-write.ts).
  *   2026-11-01 — The map carries the optional `registers` statement, and an app whose party signup is open
  *     gets DATAMAP_REGISTERS_UNSTATED until its map says whom it registers (plan doc-mvwxcas3dom3, D4.4).
  *   2026-10-29 — The AI Act questions answer `asked` too: the ones the maker's answers so far make the
@@ -55,6 +57,7 @@ import { organismReadableRecords } from '../organism-namespace-access.js';
 import { ecoMayReadKey } from '../ecosystem-access.js';
 import { readDoc } from '../compliance/docs.js';
 import type { ComplianceRegister } from '../compliance/docs-schemas.js';
+import { balancingTestStep, type BalancingTestStep } from '../compliance/lia-write.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };
@@ -82,6 +85,11 @@ export interface ProgramMapResult {
    * The maker answers them in the map. Read only; absent for an app that does not use AI.
    */
   aiAct?: { questions: Array<Omit<ComplianceQuestion, 'implies'>>; builtIn: string[]; asked: string[]; unanswered: string[] };
+  /**
+   * Answered by a write, and only when the app needs a balancing test (legitimate interests) and has
+   * no approved one: what to tell the person, and where the draft is.
+   */
+  balancingTest?: BalancingTestStep;
 }
 
 /** Who is asking, in the terms every door already resolves. */
@@ -349,7 +357,10 @@ export async function stateProgramMap(
 
   const put = await putProgramMap(storage, config, caller, record.ownerGaii, ref.filename, body, at);
   if ('refusal' in put) return put;
-  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: put.findings };
+  // Who can see the app's data is read from this map, so a map that shares the data is where a
+  // balancing test starts to be asked (services/compliance/lia-write.ts). Absent for every other app.
+  const balancingTest = await balancingTestStep({ storage, config }, ref.owner, ref.filename);
+  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: put.findings, ...(balancingTest ? { balancingTest } : {}) };
 }
 
 /**

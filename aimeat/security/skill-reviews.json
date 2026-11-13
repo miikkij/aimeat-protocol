@@ -1,6 +1,17 @@
 {
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
+    "node:balancing-test": {
+      "reviewedOn": "2026-11-13",
+      "watches": [
+        "aimeat/src/services/compliance/lia-need.ts",
+        "aimeat/src/services/compliance/lia-write.ts",
+        "aimeat/src/services/compliance/lia-ops.ts",
+        "aimeat/src/services/compliance/lia-schemas.ts",
+        "aimeat/src/data/compliance-lia.ts"
+      ],
+      "digest": "sha256:6806b612c073e1286113f469"
+    },
     "node:aimeat-app-agents": {
       "reviewedOn": "2026-11-13",
       "watches": [
@@ -154,7 +165,7 @@
         "aimeat/src/services/app-size-health.ts",
         "aimeat/src/services/app-publish-next-steps.ts"
       ],
-      "digest": "sha256:f26e7452adaddbb224a8cca6"
+      "digest": "sha256:5f921506b8911304ad88f62a"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-04",
@@ -595,7 +606,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app-size-health.ts": "b0683f91995656e0",
-      "aimeat/src/services/app-publish-next-steps.ts": "c15ebdaf3a833c2c"
+      "aimeat/src/services/app-publish-next-steps.ts": "fa6d0c122c93f31e"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
@@ -886,6 +897,13 @@
       "aimeat/src/services/app-agent-deploy.ts": "31c4cd65c3e3f93c",
       "aimeat/src/services/app-agents/app-agent-link.ts": "94ca2ec0bc9457d7",
       "aimeat/src/data/crew-runtime-scopes.ts": "d902c274174d0005"
+    },
+    "node:balancing-test": {
+      "aimeat/src/services/compliance/lia-need.ts": "514460f16c8f93eb",
+      "aimeat/src/services/compliance/lia-write.ts": "ca560c9240f3ba58",
+      "aimeat/src/services/compliance/lia-ops.ts": "21a80f122141436c",
+      "aimeat/src/services/compliance/lia-schemas.ts": "de43b51d7741b6e8",
+      "aimeat/src/data/compliance-lia.ts": "74f01d1647048d9b"
     }
   }
 }

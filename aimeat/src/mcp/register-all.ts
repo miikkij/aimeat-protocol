@@ -265,7 +265,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppdevProofTools(mcp, storage, config, agentGaii, scopes, caller);
     registerSkillsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerOperatorConfigTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
-    registerComplianceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerComplianceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerDataMapTools(mcp, storage, config, agentGaii, () => scopes, caller);
     registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
     registerExtensionsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);

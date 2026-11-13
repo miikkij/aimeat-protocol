@@ -13,6 +13,8 @@
  * @structure ProcessingSummary · PROCESSING_LIMITS · buildProcessingSummary()
  * @usage const p = await buildProcessingSummary({ storage, config });   // { summary, gaps, limits }
  * @version-history
+ *   v1.3.0 — 2026-11-13 — `lias` (the balancing tests written and approved) and `trials` (the apps
+ *     marked as a trial, running or ended with no decision).
  *   v1.2.1 — 2026-11-05 — Moved unchanged from src/services/compliance-processing.ts to src/services/compliance/processing.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.2.0 — 2026-10-29 — `apps` and `apps_by_reach`: every app in one line, with who can see its
  *     personal data and its AI use (compliance-apps-overview.ts), for the report's app table.
@@ -32,6 +34,7 @@ import { registerDrafts } from './register-drafts.js';
 import type { ComplianceRegister } from './docs-schemas.js';
 import { appsOverview, type ComplianceAppRow } from './apps-overview.js';
 import type { AppReach } from './app-reach.js';
+import { trialState } from './lia-need.js';
 
 export interface ProcessingSummary {
   registers: {
@@ -43,6 +46,10 @@ export interface ProcessingSummary {
   requests: { open: number; total: number };
   breaches: { open: number; total: number };
   dpias: number;
+  /** The balancing tests (legitimate interests) of every app: how many are written, and how many of them a person approved. */
+  lias: { total: number; approved: number };
+  /** The apps marked as a trial that is running or has ended with no decision. */
+  trials: { active: number; expired: number };
   frameworks: ReturnType<typeof frameworkVerdicts>;
   processors: ReturnType<typeof processorsView>;
   transfers: ReturnType<typeof transfersOf>;
@@ -77,9 +84,10 @@ export async function buildProcessingSummary(deps: { storage: Storage; config: A
   summary: ProcessingSummary; gaps: ScopeGap[]; limits: typeof PROCESSING_LIMITS;
 }> {
   const { storage, config } = deps;
-  const [regDocs, reqDocs, breachDocs, dpiaDocs, storedProcessors, nodeFw, policy] = await Promise.all([
+  const [regDocs, reqDocs, breachDocs, dpiaDocs, liaDocs, trialDocs, storedProcessors, nodeFw, policy] = await Promise.all([
     listDocs(storage, config.nodeId, 'registers'), listDocs(storage, config.nodeId, 'requests'),
     listDocs(storage, config.nodeId, 'breaches'), listDocs(storage, config.nodeId, 'dpias'),
+    listDocs(storage, config.nodeId, 'lias'), listDocs(storage, config.nodeId, 'trial'),
     readDoc(storage, config.nodeId, 'processors', { kind: 'node' }),
     readDoc(storage, config.nodeId, 'frameworks', { kind: 'node' }),
     readNodePolicy(storage, config.nodeId),
@@ -104,6 +112,9 @@ export async function buildProcessingSummary(deps: { storage: Storage; config: A
   }
   const requests = reqDocs.flatMap(d => d.doc.items);
   const breaches = breachDocs.flatMap(d => d.doc.items);
+  const lias = liaDocs.flatMap(d => d.doc.items);
+  const at = Date.now();
+  const trialStates = trialDocs.map(d => trialState(d.doc, at));
   const processors = processorsView(derivedProcessors(config), storedProcessors.items);
   const overview = await appsOverview(deps);
   return {
@@ -112,6 +123,8 @@ export async function buildProcessingSummary(deps: { storage: Storage; config: A
       requests: { open: requests.filter(r => r.status === 'open').length, total: requests.length },
       breaches: { open: breaches.filter(b => b.status === 'open').length, total: breaches.length },
       dpias: dpiaDocs.reduce((n, d) => n + d.doc.items.length, 0),
+      lias: { total: lias.length, approved: lias.filter(l => l.status === 'approved').length },
+      trials: { active: trialStates.filter(s => s === 'active').length, expired: trialStates.filter(s => s === 'expired').length },
       frameworks: frameworkVerdicts(nodeFw, 'node'),
       processors, transfers: transfersOf(processors), packs: packStatus(policy),
       apps: overview.apps, apps_by_reach: overview.by_reach,

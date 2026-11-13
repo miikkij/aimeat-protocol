@@ -36,6 +36,8 @@
  *   v1.1.0 — 2026-10-24 — patchDocItem(): one entry changed in place, the rest untouched (C7.7).
  *   v1.2.0 — 2026-11-01 — The document `intermediation`, at the node and organism scopes (plan
  *     doc-mvwxcas3dom3, D7.2).
+ *   v1.3.0 — 2026-11-13 — The documents `lias` and `trial` at the app scope and `contact` at the
+ *     organism scope (lia-schemas.ts); a kind that is one object is parsed and stamped as one.
  *   v1.2.1 — 2026-11-05 — Moved unchanged from src/services/compliance-docs.ts to src/services/compliance/docs.ts (codebase analysis 2026-11-03, item D-h).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -44,7 +46,7 @@ import { emitChange } from '../event-bus.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { systemGhiiFor } from './register.js';
 import {
-  emptyDoc, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs, type ComplianceRequest,
+  emptyDoc, isSingleDocKind, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs, type ComplianceRequest,
 } from './docs-schemas.js';
 
 export type ComplianceScope =
@@ -62,6 +64,10 @@ export const SCOPES_OF: Record<ComplianceDocKind, ReadonlyArray<ComplianceScope[
   processors: ['node'],
   // The node's provider (mode node), or an organism that runs its own marketplace (mode owners).
   intermediation: ['node', 'organism'],
+  // An app's balancing tests and its trial mark (lia-schemas.ts); an organism's privacy contact.
+  lias: ['app'],
+  trial: ['app'],
+  contact: ['organism'],
 };
 
 export function scopeAllows(kind: ComplianceDocKind, scope: ComplianceScope): boolean {
@@ -94,6 +100,7 @@ function parseDoc<K extends ComplianceDocKind>(kind: K) {
     if (kind === 'frameworks') {
       return (v && typeof v === 'object' && (v as { answers?: unknown }).answers ? v : emptyDoc(kind)) as ComplianceDocs[K];
     }
+    if (isSingleDocKind(kind)) return (v && typeof v === 'object' && !Array.isArray(v) ? v : emptyDoc(kind)) as ComplianceDocs[K];
     return (v && typeof v === 'object' && Array.isArray((v as { items?: unknown }).items) ? v : emptyDoc(kind)) as ComplianceDocs[K];
   };
 }
@@ -111,7 +118,7 @@ export async function readDoc<K extends ComplianceDocKind>(
 /** Stamp each entry (or the whole answers document) with the node's clock and the writer. */
 function stamped<K extends ComplianceDocKind>(kind: K, doc: ComplianceDocs[K], by: string): ComplianceDocs[K] {
   const now = new Date().toISOString();
-  if (kind === 'frameworks') return { ...(doc as ComplianceDocs['frameworks']), updatedAt: now, updatedBy: by } as ComplianceDocs[K];
+  if (isSingleDocKind(kind)) return { ...(doc as object), updatedAt: now, updatedBy: by } as ComplianceDocs[K];
   const items = (doc as { items: Array<Record<string, unknown>> }).items
     .map(it => ({ ...it, updatedAt: now, updatedBy: by }));
   return { items } as ComplianceDocs[K];

@@ -19,6 +19,7 @@
  * @structure recordsGaps() · gapNames() · buildOrganismRecordsPrompt() · OrganismRecords({ org, canEdit, num, first })
  * @usage imported by views/profile/organisms/home-settings.js and views/admin/compliance-tab.records.js
  * @version-history
+ *   v1.1.0 — 2026-11-13 — The reading order names the balancing test gaps.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.4).
  */
 import { h } from 'preact';
@@ -40,7 +41,8 @@ const O = (key, params) => t('organisms.records.' + key, params);
 /** The order the gap kinds are read in: deadlines and missing legal grounds first. */
 const KIND_ORDER = [
   'breach-notification-overdue', 'breach-hipaa-overdue', 'breach-subjects-not-notified', 'request-overdue',
-  'register-without-legal-basis', 'register-without-special-basis', 'dpia-missing', 'dpia-needs-prior-consultation',
+  'register-without-legal-basis', 'register-without-special-basis', 'legitimate-interests-special-category',
+  'dpia-missing', 'dpia-needs-prior-consultation', 'lia-missing', 'lia-reopened', 'lia-not-suitable', 'lia-incomplete',
   'domain-label-below-floor', 'app-personal-data-without-register', 'app-register-without-privacy-notice',
   'transfer-without-basis', 'processor-without-dpa', 'processor-without-baa', 'processor-not-itar-eligible',
   'classification-pack-not-accredited',

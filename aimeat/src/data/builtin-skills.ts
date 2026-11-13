@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-13 -- +balancing-test (builtin-skills.balancing-test.ts): how an AI writes the balancing
+ *     test of an app (legitimate interests) with its owner, and what it leaves to the person.
  *   2026-11-11 -- +aimeat-app-agents (builtin-skills.app-agents.ts): how an app brings an agent of
  *     its own, from the aimeat-crews block to the owner's approval.
  *   2026-11-08 -- install-skills-locally: other agents' skill folders (Codex, Goose, OpenHands), a
@@ -257,6 +259,7 @@ import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js
 import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
 import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
 import { CONTENT_PIPELINE_SKILL_ENTRY } from './builtin-skills.content-pipeline.js';
+import { BALANCING_TEST_SKILL_ENTRY } from './builtin-skills.balancing-test.js';
 import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY, AI_GEN_RULES_SKILL_ENTRY } from './builtin-skills.ai.js';
 import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
 import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
@@ -489,6 +492,7 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
   },
   CREW_AGENT_SKILL_ENTRY,
   CONTENT_PIPELINE_SKILL_ENTRY,
+  BALANCING_TEST_SKILL_ENTRY,
   CONFIGURE_ROUTING_SKILL_ENTRY,
   AI_MODEL_POLICY_SKILL_ENTRY,
   AI_GEN_RULES_SKILL_ENTRY,

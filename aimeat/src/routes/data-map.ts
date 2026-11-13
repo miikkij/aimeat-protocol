@@ -17,6 +17,7 @@
  * @structure dataMapRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-11-13 — The PUT answers `balancing_test` when the app needs a balancing test and has no approved one.
  *   2026-10-29 — ai_act.asked: the questions the maker's answers so far make the node ask.
  *   2026-10-28 — GET carries ai_act for an app that uses AI: the EU AI Act questions its maker answers in the map's `aiAct`.
  *   2026-10-24 — GET carries records_of_processing and privacy_notice (plan doc-mvlftkh9zmc9, C1.7).
@@ -90,6 +91,7 @@ export function dataMapRouter(config: AimeatConfig, storage: Storage): Router {
       // What is still unfinished, in the words of whoever has to finish it. It never refuses.
       res.json(success(config.nodeId, {
         app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings,
+        ...(out.balancingTest ? { balancing_test: out.balancingTest } : {}),
       }));
     });
 

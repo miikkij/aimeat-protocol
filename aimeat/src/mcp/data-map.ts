@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_datamap_set answers `balancing_test` when the app needs a balancing test and has no approved one.
  *   2026-10-29 — ai_act.asked, as the REST read.
  *   2026-10-28 — aimeat_datamap_get carries ai_act, as the REST read.
  *   2026-10-27 — The minted anonymous token is not a member of this node, so aimeat_datamap_get gives it no map of an app listed to members, as the REST read does not (secaudit2026oct26, minted-anonymous-token-counted-as-member).
@@ -109,7 +110,7 @@ export function registerDataMapTools(
       const out = await stateProgramMap(storage, config, mapCaller(), app,
         data_map as Partial<DataMap>, new Date().toISOString());
       if ('refusal' in out) return fail(out.refusal.message);
-      return text({ app: out.app, data_map: out.dataMap, findings: out.findings });
+      return text({ app: out.app, data_map: out.dataMap, findings: out.findings, ...(out.balancingTest ? { balancing_test: out.balancingTest } : {}) });
     },
   );
 

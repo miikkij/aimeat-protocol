@@ -9,6 +9,9 @@
  * @structure compliancePart() · complianceDocKind() · complianceScopeQuery() · complianceCliTools
  * @usage import { complianceCliTools } from './tool-call-defs-compliance.js';
  * @version-history
+ *   v1.2.0 — 2026-11-13 — The read's part "lia_draft" reaches GET /v1/compliance/lia/draft, and `lang`
+ *     is forwarded on every scoped read. The parts lias, trial and contact are document kinds, and
+ *     the approval of a balancing test is the PATCH of part lias.
  *   v1.1.0 — 2026-10-24 — The write sends item_id + set as PATCH /v1/compliance/docs/<kind>/<id>;
  *     scope "all" on the read rides in the scope query as before (C7.7).
  *   v1.0.0 — 2026-10-23 — Moved from tool-call-defs-core.ts; the register read and write reach
@@ -73,10 +76,12 @@ export const complianceCliTools: ConnectCliToolDefinition[] = [
             // ignore it, and a published parameter that never leaves the process is the defect the
             // forwarding test exists for.
             const part = requiredString(input, 'part');
-            const days = { since_days: optionalNumber(input, 'since_days') };
+            // lang rides along the same way: the balancing test draft reads it, the other routes ignore it.
+            const days = { since_days: optionalNumber(input, 'since_days'), lang: optionalString(input, 'lang') };
             if (part === 'catalog') return client.get(`/v1/compliance/catalog${query(days)}`);
             if (part === 'registers_draft') return client.get(`/v1/compliance/draft${complianceScopeQuery(input, days)}`);
             if (part === 'gaps') return client.get(`/v1/compliance/gaps${complianceScopeQuery(input, days)}`);
+            if (part === 'lia_draft') return client.get(`/v1/compliance/lia/draft${complianceScopeQuery(input, days)}`);
             const kind = complianceDocKind(input);
             if (kind) return client.get(`/v1/compliance/docs/${kind}${complianceScopeQuery(input, days)}`);
             return client.get(`/v1/admin/compliance/${compliancePart(input, true)}${query({

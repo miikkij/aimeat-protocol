@@ -18,6 +18,8 @@
  *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './app-publish-next-steps.js';
  * @version-history
+ *   v1.4.0 — 2026-11-13 — `balancing_test`, for an app whose register rests on legitimate interests,
+ *     whose data others can see, and that has no approved balancing test. Every other app gets no key.
  *   v1.3.2 — 2026-11-11 — `acceptance` says how the console is read (with the browser's own
  *     warnings, while the app works) and names the run with the JavaScript compiler off for an app
  *     that computes every frame. An app was published twice with "a clean console" checked: once
@@ -60,6 +62,7 @@ import { logger } from '../utils/logger.js';
 import { designBookStep } from './app-genre-fork.js';
 import { levelStep } from './app-build-level.js';
 import { legalReadiness } from './app-build/legal-readiness.js';
+import { balancingTestStep } from './compliance/lia-write.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -117,6 +120,7 @@ export async function buildPublishNextSteps(
     // The legal pages the app's structure page reports as open, said here first. A real build met
     // them only on the structure page after the four owed items were done (2026-11-08).
     const legalMissing = appRec ? legalReadiness(appRec).missing : [];
+    const balancing = await balancingTestStep({ storage, config }, ownerName, filename);
 
     // How big it has become, and how fast. Best-effort like everything here: an app whose version
     // line cannot be read still gets its face and skill reminder.
@@ -185,6 +189,13 @@ export async function buildPublishNextSteps(
           + `Write each with aimeat_app_manage { action: "legal", filename: "${filename}", kind, format: "markdown", content }; `
           + 'the structure page lists them as open until they exist. Say what the app really does with data: '
           + 'the node itself adds a cookie notice to the page, which names any analytics the operator runs.',
+      } : {}),
+      // Only for an app that needs a balancing test (legitimate interests) and has no approved one
+      // (compliance/lia-write.ts). A demo, an app only its user sees and a running trial get no key.
+      ...(balancing ? {
+        balancing_test: `${balancing.text} `
+          + (balancing.draft ? `The draft: ${balancing.draft.tool}. ` : '')
+          + `The app's page: ${balancing.url}. Not blocking: the publish does not wait for it.`,
       } : {}),
       template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Learnings that would bite the next builder go to aimeat_appdev_pitfall_report.',
     };

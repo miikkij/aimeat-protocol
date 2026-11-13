@@ -20,6 +20,9 @@
  * @usage
  *   const out = await writeDocOp(deps, caller, 'registers', { scope: 'organism', organism_id }, body, { dryRun });
  * @version-history
+ *   2026-11-13 — An app's balancing tests and trial mark and an organism's privacy contact go through
+ *     lia-write.ts before they are stored; a read of the tests says where each stands; an app's
+ *     register write answers with `balancing_test` when its legal basis asks for a test.
  *   2026-11-05 — Moved unchanged from src/services/compliance-docs-ops.ts to src/services/compliance/docs-ops.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-27 — The register floors take the caller as the keeper whose organisms a register may move
  *     (secaudit2026oct26, compliance-docs:register-containers-not-bound-to-scope).
@@ -42,7 +45,9 @@ import {
   appRegisterDraft, derivedProcessors, frameworkVerdicts, nodeRegistersDraft, organismRegisterDraft, processorsView, transfersOf,
 } from './derived.js';
 import { scopeGaps, nodeOnlyGaps } from './scope-gaps.js';
-import { DOC_SCHEMAS, isComplianceDocKind, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs } from './docs-schemas.js';
+import { DOC_SCHEMAS, isComplianceDocKind, isSingleDocKind, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs } from './docs-schemas.js';
+import { appLiaReading } from './lia-need.js';
+import { balancingTestStep, liasForRead, prepareContactWrite, prepareLiasWrite, prepareTrialWrite, trialForRead } from './lia-write.js';
 
 export class ComplianceDocError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); this.name = 'ComplianceDocError'; }
@@ -115,7 +120,41 @@ export async function readDocOp(deps: Deps, caller: OperatorCaller, rawKind: unk
     const regs = (doc as ComplianceDocs['registers']).items;
     return { ...head, items: regs, floors: await applyDomainFloors(deps, scope, regs, { dryRun: true, keeperName: keeperOf(caller) }) };
   }
+  // An app's balancing tests, each with where it stands against the app as it is now; its trial mark with its state.
+  if (kind === 'lias' && scope.kind === 'app') {
+    const q = `app=${encodeURIComponent(scope.app)}&app_owner=${encodeURIComponent(scope.ownerName)}`;
+    return {
+      ...head,
+      items: liasForRead(await appLiaReading(deps, scope)).map(l => ({
+        ...l, documents: { pdf: `/v1/compliance/lia/${l.id}/document?${q}`, xlsx: `/v1/compliance/lia/${l.id}/document?${q}&format=xlsx` },
+      })),
+    };
+  }
+  if (kind === 'trial') return { ...head, ...trialForRead(doc as ComplianceDocs['trial']) };
   return { ...head, ...(doc as object) };
+}
+
+/** What a write of a balancing test, a trial mark or a privacy contact stores (lia-write.ts); any other kind as parsed. */
+async function prepared<K extends ComplianceDocKind>(
+  deps: Deps, caller: OperatorCaller, kind: K, scope: ComplianceScope, body: unknown,
+): Promise<ComplianceDocs[K]> {
+  const special = kind === 'trial' && scope.kind === 'app' ? await prepareTrialWrite(deps, scope, body)
+    : kind === 'contact' && scope.kind === 'organism' ? await prepareContactWrite(deps, scope, body) : null;
+  if (special) {
+    if (!special.ok) throw new ComplianceDocError(special.status, special.code, special.message);
+    return special.doc as ComplianceDocs[K];
+  }
+  const parsed = DOC_SCHEMAS[kind].safeParse(body);
+  if (!parsed.success) {
+    throw new ComplianceDocError(400, 'VALIDATION_ERROR', `That ${kind} document was not stored: `
+      + parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+  }
+  if (kind === 'lias' && scope.kind === 'app') {
+    const lias = await prepareLiasWrite(deps, caller, scope, parsed.data as ComplianceDocs['lias']);
+    if (!lias.ok) throw new ComplianceDocError(lias.status, lias.code, lias.message);
+    return lias.doc as ComplianceDocs[K];
+  }
+  return parsed.data as ComplianceDocs[K];
 }
 
 /** Replace one document. A registers write raises the containers its domains ask for. */
@@ -129,19 +168,24 @@ export async function writeDocOp(
   const cleaned = kind === 'processors' && body && typeof body === 'object' && Array.isArray((body as { items?: unknown }).items)
     ? { items: ((body as { items: Array<Record<string, unknown>> }).items).map(({ derived: _d, ...rest }) => rest) }
     : body;
-  const parsed = DOC_SCHEMAS[kind].safeParse(cleaned);
-  if (!parsed.success) {
-    throw new ComplianceDocError(400, 'VALIDATION_ERROR', `That ${kind} document was not stored: `
-      + parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
-  }
-  const doc = parsed.data as ComplianceDocs[typeof kind];
+  const doc = await prepared(deps, caller, kind, scope, cleaned);
   if (opts.dryRun) {
     const floors = kind === 'registers' ? await applyDomainFloors(deps, scope, (doc as ComplianceDocs['registers']).items, { dryRun: true, keeperName: keeperOf(caller) }) : undefined;
     return { kind, scope, would_store: doc, stored: false, ...(floors ? { floors } : {}), note: 'Nothing was written. Show this to the person, and send it again without dry_run to store it.' };
   }
   const saved = await writeDoc(deps.storage, deps.config.nodeId, kind, scope, doc, a.by);
   const floors = kind === 'registers' ? await applyDomainFloors(deps, scope, (saved as ComplianceDocs['registers']).items, { keeperName: keeperOf(caller) }) : undefined;
-  return { kind, scope, stored: true, ...(saved as object), ...(floors ? { floors } : {}) };
+  // An app's register is where its legal basis is chosen, so this answer says when that choice asks
+  // for a balancing test (lia-write.ts). A saved test answers with where it stands and how it is approved.
+  const step = kind === 'registers' && scope.kind === 'app' ? await balancingTestStep(deps, scope.ownerName, scope.app) : null;
+  if (kind === 'lias' && scope.kind === 'app') {
+    return {
+      kind, scope, stored: true, items: liasForRead(await appLiaReading(deps, scope)),
+      note: 'Each test is saved as a draft. Its owner approves it: send item_id with set { "status": "approved" }. An agent that sends it asks the owner, who allows it in person.',
+    };
+  }
+  if (kind === 'trial') return { kind, scope, stored: true, ...trialForRead(saved as ComplianceDocs['trial']) };
+  return { kind, scope, stored: true, ...(saved as object), ...(floors ? { floors } : {}), ...(step ? { balancing_test: step } : {}) };
 }
 
 /** Fields a change of one entry never sets: the id names it, the stamp is the node's. */
@@ -158,7 +202,10 @@ export async function patchItemOp(
   opts: { dryRun?: boolean } = {},
 ): Promise<Record<string, unknown>> {
   const kind = kindOf(rawKind);
-  if (kind === 'frameworks') throw new ComplianceDocError(400, 'INVALID_INPUT', 'frameworks has no entries to change one by one; replace its answers.');
+  if (isSingleDocKind(kind)) throw new ComplianceDocError(400, 'INVALID_INPUT', `${kind} has no entries to change one by one; replace it with value.`);
+  // A balancing test is saved whole and approved by its owner (lia-ops.ts liaApproveOp); a field
+  // set in place here would skip both.
+  if (kind === 'lias') throw new ComplianceDocError(400, 'INVALID_INPUT', 'A balancing test is not changed entry by entry. Send the whole test as value; approve it with set { "status": "approved" }.');
   const id = str(itemId);
   if (!id) throw new ComplianceDocError(400, 'INVALID_INPUT', 'item_id names the entry to change.');
   if (!set || typeof set !== 'object' || Array.isArray(set) || !Object.keys(set).length) {

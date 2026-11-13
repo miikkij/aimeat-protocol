@@ -18,8 +18,12 @@
  *   - PATCH /v1/compliance/docs/:kind/:id   change the fields of one entry
  *   - GET  /v1/compliance/draft             the node's draft of a scope's registers
  *   - GET  /v1/compliance/gaps              what a scope's documents leave open
+ *   - GET  /v1/compliance/lia/draft         whether an app needs a balancing test, and its draft
+ *   - GET  /v1/compliance/lia/:id/document  one balancing test as a PDF, an Excel workbook or Markdown
  * @usage app.use(complianceDocsRouter(config, storage));   // server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-11-13 — An app's balancing test: its draft, its file, and its owner's approval as
+ *     the PATCH of kind lias (200 approved in person, 202 the owner is asked).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1–C7.1).
  *   v1.1.0 — 2026-10-24 — scope=all on the read, PATCH of one entry (C7.7).
  */
@@ -35,6 +39,7 @@ import {
   ComplianceDocError, catalogOp, draftOp, gapsOp, patchItemOp, readDocOp, writeDocOp,
 } from '../services/compliance/docs-ops.js';
 import { readAllPlacesOp } from '../services/compliance/docs-places.js';
+import { liaApproveOp, liaDocumentOp, liaDraftOp, liaLang } from '../services/compliance/lia-ops.js';
 
 export function complianceDocsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -81,10 +86,41 @@ export function complianceDocsRouter(config: AimeatConfig, storage: Storage): Ro
     try {
       // The body is { set: { field: value } }, which aimeat_compliance_register_write carries as `set`.
       const body = (req.body ?? {}) as { set?: unknown };
-      const out = await patchItemOp(deps, operatorCallerOf(req), req.params.kind as string, {
-        scope: req.query.scope, organism_id: req.query.organism_id, app: req.query.app, app_owner: req.query.app_owner,
-      }, req.params.id, body.set, { dryRun: req.query.dry_run === 'true' });
+      const where = { scope: req.query.scope, organism_id: req.query.organism_id, app: req.query.app, app_owner: req.query.app_owner };
+      // A balancing test has one change in place: its owner's approval (lia-ops.ts). In person it is
+      // approved now; an agent or an app files the owner's question and answers 202.
+      if (req.params.kind === 'lias') {
+        const out = await liaApproveOp(deps, callerOf(req, config.nodeId, storage), where, req.params.id, body.set, {
+          dryRun: req.query.dry_run === 'true', app: req.auth?.app,
+        });
+        res.status(out.approval_request ? 202 : 200).json(success(config.nodeId, out));
+        return;
+      }
+      const out = await patchItemOp(deps, operatorCallerOf(req), req.params.kind as string, where, req.params.id, body.set, { dryRun: req.query.dry_run === 'true' });
       res.json(success(config.nodeId, out));
+    } catch (err) { fail(res, err); }
+  });
+
+  // Whether an app needs a balancing test (legitimate interests), and the draft of each one, filled from the app.
+  router.get('/v1/compliance/lia/draft', requireAuth(), requireScope(COMPLIANCE_READ_SCOPE), async (req, res) => {
+    try {
+      const out = await liaDraftOp(deps, operatorCallerOf(req), { scope: 'app', app: req.query.app, app_owner: req.query.app_owner }, liaLang(req.query.lang));
+      res.json(success(config.nodeId, out, [
+        { description: 'Save the tests, once the person has answered', method: 'PUT', url: '/v1/compliance/docs/lias?scope=app' },
+        { description: 'What the app leaves open', method: 'GET', url: '/v1/compliance/gaps?scope=app' },
+      ]));
+    } catch (err) { fail(res, err); }
+  });
+
+  // One balancing test as a file: a PDF (default), an Excel workbook or Markdown.
+  router.get('/v1/compliance/lia/:id/document', requireAuth(), requireScope(COMPLIANCE_READ_SCOPE), async (req, res) => {
+    try {
+      const doc = await liaDocumentOp(deps, operatorCallerOf(req), { scope: 'app', app: req.query.app, app_owner: req.query.app_owner },
+        req.params.id as string, req.query.format, req.query.lang);
+      res.setHeader('Content-Type', doc.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${doc.filename.replace(/[^A-Za-z0-9._-]/g, '_')}"`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(doc.body);
     } catch (err) { fail(res, err); }
   });
 

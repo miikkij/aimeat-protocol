@@ -211,6 +211,10 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('compliance-ask-makers', async () => {
     const { askMakersForAiAct } = await import('./compliance/ask-makers.js');
     await askMakersForAiAct(storage, config);
+    // The same daily run asks the owner of an app whose trial has ended whether it goes into use
+    // (compliance/trial-job.ts), at most once per app per fortnight.
+    const { askOwnersAboutExpiredTrials } = await import('./compliance/trial-job.js');
+    await askOwnersAboutExpiredTrials(storage, config);
   });
 
   // The AI-job day logs. A finished job folds into ai.jobs.log.<day> and its live key is deleted;

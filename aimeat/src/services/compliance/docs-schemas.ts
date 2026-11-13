@@ -17,6 +17,9 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.5.0 — 2026-11-13 — Three documents from lia-schemas.ts: an app's balancing tests (`lias`), an
+ *     app's trial mark (`trial`) and an organism's privacy contact (`contact`); SINGLE_DOC_KINDS names
+ *     the kinds that are one object.
  *   v1.4.2 — 2026-11-05 — Moved unchanged from src/services/compliance-docs-schemas.ts to src/services/compliance/docs-schemas.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.4.1 — 2026-11-01 — A review's id takes a colon: it is the finding's id, and a finding about one
  *     organism or one owner names it after a colon, so those findings could not be reviewed (WP9b).
@@ -32,10 +35,20 @@
  */
 import { z } from 'zod';
 import { INPUT_LIMITS } from '../../models/input-limits.js';
+import {
+  ContactSchema, LiaSchema, TrialSchema, type ComplianceContact, type ComplianceLia, type ComplianceTrial,
+} from './lia-schemas.js';
 
 /** The documents, in the order the surfaces list them. */
-export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks', 'intermediation'] as const;
+export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks', 'intermediation', 'lias', 'trial', 'contact'] as const;
 export type ComplianceDocKind = typeof COMPLIANCE_DOC_KINDS[number];
+
+/** The kinds that are one object and no list of entries: nothing in them is changed entry by entry. */
+export const SINGLE_DOC_KINDS = ['frameworks', 'trial', 'contact'] as const;
+export type SingleDocKind = typeof SINGLE_DOC_KINDS[number];
+export function isSingleDocKind(kind: ComplianceDocKind): kind is SingleDocKind {
+  return (SINGLE_DOC_KINDS as readonly string[]).includes(kind);
+}
 
 export function isComplianceDocKind(v: unknown): v is ComplianceDocKind {
   return typeof v === 'string' && (COMPLIANCE_DOC_KINDS as readonly string[]).includes(v);
@@ -239,6 +252,9 @@ export const DOC_SCHEMAS = {
   dpias: listDoc(DpiaSchema, 500),
   frameworks: FrameworkAnswersSchema,
   intermediation: listDoc(IntermediationItemSchema, 500),
+  lias: listDoc(LiaSchema, 100),
+  trial: TrialSchema,
+  contact: ContactSchema,
 } as const;
 
 export type ComplianceRegister = z.infer<typeof RegisterSchema>;
@@ -260,9 +276,12 @@ export interface ComplianceDocs {
   dpias: { items: ComplianceDpia[] };
   frameworks: ComplianceFrameworkAnswers;
   intermediation: { items: IntermediationItem[] };
+  lias: { items: ComplianceLia[] };
+  trial: ComplianceTrial;
+  contact: ComplianceContact;
 }
 
 /** An empty document of a kind, which is what a scope with nothing stored reads as. */
 export function emptyDoc<K extends ComplianceDocKind>(kind: K): ComplianceDocs[K] {
-  return (kind === 'frameworks' ? { answers: {} } : { items: [] }) as ComplianceDocs[K];
+  return (kind === 'frameworks' ? { answers: {} } : isSingleDocKind(kind) ? {} : { items: [] }) as ComplianceDocs[K];
 }

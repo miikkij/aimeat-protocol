@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-13 -- e2e-compliance-lia.ts joins the list (not the guard tier): the balancing test of an app whose register rests on legitimate interests.
  *   2026-11-13 -- e2e-tool-route-parity.ts joins the list (not the guard tier): seven places where an MCP tool and its REST route answered one caller differently (structure programme 2026-11, unit 7).
  *   2026-11-13 -- e2e-agent-field-adds.ts joins the list (not the guard tier): an MCP tool takes the fields its REST route takes, and refuses through the tool what the route refuses.
  *   2026-11-13 -- e2e-capability-update-fields.ts joins the list (not the guard tier): PUT /v1/capabilities/{id} takes the fields a capability's writer may set and no other key, on both backends, and the webhook policy reads the normalised source.
@@ -1194,6 +1195,9 @@ const ALL_SUITES = [
     // signing in the AIMEAT app, a returned PDF and scan, an announced change, end and deletion, and
     // who may do what (plan doc-mvmr4i2wdk0p).
     'test/e2e-compliance-agreements.ts',
+    // The balancing test of an app (legitimate interests): the rule, the draft filled from the app, an
+    // agent's draft approved by the owner in person, the files, the trial mark, and who may do what.
+    'test/e2e-compliance-lia.ts',
     // Agent goals: open work two agents race for, the chain and its limit, a reaction, a person's step,
     // asking a result again, pause, and the refusals (session cc-jouni-goals).
     'test/e2e-goals.ts',

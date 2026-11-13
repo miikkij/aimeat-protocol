@@ -24384,8 +24384,17 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation] }
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation, lias, trial, contact] }
         description: >-
+          `lias` (app) holds the app's balancing tests, the legitimate interests assessment of GDPR
+          art. 6(1)(f): an item `{ id, registerId, status: draft | approved, language?, facts,
+          answers: { <question id>: yes | no }, notes: { <section or question id>: text },
+          outcome?: { result: suitable | not-suitable, summary }, approvedBy?, approvedAt?,
+          requestedBy?, reviewAt?, approvedOn?, answerSources }`. A read adds `standing` to each
+          (draft, approved, reopened, review-due) and `documents`, the addresses of its PDF and
+          Excel file. `trial` (app) is the app's trial mark `{ startedAt, expiresAt, days, note?,
+          renewals, endedAt? }` with its `state` (none, active, expired, ended). `contact`
+          (organism) is `{ privacyContact?: <a member's account name>, notifyApprovedLia? }`.
           `intermediation` (node and organism) holds the data intermediation notification record (an
           item `{ id, type: notification, legalName, businessId, notifiedAt?, authorityRef?,
           euRegisterUrl?, confirmedAt?, scope }`, Data Governance Act 2022/868 art. 11) and a
@@ -24457,7 +24466,18 @@ paths:
         `floors`. An organism or workspace counts only when it is the register's own organism or one
         the writer creates or administers; any other is listed with outcome `not-in-scope` and left
         alone. `dry_run=true` validates and answers what would be stored, storing nothing. The
-        node stamps updatedAt and updatedBy.
+        node stamps updatedAt and updatedBy. An app's register write answers `balancing_test` when
+        the register names legitimate interests, others can see the data and no approved balancing
+        test exists. For `lias` the body is { items: [{ id, registerId, language?, answers, notes,
+        outcome? }] }: every test is stored as a draft, the node writes `facts` again from the app
+        and marks each answer `ai` (an agent or an app wrote it), `human` or `evidence`; `status`
+        and the approval fields in the body are ignored, and an approved test sent back unchanged
+        stays approved. A register that does not name legitimate interests answers 409
+        LIA_NOT_APPLICABLE, one with special category data 409 LIA_SPECIAL_CATEGORY. For `trial`
+        the body is { days?: 1 to 180 (default 60), note? } to start a trial from now, or
+        { end: true } when the app goes into use; the dates are the node's clock. For `contact`
+        the body is { privacyContact, notifyApprovedLia }, and the account named is an active
+        member of the organism.
       security:
         - BearerAuth: []
       parameters:
@@ -24487,7 +24507,7 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [registers, processors, requests, breaches, dpias] }
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, lias] }
       - name: id
         in: path
         required: true
@@ -24508,6 +24528,13 @@ paths:
         field whose name ends in At is the node's clock. A request set to done or refused gets its
         closedAt. The whole document is validated as on PUT. The same writers as PUT, and something
         acting for a person needs `compliance:write`. 404 when the scope has no entry with that id.
+        Kind `lias` has one change in place, the owner's approval of a balancing test: `set` is
+        { status: approved, review_months? }. The account holder signed in themselves approves it
+        at once (200). An agent or an app files the owner's question instead and gets 202 with
+        `approval_request`; nothing is approved until the owner allows it in person
+        (POST /v1/publish-requests/{id}/decision), and a test changed after the question is not
+        approved by it. 409 LIA_INCOMPLETE while a question is unanswered or the outcome or its
+        summary is missing.
       security:
         - BearerAuth: []
       requestBody:
@@ -24521,6 +24548,8 @@ paths:
                 set: { type: object, additionalProperties: true }
       responses:
         '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '202':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -24559,6 +24588,73 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/compliance/lia/draft:
+    get:
+      operationId: getComplianceLiaDraft
+      summary: Whether an app needs a balancing test, and the draft of each one
+      tags: [Compliance]
+      description: >
+        The balancing test is the legitimate interests assessment of GDPR art. 6(1)(f). `needed` is
+        true when a personal register of the app names legitimate interests and others can see the
+        data or the app keeps regulated data. `items` holds one test per such register: the stored
+        one, or a draft (`stored: false`) whose `facts` the node filled from the register, the data
+        map, the privacy notice and its own safeguards. A draft answers only the questions the node
+        can see in the app, marked `evidence`; `unfinished` names what is open. `not_needed` gives
+        the reason for a register that needs none (only-its-user, trial, trial-expired,
+        reach-unknown), `not_allowed` a register with special category data, for which no test is
+        drafted. `questions` is the question set in `lang`. Stored nowhere. Readers: the app's owner
+        and the operator; anyone else gets 404. Something acting for a person needs `compliance:read`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: app, in: query, required: true, schema: { type: string }, description: "The app's filename." }
+        - { name: app_owner, in: query, required: false, schema: { type: string } }
+        - { name: lang, in: query, required: false, schema: { type: string, enum: [en, fi, es], default: en } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/compliance/lia/{id}/document:
+    get:
+      operationId: getComplianceLiaDocument
+      summary: One balancing test as a PDF, an Excel workbook or Markdown
+      tags: [Compliance]
+      description: >
+        The stored test in its five sections and the outcome. Every row says where it came from
+        (read from the app, an AI, a person, a proposal of the node), and the last rows who approved
+        it and when. The same readers as GET /v1/compliance/lia/draft.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: "The test's id." }
+        - { name: app, in: query, required: true, schema: { type: string } }
+        - { name: app_owner, in: query, required: false, schema: { type: string } }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [pdf, xlsx, md], default: pdf } }
+        - { name: lang, in: query, required: false, schema: { type: string, enum: [en, fi, es] }, description: "Absent: the test's own language." }
+      responses:
+        '200':
+          description: The file.
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: { schema: { type: string, format: binary } }
+            text/markdown: { schema: { type: string } }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/compliance/gaps:
     get:
       operationId: getComplianceScopeGaps
@@ -24571,7 +24667,11 @@ paths:
         unanswered framework; an app whose data map holds personal data that someone other than its
         user can read, with no register or no privacy notice (an app whose data only its user sees
         needs neither); an app whose data map says where data is kept or who reads it in words the
-        node does not know (`app-data-map-unreadable`); and for the node, a processor with no agreement, country or transfer basis,
+        node does not know (`app-data-map-unreadable`); a register on legitimate interests whose
+        balancing test is missing, not approved, open again, due for review or negative
+        (`lia-missing`, `lia-incomplete`, `lia-reopened`, `lia-review-overdue`, `lia-not-suitable`),
+        legitimate interests named for special category data, and a trial that ended with no
+        decision (`app-trial-expired`); and for the node, a processor with no agreement, country or transfer basis,
         and a label pack whose top classes are on. The same scope parameters and readers as GET
         /v1/compliance/docs/{kind}. The operator's node-wide report carries every scope's gaps.
       security:

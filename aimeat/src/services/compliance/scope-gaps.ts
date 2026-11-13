@@ -19,6 +19,10 @@
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   v1.4.0 — 2026-11-13 — An app's register that rests on legitimate interests: a missing, unapproved,
+ *     reopened, overdue or negative balancing test, legitimate interests named for special category
+ *     data, and a trial that ended with no decision (lia-need.ts). An app whose data only its user
+ *     sees gets none of them.
  *   v1.3.1 — 2026-11-05 — Moved unchanged from src/services/compliance-scope-gaps.ts to src/services/compliance/scope-gaps.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.3.0 — 2026-10-29 — An app's gaps follow who can see its data (compliance-app-reach.ts): an app
  *     whose data only its user sees gets no register, notice or domain gap, an unsaid row matters only
@@ -50,6 +54,9 @@ import { UNCLASSIFIED } from './register.js';
 import { appAiSignals } from './app-signals.js';
 import { readAppDataMap } from '../data-map/data-map-store.js';
 import type { ComplianceBreach, ComplianceDpia, ComplianceRegister, ComplianceRequest } from './docs-schemas.js';
+import { appLiaReading, restsOnLegitimateInterests, trialState } from './lia-need.js';
+import type { ComplianceTrial } from './lia-schemas.js';
+import { liasForRead } from './lia-write.js';
 
 export type ScopeGapKind =
   | 'register-without-legal-basis' | 'register-without-special-basis' | 'register-without-retention'
@@ -60,7 +67,10 @@ export type ScopeGapKind =
   | 'app-personal-data-without-register' | 'app-personal-data-unstated' | 'app-register-without-privacy-notice'
   | 'app-personal-data-domain-unstated' | 'app-data-map-unreadable' | 'retention-conflict'
   | 'processor-without-dpa' | 'processor-country-unknown' | 'transfer-without-basis' | 'processor-without-baa'
-  | 'processor-not-itar-eligible' | 'classification-pack-not-accredited';
+  | 'processor-not-itar-eligible' | 'classification-pack-not-accredited'
+  // The balancing test of a register that rests on legitimate interests, and an app's trial (lia-need.ts).
+  | 'lia-missing' | 'lia-incomplete' | 'lia-reopened' | 'lia-review-overdue' | 'lia-not-suitable'
+  | 'legitimate-interests-special-category' | 'app-trial-expired';
 
 export interface ScopeGap {
   kind: ScopeGapKind;
@@ -193,12 +203,12 @@ export async function scopeGaps(deps: Deps, scope: ComplianceScope, opts: { now?
       out.push({ kind: 'framework-unanswered', detail: `${v.name.en}: ${n === 1 ? 'one question is' : `${n} questions are`} unanswered, so nothing says whether it applies.`, evidence: { ...scopeName(scope), framework: v.id, unanswered: v.verdict.unanswered } });
     }
   }
-  if (scope.kind === 'app') out.push(...await appGaps(deps, scope, regs.items));
+  if (scope.kind === 'app') out.push(...await appGaps(deps, scope, regs.items, now));
   return out;
 }
 
 /** C1.6, C1.7, C4.4: an app's data map against its registers, and its privacy notice. */
-async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app' }>, regs: ComplianceRegister[]): Promise<ScopeGap[]> {
+async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app' }>, regs: ComplianceRegister[], now: number): Promise<ScopeGap[]> {
   const out: ScopeGap[] = [];
   const at = scopeName(scope);
   const ownerGhii = `${scope.ownerName}@${deps.config.nodeId}`;
@@ -250,6 +260,59 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
   }
   if (draft.register?.retentionText && personalRegs.some(r => typeof r.retentionMonths === 'number')) {
     out.push({ kind: 'retention-conflict', detail: `The register of ${scope.app} keeps data for a limited time, and the app's data map keeps it until it is deleted. One of the two is wrong.`, evidence: at });
+  }
+  out.push(...await balancingTestGaps(deps, scope, regs, now));
+  return out;
+}
+
+/**
+ * The balancing test of each register that rests on legitimate interests, and the app's trial
+ * (lia-need.ts). An app whose data only its user sees, or that is a running trial, gets none.
+ */
+async function balancingTestGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app' }>, regs: ComplianceRegister[], now: number): Promise<ScopeGap[]> {
+  const out: ScopeGap[] = [];
+  const at = scopeName(scope);
+  const expired = (trial: ComplianceTrial): void => {
+    if (trialState(trial, now) !== 'expired') return;
+    out.push({
+      kind: 'app-trial-expired',
+      detail: `The trial of the app ${scope.app} ended on ${trial.expiresAt!.slice(0, 10)}, and its owner has not said whether it goes into use or is closed.`,
+      evidence: { ...at, expiresAt: trial.expiresAt, startedAt: trial.startedAt },
+    });
+  };
+  // The node-wide report runs this for every app: one that names legitimate interests nowhere costs one read.
+  if (!regs.some(restsOnLegitimateInterests)) {
+    expired(await readDoc(deps.storage, deps.config.nodeId, 'trial', scope));
+    return out;
+  }
+  const reading = await appLiaReading(deps, scope, { regs, now });
+  expired(reading.trial);
+  const lias = liasForRead(reading, now);
+  for (const n of reading.needs) {
+    const ev = { ...at, register: n.register.id, title: n.register.title, reach: n.reach, domains: n.domains };
+    if (n.need === 'not-allowed') {
+      out.push({ kind: 'legitimate-interests-special-category', detail: `The register "${n.register.title}" names legitimate interests for special category data. That basis alone does not carry such data (GDPR art. 9): choose the ground in the register and write the impact assessment.`, evidence: ev });
+      continue;
+    }
+    if (n.need !== 'required') continue;
+    const lia = lias.find(l => l.registerId === n.register.id);
+    const employees = n.domains.includes('employment') ? ' The data is about employees, so check employment privacy law too (in Finland the necessity rule of Act 759/2004, section 3).' : '';
+    if (!lia) {
+      out.push({ kind: 'lia-missing', detail: `The register "${n.register.title}" rests on legitimate interests, and no balancing test is written for it (GDPR art. 6(1)(f)). A draft filled from the app is ready.${employees}`, evidence: ev });
+    } else if (lia.standing.state === 'draft') {
+      out.push({ kind: 'lia-incomplete', detail: `The balancing test of the register "${n.register.title}" is a draft: its owner has not approved it.${employees}`, evidence: { ...ev, lia: lia.id } });
+    } else if (lia.standing.state === 'reopened') {
+      const c = lia.standing.changed ?? {};
+      const why = [
+        c.reachTo ? `more people can see the data (${c.reachFrom} before, ${c.reachTo} now)` : '',
+        c.newDomains?.length ? `the app holds new regulated data (${c.newDomains.join(', ')})` : '',
+      ].filter(Boolean).join(' and ');
+      out.push({ kind: 'lia-reopened', detail: `The balancing test of the register "${n.register.title}" is open again: ${why}. Its owner reads it and approves it again.`, evidence: { ...ev, lia: lia.id, changed: c } });
+    } else if (lia.outcome?.result === 'not-suitable') {
+      out.push({ kind: 'lia-not-suitable', detail: `The balancing test of the register "${n.register.title}" concluded that legitimate interests do not fit, and the register still names them. Choose another legal basis or stop the processing.`, evidence: { ...ev, lia: lia.id } });
+    } else if (lia.standing.state === 'review-due') {
+      out.push({ kind: 'lia-review-overdue', detail: `The balancing test of the register "${n.register.title}" was due for review on ${lia.reviewAt!.slice(0, 10)}.`, evidence: { ...ev, lia: lia.id, reviewAt: lia.reviewAt } });
+    }
   }
   return out;
 }
