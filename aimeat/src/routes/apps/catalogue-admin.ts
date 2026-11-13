@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — GET /v1/apps reads its page, the counts and the own/building refusal through
+ *     catalogueAppPage (services/app/catalogue-page.ts), which aimeat_app_list now asks too
+ *     (structure programme 2026-11, unit 2b, B7).
  *   2026-10-31 — `screenshot_url` comes from listedScreenshotUrl: where an app's screenshot follows who
  *     may open it, a caller who may open it gets the address with a screenshot grant and anybody else
  *     null; an owner's row carries `screenshot_public` (secaudit2026oct31w2 round 10, W2-12).
@@ -60,7 +63,8 @@
  *   v1.5.0 — 2026-08-19 — the copy-scan reads listAppsWithContent; the plain listing no longer carries bytes.
  */
 import type { Router } from 'express';
-import { listAppsBuiltFor, levelName } from '../../services/app/dev-grant.js';
+import { levelName } from '../../services/app/dev-grant.js';
+import { catalogueAppPage } from '../../services/app/catalogue-page.js';
 import { resolveIdentity, localAccountName, isForeignPrincipal } from '../../utils/gaii.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -76,7 +80,7 @@ import { peerFetch } from '../../utils/peer-fetch.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app/similarity.js';
 import { publicAppManifest } from '../../services/app/public-manifest.js';
-import { appToll, presentAppManifest } from '../../services/app/pacing.js';
+import { presentAppManifest } from '../../services/app/pacing.js';
 import { appAccessOf, appAccessLevelOf } from '../../services/app/access.js';
 import { isAppOpenToInternet } from '../../services/internet-opening/opening-registry.js';
 import type { CanonicalOwner } from './helpers.js';
@@ -121,19 +125,11 @@ export function registerCatalogueAdminRoutes(
         // would have filtered to the anonymous identity and answered an empty list, which looks like
         // an answer and is not one.
         const ownOnly = req.query.own === 'true';
-        if (ownOnly && (!viewerGhii || isAnonymousPrincipal(req.auth))) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'own=true needs a signed-in caller'));
-            return;
-        }
         // `building=true` answers a different question from `own=true`: not the apps you have, the
         // apps somebody else asked you to help build. Deliberately opt-in and never mixed into the
         // default answer — an agent that iterates "my apps" and starts editing another person's
         // would be a listing change with consequences nobody asked for.
         const buildingOnly = req.query.building === 'true';
-        if (buildingOnly && (!viewerGhii || isAnonymousPrincipal(req.auth))) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'building=true needs a signed-in caller'));
-            return;
-        }
         // A member of this node (signed in, not the anonymous credential, not a visitor from another
         // node) also sees the apps their owners listed to the community.
         const isMember = !!viewerGhii && !isAnonymousPrincipal(req.auth) && !isForeignPrincipal(req.auth);
@@ -145,35 +141,24 @@ export function registerCatalogueAdminRoutes(
             limit: Math.min(parseInt(req.query.limit as string) || 50, 200),
             offset: parseInt(req.query.offset as string) || 0,
             freeOnly: req.query.free_only === 'true',
-            viewerGhii,
             includeCommunity: isMember,
-            ...(ownOnly ? { ownerGaii: viewerGhii } : {}),
         };
 
-        let { apps, total } = await storage.listApps(opts);
-
-        // The apps this caller may build for somebody else. Resolved by asking what rights they
-        // hold and then reading exactly those apps, rather than by filtering the whole catalogue:
-        // one person's rights are a short list and the catalogue is not.
-        if (buildingOnly) {
-            apps = await listAppsBuiltFor(storage, config, {
-                principal: resolveIdentity(req.auth!, config.nodeId),
-                viewerGhii,
-            });
-            const q = (opts.q ?? '').toLowerCase();
-            apps = apps.filter(app => (!opts.category || app.manifest.category === opts.category)
-                && (!opts.tag || app.manifest.tags?.includes(opts.tag))
-                && (!opts.freeOnly || !appToll(app.manifest))
-                && (!q || `${app.manifest.name} ${app.manifest.description}`.toLowerCase().includes(q)));
-            total = apps.length;
-            apps = apps.slice(Math.max(0, opts.offset), Math.max(0, opts.offset) + Math.max(1, opts.limit));
+        // The page, its download and fork counts, and who may ask own or building: the apps this
+        // caller may build for somebody else are read by asking what rights they hold, rather than
+        // by filtering the whole catalogue. aimeat_app_list asks the same function.
+        const page = await catalogueAppPage(storage, config, {
+            principal: req.auth ? resolveIdentity(req.auth, config.nodeId) : '',
+            ownerGhii: viewerGhii,
+            anonymous: isAnonymousPrincipal(req.auth),
+        }, { own: ownOnly, building: buildingOnly, list: opts });
+        if ('refusal' in page) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', `${page.refusal}=true needs a signed-in caller`));
+            return;
         }
+        const { apps, total, downloadsByApp, forksByApp } = page;
 
-        // Per-app metrics in THREE batch queries (was getAppDownloads + countAppForks +
-        // getStorageFile PER app = 3N, up to ~600 for a full page).
-        const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
-        const downloadsByApp = await storage.getAppDownloadsForApps(refs);
-        const forksByApp = await storage.countAppForksForApps(refs);
+        // The third batch query beside the page's two (was getStorageFile PER app).
         const filesByOwner = await storage.listStorageFilesForOwners([...new Set(apps.map(a => a.ownerGaii))]);
         // Whether this caller may read the access codes of the viewer's own protected apps: whoever
         // could set one (publishing with access_code asks app:write).

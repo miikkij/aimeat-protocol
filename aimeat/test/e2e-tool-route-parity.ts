@@ -912,5 +912,41 @@ await test('B9 FIXED: the operator\'s agent forks alice\'s app that is not open 
     assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
 });
 
+// B7: "my apps" (own) and "apps I help build" (building) asked by alice's agent and by the anonymous
+// credential this node mints in anonymous mode, on GET /v1/apps and aimeat_app_list.
+let pbAnonToken = '', pbAnonMcp: McpSession | null = null;
+await test('Setup (B7): the anonymous credential (POST /v1/auth/anonymous) and an MCP session with it', async () => {
+    const a = await call('POST', '/v1/auth/anonymous', undefined, {});
+    assert(a.status === 200 || a.status === 201, `anonymous token: ${show(a)}`);
+    pbAnonToken = a.body.data.token;
+    pbAnonMcp = await openSession(BASE, pbAnonToken, 'u2b2 phase B anonymous');
+});
+
+await test('B7 USE KEPT: alice\'s agent lists her own apps on the route and the tool alike', async () => {
+    const rest = await call('GET', '/v1/apps?own=true&limit=200', pbAliceAg.token);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const restNames = (rest.body.data.apps as Body[]).map(a => a.filename as string).sort();
+    const tool = await callTool(pbAliceMcp, 'aimeat_app_list', { own: true, limit: 200 });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+    const toolNames = (tool.data.apps as Body[]).map(a => a.filename as string).sort();
+    assert(restNames.includes(PB_APP) && JSON.stringify(restNames) === JSON.stringify(toolNames), `route ${restNames} / tool ${toolNames}`);
+});
+
+await test('B7 FIXED: the anonymous credential is refused own and building on the route (401) and the tool (UNAUTHORIZED) alike', async () => {
+    for (const ask of ['own', 'building'] as const) {
+        const rest = await call('GET', `/v1/apps?${ask}=true`, pbAnonToken);
+        assert(rest.status === 401, `route ${ask}: ${show(rest)}`);
+        const tool = await callTool(pbAnonMcp!, 'aimeat_app_list', { [ask]: true });
+        assert(tool.isError && tool.text.startsWith('UNAUTHORIZED'), `tool ${ask}: ${tool.text.slice(0, 200)}`);
+    }
+});
+
+await test('B7 USE KEPT: the anonymous credential lists the catalogue on the route and the tool', async () => {
+    const rest = await call('GET', '/v1/apps', pbAnonToken);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbAnonMcp!, 'aimeat_app_list', {});
+    assert(!tool.isError && Array.isArray(tool.data.apps), `tool: ${tool.text.slice(0, 200)}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);

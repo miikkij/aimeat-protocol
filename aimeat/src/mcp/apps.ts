@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-14 — aimeat_app_list reads its page through catalogueAppPage (services/app/catalogue-page.ts),
+ *     as GET /v1/apps does: own and building are refused to the anonymous credential instead of
+ *     answering it an empty list (structure programme 2026-11, unit 2b, B7).
  *   2026-11-13 — aimeat_app_draft_publish reads the draft and asks the roadmap question through
  *     services/app/draft-to-publish.ts, which POST .../publish-draft calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_app_draft_save hands mime_type to stageAppDraft, as the PUT draft route does (unit 3b).
@@ -148,7 +151,8 @@ import {
     appFilenameRefusal, resolveAppOwnerScope, resolveAppTargetScope, stageAppDraft, discardAppDraft,
     publishAppDraft, deleteOwnedApp,
 } from '../services/app/lifecycle.js';
-import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app/dev-grant.js';
+import { isSharedApp, levelName } from '../services/app/dev-grant.js';
+import { catalogueAppPage } from '../services/app/catalogue-page.js';
 import { roadmapGate } from '../services/app/roadmap.js';
 import { draftToPublish } from '../services/app/draft-to-publish.js';
 import { draftNoticeFrom, appViewerStanding, readAppNews } from '../services/app/news.js';
@@ -595,6 +599,7 @@ export function registerAppsTools(
             // whether another call is worth making.
             const take = Math.min(Math.max(limit ?? 50, 1), 200);
             const skip = Math.max(offset ?? 0, 0);
+            const session = caller();
             const opts = {
                 category,
                 q: search,
@@ -606,23 +611,23 @@ export function registerAppsTools(
                 // (hidden from everyone else), so an owner's agent can act on them. The agent acts
                 // for a member of this node, so it sees the community apps the member sees too. The
                 // minted anonymous token is no member and does not (secaudit2026oct26).
-                viewerGhii: ownerGhii,
-                includeCommunity: sessionIsMember(caller()),
-                ...(own ? { ownerGaii: ownerGhii } : {}),
+                includeCommunity: sessionIsMember(session),
             };
 
-            // `building` is a different question from `own`, and the same function answers it here
-            // as answers it on GET /v1/apps: the apps somebody else asked this person to help build.
-            const built = building ? await listAppsBuiltFor(storage, config, { principal: agentGaii, viewerGhii: ownerGhii }) : null;
-            const matching = built?.filter(app => (!category || app.manifest.category === category)
-                && (!tag || app.manifest.tags?.includes(tag))
-                && (!search || `${app.manifest.name} ${app.manifest.description}`.toLowerCase().includes(search.toLowerCase())));
-            const { apps, total } = matching ? { apps: matching.slice(skip, skip + take), total: matching.length } : await storage.listApps(opts);
-
-            // Per-app metrics in TWO batch queries (was getAppDownloads + countAppForks PER app = 2N).
-            const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
-            const downloadsByApp = await storage.getAppDownloadsForApps(refs);
-            const forksByApp = await storage.countAppForksForApps(refs);
+            // `own` narrows to the caller's own apps; `building` is a different question, the apps
+            // somebody else asked this person to help build. The function GET /v1/apps asks decides
+            // both, refuses both to the anonymous credential, and reads the page and its counts.
+            const page = await catalogueAppPage(storage, config, {
+                principal: agentGaii, ownerGhii,
+                anonymous: session.kind === 'anonymous' || isAnonymousPrincipal({ sub: session.principal, owner: session.owner }),
+            }, { own: !!own, building: !!building, list: opts });
+            if ('refusal' in page) {
+                return {
+                    content: [{ type: 'text' as const, text: `UNAUTHORIZED: ${page.refusal}: true lists the apps of a signed-in account, and this connection has none. Sign in, or list the catalogue without it.` }],
+                    isError: true,
+                };
+            }
+            const { apps, total, downloadsByApp, forksByApp } = page;
             // Public addresses in ONE subdomain-table read for the whole page. Read-only on
             // purpose: appOriginUrl would mint a subdomain per app, and listing must not write.
             const urlByApp = await resolveAppUrls(config, storage, apps.map(a => ({ owner: a.ownerName, filename: a.filename })));

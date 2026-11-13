@@ -30,6 +30,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.6.6 — 2026-11-14 — Unit 2b part 2, phase B: apps.ts 6 → 3 (B7, catalogueAppPage).
  *   v1.6.5 — 2026-11-14 — Unit 2b part 2, phase B: apps-fork.ts 2 → 0, its entry deleted (B9, forkSourceFor).
  *   v1.6.4 — 2026-11-14 — Unit 2b part 2, phase B: capabilities.ts 3 → 1 (B10, capabilityFor).
  *   v1.6.3 — 2026-11-14 — Unit 2b part 2, phase B: consent.ts 1 → 0, its entry deleted (B13, consentRecordFor).
@@ -138,7 +139,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/agent-messages.ts': 1,
     'src/mcp/agent-schedules.ts': 1,
     'src/mcp/agent-tasks.ts': 2,
-    'src/mcp/apps.ts': 6,
+    'src/mcp/apps.ts': 3,
     'src/mcp/boards.ts': 1,
     'src/mcp/capabilities.ts': 1,
     'src/mcp/chat-instances.ts': 2,
