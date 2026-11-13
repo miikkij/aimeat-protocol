@@ -4,6 +4,28 @@
     {
       "date": "2026-11-13",
       "kind": "feature",
+      "id": "2026-11-13-your-ai-sets-what-the-web-form-sets",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your AI sets what the web form sets",
+        "fi": "Tekoälysi täyttää samat kentät kuin verkkolomake"
+      },
+      "summary": {
+        "en": "Twenty-four agent tools now take the fields their web routes took. A call that worked before works the same.",
+        "fi": "Tekoälysi voi antaa 24 työkalulle samat tiedot kuin verkkosivulla. Vanhat kutsut toimivat kuten ennenkin."
+      },
+      "body": {
+        "en": "Twenty-four agent tools now take the fields their web routes already took: a task's rules, plan and checks; a templated or invoice email; a capability's examples, schemas and deprecation; a paused or guarded schedule; an organism's place and size; an app's pacing amount and licence; and a set of list filters. A call that worked before works the same.",
+        "fi": "Kaksikymmentäneljä agenttien työkalua ottaa nyt vastaan samat tiedot, jotka verkkosivulla on voinut antaa jo aiemmin: tehtävän säännöt, suunnitelman ja tarkistukset, pohjasta tehdyn tai laskuna lähtevän sähköpostin, kyvykkyyden esimerkit, skeemat ja tiedon sen vanhentumisesta, keskeytetyn tai rajoitetun ajastuksen, yhteisen paikan sijainnin ja koon, sovelluksen tahdistuksen ja lisenssin sekä joukon listojen suodattimia. Kutsu, joka toimi ennen, toimii samoin kuin ennenkin."
+      }
+    },
+    {
+      "date": "2026-11-13",
+      "kind": "feature",
       "id": "2026-11-13-your-ai-can-remove-an-agent-a-waiting-task-or-a-skill",
       "highlight": false,
       "audience": [
