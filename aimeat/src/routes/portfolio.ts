@@ -88,7 +88,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
@@ -97,7 +97,6 @@ import { listPublishedMembers } from '../services/portfolio-members.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
 import { fileTarget } from '../services/classification/labels.js';
-import { provenanceForWrite, storeHeldProvenance } from '../services/ai/provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { isNodeAccount } from '../services/audience.js';
@@ -117,6 +116,7 @@ import { callerOf } from '../middleware/caller.js';
 import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
 import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
 import { notePortfolioWriter, portfolioReadHold } from '../services/portfolio-read-hold.js';
+import { writePortfolioHtml } from '../services/portfolio/page-write.js';
 
 export { resolvePublishedPortfolio, type PortfolioResolution } from '../services/portfolio/published.js';
 // The standalone address lives in services/portfolio/standalone-url.ts, so a service builds it
@@ -129,54 +129,13 @@ export {
   PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii, portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff,
 } from '../services/portfolio-config.js';
 
-/**
- * Store one owner's welcome page, replacing whatever was there.
- *
- * Three copies of this existed — this route, the MCP publish tool, and the welcome-mat accept path —
- * and each wrote the same file under the same key with the same visibility. Which identity the page
- * lands under is already resolved in one place (portfolioWriteGaii above); the WRITE had no reason
- * to be resolved in three, and a fourth surface would have made a fourth.
- *
- * Returns the target identity, because every caller reports it back one way or another.
- *
- * `writer` is who wrote the page, for its AI-provenance record (B10): an agent that writes a page
- * and says nothing about it is stamped model-written (Mint-3), a person writing in person is not.
- * The page is public, so the record resolves for every visitor, and the portfolio origin serves its
- * marks with the page.
- */
-export async function writePortfolioHtml(
-  storage: Storage,
-  target: string,
-  data: Buffer,
-  writer?: { config: AimeatConfig; principal: string; pipeline: string },
-): Promise<string> {
-  const held: AiProvenanceRecordRow[] = [];
-  const aiProvenanceId = writer ? await provenanceForWrite(storage, {
-    principal: writer.principal, content: data, pipeline: writer.pipeline,
-    surface: { visibility: 'public', humanAudience: true },
-    labelPolicy: writer.config.aiLabelPublic, nodeId: writer.config.nodeId, baseUrl: writer.config.baseUrl,
-    enabled: writer.config.aiProvenance, held,
-  }) : undefined;
-  await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
-  // The FILE is the owner's: the portfolio origin serves the page from storage while the switch is
-  // on, and a public file stayed readable at /v1/pub after its owner took the page off the web.
-  await storage.createStorageFile({
-    key: PORTFOLIO_HTML_KEY,
-    ownerGaii: target,
-    visibility: 'owner',
-    mimeType: 'text/html',
-    size: data.length,
-    data,
-    createdAt: new Date().toISOString(),
-    ...(aiProvenanceId ? { aiProvenanceId } : {}),
-  });
-  await storeHeldProvenance(storage, held);
-  return target;
-}
-
 // resolvePublishedPortfolio (username → published page and owner identities) lives in
 // services/portfolio/published.ts since 2026-11-12, so a service reads it without importing this
 // route file; it is re-exported above for every importer of this file.
+
+// writePortfolioHtml lives in services/portfolio/page-write.ts since 2026-11-13, so the MCP publish
+// tool calls it without importing this route file; re-exported here for every importer of this file.
+export { writePortfolioHtml };
 
 export function portfolioRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

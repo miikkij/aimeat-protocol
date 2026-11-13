@@ -51,9 +51,9 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import {
-    portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml, switchPortfolioOnUnlessTurnedOff,
-} from '../routes/portfolio.js';
+import { portfolioWriteGaii, switchPortfolioOnUnlessTurnedOff } from '../services/portfolio-config.js';
+import { writePortfolioHtml } from '../services/portfolio/page-write.js';
+import { portfolioStandaloneUrl } from '../services/portfolio/standalone-url.js';
 import { emitChange } from '../services/event-bus.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
