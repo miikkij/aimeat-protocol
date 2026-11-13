@@ -57,7 +57,7 @@
       "digest": "sha256:d77b5d4aca30666ae88924ed"
     },
     "node:aimeat-context": {
-      "reviewedOn": "2026-11-09",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/services/context/index-line.ts",
         "aimeat/src/services/mcp-build-inputs.ts",
@@ -65,7 +65,7 @@
         "aimeat/src/services/context/check.ts",
         "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:d85ee35b7d7fc5418576a80b"
+      "digest": "sha256:eb66ed922a0db8baf0cdd0e2"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -876,7 +876,7 @@
       "aimeat/src/services/context/index-line.ts": "635f3d9f01f7cc1d",
       "aimeat/src/services/mcp-build-inputs.ts": "30340abebd1814dc",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
-      "aimeat/src/services/context/check.ts": "8eae091c8256a410",
+      "aimeat/src/services/context/check.ts": "472918ab30ee8263",
       "aimeat/src/services/memory-versions/history.ts": "1e7cb0431167c4d5"
     },
     "node:aimeat-app-agents": {

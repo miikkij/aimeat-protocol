@@ -16,7 +16,8 @@
  *     index `vocab.ctx.<name>.index` and the parts it lists, or `ontologyModules`, a list of keys):
  *     every source quote (`prov:wasDerivedFrom[].prov:value` from `dcterms:source` `memory:<key>`) is
  *     still found in that record, compared case-insensitive with whitespace collapsed and Markdown
- *     bold and code marks dropped; every
+ *     bold and code marks dropped, in its text or, for a record of fields, in its flat reading
+ *     (field names before values); every
  *     `vocab:ctx.<module>/…` id the concepts name resolves, in the module, the core
  *     (`vocab.ctx.core`), the registry (`vocab.ctx.registry`) or another module the caller may read;
  *     a `dcterms:isReplacedBy` chain ends and does not loop; a superseded statement names its
@@ -30,10 +31,14 @@
  *   or not open to you", one finding for both.
  *
  *   BOUNDED. At most CHECK_MAX_READS records are read and CHECK_MAX_FINDINGS findings returned.
- * @structure CHECK_MAX_READS · CHECK_MAX_FINDINGS · ContextFinding · checkContext()
+ * @structure CHECK_MAX_READS · CHECK_MAX_FINDINGS · ContextFinding · quoteStands() · isDefinition() · checkContext()
  * @usage
  *   const out = await checkContext({ storage, config }, caller, reader, 'lisbon-trip');
  * @version-history
+ *   v1.1.0 — 2026-11-13 — A quote also stands in a record's flat reading (each field's name before its
+ *     value, numbers included), so a quote taken from a JSON record is found (quoteStands); a concept
+ *     under `…/class/` is a definition and gets no no-source warning. Both were false findings on
+ *     real modules imported to an account.
  *   v1.0.0 — 2026-11-09 — Initial (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -76,6 +81,34 @@ function textOf(v: unknown, out: string[] = []): string[] {
 /** A quote is of the words, not the formatting: Markdown bold and code marks, case and runs of
  *  whitespace do not count. Measured on a real module: 16 of 636 quotes failed on `**` alone. */
 const norm = (s: string): string => s.normalize('NFC').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** A value read flat, each field's name before its value, numbers and booleans included:
+ *  {"seeds":10,"measured":"2026-09-08"} reads "seeds 10 measured 2026-09-08". */
+function flatOf(v: unknown, out: string[] = []): string[] {
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') out.push(String(v));
+    else if (Array.isArray(v)) for (const x of v) flatOf(x, out);
+    else if (isObj(v)) for (const [k, x] of Object.entries(v)) { out.push(k); flatOf(x, out); }
+    return out;
+}
+/** The flat reading's comparison: also blind to the commas, colons and semicolons that separate
+ *  fields when a quote is written out of a record. */
+const loose = (s: string): string => norm(s).replace(/[,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * Whether a source quote still stands in a record's value: in its text (the string leaves), or, for
+ * a record of fields, in its flat reading. A quote taken from a JSON record names a field and its
+ * value ("runId parvi-a-42", "seeds 10"), which the string leaves alone never hold: measured on a
+ * real module on 2026-11-13, three quotes from unchanged records were reported as gone.
+ */
+export function quoteStands(value: unknown, quote: string): boolean {
+    if (norm(textOf(value).join('\n')).includes(norm(quote))) return true;
+    return typeof value === 'object' && value !== null && loose(flatOf(value).join(' ')).includes(loose(quote));
+}
+
+/** A class of the module (`…/class/<Name>`, or typed as a class or a scheme) is a definition, and a
+ *  definition names no source; only the statements under it do. */
+export const isDefinition = (id: string, type: unknown): boolean =>
+    /\/class\//.test(id) || (typeof type === 'string' && /Class|ConceptScheme/.test(type));
 
 /** Every `vocab:ctx.…` id named anywhere inside a value, except under `@id` of the value itself. */
 function idsIn(v: unknown, out: Set<string>, top = true): Set<string> {
@@ -240,8 +273,7 @@ export async function checkContext(
             // Sources: each quote still stands in the record it names.
             const derived = Array.isArray(c['prov:wasDerivedFrom']) ? c['prov:wasDerivedFrom'].filter(isObj)
                 : isObj(c['prov:wasDerivedFrom']) ? [c['prov:wasDerivedFrom'] as Json] : [];
-            const isClass = typeof c['@type'] === 'string' && /Class|ConceptScheme/.test(c['@type'] as string);
-            if (!derived.length && !isClass) add({ severity: 'warning', kind: 'no-source', where: id, message: 'the statement names no source' });
+            if (!derived.length && !isDefinition(id, c['@type'])) add({ severity: 'warning', kind: 'no-source', where: id, message: 'the statement names no source' });
             for (const d of derived) {
                 const src = typeof d['dcterms:source'] === 'string' ? d['dcterms:source'] : '';
                 const quote = typeof d['prov:value'] === 'string' ? d['prov:value'] : '';
@@ -249,7 +281,7 @@ export async function checkContext(
                 onto.quotesChecked++;
                 const rec = await open(src.slice(7));
                 if (!rec) { onto.sourcesMissing++; add({ severity: 'error', kind: 'source-missing', where: id, source: src, message: `the source is ${NOT_OPEN}` }); continue; }
-                if (!norm(textOf(rec.value).join('\n')).includes(norm(quote))) {
+                if (!quoteStands(rec.value, quote)) {
                     onto.quotesNotFound++;
                     add({ severity: 'error', kind: 'quote-not-found', where: id, source: src, message: `the quote is no longer in its source: "${quote.slice(0, 120)}"` });
                 }
