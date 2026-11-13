@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Missed-event recovery and the measured limit of floating tally persistence.
  * @version-history
+ *   1.0.3 2026-11-13 The restart test gets 60 s instead of the default 5 s: it creates a database
+ *     file, and on a CI runner with a slow disk it took 7.8 s once and failed with no assertion run.
  *   1.0.2 2026-10-14 The tracked-response setup stores the message the contract replies to in the
  *     owner's mailbox: a contract acts only on a message of the account that stores it (QA audit K2).
  *   1.0.1 2026-10-13 The crash fixture gets 60 s to boot instead of 10 s: under the full unit run the
@@ -108,7 +110,11 @@ describe('durability boundaries', () => {
       await reconcileTrackedResponses(ctx);
       expect(sendDirectMessage).toHaveBeenCalledTimes(1);
     } finally { storage.close(); removeDatabase(path); }
-  });
+    // The one test of this file that creates a database FILE and opens it twice, so its length is
+    // the disk's: 336 ms in a green CI run, 7776 ms in the red one of 2026-11-13, where the tests
+    // before and after it (in-memory databases) took 215 ms and 144 ms. Nothing in it waits on a
+    // clock, so the limit only bounds a hang and a passing run takes as long as the disk needs.
+  }, 60_000);
 
   it('persists receiver refusal and retries through the same delivery boundary', async () => {
     const storage = new SqliteStorage(':memory:');
