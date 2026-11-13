@@ -1,20 +1,6 @@
 [
   {
     "type": "dependency",
-    "from": "src/mcp/apps.ts",
-    "to": "src/routes/apps/helpers.ts",
-    "unresolvedTo": "../routes/apps/helpers.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/mcp/cortex.ts",
     "to": "src/routes/cortex.ts",
     "unresolvedTo": "../routes/cortex.js",

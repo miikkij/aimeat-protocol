@@ -147,7 +147,7 @@ import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app-dev-gr
 import { roadmapGate } from '../services/app-roadmap.js';
 import { draftNoticeFrom, appViewerStanding, readAppNews } from '../services/app-news.js';
 import { publicAppManifest } from '../services/app-public-manifest.js';
-import { resolveAppUrls } from '../routes/apps/helpers.js';
+import { resolveAppUrls } from '../services/app-urls.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
