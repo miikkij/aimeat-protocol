@@ -38,6 +38,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   2026-11-13 — reclaimTaskLiveTrace comes from services/agent-tasks/live-trace.ts, not from a route
+ *     file (structure programme 2026-11, unit 4).
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   v1.10.0 — 2026-11-02 — A completed task whose schedule said deliver: "owner" has its result handed to
@@ -81,7 +83,7 @@ import { notifyAutomationTaskComplete } from './ecosystem-automation-notify.js';
 import { deliverTaskResult } from './task-result-delivery.js';
 import { processAutomationAdvisories } from './ecosystem-automation-advisories.js';
 import { closeItemsForTask } from './open-items.js';
-import { reclaimTaskLiveTrace } from '../routes/agent-tasks/helpers.js';
+import { reclaimTaskLiveTrace } from './agent-tasks/live-trace.js';
 import { recordPublicActivity } from './public-activity.js';
 import { emitChange } from './event-bus.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai/provenance.js';

@@ -236,12 +236,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence checks on commands, config and tag records; no values are returned."
     },
-    "src/routes/agent-tasks/helpers.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them."
-    },
     "src/routes/agent-tasks/lifecycle.ts": {
       "reads": {
         "listMemory": 1
@@ -765,6 +759,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads the deliverable only to check whether it is public before logging activity."
+    },
+    "src/services/agent-tasks/live-trace.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Moved unchanged from src/routes/agent-tasks/helpers.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them."
     },
     "src/services/agent-ties.ts": {
       "reads": {
