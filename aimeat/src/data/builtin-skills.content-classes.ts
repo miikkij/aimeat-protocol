@@ -18,6 +18,8 @@
  * @structure CONTENT_CLASSES_SKILL_ENTRY
  * @usage import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
  * @version-history
+ *   v1.3.3 — 2026-11-13 — A memory key reaches the person's own record (their context) when the AI
+ *     holds none under it; a private one needs memory:read-as-owner.
  *   v1.3.2 — 2026-11-06 — The fingerprint is made on request only, one item after the person's yes;
  *     the skill no longer offers stages.profile as "the setting for everything that arrives", which is
  *     how one owner's every agent-written text came to be fingerprinted on their key.
@@ -156,7 +158,9 @@ them"). \`with_profile: true\` adds each section's heading and one-sentence clai
 the weak one?".
 
 No profile yet: make it on request, one item at a time, after the person said yes for that item:
-\`aimeat_content_inspect { kind, key, stages: ["profile"] }\`. A fingerprint is never made on arrival,
+\`aimeat_content_inspect { kind, key, stages: ["profile"] }\`. A memory key names the person's own
+record (a context, a note) when you hold none under it, so the person's context needs only its key;
+a private record of theirs needs memory:read-as-owner. A fingerprint is never made on arrival,
 and an inspect or a scan that names no stages makes none, whatever the settings say; a scan with
 \`stages: ["profile"]\` fingerprints every item it reaches, so narrow it with \`keys\` or
 \`memory_prefix\` and tell the person how many items that is before you start it. \`stages.profile\` in

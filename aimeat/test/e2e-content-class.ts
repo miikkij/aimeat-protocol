@@ -37,6 +37,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-content-class.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-content-class.ts
  * @version-history
+ *   2026-11-13 — Test 12c: the person's AI makes the fingerprint of the person's context by its key
+ *     alone, the person's own read sees it, a private record needs memory:read-as-owner, and another
+ *     person's agent reaches nothing. Before the fix every AI connected over MCP got NOT_FOUND.
  *   2026-11-06 — Test 12b: the fingerprint is made only on request; with the profile step on, an
  *     arriving text and an inspect on the settings make none. Test 12: the sections file is never read
  *     on arrival (each reading had stored the next file, without end).
@@ -616,6 +619,35 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(!viaMcp?.result?.isError && body.fingerprint?.lines?.length === 5 && body.profile_sections?.length === 3, `facts over MCP ${toolText(viaMcp).slice(0, 300)}`);
     const listing = await mcpCall(agent, 'aimeat_content_facts', { with_profile: true });
     assert(listing?.result?.isError === true && toolText(listing).includes('with_profile'), `with_profile on a listing ${toolText(listing).slice(0, 200)}`);
+  });
+
+  await test('12c. the person\'s AI makes the fingerprint of the person\'s context by its key, and the person reads it; a private record needs memory:read-as-owner', async () => {
+    const F = await setupOwner('f');
+    const doc = fingerprintDoc();
+    const ctxKey = `context.heat-${Date.now()}`;
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(F.token), body: JSON.stringify({ key: ctxKey, value: doc, visibility: 'owner' }) });
+    assert(w.status === 201, `context ${w.status}`);
+    // The sentence the Contexts page hands the person names only the key: the AI finds the person's record.
+    const agent = await connectAgent(F, `ccctx${Date.now()}`, ['*']);
+    const insp = await mcpCall(agent, 'aimeat_content_inspect', { kind: 'memory', key: ctxKey, stages: ['profile'] });
+    assert(!insp?.result?.isError && toolText(insp).includes('profile-text-1'), `the AI's inspect of the person's context ${toolText(insp).slice(0, 300)}`);
+    // The person's own read, as the Contexts page makes it, sees that fingerprint.
+    const page = await json(`${factsPath(ctxKey, 'memory')}&with_profile=true`, { headers: auth(F.token) });
+    assert(page.status === 200 && page.body.data.fingerprint && page.body.data.profile_sections?.length === 3, `the person's read ${page.status} ${JSON.stringify(page.body?.error ?? page.body?.data?.fingerprint)}`);
+    // A private record of the person: refused as absent without memory:read-as-owner, made with it.
+    const privKey = `notes.private-heat-${Date.now()}`;
+    await json('/v1/memory', { method: 'POST', headers: auth(F.token), body: JSON.stringify({ key: privKey, value: doc, visibility: 'private' }) });
+    const plain = await connectAgent(F, `ccpriv${Date.now()}`, ['storage:read', 'memory:read', 'ai:use']);
+    const refused = await json('/v1/content/inspect', { method: 'POST', headers: auth(plain), body: JSON.stringify({ source: { kind: 'memory', key: privKey, owner: F.gaii }, stages: ['profile'] }) });
+    assert(refused.status === 404, `a private record without memory:read-as-owner ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+    const reads = await connectAgent(F, `ccasown${Date.now()}`, ['storage:read', 'memory:read', 'memory:read-as-owner', 'ai:use']);
+    const made = await json('/v1/content/inspect', { method: 'POST', headers: auth(reads), body: JSON.stringify({ source: { kind: 'memory', key: privKey }, stages: ['profile'] }) });
+    assert(made.status === 200 && made.body.data.ran.includes('profile'), `a private record with memory:read-as-owner ${made.status} ${JSON.stringify(made.body?.error ?? made.body?.data?.skipped)}`);
+    // Another person's agent reaches nothing of it, by key or by naming the account.
+    const strangerAgent = await connectAgent(B, `ccstr${Date.now()}`, ['*']);
+    const byKey = await json(factsPath(ctxKey, 'memory'), { headers: auth(strangerAgent) });
+    const byOwner = await json(factsPath(ctxKey, 'memory', F.gaii), { headers: auth(strangerAgent) });
+    assert(byKey.status === 404 && byOwner.status === 404, `another person's agent ${byKey.status} ${byOwner.status}`);
   });
 
   await test('12b. the fingerprint is made only on request: with the profile step on, an arriving text and an inspect on the settings make none', async () => {
