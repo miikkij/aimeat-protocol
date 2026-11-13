@@ -15,43 +15,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/mcp/core.ts",
-    "to": "src/mcp/index.ts",
-    "unresolvedTo": "./index.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/mcp/index.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/mcp/register-all.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/mcp/core.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/static/sdk-libs/auth/modal.js",
     "to": "src/static/sdk-libs/auth/session.js",
     "unresolvedTo": "./session.js",
