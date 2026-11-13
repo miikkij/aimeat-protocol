@@ -29,6 +29,18 @@
       "count": 1,
       "reason": "The timer that writes this process's own buffered audit rows within 1 s; no other process reads it."
     },
+    "src/services/classification/audit.ts :: let :: writer": {
+      "count": 1,
+      "reason": "Orders this process's own audit flushes, storage deletes and merged reads against each other; the queue it orders is per process, and a second process orders its own."
+    },
+    "src/services/classification/audit.ts :: let :: readers": {
+      "count": 1,
+      "reason": "The merged reads of the audit log this process has in progress, which its own next write waits for; a second process counts its own."
+    },
+    "src/services/classification/audit.ts :: let :: readersEnded": {
+      "count": 1,
+      "reason": "Wakes this process's own audit write that waits for its merged reads to end; nothing is shared."
+    },
     "src/services/consent-audit-buffer.ts :: let :: soonTimer": {
       "count": 1,
       "reason": "The timer that writes this process's own buffered audit rows within 1 s; no other process reads it."
@@ -550,10 +562,6 @@
       "reason": "DEBT"
     },
     "src/services/classification/audit.ts :: let :: evidence": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/classification/audit.ts :: let :: flushing": {
       "count": 1,
       "reason": "DEBT"
     },

@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-13 — DELETE calls deleteOrganismRecords (services/organism-lifecycle.ts), which holds the
+ *     delete sequence that stood here.
  *   2026-11-11 — DELETE detaches the organism's own remote MCP servers (with their personal sign-ins)
  *     and unlinks every SSO connection that joined people to it; both outlived the organism.
  *   2026-11-12 — PUT takes access_requests ('on' | 'off'): whether a person an app or page of the
@@ -85,16 +87,13 @@ import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { showOrganismReadme } from '../../services/organism-readme.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism, releaseOrganismLinks } from '../../services/organism-lifecycle.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism, deleteOrganismRecords } from '../../services/organism-lifecycle.js';
 import { publicShapes } from '../../data/organism-shapes.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
 import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { agentBarred } from '../../services/organism-agent-access.js';
-import { purgeClassificationAudit } from '../../services/classification/audit.js';
-import { purgeExceptions } from '../../services/classification/exceptions.js';
-import { removeComplianceDocs } from '../../services/compliance/docs.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -409,16 +408,8 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    // Its own MCP servers (with their sign-ins) and its SSO links go first: nothing could reach them
-    // once the organism is gone (services/organism-lifecycle.ts).
-    await releaseOrganismLinks(storage, id);
-    await storage.deleteOrganism(id);
-    // Unflushed classification audit rows of the organism would come back after the delete.
-    purgeClassificationAudit({ scope: `organism:${id}` });
-    // Its classification exceptions are records of system@<node>, which the cascade does not reach.
-    await purgeExceptions(storage, config.nodeId, { organism: id });
-    // Its compliance documents (plan doc-mvlftkh9zmc9) are records of system@<node> too.
-    await removeComplianceDocs(storage, config.nodeId, { kind: 'organism', organismId: id });
+    // The organism and every record that belongs to it (services/organism-lifecycle.ts).
+    await deleteOrganismRecords(storage, config.nodeId, id);
     res.json(success(config.nodeId, { deleted: true }));
     emitChange('organisms');
   });

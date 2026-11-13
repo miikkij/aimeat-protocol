@@ -37,17 +37,27 @@
  *   caller aggregates a long list of `shown` items into one row per label (reader.ts, key `*:<label>`
  *   and a `count`), so one AI list call cannot fill the buffer. `ownerGaii` is always the person:
  *   an agent's or an app's identity is collapsed to its owner, so the owner's log and the owner's
- *   erasure find the rows. purgeClassificationAudit drops the waiting rows of an erased person or a
- *   deleted organism, so the next flush does not write them back after the storage cascade.
- * @structure ClassificationAuditEvent · recordClassificationAudit · flushClassificationAudit ·
+ *   erasure find the rows.
+ *
+ *   A WRITE IN PROGRESS IS ORDERED AGAINST DELETES AND READS. While a batch is being written it has
+ *   left the queue and is not yet in storage. A storage delete that takes audit rows with it (an
+ *   organism going, a person erased) runs through removeWithClassificationAudit: after the write in
+ *   progress, with no flush beside it, and with the waiting rows of the deleted subject dropped
+ *   before and after. The merged read waits for the write in progress too. All of it orders one
+ *   process: the queue of another process of the same node is not reached, as before.
+ * @structure ClassificationAuditEvent · asReader · asWriter · recordClassificationAudit ·
+ *   purgeClassificationAudit · removeWithClassificationAudit · flushClassificationAudit ·
  *   initClassificationAudit · shutdownClassificationAudit · pendingClassificationAudit ·
- *   listClassificationAuditMerged · pruneClassificationAuditOlderThan · purgeClassificationAudit ·
- *   minuteOf · resetClassificationAudit
+ *   listClassificationAuditMerged · pruneClassificationAuditOlderThan · minuteOf ·
+ *   resetClassificationAudit
  * @usage
  *   import { recordClassificationAudit } from '../classification/audit.js';
  *   recordClassificationAudit({ scope, ownerGaii, kind: 'memory', key, label: 'luottamuksellinen',
  *     reader: 'claude#alice@node', readerKind: 'ai', action: 'used', purpose: 'chat:anthropic/claude' });
  * @version-history
+ *   v1.5.0 -- 2026-11-13 -- A flush, a storage delete of audit rows and the merged read are ordered:
+ *     removeWithClassificationAudit, and flushClassificationAudit answers when the rows are stored. A
+ *     delete during a write had been followed by the write, and a read during it missed the batch.
  *   v1.4.0 -- 2026-11-10 -- A waiting row matches a filter's ownerGaiis too (many holders in one read).
  *   v1.3.0 -- 2026-11-04 -- A recorded row is written within a second (flushSoon), not up to 60 s later
  *     (codebase analysis 2026-11-03, HA stage 1 item 1.6).
@@ -59,6 +69,7 @@
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
  */
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type {
   Storage, ClassificationAuditRow, ClassificationAuditFilter, ContentLabelKind,
   ClassificationAuditReaderKind, ClassificationAuditAction,
@@ -98,7 +109,57 @@ let storageRef: Storage | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 // process-local: the timer that writes this process's own buffered rows within 1 s; nothing is shared.
 let soonTimer: ReturnType<typeof setTimeout> | null = null;
-let flushing = false;
+
+// ── One writer at a time, and never beside a reader ──
+// A batch that is being written is in neither place: it has left the queue, and storage has not
+// answered. On SQLite a write is synchronous and that state has no length; on PostgreSQL it is a
+// round trip. So a WRITER (a flush, or a storage delete that takes audit rows with it) runs alone,
+// and a READER (the merged read of the log) never runs beside one. A writer that waits goes ahead of
+// every reader and writer that arrives after it, so neither side holds the other off without end.
+// It orders this process's own flushes, deletes and reads. The queue is per process too, so a
+// second process's waiting rows are outside it, as they are outside purgeClassificationAudit.
+/** The writer this call chain runs in. `running` goes false when it ends, so a timer or a promise
+ *  it started and did not await is an ordinary caller afterwards. */
+const insideWriter = new AsyncLocalStorage<{ running: boolean }>();
+const isInsideWriter = (): boolean => insideWriter.getStore()?.running === true;
+/** Settles when the writer that runs or waits is done. Null when there is none. Never rejects. */
+// process-local: orders this process's own audit writes; a second process orders its own queue.
+let writer: Promise<void> | null = null;
+// process-local: the merged reads this process has in progress; a second process counts its own.
+let readers = 0;
+/** Wakes the writer that waits for the readers in progress to end. */
+// process-local: wakes this process's own waiting writer; nothing is shared.
+let readersEnded: (() => void) | null = null;
+
+/** Run `fn` with no write in progress. Inside a writer it runs at once: the writer is the only one. */
+async function asReader<T>(fn: () => Promise<T>): Promise<T> {
+  if (isInsideWriter()) return fn();
+  while (writer) await writer;
+  readers++;
+  try {
+    return await fn();
+  } finally {
+    readers--;
+    if (readers === 0 && readersEnded) { const wake = readersEnded; readersEnded = null; wake(); }
+  }
+}
+
+/** Run `fn` alone: after the writer before it, and after the readers in progress. Re-entrant. */
+async function asWriter<T>(fn: () => Promise<T>): Promise<T> {
+  if (isInsideWriter()) return fn();
+  while (writer) await writer;
+  let done!: () => void;
+  writer = new Promise<void>(resolve => { done = resolve; });
+  const me = { running: true };
+  try {
+    if (readers > 0) await new Promise<void>(resolve => { readersEnded = resolve; });
+    return await insideWriter.run(me, fn);
+  } finally {
+    me.running = false;
+    writer = null;
+    done();
+  }
+}
 /** Waiting rows, by address, in insertion order (a Map keeps it), so the oldest go first.
  *  `routine` holds shown and used, `evidence` holds refused and changed. */
 let routine = new Map<string, ClassificationAuditRow>();
@@ -211,8 +272,9 @@ export function recordClassificationAudit(e: ClassificationAuditEvent): void {
 
 /**
  * Drop the waiting rows of an erased person (`owner`, their GHII) or of a deleted scope (`scope`,
- * such as `organism:<id>`), so the next flush does not write back what the storage cascade removed.
- * Call it next to the storage delete. Answers how many waiting rows were dropped.
+ * such as `organism:<id>`). Answers how many waiting rows were dropped. It reaches the queue only: a
+ * storage delete goes through removeWithClassificationAudit, which also orders it against a write
+ * in progress.
  */
 export function purgeClassificationAudit(what: { owner?: string; scope?: string }): number {
   const owner = what.owner ? ownerGhiiOf(what.owner) : null;
@@ -230,13 +292,32 @@ export function purgeClassificationAudit(what: { owner?: string; scope?: string 
 }
 
 /**
- * Write the waiting rows to storage. The queue is swapped out first, so events arriving during the
- * flush wait for the next one. A chunk that fails goes back into the queue, merged by address.
+ * Run a storage delete that takes audit rows with it (an organism going, a person erased), so that
+ * no row of theirs is written after it. `remove` runs as the only writer: a write in progress has
+ * answered before it starts, so the delete reaches those rows, and no flush starts until it has
+ * answered. The waiting rows of `what` are dropped before it and again after it, which takes the
+ * rows a request recorded while the delete ran. Inside `remove`, flushClassificationAudit writes at
+ * once.
  */
-export async function flushClassificationAudit(): Promise<void> {
-  if (!storageRef || flushing || routine.size + evidence.size === 0) return;
-  flushing = true;
+export async function removeWithClassificationAudit<T>(what: { owner?: string; scope?: string }, remove: () => Promise<T>): Promise<T> {
+  return asWriter(async () => {
+    purgeClassificationAudit(what);
+    try {
+      return await remove();
+    } finally {
+      purgeClassificationAudit(what);
+    }
+  });
+}
+
+/**
+ * Write the waiting rows to storage. The queue is swapped out first, so events arriving during the
+ * write wait for the next one. A chunk that fails goes back into the queue, merged by address.
+ * Never throws.
+ */
+async function writeWaitingRows(): Promise<void> {
   const storage = storageRef;
+  if (!storage || routine.size + evidence.size === 0) return;
   // Evidence first, so a failing store loses routine rows before it loses a refusal or a change.
   const batch = waitingRows();
   routine = new Map();
@@ -262,10 +343,21 @@ export async function flushClassificationAudit(): Promise<void> {
       for (const r of failed) enqueue(r);
       for (const r of arrived) enqueue(r);
     }
-    flushing = false;
-    // What arrived during this flush goes soon too; a failed write waits for the interval.
+    // What arrived during this write goes soon too; a failed write waits for the interval.
     if (failed.length === 0 && routine.size + evidence.size > 0) flushSoon();
   }
+}
+
+/**
+ * Write the waiting rows to storage, and answer when every row recorded before the call is stored
+ * (or back in the queue, when its write failed). A flush asked for while another writer runs waits
+ * for it and then writes what arrived meanwhile.
+ */
+export async function flushClassificationAudit(): Promise<void> {
+  if (!storageRef) return;
+  if (!writer && routine.size + evidence.size === 0) return;
+  // A flush asked for from inside a writer writes now; from anywhere else it takes its turn.
+  await asWriter(writeWaitingRows);
 }
 
 /** Wire storage and start the flush interval. Idempotent; a second call only swaps the storage. */
@@ -301,22 +393,26 @@ export function pendingClassificationAudit(filter: { ownerGaii?: string; scope?:
 /**
  * The stored rows and the waiting rows together, newest first by lastAt, at most `limit` (default
  * 200, cap 1000). A waiting row with the same address as a stored one is shown as one row with the
- * two counts added, which is what the table will hold after the next flush.
+ * two counts added, which is what the table will hold after the next flush. It runs as a reader:
+ * after a write in progress has answered and with no write beside it, so every row is in exactly
+ * one of the two places it reads.
  */
 export async function listClassificationAuditMerged(storage: Storage, filter: ClassificationAuditFilter): Promise<ClassificationAuditRow[]> {
   const limit = Math.min(Math.max(filter.limit ?? 200, 1), 1000);
-  const stored = await storage.listClassificationAudit({ ...filter, limit });
-  const byAddress = new Map<string, ClassificationAuditRow>();
-  for (const r of stored) byAddress.set(addressOf(r), { ...r });
-  for (const r of waitingRows()) {
-    if (!matches(r, filter)) continue;
-    const address = addressOf(r);
-    const had = byAddress.get(address);
-    if (had) mergeInto(had, r); else byAddress.set(address, { ...r });
-  }
-  return [...byAddress.values()]
-    .sort((a, b) => (a.lastAt < b.lastAt ? 1 : a.lastAt > b.lastAt ? -1 : 0))
-    .slice(0, limit);
+  return asReader(async () => {
+    const stored = await storage.listClassificationAudit({ ...filter, limit });
+    const byAddress = new Map<string, ClassificationAuditRow>();
+    for (const r of stored) byAddress.set(addressOf(r), { ...r });
+    for (const r of waitingRows()) {
+      if (!matches(r, filter)) continue;
+      const address = addressOf(r);
+      const had = byAddress.get(address);
+      if (had) mergeInto(had, r); else byAddress.set(address, { ...r });
+    }
+    return [...byAddress.values()]
+      .sort((a, b) => (a.lastAt < b.lastAt ? 1 : a.lastAt > b.lastAt ? -1 : 0))
+      .slice(0, limit);
+  });
 }
 
 /**

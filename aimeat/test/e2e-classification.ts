@@ -21,6 +21,9 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   2026-11-13 — The connector daemon's start limit follows AIMEAT_E2E_SERVER_READY_MS, as the node's
+ *     does: on a loaded machine the daemon missed its fixed 40 s and eight tests failed on that
+ *     alone. The ORGANISM DELETE comment names when the audit row is written. No assertion changes.
  *   2026-11-04 — The operator's access token is the person (Jouni, 2026-11-04; codebase analysis
  *     2026-11-03, PAT ruling): the switch's REST denial is proven with the operator's agent holding
  *     operator:admin, which passes the operator gate as the token did, and a new case proves the token
@@ -179,7 +182,11 @@ function writeConnectorHome(home: string, agents: Array<{ agent: string; owner: 
   }
 }
 
-async function waitForDiscovery(home: string, timeoutMs = 40_000): Promise<any> {
+/** The daemon is a cold process, as the node is: its limit follows the node's start limit when the
+ *  run raises that for a loaded machine (AIMEAT_E2E_SERVER_READY_MS, test/run-e2e-server.ts). */
+const DAEMON_READY_MS = Math.max(40_000, Number(process.env.AIMEAT_E2E_SERVER_READY_MS ?? 0) || 0);
+
+async function waitForDiscovery(home: string, timeoutMs = DAEMON_READY_MS): Promise<any> {
   const file = join(home, 'serve.json');
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -921,8 +928,9 @@ await test('ORGANISM DELETE: deleting an organism takes its exceptions and its a
   const made = await json('/v1/classification/exceptions', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key, action: 'leave', reason: 'The board approved it.' }) });
   assert(made.status === 201, `make: ${made.status} ${JSON.stringify(made.body?.error)}`);
   const inScope = (rows: any[]) => rows.filter(r => r.scope === `organism:${gone}` || r.organismId === gone);
-  // Before: the operator's node views hold the exception and its "made" row (flushed every 60 s,
-  // so it still waits in memory here).
+  // Before: the operator's node views hold the exception and its "made" row. The row is written
+  // within a second of the exception, so at the delete below it waits in memory, is being written
+  // or is stored, and the delete takes it in each of the three.
   const before = await json('/v1/classification/exceptions?level=node', { headers: auth(op.token) });
   assert(inScope(before.body?.data?.exceptions ?? []).length === 1, `exception before: ${JSON.stringify(before.body?.data?.exceptions?.length)}`);
   const auditBefore = await json('/v1/classification/audit?level=node&action=exception&limit=1000', { headers: auth(op.token) });

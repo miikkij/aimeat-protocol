@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:f901095e8a4e28777cadbfd5"
+      "digest": "sha256:ea60e2ab1f75a41e457195cf"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -437,7 +437,7 @@
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "d59a3ce453a07846",
+      "aimeat/security/process-local-baseline.json": "529c17ddb46af0b5",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",

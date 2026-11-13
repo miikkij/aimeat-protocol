@@ -27,10 +27,14 @@
  *     workspace roles (revokeDepartedMemberAccess)
  *   - releaseOrganismLinks() — before a delete: detach the organism's MCP servers, unlink its SSO
  *     connections
+ *   - deleteOrganismRecords() — the organism with every record that belongs to it
  * @usage
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-11-13 — deleteOrganismRecords: the delete sequence of DELETE /v1/organisms/:id, moved from
+ *     routes/organisms/crud.ts. Its storage delete is ordered against the classification audit's
+ *     writes, so an audit row that is being written during the delete does not outlive the organism.
  *   2026-11-12 — joinOrganism asks membershipRefusal and files through fileJoinRequest
  *     (services/organism-join-requests/requests.ts): one open request per person, and a wait after a declined
  *     one. updateOrganismRecord takes accessRequests ('on' | 'off').
@@ -96,6 +100,9 @@ import { classifyContainerAfterWrite } from './classify-on-write.js';
 import { organismTarget } from './classification/containers.js';
 import { audienceCapOf, audienceOfOrganism, capByOf, capRefusalOf } from './classification/audience-cap.js';
 import { detachMcpServer } from './mcp-client/registry-settings.js';
+import { removeWithClassificationAudit } from './classification/audit.js';
+import { purgeExceptions } from './classification/exceptions.js';
+import { removeComplianceDocs } from './compliance/docs.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -596,4 +603,22 @@ export async function releaseOrganismLinks(
   }
   const ssoConnections = await storage.unlinkSsoConnectionsOfOrganism(organismId);
   return { mcpServers, ssoConnections };
+}
+
+/**
+ * Delete an organism with every record that belongs to it, inside its own tables and outside them.
+ * The caller has already decided that this caller may delete it.
+ */
+export async function deleteOrganismRecords(storage: Storage, nodeId: string, organismId: string): Promise<void> {
+  // Its own MCP servers (with their sign-ins) and its SSO links go first: nothing could reach them
+  // once the organism is gone.
+  await releaseOrganismLinks(storage, organismId);
+  // The cascade deletes the organism's classification audit rows. A row of the organism that waits
+  // in memory, or is being written while the cascade runs, would come back after it, so the delete
+  // is ordered against the audit's writes (services/classification/audit.ts).
+  await removeWithClassificationAudit({ scope: `organism:${organismId}` }, () => storage.deleteOrganism(organismId));
+  // Its classification exceptions are records of system@<node>, which the cascade does not reach.
+  await purgeExceptions(storage, nodeId, { organism: organismId });
+  // Its compliance documents (plan doc-mvlftkh9zmc9) are records of system@<node> too.
+  await removeComplianceDocs(storage, nodeId, { kind: 'organism', organismId });
 }

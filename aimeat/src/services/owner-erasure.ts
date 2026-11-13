@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-13 — The cascade runs through removeWithClassificationAudit (services/classification/audit.ts):
+ *     a classification audit batch that was being written when the erasure began was stored after
+ *     the cascade, with the person's rows and name in it.
  *   2026-11-12 — Step join_requests: every join request the account made is deleted and its name
  *     comes off the requests it decided for others (storage.eraseJoinRequestsOfAccount). An open
  *     request under a released name made its next holder a member on approval.
@@ -97,7 +100,7 @@ import { logger } from '../utils/logger.js';
 import { ERASED_PARTY_PREFIX, erasedPartyPseudonym } from '../storage/erased-party.js';
 import { inSavepoint } from './tolerant-step.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
-import { purgeClassificationAudit, flushClassificationAudit } from './classification/audit.js';
+import { removeWithClassificationAudit, flushClassificationAudit } from './classification/audit.js';
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app-member-erasure.js';
 import { eraseAppDesignSpecsOf } from './app-design-spec.js';
@@ -197,15 +200,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
   const agents = await storage.getAgentsByOwner(name);
   const ghii = `${name}@${nodeId}`;
   const deletionLog: string[] = [];
-  // Classification audit rows still in memory would be written after the cascade and bring the
-  // erased owner back into the log (TARGET-082 review).
-  purgeClassificationAudit({ owner: ghii });
-  // What stays waiting is other people's content, some of it read by this person: written now, so the
-  // cascade below gives those rows the erasure's pseudonym as it does the stored ones (secaudit
-  // 2026-10, STO-1). Written after the cascade, they would carry the name.
-  await flushClassificationAudit();
-
-  await storage.transaction(async () => {
+  const cascade = (): Promise<void> => storage.transaction(async () => {
     // 1. The agents' cached telemetry. Their work is settled inside storage.deleteOwner(), on every
     // door that deletes an account: open work is cancelled and the requester's held morsels go back
     // with a ledger line, for the person's own identity as well as their agents', and finished work
@@ -498,6 +493,18 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
 
     // 3. The per-identity cascade, agents, GHIIs and the owner record.
     await storage.deleteOwner(name);
+  });
+  // The cascade deletes the classification audit rows of the person's content and renames the person
+  // where they were the reader of someone else's. A row that waits in memory, or is being written
+  // while the cascade runs, would be stored after it and bring the erased person back into the log
+  // (TARGET-082 review), so the cascade is ordered against the audit's writes: the person's waiting
+  // rows are dropped before it and after it, and no write runs beside it.
+  await removeWithClassificationAudit({ owner: ghii }, async () => {
+    // What stays waiting is other people's content, some of it read by this person: written now, so
+    // the cascade gives those rows the erasure's pseudonym as it does the stored ones (secaudit
+    // 2026-10, STO-1). Written after the cascade, they would carry the name.
+    await flushClassificationAudit();
+    await cascade();
   });
 
   // 4. Live connections, as deactivation closes them (owner-lifecycle.ts). A tunnel socket verified

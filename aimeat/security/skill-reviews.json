@@ -103,13 +103,13 @@
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
-      "reviewedOn": "2026-11-12",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/data/organism-shapes.ts",
         "aimeat/src/services/organism-lifecycle.ts",
         "aimeat/src/services/organism-shape-apply.ts"
       ],
-      "digest": "sha256:ef7fdeb688aeb1a81ac3ebc9",
+      "digest": "sha256:cdf5f6cacdaf3ffbea358bd2",
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
@@ -407,7 +407,7 @@
       "digest": "sha256:e116c2f3ac31e8992fc252c0"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-12",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -418,7 +418,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:b3db422f5e1c8ad05ebc1a62",
+      "digest": "sha256:905560a118b82f7d6fd8756a",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -780,7 +780,7 @@
     },
     "node:aimeat-organisms": {
       "aimeat/src/data/organism-shapes.ts": "e876d870cd931846",
-      "aimeat/src/services/organism-lifecycle.ts": "f95312fc5fa1328b",
+      "aimeat/src/services/organism-lifecycle.ts": "ff839cb5056c0846",
       "aimeat/src/services/organism-shape-apply.ts": "190c0a20e5cb806c"
     },
     "node:aimeat-workspace-contracts": {
@@ -806,7 +806,7 @@
       "aimeat/src/services/memory-bin.ts": "af03c3dad61b242b",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
-      "aimeat/src/services/owner-erasure.ts": "63d775ff741c0c00",
+      "aimeat/src/services/owner-erasure.ts": "ba33447775a276a9",
       "aimeat/src/services/archive.ts": "8a08d72e2732e5ed",
       "aimeat/src/mcp/organisms.ts": "5a7aabeab70397be"
     },
