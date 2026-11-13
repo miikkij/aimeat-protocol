@@ -30,6 +30,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.6.2 — 2026-11-14 — Unit 2b part 2, phase B: chat-instances.ts 4 → 2 (B11, chatInstanceFor).
  *   v1.6.1 — 2026-11-13 — Structure programme unit 2b, batch 3: 58 lines in 22 files. The agent, app,
  *     task and operator tools (25 lines) and the organism, workspace and board tools (29 lines) read
  *     through service functions that hold the check both surfaces put around the read; agent-capabilities,
@@ -138,7 +139,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/apps-fork.ts': 2,
     'src/mcp/boards.ts': 1,
     'src/mcp/capabilities.ts': 3,
-    'src/mcp/chat-instances.ts': 4,
+    'src/mcp/chat-instances.ts': 2,
     'src/mcp/commerce.ts': 4,
     'src/mcp/consent.ts': 1,
     'src/mcp/core-admin.ts': 3,

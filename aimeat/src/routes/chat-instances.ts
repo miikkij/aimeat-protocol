@@ -12,6 +12,7 @@
  *   - GET/other routes: list and touch chat instances for the caller
  *
  * @version-history
+ *   v1.3.1 — 2026-11-14 — GET /v1/chat-instances/:id reads through chatInstanceFor (services/chat/chat-instance-read.ts), which the MCP tool and resource now ask too (structure programme 2026-11, unit 2b, B11).
  *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): agent:write on PUT /v1/chat-instances/:id, DELETE /v1/chat-instances/:id. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -33,6 +34,8 @@ import { registerChatInstance, touchChatInstance } from '../services/chat-instan
 import { localAccountName } from '../utils/gaii.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
+import { chatInstanceFor } from '../services/chat/chat-instance-read.js';
+import { callerOf } from '../middleware/caller.js';
 
 export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -93,20 +96,16 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
   // GET /v1/chat-instances/:id — Get chat instance details
   router.get('/v1/chat-instances/:id', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const id = req.params.id as string;
-    const record = await storage.getChatInstance(id);
-
-    if (!record) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
-      return;
-    }
 
     // Ownership (SECURITY): a chat instance's economy (morsel balance, trust score) is private to its
     // owner. Only the same owner or an operator may read it — 404 (not 403) so existence isn't confirmed.
-    if (localAccountName(record.ghii) !== req.auth!.owner
-      && !(await operatorOverride(storage, config, req.auth, { ownerOf: record.ghii, area: 'chat-instance', action: 'read', subject: id }))) {
+    // The same function answers aimeat_instance_status and the chat-instance MCP resource.
+    const read = await chatInstanceFor(storage, config, callerOf(req, config.nodeId, storage), id);
+    if (read.status !== 'ok') {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }
+    const record = read.record;
 
     // Resolve GHII for economy data
     const ghiiRecord = await storage.getGHII(record.ghii);

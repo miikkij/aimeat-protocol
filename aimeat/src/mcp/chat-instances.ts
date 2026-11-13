@@ -11,6 +11,9 @@
  *   import { registerChatInstancesTools } from './chat-instances.js';
  *   registerChatInstancesTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-14 — aimeat_instance_status and the chat-instance resource read through chatInstanceFor
+ *     (services/chat/chat-instance-read.ts), as GET /v1/chat-instances/:id does: the operator's agent
+ *     holding operator:admin reads another owner's instance, with the operator trail (unit 2b, B11).
  *   2026-11-13 — aimeat_instance_list filters by platform, as GET /v1/chat-instances does (unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
@@ -38,6 +41,8 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { registerChatInstance } from '../services/chat-instance-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { resourceRefusal } from './resource-refusal.js';
+import { chatInstanceFor } from '../services/chat/chat-instance-read.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 export function registerChatInstancesTools(
     mcp: McpServer,
@@ -46,8 +51,12 @@ export function registerChatInstancesTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    sessionCaller?: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
+    // The session's caller (register-all.ts). Without one, an agent of its own account with no words,
+    // which never passes the operator check.
+    const caller = sessionCaller ?? ((): CallerContext => agentSessionCaller(agentGaii, '', [], config.nodeId, storage));
 
     /** Resolve owner name from agent GAII */
     function ownerName(): string {
@@ -73,13 +82,14 @@ export function registerChatInstancesTools(
         { mimeType: 'application/json', description: 'Chat instance details' },
         async (uri, variables) => {
             const id = decodeURIComponent(variables.id as string);
-            const inst = await storage.getChatInstance(id);
-            if (!inst) return { contents: [{ uri: uri.toString(), text: 'Instance not found' }] };
+            const read = await chatInstanceFor(storage, config, caller(), id);
+            if (read.status === 'missing') return { contents: [{ uri: uri.toString(), text: 'Instance not found' }] };
 
-            if (inst.ownerName !== ownerName()) {
+            if (read.status === 'refused') {
                 return resourceRefusal(uri, 'ACCESS_DENIED', 'This chat instance belongs to someone else, so it cannot be read here. '
                     + 'List your own chat instances instead.');
             }
+            const inst = read.record;
 
             return {
                 contents: [{
@@ -178,14 +188,15 @@ export function registerChatInstancesTools(
             annotations: annotationsFor('aimeat_instance_status'),
         },
         async ({ instance_id }) => {
-            const inst = await storage.getChatInstance(instance_id);
-            if (!inst) {
+            const read = await chatInstanceFor(storage, config, caller(), instance_id);
+            if (read.status === 'missing') {
                 return { content: [{ type: 'text' as const, text: 'Instance not found' }], isError: true };
             }
 
-            if (inst.ownerName !== ownerName()) {
+            if (read.status === 'refused') {
                 return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
             }
+            const inst = read.record;
 
             return {
                 content: [{

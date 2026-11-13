@@ -665,5 +665,58 @@ await test('B6 RECORDED DIFFERENCE (question: what a negative limit means): limi
     assert(tool.data.length === all - 1, `tool lists ${tool.data.length}, route ${all}`);
 });
 
+// The owners of the sections above are deleted by their cleanup, so phase B makes its own.
+let pbAlice!: RegisteredOwner, pbBob!: RegisteredOwner;
+let pbAliceAg!: McpAgent, pbAliceMcp!: McpSession, pbBobAg!: McpAgent, pbBobMcp!: McpSession;
+let pbOpWide!: McpAgent, pbOpWideMcp!: McpSession;
+await test('Setup (phase B): two owners, alice and bob, each with an agent holding every word; the operator\'s agent holding every word and operator:admin', async () => {
+    pbAlice = await registerOwner(BASE, N('pbalice'));
+    pbBob = await registerOwner(BASE, N('pbbob'));
+    pbAliceAg = await makeAgent(BASE, pbAlice, ['*'], N('pbaliceag'));
+    pbAliceMcp = await openSession(BASE, pbAliceAg.token, 'u2b2 phase B alice');
+    pbBobAg = await makeAgent(BASE, pbBob, ['*'], N('pbbobag'));
+    pbBobMcp = await openSession(BASE, pbBobAg.token, 'u2b2 phase B bob');
+    // operator:admin sits outside every wildcard, so it is named.
+    pbOpWide = await makeAgent(BASE, op, ['*', 'operator:admin'], N('pbopwide'));
+    pbOpWideMcp = await openSession(BASE, pbOpWide.token, 'u2b2 phase B operator wide');
+});
+
+// B11: one chat instance, read by its owner's agent, another owner's agent and the operator's agent.
+let pbInstance = '';
+const instanceResource = async (s: McpSession, id: string): Promise<string> => {
+    const r = await mcpRpc(s, 'resources/read', { uri: `aimeat://instances/${encodeURIComponent(id)}` });
+    return JSON.stringify(r?.result?.contents ?? r);
+};
+await test('Setup (B11): alice registers a chat instance', async () => {
+    const r = await call('POST', '/v1/chat-instances', pbAlice.token, { platform: 'claude', app_name: N('pbchat') });
+    assert(r.status === 201, `register: ${show(r)}`);
+    pbInstance = r.body.data.chat_instance.id;
+});
+
+await test('B11 USE KEPT: alice\'s agent reads her chat instance on the route, aimeat_instance_status and the resource', async () => {
+    const rest = await call('GET', `/v1/chat-instances/${encodeURIComponent(pbInstance)}`, pbAliceAg.token);
+    assert(rest.status === 200 && rest.body.data.chat_instance.id === pbInstance, `route: ${show(rest)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_instance_status', { instance_id: pbInstance });
+    assert(!tool.isError && tool.data.id === pbInstance, `tool: ${tool.text.slice(0, 200)}`);
+    assert((await instanceResource(pbAliceMcp, pbInstance)).includes(pbInstance), 'resource');
+});
+
+await test('B11 REFUSED: bob\'s agent is refused alice\'s chat instance on all three', async () => {
+    const rest = await call('GET', `/v1/chat-instances/${encodeURIComponent(pbInstance)}`, pbBobAg.token);
+    assert(rest.status === 404, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_instance_status', { instance_id: pbInstance });
+    assert(tool.isError && tool.text === 'Access denied', `tool: ${tool.text.slice(0, 200)}`);
+    assert((await instanceResource(pbBobMcp, pbInstance)).includes('ACCESS_DENIED'), 'resource');
+});
+
+await test('B11 FIXED: the operator\'s agent holding operator:admin reads alice\'s chat instance on the route, the tool and the resource alike', async () => {
+    const rest = await call('GET', `/v1/chat-instances/${encodeURIComponent(pbInstance)}`, pbOpWide.token);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbOpWideMcp, 'aimeat_instance_status', { instance_id: pbInstance });
+    assert(!tool.isError && tool.data.id === pbInstance, `tool: ${tool.text.slice(0, 200)}`);
+    const res = await instanceResource(pbOpWideMcp, pbInstance);
+    assert(res.includes(pbInstance) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);

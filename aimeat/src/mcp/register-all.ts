@@ -283,7 +283,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerCommerceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerExchangeTools(mcp, storage, config, agentGaii);
     registerExchangeRunTools(mcp, storage, config, agentGaii, getToken, scopes);
-    registerChatInstancesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerChatInstancesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerFlagsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerPromptsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, deps.role ?? 'all', caller);
     registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken, scopes);
