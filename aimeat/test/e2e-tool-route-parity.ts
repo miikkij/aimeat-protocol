@@ -941,6 +941,97 @@ await test('B7 FIXED: the anonymous credential is refused own and building on th
     }
 });
 
+// B12: the tool manifest of alice's listed app and of her hidden app, read by bob's agent on
+// aimeat_app_tools_get, the WebMCP listing GET /v1/apps/:owner/:filename/webmcp and the raw record.
+const PB_TOOL = { name: 'summarise', description: 'Summarises a text', inputSchema: { type: 'object', properties: { text: { type: 'string' } } } };
+const webmcp = (filename: string, token: string) => call('GET', `/v1/apps/${pbAlice.name}/${encodeURIComponent(filename)}/webmcp`, token);
+await test('Setup (B12): alice\'s agent publishes a tool manifest for her listed app and for her hidden app', async () => {
+    for (const f of [PB_APP, PB_HIDDEN]) {
+        const out = await callTool(pbAliceMcp, 'aimeat_app_tools_publish', { app_id: f, tools: [PB_TOOL] });
+        assert(!out.isError, `publish ${f}: ${out.text.slice(0, 300)}`);
+    }
+});
+
+await test('B12 USE KEPT: bob\'s agent reads the listed app\'s tools on the tool and the WebMCP listing alike', async () => {
+    const rest = await webmcp(PB_APP, pbBobAg.token);
+    assert(rest.status === 200 && (rest.body.tools as Body[]).some(t => t.name === PB_TOOL.name), `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_app_tools_get', { owner: pbAlice.name, app_id: PB_APP });
+    assert(!tool.isError && JSON.stringify(tool.data.manifest).includes(PB_TOOL.name), `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B12 RECORDED DIFFERENCE (question: should aimeat_app_tools_get hide an app the WebMCP listing hides): the hidden app\'s manifest, the listing answers 404, the tool and the raw public record give it to bob\'s agent', async () => {
+    const rest = await webmcp(PB_HIDDEN, pbBobAg.token);
+    assert(rest.status === 404 && rest.body.error.code === 'APP_NOT_FOUND', `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_app_tools_get', { owner: pbAlice.name, app_id: PB_HIDDEN });
+    assert(!tool.isError && JSON.stringify(tool.data.manifest).includes(PB_TOOL.name), `tool: ${tool.text.slice(0, 200)}`);
+    const raw = await call('GET', `/v1/memory/${encodeURIComponent(pbAlice.ghii)}/${encodeURIComponent(`apps.${PB_HIDDEN}.tools`)}`, pbBobAg.token);
+    assert(raw.status === 200 && raw.text.includes(PB_TOOL.name), `raw record: ${show(raw)}`);
+});
+
+// B14: a public tool manifest that does not parse, invoked on aimeat_app_tool_invoke and
+// POST /v1/apps/:owner/:filename/webmcp/tools/:tool.
+const PB_BROKEN = `${N('pbbroken')}.html`;
+await test('Setup (B14): alice in person writes a public tool manifest that does not parse', async () => {
+    const w = await call('POST', '/v1/memory', pbAlice.token, { key: `apps.${PB_BROKEN}.tools`, value: { tools: 'not a list' }, visibility: 'public' });
+    assert(w.status === 201 || w.status === 200, `write: ${show(w)}`);
+});
+
+await test('B14 RECORDED DIFFERENCE (question: is a manifest that does not parse absent, or malformed): both refuse bob\'s agent, the route with 404 APP_TOOLS_NOT_FOUND and the tool with INVALID_TOOL_MANIFEST', async () => {
+    const rest = await call('POST', `/v1/apps/${pbAlice.name}/${encodeURIComponent(PB_BROKEN)}/webmcp/tools/summarise`, pbBobAg.token, { input: {} });
+    assert(rest.status === 404 && rest.body.error.code === 'APP_TOOLS_NOT_FOUND', `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_app_tool_invoke', { owner: pbAlice.name, app: PB_BROKEN, tool: 'summarise', input: {} });
+    assert(tool.isError && tool.text.startsWith('INVALID_TOOL_MANIFEST'), `tool: ${tool.text.slice(0, 200)}`);
+});
+
+// B15: the links of a knowledge package on GET /v1/knowledge/:id/links and aimeat_knowledge_links.
+const PB_PKG_PUBLIC = N('pbpkgpub'), PB_PKG_PRIVATE = N('pbpkgpriv');
+let pbReaderAg!: McpAgent, pbReaderMcp!: McpSession;
+const pkgLinks = (id: string, token: string) => call('GET', `/v1/knowledge/${id}/links`, token);
+await test('Setup (B15): alice in person writes a public and a private package manifest; her agent holding memory:read and memory:read-as-owner', async () => {
+    for (const [id, visibility] of [[PB_PKG_PUBLIC, 'public'], [PB_PKG_PRIVATE, 'private']] as const) {
+        const w = await call('POST', '/v1/memory', pbAlice.token, { key: `packages/${id}/manifest`, value: { name: id, content_type: 'notes', entries: [] }, visibility, tags: ['knowledge-package'] });
+        assert(w.status === 201 || w.status === 200, `manifest ${id}: ${show(w)}`);
+    }
+    pbReaderAg = await makeAgent(BASE, pbAlice, ['memory:read', 'memory:read-as-owner'], N('pbreader'));
+    pbReaderMcp = await openSession(BASE, pbReaderAg.token, 'u2b2 phase B reader');
+});
+
+await test('B15 USE KEPT: alice\'s agents read the links of her public package on the route and the tool; alice in person reads both packages\' on the route', async () => {
+    for (const [ag, s] of [[pbAliceAg, pbAliceMcp], [pbReaderAg, pbReaderMcp]] as const) {
+        const rest = await pkgLinks(PB_PKG_PUBLIC, ag.token);
+        assert(rest.status === 200, `route ${ag.name}: ${show(rest)}`);
+        const tool = await callTool(s, 'aimeat_knowledge_links', { package_id: PB_PKG_PUBLIC });
+        assert(!tool.isError, `tool ${ag.name}: ${tool.text.slice(0, 200)}`);
+    }
+    for (const id of [PB_PKG_PUBLIC, PB_PKG_PRIVATE]) {
+        const mine = await pkgLinks(id, pbAlice.token);
+        assert(mine.status === 200, `alice ${id}: ${show(mine)}`);
+    }
+});
+
+await test('B15 REFUSED: alice\'s private package is not found for bob\'s agent, and for her agent without memory:read-as-owner, on both', async () => {
+    for (const [ag, s] of [[pbBobAg, pbBobMcp], [pbAliceAg, pbAliceMcp]] as const) {
+        const rest = await pkgLinks(PB_PKG_PRIVATE, ag.token);
+        assert(rest.status === 404, `route ${ag.name}: ${show(rest)}`);
+        const tool = await callTool(s, 'aimeat_knowledge_links', { package_id: PB_PKG_PRIVATE });
+        assert(tool.isError && tool.text.startsWith('Package not found'), `tool ${ag.name}: ${tool.text.slice(0, 200)}`);
+    }
+});
+
+await test('B15 RECORDED DIFFERENCE (question: are another account\'s public packages readable on the tool): alice\'s public package, the route gives bob\'s agent its links and the tool answers not found', async () => {
+    const rest = await pkgLinks(PB_PKG_PUBLIC, pbBobAg.token);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const tool = await callTool(pbBobMcp, 'aimeat_knowledge_links', { package_id: PB_PKG_PUBLIC });
+    assert(tool.isError && tool.text.startsWith('Package not found'), `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('B15 RECORDED DIFFERENCE (question: does memory:read-as-owner reach the owner\'s packages on the route): alice\'s private package, the tool gives the links to her agent holding the word and the route answers 404', async () => {
+    const rest = await pkgLinks(PB_PKG_PRIVATE, pbReaderAg.token);
+    assert(rest.status === 404, `route: ${show(rest)}`);
+    const tool = await callTool(pbReaderMcp, 'aimeat_knowledge_links', { package_id: PB_PKG_PRIVATE });
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
+});
+
 // B8: one app read by GET /v1/apps/:owner/:filename (serves the app) and aimeat_app_get (its detail).
 const PB_CODED = `${N('pbcode')}.html`, PB_CODE = 'pb-parity-code-42';
 const appRoute = (filename: string, token: string, code?: string) =>
