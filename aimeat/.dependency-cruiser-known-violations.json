@@ -122,36 +122,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/access-guard.ts",
-    "to": "src/services/workspace-access.ts",
-    "unresolvedTo": "./workspace-access.js",
-    "dependencyTypes": [
-      "local",
-      "dynamic-import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/services/workspace-access.ts",
-        "dependencyTypes": [
-          "local",
-          "dynamic-import"
-        ]
-      },
-      {
-        "name": "src/services/access-guard.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/static/sdk-libs/auth/modal.js",
     "to": "src/static/sdk-libs/auth/session.js",
     "unresolvedTo": "./session.js",

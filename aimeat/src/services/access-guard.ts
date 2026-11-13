@@ -9,6 +9,9 @@
  *   storage layer from drifting away from memory's reference behavior.
  * @structure
  *   - authorizeRead() — one access decision + one audit entry for a read/list/search.
+ *   - isOrgManager() / canReadWorkspace() / decideWorkspaceRead() / canReadWorkspaceRecords() — the
+ *     workspace read gate (moved from workspace-access.ts, which re-exports them; its header holds
+ *     their history). It lives here because it and authorizeRead call each other.
  * @usage
  *   import { authorizeRead } from '../services/access-guard.js';
  *   const r = await authorizeRead(storage, config, {
@@ -17,6 +20,11 @@
  *   });
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
+ *   v1.8.0 -- 2026-11-13 -- The workspace read gate (isOrgManager, canReadWorkspace, decideWorkspaceRead,
+ *     canReadWorkspaceRecords, WorkspaceReadDecision) moved here unchanged from workspace-access.ts,
+ *     which re-exports it. The 'workspace' tier calls canReadWorkspace in this file in place of a
+ *     dynamic import of workspace-access.ts, which ends the run-time import cycle between the two
+ *     files (structure programme 2026-11, unit 4).
  *   v1.7.0 -- 2026-10-24 -- The guard derives the visitor fact from the reader identity itself
  *     (namesAnotherNode, through localAccountOf): an identity of another node is a visitor whether or
  *     not the caller passed `accessorFederated`, so the MCP file read, extension files, file
@@ -48,11 +56,14 @@
  *   v1.2.0 -- 2026-07-05 -- Owner-self bypass: an accessor that is EXACTLY the resource owner is always
  *     allowed (the /v1/pub author-reads-own case), regardless of the visibility tier's membership gate.
  */
-import type { Storage } from '../storage/interface.js';
+import type { Storage, OrganismRecord, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
 import { isKeyShared } from './group-shares.js';
-import { parseGaiiLoose, localAccountOf, currentNodeId } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountOf, currentNodeId, isSameOwner, isGEAI, localAccountName } from '../utils/gaii.js';
+import { ecoMayReadKey } from './ecosystem-access.js';
+import { readWorkspaceMetaRecord } from './workspace-meta.js';
+import { agentBarred } from './organism-agent-access.js';
 import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
 import { organismVisibilityAdmits } from './organism-visibility.js';
 
@@ -197,12 +208,11 @@ export async function authorizeRead(
   // SPACE-SEPARATED list of one or more "<org>/<ws>" bindings — a file/record can be shared into several
   // workspaces, and the caller is allowed if they can read ANY ONE of them. Each binding is gated by the
   // SAME workspace read gate as GET /v1/organisms/:id/workspace (membership + manifest read), so a
-  // file/record authorizes identically to workspace content. Dynamic import breaks the access-guard ↔
-  // workspace-access cycle (workspace-access imports authorizeRead for its own manifest gate). Node-local.
+  // file/record authorizes identically to workspace content. canReadWorkspace is in this file (below),
+  // because its own manifest gate asks authorizeRead in turn. Node-local.
   if (visibility === 'workspace') {
     const refs = (args.workspaceRef || '').split(/\s+/).filter(Boolean);
     if (!refs.length) return { allowed: false, reason: 'workspace_unbound' };
-    const { canReadWorkspace } = await import('./workspace-access.js');
     for (const ref of refs) {
       const slash = ref.indexOf('/');
       if (slash < 1 || slash >= ref.length - 1) continue;
@@ -225,4 +235,152 @@ export async function authorizeRead(
     await auditDataAccess(storage, result.consentId ?? null, ownerGaii, accessorGaii, resourceKey, action, false);
   }
   return result;
+}
+
+/**
+ * True when this owner is the organism's creator or an admin. Org managers get automatic read+write
+ * access to EVERY workspace under the organism — they already manage its access grants, invitations,
+ * export and archive, so gating them out of the content itself was the illogical gap. Keyed on the
+ * BARE owner name, exactly like every other membership check (organisms.ts / consent.ts). Never
+ * throws; returns false for a missing owner / non-member / plain member.
+ */
+export async function isOrgManager(
+  storage: Storage,
+  orgId: string,
+  ownerName: string | undefined,
+): Promise<boolean> {
+  if (!ownerName) return false;
+  const m = await storage.getMembership(orgId, ownerName);
+  return !!m && m.status === 'active' && (m.role === 'creator' || m.role === 'admin');
+}
+
+/** Each gate's answer, for a caller that must tell "not a member" from "cannot read this workspace". */
+export interface WorkspaceReadDecision {
+  member: boolean;
+  manager: boolean;
+  canRead: boolean;
+  /** The manifest the decision was made on, or null when there is none. */
+  manRec: MemoryRecord | null;
+}
+
+/**
+ * Decide whether the caller may READ the content of one workspace.
+ *
+ * Two gates, both required, identical to GET /v1/organisms/:id/workspace:
+ *  1. Membership — an org agent (callerSub in organism.agentGaiis) OR the caller's owner has an
+ *     ACTIVE membership (memberships are keyed by the BARE owner name).
+ *  2. Workspace read — the manifest record at `organism.{id}.w.{ws}.meta.manifest` is readable:
+ *     the caller owns it, is the same owner, or holds a viewer/contributor consent grant
+ *     (authorizeRead). No manifest record → not readable (membership alone is discovery-only).
+ *
+ * Never throws; returns false on any miss.
+ */
+export async function canReadWorkspace(
+  storage: Storage,
+  config: AimeatConfig,
+  organism: OrganismRecord,
+  callerSub: string | undefined,
+  callerOwner: string | undefined,
+  callerGaii: string,
+  ws: string,
+): Promise<boolean> {
+  return (await decideWorkspaceRead(storage, config, organism, callerSub, callerOwner, callerGaii, ws)).canRead;
+}
+
+/**
+ * The same decision with each gate's answer. A loader that already holds the workspace's records
+ * passes the manifest it picked from them (`manRec`, the copy that counts, or null for none), so the
+ * decision reads nothing twice; `ws` null is an organism's legacy root, whose manifest the caller
+ * must pass. This is the one place the workspace read is decided (TARGET-082, spec §13.2).
+ */
+export async function decideWorkspaceRead(
+  storage: Storage,
+  config: AimeatConfig,
+  organism: OrganismRecord,
+  callerSub: string | undefined,
+  callerOwner: string | undefined,
+  callerGaii: string,
+  ws: string | null,
+  known?: { manRec: MemoryRecord | null },
+): Promise<WorkspaceReadDecision> {
+  const no = (member: boolean, manager: boolean, manRec: MemoryRecord | null): WorkspaceReadDecision => ({ member, manager, canRead: false, manRec });
+  // Gate 0: an organism that admits only listed agents treats every other agent as a non-member.
+  if (agentBarred(organism, callerSub)) return no(false, false, null);
+  // Gate 1: membership. The owner's membership row also decides org-manager status (creator/admin),
+  // which grants an automatic pass on Gate 2 below — resolve it in the same lookup.
+  let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+  let manager = false;
+  if (callerOwner) {
+    const m = await storage.getMembership(organism.id, callerOwner);
+    if (m && m.status === 'active') {
+      isMember = true;
+      manager = m.role === 'creator' || m.role === 'admin';
+    }
+  }
+  if (!isMember) return no(false, false, null);
+
+  // Gate 2: workspace read (manifest is the single gate record). An org manager (creator/admin) passes
+  // unconditionally — they own the organism's access, so they read every workspace under it. The
+  // record is the copy that counts (services/workspace-meta.ts), never the first one the store
+  // returns: a member's own copy of the manifest would otherwise make them its owner here.
+  const manRec = known ? known.manRec
+    : ws === null ? null : await readWorkspaceMetaRecord(storage, organism.id, ws, 'meta.manifest', config.nodeId);
+  if (!manRec) return no(true, manager, null);
+  const manKey = manRec.key;
+  let allowed: boolean;
+  if (manager || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) {
+    allowed = true;
+  } else {
+    const decision = await authorizeRead(storage, config, {
+      ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
+      visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
+    });
+    allowed = decision.allowed;
+  }
+
+  // Gate 3 (ecosystem/GEAI only, model A / strict): a GEAI rides its owner's organism membership, so
+  // membership + the manifest gate alone would let it read any workspace its owner belongs to. Require
+  // a matching owner-granted 'read' data-area — the same allowlist the write path enforces — so the
+  // owner-selected read scope actually bites (and the tunnel record-push honours it identically).
+  if (allowed && callerSub && isGEAI(callerSub)) allowed = await ecoMayReadKey(storage, callerSub, manKey);
+  return { member: true, manager, canRead: allowed, manRec };
+}
+
+/**
+ * The read gate of the member records read (GET …/workspace/records) and the member page routes
+ * (…/frame, …/opened): canReadWorkspace, and in addition a caller who is not a member of the
+ * organism but holds a viewer or contributor grant from the workspace's creator.
+ *
+ * WHY THE SECOND BRANCH. These routes used to decide on the manifest alone (canReadWsManifest in
+ * routes/organisms/shared.ts), with no membership gate, so a grant opened them to a non-member, and
+ * test/e2e-workspace-member-records.ts test 6 asserts that use. The same rule also admitted the
+ * manifest's own owner, a workspace creator removed or banned from the organism, who then kept reading
+ * every member's published records (secaudit2026oct22, canReadWsManifest no-membership-gate). The
+ * creator now reads only as an active member, and a non-member's grant counts only while the
+ * account that issued it is an active member (ruled by the developer on 2026-10-25).
+ */
+export async function canReadWorkspaceRecords(
+  storage: Storage,
+  config: AimeatConfig,
+  organism: OrganismRecord,
+  callerSub: string | undefined,
+  callerOwner: string | undefined,
+  callerGaii: string,
+  ws: string,
+): Promise<boolean> {
+  if (await canReadWorkspace(storage, config, organism, callerSub, callerOwner, callerGaii, ws)) return true;
+  const manRec = await readWorkspaceMetaRecord(storage, organism.id, ws, 'meta.manifest', config.nodeId);
+  // The manifest's own owner is its creator, who reads only as an active member (above).
+  if (!manRec || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) return false;
+  // A grant opens these routes to a non-member only while the account that issued it, the owner of
+  // the manifest copy that counts, is an active member: a creator removed or banned from the
+  // organism no longer lets anyone in (ruled by the developer on 2026-10-25).
+  const issuer = await storage.getMembership(organism.id, localAccountName(manRec.ownerGaii));
+  if (!issuer || issuer.status !== 'active') return false;
+  const decision = await authorizeRead(storage, config, {
+    ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
+    visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
+  });
+  if (!decision.allowed) return false;
+  return isGEAI(callerGaii) ? ecoMayReadKey(storage, callerGaii, manRec.key) : true;
 }
