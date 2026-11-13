@@ -718,5 +718,36 @@ await test('B11 FIXED: the operator\'s agent holding operator:admin reads alice\
     assert(res.includes(pbInstance) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
 });
 
+// B13: one consent alice gave in person, read on GET /v1/consent/:id and the consent-record resource.
+let pbConsent = '';
+const consentResource = async (s: McpSession, id: string): Promise<string> => {
+    const r = await mcpRpc(s, 'resources/read', { uri: `aimeat://consent/${encodeURIComponent(id)}` });
+    return JSON.stringify(r?.result?.contents ?? r);
+};
+await test('Setup (B13): alice in person gives a consent', async () => {
+    const r = await call('POST', '/v1/consent', pbAlice.token, { data_pattern: `${N('pbnotes')}.*`, recipient: pbBobAg.gaii, purpose: 'phase B parity' });
+    assert(r.status === 201, `consent: ${show(r)}`);
+    pbConsent = r.body.data.id ?? r.body.data.consent?.id;
+    assert(typeof pbConsent === 'string' && pbConsent.length > 0, `consent id: ${show(r)}`);
+});
+
+await test('B13 USE KEPT: alice in person reads her consent on the route', async () => {
+    const r = await call('GET', `/v1/consent/${encodeURIComponent(pbConsent)}`, pbAlice.token);
+    assert(r.status === 200 && r.body.data.id === pbConsent, `route: ${show(r)}`);
+});
+
+await test('B13 REFUSED: bob\'s agent is refused alice\'s consent on the route and the resource', async () => {
+    const r = await call('GET', `/v1/consent/${encodeURIComponent(pbConsent)}`, pbBobAg.token);
+    assert(r.status === 403, `route: ${show(r)}`);
+    assert((await consentResource(pbBobMcp, pbConsent)).includes('ACCESS_DENIED'), 'resource');
+});
+
+await test('B13 FIXED: the operator\'s agent holding operator:admin reads alice\'s consent on the route and the resource alike', async () => {
+    const r = await call('GET', `/v1/consent/${encodeURIComponent(pbConsent)}`, pbOpWide.token);
+    assert(r.status === 200 && r.body.data.id === pbConsent, `route: ${show(r)}`);
+    const res = await consentResource(pbOpWideMcp, pbConsent);
+    assert(res.includes(pbConsent) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);

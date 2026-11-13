@@ -11,6 +11,9 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — The consent-record resource reads through consentRecordFor (services/consent/consent-read.ts),
+ *     as GET /v1/consent/:id does: the operator's agent holding operator:admin reads another owner's
+ *     consent, with the operator trail (unit 2b, B13).
  *   2026-11-13 — aimeat_consent_list filters by recipient, as GET /v1/consent does (unit 3b).
  *   2026-11-08 — aimeat_consent_grant passes `role` (read | write) to grantConsent, as POST /v1/consent does.
  *   2026-11-01 — aimeat_consent_grant takes a party recipient (a named share of a data package) with
@@ -44,7 +47,8 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { grantConsent, revokeConsent, listAccountConsents, accountHoldsConsent } from '../services/consent-write.js';
+import { grantConsent, revokeConsent, listAccountConsents } from '../services/consent-write.js';
+import { consentRecordFor } from '../services/consent/consent-read.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -116,14 +120,16 @@ export function registerConsentTools(
         { mimeType: 'application/json', description: 'Consent record details' },
         async (uri, variables) => {
             const id = decodeURIComponent(variables.id as string);
-            const consent = await storage.getConsent(id);
-            if (!consent) return { contents: [{ uri: uri.toString(), text: 'Consent not found' }] };
+            // The account's consents, as aimeat_consent_list reads them, or the operator's pass; the
+            // same function answers GET /v1/consent/:id (for the session's principal).
+            const read = await consentRecordFor(storage, config, caller(), id, 'account');
+            if (read.status === 'missing') return { contents: [{ uri: uri.toString(), text: 'Consent not found' }] };
 
-            const ghii = ownerGhii();
-            if (!accountHoldsConsent(ghii, consent.ownerGaii)) {
+            if (read.status === 'refused') {
                 return resourceRefusal(uri, 'ACCESS_DENIED', 'This consent record belongs to someone else, so it cannot be read here. '
                     + 'List your own consent records instead.');
             }
+            const consent = read.record;
 
             return {
                 contents: [{

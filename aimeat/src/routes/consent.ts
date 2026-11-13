@@ -13,6 +13,8 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   2026-11-14 — GET /v1/consent/:id reads through consentRecordFor (services/consent/consent-read.ts),
+ *     which the consent-record MCP resource now asks too (structure programme 2026-11, unit 2b, B13).
  *   2026-11-09 — Additive query parameters for the Data Wallet trail read by day: GET /v1/data-wallet
  *     takes group_limit, today_from and yesterday_from; GET /v1/consent/audit takes from, to and
  *     grouped=true (the groups of the window, paged by limit and offset).
@@ -37,10 +39,10 @@ import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
 import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { grantConsent, revokeConsent, listAccountConsents, accountHoldsConsent } from '../services/consent-write.js';
+import { grantConsent, revokeConsent, listAccountConsents } from '../services/consent-write.js';
+import { consentRecordFor } from '../services/consent/consent-read.js';
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
-import { operatorOverride } from '../services/operator-override.js';
 import { callerOf } from '../middleware/caller.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';
 import { auditWithin, groupConsentAudit } from '../services/consent-audit-groups.js';
@@ -226,20 +228,20 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     // GET /v1/consent/:id — Get single consent
     router.get('/v1/consent/:id', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const id = req.params.id as string;
-        const consent = await storage.getConsent(id);
+        // Another person's record: the operator's pass (operatorOverride) admits the operator and the
+        // operator's agent holding operator:admin, and writes the operator trail. The same function
+        // answers the consent-record MCP resource.
+        const read = await consentRecordFor(storage, config, callerOf(req, config.nodeId, storage), id, 'principal');
 
-        if (!consent) {
+        if (read.status === 'missing') {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Consent not found: ${id}`));
             return;
         }
-
-        // Another person's record: the operator's pass (operatorOverride) admits the operator and the
-        // operator's agent holding operator:admin, as on MCP, and writes the operator trail.
-        if (!accountHoldsConsent(resolve(req), consent.ownerGaii) && !(await operatorOverride(storage, config, req.auth,
-            { ownerOf: consent.ownerGaii, area: 'consent', action: 'read', subject: consent.id }))) {
+        if (read.status === 'refused') {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this consent record'));
             return;
         }
+        const consent = read.record;
 
         res.json(success(config.nodeId, {
             id: consent.id,

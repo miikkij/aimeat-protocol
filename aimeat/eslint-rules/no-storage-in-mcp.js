@@ -41,6 +41,8 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.3.2 — 2026-11-14 — Unit 2b part 2, phase B: consent.ts leaves EXEMPT; its record read and the
+ *     owner-or-operator check moved to services/consent/consent-read.ts, which GET /v1/consent/:id calls too.
  *   v1.3.1 — 2026-11-13 — Structure programme unit 2b, batch 3: agent-capabilities.ts, agent-onboarding.ts,
  *     core-boards.ts, organisms-email-invites.ts and organisms-name-invites.ts leave EXEMPT; their reads
  *     moved with the gate around them into service functions the REST routes call too.
@@ -84,7 +86,6 @@ const EXEMPT = new Set([
   'src/mcp/capabilities.ts',
   'src/mcp/chat-instances.ts',
   'src/mcp/commerce.ts',
-  'src/mcp/consent.ts',
   'src/mcp/core-admin.ts',
   'src/mcp/core-resources.ts',         // extraction out of core.ts (max-file-lines): the same four storage reads
   'src/mcp/core.ts',
