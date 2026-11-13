@@ -28,6 +28,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose, resolveIdentity } from '../utils/gaii.js';
 import { isStopped } from '../services/agent-stop-rules.js';
+import { activeSystemPrompt } from '../services/prompts/prompt-read.js';
 
 export function registerAgentHandbook(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/agents/me/handbook -- Agent operating handbook
@@ -35,8 +36,8 @@ export function registerAgentHandbook(router: Router, config: AimeatConfig, stor
     // The caller's resolved identity: an agent session's own GAII as it is, an owner session's GHII.
     const gaii = req.auth && !isAnonymousPrincipal(req.auth) ? resolveIdentity(req.auth, config.nodeId) : 'unknown';
     const agent = gaii !== 'unknown' ? await storage.getAgent(gaii) : null;
-    const record = await storage.getSystemPrompt('tier-1');
-    if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Handbook not available')); return; }
+    const record = await activeSystemPrompt(storage, 'tier-1');
+    if (!record) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Handbook not available')); return; }
     const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
     const parsedSelf = parseGaiiLoose(gaii);
     const selfAgentName = parsedSelf.agent || 'unknown';

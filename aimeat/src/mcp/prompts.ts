@@ -87,6 +87,7 @@ import { V2_ROLES, toolsForSurface, type SurfaceRole } from '../tool-catalog/sur
 import { featureMapPiece, featureMapPieceIds } from '../services/feature-map.js';
 import { settingsExplainPiece, settingsExplainPieceIds } from '../services/settings-explain.js';
 import { placesPiece, placesPieceIds } from '../services/places.js';
+import { activeSystemPrompt } from '../services/prompts/prompt-read.js';
 
 /**
  * The input of aimeat_handbook_get: one object for the process, not one per server, so tools/list
@@ -235,11 +236,11 @@ export function registerPromptsTools(
                 daily_allowance: config.dailyAllowance,
             });
 
-            const record = await storage.getSystemPrompt(normalized);
-            if (!record || !record.active) {
+            const record = await activeSystemPrompt(storage, normalized);
+            if (!record) {
                 // Try the original key as a fallback
-                const fallback = await storage.getSystemPrompt(tierKey);
-                if (!fallback || !fallback.active) {
+                const fallback = await activeSystemPrompt(storage, tierKey);
+                if (!fallback) {
                     return {
                         content: [{
                             type: 'text' as const,
