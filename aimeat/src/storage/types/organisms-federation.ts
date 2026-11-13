@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — A comment names services/cortex/activation.ts, where the cortex activation moved
+ *     (structure programme 2026-11, unit 4).
  *   v1.17.0 — 2026-11-12 — OrganismRecord.accessRequests ('on' | 'off', unset reads 'on') and
  *     JoinRequestRecord.via (JoinRequestVia): the app or page a join request was asked from
  *     (migration 0129; services/organism-join-requests/requests.ts).
@@ -713,7 +715,7 @@ export interface CortexActivationArtifacts {
    * The identity the actions in `actionIds` were published under: the activating caller's resolved
    * identity (a person's GHII, an agent's GAII). Deactivation, uninstall and a redeploy delete the
    * actions under it, whoever does them. Absent on a record stored before 2026-09-26 and on one with
-   * no actions; routes/cortex/activation.ts says what a teardown does then.
+   * no actions; services/cortex/activation.ts says what a teardown does then.
    */
   actionProvider?: string;
   boardIds: string[];

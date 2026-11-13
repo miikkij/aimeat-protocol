@@ -21,6 +21,8 @@
  *   - accountPrincipals(storage, owner) — every principal one account holds, its bare name included
  * @usage const agents = await loadOwnerAgents(storage, owner);   // 0 extra reads inside a read scope
  * @version-history
+ *   2026-11-13 — The history names services/cortex/activation.ts, where the cortex activation moved
+ *     (structure programme 2026-11, unit 4).
  *   v1.3.0 — 2026-11-09 — loadOwnerOnboardings: every agent's onboarding record in one query, shared by
  *     the home state and the journey (they read one per agent: 80 + up to 79 reads at 79 agents).
  *   v1.2.0 — 2026-09-26 — identitiesActingFor: the person's own identity, then their agents' GAIIs and
@@ -29,7 +31,7 @@
  *     published reaches the person as their agents' work does (secaudit 2026-09, R4 3).
  *   v1.1.0 — 2026-09-26 — accountPrincipals: the bare account name, the GHII, the agents' GAIIs and the
  *     ecosystem apps' GEAIs of one account. A cortex teardown deletes what an activation wrote under
- *     each of them (routes/cortex/activation.ts).
+ *     each of them (services/cortex/activation.ts).
  *   v1.0.0 — 2026-07-15 — Phase 3: canonical IdentityMap-aware owner-identity loaders (dedup).
  */
 import type { Storage, AgentOnboardingRecord } from '../../storage/interface.js';

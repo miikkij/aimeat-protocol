@@ -32,6 +32,8 @@
  *   AmbiguousComponentName · extensionHoldersOf
  * @usage const ext = await findExtension(storage, req.params.name, req.auth?.owner, 'manage');
  * @version-history
+ *   2026-11-13 — A comment names services/cortex/activation.ts, where the cortex activation moved
+ *     (structure programme 2026-11, unit 4).
  *   v1.4.0 — 2026-10-29 — A released-name row an account erasure or the held-name settlement wrote
  *     (`freed:`) leaves the name free for the next install; the apps that loaded it ask their owner
  *     before they load the new holder's (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
@@ -395,7 +397,7 @@ function stripPin(raw: string): string {
  * board and action ids, `cortex-<name>-<component>`): `alice/recipes` becomes `alice-recipes`, a bare
  * name stays as it was, so an id an older activation made keeps its value. Two cortexes of one
  * account can still derive one id; a board of another account is refused at activation
- * (routes/cortex/activation.ts foreignBoardRefusal).
+ * (services/cortex/activation.ts foreignBoardRefusal).
  */
 export const idStemOf = (name: string): string => name.replace('/', '-');
 

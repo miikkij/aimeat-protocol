@@ -47,6 +47,8 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-13 -- A comment names services/cortex/activation.ts, where the cortex activation moved
+ *     (structure programme 2026-11, unit 4).
  *   v1.10.0 -- 2026-10-20 -- setBoardMembers() deletes the subscription of an identity it takes off
  *     the roster that the board no longer serves. The delivery path asks the read rule again too
  *     (services/board-subscribers.ts; secaudit 2026-10, board-subscribers:notify-without-read-recheck).
@@ -296,7 +298,7 @@ export async function publicBoardCeiling(
     /**
      * How many public boards the caller is about to open. One by default, which is every door that
      * creates a board. A cortex activation asks about all of its board-templates at once, because
-     * it has to know BEFORE it writes the first of them — see routes/cortex/activation.ts.
+     * it has to know BEFORE it writes the first of them — see services/cortex/activation.ts.
      */
     wanted = 1,
     /**
