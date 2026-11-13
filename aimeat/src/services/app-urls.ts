@@ -2,13 +2,15 @@
  * @file src/services/app-urls.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The public address of an app, read-only: resolveAppUrls answers a batch of apps from
- *   one read of the subdomain table and assigns nothing. appOriginScheme is the scheme and port the
- *   app origin inherits from the apex baseUrl, shared with the writing sibling appOriginUrl
- *   (routes/apps/helpers.ts, which re-exports resolveAppUrls).
- * @structure appOriginScheme · resolveAppUrls
+ * @description The public address of an app: resolveAppUrls answers a batch of apps from one read of
+ *   the subdomain table and assigns nothing; appOriginUrl, its writing sibling, assigns a subdomain on
+ *   first use and builds the redirect target. appOriginScheme is the scheme and port the app origin
+ *   inherits from the apex baseUrl, shared by both (routes/apps/helpers.ts re-exports the two).
+ * @structure appOriginScheme · resolveAppUrls · appOriginUrl
  * @usage const urls = await resolveAppUrls(config, storage, [{ owner, filename }]);
  * @version-history
+ *   v1.1.0 — 2026-11-13 — appOriginUrl moved here unchanged from routes/apps/helpers.ts, so the draft
+ *     preview service no longer imports a route file (structure programme 2026-11, unit 4).
  *   v1.0.0 — 2026-10-05 — Moved from routes/apps/helpers.ts by extraction, so the roster service that
  *     sends an invitation reads the app's address; aimeat_app_manage calls the service in place of
  *     the route over loopback HTTP (secaudit 2026-10, M6). The history before the move is in
@@ -18,6 +20,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { ensureAppSubdomain } from './subdomain-names.js';
 
 /**
  * Scheme + port for the app origin, inherited from the apex baseUrl so only the host
@@ -88,4 +91,25 @@ export async function resolveAppUrls(
             : `${scheme}://${config.appHost}${portSuffix}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(ref.filename)}`;
     }
     return out;
+}
+
+/**
+ * Build the app-origin URL an apex app request should 301 to (H-2). Prefers an
+ * assigned per-app subdomain (`https://<sub>.apps.<apex>/`, which also isolates the
+ * app from other apps), falling back to the shared path form
+ * (`https://apps.<apex>/<owner>/<filename>`). Caller guarantees config.appHost is set.
+ *
+ * ASSIGNS a subdomain when the app has none. A caller that must not write (a listing,
+ * a read-only tool) uses resolveAppUrls instead.
+ */
+export async function appOriginUrl(config: AimeatConfig, storage: Storage, owner: string, filename: string): Promise<string> {
+    const { scheme, portSuffix } = appOriginScheme(config);
+    const bareOwner = bare(owner);
+    try {
+        // Auto-assign a per-app subdomain on first open so seamless SSO works with no manual step
+        // (existing apps migrate transparently); fall back to the shared path form only if none is free.
+        const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);
+        if (sub) return `${scheme}://${sub}.${config.appHost}${portSuffix}/`;
+    } catch (err) { logger.warn('appOriginUrl: fall through to path form', { error: String(err) }); }
+    return `${scheme}://${config.appHost}${portSuffix}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
 }

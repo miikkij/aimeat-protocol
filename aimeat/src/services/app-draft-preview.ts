@@ -17,6 +17,8 @@
  *   const out = await mintDraftPreview(storage, config, { owner, ownerGhii, filename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   2026-11-13 — appOriginUrl comes from services/app-urls.ts, not from a route file (structure
+ *     programme 2026-11, unit 4).
  *   v1.1.0 — 2026-10-06 — On a per-app origin the link names the app's draft origin,
  *     `<sub>--draft.<appHost>`, where the draft's code gets no silent sign-in (secaudit 2026-10
  *     follow-up, A2). A path-form address is unchanged: it is bound to no app.
@@ -26,7 +28,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateDraftToken } from './draft-token.js';
-import { appOriginUrl } from '../routes/apps/helpers.js';
+import { appOriginUrl } from './app-urls.js';
 import { DRAFT_LABEL_SUFFIX } from './app-origin-target.js';
 
 /** How long a preview token stays valid, in seconds. */

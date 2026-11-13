@@ -8,10 +8,12 @@
  * @structure
  *   - CanonicalOwner — authenticated-caller → owner resolver closure type
  *   - AppTargetFor / appTargetOr — whose bucket this act lands in, or the refusal to send
- *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL
+ *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL; re-exported from services/app-urls.ts
  *   - withForwardedQuery() — the request's query on the redirect target, minus the apex-only parameters
  *   - resolveAppUrls() — READ-ONLY, re-exported from services/app-urls.ts
  * @version-history
+ *   2026-11-13 — appOriginUrl moved unchanged to services/app-urls.ts and is re-exported here, so the
+ *     draft preview service no longer imports a route file (structure programme 2026-11, unit 4).
  *   2026-10-19 — withForwardedQuery: the apex inline redirect keeps the app's own query parameters and
  *     drops mode, code, access, unlock, frame and preview (wish-the-apex-app-redirect-keeps-the-query-string).
  *   v1.3.2 — 2026-10-05 — appOriginScheme and resolveAppUrls moved to services/app-urls.ts (re-exported
@@ -33,16 +35,12 @@
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
 import type { AppDevAct, DelegatedDev } from '../../services/app-dev-grant.js';
 import { error } from '../../middleware/envelope.js';
-import { ensureAppSubdomain } from '../../services/subdomain-names.js';
-import { logger } from '../../utils/logger.js';
-import { localAccountName } from '../../utils/gaii.js';
-import { appOriginScheme, resolveAppUrls } from '../../services/app-urls.js';
 
-// Read-only sibling of appOriginUrl, in services/app-urls.ts so a service can read an app's address.
-export { resolveAppUrls };
+// appOriginUrl and its read-only sibling resolveAppUrls live in services/app-urls.ts, so a service
+// can build or read an app's address; re-exported for every importer of this file.
+export { appOriginUrl, resolveAppUrls } from '../../services/app-urls.js';
 
 /**
  * The canonical-owner resolver closure built in appsRouter and passed to each route
@@ -81,32 +79,6 @@ export async function appTargetOr(
     return null;
   }
   return { owner: t.owner, ownerGhii: t.ownerGhii, delegated: t.delegated };
-}
-
-/** The account name, with a `@node-id` of this node removed; another node's identity stays whole. */
-function bare(owner: string): string {
-    return localAccountName(owner);
-}
-
-/**
- * Build the app-origin URL an apex app request should 301 to (H-2). Prefers an
- * assigned per-app subdomain (`https://<sub>.apps.<apex>/`, which also isolates the
- * app from other apps), falling back to the shared path form
- * (`https://apps.<apex>/<owner>/<filename>`). Caller guarantees config.appHost is set.
- *
- * ASSIGNS a subdomain when the app has none. A caller that must not write (a listing,
- * a read-only tool) uses resolveAppUrls instead.
- */
-export async function appOriginUrl(config: AimeatConfig, storage: Storage, owner: string, filename: string): Promise<string> {
-    const { scheme, portSuffix } = appOriginScheme(config);
-    const bareOwner = bare(owner);
-    try {
-        // Auto-assign a per-app subdomain on first open so seamless SSO works with no manual step
-        // (existing apps migrate transparently); fall back to the shared path form only if none is free.
-        const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);
-        if (sub) return `${scheme}://${sub}.${config.appHost}${portSuffix}/`;
-    } catch (err) { logger.warn('appOriginUrl: fall through to path form', { error: String(err) }); }
-    return `${scheme}://${config.appHost}${portSuffix}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
 }
 
 /**
