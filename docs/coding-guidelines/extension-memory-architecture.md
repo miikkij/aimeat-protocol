@@ -282,7 +282,7 @@ in a namespace the user cannot write.
 Where the records come from:
 
 - **A cortex `seed-data` component** writes its entries at activation as `public` records in the
-  activating principal's namespace (`activateExtension` in `src/routes/cortex/activation.ts`).
+  activating principal's namespace (`activateExtension` in `src/services/cortex/activation.ts`).
   Deactivation keeps them; uninstall removes them.
 - **The user, or their agent,** writes them like any other memory record.
 
@@ -390,4 +390,4 @@ an active cortex (`upsertCortex` in `src/routes/cortex/upsert.ts`). Over MCP, th
 | `src/static/sdk-libs/data/index.js` (`get`, `getPublic`) | `AIMEAT.data.get()` with its creator fallback, and `AIMEAT.data.getPublic()` |
 | `src/services/cortex-lifecycle.ts` (`installCortex`, `activateCortex`) | Cortex install (expects the `libs` dict) and activate (no-op when already active) |
 | `src/routes/cortex/upsert.ts` (`upsertCortex`) | `PUT /v1/cortex/:name`: redeploy in place, re-run activation |
-| `src/routes/cortex/activation.ts` (`activateExtension`) | What an activation writes, `seed-data` included |
+| `src/services/cortex/activation.ts` (`activateExtension`) | What an activation writes, `seed-data` included |
