@@ -25,6 +25,8 @@
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   2026-11-13 — AiCompletionError is imported from errors.ts, where it lives, and not through the
+ *     re-export in completion.ts, which imports this file (structure programme 2026-11, unit 4).
  *   v1.7.1 — 2026-11-05 — Moved unchanged from src/services/ai-allowance.ts to src/services/ai/allowance.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.7.0 — 2026-11-04 — The allowance record is written on the version that was read
  *     (record-cas.ts updateRecord), so two processes settling one account's calls lose no debit; in one
@@ -60,7 +62,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { AiCompletionError } from './completion.js';
+import { AiCompletionError } from './errors.js';
 import { readSystem, updateSystem } from '../classification/system-record.js';
 import { nodeKeySpent, markNodeKeyUsed } from './node-key-balance.js';
 import { logger } from '../../utils/logger.js';

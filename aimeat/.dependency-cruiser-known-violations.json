@@ -152,36 +152,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/ai/allowance.ts",
-    "to": "src/services/ai/completion.ts",
-    "unresolvedTo": "./completion.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/services/ai/completion.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/ai/allowance.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/services/home-state.ts",
     "to": "src/services/onboarding-funnel.ts",
     "unresolvedTo": "./onboarding-funnel.js",
