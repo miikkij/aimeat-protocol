@@ -107,7 +107,8 @@ import type { MeteredEntitlement } from '../services/metered-entitlements.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../services/extension-access/metered-response.js';
-import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
+import { appToolsKey, AppToolsDocSchema, applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
+import { appToolManifestIds } from '../services/app-tools/manifest-read.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
@@ -127,23 +128,6 @@ import { findBackingCapability } from '../services/component-address.js';
 /** An app tool's binding, resolved for one call: the capability it runs and the interface version it was pinned at. */
 interface BoundTool { cap: CapabilityRecord; pinnedVersion: number | undefined; providerGhii: string }
 
-/** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
-async function listAppToolManifests(storage: Storage, ownerGhii: string): Promise<string[]> {
-    try {
-        const recs = await storage.listMemory(ownerGhii, { prefix: 'apps.' });
-        return recs
-            .filter(r => r.visibility === 'public')
-            .map(r => appIdFromToolsKey(r.key))
-            .filter((id): id is string => !!id)
-            .sort()
-            .slice(0, 12);
-    } catch (err) {
-        // A courtesy on a path that already failed; never turn it into a second failure — but say
-        // so, or a broken listing looks like an owner with no manifests.
-        logger.warn('app-tool manifest hint could not be built', { ownerGhii, error: String(err) });
-        return [];
-    }
-}
 
 export function registerExchangeRunTools(
     mcp: McpServer,
@@ -192,7 +176,7 @@ export function registerExchangeRunTools(
                 // An app id is a FILENAME and carries its extension; the app's own subdomain does not.
                 // Naming what this owner actually publishes turns a dead end into a one-step correction,
                 // instead of sending the caller off to read the app's source to guess.
-                const near = await listAppToolManifests(storage, `${ownerName}@${config.nodeId}`);
+                const near = await appToolManifestIds(storage, `${ownerName}@${config.nodeId}`, false);
                 const hint = near.length ? ` This owner publishes tool manifests for: ${near.join(', ')}.` : '';
                 return fail(`APP_TOOLS_NOT_FOUND: app "${ownerName}/${app}" declares no tool manifest.${hint}`);
             }
