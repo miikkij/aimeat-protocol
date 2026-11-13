@@ -28213,7 +28213,12 @@ paths:
     get:
       operationId: listMemoryFiles
       summary: List memory files
-      description: List files stored in memory for the authenticated agent.
+      description: |
+        List files stored in memory for the authenticated agent (the owner in person: their own and
+        every agent's). With classification on, a file the caller's classification reader does not
+        show (outside its audience, hidden from AI, above an agent's clearance) is not listed, as
+        `GET /v1/memory/files/{key}` answers it 404. `count=true` without `exclude_prefix` counts
+        every stored file.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -48213,6 +48218,9 @@ paths:
         enumerable only by the member themself (authenticated as that owner or
         one of their agents) or an operator — for anyone else the member filter
         degrades to public organisms only (no private-membership disclosure).
+        For an agent caller the member list leaves out an organism that admits only
+        listed agents and does not list this one (`agent_access: listed`), as
+        `aimeat_organism_list` and `GET /v1/organisms/waiting` do.
 
         Without `member`, `?visibility=` takes `public` (the default) or `listed`,
         the two the directory shows. Any other value answers an empty list unless
