@@ -1724,7 +1724,7 @@ const ALL_SUITES = [
     // refuses (structure programme 2026-11, unit 3b).
     'test/e2e-agent-field-adds.ts',
     // An MCP tool and its REST route give one caller one answer: approvals, discovery, the roster, the
-    // organism list, the file list; two differences recorded for the developer's decision.
+    // organism list, the file list, the sharing groups and an attached agent's role.
     'test/e2e-tool-route-parity.ts',
     // A draft is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
     'test/e2e-capability-reach.ts',

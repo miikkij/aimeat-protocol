@@ -5,7 +5,7 @@
  * @description E2E for seven places where an MCP tool and the REST route beside it answered the same
  *   caller differently (structure programme 2026-11, unit 7). Each section holds the refused case and
  *   the designed use of the same path. A section headed RECORDED states today's answer of a
- *   difference whose fix waits for the developer's decision; it changes when he decides.
+ *   difference whose fix waits for the developer's decision; GROUPS follows his decision of 2026-11-13.
  *     APPROVALS  POST /v1/organisms/:id/approvals: a caller that is not the person in person does not
  *                choose who may resolve its request (approverRole), as it does not lower `risk`; the
  *                person's own word stands, and an agent following a flow gate takes the gate's role.
@@ -17,14 +17,15 @@
  *                admit it, as aimeat_organism_list does; the owner and an admitted agent see it.
  *     WS-ROLE    RECORDED: an agent attached to an organism manages a workspace with its owner's
  *                creator role over MCP and is a plain member on REST.
- *     GROUPS     RECORDED: aimeat_group_list and aimeat_group_get show an agent its owner's sharing
- *                groups, which GET /v1/groups and GET /v1/groups/:id do not.
+ *     GROUPS     An agent holding consent:groups sees its owner's sharing groups on both surfaces;
+ *                without it, only the groups it is a member of. The owner in person as before.
  *     FILES      GET /v1/memory/files lists to an agent only the files its classification reader
  *                shows, as the download beside it and the MCP storage resource do.
  *   The operator (the suite's first account) turns classification on for the FILES section only and
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.1.0 — 2026-11-13 — GROUPS asserts the decided rule instead of today's answer.
  *   v1.0.0 — 2026-11-13 — Initial (structure programme 2026-11, unit 7).
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
@@ -278,30 +279,54 @@ await test('RECORDED: alice\'s agent that is not attached reads the same list on
 });
 
 // ─── GROUPS ───
-console.log('\nGROUPS (RECORDED, decision open): the owner\'s sharing groups and the owner\'s agent');
+console.log('\nGROUPS: an agent sees its owner\'s sharing groups with consent:groups, and only its own without (developer ruling 2026-11-13)');
 
 let groupId = '';
-let reader!: McpAgent, readerMcp!: McpSession;
-await test('Setup: alice in person makes a sharing group; her agent holds memory:read', async () => {
+let reader!: McpAgent, readerMcp!: McpSession, manager!: McpAgent, managerMcp!: McpSession;
+await test('Setup: alice in person makes a sharing group; one of her agents holds memory:read, another memory:read and consent:groups', async () => {
     const g = await call('POST', '/v1/groups', alice.token, { name: N('group') });
     assert(g.status === 201, `group: ${show(g)}`);
     groupId = g.body.data.group.id;
     reader = await makeAgent(BASE, alice, ['memory:read'], N('reader'));
     readerMcp = await openSession(BASE, reader.token, 'u7 reader');
+    manager = await makeAgent(BASE, alice, ['memory:read', 'consent:groups'], N('manager'));
+    managerMcp = await openSession(BASE, manager.token, 'u7 manager');
 });
 
-await test('RECORDED: aimeat_group_list and aimeat_group_get show the agent its owner\'s group', async () => {
+await test('REFUSED: without consent:groups, aimeat_group_list leaves the owner\'s group out and aimeat_group_get refuses it', async () => {
     const list = await callTool(readerMcp, 'aimeat_group_list', {});
-    assert(!list.isError && list.text.includes(groupId), `list: ${list.text.slice(0, 300)}`);
+    assert(!list.isError && !list.text.includes(groupId), `list: ${list.text.slice(0, 300)}`);
     const one = await callTool(readerMcp, 'aimeat_group_get', { group_id: groupId });
-    assert(!one.isError && one.text.includes(groupId), `get: ${one.text.slice(0, 300)}`);
+    assert(one.isError, `get: ${one.text.slice(0, 300)}`);
 });
 
-await test('RECORDED: GET /v1/groups leaves the group out for the agent, and GET /v1/groups/:id answers 403', async () => {
+await test('REFUSED: without consent:groups, GET /v1/groups leaves the group out and GET /v1/groups/:id answers 403', async () => {
     const list = await call('GET', '/v1/groups', reader.token);
     assert(list.status === 200 && !list.text.includes(groupId), `list: ${show(list)}`);
     const one = await call('GET', `/v1/groups/${groupId}`, reader.token);
     assert(one.status === 403, `get: ${show(one)}`);
+});
+
+await test('DECIDED: with consent:groups, the owner\'s group is listed and read on both surfaces', async () => {
+    const list = await callTool(managerMcp, 'aimeat_group_list', {});
+    assert(!list.isError && list.text.includes(groupId), `MCP list: ${list.text.slice(0, 300)}`);
+    const one = await callTool(managerMcp, 'aimeat_group_get', { group_id: groupId });
+    assert(!one.isError && one.text.includes(groupId), `MCP get: ${one.text.slice(0, 300)}`);
+    const rest = await call('GET', '/v1/groups', manager.token);
+    assert(rest.status === 200 && rest.text.includes(groupId), `REST list: ${show(rest)}`);
+    const restOne = await call('GET', `/v1/groups/${groupId}`, manager.token);
+    assert(restOne.status === 200, `REST get: ${show(restOne)}`);
+});
+
+await test('USE KEPT: alice in person lists and reads her group; an agent that is a member sees that group without consent:groups', async () => {
+    const mine = await call('GET', '/v1/groups', alice.token);
+    assert(mine.status === 200 && mine.text.includes(groupId), `owner list: ${show(mine)}`);
+    const add = await call('POST', `/v1/groups/${groupId}/members`, alice.token, { identifier: reader.gaii, identifier_type: 'gaii' });
+    assert(add.status === 201, `add the agent: ${show(add)}`);
+    const rest = await call('GET', `/v1/groups/${groupId}`, reader.token);
+    assert(rest.status === 200, `member agent, REST: ${show(rest)}`);
+    const mcp = await callTool(readerMcp, 'aimeat_group_list', {});
+    assert(!mcp.isError && mcp.text.includes(groupId), `member agent, MCP: ${mcp.text.slice(0, 300)}`);
 });
 
 // ─── FILES ───

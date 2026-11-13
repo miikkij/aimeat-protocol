@@ -41,6 +41,8 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.2.1 — 2026-11-13 — src/mcp/sharing-groups.ts leaves EXEMPT: its group reads call
+ *     services/sharing-groups/reach.ts, as the REST routes do (structure programme unit 7).
  *   v1.2.0 — 2026-11-13 — Structure programme unit 2: a file leaves EXEMPT when its reads call the
  *     service function its REST route calls.
  *   v1.1.2 — 2026-10-20 — src/mcp/index.ts leaves EXEMPT: its storage reads moved to
@@ -94,7 +96,6 @@ const EXEMPT = new Set([
   'src/mcp/organisms-name-invites.ts',
   'src/mcp/organisms.ts',
   'src/mcp/prompts.ts',
-  'src/mcp/sharing-groups.ts',
   'src/mcp/skills.ts',
   'src/mcp/wallet-extended.ts',
   'src/mcp/workspaces.ts',

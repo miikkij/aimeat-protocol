@@ -18,6 +18,9 @@
  *   - GET    /v1/shares/incoming     -- What has been shared WITH me
  *   - DELETE /v1/shares/:shareId     -- Stop sharing
  * @version-history
+ *   2026-11-13 -- GET /v1/groups and GET /v1/groups/:id ask services/sharing-groups/reach.ts, as
+ *     aimeat_group_list and aimeat_group_get do: an agent holding consent:groups sees its owner's
+ *     groups, without it only its own (developer ruling 2026-11-13; structure programme 2026-11, unit 7).
  *   2026-11-05 -- PATCH /v1/groups/:id/members/:identifier admits the owner's agent holding
  *     consent:groups, as DELETE of the same member does, and acts on groups owned by the owner's GHII
  *     (codebase analysis 2026-11-03, decision 13a of 2026-11-05: the looser of a path's verbs decides).
@@ -56,9 +59,10 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
-import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { callerOf } from '../middleware/caller.js';
+import { sharingGroupsFor, sharingGroupFor } from '../services/sharing-groups/reach.js';
 import {
   SharingGroupUpdateSchema,
   SharingGroupUpdateMemberSchema,
@@ -95,61 +99,23 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── GET /v1/groups -- List own + member-of groups ── */
+  // Which groups a caller sees is services/sharing-groups/reach.ts, which aimeat_group_list and
+  // aimeat_group_get ask too: the owner in person their own and their memberships; an agent holding
+  // consent:groups the same plus its own memberships; any other caller its own (ruling 2026-11-13).
   router.get('/v1/groups', requireAuth(), requireScope('memory:read'), async (req, res) => {
-    const isOwnerSession = isOwnerInPerson(req.auth);
-    const identity = resolve(req);
-
-    let groups;
-    if (isOwnerSession) {
-      // Owner sees their owned groups + groups where they are a member
-      const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
-      const owned = await storage.listSharingGroups(ownerGhii);
-      const memberOf = await storage.listSharingGroupsByMember(ownerGhii);
-
-      // Merge and deduplicate by id
-      const seen = new Set(owned.map(g => g.id));
-      groups = [...owned];
-      for (const g of memberOf) {
-        if (!seen.has(g.id)) {
-          groups.push(g);
-          seen.add(g.id);
-        }
-      }
-    } else {
-      // Agent sees groups where it is a member
-      groups = await storage.listSharingGroupsByMember(identity);
-    }
-
+    const groups = await sharingGroupsFor(storage, callerOf(req, config.nodeId, storage));
     res.json(success(config.nodeId, { groups, total: groups.length }));
   });
 
   /* ── GET /v1/groups/:id -- Get group detail ── */
   router.get('/v1/groups/:id', requireAuth(), requireScope('memory:read'), async (req, res) => {
-    const id = req.params.id as string;
-    const identity = resolve(req);
-
-    const group = await storage.getSharingGroup(id);
-    if (!group) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Sharing group not found'));
+    const found = await sharingGroupFor(storage, callerOf(req, config.nodeId, storage), req.params.id as string);
+    if (!found.ok) {
+      if (found.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Sharing group not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not a member of this group'));
       return;
     }
-
-    // Must be owner or member
-    const isOwner = group.ownerGaii === identity;
-    const isMember = group.members.some(m => m.identifier === identity);
-
-    // For owner sessions, also check if the bare owner matches
-    const isOwnerSession = isOwnerInPerson(req.auth);
-    const ownerGhii = isOwnerSession ? `${req.auth!.owner}@${config.nodeId}` : null;
-    const isOwnerByGhii = ownerGhii ? group.ownerGaii === ownerGhii : false;
-    const isMemberByGhii = ownerGhii ? group.members.some(m => m.identifier === ownerGhii) : false;
-
-    if (!isOwner && !isMember && !isOwnerByGhii && !isMemberByGhii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not a member of this group'));
-      return;
-    }
-
-    res.json(success(config.nodeId, { group }));
+    res.json(success(config.nodeId, { group: found.group }));
   });
 
   /* ── PATCH /v1/groups/:id -- Update group ── */

@@ -10,6 +10,9 @@
  *   import { registerSharingGroupTools } from './sharing-groups.js';
  *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — SECURITY: aimeat_group_list and aimeat_group_get ask services/sharing-groups/reach.ts, as
+ *     GET /v1/groups and GET /v1/groups/:id do: the owner's groups only to an agent holding consent:groups,
+ *     else its own (developer ruling 2026-11-13; structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_group_create hands default_permissions to createSharingGroup, as POST
  *     /v1/groups does (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -53,6 +56,7 @@ import {
 } from '../services/group-shares.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { sharingGroupsFor, sharingGroupFor } from '../services/sharing-groups/reach.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -85,23 +89,9 @@ export function registerSharingGroupTools(
             annotations: annotationsFor('aimeat_group_list'),
         },
         async () => {
-            const ownerGhii = getOwnerGhii();
-
-            // Get groups the owner owns
-            const owned = await storage.listSharingGroups(ownerGhii);
-            // Get groups where the owner is a member
-            const memberOf = await storage.listSharingGroupsByMember(ownerGhii);
-
-            // Also check by agent GAII
-            const agentMemberOf = await storage.listSharingGroupsByMember(agentGaii);
-
-            // Merge and deduplicate by id
-            const seen = new Set<string>();
-            const all = [...owned, ...memberOf, ...agentMemberOf].filter(g => {
-                if (seen.has(g.id)) return false;
-                seen.add(g.id);
-                return true;
-            });
+            // The groups GET /v1/groups lists to the same caller (services/sharing-groups/reach.ts):
+            // the owner's with consent:groups, else only the agent's own (ruling 2026-11-13).
+            const all = await sharingGroupsFor(storage, caller());
 
             return {
                 content: [{
@@ -130,18 +120,12 @@ export function registerSharingGroupTools(
             annotations: annotationsFor('aimeat_group_get'),
         },
         async ({ group_id }) => {
-            const group = await storage.getSharingGroup(group_id);
-            if (!group) return { content: [{ type: 'text' as const, text: 'Sharing group not found' }], isError: true };
-
-            const ownerGhii = getOwnerGhii();
-
-            // Must be owner or member
-            const isOwner = group.ownerGaii === ownerGhii;
-            const isMember = group.members.some(m => m.identifier === ownerGhii || m.identifier === agentGaii);
-
-            if (!isOwner && !isMember) {
-                return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
+            // The read GET /v1/groups/:id answers the same caller (services/sharing-groups/reach.ts).
+            const found = await sharingGroupFor(storage, caller(), group_id);
+            if (!found.ok) {
+                return { content: [{ type: 'text' as const, text: found.code === 'NOT_FOUND' ? 'Sharing group not found' : 'Access denied' }], isError: true };
             }
+            const group = found.group;
 
             return {
                 content: [{

@@ -73723,7 +73723,11 @@ paths:
     get:
       operationId: listSharingGroups
       summary: List sharing groups
-      description: List all sharing groups the authenticated user is a member of or owns.
+      description: |
+        List the sharing groups the caller sees. The owner in person: the groups they own and the
+        groups they are a member of. An agent or app holding `consent:groups`: the same groups as its
+        owner, plus the groups it is a member of itself. Any other caller: the groups its own identity
+        is a member of. `aimeat_group_list` gives the same list.
       tags: [Sharing Groups]
       security:
         - BearerAuth: []
@@ -73751,7 +73755,9 @@ paths:
     get:
       operationId: getSharingGroup
       summary: Get sharing group detail
-      description: Get full detail of a sharing group including members and entry count.
+      description: |
+        Get full detail of a sharing group including members and entry count. Readable by the
+        callers `GET /v1/groups` lists it to; anyone else gets 403.
       tags: [Sharing Groups]
       security:
         - BearerAuth: []

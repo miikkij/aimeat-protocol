@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_group_list and aimeat_group_get say which groups an agent sees with and without
+ *     consent:groups (developer ruling 2026-11-13; structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_group_create takes default_permissions (unit 3b).
  *   2026-11-13 — aimeat_consent_list takes recipient (unit 3b).
  *   2026-11-13 — aimeat_instance_list takes platform (unit 3b).
@@ -354,7 +356,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_group_list',
-        description: 'List the sharing groups relevant to you: those your owner created plus any your owner or this agent is a member of (deduplicated), each with name, owner, and member count. Sharing groups back the "group" visibility level on memory entries. Inspect one with aimeat_group_get, create one with aimeat_group_create.',
+        description: 'List the sharing groups relevant to you, each with name, owner, and member count: the groups this agent is a member of and, when you hold consent:groups, also those your owner created or is a member of (deduplicated), the same list GET /v1/groups gives you. Sharing groups back the "group" visibility level on memory entries. Inspect one with aimeat_group_get, create one with aimeat_group_create.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Sharing Groups', readOnlyHint: true },
@@ -365,7 +367,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_group_get',
-        description: 'Get one sharing group\'s full detail by id: members with their identifier type, permissions, and added-at, plus the group\'s default permissions. Only the owner or a member may read it. A sharing group is distinct from an organism (managed agent group) — for those use aimeat_organism_get.',
+        description: 'Get one sharing group\'s full detail by id: members with their identifier type, permissions, and added-at, plus the group\'s default permissions. You read a group this agent is a member of, and with consent:groups also one your owner created or is a member of. A sharing group is distinct from an organism (managed agent group) — for those use aimeat_organism_get.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get Sharing Group', readOnlyHint: true },

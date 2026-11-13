@@ -30,6 +30,8 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.5.2 — 2026-11-13 — Structure programme unit 7: sharing-groups.ts 4 → none (aimeat_group_list
+ *     and aimeat_group_get call services/sharing-groups/reach.ts, as GET /v1/groups does).
  *   v1.5.1 — 2026-11-13 — Structure programme unit 7: core.ts 9 → 8 (aimeat_discover builds its caller
  *     with services/discovery/caller.ts), organisms.ts 21 → 19 (aimeat_organism_members asks
  *     rosterAgentsFor in services/organism-privacy.ts).
@@ -145,7 +147,6 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/organisms-name-invites.ts': 7,
     'src/mcp/organisms.ts': 19,
     'src/mcp/prompts.ts': 1,
-    'src/mcp/sharing-groups.ts': 4,
     'src/mcp/skills.ts': 1,
     'src/mcp/wallet-extended.ts': 2,
     'src/mcp/workspaces.ts': 6,
