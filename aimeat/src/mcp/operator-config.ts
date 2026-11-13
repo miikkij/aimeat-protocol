@@ -77,7 +77,7 @@ import { writeMemoryRecord } from '../services/memory-write.js';
 import { CAS_ATTEMPTS } from '../services/record-cas.js';
 import { recommendedModelsOf } from '../services/ai/policy-store.js';
 import {
-    normaliseAgentProfile, resolveAgentTarget, setAgentProfile,
+    normaliseAgentProfile, loadSameOwnerAgent, setAgentProfile,
     type AgentProfileFields,
 } from '../services/agent-profile-write.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -159,9 +159,9 @@ export function registerOperatorConfigTools(
             // One target resolution, the writer's: a bare name becomes a GAII under the CALLER's
             // own owner, and anything already GAII-shaped has to survive the ownership check below
             // before it is read or written. Both doors resolve a name the same way now.
-            const targetGaii = resolveAgentTarget(config, callerOwner, agent_name);
-            const agent = await storage.getAgent(targetGaii);
-            if (!agent || agent.owner !== callerOwner) return err(`No agent "${agent_name}" under owner ${callerOwner}`);
+            const target = await loadSameOwnerAgent({ storage, config }, callerOwner, agent_name, '');
+            if (!target.ok) return err(`No agent "${agent_name}" under owner ${callerOwner}`);
+            const { gaii: targetGaii, agent } = target;
 
             const proposed: AgentConfigChange = {};
             if (display_name !== undefined) proposed.display_name = display_name;

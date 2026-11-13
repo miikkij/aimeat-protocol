@@ -137,7 +137,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/extensions.ts': 2,
     'src/mcp/knowledge.ts': 1,
     'src/mcp/memory-extended.ts': 1,
-    'src/mcp/operator-config.ts': 2,
+    'src/mcp/operator-config.ts': 1,
     'src/mcp/organisms-email-invites.ts': 2,
     'src/mcp/organisms-name-invites.ts': 7,
     'src/mcp/organisms.ts': 21,

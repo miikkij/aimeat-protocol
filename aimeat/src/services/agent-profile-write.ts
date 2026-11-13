@@ -122,8 +122,11 @@ export function resolveAgentTarget(config: AimeatConfig, callerOwner: string, id
     return identifier.includes('#') ? identifier : buildGAII(identifier, callerOwner, config.nodeId);
 }
 
-/** Load the target agent and refuse unless it belongs to the caller's owner. */
-async function loadSameOwnerAgent(
+/**
+ * Load the target agent and refuse unless it belongs to the caller's owner. Exported for
+ * aimeat_operator_agent_configure, which reads the agent before its confirm step (2026-11-13).
+ */
+export async function loadSameOwnerAgent(
     deps: AgentWriteDeps,
     callerOwner: string,
     identifier: string,
