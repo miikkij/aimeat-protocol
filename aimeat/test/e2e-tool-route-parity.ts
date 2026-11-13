@@ -44,6 +44,8 @@
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.8.0 — 2026-11-14 — Unit 2b part 2, phase B: B6, aimeat_admin_agents against GET /v1/admin/agents
+ *     with a negative limit, recorded as an open question.
  *   v1.7.0 — 2026-11-14 — MEMBER-LIST.
  *   v1.6.0 — 2026-11-14 — JOIN-PRIVATE asserts the developer's decision instead of today's answers.
  *   v1.5.0 — 2026-11-14 — ROSTER-PRIVATE asserts the developer's decision instead of today's answers.
@@ -632,6 +634,35 @@ await test('Cleanup: classification off; the accounts deleted', async () => {
         if (gone.body?.ok !== true) left.push(`${who.name}: ${gone.status}`);
     }
     assert(left.length === 0, `accounts not deleted: ${left.join(', ')}`);
+});
+
+// ─── unit 2b part 2, phase B (session cc-jouni-structure-u2b-2) ───
+// One section per difference between an agent, app, task or operator tool and its REST route. A
+// RECORDED DIFFERENCE asserts both answers as they are today and names the open question in its title.
+console.log('\nunit 2b part 2, phase B: agent, app, task and operator tools against their routes');
+
+let pbOpAgent!: McpAgent, pbOpMcp!: McpSession;
+await test('Setup (phase B): the operator\'s agent holding operator:admin', async () => {
+    pbOpAgent = await makeAgent(BASE, op, ['operator:admin'], N('pbop'));
+    pbOpMcp = await openSession(BASE, pbOpAgent.token, 'u2b2 phase B operator');
+});
+
+await test('B6 USE KEPT: aimeat_admin_agents and GET /v1/admin/agents answer limit=1 alike', async () => {
+    const tool = await callTool(pbOpMcp, 'aimeat_admin_agents', { limit: 1 });
+    const rest = await call('GET', '/v1/admin/agents?limit=1', pbOpAgent.token);
+    assert(!tool.isError && rest.status === 200, `tool: ${tool.text.slice(0, 200)} / route: ${show(rest)}`);
+    assert(Array.isArray(tool.data) && tool.data.length === 1 && rest.body.data.agents.length === 1,
+        `tool ${JSON.stringify(tool.data).slice(0, 120)} / route ${rest.body.data.agents.length}`);
+});
+
+await test('B6 RECORDED DIFFERENCE (question: what a negative limit means): limit=-1, the tool leaves out the last agent and the route lists every agent', async () => {
+    const tool = await callTool(pbOpMcp, 'aimeat_admin_agents', { limit: -1 });
+    const rest = await call('GET', '/v1/admin/agents?limit=-1', pbOpAgent.token);
+    assert(rest.status === 200, `route: ${show(rest)}`);
+    const all = rest.body.data.agents.length as number;
+    assert(all === rest.body.data.total, `route lists ${all} of ${rest.body.data.total}`);
+    assert(!tool.isError && Array.isArray(tool.data), `tool: ${tool.text.slice(0, 200)}`);
+    assert(tool.data.length === all - 1, `tool lists ${tool.data.length}, route ${all}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
