@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-13 — readWorkspaceOp takes `archived` ('only' reads the archived content alone), as
+ *     GET /v1/organisms/:id/workspace does (structure programme 2026-11, unit 3b).
  *   2026-11-10 — writeWorkspaceDraftsOp passes the organism rule's refusal through (status, code,
  *     reason). It answered every refusal with "You are not approved to write to this workspace. Request
  *     access...", which sent the organism creator's own agent to request access to its own workspace.
@@ -213,6 +215,9 @@ export interface ReadWorkspaceArgs {
     /** With `ids`: restrict to this space (name or namespace). */
     space?: string;
     includeArchived?: boolean;
+    /** 'only': the archived content alone, as GET /v1/organisms/:id/workspace?archived=only reads it.
+     *  Wins over includeArchived. */
+    archived?: 'only' | 'include';
     /** The classification reader (TARGET-082): the loader takes one, so no read skips the check. */
     reader: ContentReader;
 }
@@ -240,7 +245,7 @@ export async function readWorkspaceOp(
     const opening = !!(ids && ids.length);
     const got = await loadWorkspaceContent(deps, args.reader,
         { sub: caller.principal, ownerName: caller.ownerName, accessorGaii: caller.ownerGhii },
-        { organismId, ws, archived: args.includeArchived ? 'include' : undefined, valuesOnDemand: opening });
+        { organismId, ws, archived: args.archived ?? (args.includeArchived ? 'include' : undefined), valuesOnDemand: opening });
     if (!got.ok) return refuse(got.status, got.code, got.message);
     const { items } = got;
     // The meta records are the copies that count (services/workspace-meta.ts), for the gate and the answer.

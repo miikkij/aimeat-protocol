@@ -5,6 +5,12 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_memory_list takes archived (unit 3b).
+ *   2026-11-13 — aimeat_task_todo takes completed_at (unit 3b).
+ *   2026-11-13 — aimeat_schedule_update takes purpose, constraints and input (unit 3b).
+ *   2026-11-13 — aimeat_schedule_create takes enabled and constraints (unit 3b).
+ *   2026-11-13 — aimeat_task_create takes rules, verification, todos, resources and parent_task_id
+ *     (structure programme 2026-11, unit 3b).
  *   2026-11-10 — aimeat_memory_list takes `cursor`: a page in key order read in SQL batches, with
  *     next_cursor (GET /v1/memory?cursor; performance work, architecture item 4).
  *   2026-11-09 — aimeat_memory_write's `tags` says that leaving it out keeps the record's tags.
@@ -85,6 +91,14 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
+/** A schedule's guards, as POST /v1/schedules and PATCH /v1/schedules/:id read them (services/schedule-constraints.ts). */
+const SCHEDULE_CONSTRAINTS_INPUT = z.array(z.object({
+    type: z.string().max(INPUT_LIMITS.name).describe("'max_runs' or 'daily_limit'."),
+    enabled: z.boolean().optional().describe('true turns the guard on; a guard without it is stored off.'),
+    params: z.record(z.string(), z.unknown()).optional().describe('{ limit: <number> }'),
+})).max(20);
+const SCHEDULE_CONSTRAINTS_TEXT = "Guards checked before every fire, each { type, enabled: true, params: { limit } }: 'max_runs' stops the schedule after `limit` runs; 'daily_limit' holds an ai schedule once the owner's AI spend today reaches `limit` US dollars. An unknown type is dropped.";
+
 export const schedulesTasksMemoryTools = [
     {
         name: 'aimeat_schedule_create',
@@ -115,6 +129,10 @@ export const schedulesTasksMemoryTools = [
             system_prompt: { type: 'string', description: '' },
             target_agent: { type: 'string', description: 'agent_task only: target agent name (defaults to yourself; must be same owner).' },
             description: { type: 'string', description: '' },
+            // The two fields below are the ones POST /v1/schedules takes on task:write (structure
+            // programme 2026-11, unit 3b); createScheduleRecord reads them for both callers.
+            enabled: { type: 'boolean', description: 'false creates the schedule paused: it does not fire until aimeat_schedule_update sets enabled true. Default true.' },
+            constraints: { type: 'array', description: SCHEDULE_CONSTRAINTS_TEXT, zod: SCHEDULE_CONSTRAINTS_INPUT },
         },
     },
     {
@@ -145,6 +163,11 @@ export const schedulesTasksMemoryTools = [
             display_name: { type: 'string', description: 'New label.' },
             prompt: { type: 'string', description: 'New prompt: an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates.' },
             deliver: { type: 'string', enum: ['owner', 'none'], description: 'agent_task only: "owner" makes the node hand each finished task\x27s result to the owner; "none" leaves it to the agent.' },
+            // The fields below are the ones PATCH /v1/schedules/:id takes on workflow:write
+            // (structure programme 2026-11, unit 3b); updateScheduleRecord checks them for both callers.
+            purpose: { type: 'string', description: 'Why this runs, shown to the owner.', zod: z.string().max(500) },
+            constraints: { type: 'array', description: `Replaces the schedule's guards. ${SCHEDULE_CONSTRAINTS_TEXT}`, zod: SCHEDULE_CONSTRAINTS_INPUT },
+            input: { type: 'object', description: "Replaces the schedule's input (see aimeat_schedule_create for what each kind takes). The node checks a new input by the same rules as at creation, and a new prompt given with it goes on top." },
         },
     },
     {
@@ -297,6 +320,30 @@ export const schedulesTasksMemoryTools = [
                 description: z.string().max(INPUT_LIMITS.description).optional().describe('What this field is for, for whoever reads the task.'),
             })).max(20) },
             start: { type: 'string', enum: ['automatic', 'confirm'], description: "How THIS task starts. 'confirm' = it waits for the owner's OK; 'automatic' = the agent proposes its plan and goes on (needs agent:write, never for your own task). Leave it out to use the agent's own setting. The answer's `start` says whether it runs now or waits, and why: tell the person." },
+            // The fields below are the ones POST /v1/agents/:name/tasks takes on the same word
+            // (structure programme 2026-11, unit 3b); createTask validates them for both callers.
+            rules: { type: 'array', description: 'Rules the target agent must keep while it works, one sentence each (for example "Never send mail").', zod: z.array(z.string().max(INPUT_LIMITS.description)).max(50) },
+            verification: { type: 'object', description: 'How the owner will judge the result: what they expect to get, and the checks that prove it.', zod: z.object({
+                user_expects: z.string().max(INPUT_LIMITS.description).describe('What the owner expects to receive, in their words.'),
+                technical_checks: z.array(z.string().max(INPUT_LIMITS.description)).max(50).describe('Checks that show the work is done.'),
+            }) },
+            todos: { type: 'array', description: "A plan given with the task: the steps in order. A step that spends money, sends mail as the owner or deletes the owner's data declares it in `effects`, and then the task waits for the owner's OK.", zod: z.array(z.object({
+                id: z.string().max(INPUT_LIMITS.id).describe('Step id, unique in this task.'),
+                order: z.number().describe('Position of the step, from 1.'),
+                title: z.string().max(INPUT_LIMITS.title),
+                description: z.string().max(INPUT_LIMITS.description).optional(),
+                environment: z.enum(['aimeat', 'agent']).describe("'aimeat' when the step runs on this node, 'agent' when the agent runs it on its own side."),
+                environment_reason: z.string().max(INPUT_LIMITS.line).optional(),
+                verification: z.string().max(INPUT_LIMITS.description).optional(),
+                estimate_minutes: z.number().optional(),
+                effects: z.array(z.enum(['spend', 'send_as_owner', 'delete'])).max(3).optional(),
+            })).max(100) },
+            resources: { type: 'object', description: 'What the target agent may read for this task besides `files`: knowledge packages, memory keys and memory key prefixes.', zod: z.object({
+                knowledge_packages: z.array(z.string().max(INPUT_LIMITS.key)).max(50).optional(),
+                memory_keys: z.array(z.string().max(INPUT_LIMITS.key)).max(100).optional(),
+                memory_prefixes: z.array(z.string().max(INPUT_LIMITS.key)).max(50).optional(),
+            }) },
+            parent_task_id: { type: 'string', description: 'The task this one is part of, when you split a larger task into pieces.', zod: z.string().max(INPUT_LIMITS.id) },
         },
     },
     {
@@ -454,6 +501,8 @@ export const schedulesTasksMemoryTools = [
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             todo_id: { type: 'string', required: true, description: 'TODO item identifier.' },
             status: { type: 'string', required: true, enum: ['pending', 'active', 'done', 'failed', 'skipped'], description: 'New TODO status.' },
+            // As PATCH /v1/agents/:name/tasks/:id/todos/:todoId takes it (unit 3b).
+            completed_at: { type: 'string', description: 'When the step was finished (ISO 8601), when that was earlier than this call. Without it a done, failed or skipped step gets the time of this call.', zod: z.string().max(INPUT_LIMITS.id) },
         },
     },
     {
@@ -609,6 +658,8 @@ export const schedulesTasksMemoryTools = [
             owner_scope: { type: 'boolean', description: 'When true, list same-owner GHII and all same-owner agent memory. Their private records are listed only with the memory:read-as-owner scope.', zod: flexibleBoolean },
             limit: { type: 'number', description: 'Maximum entries to return (recommended on large stores).', zod: z.number().int().positive().max(MEMORY_LIST_MAX_LIMIT) },
             cursor: { type: 'string', description: 'Page through a large store in key order: pass "" for the first page and the answer\'s next_cursor for the next one, until next_cursor is null. Each page reads only its own rows. Used with limit.', zod: z.string().max(INPUT_LIMITS.key) },
+            // As GET /v1/memory reads ?archived=only and ?include_archived=true (unit 3b).
+            archived: { type: 'string', enum: ['only', 'include'], description: "Archived records are left out by default. 'only' lists the archived ones alone; 'include' lists archived and active together." },
         },
     },
     {

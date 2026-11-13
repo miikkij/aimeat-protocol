@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — aimeat_workspace_read forwards archived=only to .../workspace/index (unit 3b).
+ *   2026-11-13 — aimeat_organism_list forwards visibility on both of its reads (unit 3b).
+ *   2026-11-13 — aimeat_organism_update forwards location, max_members and member_visibility (unit 3b).
+ *   2026-11-13 — aimeat_organism_create forwards interests, location, max_members and
+ *     member_visibility to POST /v1/organisms (structure programme 2026-11, unit 3b).
  *   2026-11-12 — aimeat_access_request → GET or POST …/access-request of the app, welcome page or
  *     company it names; aimeat_organism_join_requests → GET /v1/organisms/:id/join-requests;
  *     aimeat_organism_join_request_review → POST …/join-requests/:requestId/review;
@@ -40,9 +45,16 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalBoolean, requiredArray, coerceObject, wsRoot } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalBoolean, optionalRecord, requiredArray, coerceObject, wsRoot } from './tool-call-helpers.js';
 import { unfileThroughDoor, sectionsFromRead } from './workspace-section-filing.js';
 import { shareBodyFromToolInput } from '../services/workspace-share-input.js';
+
+/** location, max_members and member_visibility, under the names POST and PUT /v1/organisms read. */
+function copyOrganismPlaceAndRoster(input: JsonObject, body: JsonObject): void {
+    const location = optionalRecord(input, 'location'); if (location) body.location = location;
+    const maxMembers = optionalNumber(input, 'max_members'); if (maxMembers !== undefined) body.max_members = maxMembers;
+    const memberVisibility = optionalString(input, 'member_visibility'); if (memberVisibility) body.member_visibility = memberVisibility;
+}
 
 export const organismTools: ConnectCliToolDefinition[] = [
     {
@@ -54,10 +66,12 @@ export const organismTools: ConnectCliToolDefinition[] = [
         // Public discovery + the agent's own (possibly private) organisms. A bare GET /v1/organisms
         // is public-only, so an agent could not list an organism it is already a member of (join
         // answered ALREADY_MEMBER while this list omitted it). Mirrors the server-MCP tool.
-        handler: async ({ client, config }) => {
+        handler: async ({ client, config }, input) => {
+            // ?visibility= narrows both reads, as GET /v1/organisms reads it (unit 3b).
+            const visibility = optionalString(input, 'visibility');
             const [pub, mine] = await Promise.all([
-                client.get('/v1/organisms'),
-                client.get(`/v1/organisms?member=${encodeURIComponent(config.owner)}`),
+                client.get(`/v1/organisms${query({ visibility })}`),
+                client.get(`/v1/organisms${query({ member: config.owner, visibility })}`),
             ]);
             if (pub.ok === false && mine.ok === false) return pub;
             const mineList = ((mine.data as { organisms?: { id: string }[] } | undefined)?.organisms) ?? [];
@@ -93,6 +107,7 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
             const agentAccess = optionalString(input, 'agent_access'); if (agentAccess) body.agent_access = agentAccess;
             const accessRequests = optionalString(input, 'access_requests'); if (accessRequests) body.access_requests = accessRequests;
+            copyOrganismPlaceAndRoster(input, body);
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}`, body);
         },
     },
@@ -164,6 +179,8 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
             const shape = optionalString(input, 'shape'); if (shape) body.shape = shape;
             const lang = optionalString(input, 'lang'); if (lang) body.lang = lang;
+            const interests = optionalArray(input, 'interests'); if (interests) body.interests = interests;
+            copyOrganismPlaceAndRoster(input, body);
             return client.post('/v1/organisms', body);
         },
     },
@@ -453,6 +470,7 @@ export const organismTools: ConnectCliToolDefinition[] = [
                 ids: ids?.length ? ids.join(',') : undefined,
                 space: optionalString(input, 'space'),
                 include_archived: optionalBoolean(input, 'include_archived') ? 'true' : undefined,
+                archived: optionalString(input, 'archived') === 'only' ? 'only' : undefined,
             })}`);
         },
     },

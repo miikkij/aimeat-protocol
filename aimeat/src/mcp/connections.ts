@@ -26,6 +26,8 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-11-13 — aimeat_mail_send hands template_id, variables, invoice_id, from_name, company_id and
+ *     links to sendOutbound, as POST /v1/outbound/send does (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-17 — aimeat_mail_send has no guard of its own: the registration gate decides from its
@@ -317,7 +319,8 @@ export function registerConnectionTools(
         mcp.registerTool('aimeat_mail_send', { description: descriptionFor('aimeat_mail_send'),
             inputSchema: zodShapeFor('aimeat_mail_send'),
             annotations: annotationsFor('aimeat_mail_send') },
-            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, ai_provenance_id, theme, locale, image_url, image_alt }): Promise<TextResult> => {
+            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, ai_provenance_id, theme, locale, image_url, image_alt,
+                template_id, variables, invoice_id, from_name, company_id, links }): Promise<TextResult> => {
                 try {
                     // THE OUTBOUND DOOR, NOT AROUND IT. Saved contact, suppression, opt-out, the
                     // daily allowance, the unsubscribe link and the append-only log all happen in
@@ -343,6 +346,14 @@ export function registerConnectionTools(
                         ...(locale ? { locale } : {}),
                         // The service refuses an image without alt text (INVALID_IMAGE), as the REST route does.
                         ...(image_url ? { image: { url: image_url, alt: image_alt ?? '' } } : {}),
+                        // The template, the invoice and the company are looked up and checked in
+                        // sendOutbound, as for POST /v1/outbound/send.
+                        ...(template_id ? { templateId: template_id } : {}),
+                        ...(variables ? { variables } : {}),
+                        ...(invoice_id ? { invoiceId: invoice_id } : {}),
+                        ...(from_name ? { fromName: from_name } : {}),
+                        ...(company_id ? { companyId: company_id } : {}),
+                        ...(links ? { links } : {}),
                     });
                     // No `channel`: it says whether the address has an account here, which only the
                     // owner in person reads (routes/outbound.ts seesAccounts), and a tool session is

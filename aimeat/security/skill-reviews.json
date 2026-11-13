@@ -75,14 +75,14 @@
       "digest": "sha256:713b17bc7e4b121014ceda7b"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-11-06",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:631e9a4390b6c8e8e4eaa6c1"
+      "digest": "sha256:3dc89a71d48712b051eeb483"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-11-08",
@@ -141,12 +141,12 @@
       "digest": "sha256:7c0091b8650355e912af334f"
     },
     "node:aimeat-mail-to-data": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/tool-catalog/definitions/connections.ts",
         "aimeat/src/services/connections/providers.ts"
       ],
-      "digest": "sha256:06cfafdc03527b2a0174f9f7"
+      "digest": "sha256:a99fd4d8356918be71ebb999"
     },
     "node:aimeat-app-workstation": {
       "reviewedOn": "2026-11-11",
@@ -290,7 +290,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:06bdb583a679d35cd107ebd0"
+      "digest": "sha256:84cb945cc302904e3183de80"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -418,7 +418,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:905560a118b82f7d6fd8756a",
+      "digest": "sha256:159b32744ef0035ded5fec1e",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -480,14 +480,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-11-07",
+      "reviewedOn": "2026-11-13",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:95ce8a3d9f963d5197f3a886"
+      "digest": "sha256:055b36b3ffdbd6967a6b6d8f"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -590,7 +590,7 @@
       "aimeat/src/services/ai/completion.ts": "b5184aa7ee1cd07c"
     },
     "node:aimeat-mail-to-data": {
-      "aimeat/src/tool-catalog/definitions/connections.ts": "4ed56ffc46c5c924",
+      "aimeat/src/tool-catalog/definitions/connections.ts": "6f921f29104aea7d",
       "aimeat/src/services/connections/providers.ts": "1e7f107cb72430c4"
     },
     "node:aimeat-app-workstation": {
@@ -675,8 +675,8 @@
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "b8dfc8d3da73cb3d",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "b0f7b31c0950a95d"
+      "aimeat/src/mcp/core.ts": "601751ec6e485668",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "26a67367e224834f"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
@@ -705,7 +705,7 @@
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
-      "aimeat/src/mcp/agent-schedules.ts": "e765a5170e850f1e",
+      "aimeat/src/mcp/agent-schedules.ts": "46137eed7b9bdec5",
       "aimeat/src/services/scheduler.ts": "908687da659c6582",
       "aimeat/src/services/ai/route-plan.ts": "95f735f72eac78b4"
     },
@@ -744,7 +744,7 @@
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "4d2c13ef4ace9e0e",
-      "aimeat/src/mcp/agent-schedules.ts": "e765a5170e850f1e",
+      "aimeat/src/mcp/agent-schedules.ts": "46137eed7b9bdec5",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "ba6f5c775d7ed2f4",
       "aimeat/src/services/schedule-write.ts": "328a030e6be264be"
     },
@@ -808,7 +808,7 @@
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
       "aimeat/src/services/owner-erasure.ts": "ba33447775a276a9",
       "aimeat/src/services/archive.ts": "8a08d72e2732e5ed",
-      "aimeat/src/mcp/organisms.ts": "5a7aabeab70397be"
+      "aimeat/src/mcp/organisms.ts": "a17a8ef8ae332755"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",

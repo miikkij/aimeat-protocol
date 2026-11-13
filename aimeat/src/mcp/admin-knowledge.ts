@@ -25,6 +25,8 @@
  * @structure registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii, scopes) — one read.
  * @usage registerAdminKnowledgeTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-11-13 — aimeat_admin_knowledge passes `author` to buildKnowledgeOverview, as GET
+ *     /v1/admin/knowledge does (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -61,7 +63,7 @@ export function registerAdminKnowledgeTools(
   mcp.registerTool('aimeat_admin_knowledge', { description: descriptionFor('aimeat_admin_knowledge'),
     inputSchema: zodShapeFor('aimeat_admin_knowledge'),
     annotations: annotationsFor('aimeat_admin_knowledge') },
-    async ({ page, limit, q, author_key, content_type, flagged }) => {
+    async ({ page, limit, q, author, author_key, content_type, flagged }) => {
       const operator = await resolveOperatorAgentName(storage, agentGaii, scopes);
       if (!operator) return refuse(OPERATOR_AGENT_REFUSAL);
 
@@ -69,6 +71,7 @@ export function registerAdminKnowledgeTools(
         ...(page !== undefined ? { page } : {}),
         ...(limit !== undefined ? { perPage: limit } : {}),
         ...(q !== undefined ? { q } : {}),
+        ...(author ? { author } : {}),
         ...(author_key !== undefined ? { authorKey: author_key } : {}),
         ...(content_type !== undefined ? { contentType: content_type } : {}),
         ...(flagged !== undefined ? { flagged } : {}),

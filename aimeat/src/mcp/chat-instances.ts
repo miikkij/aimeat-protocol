@@ -11,6 +11,7 @@
  *   import { registerChatInstancesTools } from './chat-instances.js';
  *   registerChatInstancesTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — aimeat_instance_list filters by platform, as GET /v1/chat-instances does (unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — The chat-instance resource refuses another owner's instance with resourceRefusal
@@ -107,8 +108,9 @@ export function registerChatInstancesTools(
             inputSchema: zodShapeFor('aimeat_instance_list'),
             annotations: annotationsFor('aimeat_instance_list'),
         },
-        async () => {
-            const instances = await storage.listChatInstances({ ownerName: ownerName() });
+        async ({ platform }) => {
+            // The same read filter GET /v1/chat-instances passes (unit 3b).
+            const instances = await storage.listChatInstances({ ownerName: ownerName(), ...(platform ? { platform } : {}) });
 
             return {
                 content: [{

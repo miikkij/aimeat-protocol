@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 -- aimeat_agents_list forwards run_mode (unit 3b).
+ *   2026-11-13 -- aimeat_message_history forwards direction (unit 3b).
+ *   2026-11-13 -- aimeat_task_todo forwards completed_at (unit 3b).
+ *   2026-11-13 -- aimeat_task_create forwards rules, verification, todos, resources and parent_task_id
+ *     to POST /v1/agents/:name/tasks (structure programme 2026-11, unit 3b).
  *   2026-10-31 -- aimeat_agent_propose forwards `schedule` (v31 K47), and moves unchanged to
  *     tool-call-defs-agent-propose.ts (max-file-lines).
  *   2026-10-29 -- The aimeat_operator_agent_configure comment names agent:permissions-add, which PATCH scopes now asks for an addition.
@@ -509,7 +514,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_agents_list',
         description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, ...). Use this to discover delegation targets for aimeat_task_create. Each agent also carries default_scopes, scope_request (what it asked for at its last approval) and refusals (calls the node refused it for a permission it still lacks).",
         input: {},
-        handler: ({ client }) => client.get('/v1/agents'),
+        handler: ({ client }, input) => client.get(`/v1/agents${query({ run_mode: optionalString(input, 'run_mode') })}`),
     },
     {
         name: 'aimeat_task_list',
@@ -552,15 +557,24 @@ export const agentTools: ConnectCliToolDefinition[] = [
             // Attachments. The connector's MCP twin has taken these since August; this door dropped
             // them, so a task commissioned here arrived without the files it was about.
             const files = (optionalArray(input, 'files') ?? []).map(ref => ({ ref }));
+            // `resources` and `files` are one record field on the route: the references travel in
+            // resources.files beside what `resources` names.
+            const resources = optionalRecord(input, 'resources');
+            const rules = optionalArray(input, 'rules');
+            const verification = optionalRecord(input, 'verification');
+            const todos = optionalArray(input, 'todos');
+            const parentTaskId = optionalString(input, 'parent_task_id');
             return client.post(`/v1/agents/${encodeURIComponent(target)}/tasks`, {
                 title: requiredString(input, 'title'),
                 description: requiredString(input, 'description'),
                 status: optionalString(input, 'status') ?? 'queued',
                 ...(scope.length ? { scope } : {}),
-                ...(files.length ? { resources: { files } } : {}),
+                ...(files.length || resources ? { resources: { ...(resources ?? {}), ...(files.length ? { files } : {}) } } : {}),
                 ...(optionalString(input, 'start') ? { start: optionalString(input, 'start') } : {}),
-                verification: { user_expects: '', technical_checks: [] },
-                todos: [],
+                ...(rules ? { rules } : {}),
+                verification: verification ?? { user_expects: '', technical_checks: [] },
+                todos: todos ?? [],
+                ...(parentTaskId ? { parent_task_id: parentTaskId } : {}),
             });
         },
     },
@@ -636,7 +650,10 @@ export const agentTools: ConnectCliToolDefinition[] = [
         },
         handler: ({ client, agentPath }, input) => client.patch(
             `/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/todos/${encodeURIComponent(requiredString(input, 'todo_id'))}`,
-            { status: requiredString(input, 'status') },
+            {
+                status: requiredString(input, 'status'),
+                ...(optionalString(input, 'completed_at') ? { completed_at: optionalString(input, 'completed_at') } : {}),
+            },
         ),
     },
     {
@@ -694,6 +711,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         },
         handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/messages${query({
             thread_id: optionalString(input, 'thread_id'), page: optionalNumber(input, 'page'), per_page: optionalNumber(input, 'per_page'),
+            direction: optionalString(input, 'direction'),
         })}`),
     },
     {

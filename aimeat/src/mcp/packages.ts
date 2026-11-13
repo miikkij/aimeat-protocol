@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-11-13 — aimeat_package_list filters by category, as GET /v1/packages does (unit 3b).
  *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-31 — aimeat_package_get passes `config`: the operator's read of a sold package is written
@@ -270,13 +271,14 @@ export function registerPackageTools(
         return { roles: [...session.roles], scopes: [...session.scopes] };
     };
 
-    mcp.registerTool('aimeat_package_list', { description: descriptionFor('aimeat_package_list'), inputSchema: zodShapeFor('aimeat_package_list'), annotations: annotationsFor('aimeat_package_list') }, async ({ search, author, status, for_sale }) => {
+    mcp.registerTool('aimeat_package_list', { description: descriptionFor('aimeat_package_list'), inputSchema: zodShapeFor('aimeat_package_list'), annotations: annotationsFor('aimeat_package_list') }, async ({ search, author, status, for_sale, category }) => {
         // The packages their authors sell to accounts here, as listings with the price (GET /v1/packages?for_sale=true).
+        // `category` filters both lists, as on the route (unit 3b).
         if (for_sale === true) {
-            const sold = await listForSale(storage, { search, author });
+            const sold = await listForSale(storage, { search, author, category });
             return { content: [{ type: 'text' as const, text: JSON.stringify({ total: sold.total, packages: sold.packages }, null, 2) }] };
         }
-        const result = await listPackagesFor(storage, ownerOf(), { search, author, status });
+        const result = await listPackagesFor(storage, ownerOf(), { search, author, status, category });
         return {
             content: [{
                 type: 'text' as const,

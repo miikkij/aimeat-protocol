@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   2026-11-13 — aimeat_cortex_list takes namespace and visibility, as GET /v1/cortex does (unit 3b).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — aimeat_extension_config_set says emailPolicy "unrestricted" is asked of the operators (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_invoke says a full run pool answers EXTENSION_RUNS_BUSY with the seconds to wait (secaudit2026oct22, lead 817).
@@ -195,6 +196,10 @@ export const extensionsCortexTools = [
         input: {
             name: { type: 'string', description: 'One cortex, in full, instead of the list.' },
             include_source: { type: 'boolean', description: 'With name: also its manifest and lib files, for editing. Your own cortex only; needs cortex:write.' },
+            // As GET /v1/cortex reads them on catalogue:read (unit 3b). Filters over what the caller
+            // may see; neither widens it.
+            namespace: { type: 'string', description: 'List only the cortexes of this namespace.', zod: z.string().max(INPUT_LIMITS.name) },
+            visibility: { type: 'string', description: 'List only the cortexes at this visibility (public, private, ...), among those you may see.', zod: z.string().max(INPUT_LIMITS.name) },
         },
     },
     {

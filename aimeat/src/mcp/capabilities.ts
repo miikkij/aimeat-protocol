@@ -10,6 +10,12 @@
  * @usage Registered by mcp/index.ts per agent session; the shared write lives in
  *   services/capability-record.ts, which the REST routes call as well.
  * @version-history
+ *   2026-11-13 — aimeat_capabilities_update hands callable, inputSchema, outputSchema,
+ *     deprecationMessage, replacedBy and the record fields to updateCapability, as PUT
+ *     /v1/capabilities/:id does (structure programme 2026-11, unit 3b).
+ *   2026-11-13 — aimeat_capabilities_create hands whenNotToUse, source, authRequired, exports,
+ *     examples, dependencies, webhookUrl, trustRequired and redactedFields to createCapability, as
+ *     POST /v1/capabilities does (structure programme 2026-11, unit 3b).
  *   2026-10-26 — aimeat_capabilities_get and _invoke answer "not found" for a private capability, an
  *     unknown visibility word, and a draft, pending_review or rejected one, unless the session is the
  *     owner's side or the operator's agent; the get asked nothing before (services/capability-reach.ts;
@@ -43,6 +49,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import {
     createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
+    type CapabilityCreateInput,
 } from '../services/capability-record.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
@@ -205,6 +212,11 @@ export function registerCapabilitiesTools(
                     callable: args.callable, inputSchema: args.inputSchema, outputSchema: args.outputSchema,
                     usage: args.usage, whenToUse: args.whenToUse, tags: args.tags,
                     status: args.status,
+                    // The rest of what POST /v1/capabilities takes, under the same names.
+                    whenNotToUse: args.whenNotToUse, source: args.source, authRequired: args.authRequired,
+                    exports: args.exports as CapabilityCreateInput['exports'], examples: args.examples,
+                    dependencies: args.dependencies, webhookUrl: args.webhookUrl,
+                    trustRequired: args.trustRequired, redactedFields: args.redactedFields,
                 });
                 if (!created.ok) {
                     return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
@@ -236,6 +248,12 @@ export function registerCapabilitiesTools(
             if (args.usage !== undefined) updates.usage = args.usage;
             if (args.whenToUse !== undefined) updates.whenToUse = args.whenToUse;
             if (args.whenNotToUse !== undefined) updates.whenNotToUse = args.whenNotToUse;
+            // The rest of what PUT /v1/capabilities/:id takes, under the same names. updateCapability
+            // picks them from PATCHABLE_CAPABILITY_FIELDS and checks the source and the webhook.
+            for (const field of ['callable', 'inputSchema', 'outputSchema', 'deprecationMessage', 'replacedBy', 'source',
+                'authRequired', 'exports', 'examples', 'dependencies', 'webhookUrl', 'trustRequired', 'redactedFields'] as const) {
+                if (args[field] !== undefined) updates[field] = args[field];
+            }
 
             const updated = await updateCapability({ storage, config }, await caller(), args.id, updates);
             if (!updated.ok) {

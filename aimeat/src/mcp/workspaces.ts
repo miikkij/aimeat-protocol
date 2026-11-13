@@ -17,6 +17,7 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-13 — aimeat_workspace_read hands archived ('only') to readWorkspaceOp (unit 3b).
  *   2026-11-08 — findWsEntry is the gate's (services/organism-gate.ts, workspaceRegistrations), so the
  *     access, member and transfer tools name the creator the REST gate and the access layer name
  *     (secaudit2026nov08 round 14, mcp/workspaces.ts:findWsEntry:first-store-order-registry-copy).
@@ -402,13 +403,14 @@ export function registerWorkspaceTools(
     mcp.registerTool('aimeat_workspace_read', { description: descriptionFor('aimeat_workspace_read'),
         inputSchema: zodShapeFor('aimeat_workspace_read'),
         annotations: annotationsFor('aimeat_workspace_read') },
-        async ({ organism_id, ws, ids, space, include_archived }): Promise<TextResult> => {
+        async ({ organism_id, ws, ids, space, include_archived, archived }): Promise<TextResult> => {
             // The work is services/workspace-tool-ops.ts, which the extension sandbox's
             // ctx.workspace calls as well: a workspace is SHARED, authorization is at the workspace
             // level (whoever may read the manifest sees all of its content), version history is
             // never surfaced, and row spaces answer with a count.
             const r = await readWorkspaceOp({ storage, config }, opsCaller(), {
                 organismId: organism_id, ws, ids, space, includeArchived: include_archived,
+                ...(archived ? { archived } : {}),
                 reader: readerForAgent({ storage, config }, agentGaii),
             });
             return r.ok ? ok(r.data) : fail(r.message);

@@ -9,6 +9,9 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — aimeat_task_todo hands completed_at to setTodoStatus, as the PATCH route does (unit 3b).
+ *   2026-11-13 — aimeat_task_create takes rules, verification, todos, resources and parent_task_id,
+ *     the fields POST /v1/agents/:name/tasks takes on the same word (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-11-12 — aimeat_agent_delete (services/agents/remove-agent.ts), aimeat_task_delete
@@ -165,7 +168,7 @@ export function registerAgentTaskTools(
             inputSchema: zodShapeFor('aimeat_task_create'),
             annotations: annotationsFor('aimeat_task_create'),
         },
-        async ({ target_agent, title, description, status, files, scope, start }) => {
+        async ({ target_agent, title, description, status, files, scope, start, rules, verification, todos, resources, parent_task_id }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
@@ -200,8 +203,18 @@ export function registerAgentTaskTools(
                     // a tool that refuses a task over a missing type field would be refusing the
                     // common case to satisfy a schema.
                     ...(scope?.length ? { scope: scope.map(s => ({ ...s, type: s.type ?? 'text' as const })) } : {}),
-                    ...(files?.length ? { resources: { files: files.map(ref => ({ ref })) } } : {}),
+                    // `files` and `resources` are one record field on the route: the references
+                    // travel inside resources.files, beside what `resources` names.
+                    ...(files?.length || resources
+                        ? { resources: { ...(resources ?? {}), ...(files?.length ? { files: files.map(ref => ({ ref })) } : {}) } }
+                        : {}),
                     ...(start ? { start } : {}),
+                    // The rest of the fields POST /v1/agents/:name/tasks takes, under the names
+                    // AgentTaskCreateSchema reads, so createTask validates them for both callers.
+                    ...(rules ? { rules } : {}),
+                    ...(verification ? { verification } : {}),
+                    ...(todos ? { todos } : {}),
+                    ...(parent_task_id ? { parent_task_id } : {}),
                 },
                 actor: agentGaii,
                 mayAskAutomatic: mayLoosenStart(startCaller, targetGaii),
@@ -619,7 +632,7 @@ export function registerAgentTaskTools(
             inputSchema: zodShapeFor('aimeat_task_todo'),
             annotations: annotationsFor('aimeat_task_todo'),
         },
-        async ({ task_id, todo_id, status }) => {
+        async ({ task_id, todo_id, status, completed_at }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
 
@@ -630,7 +643,7 @@ export function registerAgentTaskTools(
             // Same as the event path, and the same service: ticking off a todo is the agent showing
             // up, so a stalled task resumes on it, the task's lastEventAt moves and the matching
             // todo_completed / todo_failed event is appended.
-            const result = await setTodoStatus({ storage, config }, task, todo_id, { status }, agentGaii);
+            const result = await setTodoStatus({ storage, config }, task, todo_id, { status, ...(completed_at ? { completed_at } : {}) }, agentGaii);
             if (!result.ok) {
                 return { content: [{ type: 'text' as const, text: `${result.code}: ${result.message}` }], isError: true };
             }

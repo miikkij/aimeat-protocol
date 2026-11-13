@@ -6,6 +6,9 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_mail_send takes template_id, variables, invoice_id, from_name, company_id and
+ *     links, as POST /v1/outbound/send does, and subject and body are optional when a template or an
+ *     invoice gives them (structure programme 2026-11, unit 3b).
  *   2026-10-16 — aimeat_mail_send takes locale, image_url and image_alt, and its body and kind descriptions name the formatting vocabulary and the sender footer.
  *   2026-10-16 — aimeat_connection_history and aimeat_connection_replies reach the owner's published
  *     items on connections:read-as-owner, and the replies read allows one pass per run of an agent the
@@ -30,6 +33,7 @@
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 
 export const connectionTools = [
     {
@@ -176,8 +180,10 @@ export const connectionTools = [
         surfaces: ['agent'],
         input: {
             contact_id: { type: 'string', required: true, description: 'A saved recipient. Never a free address.' },
-            subject: { type: 'string', required: true, description: 'The subject line.' },
-            body: { type: 'string', required: true, description: "The message as plain text; the server renders and escapes it, and no HTML you write reaches the mail. A blank line starts a paragraph. A small formatting vocabulary is read: '## ' or '### ' at the start of a line is a heading, '- ' at the start of a line is a bullet, '---' alone on a line is a divider, **bold**, and [label](https://address) is a link (https only; any other address stays plain text)." },
+            // Optional since 2026-11-13, as on POST /v1/outbound/send: a template or an invoice gives
+            // the subject and the body, and sendOutbound refuses a message that has neither.
+            subject: { type: 'string', description: 'The subject line. Required unless template_id or invoice_id gives it.' },
+            body: { type: 'string', description: "Required unless template_id or invoice_id gives it. The message as plain text; the server renders and escapes it, and no HTML you write reaches the mail. A blank line starts a paragraph. A small formatting vocabulary is read: '## ' or '### ' at the start of a line is a heading, '- ' at the start of a line is a bullet, '---' alone on a line is a divider, **bold**, and [label](https://address) is a link (https only; any other address stays plain text)." },
             connection_id: { type: 'string', description: 'Send through this connected mailbox of yours.' },
             from_alias: { type: 'string', description: 'A verified alias of that mailbox to send as.' },
             kind: { type: 'string', description: "'transactional' (default) or 'marketing', which an opt-out blocks and which carries the unsubscribe link and the List-Unsubscribe headers a mail program turns into its own unsubscribe button. When your owner keeps a sender record (memory key outbound.sender: legal_name, business_id, address, privacy_url, reason), a marketing message also carries a footer with who sends it, why the reader gets it and the privacy notice.", zod: z.enum(['transactional', 'marketing']) },
@@ -188,6 +194,14 @@ export const connectionTools = [
             image_alt: { type: 'string', description: 'The words a reader sees when their mail program blocks the picture, which most do until they allow it. Required with image_url.', zod: z.string().max(200) },
             ai_disclosure: { type: 'string', description: "Optional: mark the message as machine-written in a header. One of none | ai-assisted | ai-generated | autonomous. If YOU wrote the body, declare it — 'ai-generated' when you produced the text, 'ai-assisted' when a person wrote it and you edited. It goes in a HEADER and not in the text, because the audience for it is machines: nobody reading their inbox follows a link to a hash. Declaring it and then asking for it to be left out is not possible.", zod: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']) },
             ai_provenance_id: { type: 'string', description: "Optional, with ai_disclosure: a provenance record of your own that describes this text, the id the node returned when it generated it for you. The header then links that record. A record that is not yours is not attached; the node stamps the message itself instead.", zod: z.string().max(80) },
+            // The fields below are the ones POST /v1/outbound/send takes on the same two words
+            // (structure programme 2026-11, unit 3b), with the route's own limits.
+            template_id: { type: 'string', description: "Compose the message from one of your owner's saved templates: the id of the memory record outbound.template.<id>, which holds { subject, body }. The template's subject and body replace `subject` and `body`. An id that matches nothing is refused (TEMPLATE_NOT_FOUND).", zod: z.string().max(80) },
+            variables: { type: 'object', description: 'Words to put in the template: each {{name}} in its subject and body becomes the value given here under that name.', zod: z.record(z.string().max(INPUT_LIMITS.name), z.string().max(2000)) },
+            invoice_id: { type: 'string', description: "Attach this invoice of your owner's as a PDF and a Finvoice file. The invoice must be sent first (draft to sent); without a subject or body the node writes them from the invoice.", zod: z.string().max(80) },
+            from_name: { type: 'string', description: 'The name the recipient sees as the sender. The sending address does not change.', zod: z.string().max(140) },
+            company_id: { type: 'string', description: "Send as one of your owner's companies: its own mail server and address when it has one, and its own address book, opt-outs and daily allowance. A company you may not send for is refused (NOT_FOUND).", zod: z.string().max(80) },
+            links: { type: 'array', description: 'Up to 10 buttons under the text, each { label, url }. The node builds the buttons; the address must be a full URL.', zod: z.array(z.object({ label: z.string().max(120), url: z.string().url().max(600) })).max(10) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

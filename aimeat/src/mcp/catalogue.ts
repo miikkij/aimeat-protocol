@@ -12,6 +12,8 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-11-13 — aimeat_catalogue_directory filters by country and interests, as GET
+ *     /v1/catalogue/directory does (structure programme 2026-11, unit 3b).
  *   2026-10-20 — SECURITY: aimeat_catalogue_directory refuses the shared anonymous principal by
  *     identity (AUTH_REQUIRED), as GET /v1/catalogue/directory does (secaudit 2026-10,
  *     jwt.ts:issueJWT:anonymous-claim-not-signed).
@@ -133,7 +135,7 @@ export function registerCatalogueTools(
             inputSchema: zodShapeFor('aimeat_catalogue_directory'),
             annotations: annotationsFor('aimeat_catalogue_directory'),
         },
-        async ({ city, interest }) => {
+        async ({ city, interest, country, interests }) => {
             // ONE LISTING, ONE OPT-IN. GET /v1/catalogue/directory answers from the DirectoryService,
             // which indexes a person only while they hold an active `federation` consent and reads
             // their profile under `profile.<username>.location` and `.interests`. This tool had its
@@ -150,7 +152,8 @@ export function registerCatalogueTools(
             const directory = nodeDirectory();
             if (!directory) return { ...toolError('FEATURE_DISABLED', 'This node runs no people directory.') };
 
-            const result = await directory.search({ type: 'people', city, interest, perPage: 100 });
+            // country and interests are the filters GET /v1/catalogue/directory reads too (unit 3b).
+            const result = await directory.search({ type: 'people', city, interest, country, interests, perPage: 100 });
             const entries = result.entries.map(e => ({
                 ghii: e.ghii,
                 display_name: e.displayName,

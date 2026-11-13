@@ -10,6 +10,16 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-13 -- aimeat_group_create forwards default_permissions (unit 3b).
+ *   2026-11-13 -- aimeat_memory_list forwards archived as ?archived=only or ?include_archived=true (unit 3b).
+ *   2026-11-13 -- aimeat_consent_list forwards recipient (unit 3b).
+ *   2026-11-13 -- aimeat_instance_list forwards platform (unit 3b).
+ *   2026-11-13 -- aimeat_action_execute forwards callback_url to POST /v1/work/request (unit 3b).
+ *   2026-11-13 -- aimeat_catalogue_directory forwards country and interests (unit 3b).
+ *   2026-11-13 -- aimeat_capabilities_update forwards callable, inputSchema, outputSchema,
+ *     deprecationMessage, replacedBy and the record fields to PUT /v1/capabilities/:id (unit 3b).
+ *   2026-11-13 -- aimeat_capabilities_create forwards whenNotToUse and the capability record fields
+ *     (copyCapabilityRecordFields) to POST /v1/capabilities (structure programme 2026-11, unit 3b).
  *   2026-11-10 -- aimeat_memory_list forwards `cursor` to GET /v1/memory ("" included: the first page).
  *   2026-11-09 -- aimeat_memory_write with `patch` proxies PATCH /v1/memory/:key (utils/memory-write-mode.ts
  *     decides value or patch); aimeat_memory_history, a proxy over GET /v1/memory/history/:key; aimeat_context_check,
@@ -69,6 +79,21 @@ import { dataMapCliTools } from './tool-call-defs-data-map.js';
 import { memoryWriteMode } from '../utils/memory-write-mode.js';
 import type { ApiResponse } from './api-client.js';
 import { complianceCliTools } from './tool-call-defs-compliance.js';
+
+/**
+ * The capability record fields both capability write tools take (tool-catalog/definitions/
+ * capability-record-input.ts), copied to the body under the names POST and PUT /v1/capabilities
+ * read. A null webhookUrl or trustRequired travels as null, because null clears the field.
+ */
+function copyCapabilityRecordFields(input: JsonObject, body: JsonObject): void {
+    const source = optionalRecord(input, 'source'); if (source) body.source = source;
+    const authRequired = optionalString(input, 'authRequired'); if (authRequired) body.authRequired = authRequired;
+    for (const field of ['exports', 'examples', 'dependencies', 'redactedFields'] as const) {
+        const list = optionalArray(input, field); if (list) body[field] = list;
+    }
+    if (input.webhookUrl === null || typeof input.webhookUrl === 'string') body.webhookUrl = input.webhookUrl;
+    if (input.trustRequired === null || typeof input.trustRequired === 'number') body.trustRequired = input.trustRequired;
+}
 
 /**
  * Appended to the catalog description on both connector doors. An agent that learns this from the
@@ -216,6 +241,9 @@ export const coreTools: ConnectCliToolDefinition[] = [
                 limit: optionalNumber(input, 'limit'),
                 // A page in key order after the cursor; "" is the first page, so it is forwarded as given.
                 cursor: typeof input.cursor === 'string' ? input.cursor : undefined,
+                // The route's two spellings for the one choice.
+                archived: optionalString(input, 'archived') === 'only' ? 'only' : undefined,
+                include_archived: optionalString(input, 'archived') === 'include' ? 'true' : undefined,
                 // A LISTING IS A LISTING. `include=meta` is what the node MCP surface has always
                 // answered with and what this tool's published output schema promises ("the listing
                 // carries no values (always the case)"); this door was the one shipping them, and
@@ -297,6 +325,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
             // request to whoever the node picks; dropping the second silently takes the default TTL.
             if (providerGaii) body.provider_gaii = providerGaii;
             if (ttlHours !== undefined) body.ttl_hours = ttlHours;
+            const callbackUrl = optionalString(input, 'callback_url'); if (callbackUrl) body.callback_url = callbackUrl;
             return client.post('/v1/work/request', body);
         },
     },
@@ -575,6 +604,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const outputSchema = optionalRecord(input, 'outputSchema'); if (outputSchema) body.outputSchema = outputSchema;
             const usage = optionalString(input, 'usage'); if (usage) body.usage = usage;
             const whenToUse = optionalString(input, 'whenToUse'); if (whenToUse) body.whenToUse = whenToUse;
+            const whenNotToUse = optionalString(input, 'whenNotToUse'); if (whenNotToUse) body.whenNotToUse = whenNotToUse;
+            copyCapabilityRecordFields(input, body);
             return client.post('/v1/capabilities', body);
         },
     },
@@ -589,6 +620,14 @@ export const coreTools: ConnectCliToolDefinition[] = [
             }
             const tags = optionalArray(input, 'tags');
             if (tags) body.tags = tags;
+            const callable = optionalBoolean(input, 'callable'); if (callable !== undefined) body.callable = callable;
+            const inputSchema = optionalRecord(input, 'inputSchema'); if (inputSchema) body.inputSchema = inputSchema;
+            const outputSchema = optionalRecord(input, 'outputSchema'); if (outputSchema) body.outputSchema = outputSchema;
+            // null clears these two, so it travels as null.
+            for (const field of ['deprecationMessage', 'replacedBy'] as const) {
+                if (input[field] === null || typeof input[field] === 'string') body[field] = input[field];
+            }
+            copyCapabilityRecordFields(input, body);
             return client.put(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`, body);
         },
     },
@@ -622,6 +661,9 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/catalogue/directory${query({
             city: optionalString(input, 'city'),
             interest: optionalString(input, 'interest'),
+            country: optionalString(input, 'country'),
+            // The route reads a comma list.
+            interests: optionalArray(input, 'interests')?.map(String).join(',') || undefined,
         })}`),
     },
     {
@@ -652,7 +694,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_consent_list',
-        handler: ({ client }) => client.get('/v1/consent'),
+        handler: ({ client }, input) => client.get(`/v1/consent${query({ recipient: optionalString(input, 'recipient') })}`),
     },
     {
         name: 'aimeat_access_list',
@@ -696,6 +738,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
             // A sharing group created without its members is an empty group, and group visibility
             // then silently shares with nobody.
             if (members) body.members = members;
+            const defaults = optionalRecord(input, 'default_permissions'); if (defaults) body.default_permissions = defaults;
             return client.post('/v1/groups', body);
         },
     },
@@ -738,7 +781,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_instance_list',
-        handler: ({ client }) => client.get('/v1/chat-instances'),
+        handler: ({ client }, input) => client.get(`/v1/chat-instances${query({ platform: optionalString(input, 'platform') })}`),
     },
     {
         // An "instance" here is a chat session, which is what all three tool descriptions say and

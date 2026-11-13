@@ -17,6 +17,7 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   2026-11-13 -- aimeat_package_list forwards category (unit 3b).
  *   v1.16.0 -- 2026-10-31 -- aimeat_package_price_set (PUT /v1/packages/:groupId/price) and
  *     aimeat_package_sales (GET .../sales, POST .../sales/:order/refund); aimeat_package_buy without
  *     `repository` reads GET /v1/packages/:groupId and opens a `package-account` checkout, and action
@@ -74,6 +75,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             author: optionalString(input, 'author'),
             status: optionalString(input, 'status'),
             for_sale: optionalBoolean(input, 'for_sale') === true ? 'true' : undefined,
+            category: optionalString(input, 'category'),
         })}`),
     },
     {

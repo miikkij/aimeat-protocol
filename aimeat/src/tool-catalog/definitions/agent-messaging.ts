@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_agents_list takes run_mode (unit 3b).
+ *   2026-11-13 — aimeat_message_history takes direction (unit 3b).
  *   2026-11-12 — aimeat_agent_propose says which permissions make every task of the agent wait for
  *     the owner's OK, and that exchange:invoke and work:request do not (services/agent-proposals.ts
  *     heldTaskWarnings).
@@ -497,6 +499,8 @@ export const agentMessagingTools = [
             thread_id: { type: 'string', description: 'Conversation thread to read (omit for recent messages across all threads).' },
             page: { type: 'number', description: 'Page number (default 1).', zod: z.number().int().positive() },
             per_page: { type: 'number', description: 'Messages per page (default 20, max 100).', zod: z.number().int().positive().max(100) },
+            // As GET /v1/agents/:name/messages reads it (unit 3b).
+            direction: { type: 'string', enum: ['inbound', 'outbound'], description: "Only the owner's messages to you (inbound) or only yours to the owner (outbound). Omit for both." },
         },
     },
     {
@@ -790,7 +794,10 @@ export const agentMessagingTools = [
         scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         // On `chat`: Their agents, a new one, and work for them. A schedule is found when it is needed.
         surfaces: ['agent', 'service', 'chat'],
-        input: {},
+        // As GET /v1/agents reads it on agent:read (unit 3b).
+        input: {
+            run_mode: { type: 'string', description: "List only the agents with this run mode (for example 'spawn', the agents a fleet runtime starts). A value no agent has lists none.", zod: z.string().max(INPUT_LIMITS.name) },
+        },
     },
 
     // The A2A v2 message, push and task tools: ./agent-v2.ts, spread in place.

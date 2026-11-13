@@ -49399,6 +49399,10 @@ paths:
         - name: include_archived
           in: query
           schema: { type: boolean, default: false }
+        - name: archived
+          in: query
+          description: only reads the archived content alone. Wins over include_archived.
+          schema: { type: string, enum: [only] }
       responses:
         '200':
           description: data is the index (mode index) or the opened records (mode content, with missing ids listed).

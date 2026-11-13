@@ -8,6 +8,8 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   2026-11-13 — aimeat_message_history filters by direction, as GET /v1/agents/:name/messages does
+ *     (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_message_send passes metadata.prompt (the choice prompt) to the send service, as POST /v1/agents/:name/messages does (feature-list audit #126).
@@ -161,9 +163,11 @@ export function registerAgentMessageTools(
             inputSchema: zodShapeFor('aimeat_message_history'),
             annotations: annotationsFor('aimeat_message_history'),
         },
-        async ({ thread_id, page, per_page }) => {
+        async ({ thread_id, page, per_page, direction }) => {
             const result = await storage.listMessages(agentGaii, {
                 threadId: thread_id,
+                // The same read filter GET /v1/agents/:name/messages passes (unit 3b).
+                ...(direction ? { direction } : {}),
                 page: page ?? 1,
                 perPage: per_page ?? 20,
             });

@@ -11,6 +11,11 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_organism_list filters by visibility over what it already lists (unit 3b).
+ *   2026-11-13 — aimeat_organism_update hands location, max_members and member_visibility to
+ *     updateOrganismRecord, as PUT /v1/organisms/:id does (unit 3b).
+ *   2026-11-13 — aimeat_organism_create hands interests, location, max_members and member_visibility
+ *     to createOrganismRecord, as POST /v1/organisms does (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_organism_create and aimeat_organism_update ask the publish gate with the
@@ -227,7 +232,7 @@ export function registerOrganismsTools(
             inputSchema: zodShapeFor('aimeat_organism_list'),
             annotations: annotationsFor('aimeat_organism_list'),
         },
-        async () => {
+        async ({ visibility }) => {
             const ownerName = getOwnerName();
             // Get public organisms (archived ones are read-only/hidden from AI operations — excluded)
             const publicOrgs = await storage.listOrganisms({ visibility: 'public', archived: 'exclude' });
@@ -241,7 +246,8 @@ export function registerOrganismsTools(
                 if (seen.has(o.id)) return false;
                 seen.add(o.id);
                 return true;
-            });
+            // ?visibility= on GET /v1/organisms, as a filter over what this list already shows (unit 3b).
+            }).filter(o => !visibility || o.visibility === visibility);
             return {
                 content: [{
                     type: 'text' as const,
@@ -590,12 +596,13 @@ export function registerOrganismsTools(
             inputSchema: zodShapeFor('aimeat_organism_create'),
             annotations: annotationsFor('aimeat_organism_create'),
         },
-        async ({ name, description, type, join_policy, visibility, shape, lang }) => {
+        async ({ name, description, type, join_policy, visibility, shape, lang, interests, location, max_members, member_visibility }) => {
             // Validation, the board, the record, the creator membership, the shape's workspaces and
             // the feed/timeline side effects are the shared writer's (services/organism-lifecycle.ts,
             // same call POST /v1/organisms makes).
             const result = await createOrganismRecord({ storage, config }, getOwnerName(), {
                 name, description, type, joinPolicy: join_policy, visibility, shape, lang,
+                interests, location, maxMembers: max_members, memberVisibility: member_visibility,
                 // A public organism asks the node's publish gate, as POST /v1/organisms does.
                 publishGate: { caller: caller() },
             });
@@ -631,7 +638,7 @@ export function registerOrganismsTools(
             inputSchema: zodShapeFor('aimeat_organism_update'),
             annotations: annotationsFor('aimeat_organism_update'),
         },
-        async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access, access_requests }) => {
+        async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access, access_requests, location, max_members, member_visibility }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = getOwnerName();
@@ -643,6 +650,7 @@ export function registerOrganismsTools(
             // visibility is refused here rather than dropped, so "updated" means it was.
             const result = await updateOrganismRecord({ storage, config }, organism, {
                 name, description, readme, interests, joinPolicy: join_policy, visibility,
+                location, maxMembers: max_members, memberVisibility: member_visibility,
                 // An MCP session is always an agent, never the person in person.
                 agentAccess: agent_access, callerIsPerson: false,
                 accessRequests: access_requests,

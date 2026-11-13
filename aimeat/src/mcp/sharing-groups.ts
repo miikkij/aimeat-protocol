@@ -10,6 +10,8 @@
  *   import { registerSharingGroupTools } from './sharing-groups.js';
  *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_group_create hands default_permissions to createSharingGroup, as POST
+ *     /v1/groups does (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -173,14 +175,14 @@ export function registerSharingGroupTools(
             inputSchema: zodShapeFor('aimeat_group_create'),
             annotations: annotationsFor('aimeat_group_create'),
         },
-        async ({ name, description, members }) => {
+        async ({ name, description, members, default_permissions }) => {
             const ownerGhii = getOwnerGhii();
 
             // The ceiling, the shape limits, the member's stored address and the record build are
             // services/sharing-group-members.ts, because POST /v1/groups decides them too. The
             // service also emits the `groups` change event to the owner's open browser; the
             // notification below is the MCP session's own.
-            const created = await createSharingGroup({ storage, config }, ownerGhii, { name, description, members });
+            const created = await createSharingGroup({ storage, config }, ownerGhii, { name, description, members, ...(default_permissions ? { default_permissions } : {}) });
             if (!created.ok) return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
             const record = created.group;
 

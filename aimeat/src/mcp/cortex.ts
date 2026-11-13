@@ -10,6 +10,8 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_cortex_list filters by namespace and visibility, through the same
+ *     listVisibleCortexes GET /v1/cortex calls (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_cortex_install (install, and update:true under a new name) asks the publish
@@ -147,9 +149,13 @@ export function registerCortexTools(
             inputSchema: zodShapeFor('aimeat_cortex_list'),
             annotations: annotationsFor('aimeat_cortex_list'),
         },
-        async ({ name, include_source }) => {
+        async ({ name, include_source, namespace, visibility }) => {
             // One cortex: the same reads GET /v1/cortex/:name and its /export make (services/cortex-read.ts).
             if (name) {
+                // The two filters narrow the list; one named cortex has nothing to narrow.
+                if (namespace || visibility) {
+                    return { ...toolError('INVALID_INPUT', 'namespace and visibility filter the list. Leave them out when you name one cortex.') };
+                }
                 const detail = await cortexDetail(storage, config, agentCaller(), name);
                 if (!detail.ok) return { ...toolError(detail.code, detail.message) };
                 if (!include_source) return { content: [{ type: 'text' as const, text: JSON.stringify(detail.data, null, 2) }] };
@@ -162,7 +168,11 @@ export function registerCortexTools(
             }
             // The same fence GET /v1/cortex applies: public, the node's own bundled ones, and the
             // caller's own. This tool listed every owner's private cortex until 2026-09-05.
-            const extensions = await listVisibleCortexes(storage, agentCaller(), config.nodeId, {});
+            // The filters narrow; canSeeCortex decides what they may narrow over, as on the route.
+            const extensions = await listVisibleCortexes(storage, agentCaller(), config.nodeId, {
+                namespace: namespace || undefined,
+                visibility: visibility || undefined,
+            });
             // Who loads each cortex, from the dependency map (the rows GET /v1/cortex carries too).
             const deps = await dependencyIndex(storage);
             const viewerOwner = localAccountName(getAgentGaii());

@@ -16,6 +16,8 @@
  * @structure registerOrganismWorkspaceToolRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceToolRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   2026-11-13 — GET .../workspace/index takes ?archived=only, the archived content alone, as GET
+ *     /v1/organisms/:id/workspace does on organism:read (structure programme 2026-11, unit 3b).
  *   v1.0.2 — 2026-10-06 — The caller carries the session's scopes; a provenance declaration the
  *     session may not make answers 403 SCOPE_DENIED, where it answered 500 (secaudit 2026-10 last
  *     items, F2).
@@ -75,6 +77,8 @@ export function registerOrganismWorkspaceToolRoutes(
             ids: ids?.length ? ids : undefined,
             space: typeof req.query.space === 'string' && req.query.space ? req.query.space : undefined,
             includeArchived: req.query.include_archived === 'true',
+            // ?archived=only, as GET /v1/organisms/:id/workspace reads it on the same word.
+            ...(req.query.archived === 'only' ? { archived: 'only' as const } : {}),
             reader: readerFor({ storage, config }, req.auth),
         });
         if (!r.ok) { refuse(res, r); return; }

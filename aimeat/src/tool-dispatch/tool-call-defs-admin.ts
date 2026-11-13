@@ -9,6 +9,7 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   2026-11-13 -- aimeat_admin_knowledge forwards `author` (unit 3b).
  *   v1.13.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt (GET and POST /v1/admin/encryption/reencrypt;
  *     codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.12.0 -- 2026-10-31 -- aimeat_admin_federation_settlement_ceiling_set (PUT /v1/federation/peers/
@@ -107,6 +108,7 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
             page: optionalNumber(input, 'page'),
             limit: optionalNumber(input, 'limit'),
             q: optionalString(input, 'q'),
+            author: optionalString(input, 'author'),
             author_key: optionalString(input, 'author_key'),
             content_type: optionalString(input, 'content_type'),
             flagged: optionalBoolean(input, 'flagged'),

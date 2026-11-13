@@ -18,6 +18,10 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_schedule_update hands purpose, constraints and input to updateScheduleRecord,
+ *     as PATCH /v1/schedules/:id does (unit 3b).
+ *   2026-11-13 — aimeat_schedule_create hands enabled and constraints to createScheduleRecord, as
+ *     POST /v1/schedules does (structure programme 2026-11, unit 3b).
  *   2026-11-02 — aimeat_schedule_create and aimeat_schedule_update forward `deliver` (services/task-result-delivery.ts).
  *   2026-10-27 — aimeat_schedule_update answers `approval_request` when the agent's new instruction to a
  *     sibling's ai schedule waits for the owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
@@ -144,6 +148,9 @@ export function registerAgentScheduleTools(
         action_id: a.action_id,
         input: a.input,
         instance_id: a.instance_id,
+        // Paused at birth, and the guards, as POST /v1/schedules takes them.
+        ...(a.enabled !== undefined ? { enabled: a.enabled } : {}),
+        ...(a.constraints !== undefined ? { constraints: a.constraints } : {}),
       });
       if (!out.ok) return err(`${out.code}: ${out.message}`);
       const created = out.schedule;
@@ -201,6 +208,10 @@ export function registerAgentScheduleTools(
         display_name: a.display_name,
         prompt: a.prompt,
         deliver: a.deliver,
+        // As PATCH /v1/schedules/:id takes them; a new input is re-checked per kind in the service.
+        purpose: a.purpose,
+        constraints: a.constraints,
+        input: a.input,
       });
       if (!out.ok) return err(`${out.code}: ${out.message}`);
       return text({

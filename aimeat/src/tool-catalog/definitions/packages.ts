@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-11-13 — aimeat_package_list takes category, as GET /v1/packages does (unit 3b).
  *   2026-10-31 — aimeat_package_price_set and aimeat_package_sales (an author sells their own package to
  *     accounts of this node); aimeat_package_buy without `repository` buys such a package and takes
  *     action "purchases"; aimeat_package_list takes `for_sale`.
@@ -99,6 +100,8 @@ export const packagesTools = [
             author: { type: 'string', description: 'Only this author\'s packages. Your own name also shows your private ones.' },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
             for_sale: { type: 'boolean', description: 'true: only the packages their authors sell to accounts of this node, each with its price and preview. Buy one with aimeat_package_buy.' },
+            // As GET /v1/packages reads it (unit 3b).
+            category: { type: 'string', description: 'Only the packages of this category.', zod: z.string().max(INPUT_LIMITS.name) },
         },
     },
     {

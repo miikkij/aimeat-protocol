@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — aimeat_app_draft_save hands mime_type to stageAppDraft, as the PUT draft route does (unit 3b).
+ *   2026-11-13 — aimeat_app_publish takes toll_morsels and license_type on an inline publish, refused
+ *     to a delegated builder as on POST /v1/apps (structure programme 2026-11, unit 3b).
  *   2026-10-31 — aimeat_app_publish and aimeat_app_draft_publish answer with `url`, the address to hand
  *     the person, as aimeat_app_list does. They answered with download_url first, the raw file served
  *     as an attachment, and the node chat gave a buyer that link: it downloaded the app (v28 #12).
@@ -153,7 +156,8 @@ import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { loadServedProvenance } from '../services/ai/provenance-marks.js';
 import { registerAppForkTool } from './apps-fork.js';
-import { presentAppManifest } from '../services/app-pacing.js';
+import { presentAppManifest, readAppTollInput } from '../services/app-pacing.js';
+import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { mayViewApp } from '../services/app-visibility.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -213,7 +217,7 @@ export function registerAppsTools(
             inputSchema: zodShapeFor('aimeat_app_publish'),
             annotations: annotationsFor('aimeat_app_publish'),
         },
-        async ({ filename, owner, roadmap, content, content_base64: givenBase64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+        async ({ filename, owner, roadmap, content, content_base64: givenBase64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack, toll_morsels, license_type }) => {
             const content_base64 = givenBase64 ?? (content !== undefined ? Buffer.from(content, 'utf-8').toString('base64') : undefined);
             const agentGaii = getAgentGaii();
             // The same target the HTTP door resolves, through the same function: whose catalogue this
@@ -228,6 +232,13 @@ export function registerAppsTools(
             if ('refusal' in scope) {
                 return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
             }
+            // The pacing amount and the licence are the owner's terms, and no development right
+            // carries them: refused to a delegated builder, as POST /v1/apps refuses them.
+            if (scope.delegated && (toll_morsels !== undefined || license_type !== undefined)) {
+                return toolError('FORBIDDEN', `You may build ${scope.ownerName}'s app, but its pacing amount and licence are theirs to set.`);
+            }
+            const tollIn = readAppTollInput({ toll_morsels });
+            if (!tollIn.ok) return toolError(tollIn.code, tollIn.message);
             // What did this change? A warning alone, a refusal on an app somebody else helps build.
             // Asked here rather than only on the HTTP door, because this tool does not go through it.
             const road = roadmapGate({
@@ -327,7 +338,7 @@ export function registerAppsTools(
                     filename,
                     data,
                     mimeType: 'text/html',
-                    requested: { name, description, category, tags, icon, version, cortexAgents },
+                    requested: { name, description, category, tags, icon, version, cortexAgents, tollMorsels: tollIn.toll, licenseType: license_type },
                     accessCode: { mode: 'carry' },
                     source: 'inline',
                     publishGate: publishAskOf({ storage, config }, caller()),
@@ -393,7 +404,7 @@ export function registerAppsTools(
             inputSchema: zodShapeFor('aimeat_app_draft_save'),
             annotations: annotationsFor('aimeat_app_draft_save'),
         },
-        async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon, version, notice }) => {
+        async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon, version, notice, mime_type }) => {
             const content_base64 = givenBase64 ?? content;
             if (!content_base64) return { content: [{ type: 'text' as const, text: 'INVALID_INPUT: give the draft\'s base64-encoded HTML as content_base64 (or content).' }], isError: true };
             const agentGaii = getAgentGaii();
@@ -413,7 +424,7 @@ export function registerAppsTools(
                     ownerGhii: scope.ownerGhii,
                     filename,
                     data,
-                    requested: { name, description, category, tags, icon, version, draftNotice },
+                    requested: { name, description, category, tags, icon, version, draftNotice, ...(mime_type ? { mimeType: mime_type } : {}) },
                 });
                 if ('refusal' in staged) {
                     return { content: [{ type: 'text' as const, text: refusalText(staged.refusal) }], isError: true };

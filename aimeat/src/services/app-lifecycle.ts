@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.12.0 — 2026-11-13 — resolveAppTargetScope also answers `delegated`, so aimeat_app_publish
+ *     refuses the pacing amount and the licence to a delegated builder as POST /v1/apps does.
  *   v1.11.0 — 2026-11-11 — A staged draft reads its agents from the page's own aimeat-crews block
  *     when it has a usable one, as a publish does; otherwise it keeps the live app's.
  *   v1.10.5 — 2026-10-29 — deleteOwnedApp removes the app's plan with the whole app
@@ -151,7 +153,7 @@ export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 export async function resolveAppTargetScope(
   storage: Storage, config: AimeatConfig,
   input: { principal: string; owner?: string | undefined; filename?: string | undefined; act: AppDevAct },
-): Promise<AppOwnerScope | { refusal: string } | null> {
+): Promise<(AppOwnerScope & { delegated: boolean }) | { refusal: string } | null> {
   const parsed = parseGAII(input.principal);
   if (!parsed) return null;
   const t = await resolveAppTarget(storage, config, {
@@ -160,7 +162,9 @@ export async function resolveAppTargetScope(
     filename: input.filename,
     act: input.act,
   });
-  return t.ok ? { ownerName: t.ownerName, ownerGhii: t.ownerGhii } : { refusal: t.message };
+  // `delegated`: the act lands in another owner's bucket on a development right, so the owner's own
+  // terms (the pacing amount, the licence) are refused to it, as on POST /v1/apps.
+  return t.ok ? { ownerName: t.ownerName, ownerGhii: t.ownerGhii, delegated: t.delegated !== null } : { refusal: t.message };
 }
 
 // ── The draft slot ────────────────────────────────────────────────────────────────────────────────

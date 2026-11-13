@@ -11,6 +11,10 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-13 — aimeat_memory_list passes archived to the listing GET /v1/memory reads (unit 3b).
+ *   2026-11-13 — aimeat_agents_list filters by run_mode, as GET /v1/agents does (unit 3b).
+ *   2026-11-13 — aimeat_action_execute hands callback_url to createWorkItem, as POST /v1/work/request
+ *     does (structure programme 2026-11, unit 3b).
  *   2026-11-10 — aimeat_memory_list takes `cursor`: one page in key order after it, read in SQL batches
  *     through the same filters (services/memory-query.ts listMemoryMetaPage), with next_cursor.
  *   2026-11-09 — aimeat_memory_read and aimeat_memory_list with owner_scope show an agent its owner's
@@ -415,12 +419,14 @@ export function registerCoreTools(
     mcp.registerTool(
         'aimeat_agents_list',
         { description: descriptionFor('aimeat_agents_list'), inputSchema: zodShapeFor('aimeat_agents_list'), outputSchema: agentsListOutput, annotations: annotationsFor('aimeat_agents_list') },
-        async () => {
+        async ({ run_mode }) => {
             const parsed = parseGAII(agentGaii);
             if (!parsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
-            const agents = await storage.getAgentsByOwner(localAccountName(agentGaii));
+            const all = await storage.getAgentsByOwner(localAccountName(agentGaii));
+            // The roster filter GET /v1/agents applies: an unknown value lists nothing (unit 3b).
+            const agents = run_mode ? all.filter(a => (a.runMode ?? '') === run_mode) : all;
             // The same two fields GET /v1/agents gives the owner and the owner's agents.
             const access = await readOwnerAgentAccessOrMarker(storage, ownerGhiiOf(agentGaii), 'aimeat_agents_list');
             const useOf = await scopeUseLookup(storage, agents);
@@ -637,7 +643,7 @@ export function registerCoreTools(
     mcp.registerTool(
         'aimeat_memory_list',
         { description: descriptionFor('aimeat_memory_list'), outputSchema: memoryListOutput, annotations: annotationsFor('aimeat_memory_list'), inputSchema: zodShapeFor('aimeat_memory_list') },
-        async ({ prefix, visibility, tags, owner_scope, limit, cursor, response_format }) => {
+        async ({ prefix, visibility, tags, owner_scope, limit, cursor, response_format, archived }) => {
             const cap = Math.min(limit ?? MEMORY_LIST_DEFAULT_LIMIT, MEMORY_LIST_MAX_LIMIT);
             let entries: Awaited<ReturnType<Storage['listMemoryMeta']>>;
             let truncated = false;
@@ -654,7 +660,7 @@ export function registerCoreTools(
             if (typeof cursor === 'string') {
                 const page = await listMemoryMetaPage({ storage, config }, {
                     ownerScopeOf: owner_scope ? localAccountName(agentGaii) : null, gaii: agentGaii,
-                    prefix, visibility, tags, cursor, limit: cap,
+                    prefix, visibility, tags, archived, cursor, limit: cap,
                     keep: async rows => {
                         const scoped = owner_scope
                             ? await organismReadableRecords({ storage, config }, caller(), await ownerScopeViewAdmitting(storage, rows, agentGaii, readsAsOwner(caller()), caller().visitor))
@@ -676,10 +682,10 @@ export function registerCoreTools(
                 // the owner's GHII, every agent and every ecosystem app in one query, one row per key.
                 // The organism rule too, as GET /v1/memory?owner_scope=true (secaudit 2026-10, v57).
                 entries = await organismReadableRecords({ storage, config }, caller(), await ownerScopeViewAdmitting(storage,
-                    await listMemoryMetaFor({ storage, config }, { ownerScopeOf: localAccountName(agentGaii), gaii: agentGaii, prefix, visibility, tags }),
+                    await listMemoryMetaFor({ storage, config }, { ownerScopeOf: localAccountName(agentGaii), gaii: agentGaii, prefix, visibility, tags, archived }),
                     agentGaii, readsAsOwner(caller()), caller().visitor));
             } else {
-                entries = await listMemoryMetaFor({ storage, config }, { ownerScopeOf: null, gaii: agentGaii, prefix, visibility, tags });
+                entries = await listMemoryMetaFor({ storage, config }, { ownerScopeOf: null, gaii: agentGaii, prefix, visibility, tags, archived });
             }
             // The classification reader (TARGET-082): a key this agent may not see is not listed.
             entries = await readerForAgent({ storage, config }, agentGaii).show(entries, e => memoryTarget(e.ownerGaii, e.key));
@@ -721,7 +727,7 @@ export function registerCoreTools(
             inputSchema: zodShapeFor('aimeat_action_execute'),
             annotations: annotationsFor('aimeat_action_execute'),
         },
-        async ({ action_id, provider_gaii, input, ttl_hours }) => {
+        async ({ action_id, provider_gaii, input, ttl_hours, callback_url }) => {
             // One implementation, called from both doors. This tool used to re-do the commission by
             // hand and got a thinner version of it: it never resolved the provider, so cross-node
             // work created a LOCAL row and held the requester's morsels in escrow while the
@@ -732,7 +738,7 @@ export function registerCoreTools(
             // added on 2026-08-11 live in there too, so this is now one place rather than two.
             const result = await createWorkItem(
                 config, storage, agentGaii,
-                { action_id, provider_gaii, input, ttl_hours },
+                { action_id, provider_gaii, input, ttl_hours, ...(callback_url ? { callback_url } : {}) },
                 peers,
             );
             if ('error' in result) {

@@ -5,6 +5,14 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_group_create takes default_permissions (unit 3b).
+ *   2026-11-13 — aimeat_consent_list takes recipient (unit 3b).
+ *   2026-11-13 — aimeat_instance_list takes platform (unit 3b).
+ *   2026-11-13 — aimeat_catalogue_directory takes country and interests (unit 3b).
+ *   2026-11-13 — aimeat_capabilities_update takes callable, inputSchema, outputSchema,
+ *     deprecationMessage, replacedBy and the record fields, as PUT /v1/capabilities/:id does (unit 3b).
+ *   2026-11-13 — aimeat_capabilities_create takes whenNotToUse and the record fields of
+ *     ./capability-record-input.ts, as POST /v1/capabilities does (structure programme 2026-11, unit 3b).
  *   (2026-11-08) aimeat_appdev_pitfall_list names each row's `open` call instead of a rule to pick one.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-08 — aimeat_consent_grant takes `role` (read | write), the field POST /v1/consent reads, so
@@ -61,6 +69,7 @@ import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 import { organismAudienceInput } from '../input-schemas.js';
+import { CAPABILITY_RECORD_INPUT } from './capability-record-input.js';
 
 export const capabilitiesGroupsSkillsTools = [
     {
@@ -125,6 +134,11 @@ export const capabilitiesGroupsSkillsTools = [
             outputSchema: { type: 'object', description: 'JSON Schema for output format.' },
             usage: { type: 'string', description: 'Usage instructions for consumers.' },
             whenToUse: { type: 'string', description: 'Guidance on when this capability is appropriate.' },
+            whenNotToUse: { type: 'string', description: 'Guidance on when NOT to use it.' },
+            // The fields below are the ones POST /v1/capabilities takes on capability:write
+            // (structure programme 2026-11, unit 3b); createCapability applies the visibility,
+            // publishing, source and webhook rules to them for every caller.
+            ...CAPABILITY_RECORD_INPUT,
         },
     },
     {
@@ -145,6 +159,15 @@ export const capabilitiesGroupsSkillsTools = [
             usage: { type: 'string', description: 'Updated usage instructions.' },
             whenToUse: { type: 'string', description: 'Updated guidance on when to use.' },
             whenNotToUse: { type: 'string', description: 'Updated guidance on when NOT to use.' },
+            // The fields below are the ones PUT /v1/capabilities/:id takes on capability:write
+            // (structure programme 2026-11, unit 3b); updateCapability runs the owner, source and
+            // webhook checks on them for every caller.
+            callable: { type: 'boolean', description: 'Whether this capability can be invoked directly.' },
+            inputSchema: { type: 'object', description: 'Updated JSON Schema for the input.' },
+            outputSchema: { type: 'object', description: 'Updated JSON Schema for the output.' },
+            deprecationMessage: { type: 'string', description: 'What a caller of a deprecated capability is told, for example which one to use instead.', zod: z.string().max(INPUT_LIMITS.description).nullable() },
+            replacedBy: { type: 'string', description: 'The id of the capability that replaces this one.', zod: z.string().max(INPUT_LIMITS.id).nullable() },
+            ...CAPABILITY_RECORD_INPUT,
         },
     },
     {
@@ -205,6 +228,9 @@ export const capabilitiesGroupsSkillsTools = [
         input: {
             city: { type: 'string', description: 'Filter by city.' },
             interest: { type: 'string', description: 'Filter by interest keyword.' },
+            // As GET /v1/catalogue/directory reads them on catalogue:read (unit 3b).
+            country: { type: 'string', description: 'Filter by country.', zod: z.string().max(INPUT_LIMITS.name) },
+            interests: { type: 'array', description: 'Filter by several interest keywords at once.', zod: z.array(z.string().max(INPUT_LIMITS.name)).max(20) },
         },
     },
     {
@@ -236,7 +262,10 @@ export const capabilitiesGroupsSkillsTools = [
         annotations: { title: 'List Consents', readOnlyHint: true },
         scope: 'consent:manage',
         surfaces: ['admin'],
-        input: {},
+        // As GET /v1/consent reads it on consent:manage (unit 3b).
+        input: {
+            recipient: { type: 'string', description: 'List only the consents given to this recipient (a GAII, a GHII, "*" or a prefixed scope such as organism:<id>).', zod: z.string().max(INPUT_LIMITS.id) },
+        },
     },
     {
         name: 'aimeat_access_list',
@@ -364,6 +393,8 @@ export const capabilitiesGroupsSkillsTools = [
                     write: z.boolean(),
                 }).optional().describe('Member permissions (defaults to read:true, write:false)'),
             })) },
+            // As POST /v1/groups takes it on consent:groups (unit 3b).
+            default_permissions: { type: 'object', description: 'The permissions of every member listed without its own: { read, write }. Default read only.', zod: z.object({ read: z.boolean(), write: z.boolean() }) },
         },
     },
     {
@@ -450,7 +481,10 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Chat Instances', readOnlyHint: true },
-        input: {},
+        // As GET /v1/chat-instances reads it (unit 3b).
+        input: {
+            platform: { type: 'string', description: 'List only the instances of this platform (for example claude or chatgpt).', zod: z.string().max(INPUT_LIMITS.name) },
+        },
     },
     {
         name: 'aimeat_instance_create',

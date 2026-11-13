@@ -8,6 +8,9 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-11-13 — aimeat_app_draft_save takes mime_type (unit 3b).
+ *   2026-11-13 — aimeat_app_publish takes toll_morsels and license_type, as POST /v1/apps does
+ *     (structure programme 2026-11, unit 3b).
  *   (2026-11-08) aimeat_app_publish says which template a build starts from by level (a genre on
  *     fine, shell-atelier on proto and plain) where it said "start from the shell" for every app.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -97,6 +100,11 @@ export const appPublishTools = [
             tags: { type: 'array', description: 'Tags for search and filtering.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             icon: { type: 'string', description: 'Emoji icon.' },
             version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
+            // The two fields below are the ones POST /v1/apps takes on app:write (structure programme
+            // 2026-11, unit 3b). As there, they travel with an inline publish only, and an owner's
+            // development grant does not carry them.
+            toll_morsels: { type: 'number', description: "The app's pacing amount: the morsels of pacing taking this app moves (0 to 100; a morsel paces use and is not money). Your owner's own apps only: on an app you build for somebody else it is refused (FORBIDDEN). Inline publish only; a publish in upload mode keeps the amount the app has.", zod: z.number().int().min(0) },
+            license_type: { type: 'string', enum: ['single', 'lifetime'], description: "How taking the app is licensed: 'single' or 'lifetime'. Your owner's own apps only, as toll_morsels; inline publish only." },
             cortex_agents: { type: 'array', description: 'The agents this app brings (manifest.cortex.agents), validated at publish in both modes. Usually omit it and declare them in the page instead, in a <script type="application/json" id="aimeat-crews"> block, which a package made from the app reads too. With neither, the previous version\'s agents carry forward; [] clears. The shape is in skill node:aimeat-app-agents.', zod: z.array(z.record(z.string(), z.unknown())) },
         },
     },
@@ -181,6 +189,8 @@ export const appPublishTools = [
             tags: { type: 'array', description: 'Tags (default: the live app\'s).', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             icon: { type: 'string', description: 'Emoji icon (defaults to the live app\'s).' },
             version: { type: 'string', description: 'Display version the draft publishes with, e.g. "1.4.0" (defaults to the live app\'s). Letters, digits, dots, hyphens, plus signs and underscores, at most 40.' },
+            // As PUT /v1/apps/:owner/:filename/draft takes it on app:write (unit 3b).
+            mime_type: { type: 'string', description: 'The content type of the draft (defaults to the live app\'s, else text/html), as aimeat_app_publish takes it.', zod: z.string().max(INPUT_LIMITS.name) },
             ...DRAFT_NOTICE_INPUT,
         },
     },

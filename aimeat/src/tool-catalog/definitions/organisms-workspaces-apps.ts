@@ -5,6 +5,11 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_workspace_read takes archived ('only') (unit 3b).
+ *   2026-11-13 — aimeat_organism_list takes visibility (unit 3b).
+ *   2026-11-13 — aimeat_organism_update takes location, max_members and member_visibility (unit 3b).
+ *   2026-11-13 — aimeat_organism_create takes interests, location, max_members and member_visibility,
+ *     as POST /v1/organisms does (structure programme 2026-11, unit 3b).
  *   2026-11-08 — aimeat_organism_archive names the archived memory key limit and its QUOTA_EXCEEDED
  *     (secaudit2026nov08b round 15b).
  *   2026-11-07 — aimeat_workspace_update, aimeat_workspace_create and aimeat_workspace_read say a ROW
@@ -97,6 +102,22 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
+
+/**
+ * Where an organism is, how many may join and who sees its members: fields POST /v1/organisms and
+ * PUT /v1/organisms/:id both take on organism:write (structure programme 2026-11, unit 3b). The
+ * service (services/organism-lifecycle.ts) validates them for every caller.
+ */
+const ORGANISM_PLACE_AND_ROSTER_INPUT = {
+    location: { type: 'object', description: 'Where the organism is: { city, area, country, geo: [latitude, longitude] }, each part optional. The directory searches by it.', zod: z.object({
+        city: z.string().max(INPUT_LIMITS.name).optional(),
+        area: z.string().max(INPUT_LIMITS.name).optional(),
+        country: z.string().max(INPUT_LIMITS.name).optional(),
+        geo: z.tuple([z.number(), z.number()]).optional(),
+    }) },
+    max_members: { type: 'number', description: 'How many members the organism takes at most (default 500).', zod: z.number().int().positive() },
+    member_visibility: { type: 'string', enum: ['public', 'authenticated', 'members', 'admins'], description: "Who sees the member list: anyone (public), any signed-in account (authenticated, the default), the members (members), or only the owners and admins (admins)." },
+} as const;
 // Documents and rows: the two surfaces that edit PART of a workspace object rather than replace
 // one. Spread in place below, so the catalog order is exactly what it was before the extraction.
 import { workspaceSpaceTools } from './workspace-spaces.js';
@@ -126,7 +147,10 @@ export const organismsWorkspacesAppsTools = [
         // On `chat`: What their groups know. Writing to a workspace is found when it is needed: its description
         // alone is 6 500 characters, which every round would pay for.
         surfaces: ['appdev', 'agent', 'service', 'chat'],
-        input: {},
+        // As GET /v1/organisms reads it (unit 3b): a filter over what the list already shows.
+        input: {
+            visibility: { type: 'string', enum: ['public', 'listed', 'private'], description: 'List only the organisms at this visibility, among those the list shows you.' },
+        },
     },
     {
         name: 'aimeat_organism_get',
@@ -444,6 +468,8 @@ export const organismsWorkspacesAppsTools = [
             ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index.', zod: z.array(z.string().max(INPUT_LIMITS.key)) },
             space: { type: 'string', description: 'With `ids`: optionally restrict the lookup to this space (objectType name or namespace).' },
             include_archived: { type: 'boolean', description: 'Include archived (hidden) content. Default false.' },
+            // As GET /v1/organisms/:id/workspace reads ?archived=only on organism:read (unit 3b).
+            archived: { type: 'string', enum: ['only'], description: "'only' reads the archived content alone. Wins over include_archived." },
         },
     },
     {
@@ -603,6 +629,10 @@ export const organismsWorkspacesAppsTools = [
             visibility: { type: 'string', description: 'public | listed | private (default public, or the shape\'s).' },
             shape: { type: 'string', description: 'A starting shape that also creates its workspaces: own-work | team | company | family | club | project.' },
             lang: { type: 'string', description: 'Language of the shape\'s workspace names and readme: en | fi | es.' },
+            // The fields below are the ones POST /v1/organisms takes on organism:write (structure
+            // programme 2026-11, unit 3b); createOrganismRecord reads them for both callers.
+            interests: { type: 'array', description: 'Interest tags, used by the directory to find the organism.', zod: z.array(z.string().max(INPUT_LIMITS.name)).max(50) },
+            ...ORGANISM_PLACE_AND_ROSTER_INPUT,
         },
     },
     {
@@ -622,6 +652,8 @@ export const organismsWorkspacesAppsTools = [
             join_policy: { type: 'string', required: false, description: 'open | approval_required | invite_only.' },
             visibility: { type: 'string', required: false, description: 'public | listed | private.' },
             agent_access: { type: 'string', required: false, enum: ['all', 'listed'], description: 'Which members\' agents may act here: "all" (every member\'s agents, the default) or "listed" (only the agents in the Agents section of the organism\'s page; any other agent is refused as a non-member). An agent can set "listed"; only the owner signed in can set "all" again.' },
+            // As PUT /v1/organisms/:id takes them on organism:write (unit 3b).
+            ...ORGANISM_PLACE_AND_ROSTER_INPUT,
             access_requests: { type: 'string', required: false, enum: ['on', 'off'], description: 'Whether a person refused by an app or a page that is opened to this organism\'s members may ask for access from the refusal page: "on" (the default; each request comes to the owners and admins to decide, see aimeat_organism_join_requests) or "off" (nothing can be asked, and the refusal page offers nothing). Separate from join_policy.' },
         },
     },

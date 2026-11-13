@@ -11,6 +11,7 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_consent_list filters by recipient, as GET /v1/consent does (unit 3b).
  *   2026-11-08 — aimeat_consent_grant passes `role` (read | write) to grantConsent, as POST /v1/consent does.
  *   2026-11-01 — aimeat_consent_grant takes a party recipient (a named share of a data package) with
  *     pinned_version, allow_url_key and terms_required, sent to grantConsent as the share's metadata,
@@ -209,9 +210,10 @@ export function registerConsentTools(
             inputSchema: zodShapeFor('aimeat_consent_list'),
             annotations: annotationsFor('aimeat_consent_list'),
         },
-        async () => {
+        async ({ recipient }) => {
             const ghii = ownerGhii();
-            const consents = await listAccountConsents(storage, ghii);
+            // The same read filter GET /v1/consent passes (unit 3b).
+            const consents = await listAccountConsents(storage, ghii, recipient ? { recipient } : {});
 
             return {
                 content: [{

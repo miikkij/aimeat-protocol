@@ -10,6 +10,8 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
+ *   2026-11-13 — aimeat_mail_send forwards template_id, variables, invoice_id, from_name, company_id
+ *     and links, and sends subject and body only when given (structure programme 2026-11, unit 3b).
  *   2026-10-16 — aimeat_mail_send forwards locale, image_url and image_alt to POST /v1/outbound/send.
  *   2026-10-15 — aimeat_connection_history (GET /v1/connections/attempts) and aimeat_connection_replies
  *     (POST /v1/connections/attempts/:id/replies); aimeat_connection_start forwards account.
@@ -30,7 +32,7 @@
 import type { ConnectCliToolDefinition, ToolCallContext } from './tool-call-helpers.js';
 
 type ConnectCliToolContextClient = ToolCallContext['client'];
-import { requiredString, optionalString, optionalNumber, optionalBoolean, query } from './tool-call-helpers.js';
+import { requiredString, optionalString, optionalNumber, optionalBoolean, optionalRecord, optionalArray, query } from './tool-call-helpers.js';
 import type { ApiResponse } from './api-client.js';
 
 /**
@@ -169,10 +171,18 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
         handler: async ({ client }, input) => {
             const body: Record<string, unknown> = {
                 contact_id: requiredString(input, 'contact_id'),
-                subject: requiredString(input, 'subject'),
-                body: requiredString(input, 'body'),
                 kind: optionalString(input, 'kind') || 'transactional',
             };
+            // Subject and body may come from a template or an invoice; the route refuses a message
+            // that has neither (INVALID_MESSAGE).
+            const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
+            const text = optionalString(input, 'body'); if (text) body.body = text;
+            const templateId = optionalString(input, 'template_id'); if (templateId) body.template_id = templateId;
+            const variables = optionalRecord(input, 'variables'); if (variables) body.variables = variables;
+            const invoiceId = optionalString(input, 'invoice_id'); if (invoiceId) body.invoice_id = invoiceId;
+            const fromName = optionalString(input, 'from_name'); if (fromName) body.from_name = fromName;
+            const companyId = optionalString(input, 'company_id'); if (companyId) body.company_id = companyId;
+            const links = optionalArray(input, 'links'); if (links) body.links = links;
             const conn = optionalString(input, 'connection_id'); if (conn) body.connection_id = conn;
             const alias = optionalString(input, 'from_alias'); if (alias) body.from_alias = alias;
             const replyTo = optionalString(input, 'reply_to'); if (replyTo) body.reply_to = replyTo;

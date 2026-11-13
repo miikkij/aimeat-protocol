@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_action_execute takes callback_url, as POST /v1/work/request does (unit 3b).
+ *   2026-11-13 — aimeat_admin_knowledge takes author, as GET /v1/admin/knowledge does (unit 3b).
  *   2026-11-09 — aimeat_admin_hooks says five gates and six moments that are only told, as HOOK_NAMES
  *     in services/hooks.ts has them (it said four and seven).
  *   2026-11-08 — aimeat_admin_incident_resolve decides a lock of the erased lock holders incident
@@ -185,6 +187,8 @@ export const discoveryWorkBoardsTools = [
             provider_gaii: { type: 'string', required: true, description: 'The provider_gaii the catalogue lists for the action: an agent\'s GAII, or a person\'s GHII when a person published it.' },
             input: { type: 'object', required: true, description: 'Input parameters for the action.' },
             ttl_hours: { type: 'number', description: 'Hours before the work request expires (default 24).' },
+            // As POST /v1/work/request takes it on work:request (unit 3b), with WorkRequestSchema's limit.
+            callback_url: { type: 'string', description: 'An address the node POSTs to when the provider starts the work and when it delivers, so you need not poll. The node calls it through its outbound fetch guard, which refuses internal addresses.', zod: z.string().url().max(INPUT_LIMITS.url) },
         },
     },
     {
@@ -679,6 +683,8 @@ export const discoveryWorkBoardsTools = [
             limit: { type: 'number', required: false, description: 'How many packages on the page. 20 by default, 50 at most.', zod: z.number().int() },
             q: { type: 'string', required: false, description: 'Free text over the name, the author and the tags.' },
             author_key: { type: 'string', required: false, description: 'One author, collapsed across the spellings of their name. Take the key from facets.authors.' },
+            // As GET /v1/admin/knowledge reads it (unit 3b); author_key is usually the better filter.
+            author: { type: 'string', required: false, description: 'One author as the package stores the name, matched exactly, so one spelling only. Prefer author_key.', zod: z.string().max(INPUT_LIMITS.id) },
             content_type: { type: 'string', required: false, description: 'One kind of package, as facets.kinds names it.' },
             flagged: { type: 'boolean', required: false, description: 'Only packages somebody has reported.' },
         },

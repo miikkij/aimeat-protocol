@@ -8,6 +8,9 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-11-13 -- aimeat_app_draft_save forwards mime_type (unit 3b).
+ *   2026-11-13 -- aimeat_cortex_list forwards namespace and visibility to GET /v1/cortex (unit 3b).
+ *   2026-11-13 -- aimeat_app_publish forwards toll_morsels and license_type to POST /v1/apps (unit 3b).
  *   2026-10-30 -- aimeat_designbook_kit takes view "defaults", aimeat_designbook_kit_default takes `node`, and aimeat_designbook_status proxies POST /v1/designbook/:id/status.
  *   v1.13.0 -- 2026-10-20 -- The eight extension entries move to tool-call-defs-extensions.ts (pure
  *     extraction at the 800-line ceiling, so the next extension tool had somewhere to go).
@@ -291,6 +294,9 @@ export const appTools: ConnectCliToolDefinition[] = [
             // carried no provenance (secaudit 2026-10 follow-up, Part B).
             if (input.ai_provenance && typeof input.ai_provenance === 'object') body.ai_provenance = input.ai_provenance;
             const provenanceId = optionalString(input, 'ai_provenance_id'); if (provenanceId) body.ai_provenance_id = provenanceId;
+            // The owner's terms; the route refuses them to a delegated builder.
+            const toll = optionalNumber(input, 'toll_morsels'); if (toll !== undefined) body.toll_morsels = toll;
+            const license = optionalString(input, 'license_type'); if (license) body.license_type = license;
             return client.post('/v1/apps', body);
         },
     },
@@ -391,7 +397,12 @@ export const appTools: ConnectCliToolDefinition[] = [
         },
         handler: async ({ client }, input) => {
             const name = optionalString(input, 'name');
-            if (!name) return client.get('/v1/cortex');
+            const namespace = optionalString(input, 'namespace');
+            const visibility = optionalString(input, 'visibility');
+            if (!name) return client.get(`/v1/cortex${query({ namespace, visibility })}`);
+            // The two filters narrow the list; one named cortex has nothing to narrow. Refused rather
+            // than ignored, so the caller learns the filter did nothing.
+            if (namespace || visibility) return refuse('INVALID_INPUT', 'namespace and visibility filter the list. Leave them out when you name one cortex.');
             const detail = await client.get(`/v1/cortex/${encodeURIComponent(name)}`);
             if (!optionalBoolean(input, 'include_source') || detail.ok === false) return detail;
             const source = await client.get(`/v1/cortex/${encodeURIComponent(name)}/export`);
@@ -538,6 +549,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             const icon = optionalString(input, 'icon'); if (icon) body.icon = icon;
             const tags = optionalArray(input, 'tags'); if (tags) body.tags = tags;
             const version = optionalString(input, 'version'); if (version !== undefined) body.version = version;
+            const mimeType = optionalString(input, 'mime_type'); if (mimeType) body.mime_type = mimeType;
             draftNoticeBody(input, body);
             return client.put(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft`, body);
         },
