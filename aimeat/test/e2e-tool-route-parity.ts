@@ -406,9 +406,10 @@ await test('Setup: alice\'s private organism with an open join policy; bob\'s ag
 });
 
 await test('DIFFERS TODAY (a question, not a defect): POST /v1/organisms/:id/join and aimeat_organism_join answer bob\'s agent alike', async () => {
-    const restAgent = await makeAgent(BASE, bob, ['organism:read', 'organism:write'], N('jprest'));
+    // Both agents hold social:write, the word both surfaces ask for a join, so neither answer is a scope refusal.
+    const restAgent = await makeAgent(BASE, bob, ['organism:read', 'organism:write', 'social:write'], N('jprest'));
     const rest = await call('POST', `/v1/organisms/${jpOrg}/join`, restAgent.token, {});
-    const toolAgent = await makeAgent(BASE, carol, ['organism:read', 'organism:write'], N('jptool'));
+    const toolAgent = await makeAgent(BASE, carol, ['organism:read', 'organism:write', 'social:write'], N('jptool'));
     const tool = await callTool(await openSession(BASE, toolAgent.token, 'u2b-join'), 'aimeat_organism_join', { organism_id: jpOrg });
     // The outcome is compared, not a status: a direct join and a join request are both an admission.
     assert((rest.body.ok === true) === !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
