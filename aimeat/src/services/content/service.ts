@@ -18,6 +18,11 @@
  *   ontologyFor · overviewFor · listFactsFor · RESERVED_WORD
  * @usage const out = await inspectFor(deps, caller, { source: { kind: 'file', key: 'a.pdf' } });
  * @version-history
+ *   v1.4.0 — 2026-11-13 — sourceFor: an agent's facts, inspect and correct requests reach its owner's
+ *     memory record (named by the owner's account, or by key alone when the agent holds no record of
+ *     its own under it), read under the owner-scope memory rule. The Contexts page's "make a
+ *     fingerprint of my context" was refused to every AI connected over MCP, even one holding
+ *     memory:read-as-owner, because only the caller's own records could be named.
  *   v1.3.1 — 2026-11-03 — A permission refusal to an agent carries `details.allow_url`, the address
  *     where its person allows the word, and is noted on the agent's card, as a route's refusal is.
  *   v1.3.0 — 2026-11-03 — A published workspace document's fingerprint is its one shared fingerprint
@@ -34,6 +39,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
+import { readsAsOwner, visibleToSameOwnerReader } from '../owner-scope-read.js';
 import { allowAddressFor } from '../permission-ask.js';
 import { noteAgentRefusal } from '../agent/refusals.js';
 import { inspectSource, stagesToRun, ContentError, type InspectResult } from './pipeline.js';
@@ -92,7 +98,9 @@ function requireWord(deps: Deps, caller: CallerContext, word: string, why: strin
 
 /**
  * The item a request names. `owner` defaults to the caller; the account holder may name one of
- * their own agents. Anything else is refused as absent, the answer an item that does not exist gets.
+ * their own agents, and an agent may name its owner's account for a memory record (sourceFor then
+ * applies the memory read rule). Anything else is refused as absent, the answer an item that does
+ * not exist gets.
  */
 export function parseSource(caller: CallerContext, input: unknown): ContentSource {
   const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
@@ -101,10 +109,36 @@ export function parseSource(caller: CallerContext, input: unknown): ContentSourc
   const key = typeof o.key === 'string' ? o.key.trim() : '';
   if (!key || key.length > KEY_MAX) refuse('INVALID_INPUT', 400, 'source.key names the stored file or the memory record.');
   const owner = typeof o.owner === 'string' && o.owner.trim() ? o.owner.trim() : caller.principal;
-  if (owner !== caller.principal && !(caller.inPerson && ownerGhiiOf(owner) === caller.ownerGhii)) {
+  const agentOfOwner = caller.kind === 'agent' && kind === 'memory' && owner === caller.ownerGhii;
+  if (owner !== caller.principal && !agentOfOwner && !(caller.inPerson && ownerGhiiOf(owner) === caller.ownerGhii)) {
     refuse('NOT_FOUND', 404, `Nothing of yours is stored as ${kind} "${key}".`);
   }
   return { kind, owner, key };
+}
+
+/**
+ * The item, for an agent that works on its owner's memory. The person's AI is an agent, and what it
+ * is asked to fingerprint or read the facts of is usually the person's own record (a context, a
+ * note), not one of its own: the Contexts page hands the person the sentence "make a fingerprint of my
+ * context" to give their AI. So for a memory record an agent's request reaches its owner's record
+ * when it names the owner's account, or names no owner and holds no record of its own under the key.
+ * The owner's record is then read under the rule an owner-scope memory read applies
+ * (owner-scope-read.ts): every record with memory:read-as-owner, otherwise only one kept at owner,
+ * members or public visibility. A record it may not read answers as absent.
+ */
+async function sourceFor(deps: Deps, caller: CallerContext, input: unknown): Promise<ContentSource> {
+  const source = parseSource(caller, input);
+  if (source.kind !== 'memory' || caller.kind !== 'agent' || isWorkspaceDocKey(source.key)) return source;
+  const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const named = typeof o.owner === 'string' && o.owner.trim() !== '';
+  let target = source;
+  if (!named && !(await deps.storage.getMemory(caller.principal, source.key))) target = { ...source, owner: caller.ownerGhii };
+  if (target.owner === caller.principal) return target;
+  const rec = await deps.storage.getMemory(target.owner, target.key);
+  if (!rec || !(readsAsOwner(caller) || visibleToSameOwnerReader(rec, caller.principal))) {
+    refuse('NOT_FOUND', 404, `Nothing of yours is stored as memory "${source.key}".`);
+  }
+  return target;
 }
 
 function readWord(source: ContentSource): string { return source.kind === 'file' ? 'storage:read' : 'memory:read'; }
@@ -133,7 +167,7 @@ function parseStages(v: unknown): StageName[] | undefined {
 /** The facts kept about one item, or NOT_FOUND when none were read yet. */
 export async function factsFor(deps: Deps, caller: CallerContext, sourceInput: unknown): Promise<ContentFacts> {
   assertOn(deps); assertLocal(caller);
-  const source = parseSource(caller, sourceInput);
+  const source = await sourceFor(deps, caller, sourceInput);
   requireWord(deps, caller,readWord(source), 'Reading what is known about an item');
   const f = await getFacts(deps.storage, caller.ownerGhii, sourceIdOf(source));
   if (!f) refuse('NOT_FOUND', 404, `Nothing has been read from ${source.kind} "${source.key}" yet. Inspect it first.`);
@@ -174,7 +208,7 @@ export async function inspectFor(
   deps: Deps, caller: CallerContext, input: { source?: unknown; stages?: unknown; force?: unknown }, appRef?: string,
 ): Promise<InspectResult & { shared?: SharedMeta }> {
   assertOn(deps); assertLocal(caller);
-  const source = parseSource(caller, input.source);
+  const source = await sourceFor(deps, caller, input.source);
   requireWord(deps, caller,readWord(source), 'Inspecting an item');
   const stages = parseStages(input.stages);
   const effective = stagesToRun(await readSettings(deps.storage, caller.ownerGhii), stages, false);
@@ -212,7 +246,7 @@ export async function correctFor(
   input: { source?: unknown; classes?: unknown; fields?: unknown; extract?: unknown; profile?: unknown }, appRef?: string,
 ): Promise<{ facts: ContentFacts; review: unknown; fingerprint?: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null; shared?: SharedMeta }> {
   assertOn(deps); assertLocal(caller);
-  const source = parseSource(caller, input.source);
+  const source = await sourceFor(deps, caller, input.source);
   requireWord(deps, caller,readWord(source), 'Correcting what is known about an item');
   requireWord(deps, caller,'memory:write', 'Correcting what is known about an item');
   if (input.extract === true) requireWord(deps, caller,'ai:use', 'Extracting the fields again');

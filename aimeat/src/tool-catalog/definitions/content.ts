@@ -22,6 +22,7 @@
  * @structure checkContentInput() · contentTools
  * @usage imported by tool-catalog/definitions.ts; checkContentInput by mcp/content.ts and tool-dispatch/tool-call-defs-content.ts
  * @version-history
+ *   v1.4.2 — 2026-11-13 — `owner` says an agent reaches its owner's memory record, such as a context.
  *   v1.4.1 — 2026-11-06 — aimeat_content_settings says the profile step is never run on arrival or by
  *     a scan on the settings, only when a caller names it.
  *   v1.4.0 — 2026-11-03 — A workspace document's shared fingerprint: aimeat_content_facts prefix and
@@ -47,7 +48,7 @@ const SOURCE_KIND = {
 };
 const SOURCE_OWNER = {
     type: 'string' as const,
-    description: 'Whose item it is. Omit for your own. The account holder may name one of their own agents (its full agent identity, name#owner@node).',
+    description: 'Whose item it is. Omit for your own. The account holder may name one of their own agents (its full agent identity, name#owner@node). An agent may name its owner\'s account (owner@node) for a memory record, such as the person\'s context; with the owner left out, a memory key the agent holds no record under is read as the owner\'s. The owner\'s record is reached as an owner-scope memory read reaches it: a private one only with memory:read-as-owner.',
 };
 const STAGES = {
     type: 'array' as const,

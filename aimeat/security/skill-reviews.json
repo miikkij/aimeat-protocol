@@ -54,7 +54,7 @@
         "aimeat/src/services/content/shared-profile.ts",
         "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:d77b5d4aca30666ae88924ed"
+      "digest": "sha256:d5201ed0d93ea96dd96033ec"
     },
     "node:aimeat-context": {
       "reviewedOn": "2026-11-13",
@@ -852,9 +852,9 @@
       "aimeat/src/data/agent-avatar-templates.ts": "81f58ad6900169db"
     },
     "node:aimeat-content-classes": {
-      "aimeat/src/services/content/pipeline.ts": "40cc0216503b00e7",
+      "aimeat/src/services/content/pipeline.ts": "7e7f25fea35e511a",
       "aimeat/src/services/content/ai-stages.ts": "96d3366e8f153380",
-      "aimeat/src/services/content/service.ts": "f154d34c19174f2f",
+      "aimeat/src/services/content/service.ts": "5ff8f6edfe5f4818",
       "aimeat/src/services/content/settings.ts": "75ca4524dd531ba0",
       "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949",
       "aimeat/src/services/content/shared-profile.ts": "85aadbe640835bee",

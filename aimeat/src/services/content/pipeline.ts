@@ -25,6 +25,8 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.7.0 — 2026-11-13 — mayAsk admits an agent on its owner's memory record, which service.ts
+ *     sourceFor has checked against the owner-scope read rule.
  *   v1.6.0 — 2026-11-09 — memoryValueText reads a person's context (aimeat.context/v1) as its name,
  *     summary, core and material, so its fingerprint sees the text's own parts instead of JSON.
  *   v1.5.0 — 2026-11-06 — The profile stage runs only when the caller names it (stagesToRun). With
@@ -128,9 +130,11 @@ interface LoadedItem {
 }
 
 /** May this caller ask about an item stored under `owner`: its own, or the account holder's agent's. */
-function mayAsk(caller: CallerContext, owner: string): boolean {
-  if (owner === caller.principal) return true;
-  return caller.inPerson && ownerGhiiOf(owner) === caller.ownerGhii;
+function mayAsk(caller: CallerContext, source: ContentSource): boolean {
+  if (source.owner === caller.principal) return true;
+  // An agent on its owner's memory record: service.ts sourceFor has applied the owner-scope read rule.
+  if (caller.kind === 'agent' && source.kind === 'memory' && source.owner === caller.ownerGhii) return true;
+  return caller.inPerson && ownerGhiiOf(source.owner) === caller.ownerGhii;
 }
 
 /**
@@ -228,7 +232,7 @@ export async function inspectSource(
   deps: Deps, caller: CallerContext, source: ContentSource, opts: InspectOptions = {},
 ): Promise<InspectResult> {
   if (deps.config.contentClassMode === 'off') throw new ContentError('NOT_FOUND', 404, 'Content classes are off on this node.');
-  if (!mayAsk(caller, source.owner)) throw new ContentError('NOT_FOUND', 404, `Nothing of yours is stored as ${source.kind} "${source.key}".`);
+  if (!mayAsk(caller, source)) throw new ContentError('NOT_FOUND', 404, `Nothing of yours is stored as ${source.kind} "${source.key}".`);
   const ownerGhii = caller.ownerGhii;
   const automatic = opts.automatic === true;
   const reader = automatic ? systemReader(deps, ownerGhii) : readerFor(deps, caller.auth);
