@@ -1,11 +1,14 @@
 /**
- * @file src/routes/cortex/activation.ts
+ * @file src/services/cortex/activation.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Cortex extension activation/deactivation logic — materialises (and tears down)
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — Moved unchanged from src/routes/cortex/activation.ts: it reads no request and every
+ *     import is a service, so the cortex lifecycle service no longer imports a route file (structure
+ *     programme 2026-11, unit 4).
  *   2026-10-25 — Board and action ids take the cortex name through idStemOf, so a cortex named
  *     `<owner>/<name>` makes `cortex-<owner>-<name>-<component>` and no id carries a slash; a bare
  *     name gives the id it always gave (owner namespaces wish, secaudit2026oct22).
@@ -50,12 +53,12 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { idStemOf } from '../../services/component-address.js';
-import { publicBoardCeiling, type BoardWriteRefusal } from '../../services/board-write.js';
-import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
-import { accountPrincipals } from '../../services/db/owner-identity.js';
-import { schemaLockRefusal } from '../../services/schema-lock-rule.js';
-import { isOwnersLock } from '../../services/packages/compose/package-component-collisions.js';
+import { idStemOf } from '../component-address.js';
+import { publicBoardCeiling, type BoardWriteRefusal } from '../board-write.js';
+import { cortexOntologyToSkos } from '../cortex-ontology-skos.js';
+import { accountPrincipals } from '../db/owner-identity.js';
+import { schemaLockRefusal } from '../schema-lock-rule.js';
+import { isOwnersLock } from '../packages/compose/package-component-collisions.js';
 import { localAccountName } from '../../utils/gaii.js';
 
 // ── Activation Logic ──

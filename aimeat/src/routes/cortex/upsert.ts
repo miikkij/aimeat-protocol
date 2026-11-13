@@ -9,6 +9,8 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   2026-11-13 — The activation functions come from services/cortex/activation.ts, where ./activation.ts
+ *     moved (structure programme 2026-11, unit 4).
  *   v1.7.3 — 2026-10-29 — The create branch under a bare name an erasure or the held-name settlement
  *     freed asks the earlier library's callers first (services/cortex-holder-change.ts; round 8c).
  *   v1.7.2 — 2026-10-29 — The create branch refuses a new name that starts with aimeat- to anyone but an
@@ -58,7 +60,7 @@ import {
   libsWithoutContent, missingLibsMessage, reservedNameRefusal, type CortexCaller,
   type CortexDeps, type CortexOutcome, type CortexRefusal,
 } from '../../services/cortex-lifecycle.js';
-import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
+import { activateExtension, activationRefusal, deactivateExtension } from '../../services/cortex/activation.js';
 import { refreshCortexDependencies } from '../../services/dependency-map.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { cortexPublishAsk, fileCortexAsk } from '../../services/cortex-visibility.js';

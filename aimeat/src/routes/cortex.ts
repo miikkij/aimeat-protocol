@@ -11,6 +11,8 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-11-13 — activateExtension is re-exported from services/cortex/activation.ts, where the
+ *     activation logic moved from ./cortex/activation.ts (structure programme 2026-11, unit 4).
  *   2026-10-29 — A lib request from an app that loaded the name from an earlier holder answers 404 until
  *     the app's owner allowed the new holder (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): `:name` takes
@@ -89,7 +91,7 @@ import type { PublishGateInput } from '../services/publish-requests/door.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
 // `activateExtension` from '../routes/cortex.js' unchanged after the activation logic moved out.
-export { activateExtension } from './cortex/activation.js';
+export { activateExtension } from '../services/cortex/activation.js';
 // …and the redeploy, which mcp/cortex.ts imports from here (./cortex/upsert.ts, max-file-lines).
 export { upsertCortex, type CortexUpsertResult } from './cortex/upsert.js';
 

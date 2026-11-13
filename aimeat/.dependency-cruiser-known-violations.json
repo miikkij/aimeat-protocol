@@ -272,20 +272,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/cortex-lifecycle.ts",
-    "to": "src/routes/cortex/activation.ts",
-    "unresolvedTo": "../routes/cortex/activation.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/db/agent-integration-overview-db-service.ts",
     "to": "src/routes/agent-onboarding.ts",
     "unresolvedTo": "../../routes/agent-onboarding.js",

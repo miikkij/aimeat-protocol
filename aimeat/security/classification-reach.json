@@ -341,12 +341,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The stored file passes reader.leave (external) before a delegated publish."
     },
-    "src/routes/cortex/activation.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of cortex ontology, prompt and seed records."
-    },
     "src/routes/ecosystem-apps-advisories.ts": {
       "reads": {
         "getMemory": 1,
@@ -1455,6 +1449,12 @@
         "listAllMemory": 1
       },
       "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUNDLED_CORTEX_NAME_HELD incident twice. No content."
+    },
+    "src/services/cortex/activation.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Moved unchanged from src/routes/cortex/activation.ts on 2026-11-13 (structure programme 2026-11, unit 4). Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of cortex ontology, prompt and seed records."
     },
     "src/services/credential-search-reindex.ts": {
       "reads": {

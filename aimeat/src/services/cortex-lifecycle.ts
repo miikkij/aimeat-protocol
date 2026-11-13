@@ -45,6 +45,8 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-11-13 — The activation functions come from services/cortex/activation.ts, not from a route file
+ *     (structure programme 2026-11, unit 4).
  *   2026-10-29 — installCortex under a bare name an account erasure or the held-name settlement freed
  *     asks each owner of an app that loaded the earlier library first (cortex-holder-change.ts;
  *     secaudit2026oct26 round 8c).
@@ -105,7 +107,7 @@ import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '
 import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
 import { cortexInstallRefusal } from './install-quotas.js';
 import { emitChange } from './event-bus.js';
-import { activateExtension, activationRefusal, deactivateExtension, type CortexActor } from '../routes/cortex/activation.js';
+import { activateExtension, activationRefusal, deactivateExtension, type CortexActor } from './cortex/activation.js';
 import { refreshCortexDependencies, forgetDependencies } from './dependency-map.js';
 import { snapshotCortexVersion, forgetVersions } from './component-versions.js';
 import { accountPrincipals } from './db/owner-identity.js';
