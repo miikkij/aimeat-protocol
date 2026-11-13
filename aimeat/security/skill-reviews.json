@@ -290,7 +290,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:1e6eb09ebe1ae67698937233"
+      "digest": "sha256:23e1e1c3862f611e4f51b33d"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -418,7 +418,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:d4e97541dbcfa468522518f6",
+      "digest": "sha256:28e89c6bdc720ad1aa24f849",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -675,7 +675,7 @@
       "aimeat/src/mcp/core-admin.ts": "39bc0e562ea85265"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "9a1863143db235da",
+      "aimeat/src/mcp/core.ts": "20a39b2f3af68bd0",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "26a67367e224834f"
     },
     "node:manage-my-profile-data": {
@@ -808,7 +808,7 @@
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
       "aimeat/src/services/owner-erasure.ts": "9bba402873027385",
       "aimeat/src/services/archive.ts": "8a08d72e2732e5ed",
-      "aimeat/src/mcp/organisms.ts": "a17a8ef8ae332755"
+      "aimeat/src/mcp/organisms.ts": "6f999ec1e324a446"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",
