@@ -14,10 +14,14 @@
  *   The decision itself is services/audience.ts, the same one every content kind asks. The owner and
  *   an operator are exempt the way they are exempt from the code: the caller of mayOpenApp decides
  *   that, because the operator pass writes a trail line (routes/apps/read.ts operatorReads).
- * @structure APP_ACCESS_VALUES · parseAppAccessInput · appAccessOf · appAccessLevelOf · appAudience · appNeedsCodeOrPayment · appNeedsSignIn · mayOpenApp
+ * @structure APP_ACCESS_VALUES · parseAppAccessInput · appAccessOf · appAccessLevelOf · appAudience · appNeedsCodeOrPayment · appNeedsSignIn · mayOpenApp ·
+ *   resolveAppTarget · resolveServableApp · appIsRestricted (which app an app origin serves, and whether it needs a grant)
  * @usage
  *   if (appNeedsSignIn(config, app) && !(await mayOpenApp(storage, config, app, req.auth))) → refuse
  * @version-history
+ *   v1.3.0 — 2026-11-13 — resolveAppTarget, resolveServableApp and appIsRestricted moved here unchanged from
+ *     routes/subdomain-app-gate.ts (its history holds theirs), so services/subdomain-sites.ts no longer
+ *     imports a route file (structure programme 2026-11, unit 4).
  *   v1.2.0 — 2026-10-25 — An app opened to the internet on a closed node keeps the audience anyone while
  *     its opening is in force (services/internet-opening/); the app record's owner name and filename
  *     name it.
@@ -31,6 +35,7 @@ import { appIsPaced } from './app-pacing.js';
 import { signedInOnly, type ContentAccess } from '../config-visibility.js';
 import { parseAudience, audienceAllows, type Audience, type AudienceAuth } from './audience.js';
 import { isAppOpenToInternet } from './internet-opening/opening-registry.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** What an owner writes, and what the settings answer carries. */
 export type AppAccess = 'anyone' | 'signed-in' | `organism:${string}`;
@@ -102,4 +107,32 @@ export async function mayOpenApp(
 ): Promise<boolean> {
   const audience = appAudience(config, app);
   return audience === null || audienceAllows(storage, audience, auth);
+}
+
+/** Resolve an "owner/filename" app target to its latest published record. */
+export async function resolveAppTarget(storage: Storage, target: string): Promise<AppRecord | null> {
+  const slash = target.indexOf('/');
+  if (slash <= 0 || slash === target.length - 1) return null;
+  const owner = target.slice(0, slash);
+  const filename = target.slice(slash + 1);
+  let app = await storage.getAppByOwnerName(owner, filename);
+  // Backward-compat: target may carry the full GHII as the owner segment
+  const bare = localAccountName(owner);
+  if (!app && bare !== owner) {
+    app = await storage.getAppByOwnerName(bare, filename);
+  }
+  return app;
+}
+
+/** The app an app origin may serve: null when there is none or an operator hid it. The origin holds
+ *  no session, so the owner and an operator look like strangers here; the apex keeps their pass. */
+export async function resolveServableApp(storage: Storage, target: string): Promise<AppRecord | null> {
+  const app = await resolveAppTarget(storage, target);
+  return app && !app.operatorHidden ? app : null;
+}
+
+/** True when the app must not be served openly at a subdomain root: a code, a payment, or a sign-in
+ *  (the app's own access setting or the node's signed-in content access, services/app-access.ts). */
+export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
+  return appNeedsCodeOrPayment(config, app) || appNeedsSignIn(config, app);
 }

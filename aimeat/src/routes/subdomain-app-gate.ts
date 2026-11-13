@@ -6,9 +6,13 @@
  *   resolveServableApp, appIsRestricted and unlockRedirect. A pure extraction from subdomains.ts when
  *   that file reached the 800-line ceiling; subdomains.ts re-exports the three exported functions, so
  *   no importer changed.
- * @structure resolveAppTarget · resolveServableApp · appIsRestricted · unlockRedirect
+ * @structure unlockRedirect · resolveAppTarget, resolveServableApp and appIsRestricted re-exported from
+ *   services/app-access.ts
  * @usage import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain-app-gate.js';
  * @version-history
+ *   2026-11-13 — resolveAppTarget, resolveServableApp and appIsRestricted moved unchanged to
+ *     services/app-access.ts and are re-exported here, so services/subdomain-sites.ts no longer imports
+ *     a route file (structure programme 2026-11, unit 4).
  *   v1.1.0 — 2026-10-17 — An app that needs a sign-in (its access setting or the node's signed-in
  *     content access) is restricted: the origin serves it only with a grant, and a browser without
  *     one is sent to /v1/app-open, the apex page that asks for the grant with the session.
@@ -18,37 +22,13 @@
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppRecord } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { appNeedsSignIn, appNeedsCodeOrPayment } from '../services/app-access.js';
+import type { AppRecord } from '../storage/interface.js';
+import { appNeedsSignIn } from '../services/app-access.js';
 
-/** Resolve an "owner/filename" app target to its latest published record. */
-export async function resolveAppTarget(storage: Storage, target: string): Promise<AppRecord | null> {
-  const slash = target.indexOf('/');
-  if (slash <= 0 || slash === target.length - 1) return null;
-  const owner = target.slice(0, slash);
-  const filename = target.slice(slash + 1);
-  let app = await storage.getAppByOwnerName(owner, filename);
-  // Backward-compat: target may carry the full GHII as the owner segment
-  const bare = localAccountName(owner);
-  if (!app && bare !== owner) {
-    app = await storage.getAppByOwnerName(bare, filename);
-  }
-  return app;
-}
-
-/** The app an app origin may serve: null when there is none or an operator hid it. The origin holds
- *  no session, so the owner and an operator look like strangers here; the apex keeps their pass. */
-export async function resolveServableApp(storage: Storage, target: string): Promise<AppRecord | null> {
-  const app = await resolveAppTarget(storage, target);
-  return app && !app.operatorHidden ? app : null;
-}
-
-/** True when the app must not be served openly at a subdomain root: a code, a payment, or a sign-in
- *  (the app's own access setting or the node's signed-in content access, services/app-access.ts). */
-export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
-  return appNeedsCodeOrPayment(config, app) || appNeedsSignIn(config, app);
-}
+// resolveAppTarget, resolveServableApp and appIsRestricted read no request and live in
+// services/app-access.ts, so a service resolves an app origin's target without importing a route
+// file; re-exported for every importer of this file.
+export { resolveAppTarget, resolveServableApp, appIsRestricted } from '../services/app-access.js';
 
 /**
  * A CODE-gated app met by a browser that holds no usable grant: send it to the apex, where the

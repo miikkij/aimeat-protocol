@@ -22,6 +22,8 @@
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   2026-11-13 — resolveAppTarget comes from services/app-access.ts, not from a route file (structure
+ *     programme 2026-11, unit 4).
  *   v1.4.0 — 2026-10-25 — A mapping created here has origin 'operator' (served on the apex namespace
  *     too), and an update takes `origin` ('operator' | 'publisher', else 400 INVALID_ORIGIN): the
  *     operator's decision on a row the start step could not classify (secaudit2026oct22).
@@ -37,7 +39,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
-import { resolveAppTarget } from '../routes/subdomains.js';
+import { resolveAppTarget } from './app-access.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from './subdomain-names.js';
 import { appNeedsCodeOrPayment } from './app-access.js';
 import { isNodeApexLabel } from './subdomain-node-labels.js';

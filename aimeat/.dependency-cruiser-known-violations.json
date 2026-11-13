@@ -211,20 +211,6 @@
     ]
   },
   {
-    "type": "dependency",
-    "from": "src/services/subdomain-sites.ts",
-    "to": "src/routes/subdomains.ts",
-    "unresolvedTo": "../routes/subdomains.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
     "type": "cycle",
     "from": "src/config-types.ts",
     "to": "src/services/config-sealing.ts",
