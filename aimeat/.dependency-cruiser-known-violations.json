@@ -182,43 +182,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/app-lifecycle.ts",
-    "to": "src/services/app-publish.ts",
-    "unresolvedTo": "./app-publish.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/services/app-publish.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/app-seo.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/app-lifecycle.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/services/home-state.ts",
     "to": "src/services/onboarding-funnel.ts",
     "unresolvedTo": "./onboarding-funnel.js",

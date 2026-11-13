@@ -36,6 +36,9 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   2026-11-13 — resolveAppOwnerScope is imported from app-owner-scope.ts, where it lives, and not
+ *     through the re-export in app-lifecycle.ts, which closed the cycle app-lifecycle → app-publish →
+ *     app-seo → app-lifecycle (structure programme 2026-11, unit 4).
  *   v1.5.1 — 2026-11-07 — seoNote(state, announced): an app switched on that the node does not announce
  *     (seo.announce_apps off, or a thin page) is no longer told it was added to the sitemap.
  *   v1.5.0 — 2026-11-06 — Switching search on is refused below APP_OWN_WORDS_MIN words of the app's own
@@ -65,7 +68,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppSeo, AppSummaryRecord } from '../storage/types/apps.js';
 import { announceApp } from './indexnow.js';
-import { resolveAppOwnerScope } from './app-lifecycle.js';
+import { resolveAppOwnerScope } from './app-owner-scope.js';
 import { emitChange } from './event-bus.js';
 import { appToll } from './app-pacing.js';
 import { signedInOnly } from '../config-visibility.js';
