@@ -42,6 +42,8 @@
  *   const r = await createTask({ storage, config, webhook }, { agent, agentGaii, agentName, creator, body, actor });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-13 — commissionFingerprint and isUniqueViolation come from services/agent-tasks/commission-dedupe.ts,
+ *     not from a route file (structure programme 2026-11, unit 4).
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-10-28 — createTask and applyProposedPlan decide on the agent record as it is: the node no
@@ -75,7 +77,7 @@ import {
     decideTaskStart, taskWakeId, autoStartEvent, startedOnItsOwn, TASK_EFFECTS, type TaskStartDecision, type TaskEffect,
 } from './agent-task-rules.js';
 import { notifyTaskWaiting } from './task-start-notice.js';
-import { commissionFingerprint, isUniqueViolation } from '../routes/agent-tasks/dedupe.js';
+import { commissionFingerprint, isUniqueViolation } from './agent-tasks/commission-dedupe.js';
 import { resumeIfStalled } from './task-resume.js';
 import { resolveTaskFileInputs } from './task-files.js';
 import type { FileRefAccessor } from './file-refs.js';

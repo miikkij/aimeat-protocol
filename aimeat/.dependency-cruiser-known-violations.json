@@ -316,20 +316,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/agent-task-write.ts",
-    "to": "src/routes/agent-tasks/dedupe.ts",
-    "unresolvedTo": "../routes/agent-tasks/dedupe.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/app-draft-preview.ts",
     "to": "src/routes/apps/helpers.ts",
     "unresolvedTo": "../routes/apps/helpers.js",
