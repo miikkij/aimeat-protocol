@@ -3,6 +3,14 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.41.1 - 2026-11-13
+
+- **The daemon plans a waiting task once.** A task that already has a plan and waits for the
+  owner's OK is no longer planned again each time its worker starts. Before, a spawned worker
+  planned such a task at every start, because it kept the list of planned tasks only in its own
+  memory. Each of those plans cost a model call, and on a node built before 2026-11-13 it also
+  sent the owner the "waits for your OK" notice again. A task with no plan is planned as before.
+
 ## 0.41.0 - 2026-11-08
 
 A minor release, as 0.40.0 was: a call that went out before is now refused, with the reason and what

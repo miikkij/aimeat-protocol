@@ -14,10 +14,10 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
-  unreleased -- 2026-11-12 -- PROPOSE plans a queued task only when it carries no live plan
+  0.41.1 -- 2026-11-12 -- PROPOSE plans a queued task only when it carries no live plan
     (`_tasks_needing_plan`). A queued task with a plan waits for the owner's OK; a spawned worker
     starts with an empty `proposed_ids`, so it planned such a task again at every start: a model
-    call each time, and on a node built before 2026-11-12 a repeated notice to the owner.
+    call each time, and on a node built before 2026-11-13 a repeated notice to the owner.
   unreleased -- 2026-11-08 -- secaudit2026nov08b round 15: both liaisons get `agent_identity`, so
     the offers publish tool picks its credential by the agent's full identity. A bare name another
     owner's agent carries in the same home no longer picks that owner's stored token.
@@ -751,7 +751,7 @@ def _tasks_needing_plan(
     """The tasks the PROPOSE phase plans: every queued or active task with no live plan.
 
     A queued task that already carries a plan waits for the owner's OK. Planning it again is a
-    model call that changes nothing, and on a node built before 2026-11-12 each such proposal also
+    model call that changes nothing, and on a node built before 2026-11-13 each such proposal also
     sent the owner the "waits for your OK" notice again. Measured on aimeat.io on 2026-11-12: one waiting task of
     a spawned agent was planned at every start of its worker, four times in 78 minutes, because
     the set of already planned ids lives in the worker's memory and a new worker starts with none.

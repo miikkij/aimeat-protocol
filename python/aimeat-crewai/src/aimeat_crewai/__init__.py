@@ -26,6 +26,10 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.41.1 -- 2026-11-13 -- The crew daemon plans a queued task only when it carries no live plan
+    (daemon._tasks_needing_plan). A spawned worker planned a task that waited for the owner's OK
+    again at every start: a model call each time, and a repeated notice on a node built before
+    2026-11-13.
   0.41.0 -- 2026-11-08 -- A bare agent name that agents of two owners carry in one connector home
     picks no stored token: decide() and publish_offers() stop and ask for the full identity
     agent#owner@node; publish_offers() takes a full identity, and create_liaison_agent(agent_identity=...)
@@ -266,7 +270,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.41.0"
+__version__ = "0.41.1"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

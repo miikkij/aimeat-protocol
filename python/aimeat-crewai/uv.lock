@@ -23,7 +23,7 @@ overrides = [
 
 [[package]]
 name = "aimeat-crewai"
-version = "0.41.0"
+version = "0.41.1"
 source = { editable = "." }
 dependencies = [
     { name = "crewai" },
