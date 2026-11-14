@@ -14,16 +14,21 @@
  *   call can take half a minute), so the number that matters is per-capability p95, never a node-wide
  *   average. Timings buffer in memory and flush on an interval — the same shape the telemetry buffer
  *   uses — so a metered call never pays for an extra write.
- * @structure recordCallDuration · readCallTiming · timingKey · flushCallTimings
+ * @structure recordCallDuration · readCallTiming · timingKey · flushCallTimings · holdCallTimingsForErasure
  * @usage
  *   const started = Date.now();
  *   ... invoke ...
  *   recordCallDuration(storage, providerGhii, ext, action, Date.now() - started);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — holdCallTimingsForErasure: before the erasure cascade, the provider's waiting
+ *     durations are dropped and a write in progress answers, and no duration of the provider is kept
+ *     until it ends. A waiting duration wrote the public timing record back under the erased GHII,
+ *     where the next holder of the name owned it (register finding f-2026-11-13-write-buffers-and-erasure).
  *   v1.0.0 — 2026-07-25 — Initial: measure so an ODPS service commitment can be proposed from data.
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from './erasure/holds.js';
 
 /** The public record a coordinate's timings live in, under the PROVIDER's GHII. */
 export function timingKey(ext: string, action: string): string {
@@ -48,6 +53,9 @@ const FLUSH_MS = 60_000;
 interface Pending { providerGhii: string; ext: string; action: string; durations: number[] }
 const pending = new Map<string, Pending>();
 let timer: NodeJS.Timeout | null = null;
+/** The providers whose erasure runs now, whose durations are not kept, and the writes in progress
+ *  an erasure waits for (holdCallTimingsForErasure). */
+const erasing = new ErasureHolds();
 
 function percentile(sorted: number[], p: number): number {
   if (!sorted.length) return 0;
@@ -61,7 +69,9 @@ function percentile(sorted: number[], p: number): number {
  */
 export function recordCallDuration(storage: Storage, providerGhii: string, ext: string, action: string, ms: number): void {
   if (!Number.isFinite(ms) || ms < 0) return;
-  const k = `${providerGhii}|${ext}|${action}`;
+  // A provider being erased: the cascade deletes the timing records, so none is started again.
+  if (erasing.covers(providerGhii)) return;
+  const k =`${providerGhii}|${ext}|${action}`;
   const entry = pending.get(k) ?? { providerGhii, ext, action, durations: [] };
   entry.durations.push(Math.round(ms));
   pending.set(k, entry);
@@ -77,28 +87,44 @@ export async function flushCallTimings(storage: Storage): Promise<void> {
   const batch = [...pending.values()];
   pending.clear();
   for (const item of batch) {
+    // Taken before an erasure began and reached after it: the provider's timings are not written back.
+    if (erasing.covers(item.providerGhii)) continue;
     try {
-      const key = timingKey(item.ext, item.action);
-      const existing = (await storage.getMemory(item.providerGhii, key))?.value as CallTiming | undefined;
-      const samples = [...(existing?.samples ?? []), ...item.durations].slice(-SAMPLE_CAP);
-      const sorted = [...samples].sort((a, b) => a - b);
-      const now = new Date().toISOString();
-      const value: CallTiming = {
-        count: (existing?.count ?? 0) + item.durations.length,
-        p50Ms: percentile(sorted, 50),
-        p95Ms: percentile(sorted, 95),
-        maxMs: Math.max(existing?.maxMs ?? 0, ...item.durations),
-        samples,
-        updatedAt: now,
-      };
-      await storage.setMemory({
-        key, ownerGaii: item.providerGhii, value, visibility: 'public',
-        tags: ['exchange', 'timing'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-      });
+      await erasing.track((async () => {
+        const key = timingKey(item.ext, item.action);
+        const existing = (await storage.getMemory(item.providerGhii, key))?.value as CallTiming | undefined;
+        const samples = [...(existing?.samples ?? []), ...item.durations].slice(-SAMPLE_CAP);
+        const sorted = [...samples].sort((a, b) => a - b);
+        const now = new Date().toISOString();
+        const value: CallTiming = {
+          count: (existing?.count ?? 0) + item.durations.length,
+          p50Ms: percentile(sorted, 50),
+          p95Ms: percentile(sorted, 95),
+          maxMs: Math.max(existing?.maxMs ?? 0, ...item.durations),
+          samples,
+          updatedAt: now,
+        };
+        await storage.setMemory({
+          key, ownerGaii: item.providerGhii, value, visibility: 'public',
+          tags: ['exchange', 'timing'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        });
+      })());
     } catch (err) {
       logger.warn('[call-timing] could not flush timings', { ext: item.ext, action: item.action, error: String(err) });
     }
   }
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no duration of the provider is
+ * kept from now on, a write in progress answers first so the cascade deletes what it stored, and the
+ * provider's waiting durations are dropped. The returned function ends the hold, after the cascade.
+ */
+export async function holdCallTimingsForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  await erasing.writesSettled();
+  for (const [k, item] of pending) if (ErasureHolds.isOf(item.providerGhii, account)) pending.delete(k);
+  return release;
 }
 
 /**

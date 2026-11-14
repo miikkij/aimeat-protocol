@@ -22,18 +22,19 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-write-buffers.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-write-buffers.test.ts
  * @version-history
+ *   v1.5.0 — 2026-11-14 — The shared setup and the call hold move to erasure-test-kit.ts.
  *   v1.4.0 — 2026-11-14 — The agent refusal notes.
  *   v1.3.0 — 2026-11-14 — The record of the permissions a `*` agent uses.
  *   v1.2.0 — 2026-11-14 — The memory write tally.
  *   v1.1.0 — 2026-11-14 — The usage call stream.
  *   v1.0.0 — 2026-11-14 — Initial: the consent audit.
  */
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
-import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { twoProviders, NODE, now, people, holdFirst, eraseDuring, until, type People } from './erasure-test-kit.js';
 import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent-audit-buffer.js';
 import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';
 import { initWriteTallyBuffer, recordMemoryTouch, flushWriteTallyBuffer, resetWriteTallyBuffer } from '../../src/services/data-map/write-tally-buffer.js';
@@ -42,93 +43,12 @@ import { initAgentRefusals, noteAgentRefusal, flushAgentRefusals, agentRefusalsK
 
 requirePostgresWhenAsked('erasure-write-buffers');
 
-type TestStorage = Storage & { close(): void | Promise<void> };
-const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])];
-const providers = new Map<string, TestStorage>();
+const { names, storageOf } = twoProviders(['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])]);
 /** One interval for the whole file, longer than any run: a flush happens only when a test asks. */
 const NEVER = 3_600_000;
-beforeAll(async () => {
-  for (const name of names) providers.set(name, await createStorage({
-    provider: name === 'sqlite' ? 'sqlite' : 'postgres-kysely',
-    sqlitePath: ':memory:', dbUrl: process.env.DATABASE_URL,
-  }) as TestStorage);
-}, 60_000);
-afterAll(async () => { for (const s of providers.values()) await s.close(); });
-
-const NODE = 'erasure-buffers';
-const now = () => new Date().toISOString();
-
-interface People { alice: string; bob: string; aliceGhii: string; bobGhii: string; star: string; scout: string }
-
-/** Two accounts; alice has an agent holding `*` and one holding memory:read only. */
-async function people(s: Storage): Promise<People> {
-  const tag = randomUUID().slice(0, 8);
-  const alice = `alice${tag}`, bob = `bob${tag}`;
-  const at = now();
-  for (const name of [alice, bob]) {
-    await s.createOwner({ name, displayName: name, publicKey: 'pk', roles: ['owner'], createdAt: at });
-    await s.createGHII({ ghii: `${name}@${NODE}`, username: name, nodeId: NODE, ownerName: name, displayName: name,
-      verificationLevel: 0, totpEnabled: false, createdAt: at, updatedAt: at });
-  }
-  const aliceGhii = `${alice}@${NODE}`;
-  const star = `star#${aliceGhii}`, scout = `scout#${aliceGhii}`;
-  for (const [gaii, scopes] of [[star, ['*']], [scout, ['memory:read']]] as const) {
-    await s.createAgent({
-      name: gaii.split('#')[0], owner: alice, gaii, publicKey: 'pk', trustScore: 50, morselBalance: 0, capabilities: [],
-      defaultScopes: [...scopes], createdAt: at, lastSeen: at,
-    } as never);
-  }
-  return { alice, bob, aliceGhii, bobGhii: `${bob}@${NODE}`, star, scout };
-}
-
-/**
- * Hold the first call of `method` on `target` open: `began` resolves when it has started, and it
- * answers only after `release()`. A write is held before it reaches storage (`before`); a read that
- * decides a later write is held after it has read (`after`), so the write follows the erasure with
- * what was read before it. Later calls go straight through.
- */
-function holdFirst<T extends object>(target: T, method: keyof T & string, when: 'before' | 'after' = 'before'): { began: Promise<void>; release: () => void; restore: () => void } {
-  const real = (target[method] as unknown as (...a: unknown[]) => unknown).bind(target);
-  let started!: () => void;
-  let release!: () => void;
-  const began = new Promise<void>(r => { started = r; });
-  const released = new Promise<void>(r => { release = r; });
-  let first = true;
-  (target as Record<string, unknown>)[method] = async (...args: unknown[]) => {
-    if (!first) return real(...args);
-    first = false;
-    if (when === 'before') { started(); await released; return real(...args); }
-    const answer = await real(...args);
-    started();
-    await released;
-    return answer;
-  };
-  return { began, release, restore: () => { delete (target as Record<string, unknown>)[method]; } };
-}
-
-/** Let `work` run until it has finished or has nothing left to do but wait. */
-async function settledOrWaiting(work: Promise<unknown>): Promise<void> {
-  let done = false;
-  void work.then(() => { done = true; }, () => { done = true; });
-  for (let i = 0; i < 30 && !done; i++) await new Promise(r => setTimeout(r, 20));
-}
-
-/** Erase alice while `held` holds a buffer's write open, then release it and wait for both. */
-async function eraseDuring(s: Storage, p: People, held: { began: Promise<void>; release: () => void }, write: Promise<unknown>): Promise<void> {
-  await held.began;
-  const erased = eraseOwner(s, NODE, p.alice);
-  await settledOrWaiting(erased);
-  held.release();
-  await Promise.all([write, erased]);
-}
-
-async function until(cond: () => Promise<boolean>, what: string): Promise<void> {
-  for (let i = 0; i < 100; i++) { if (await cond()) return; await new Promise(r => setTimeout(r, 20)); }
-  throw new Error(`timed out waiting for ${what}`);
-}
 
 describe.each(names)('%s: a write buffer and an account erasure', provider => {
-  const st = () => providers.get(provider)!;
+  const st = () => storageOf(provider);
   afterEach(async () => {
     await shutdownConsentAuditBuffer();
     resetUsageBuffer();
