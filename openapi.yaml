@@ -53123,7 +53123,9 @@ paths:
         An outside app (role `ecosystem`) needs `notifications:send` among its approved scopes; its
         notification gets the app's name prefixed to the title, `source.kind` `ecosystem` with its
         GEAI as `source.id`, and `link` defaults to the Outside apps page, so the owner can tell it
-        apart from their own notices and mute it on its own.
+        apart from their own notices and mute it on its own. An agent's notification without a
+        `link` opens that agent's own card (`/v1/profile?tab=agents&agent={name}`), not the list of
+        agents.
         `created` says whether the notification was STORED — that it is in the bell and will be
         there when the owner next looks. It is not a claim about the browser push, which is
         best-effort on top and can fail without changing `created`. A notification the owner has
