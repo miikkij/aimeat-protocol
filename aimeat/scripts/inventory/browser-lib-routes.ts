@@ -17,13 +17,17 @@
  *   path is the literal from `/v1/` to its query; a literal that ends in `/` and is followed by
  *   `+ <expression>` gets a `{}` segment, and `${...}` is `{}`. The parameters are the `name=` pairs in
  *   the literals of the same line. Its documented limit: a parameter set through URLSearchParams
- *   (`p.set('agent', ...)`) or a path built in a variable over several lines is not seen.
+ *   (`p.set('agent', ...)`) or a path built in a variable over several lines is not seen. A literal
+ *   that is the value of an `href:` or `path:` key is a page link, not a call, and is skipped.
  * @structure
  *   - libraryCalls(dir, skip): route -> the parameter names seen with it
  *   - routeDifferences(portal, apps): the shared routes and the differing ones
  *   - PORTAL_DIR, APPS_DIR, APPS_SKIP, BASELINE
  * @usage import { libraryCalls, routeDifferences } from './inventory/browser-lib-routes.js';
  * @version-history
+ *   v1.2.0 — 2026-11-14 — A page link (`href:` or `path:` key) is no call: the header's nav table
+ *     linked /v1/appcat and the portal's list linked /v1/appcat?q=, and the gate read the two links
+ *     as one route called with different parameters (main CI red from bfea88347).
  *   v1.1.0 — 2026-10-18 — The report became a shrink-only gate (scripts/audit-browser-libs.ts --check).
  *   v1.0.0 — 2026-10-18 — Initial (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
  */
@@ -60,7 +64,9 @@ export function callsInText(text: string, into: RouteCalls = new Map()): RouteCa
     for (const line of code(text).split('\n')) {
         if (!line.includes('/v1/')) continue;
         const literals = [...line.matchAll(/(['"`])((?:\\.|(?!\1).)*)\1/g)];
-        const at = literals.findIndex(l => l[2].includes('/v1/'));
+        // A page link is no call: the value of an `href:` or `path:` key (a list item's link, the
+        // header's nav table). A call builds its address in a variable or passes it to a function.
+        const at = literals.findIndex(l => l[2].includes('/v1/') && !/\b(?:href|path)\s*:\s*$/.test(line.slice(0, l.index)));
         if (at < 0) continue;
         // Follow a concatenation: '/v1/organisms/' + id + '/workspace?ws=' is /v1/organisms/{}/workspace.
         let url = literals[at][2].slice(literals[at][2].indexOf('/v1/'));

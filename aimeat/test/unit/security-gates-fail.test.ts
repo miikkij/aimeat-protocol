@@ -483,6 +483,12 @@ describe('audit:browser-libs finds a route both libraries call with different pa
         expect(shared).toEqual(['/v1/memory/{}', '/v1/organisms/{}/search']);
         expect(differences).toEqual({ '/v1/memory/{}': { portal: ['soft'], apps: ['owner_scope', 'soft'] } });
     });
+    it('reads a page link (an href or a nav path key) as no call, and still reads a url variable', () => {
+        const portal = callsInText("items.push({ href: `/v1/appcat?q=${q}` });\nconst url = `/v1/memory?prefix=${p}`;");
+        const apps = callsInText("{ id: 'apps', path: '/v1/appcat', key: 'nav.apps' },\nvar path = '/v1/memory' + '?limit=' + n;");
+        expect([...portal.keys()]).toEqual(['/v1/memory']);
+        expect([...apps.keys()]).toEqual(['/v1/memory']);
+    });
 });
 
 // ── check:atomic-writes ──
