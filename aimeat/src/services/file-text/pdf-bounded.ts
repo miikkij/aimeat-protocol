@@ -11,7 +11,9 @@
  *   process. Here pdf.js runs in a worker thread: the node keeps answering, the worker's V8 heap is
  *   capped (resourceLimits), and the decoded buffers pdf.js allocates outside the heap are read from
  *   the worker's heap statistics (external_memory) every POLL_MS. Past either limit the worker is
- *   terminated and the read ends with PdfLimitReached; the file itself is untouched.
+ *   terminated and the read ends with PdfLimitReached; the file itself is untouched. The worker runs
+ *   inside a child process of its own (contained-worker.ts), because a worker that reaches its heap
+ *   limit can abort the process it runs in; here that ends the child, not the node.
  *
  *   THE LIMITS ARE SETTINGS (content_class.pdf_text_seconds, content_class.pdf_text_memory_mb), and
  *   0 means no limit. With both at 0 the caller reads in its own thread as it did before.
@@ -24,9 +26,11 @@
  *   const got = await readPdfBounded(bytes, pdfReadLimits(config), { text: true, meta: ['dc:title'] });
  * @version-history
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c, memory-b-09).
+ *   v1.1.0 — 2026-11-14 — The worker runs in a child process (ContainedWorker): a worker that reached
+ *     the heap limit aborted the whole process.
  */
-import { Worker } from 'node:worker_threads';
 import { createRequire } from 'node:module';
+import { ContainedWorker } from '../isolation/contained-worker.js';
 import type { AimeatConfig } from '../../config.js';
 
 /** The limits one bounded read runs under. 0 is no limit. */
@@ -114,11 +118,9 @@ function unpdfEntry(): string {
  */
 export function readPdfBounded(bytes: Buffer, limits: PdfReadLimits, want: { text: boolean; meta?: readonly string[] }): Promise<BoundedPdf> {
   const copy = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length) as ArrayBuffer;
-  const worker = new Worker(WORKER_SOURCE, {
-    eval: true,
+  const worker = new ContainedWorker(WORKER_SOURCE, {
     workerData: { unpdf: unpdfEntry(), bytes: copy, text: want.text, meta: want.meta ?? null },
-    transferList: [copy],
-    ...(limits.memoryMb > 0 ? { resourceLimits: { maxOldGenerationSizeMb: limits.memoryMb } } : {}),
+    memoryMb: limits.memoryMb,
   });
   return new Promise<BoundedPdf>((resolve, reject) => {
     let settled = false;

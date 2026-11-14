@@ -123,6 +123,13 @@ export default tseslint.config(
       // calls had lost their reason that way (QA audit E1-04). Straight to 'error': the 33 were
       // converted in the same change.
       'aimeat/no-error-object-log-field': 'error',
+      // A worker thread's resourceLimits do not contain an out-of-memory: a worker that reaches its
+      // heap limit can abort the whole process (Node 24.22, measured 2026-11-14). A memory-limited
+      // worker is a ContainedWorker, which runs it in a child process of its own.
+      'no-restricted-syntax': ['error', {
+        selector: "Property[key.name='resourceLimits']",
+        message: 'A worker that reaches resourceLimits can abort the whole node. Use ContainedWorker (src/services/isolation/contained-worker.ts), which runs the worker in a child process.',
+      }],
     },
   },
   {

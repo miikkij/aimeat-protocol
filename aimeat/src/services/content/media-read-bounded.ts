@@ -15,6 +15,8 @@
  *   Here the worker's V8 heap is capped (resourceLimits), the buffers it allocates outside the heap are
  *   read from its heap statistics every POLL_MS, and past either limit, or past the time limit, the
  *   worker is terminated and the read ends with MediaReadLimitReached. The file itself is untouched.
+ *   The worker runs inside a child process of its own (contained-worker.ts), because a worker that
+ *   reaches its heap limit can abort the process it runs in; here that ends the child, not the node.
  *
  *   ONE CHECK BEFORE exifr. exifr inflates the first PNG iCCP chunk with no output limit, outside the
  *   V8 heap, before it looks at any option. The worker inflates that chunk first with an output limit
@@ -39,9 +41,11 @@
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 12: readImageFacts:exifr-heif-zero-length-box-unbounded-loop,
  *     exifr-icc-mluc-unbounded-entry-loop, exifr-png-iccp-inflate-unbounded-output,
  *     exifr-tiff-value-count-aliasing-amplification; readC2pa:jumbf-superbox-nesting-quadratic-copy).
+ *   v1.1.0 — 2026-11-14 — The worker runs in a child process (ContainedWorker): a reader that reached the
+ *     heap limit aborted the whole process, which CI saw as a crashed unit run.
  */
-import { Worker } from 'node:worker_threads';
 import { createRequire } from 'node:module';
+import { ContainedWorker } from '../isolation/contained-worker.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 
@@ -234,7 +238,7 @@ interface Job {
 }
 
 interface Slot {
-  worker: Worker;
+  worker: ContainedWorker;
   memoryMb: number;
   job: Job | null;
   jobId: number;
@@ -277,11 +281,7 @@ function finish(slot: Slot, settle: () => void, keep: boolean): void {
 }
 
 function spawn(memoryMb: number): Slot {
-  const worker = new Worker(WORKER_SOURCE, {
-    eval: true,
-    workerData: libraryPaths(),
-    ...(memoryMb > 0 ? { resourceLimits: { maxOldGenerationSizeMb: memoryMb } } : {}),
-  });
+  const worker = new ContainedWorker(WORKER_SOURCE, { workerData: libraryPaths(), memoryMb });
   const slot: Slot = { worker, memoryMb, job: null, jobId: 0 };
   worker.unref();
   worker.on('message', (m: Answer) => {

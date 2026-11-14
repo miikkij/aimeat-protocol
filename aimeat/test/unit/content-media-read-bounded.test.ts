@@ -19,6 +19,8 @@
  * @usage pnpm exec vitest run test/unit/content-media-read-bounded.test.ts
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 12).
+ *   v1.0.1 — 2026-11-14 — The readers now run in a child process (contained-worker.ts), so rssGrowthMb
+ *     measures the node's own process, which the reader's memory no longer reaches.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { Worker } from 'node:worker_threads';
