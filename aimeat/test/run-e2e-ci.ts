@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-14 -- e2e-mcp-admin-usage-reports.ts joins the list (not the guard tier): aimeat_admin_usage reads the node usage reports GET /v1/admin/usage/summary reads.
  *   2026-11-14 -- e2e-help.ts joins the list (not the guard tier): Ask someone who knows.
  *   2026-11-14 -- e2e-secret-shares.ts joins the list (not the guard tier): secret shares and secret requests (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   2026-11-14 -- e2e-consent-read-as-owner.ts joins the list (not the guard tier): an agent sees its own consents, and the account's with consent:read-as-owner, on the route, the tool and the resource.
@@ -1895,6 +1896,9 @@ const ALL_SUITES = [
     'test/e2e-mcp-operator-site-tools.ts',
     'test/e2e-mcp-compliance-tools.ts',
     'test/e2e-mcp-admin-tools.ts',
+    // aimeat_admin_usage takes the report parameters GET /v1/admin/usage/summary takes, on the node
+    // MCP endpoint and the CLI dispatch; with none it still answers the AI-cost page.
+    'test/e2e-mcp-admin-usage-reports.ts',
     'test/e2e-mcp-ai-tools.ts',
     // Reference pictures and a mask on the image AI: what OpenRouter, the OpenAI type and an
     // OpenAI-compatible server receive, and the refusals that send nothing (Comicland v3 A-1, A-2).

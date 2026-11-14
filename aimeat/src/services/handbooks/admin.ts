@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.36.3 -- 2026-11-14 -- aimeat_admin_usage reads a node usage report with report (tool, day, model and the rest).
  *   v1.36.2 -- 2026-11-14 -- aimeat_consent_list lists the agent's own consents, and the account's with
  *     consent:read-as-owner.
  *   v1.36.1 -- 2026-11-14 -- The balancing test setting (required, optional, off) and who approves.
@@ -110,7 +111,10 @@ accounts and costs them nothing, \`whose_money.ledger\` is a third count off a d
 add the three together. \`ceiling_usd\` is the grant × the accounts: the most the house key can cost
 before somebody is refused. \`keys.chat.metered_here\` is false because every chat turn is spent from
 a key handed to a child process, so say that whenever you report a total, and pass ask_provider true
-to get the provider's own figure for it) · \`aimeat_admin_statistics\` (what the node COUNTED: requests,
+to get the provider's own figure for it. Give \`report\` and it reads one usage report across the node
+instead, as GET /v1/admin/usage/summary does: \`tool\` for which tools are called and which refuse or
+fail, \`day\`, \`model\`, \`app\`, \`agent\`, \`user\` and the others it lists; add \`owner\` for one
+person's slice) · \`aimeat_admin_statistics\` (what the node COUNTED: requests,
 memory, refusals, the day-by-day tallies, and the live gauges — give both \`from\` and \`to\` for a
 period, neither for the node's whole life, and read it both ways to tell a quiet period from a
 counter nothing writes) · \`aimeat_admin_stats\` (a different question: how many agents, actions,

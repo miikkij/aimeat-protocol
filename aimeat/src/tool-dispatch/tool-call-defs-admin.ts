@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   2026-11-14 -- aimeat_admin_usage forwards report, owner, from, to, grain, series and limit to
+ *     GET /v1/admin/usage/summary when any report parameter is given.
  *   2026-11-13 -- aimeat_admin_knowledge forwards `author` (unit 3b).
  *   v1.13.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt (GET and POST /v1/admin/encryption/reencrypt;
  *     codebase analysis 2026-11-03, decision 4a of 2026-11-05).
@@ -37,6 +39,7 @@
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { requiredString, requiredValue, optionalString, optionalNumber, optionalBoolean, query } from './tool-call-helpers.js';
+import { USAGE_REPORT_PARAMS } from '../models/tool-input-vocabulary.js';
 
 export const adminCliTools: ConnectCliToolDefinition[] = [
     {
@@ -83,8 +86,24 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
         // would turn that refusal into thirty days of numbers wearing the caller's label.
         // `ask_provider` picks a SECOND route rather than a query parameter, because asking the
         // provider costs an outbound round trip the page's own read never pays.
+        // A REPORT PARAMETER (USAGE_REPORT_PARAMS) picks a THIRD route, GET /v1/admin/usage/summary,
+        // with all seven forwarded as given: the route checks the report name and the days.
         name: 'aimeat_admin_usage',
         handler: async ({ client }, input) => {
+            if (USAGE_REPORT_PARAMS.some((k) => input[k] !== undefined)) {
+                if (optionalBoolean(input, 'ask_provider') === true) {
+                    throw new Error('INVALID_INPUT: ask_provider reads the cost page; leave out report, owner, grain, series and limit to use it.');
+                }
+                return client.get(`/v1/admin/usage/summary${query({
+                    report: typeof input.report === 'string' ? input.report : undefined,
+                    owner: optionalString(input, 'owner'),
+                    from: optionalString(input, 'from'),
+                    to: optionalString(input, 'to'),
+                    grain: optionalString(input, 'grain'),
+                    series: optionalBoolean(input, 'series'),
+                    limit: optionalNumber(input, 'limit'),
+                })}`);
+            }
             const page = await client.get(`/v1/admin/usage/page${query({
                 from: optionalString(input, 'from'),
                 to: optionalString(input, 'to'),

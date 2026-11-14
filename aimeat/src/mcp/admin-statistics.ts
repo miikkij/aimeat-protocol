@@ -26,6 +26,9 @@
  * @structure registerAdminStatisticsTools(mcp, storage, config, getAgentGaii, scopes) — two reads.
  * @usage registerAdminStatisticsTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-11-14 — aimeat_admin_usage reads any node usage report (report, owner, from, to, grain,
+ *     series, limit) through services/usage/usage-summary.ts, the function GET
+ *     /v1/admin/usage/summary calls; with none of them it answers the cost page as before.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -45,6 +48,9 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/ow
 import { buildStatsSnapshot } from '../services/stats-page.js';
 import { buildUsagePage } from '../services/usage-page.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { readUsageSummary } from '../services/usage/usage-summary.js';
+import { USAGE_REPORT_PARAMS } from '../models/tool-input-vocabulary.js';
+import { toolError } from './tool-error.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -91,8 +97,19 @@ export function registerAdminStatisticsTools(
   mcp.registerTool('aimeat_admin_usage', { description: descriptionFor('aimeat_admin_usage'),
     inputSchema: zodShapeFor('aimeat_admin_usage'),
     annotations: annotationsFor('aimeat_admin_usage') },
-    async ({ from, to, ask_provider }) => {
+    async ({ from, to, ask_provider, report, owner, grain, series, limit }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
+
+      // A report parameter reads GET /v1/admin/usage/summary's report through the service that route
+      // calls, so the report names, the days and the defaults are checked in one place.
+      const given = { report, owner, grain, series, limit };
+      if (USAGE_REPORT_PARAMS.some((k) => given[k] !== undefined)) {
+        if (ask_provider === true) {
+          return toolError('INVALID_INPUT', 'ask_provider reads the cost page; leave out report, owner, grain, series and limit to use it.');
+        }
+        const result = await readUsageSummary(storage, config.nodeId, { report, owner, from, to, grain, series, limit });
+        return result.ok ? text(result.data) : toolError(result.code, result.message);
+      }
 
       for (const [label, value] of [['from', from], ['to', to]] as const) {
         if (value !== undefined && !ISO_DAY.test(value)) {

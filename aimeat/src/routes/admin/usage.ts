@@ -28,6 +28,8 @@
  *   import { adminUsageRouter } from './routes/admin/usage.js';
  *   app.use(adminUsageRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-11-14 — The summary route's argument handling moved to services/usage/usage-summary.ts,
+ *     unchanged, so aimeat_admin_usage reads the same reports with the same validation.
  *   v1.4.1 — 2026-11-01 — free_fallback_model is null in eu-only (ai.region_mode), where the free router does not run.
  *   v1.4.0 — 2026-10-25 — The hot window and the hour-rollup window come from the config
  *     (usage.hot_days, usage.hour_rollup_days), so the admin Config tab shows and changes them.
@@ -46,9 +48,9 @@ import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import {
-  readUsageReport, NODE_REPORTS, OWNER_REPORTS, UnknownReportError,
-  usageComputedThrough, dayNDaysAgo,
+  NODE_REPORTS, OWNER_REPORTS, usageComputedThrough, dayNDaysAgo,
 } from '../../services/usage/usage-read.js';
+import { readUsageSummary } from '../../services/usage/usage-summary.js';
 import { rebuildUsageRollup } from '../../services/usage/rollup-engine.js';
 import { recordUsageCall, pendingUsageCalls } from '../../services/usage/usage-buffer.js';
 import { buildUsagePage } from '../../services/usage-page.js';
@@ -70,35 +72,17 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/admin/usage/summary',
     requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
-      const report = typeof req.query.report === 'string' ? req.query.report : 'day';
-      const owner = typeof req.query.owner === 'string' && req.query.owner ? req.query.owner : null;
-      const from = typeof req.query.from === 'string' ? req.query.from : dayNDaysAgo(30);
-      const to = typeof req.query.to === 'string' ? req.query.to : dayNDaysAgo(0);
-      if (!ISO_DAY.test(from) || !ISO_DAY.test(to)) {
-        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'from and to must be YYYY-MM-DD'));
-      }
-      const grain = req.query.grain === 'hour' ? 'hour' : 'day';
-
-      try {
-        const data = await readUsageReport(storage, {
-          report,
-          scope: owner ? 'owner' : 'node',
-          // A bare owner name and a full GHII both work; the operator types whichever they have.
-          ownerGhii: owner ? (owner.includes('@') ? owner : `${owner}@${config.nodeId}`) : undefined,
-          from, to, grain,
-          series: req.query.series !== 'false',
-          limit: Number(req.query.limit) || undefined,
-        });
-        res.json(success(config.nodeId, data, [
-          { description: 'Raw calls behind these numbers', method: 'GET', url: '/v1/admin/usage/calls' },
-          { description: 'How fresh the serving layer is', method: 'GET', url: '/v1/admin/usage/status' },
-        ]));
-      } catch (err) {
-        if (err instanceof UnknownReportError) {
-          return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', err.message));
-        }
-        throw err;
-      }
+      // The argument handling is services/usage/usage-summary.ts, which aimeat_admin_usage calls too.
+      const q = (name: string) => typeof req.query[name] === 'string' ? req.query[name] as string : undefined;
+      const result = await readUsageSummary(storage, config.nodeId, {
+        report: q('report'), owner: q('owner'), from: q('from'), to: q('to'),
+        grain: q('grain'), series: q('series'), limit: q('limit'),
+      });
+      if (!result.ok) return res.status(400).json(error(config.nodeId, result.code, result.message));
+      res.json(success(config.nodeId, result.data, [
+        { description: 'Raw calls behind these numbers', method: 'GET', url: '/v1/admin/usage/calls' },
+        { description: 'How fresh the serving layer is', method: 'GET', url: '/v1/admin/usage/status' },
+      ]));
     });
 
   // ── GET /v1/admin/usage/reports ── what may be asked for, in both scopes.

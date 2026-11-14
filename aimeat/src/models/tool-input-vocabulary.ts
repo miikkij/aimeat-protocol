@@ -6,10 +6,12 @@
  *   catalog and the code that acts on them can import them (secaudit 2026-10, M3). The catalog
  *   imports nothing above utils/ and models/, and each of these lived in a service or a route
  *   module, so they moved here unchanged and the module they came from re-exports them.
- * @structure OWNER_REPORTS · FLAG_TARGET_TYPES · FLAG_REASONS · OVERVIEW_SECTIONS · BENEFICIARIES_MAX ·
- *   MEMORY_LIST_MAX_LIMIT · FONT_KINDS
+ * @structure OWNER_REPORTS · NODE_REPORTS · USAGE_REPORT_PARAMS · FLAG_TARGET_TYPES · FLAG_REASONS ·
+ *   OVERVIEW_SECTIONS · BENEFICIARIES_MAX · MEMORY_LIST_MAX_LIMIT · FONT_KINDS
  * @usage import { FLAG_REASONS } from '../models/tool-input-vocabulary.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — NODE_REPORTS moved unchanged from services/usage/usage-read.ts, and
+ *     USAGE_REPORT_PARAMS: aimeat_admin_usage states the node reports and reads them.
  *   v1.0.0 — 2026-10-05 — Moved from services/usage/usage-read.ts, services/moderation-flags.ts,
  *     services/appdev-overview.ts, commerce/beneficiary-split.ts, routes/memory/shared.ts and
  *     services/themes/font-registry.ts (secaudit 2026-10, M3).
@@ -27,6 +29,28 @@ export const OWNER_REPORTS: Record<string, string> = {
   activity: 'call.owner',
   sold: 'call.provider.coordinate',
 };
+
+/** Reports across every owner. Operator-only: the calling route MUST gate on the operator role (services/usage/usage-read.ts). */
+export const NODE_REPORTS: Record<string, string> = {
+  day: 'llm.node',
+  model: 'llm.model',
+  app: 'llm.app',
+  'app-model': 'llm.app.model',
+  agent: 'llm.actor',
+  user: 'llm.owner',
+  tool: 'call.tool',
+  surface: 'call.surface',
+  'apps-used': 'call.app',
+  activity: 'call.node',
+  provider: 'call.provider.coordinate',
+};
+
+/**
+ * The aimeat_admin_usage parameters only a usage report reads (GET /v1/admin/usage/summary). A call
+ * naming any of them reads a report; a call naming none reads the AI-cost page (GET
+ * /v1/admin/usage/page). The node MCP handler and the CLI dispatch both decide by this list.
+ */
+export const USAGE_REPORT_PARAMS = ['report', 'owner', 'grain', 'series', 'limit'] as const;
 
 /**
  * What a moderation flag may point at, and why (services/moderation-flags.ts). `ai_provenance` takes

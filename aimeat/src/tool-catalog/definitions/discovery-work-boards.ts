@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-14 — aimeat_admin_usage takes report, owner, grain, series and limit, and reads any node
+ *     usage report as GET /v1/admin/usage/summary does.
  *   2026-11-13 — aimeat_board_post takes ttl_hours, as POST /v1/boards/:boardId/posts does (unit 3b).
  *   2026-11-13 — aimeat_storage_upload takes federate, as POST /v1/storage does (unit 3b).
  *   2026-11-13 — aimeat_action_execute takes callback_url, as POST /v1/work/request does (unit 3b).
@@ -97,6 +99,7 @@
 import { z } from 'zod';
 import { storedVisibilitySchema } from '../../utils/visibility-words.js';
 import { INPUT_LIMITS } from '../../models/input-limits.js';
+import { NODE_REPORTS, OWNER_REPORTS } from '../../models/tool-input-vocabulary.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -697,7 +700,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_admin_usage',
-        description: 'Operator-only. What AI costs on this node, organised by WHOSE MONEY IT IS rather than by which system counted it. Give BOTH from and to (ISO dates, inclusive) or neither for the trailing thirty days. `whose_money.house` is the operator\'s own bill — what people spent on the node\'s key because they had not brought their own. `whose_money.own` is other people\'s own provider accounts and costs the operator nothing. `whose_money.ledger` is a THIRD count, off a different table, and is the larger set; report it as such and never add it to the other two. `ceiling_usd` is the free grant times the number of accounts: the most the server\'s key can cost before somebody is refused, and the number an operator acts on. THE IMPORTANT LIMIT: `keys.chat.metered_here` is false, because every chat turn is spent from one key handed to a child process, so no figure here contains any of it — say so whenever you report a total, or the operator will read a bill that is missing its largest item. Pass ask_provider true to have the node ask the provider what its own two keys have actually spent (one outbound call per key, cached a minute); without it `keys.*.spend` is null and unknown is the honest answer. `models.unpriced` explains the calls that carry no cost: most are free or local models that have none, and `estimated_missing_usd` is what the rest would have cost at the priced average. The same data as GET /v1/admin/usage/page. Returns an operator-role error for non-operators.',
+        description: 'Operator-only. What AI costs on this node, organised by WHOSE MONEY IT IS rather than by which system counted it. Give BOTH from and to (ISO dates, inclusive) or neither for the trailing thirty days. `whose_money.house` is the operator\'s own bill — what people spent on the node\'s key because they had not brought their own. `whose_money.own` is other people\'s own provider accounts and costs the operator nothing. `whose_money.ledger` is a THIRD count, off a different table, and is the larger set; report it as such and never add it to the other two. `ceiling_usd` is the free grant times the number of accounts: the most the server\'s key can cost before somebody is refused, and the number an operator acts on. THE IMPORTANT LIMIT: `keys.chat.metered_here` is false, because every chat turn is spent from one key handed to a child process, so no figure here contains any of it — say so whenever you report a total, or the operator will read a bill that is missing its largest item. Pass ask_provider true to have the node ask the provider what its own two keys have actually spent (one outbound call per key, cached a minute); without it `keys.*.spend` is null and unknown is the honest answer. `models.unpriced` explains the calls that carry no cost: most are free or local models that have none, and `estimated_missing_usd` is what the rest would have cost at the priced average. The same data as GET /v1/admin/usage/page. NODE USAGE REPORTS: give `report` (or any of owner, grain, series, limit) and the tool answers what GET /v1/admin/usage/summary answers instead of the cost page: one report\'s rows (`groups`, each with calls, errors, refusals, tokens and cost), its `totals`, a per-bucket `series`, and `computed_through`, how fresh the numbers are. `report: "tool"` says which tools are called across the node and which of them refuse or fail. With `owner` it reads that one person\'s slice. In report mode `from` and `to` may be given alone and default to the last 30 days, and an unknown report name or a day not written YYYY-MM-DD is refused with INVALID_INPUT, as on the route. Returns an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         // Read-only about this node, but `ask_provider` reaches a third party, so it is not closed-world.
@@ -706,9 +709,14 @@ export const discoveryWorkBoardsTools = [
         // On `admin`: The Usage page in one read: whose money paid for the AI, and the key nothing here meters.
         surfaces: ['admin'],
         input: {
-            from: { type: 'string', required: false, description: 'First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well or neither is used.' },
-            to: { type: 'string', required: false, description: 'Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well or neither is used.' },
-            ask_provider: { type: 'boolean', required: false, description: 'Ask the provider what the node\'s own house and chat keys have spent. One outbound call per key. Off by default.' },
+            from: { type: 'string', required: false, description: 'First day of the period, inclusive, as YYYY-MM-DD. On the cost page give `to` as well or neither is used; in a report it defaults to 30 days ago.' },
+            to: { type: 'string', required: false, description: 'Last day of the period, inclusive, as YYYY-MM-DD. On the cost page give `from` as well or neither is used; in a report it defaults to today.' },
+            ask_provider: { type: 'boolean', required: false, description: 'Ask the provider what the node\'s own house and chat keys have spent. One outbound call per key. Off by default. Cost page only: refused beside a report.' },
+            report: { type: 'string', required: false, description: `Read this usage report instead of the cost page. Across the node: ${Object.keys(NODE_REPORTS).join(', ')}. With owner: ${Object.keys(OWNER_REPORTS).join(', ')}. Defaults to day when another report parameter is given.`, zod: z.string().max(INPUT_LIMITS.name) },
+            owner: { type: 'string', required: false, description: 'Read this one person\'s slice of the report: an account name or a full owner identity (alice@node-id). Leave it out for the whole node.' },
+            grain: { type: 'string', required: false, enum: ['day', 'hour'], description: 'Bucket size of the report, where the report has one. Defaults to day.' },
+            series: { type: 'boolean', required: false, description: 'Include the per-bucket series of the report. Defaults to true; false leaves it out.' },
+            limit: { type: 'number', required: false, description: 'The most report groups to return (1 to 2000, default 200).' },
         },
     },
     {

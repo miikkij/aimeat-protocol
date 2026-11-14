@@ -23,6 +23,8 @@
  * @usage
  *   const report = await readUsageReport(storage, { report: 'model', ownerGhii, from, to });
  * @version-history
+ *   2026-11-14 — NODE_REPORTS moved unchanged to models/tool-input-vocabulary.ts and is re-exported:
+ *     aimeat_admin_usage states the node reports.
  *   2026-11-14 — Every group carries `last_bucket`, the latest bucket with a call: `apps-used` then
  *     says when the person last used each app (My Apps' Recently opened and its six-month section).
  *   2026-10-25 — The hot window comes from the config (usage-settings.ts), not from process.env.
@@ -38,24 +40,12 @@ import { pendingRollupDeltas } from './rollup-engine.js';
 import { pendingUsageCalls } from './usage-buffer.js';
 import { usageSettings } from './usage-settings.js';
 
-/** Reports an owner may ask about their OWN usage. Every cut here carries ownerGhii. In models/ since 2026-10-05 (the tool catalog states it). */
-import { OWNER_REPORTS } from '../../models/tool-input-vocabulary.js';
-export { OWNER_REPORTS };
-
-/** Reports across every owner. Operator-only: the calling route MUST gate on the operator role. */
-export const NODE_REPORTS: Record<string, string> = {
-  day: 'llm.node',
-  model: 'llm.model',
-  app: 'llm.app',
-  'app-model': 'llm.app.model',
-  agent: 'llm.actor',
-  user: 'llm.owner',
-  tool: 'call.tool',
-  surface: 'call.surface',
-  'apps-used': 'call.app',
-  activity: 'call.node',
-  provider: 'call.provider.coordinate',
-};
+// OWNER_REPORTS: reports an owner may ask about their OWN usage; every cut there carries ownerGhii.
+// In models/ since 2026-10-05 (the tool catalog states it).
+// NODE_REPORTS: reports across every owner. Operator-only: the calling route MUST gate on the
+// operator role. In models/ since 2026-11-14 (aimeat_admin_usage states it).
+import { OWNER_REPORTS, NODE_REPORTS } from '../../models/tool-input-vocabulary.js';
+export { OWNER_REPORTS, NODE_REPORTS };
 
 /**
  * The separator inside an in-memory grouping key. A dimension value can contain a space, a slash or
