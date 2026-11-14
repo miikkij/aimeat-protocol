@@ -22,6 +22,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-write-buffers.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-write-buffers.test.ts
  * @version-history
+ *   v1.4.0 — 2026-11-14 — The agent refusal notes.
  *   v1.3.0 — 2026-11-14 — The record of the permissions a `*` agent uses.
  *   v1.2.0 — 2026-11-14 — The memory write tally.
  *   v1.1.0 — 2026-11-14 — The usage call stream.
@@ -37,6 +38,7 @@ import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdown
 import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';
 import { initWriteTallyBuffer, recordMemoryTouch, flushWriteTallyBuffer, resetWriteTallyBuffer } from '../../src/services/data-map/write-tally-buffer.js';
 import { initScopeUse, noteScopeUse, flushScopeUse, SCOPE_USE_KEY } from '../../src/services/scope-use.js';
+import { initAgentRefusals, noteAgentRefusal, flushAgentRefusals, agentRefusalsKey } from '../../src/services/agent/refusals.js';
 
 requirePostgresWhenAsked('erasure-write-buffers');
 
@@ -288,5 +290,38 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
       await eraseDuring(s, p, held, flushScopeUse(s));
     } finally { held.restore(); }
     expect(await s.getMemory(p.aliceGhii, SCOPE_USE_KEY)).toBeNull();
+  });
+
+  // ── The agent refusal notes (services/agent/refusals.ts) ──
+  const refused = (p: People, call: string) => noteAgentRefusal({ sub: p.scout, roles: ['agent'] }, ['memory:write'], false, call);
+  const refusalNote = (s: Storage, p: People) => s.getMemory(p.aliceGhii, agentRefusalsKey('scout'));
+
+  it('refusal notes, WAITING: no note of the erased account is stored after the erasure (green before the fix too: the note reads the agent first)', async () => {
+    const s = st();
+    const p = await people(s);
+    initAgentRefusals(s);
+    // The first refusal is written at once; the second waits for the end of its one-minute window.
+    refused(p, 'POST /v1/memory');
+    await until(async () => (await refusalNote(s, p)) !== null, 'the first note');
+    refused(p, 'POST /v1/memory');
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushAgentRefusals();
+
+    expect(await refusalNote(s, p)).toBeNull();
+  });
+
+  it('refusal notes, BEING WRITTEN: a note whose write is in progress is not stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    initAgentRefusals(s);
+    // The note reads the agent, then writes: held after the read, the write comes after the erasure.
+    const held = holdFirst(s, 'getAgent', 'after');
+    try {
+      refused(p, 'PUT /v1/memory');
+      await eraseDuring(s, p, held, Promise.resolve());
+      await flushAgentRefusals();
+    } finally { held.restore(); }
+    expect(await refusalNote(s, p)).toBeNull();
   });
 });

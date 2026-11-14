@@ -46,10 +46,15 @@
  *   - declineRefusals(storage, gaii, needed?) — the owner declines to give the permissions
  *   - forgetAgentAccess(storage, ownerGhii, agentName) — the agent was deleted
  *   - flushAgentRefusals() — write what the windows hold now (tests, shutdown)
+ *   - holdAgentRefusalsForErasure(account) — an account erasure: drop its notes, take none until released
  * @usage
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   2026-11-14 — holdAgentRefusalsForErasure: before the erasure cascade, the account's agents' notes in
+ *     their windows are dropped and their writes in progress answer, and no refusal of the account's
+ *     agents is noted until it ends. A note that had read the agent before the cascade was stored
+ *     after it (register finding f-2026-11-13-write-buffers-and-erasure).
  *   2026-10-31 — The opened-refusal listener also gets the refused call, so a withheld direct message is
  *     asked about in words of its own (secaudit2026oct31w2 round 10).
  *   2026-10-28 — A refusal keeps only the words the agent's record lacks, so neither the card nor the
@@ -78,6 +83,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 export const AGENT_REFUSALS_SPEC = 'aimeat.agent-refusals/v1';
 export const AGENT_SCOPE_REQUEST_SPEC = 'aimeat.agent-scope-request/v1';
@@ -154,6 +160,8 @@ interface Slot {
 const slots = new Map<string, Slot>();
 /** One write at a time per agent, so two refusals in the same moment cannot lose each other's entry. */
 const chains = new Map<string, Promise<void>>();
+/** The accounts whose erasure runs now: their agents' refusals are not noted (holdAgentRefusalsForErasure). */
+const erasing = new ErasureHolds();
 
 /**
  * Called once when a refusal opens: the agent was refused `words`, the owner has not declined them,
@@ -180,6 +188,8 @@ export function noteAgentRefusal(
 ): void {
   if (!storageRef || !auth || !auth.roles.includes('agent') || needed.length === 0) return;
   if (!parseGAII(auth.sub)) return;
+  // An agent of an account being erased: the cascade deletes the notes, so none is started again.
+  if (erasing.covers(auth.sub)) return;
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
   const key = `${auth.sub}|${[...needed].sort().join(' ')}|${call}`;
@@ -228,6 +238,29 @@ export async function flushAgentRefusals(): Promise<void> {
     if (slot.pending > 0) writeSlot(slot);
   }
   await Promise.all([...chains.values()]);
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no refusal of the account's
+ * agents is noted from now on, the refusals waiting in their windows are dropped, and the writes in
+ * progress answer first, so the cascade deletes what they stored. A waiting refusal alone did no
+ * harm, because the note reads the agent first and the cascade removes it; a note that had read the
+ * agent before the cascade was stored after it. The returned function ends the hold, after the cascade.
+ */
+export async function holdAgentRefusalsForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  for (const [key, slot] of slots) {
+    if (!ErasureHolds.isOf(slot.gaii, account)) continue;
+    if (slot.timer) { clearTimeout(slot.timer); slot.timer = null; }
+    slots.delete(key);
+  }
+  // A chain never rejects (writeSlot catches a failed note, and a decline stores a tail that cannot).
+  for (;;) {
+    const writes = [...chains].filter(([gaii]) => ErasureHolds.isOf(gaii, account)).map(([, chain]) => chain);
+    if (writes.length === 0) break;
+    await Promise.all(writes);
+  }
+  return release;
 }
 
 function sameEntry(e: AgentRefusalEntry, needed: string[], call: string): boolean {

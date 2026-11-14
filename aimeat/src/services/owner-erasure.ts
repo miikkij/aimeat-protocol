@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-14 — The agent refusal notes hold the account for the length of the erasure
+ *     (holdAgentRefusalsForErasure): a note that had read the agent before the cascade was stored
+ *     after it (register finding f-2026-11-13-write-buffers-and-erasure).
  *   2026-11-14 — The record of the permissions a `*` agent uses holds the account for the length of the
  *     erasure (holdScopeUseForErasure): a write that had read the agent before the cascade stored the
  *     record after it (register finding f-2026-11-13-write-buffers-and-erasure).
@@ -119,6 +122,7 @@ import { holdConsentAuditForErasure } from './consent-audit-buffer.js';
 import { holdUsageForErasure } from './usage/usage-buffer.js';
 import { holdWriteTallyForErasure } from './data-map/write-tally-buffer.js';
 import { holdScopeUseForErasure } from './scope-use.js';
+import { holdAgentRefusalsForErasure } from './agent/refusals.js';
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app/member-erasure.js';
 import { eraseAppDesignSpecsOf } from './app/design-spec.js';
@@ -538,6 +542,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     releases.push(await holdUsageForErasure(account));
     releases.push(await holdWriteTallyForErasure(account));
     releases.push(await holdScopeUseForErasure(account));
+    releases.push(await holdAgentRefusalsForErasure(account));
     // The cascade deletes the classification audit rows of the person's content and renames the person
     // where they were the reader of someone else's. A row that waits in memory, or is being written
     // while the cascade runs, would be stored after it and bring the erased person back into the log
