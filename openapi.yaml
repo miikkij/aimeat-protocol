@@ -58705,7 +58705,7 @@ paths:
             schema:
               type: object
               properties:
-                catalog_listed: { type: boolean, description: 'true is the public catalogue; must agree with audience when both are sent.' }
+                catalog_listed: { description: 'true is the public catalogue; must agree with audience when both are sent. Read for its truth, so 1 or "yes" asks as true does.' }
                 allow_clone: { type: boolean }
                 audience: { type: string, pattern: '^(owner|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$' }
       responses:
