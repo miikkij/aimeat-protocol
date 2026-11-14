@@ -46,7 +46,7 @@ AIMEAT MCP tools support presigned upload URLs to transfer files from the agent'
 | `aimeat_skill_publish` | `skill_md` | ZIP of the skill directory | `skill` |
 | `aimeat_theme_font_save` | (always presigned) | One woff2 file per listed face file; the answer carries one `upload_url` per file in `uploads` | `font` |
 
-Four REST routes mint the same tokens when the body says `mode: 'presigned'`: `POST /v1/apps`, `POST /v1/memory/files`, `POST /v1/extensions` and `POST /v1/cortex`.
+Five REST routes mint the same tokens when the body says `mode: 'presigned'`: `POST /v1/apps`, `POST /v1/memory/files`, `POST /v1/extensions`, `POST /v1/cortex` and `POST /v1/storage` (`src/routes/storage-files.ts`).
 
 ## Inline Fallback
 

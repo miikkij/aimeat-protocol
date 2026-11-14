@@ -20,7 +20,7 @@ anywhere in the table above.
 
 An extension's `ctx.memory.set(key, value)` writes to `ext:{extensionName}`, with `visibility: 'public'` unless the call passes `{ visibility: 'private' }`. Nobody else can write to this namespace: not the cortex, not the app, not the user directly. Pass `private` on every write that holds somebody's personal data, because an `ext:` namespace is world-readable.
 
-**Code reference:** `extMemoryOwner` in `src/routes/extensions/actions.ts` (`ext:${ext.name}`, or `ext:${ext.name}.${instanceId}` on the instance route) and in `src/mcp/extensions.ts` (`aimeat_extension_invoke`). The memory calls themselves are `buildExtensionCtx` in `src/services/extension/ctx.ts`.
+**Code reference:** `extMemoryOwner` in `invokeExtensionAction` (`src/services/extension/invoke.ts`: `ext:${ext.name}`, or `ext:${ext.name}.${instanceId}` on the instance route), which both `POST /v1/ext/...` (`src/routes/extensions/actions.ts`) and `aimeat_extension_invoke` (`src/mcp/extensions.ts`) call. An unattended run sets it the same way in `src/services/extension/system-run.ts`. The memory calls themselves are `buildExtensionCtx` in `src/services/extension/ctx.ts`.
 
 ---
 
@@ -45,10 +45,17 @@ ctx.workspace.{index,get,write,writeDoc,publish}
                                 → the CALLER's organism workspace, as the caller, through the same
                                   operations aimeat_workspace_read/_write/_publish run; present only
                                   when the manifest declares `workspace: { read, write }` and a real
-                                  caller invoked the action (never on a scheduled run)
+                                  caller invoked the action (never on a scheduled run, except
+                                  appendRows below)
 ctx.workspace.{publishRecords,deleteRecords}
                                 → a BATCH (up to 1000 / 2000 records) in one host call, through the
                                   operations the batch publish and delete routes run
+ctx.workspace.archiveRecords    → archive up to 500 records of one space in one call; the caller
+                                  must be the organism's creator or an admin
+ctx.workspace.{appendRows,readRows,readRow}
+                                → a ROW space that names this extension (manifest `workspace.rows`):
+                                  append up to 500 rows, read a page, read one row; appendRows also
+                                  works on a schedule and a workflow step
 ```
 
 The full contract is `ExtensionCtx` in `src/services/extension/ctx-contract.ts`.
@@ -131,8 +138,8 @@ Apps call cortex public methods ONLY. They NEVER call:
 
 ```javascript
 // App uses cortex public API:
-const result = await AIMEAT.myLib.searchCompanies('Overscale');
-const company = await AIMEAT.myLib.getCompany('3323553-5');
+const result = await AIMEAT.myLib.searchCompanies('Example Oy');
+const company = await AIMEAT.myLib.getCompany('1234567-8');
 const tr = await AIMEAT.myLib.getTranslations('fi');
 ```
 
@@ -260,7 +267,7 @@ inside a document, a config or a workflow and the vault can see none of those. I
 this node has to "what breaks if I delete this".
 
 Full reference: `src/services/owner-secrets.ts` (the one implementation), `src/routes/secrets.ts`
-(the three routes), `src/services/extension/ctx.ts` (the resolution point).
+(the routes: list, set, change, delete, and the four approval routes), `src/services/extension/ctx.ts` (the resolution point).
 
 ---
 
@@ -380,9 +387,9 @@ an active cortex (`upsertCortex` in `src/services/cortex/upsert.ts`). Over MCP, 
 
 | File and symbol | What it does |
 |------|-------------|
-| `src/routes/extensions/actions.ts` (`extMemoryOwner`) | Sets the extension's namespace, `ext:${ext.name}` or `ext:${ext.name}.${instanceId}`, on `POST /v1/ext/...` |
-| `src/mcp/extensions.ts` (`extMemoryOwner`) | The same for `aimeat_extension_invoke` |
-| `src/routes/extensions/actions.ts` (`callerGaii`) | `resolveIdentity(req.auth!, config.nodeId)`, the value the script sees as `ctx.caller.gaii` |
+| `src/services/extension/invoke.ts` (`invokeExtensionAction`, `extMemoryOwner`) | Sets the extension's namespace, `ext:${ext.name}` or `ext:${ext.name}.${instanceId}`, for `POST /v1/ext/...` and `aimeat_extension_invoke` alike |
+| `src/services/extension/system-run.ts` (`extMemoryOwner`) | The same for an unattended run (schedule, workflow step) |
+| `src/routes/extensions/actions.ts` (`runAction`) | Passes `callerOf(req, …).principal` as `caller.gaii`, the value the script sees as `ctx.caller.gaii` |
 | `src/services/extension/ctx.ts` (`buildExtensionCtx`) | `ctx.memory.get/set/search/delete/getPublic` and `ctx.fetch` |
 | `src/services/extension/ctx-contract.ts` (`ExtensionCtx`) | The context contract a script is written against |
 | `src/services/extension/runtime.ts` (`transformScript`) | How an action script's `export default` is loaded |

@@ -21,7 +21,7 @@ The Prisma-era backends (MongoDB and the Prisma `postgres` provider) were remove
 | One repository interface per domain | `src/storage/repositories/<domain>.repository.ts` |
 | The `Storage` composite that extends every repository interface | `src/storage/interface.ts` |
 | SQLite fresh-install DDL (`CREATE TABLE/INDEX IF NOT EXISTS`) | `providers/sqlite/schema-tables-1.ts` … `schema-tables-4.ts` |
-| SQLite added columns for existing databases (`safeAddColumn`) | `providers/sqlite/schema.ts` (`initializeSchema`), plus the per-table blocks moved out of it: `schema-columns-agents.ts`, `schema-columns-extensions.ts`, `schema-columns-scheduler.ts` |
+| SQLite added columns for existing databases (`safeAddColumn`) | `providers/sqlite/schema.ts` (`initializeSchema`), plus the per-table blocks moved out of it: the `schema-columns-*.ts` files (agents, extensions, files, scheduler) and the other `schema-*.ts` helpers beside it |
 | SQLite table rebuilds that `ALTER TABLE` cannot express | `providers/sqlite/schema-rebuilds.ts` |
 | Method bodies | `providers/<provider>/methods/<group>.ts`, merged onto the provider class with `Object.assign(prototype, …)` in `providers/<provider>/index.ts` |
 | The owner deletion cascade | `providers/sqlite/methods/owner-cascade.ts`; `providers/postgres-kysely/methods/owner-cascade.ts` and `identity-erasure.ts` |
@@ -105,8 +105,8 @@ pnpm typecheck
 pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=<suite>
 pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=<suite>
 
-# When the work is finished:
-pnpm gate --postgres
+# When the work is finished (a change under src/storage/ adds the PostgreSQL legs by itself):
+pnpm gate
 ```
 
 `pnpm gate` runs the static checks above, the unit tests the change reaches and, because the change is under `src/storage/`, the guard tier on both backends and every unit file with a PostgreSQL half against the PostgreSQL test database (the storage conformance test among them); `--postgres` is no longer needed for a storage change, and forces the same for any other change. The full E2E sweep is not a routine step; see [testing-requirements.md](testing-requirements.md).
@@ -189,7 +189,7 @@ If the table holds data that belongs to one person, add it to both cascades: `pr
 
 ### Step 7: Type-check and test both backends
 
-The same commands as Step 6 of the field procedure: `pnpm typecheck`, the suites that exercise the new table with `--test=<suite>` on both `.env.test.*` files, and `pnpm gate --postgres` when the work is finished. A new table usually comes with a new route and a new E2E suite; [testing-requirements.md](testing-requirements.md) says how to register one.
+The same commands as Step 6 of the field procedure: `pnpm typecheck`, the suites that exercise the new table with `--test=<suite>` on both `.env.test.*` files, and `pnpm gate` when the work is finished. A new table usually comes with a new route and a new E2E suite; [testing-requirements.md](testing-requirements.md) says how to register one.
 
 ---
 
@@ -256,7 +256,7 @@ What proves a storage change, from fastest to slowest:
 | `pnpm check:migration-hashes` | an edited migration, or a new one without its hash line |
 | `test/unit/storage-conformance.test.ts`, `test/unit/storage-conformance-lists.test.ts` | the two providers returning different results, or the same rows in a different order, for the same scenario |
 | `--test=<suite>` on both `.env.test.*` files | the feature's own behaviour on each backend |
-| `pnpm gate --postgres` | all of the above that the change reaches, plus the guard tier on both backends |
+| `pnpm gate` | all of the above that the change reaches, plus the guard tier on both backends (a storage change adds the PostgreSQL legs by itself; `--postgres` forces them) |
 
 **Both backends must pass.** If either fails after a schema change, the change is incomplete.
 

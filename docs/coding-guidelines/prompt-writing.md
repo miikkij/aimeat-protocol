@@ -2,7 +2,7 @@
 @file docs/coding-guidelines/prompt-writing.md
 @description How we write prompts in AIMEAT: positive framing (say what TO do) and the wider prompt
   framework. Applies to every prompt string in the codebase: LLM system/user prompts, prompts the app
-  generates for the user to paste into an AI chat (e.g. the Secretary setup interview), re-plan prompts,
+  generates for the user to paste into an AI chat (e.g. a setup interview), re-plan prompts,
   etc. The rule of thumb: an instruction describes the behaviour we want, affirmatively.
 @usage Read before writing or editing any prompt string. Check a prompt against §6 before shipping it.
 @version-history
@@ -37,13 +37,14 @@ Warning words that signal a rewrite is needed: `not`, `don't`, `never`, `no`, `a
 
 ## 2. The conversion move (negative → positive)
 
-Real examples from the Secretary setup prompt:
+Invented examples, in the shape of a setup interview where a prompt asks the user about their work
+and ends with a JSON summary:
 
 | ✗ Negative | ✓ Positive |
 |-----------|-----------|
 | "You are NOT a form-filler." | "Treat this as a real, flowing conversation between two people." |
 | "Do not rush to the JSON." | "Lead with the conversation; capture the JSON once we share a picture that feels right." |
-| "Do NOT ask about organisms/workspaces." | "Keep your words human and plain, and work out any structure quietly on your own." |
+| "Do NOT ask about the data model." | "Keep your words human and plain, and work out any structure quietly on your own." |
 | "Never present assumptions to rubber-stamp." | "Offer your hunches as suggestions I can shape, and let me steer." |
 | "Don't invent facts." | "Ground everything in what I actually told you." |
 | "Output ONLY the JSON, no commentary." | "Output the single JSON code block on its own." |
@@ -66,13 +67,13 @@ Real examples from the Secretary setup prompt:
   user's own language, so a Finnish user still gets Finnish replies; the source stays English.
 - Plain, everyday language. Skip corporate filler. Match the voice you want back.
 
-## 5. Before / after (the Secretary interview, condensed)
+## 5. Before / after (an invented setup interview, condensed)
 
-**Before** (negative, infuriating): *"Act as the Secretary. You are NOT a form-filler. Do not rush to
-the JSON. Do NOT ask about organisms or workspaces. Reflect the structure back and do not output JSON
+**Before** (negative, infuriating): *"Act as my assistant. You are NOT a form-filler. Do not rush to
+the JSON. Do NOT ask about the data model. Reflect the structure back and do not output JSON
 until I confirm."*
 
-**After** (positive, what we want): *"You are that Secretary, and this is the start of us working
+**After** (positive, what we want): *"You are my assistant, and this is the start of us working
 together. Treat it as a real, flowing conversation. Be useful from the first message. Lead with the
 conversation; keep your words human and plain and work out any structure quietly on your own. Keep
 exploring with me until we share a picture that feels right to me; once I say it clicks, capture it as

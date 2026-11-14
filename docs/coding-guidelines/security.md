@@ -6,12 +6,12 @@ This page is the lookup reference: library names, function signatures, environme
 
 Every fact on this page was read from the code. If the code and this page disagree, the code is right and this page needs a fix. Paths are relative to `aimeat/`.
 
-**This page names settings, not their values.** For each one it says what the setting controls and which `src/config*.ts` field reads it. To see a value:
+**This page names settings, not their values.** For each one it says what the setting controls and which config field (`src/config.ts`, `src/config/`) reads it. To see a value:
 
-- The admin **Config** tab (`GET /v1/admin/config`, operator role) shows every setting in `CONFIG_FIELDS` (`src/services/config-schema*.ts`) with its value on this node and where that value came from. A setting nobody changed shows the source `default`, so the value shown is the shipped default.
+- The admin **Config** tab (`GET /v1/admin/config`, operator role) shows every setting in `CONFIG_FIELDS` (`src/services/config/schema.ts` and its `schema-*.ts` groups) with its value on this node and where that value came from. A setting nobody changed shows the source `default`, so the value shown is the shipped default. A secret (the data key, the key passphrase) shows only whether it is set. A setting marked immutable takes effect after a restart.
 - `aimeat config` prints a separate list (`src/utils/env-config/sections-*.ts`) with each value and its source, the same way. It covers most settings below, but not all of them.
 - `aimeat/.env.example` lists each variable with its shipped default, and [b-config.md](../b-config.md) explains the layers a value comes from.
-- A setting that is not in `CONFIG_FIELDS` is marked "not on the Config tab" below. Read its default in the named file or in `.env.example`.
+- Every node setting has a `CONFIG_FIELDS` row; `pnpm check:config-coverage` fails for an `AIMEAT_*` variable read under `src/` without one, unless `aimeat/security/config-coverage-exemptions.json` says why.
 
 ---
 
@@ -32,7 +32,7 @@ Every fact on this page was read from the code. If the code and this page disagr
 
 - **Owner keys are generated on the server.** `POST /v1/owners` (`src/routes/owners.ts`) and `POST /v1/ghii` (`src/routes/ghii/register-login.ts`) call `generateKeyPair()`, store the public key on the owner record and return the private key once in the response. The node keeps no copy of the private key. The owner key no longer signs anyone in (removed in 4.0.0), and the operator route that issued a new pair was removed on 2026-10-15.
 - **Owner-key sign-in is removed in 4.0.0.** `POST /v1/auth/token` with an owner name and a signature made with that key answers `410 OWNER_KEY_LOGIN_OFF` from 4.0.0 and points to `POST /v1/ghii/login`, whatever `AIMEAT_OWNER_KEY_LOGIN` says (`OWNER_KEY_LOGIN_REMOVED_IN` in `src/config/security.ts`). On a 3.x node the setting still switches it on or off, and an account with two-step sign-in armed is refused even when it is on. New code signs owners in with a password session, never with the account key.
-- The node's own key pair signs JWTs and federation messages. `AIMEAT_KEY_PASSPHRASE` encrypts the node key on disk. It is read in `src/auth/node-keys.ts`, not in a config file, so it is not on the Config tab.
+- The node's own key pair signs JWTs and federation messages. `AIMEAT_KEY_PASSPHRASE` encrypts the node key on disk. It is read in `src/auth/node-keys.ts` and is the `node.key_passphrase` row of the Config tab, which shows only that it is set (`keyPassphrase`).
 
 ### JWT Tokens
 
@@ -47,7 +47,7 @@ Every fact on this page was read from the code. If the code and this page disagr
   await revokeToken(token, expiresAtEpochSeconds);
   ```
 
-- Claims: `sub` (bare owner name for an owner, the GAII for an agent, the GEAI for an ecosystem app), `owner`, `node`, `roles`, `scopes`, `iat`, `iat_ms`, `exp`, and `jti` when a session id is passed. Optional claims (`mcp_client`, `federated`, `homeNode`, `homeUrl`, `eco_app`, `app_grant`, `app`, `via`, `auth_time`) are written only when set. The full list is the `JWTPayload` interface.
+- Claims: `sub` (bare owner name for an owner, the GAII for an agent, the GEAI for an ecosystem app), `owner`, `node`, `roles`, `scopes`, `iat`, `iat_ms`, `exp`, and `jti` when a session id is passed. Optional claims (`mcp_client`, `federated`, `homeNode`, `homeUrl`, `eco_app`, `app_grant`, `app`, `via`, `pat`, `auth_time`, and `aud`, which MCP OAuth tokens set to the MCP endpoint) are written only when set. The full list is the `JWTPayload` interface.
 - A missing `scopes` claim is written and read as `[]`, so an agent token that names no scopes can do nothing.
 - `issueJWT` throws `AccountDisabledError` (403 `ACCOUNT_DISABLED`) for a deactivated local owner.
 - `verifyJWT` reads every federated token as a visitor: role `federated` only, with its home GHII as `sub` and `owner`. See [identity-model.md](identity-model.md#a-visitor-from-another-node).
@@ -115,7 +115,7 @@ All outbound HTTP to a URL that is not a compile-time constant goes through `saf
 - Loopback (`localhost`, `::1`, `127.x`) is allowed only when `AIMEAT_ALLOW_PRIVATE_EGRESS=true`. `AIMEAT_DEV_MODE=true` is a back-compat alias.
 - `safeFetch` follows redirects by hand and validates every hop. On a redirect to another origin it drops credential headers.
 
-The security posture decides the egress setting when nobody sets it. All three are read in `src/config.ts`, and none of them is on the Config tab:
+The security posture decides the egress setting when nobody sets it. All three are read in `src/config.ts` and are immutable rows of the Config tab, so a change takes effect after a restart:
 
 | Env var | What it controls | Field |
 |---|---|---|
@@ -161,7 +161,7 @@ style-src 'self' 'unsafe-inline'
 connect-src 'self' wss: ws:
 img-src 'self' data: blob:
 font-src 'self'
-frame-src 'self' blob: data: <the app host family, when the app origin is on>
+frame-src 'self' blob: data: <the app host family, when the app origin is on> <the page host, when set>
 object-src 'none'
 base-uri 'self'
 ```
@@ -217,8 +217,8 @@ Middleware: `rateLimit()` in `src/middleware/rate-limit.ts`. The bucket key is t
 | `AIMEAT_RL_MEMORY` | Memory routes | one second | `rlMemory` |
 | `AIMEAT_RL_BOARDS` | Board routes | one second | `rlBoards` |
 | `AIMEAT_RL_OWNERS` | Owner account routes | one second | `rlOwners` |
-| `AIMEAT_RL_REGISTRATION_INVITES` | Registration invitations sent. Not on the Config tab | one hour | `rateLimits.registrationInvites` |
-| `AIMEAT_RL_OPENROUTER` | Calls to the OpenRouter proxy. Not on the Config tab | one minute | `rateLimits.openrouter` |
+| `AIMEAT_RL_REGISTRATION_INVITES` | Registration invitations sent | one hour | `rlRegistrationInvites` |
+| `AIMEAT_RL_OPENROUTER` | Calls to the OpenRouter proxy | one minute | `rlOpenrouter` |
 
 The other per-area limits (GHII, flags, appeals, admin setup, federation, catalogue, auth challenge) are `rate_limits.*` rows in `src/services/config/schema-rate-limits.ts`, each with its own environment variable.
 
@@ -236,7 +236,7 @@ The limit is multiplied by a factor for the caller's role: operator, owner, any 
 
 - `encrypt(plaintext, key)` / `decrypt(data, key)`.
 - `encryptBound(plaintext, key, context)` / `decryptBound(data, key, context)` bind the ciphertext to a context string (AES-GCM additional data), so the value opens only where that context is named.
-- `getEncryptionKey(config)` reads `AIMEAT_ENCRYPTION_KEY` (`encryptionKey` in `src/config/types-account-security.ts`, not on the Config tab), then falls back to `AIMEAT_TOTP_ENCRYPTION_KEY` (`totpSecretEncryptionKey`). The key is 64 hex characters (32 bytes); any other length gives `null`.
+- `getEncryptionKey(config)` reads `AIMEAT_ENCRYPTION_KEY` (`encryptionKey` in `src/config/types-account-security.ts`; the Config tab shows only that it is set), then falls back to `AIMEAT_TOTP_ENCRYPTION_KEY` (`totpSecretEncryptionKey`). The key is 64 hex characters (32 bytes); any other length gives `null`.
 
 The rules for secrets (never returned, never logged, destination allowlisted) are invariant 7.
 
@@ -270,7 +270,7 @@ Extensions run in a QuickJS sandbox compiled to WASM (`quickjs-emscripten`, `src
 | `AIMEAT_EXT_MAX_API_CALLS` | `ctx` API calls one invocation may make | `extensionMaxApiCalls` |
 | `AIMEAT_EXT_MAX_CODE_SIZE_KB` | The largest script an action may have | `extensionMaxCodeSizeKb` |
 | `AIMEAT_EXT_ZIP_MAX_FILES` | Files one extension or cortex ZIP upload may hold, manifest included (default 1000) | `extensionZipMaxFiles` |
-| `AIMEAT_EXT_MAX_DEBIT` | The most morsels one call may debit. Not on the Config tab | `extensionMaxDebitPerCall` |
+| `AIMEAT_EXT_MAX_DEBIT` | The most morsels one call may debit (`extensions.max_debit_per_call`) | `extensionMaxDebitPerCall` |
 | `AIMEAT_EXT_MAX_INSTALLED` | Extensions installed on the node | `extensionMaxInstalled` |
 | `AIMEAT_MAX_EXTENSIONS_PER_OWNER` | Extensions one owner may install | `maxExtensionsPerOwner` |
 | `AIMEAT_EXT_INSTALL_ROLE` | Who may install: `owner` or the stricter `operator` (only the operator's account, its agents included) | `extInstallRole` |

@@ -5,8 +5,10 @@
 ### Before Adding Any Package
 
 1. **Check if it's actually needed.** Can Node.js built-ins or existing dependencies handle this?
-2. **Check the license.** Permissive and no decision needed: MIT, MIT-0, ISC, Apache-2.0,
-   BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0, Unlicense, CC0-1.0. Anything else (GPL, AGPL,
+2. **Check the license.** Permissive and no decision needed: the ids in `PERMISSIVE` in
+   `aimeat/scripts/lib/license-inventory.ts` (MIT, Apache-2.0, the BSD licences, ISC, Python-2.0,
+   OFL-1.1 and others), plus `ALSO_PERMISSIVE` in `aimeat/scripts/check-licenses.ts` (Zlib, WTFPL,
+   CC-BY-4.0). Those two lists are the source; read them rather than this line. Anything else (GPL, AGPL,
    LGPL, MPL, SSPL, BUSL, a source-available licence) needs the developer's approval and an entry
    in `EXCEPTIONS` in `aimeat/scripts/check-licenses.ts` saying what the obligation costs an
    operator. `pnpm check:licenses` fails `pnpm gate` and CI otherwise.
@@ -59,8 +61,8 @@ a list anybody maintains by hand.
 
 **This section used to be a table of every dependency and its licence, and that is why it is not
 one now.** By August 2026 it listed `isolated-vm` (replaced by `quickjs-emscripten`), `uuid ^13`
-(shipping `^14`) and `typescript ^5.9` (shipping `^6`), because 412 production packages cannot be
-tracked by a human. A stale table is worse than none: it reads as an assurance. The gate fails on
+(shipping `^14`) and `typescript ^5.9` (shipping `^6`), because several hundred production packages
+cannot be tracked by a human. A stale table is worse than none: it reads as an assurance. The gate fails on
 the commit that introduces the problem, and the notices file is regenerated from the tree that is
 actually installed.
 
@@ -69,7 +71,7 @@ actually installed.
 Every licence tool in the ecosystem walks the npm tree and stops. That describes about two thirds of
 what this node distributes:
 
-- **The npm tree**, 412 production packages, read by `pnpm licenses list`. Dev dependencies are
+- **The npm tree**, the production packages, read by `pnpm licenses list`. Dev dependencies are
   excluded on purpose: the toolchain does not ship, so it carries no obligation for anyone.
 - **`aimeat/public/lib/`**, twenty-odd browser libraries fetched from a CDN and committed by hand.
   No npm tool has ever looked at them, and serving a file to a browser is distribution in the same
@@ -83,7 +85,9 @@ Adding a file under `public/lib/` without an entry in `licenses.json` fails the 
 ### The three approved exceptions
 
 Each is a decision with a date, not a suppression. The full reasoning is in `EXCEPTIONS` in
-`aimeat/scripts/check-licenses.ts` and in the notices file.
+`aimeat/scripts/check-licenses.ts` and in the notices file. That list has five entries for these
+three components, because a new major of p5 and of ffmpeg is a separate component beside the old one
+(`p5v2`, `ffmpeg-core-0-12-10`), each with its own entry.
 
 | Component | Licence | Why it is acceptable |
 |---|---|---|
@@ -221,7 +225,8 @@ happen together.
 
 1. Fetch the new build over the old path.
 2. Update the version in `public/lib/VENDORED.md`, in `public/lib/licenses.json` (version **and**
-   `purl`, or the scan keeps checking the old version) and in `src/data/library-packs/vendored.ts`.
+   `purl`, or the scan keeps checking the old version) and in the library's pack in
+   `src/data/library-packs/` (`vendored.ts` or one of the `vendored-*.ts` files).
 3. Append a `changelog` entry to that pack. It is written **for an AI**: what changed and what it
    means for apps already published.
 4. Verify in a real browser that the library still does its job, then `pnpm gen:notices` and
@@ -248,8 +253,8 @@ keeps published apps alive, and it was first walked on 2026-08-31 for p5 2, Phas
 - **Take every file of a library from the SAME upstream build.** preact from one esm.sh variant and
   hooks from another gave two different `options` objects, every hook ran outside a render, and the
   SPA died with "AIMEAT failed to start". The library was fine; the fetch was wrong.
-- **A file that imports a sibling relatively cannot work here.** `portal.ts` stamps `?v=<build>` on
-  every importmap entry, and a relative `./preact.mjs` does not carry that query, so the same file
+- **A file that imports a sibling relatively cannot work here.** `stampAssets()` in `src/routes/portal-spa.ts` stamps
+  `?v=<content tag>` on every importmap entry, and a relative `./preact.mjs` does not carry that query, so the same file
   arrives twice under two URLs, as two modules. The vendored build must import the bare specifier.
 
 And the reason step 4 says a real browser: every one of those failures compiles, typechecks and

@@ -7,7 +7,7 @@
 - **Core**: a thin, generic protocol that nodes can federate. It has three principals (human GHII, agent GAII, ecosystem app GEAI), consent-governed memory and file storage, an authorization stack (consent, access guard, IAM and scoped delegation), collaboration primitives (organisms and workspaces), an economy of *meters* (morsels and real-currency metering) behind an optional payment interface, and federation, whose live use is cross-node identity and login.
 - **Platform (aimeat.io)**: what is built on the Core. The app platform (app grants and H-2 origin isolation), the agent fleet plane, sandboxed compute with metered AI (extensions, cortex, scheduler, workflows), and skills and capabilities. Most of the value a person gets is here, because AI-generated apps on generic APIs replace purpose-built protocol features.
 
-The specification is [AIMEAT Core 2026-11](../AIMEAT-Core-2026-11.md), normative from node 4.0.0, with its [conformance evidence](../AIMEAT-Core-2026-11-evidence.md); the [Platform reference](../AIMEAT-Platform-reference.md) describes what the node builds on it. Until 4.0.0, [Core v4.0](../AIMEAT-RFC-v4.0-Core-full.md) and [Platform v4.0](../AIMEAT-RFC-v4.0-Platform-full.md) stay as published, corrected by the [errata](../AIMEAT-RFC-v4.0-errata.md). The API contract is [openapi.yaml](../../openapi.yaml). This repository holds the specification and the reference implementation, a Node.js and TypeScript server under `aimeat/`.
+The specification is [AIMEAT Core 2026-11](../AIMEAT-Core-2026-11.md), normative from node 4.0.0, with its [conformance evidence](../AIMEAT-Core-2026-11-evidence.md); the [Platform reference](../AIMEAT-Platform-reference.md) describes what the node builds on it. [Core v4.0](../AIMEAT-RFC-v4.0-Core-full.md) and [Platform v4.0](../AIMEAT-RFC-v4.0-Platform-full.md), with their [errata](../AIMEAT-RFC-v4.0-errata.md), were the specification until node 4.0.0 and are kept as history. The API contract is [openapi.yaml](../../openapi.yaml). This repository holds the specification and the reference implementation, a Node.js and TypeScript server under `aimeat/`.
 
 ---
 
@@ -28,7 +28,7 @@ is not a deployable verification feature. See [the current status](../aimeat-eud
 
 AIMEAT has three identity layers:
 
-**Owner**: the account layer. Created during registration. Has a name, an Ed25519 public key and roles (`owner`, `operator`). Owners manage agents and reach all their data.
+**Owner**: the account layer. Created during registration. Has a name, an Ed25519 public key and roles (`owner`, `operator`). The owner key no longer signs anyone in: owner-key sign-in was removed in node 4.0.0, and an owner signs in with a password session. Owners manage agents and reach all their data.
 
 **GHII (Global Human Intelligence Identifier)**: the human profile layer.
 Format: `username@node-id` (for example `alice@aimeat-finland-001`).
@@ -57,11 +57,11 @@ Owner ("alice")
 
 **Agent mode**: every agent carries one of **five** modes. The mode says how the agent is used and which Hello Integration steps apply (`AgentMode` in `models/agent-onboarding-schemas.ts`):
 
-- `autonomous`: runs continuously (Hermes, OpenClaw). Full 16-step Hello Integration (12 required, 4 optional).
-- `interactive`: a chat or IDE session (Claude Code, Cursor, Cline). Full 16-step Hello Integration. **The default** when the mode is omitted.
+- `autonomous`: runs continuously (Hermes, OpenClaw). Full 17-step Hello Integration (12 required, 5 optional).
+- `interactive`: a chat or IDE session (Claude Code, Cursor, Cline). Full 17-step Hello Integration. **The default** when the mode is omitted.
 - `coordinator`: orchestrates other agents (Claude Desktop, a LangGraph supervisor). Treated as `interactive` for onboarding.
-- `task-runner`: triggered, runs one task, exits (CrewAI crews). **7 steps**: authenticate, identify_platform, install_skill, report_capabilities, accept_test_task, complete_test_task, publish_config. It has no slash-command, message or telemetry steps, but it **keeps the test-task pair**: a runner is not ready until its subprocess has run a real test task end to end, which is its capability proof.
-- `workstation`: a tool on the person's own machine that visits the node over MCP as one tool among many (VS Code, Claude Desktop), and is not node-resident. **4 steps**: authenticate, identify_platform, report_capabilities, read_directives. The MCP round trip is its smoke test, so there is no separate test task.
+- `task-runner`: triggered, runs one task, exits (CrewAI crews). **8 steps, 7 required**: authenticate, identify_platform, install_skill, report_capabilities, accept_test_task, complete_test_task, publish_config, and the optional set_avatar. It has no slash-command, message or telemetry steps, but it **keeps the test-task pair**: a runner is not ready until its subprocess has run a real test task end to end, which is its capability proof.
+- `workstation`: a tool on the person's own machine that visits the node over MCP as one tool among many (VS Code, Claude Desktop), and is not node-resident. **5 steps, 4 required**: authenticate, identify_platform, report_capabilities, read_directives, and the optional set_avatar. The MCP round trip is its smoke test, so there is no separate test task.
 
 The mode is set at `POST /v1/agents/device-authorize` and changed later with `PATCH /v1/agents/:name/mode`, by the owner or by an agent of the same owner that holds `agent:write` (a crew sets its own mode at startup this way). It is independent of `tags` (owner-managed grouping labels): see [agent-tags.md](agent-tags.md).
 
@@ -127,7 +127,7 @@ Every API response includes `hints.next_actions`, which tells an AI agent what i
 └──────────────────────────────────────────────┘
 ```
 
-Two backends are valid: PostgreSQL with Kysely (production) and SQLite (personal nodes and fast iteration). An in-memory node is SQLite with `AIMEAT_SQLITE_PATH=:memory:`, on the same code path. The Prisma backends (MongoDB and legacy Prisma-PG) were removed on 2026-07-16.
+Two backends are valid: PostgreSQL with Kysely (production) and SQLite (personal nodes and fast iteration). An in-memory node is SQLite with `AIMEAT_SQLITE_PATH=:memory:`, on the same code path. `AIMEAT_STORAGE=memory` is the same in-memory SQLite, and it is the default when `AIMEAT_STORAGE` is unset, so a node started with only `DATABASE_URL` keeps nothing across a restart. The Prisma backends (MongoDB and legacy Prisma-PG) were removed on 2026-07-16.
 
 `src/server.ts` (`createServer()`) builds the HTTP stack, and `mountRoutes()` in `src/server-bootstrap/routes-loader.ts` mounts every router in order. Two siblings hold groups moved out of it: `routes-loader-ai.ts` and `routes-loader-outbound.ts`.
 
@@ -142,13 +142,13 @@ The boundary test is *"would a second, different service also use this?"*. If ye
 | Domain | Routes | Purpose |
 |--------|--------|---------|
 | Identity (GHII/GAII/**GEAI**) | `owners.ts`, `agents.ts`, `ghii.ts`, `ecosystem-apps.ts` | Three principals; `resolveIdentity`; device authorization, owner OAuth and TOTP |
-| Verification | `verification.ts`, `totp.ts`, `oauth-login.ts` | EUDIW, DID, VC and FTN identity assurance |
+| Verification | `verification.ts`, `totp.ts`, `oauth-login.ts` | DID, VC and FTN identity assurance. The EUDIW wallet path is blocked at startup (see above) |
 | Memory and storage | `memory.ts`, `storage-files.ts`, `schemas.ts` | Key-value records and files, visibility tiers (private/owner/group/members/public/workspace), schema lock |
 | Authorization | `consent.ts`, `sharing-groups.ts`, the access guard and IAM services | Consent, runtime read guard, capability model, scoped delegation |
 | Collaboration | `organisms.ts` (workspaces inside it), `knowledge.ts`, `librarian.ts` | Organisms and **workspaces** (the shared living surface), knowledge and links |
 | Economy and metering | `wallet.ts`, `actions.ts`, `work.ts`, `disputes.ts`, `ledger.ts` | Morsels (pacing) and the USD usage ledger; actions are the backing primitive |
 | Federation | `federation*.ts`, `personal.ts`, `connect-tunnel.ts` | Peering, **cross-node identity and login**, personal-node and connector tunnels |
-| Observability | `stats.ts`, `admin-*.ts` | Monitoring, telemetry, configuration |
+| Observability | `stats.ts`, `admin.ts` and `admin/` | Monitoring, telemetry, configuration |
 
 ### Platform (built on the Core: see the Platform specification)
 
@@ -161,7 +161,7 @@ The boundary test is *"would a second, different service also use this?"*. If ye
 | Ecosystem (GEAI) | `ecosystem-apps.ts`, `ecosystem-events.ts` | External apps and their event plane |
 | Realtime UX | `sse.ts`, `notifications.ts`, `push.ts`, `realtime.ts`, `public-events.ts` | Live updates, push, WebRTC |
 
-**Removed:** micro-memory, the OTK write routes, the Generator and the Foundry. The legacy Ed25519 challenge (`GET /v1/auth/challenge`) is still mounted and is deprecated. **Boards are current Core functionality.** App builders start with `GET /v1/prompts/build-app`.
+**Removed:** micro-memory, the OTK write routes, the Generator and the Foundry. The legacy Ed25519 challenge (`GET /v1/auth/challenge`) is still mounted and is deprecated: nothing reads the challenge value it returns. Owner-key sign-in on `POST /v1/auth/token` answers `410 OWNER_KEY_LOGIN_OFF` since node 4.0.0. An agent renews its token on that route by signing its GAII and a timestamp, which is current. **Boards are current Core functionality.** App builders start with `GET /v1/prompts/build-app`.
 
 ---
 
@@ -193,7 +193,7 @@ Where real AI agents are operated. The owner-to-agent **task** lifecycle draft, 
 
 #### Hello Integration (agent onboarding)
 
-An agent connects through device authorization, then walks a mode-keyed onboarding step machine (`agent-onboarding.ts`, `models/agent-onboarding-schemas.ts`). The full flow is **16 steps: 12 required and 4 optional** (for `autonomous`, `interactive` and `coordinator`). Reduced flows: **`task-runner` has 7 steps** (it keeps the test-task pair; see the mode list above) and **`workstation` has 4** (authenticate, platform, capabilities, directives; the MCP round trip is its smoke test). The **12 required** steps of the full flow: `authenticate`, `identify_platform`, `install_skill`, `report_capabilities`, `read_directives`, `send_test_message`, `configure_delivery`, `report_telemetry`, `accept_test_task`, `complete_test_task`, `publish_commands`, `publish_config`. The **4 optional** steps: `declare_services` and the offers ladder `declare_offerings`, `make_workflow_compatible`, `price_offer`. Readiness completes when all required steps pass; the node drives each pending step with a `step_guide`. The agent-side counterpart is [the agent guide](../building-an-aimeat-compatible-agent.md).
+An agent connects through device authorization, then walks a mode-keyed onboarding step machine (`agent-onboarding.ts`, `models/agent-onboarding-schemas.ts`). The full flow is **17 steps: 12 required and 5 optional** (for `autonomous`, `interactive` and `coordinator`). Reduced flows: **`task-runner` has 8 steps, 7 required** (it keeps the test-task pair; see the mode list above) and **`workstation` has 5, 4 required** (authenticate, platform, capabilities, directives; the MCP round trip is its smoke test). Every flow has the optional `set_avatar`. The **12 required** steps of the full flow: `authenticate`, `identify_platform`, `install_skill`, `report_capabilities`, `read_directives`, `send_test_message`, `configure_delivery`, `report_telemetry`, `accept_test_task`, `complete_test_task`, `publish_commands`, `publish_config`. The **5 optional** steps: `declare_services`, the offers ladder `declare_offerings`, `make_workflow_compatible`, `price_offer`, and `set_avatar` (the agent writes its own picture at `agent.avatar`). Readiness completes when all required steps pass; the node drives each pending step with a `step_guide`. The agent-side counterpart is [the agent guide](../building-an-aimeat-compatible-agent.md).
 
 #### Capability declaration and proof
 
@@ -253,7 +253,7 @@ User-facing surfaces in the portal that are *clients* of the generic APIs, and s
 
 ### Operator Admin
 
-The admin dashboard is SPA views under `public/views/admin/`, served by `admin.ts`, the `admin-*.ts` route files and `routes/admin/`, which answer JSON like every other route. The admin sign-in and first-run setup page is one static HTML string (`routes/admin/setup-html.ts`) that `admin.ts` sends. The admin is operator tooling and defines no protocol; it uses the same generic APIs as the rest of the system.
+The admin dashboard is SPA views under `public/views/admin/`, served by `admin.ts` and the route files in `routes/admin/`, which answer JSON like every other route. The admin sign-in and first-run setup page is one static HTML string (`routes/admin/setup-html.ts`) that `admin.ts` sends. The admin is operator tooling and defines no protocol; it uses the same generic APIs as the rest of the system.
 
 ---
 
@@ -304,7 +304,7 @@ The pre-commit hook (`.githooks/pre-commit`) runs `pnpm lint`, `pnpm typecheck`,
 |------|---------|
 | `index.ts`, `index-*.ts` | CLI entry: node commands, `start`, connector dispatch |
 | `server.ts` | `createServer()`: the Express application and its middleware |
-| `config.ts`, `config-*.ts` | Configuration loading and the config type, split by area |
+| `config.ts`, `config-types.ts`, `config/` | Configuration loading and the config type, split by area (`config/<area>.ts` loaders, `config/types-<area>.ts` mixins); the Config tab rows are in `services/config/` |
 | `i18n.ts` | Server-side translation and the `LOCALES` list |
 | `auth/` | JWT, keys, auth middleware, account security |
 | `cli/` | CLI wizards and commands (init wizard, config export and import, connect) |
@@ -395,7 +395,9 @@ Storage interface (src/storage/interface.ts)
 - `AIMEAT_STORAGE=sqlite`: better-sqlite3. `AIMEAT_SQLITE_PATH=:memory:` gives an ephemeral node on the same code path.
 - `AIMEAT_STORAGE=postgres-kysely` (aliases `postgres`, `postgresql`): PostgreSQL through Kysely, `DATABASE_URL=postgresql://…`. SQL migrations run on boot.
 
-`AIMEAT_STORAGE=mongodb` fails at start with migration guidance. A data-model change updates both backends in the same commit: see [storage-sync.md](storage-sync.md).
+- `AIMEAT_STORAGE=memory`, or `AIMEAT_STORAGE` unset: an in-memory SQLite database. This is the default, so a node with only `DATABASE_URL` set keeps nothing.
+
+`AIMEAT_STORAGE=mongodb` fails at start with migration guidance, and any other unknown value stops the start with an error. A data-model change updates both backends in the same commit: see [storage-sync.md](storage-sync.md).
 
 ---
 

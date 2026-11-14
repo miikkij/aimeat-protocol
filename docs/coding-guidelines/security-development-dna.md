@@ -29,7 +29,7 @@ Every request runs as exactly one **principal**. Get the principal + its trust t
 
 1. **Cross-owner is a hard wall.** Owner B can never read/write owner A's data. Enforced three ways and all three must stay intact: (a) **namespace:** `getMemory(gaii, key)` is a composite-key lookup scoped to the caller's resolved identity; (b) **visibility/consent:** a `private` record with no consent grant is denied to non-owners (`services/access-guard.ts`); (c) **encryption at rest:** secrets are AES-256-GCM (`services/encryption.ts`), so even a raw DB read yields ciphertext.
 2. **Owner ↔ their own agents/apps is a *scope* boundary, not a wall.** An app/agent token resolves to the owner's GHII (`resolveIdentity` returns `sub` for non-owner sessions), so its writes land **in the owner's namespace**. That is by design, but it means **anything the server later reads and trusts from that namespace is attacker-influenceable by a granted app/agent** unless it is protected. See Invariant 2.
-3. **Node ↔ peer is signature-gated.** Federation auth lives entirely in the handlers (there is no auth middleware on `/v1/federation/*`). Every inbound peer endpoint must verify a signature. See Invariant 5.
+3. **Node ↔ peer is signature-gated.** `/v1/federation/*` has no scope middleware, because a scope word means nothing for a peer node. An inbound peer endpoint declares the peer check on its chain as `acceptCredential('federation-peer', …)` (`src/auth/credential-strategies-node.ts`), which verifies the signature before the handler runs. `pnpm check:federation-signatures` refuses a write door with neither that check nor an owner gate. See Invariant 5.
 4. **Extension sandbox / app origin are isolation boundaries.** Extensions run in QuickJS with their own `ext:` namespace, CPU/memory caps, and owner-scoped secrets; published apps run on an isolated `*.apps.<host>` origin and get a scoped grant token, never the session.
 
 ---
@@ -81,6 +81,7 @@ must equal the number of mutating handlers.
 ### 5. Federation is zero-trust: signatures are mandatory, never conditional
 Every inbound `/v1/federation/*` endpoint that mutates or discloses MUST verify an **Ed25519 signature**
 from an **already-approved** peer, using the peer's **previously-established** key. Rules:
+- Declare the check as middleware: `acceptCredential('federation-peer', { … })` on the route, with the door's capability, the text it signs and its refusal sentences as options, and read the verified peer and the signed text in the handler with `credentialOf(req, 'federation-peer')`. The strategy finds the peer (active, entitled to the door, key on file), refuses a missing signature and verifies it, with no option that skips the check. Do not verify the signature inside a new handler. What a door checks after the signature (audience, send time, single use) stays in the handler. `pnpm check:federation-signatures` holds every write door to this rule or an owner gate.
 - Never `if (signature && peer.publicKey) verify(...)`: an attacker just omits the signature. Verify **unconditionally**; reject when absent.
 - Never overwrite an active peer's key without a signature from the **current** key.
 - Never derive trust (`isGenesis`, tier, admission) from a **body-supplied** `node_url`/`node_id`. Those are claims, not proof.
@@ -94,7 +95,7 @@ is truthy even when unauthenticated. To require real auth use `requireAuth()`; t
 ### 7. Secrets: encrypt at rest, never return/log, allowlist the destination
 Store secrets only via `encryption.ts` (AES-256-GCM). Never return a decrypted secret in a response or a
 log line. The **destination** a secret is transmitted to must be an allowlisted host (ties to Invariants 2 & 3).
-`AIMEAT_ENCRYPTION_KEY` must be set on any node holding secrets (keys, TOTP). A public node without it must fail loudly.
+`AIMEAT_ENCRYPTION_KEY` must be set on any node holding secrets (keys, TOTP). A node on the `public` profile without it (and without `AIMEAT_ENCRYPTION_KEY_1`) warns at start (`securityPostureWarnings()` in `src/config/posture.ts`) and still starts; see section 3.
 
 ### 8. Least privilege by default; consent text must convey real capability
 App/agent default scopes stay minimal; powerful scopes (`ai:use`, `task:write`, `memory:purge`,
@@ -227,8 +228,8 @@ account up by the name answered for the local namesake.
 
 **What the session is now.** `verifyJWT()` reads every federated token, old ones included, as a
 visitor: role `federated` and no other, and its HOME GHII (`alice@their-node`) as both `sub` and
-`owner`. `resolveIdentity` returns that GHII, which is what RFC v4.0 Core §31 means by a visitor acting
-"under their own identity". No gate that asks for the account holder admits it:
+`owner`. `resolveIdentity` returns that GHII, which is what Core 2026-11 FED-17 and FED-18 require of a
+visitor: never the local namesake, no owner bypass, and reads through the same read decision. No gate that asks for the account holder admits it:
 `requireRole('owner')`, `isOwnerPrincipal()`, `requireOwnerSession()` and `requireLocalSession()`
 refuse it, and `requireScope` gives it no owner bypass, only the scopes this node grants its peer. A
 door that looks the account up by `req.auth!.owner` finds nobody, because no local account has a name
@@ -269,10 +270,12 @@ made on purpose, never from who your owner happens to be. When you add a mint, d
 against the other mints; there were four and one of them disagreed for months.
 
 ### 13. A gate reads the normalized value, never the raw request
-`POST /v1/capabilities` checks the webhook allowlist against `body.source.type === 'manual'`, and the
-record builder defaults a MISSING type to `'manual'`. So omitting `source` entirely skips both
-`WEBHOOKS_DISABLED` and the domain allowlist, and the record is then built as exactly the manual
-capability the gate would have refused. The gate and the record disagree about what the request was.
+`POST /v1/capabilities` checked the webhook allowlist against `body.source.type === 'manual'`, and the
+record builder defaulted a MISSING type to `'manual'`. So omitting `source` entirely skipped both
+`WEBHOOKS_DISABLED` and the domain allowlist, and the record was then built as exactly the manual
+capability the gate would have refused. The gate and the record disagreed about what the request was.
+The builder now normalises the source first and gates on the normalised value
+(`services/capability-record.ts`).
 
 The same shape reached the isolation boundary: `middleware/subdomain.ts` set `req.appOrigin` from the
 `X-App-Origin` REQUEST header, so one header made the node believe a request had arrived on the
@@ -293,11 +296,12 @@ Postgres the caller's next read raced the counters it had just been told about.
 refuse it. When a handler both writes and validates, read the ORDER, not just the presence.
 
 ### 15. A permission word is enforced on every door or it does not exist
-`organism:write` deletes `aimeat_organism_create` from an agent's MCP surface, because a `TOOL_SCOPES`
-entry removes the tool rather than refusing the call. The same agent gets `201 Created` from
-`POST /v1/organisms`, because `requireRoleOrScope('agent', 'organism:write')` admits any principal
-holding the `agent` role BEFORE it looks at scopes. The word is real on the surface an owner reads and
-decorative on the door that writes.
+`organism:write` deleted `aimeat_organism_create` from an agent's MCP surface, because a `TOOL_SCOPES`
+entry removes the tool rather than refusing the call. The same agent got `201 Created` from
+`POST /v1/organisms`, because `requireRoleOrScope('agent', 'organism:write')` admitted any principal
+holding the `agent` role BEFORE it looked at scopes. The word was real on the surface an owner reads and
+decorative on the door that writes. The route now asks `requireScope('organism:write')`
+(`routes/organisms/crud.ts`).
 
 *Check:* when you add a scope word, name every door that reaches the capability and gate all of them.
 A word enforced on one door teaches an owner that they have controlled something they have not.
@@ -547,8 +551,8 @@ the shipped default agent scopes. What it leaves open is listed in the script as
 config file, prints errors, warnings and notes, and exits 1 on an error. It does not read the security
 profile. Its security-related checks: `AIMEAT_DEV_MODE=true`; an `http://` `AIMEAT_BASE_URL` on a host
 other than `localhost`, `127.0.0.1` or `::1`; a short or common `AIMEAT_ADMIN_PASSWORD`; a malformed
-`AIMEAT_CORS_ALLOWED_ORIGINS` entry; no `AIMEAT_TOTP_ENCRYPTION_KEY` (an error) or a short one while TOTP
-is on; invalid `AIMEAT_STATS_ACCESS`, `AIMEAT_METRICS_ACCESS` or `AIMEAT_EXT_INSTALL_ROLE` values;
+`AIMEAT_CORS_ALLOWED_ORIGINS` entry; while TOTP is on, neither `AIMEAT_ENCRYPTION_KEY` (or
+`AIMEAT_ENCRYPTION_KEY_1`) nor `AIMEAT_TOTP_ENCRYPTION_KEY` set (an error), or a short TOTP key (a warning); invalid `AIMEAT_STATS_ACCESS`, `AIMEAT_METRICS_ACCESS` or `AIMEAT_EXT_INSTALL_ROLE` values;
 `AIMEAT_APP_ORIGIN_ENABLED=true` without `AIMEAT_APP_HOST`; and `AIMEAT_AI_LABEL_PUBLIC=off`.
 
 ---
@@ -562,7 +566,7 @@ Before merging any change to `src/routes/`, `src/auth/`, `src/services/`, `src/s
 - [ ] **Scope/role:** every mutating handler has `requireScope`/`requireRole` (Inv. 4).
 - [ ] **Reserved keys:** if the server reads-and-trusts any memory key you introduced, it's system-namespaced or denylisted (Inv. 2).
 - [ ] **Egress:** any non-constant outbound URL uses `safeFetch`; private-egress respects posture (Inv. 3).
-- [ ] **Federation:** new inbound peer endpoints verify a signature unconditionally from an approved peer (Inv. 5).
+- [ ] **Federation:** a new inbound peer endpoint declares `acceptCredential('federation-peer', …)` and reads the peer with `credentialOf()`; `pnpm check:federation-signatures` passes (Inv. 5).
 - [ ] **Anonymous:** no `if(!req.auth)` gate; `members` reads check `!req.auth.anonymous` (Inv. 6).
 - [ ] **Secrets:** encrypted at rest, never returned/logged, destination allowlisted (Inv. 7).
 - [ ] **Config:** any security value that differs local↔public is in `.env.example` with a safe public default (Inv. 10).
@@ -580,7 +584,7 @@ Before merging any change to `src/routes/`, `src/auth/`, `src/services/`, `src/s
 The point-in-time vulnerability audits that motivated this DNA are tracked separately (they contain
 exploit detail; keep them out of the public repo): 2026-07-10 for invariants 1 to 10, the August and
 September 2026 audits for 11 to 16, and the October 2026 audit of the AI/agent and data-isolation
-scope for 17 to 19. Fix order and status live with the developer. This document is the
+scope for 17 to 20 (20 from that audit's second wave). Fix order and status live with the developer. This document is the
 **forward-looking** contract: new code must not reintroduce any invariant above.
 
 *Related:* [security.md](security.md) (reference values: crypto functions, headers, rate limits, sandbox limits) ·

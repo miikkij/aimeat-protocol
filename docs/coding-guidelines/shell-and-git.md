@@ -63,13 +63,19 @@ an assistant, either shell. It refuses:
 - a last line of the same kind, which is the closing half of the same mistake
 - a non-blank line 2, which is what glues a body onto the subject
 - an empty message, and the `Co-Authored-By` trailer this project does not use
+- for an agent session's commit only (`CLAUDECODE=1` or `AIMEAT_SESSION` set): a subject over 72 characters, a body over
+  600, and a line that says who approved or asked for the change
+
+The same hook then runs `node scripts/check-private-terms.mjs --commit`, which refuses a message that
+names a term from the private-terms list (the organisation-node names this public repository must not
+carry; the list sits in git's common directory, never in the tree).
 
 For a commit from VS Code or a terminal it is structural, not stylistic. It does not judge tone,
 length (below a runaway threshold), mood or wording: a gate that refuses the repo's own history gets
 bypassed, and then it protects nothing. The first version of this one rejected a real 131-character
 subject and was corrected.
 
-For a commit made by a Claude Code session it also holds the three rules under "How long, and what
+For a commit made by an agent session (`CLAUDECODE=1` or `AIMEAT_SESSION` set) it also holds the three rules under "How long, and what
 stays out" below (since 2026-11-11). The 72-character subject had been a written rule since
 2026-09-27, and 230 of the 300 subjects written after it were longer.
 
@@ -108,7 +114,7 @@ costs.
 Ruled by the developer on 2026-11-11. The bodies on `main` had grown to between 1,000 and 3,400
 characters, and three of the last 200 quoted his one-word approval of the work.
 
-A commit made by a Claude Code session (`CLAUDECODE=1`) has:
+A commit made by an agent session (`CLAUDECODE=1` or `AIMEAT_SESSION` set) has:
 
 - **a subject of at most 72 characters**, which names the one thing that changed;
 - **a body of at most 600 characters**, trailers not counted, which says why the change exists;
@@ -198,14 +204,16 @@ main from booting could only be attributed by content and time, after three sess
 asked in turn. Three hooks and two variables answer it; the ritual around them is skill
 `aimeat-dev-session` on the node.
 
-The two variables and the one-worktree rule are for maintainer sessions, the Claude Code sessions
-that work on this repo. A contributor committing from VS Code or a terminal is never asked for
+The two variables and the one-worktree rule are for maintainer sessions: the Claude Code sessions
+that work on this repo, and any other agent session that sets `AIMEAT_SESSION`. A contributor committing from VS Code or a terminal is never asked for
 them. `check:imports-tracked` and the `pre-push` checks apply to every commit.
 
 - **`AIMEAT_SESSION=cc-<owner>-<tag>`** in the shell a session commits from. The
   `prepare-commit-msg` hook stamps `Session: <name>` as a trailer on every commit; the same name
   is on the session's claim record. In a Claude Code session (`CLAUDECODE=1`) a missing variable
-  REFUSES the commit; a person committing from VS Code or a terminal is never asked.
+  REFUSES the commit. Any agent that sets it is held to the session rules (72/600, a named reason
+  on a red CI, a refusal when the private-terms list is missing). A person committing from VS Code
+  or a terminal sets neither and is never asked. A term found on the list refuses everybody.
 - **`AIMEAT_PROJECT=aimeat-protocol`** beside it. The same hook stamps `Project: <name>` when the
   variable is set and the message has no `Project:` line yet. A missing `AIMEAT_PROJECT` refuses
   nothing; the commit only goes without the trailer.
@@ -215,9 +223,15 @@ them. `check:imports-tracked` and the `pre-push` checks apply to every commit.
   so a peer's half-done work in a shared checkout is not this commit's problem, and an
   untracked importer is ignored until it is staged. c932f2f17 shipped without the two files it
   imported and passed every gate that read the worktree.
-- **`pre-push`** fetches and refuses a push from behind `origin/main` (rebase first), lists the
-  commits about to go that carry no `Session:` trailer, and runs `pnpm boot:smoke`, which
-  imports the modules on the server's boot path and refuses when one throws at load.
+- **`pre-push`**, in order: refuses a push that carries a commit of a rewritten history
+  (`check-rewritten-history.mjs`, roots in `aimeat/security/rewritten-history.txt`); refuses a
+  pushed commit that names a private term (`check-private-terms.mjs --push`); fetches and refuses
+  a push from behind `origin/main` (rebase first); refuses a push on top of a red CI on main
+  without a named reason (`ci-state.mjs --push-check`: a `Red-CI:` trailer or
+  `AIMEAT_RED_CI_REASON`; an agent session is refused, a person's push gets a warning);
+  lists, for a session, the commits about to go that carry no `Session:` trailer; and runs
+  `pnpm boot:smoke`, which imports the modules on the server's boot path and refuses when one
+  throws at load.
 - **One session, one worktree**, made by Claude Code (`claude --worktree cc-<owner>-<tag>`, or
   the `EnterWorktree` tool), whose `WorktreeCreate` hook (`.claude/hooks/worktree-create.sh`)
   runs the whole recipe. By hand it is
