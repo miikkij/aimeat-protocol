@@ -15885,7 +15885,7 @@ paths:
                         type: object
                         required: [format]
                         properties:
-                          format: { type: string, enum: [document, record, board-post, file, app, image] }
+                          format: { type: string, enum: [document, record, board-post, file, app, image, json] }
                           location: { type: object }
                           sample: {}
       responses:
