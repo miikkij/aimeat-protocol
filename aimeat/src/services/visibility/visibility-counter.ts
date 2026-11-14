@@ -23,9 +23,13 @@
  *   NEVER BLOCKS AND NEVER THROWS. The callers are serve paths; a counter must not cost anybody
  *   their page.
  * @structure ownerCounts · resolvePlaceOwner · countVisit · recordPurchase ·
- *   flushVisibility · mergeDay · resetVisibilityState (tests)
+ *   flushVisibility · mergeDay · resetVisibilityState (tests) · holdVisibilityForErasure
  * @usage countVisit(storage, config, { ownerGaii, target: app.filename, ...visit });
  * @version-history
+ *   2026-11-14 — holdVisibilityForErasure: before the erasure cascade, a merge in progress answers, the
+ *     owner's waiting counts are dropped, and none of the owner's counts is kept or merged until it
+ *     ends. A merge that had read the owner before the cascade wrote the month record back after it
+ *     (register finding f-2026-11-13-write-buffers-and-erasure).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-11 — recordPurchase sums money only: a purchase in morsels is counted as a free
@@ -51,6 +55,7 @@ import { cachedVisibilitySettings, resetVisibilitySettingsCache } from './visibi
 import { ownerGhiiOf, localAccountOf } from '../../utils/gaii.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 import { logger } from '../../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 /** How long buffered counts wait before they are merged. */
 const FLUSH_MS = 10_000;
@@ -120,6 +125,9 @@ interface Pending {
 const pendingByStorage = new WeakMap<Storage, Pending>();
 /** Storages with counts waiting, so a shutdown or a test can flush them all. */
 const liveStorages = new Set<Storage>();
+/** The owners whose erasure runs now, whose counts are not kept or merged, and the merges in
+ *  progress an erasure waits for (holdVisibilityForErasure). */
+const erasing = new ErasureHolds();
 
 function pendingFor(storage: Storage): Pending {
   let p = pendingByStorage.get(storage);
@@ -128,6 +136,8 @@ function pendingFor(storage: Storage): Pending {
 }
 
 function deltaDay(storage: Storage, ownerGhii: string, day: string): VisibilityDay {
+  // An owner being erased: the caller fills a day that is never kept, and nothing is buffered.
+  if (erasing.covers(ownerGhii)) return emptyVisibilityDay();
   const p = pendingFor(storage);
   let days = p.owners.get(ownerGhii);
   if (!days) { days = new Map(); p.owners.set(ownerGhii, days); }
@@ -460,29 +470,53 @@ export async function flushVisibility(storage: Storage, onlyOwner?: string): Pro
     liveStorages.delete(storage);
   }
   for (const [owner, days] of taken) {
-    // An account erased while its counts waited here gets no record back: a merge would recreate
-    // data the erasure removed. One key read per owner per merge.
+    // An owner whose erasure runs now: the counts are not merged (holdVisibilityForErasure).
+    if (erasing.covers(owner)) continue;
+    // The owner check and the merges are one tracked write, so an erasure that begins between them
+    // waits for the merge and its cascade then deletes what the merge wrote.
+    await erasing.track(mergeTaken(storage, owner, days));
+  }
+}
+
+async function mergeTaken(storage: Storage, owner: string, days: Map<string, VisibilityDay>): Promise<void> {
+  // An account erased while its counts waited here gets no record back: a merge would recreate
+  // data the erasure removed. One key read per owner per merge.
+  try {
+    const name = localAccountOf(owner);
+    if (!name || !(await storage.getOwner(name))) return;
+  } catch (e) {
+    logger.warn('visibility: the owner could not be read before a merge', { owner, error: String(e) });
+    return;
+  }
+  const byMonth = new Map<string, Map<string, VisibilityDay>>();
+  for (const [day, delta] of days) {
+    const m = monthOf(day);
+    if (!byMonth.has(m)) byMonth.set(m, new Map());
+    byMonth.get(m)!.set(day, delta);
+  }
+  for (const [month, monthDays] of byMonth) {
     try {
-      const name = localAccountOf(owner);
-      if (!name || !(await storage.getOwner(name))) continue;
+      await mergeOwnerMonth(storage, owner, month, monthDays);
     } catch (e) {
-      logger.warn('visibility: the owner could not be read before a merge', { owner, error: String(e) });
-      continue;
-    }
-    const byMonth = new Map<string, Map<string, VisibilityDay>>();
-    for (const [day, delta] of days) {
-      const m = monthOf(day);
-      if (!byMonth.has(m)) byMonth.set(m, new Map());
-      byMonth.get(m)!.set(day, delta);
-    }
-    for (const [month, monthDays] of byMonth) {
-      try {
-        await mergeOwnerMonth(storage, owner, month, monthDays);
-      } catch (e) {
-        logger.warn('visibility: merging counts failed', { owner, month, error: String(e) });
-      }
+      logger.warn('visibility: merging counts failed', { owner, month, error: String(e) });
     }
   }
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: a merge in progress answers
+ * first so the cascade deletes what it wrote, the owner's waiting counts are dropped on every storage,
+ * and none of the owner's counts is kept or merged until the returned function ends the hold.
+ */
+export async function holdVisibilityForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  await erasing.writesSettled();
+  for (const storage of liveStorages) {
+    const p = pendingByStorage.get(storage);
+    if (!p) continue;
+    for (const owner of [...p.owners.keys()]) if (ErasureHolds.isOf(owner, account)) p.owners.delete(owner);
+  }
+  return release;
 }
 
 /** Merge everything waiting on every storage. For a clean shutdown. */

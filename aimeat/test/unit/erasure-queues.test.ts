@@ -23,6 +23,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-queues.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-queues.test.ts
  * @version-history
+ *   v1.6.0 — 2026-11-14 — The visibility and behaviour counters.
  *   v1.5.0 — 2026-11-14 — The agent telemetry buffer.
  *   v1.4.0 — 2026-11-14 — The content intake queue.
  *   v1.3.0 — 2026-11-14 — The write-time classification queue.
@@ -47,6 +48,11 @@ import { contentAfterStore, flushContentIntake } from '../../src/services/conten
 import { getFacts, sourceIdOf } from '../../src/services/content/facts-store.js';
 import { writeStorageFile } from '../../src/services/storage-file-write.js';
 import { initTelemetryBuffer, recordTelemetryActivity, flushTelemetryBuffer } from '../../src/services/telemetry-buffer.js';
+import type { AimeatConfig } from '../../src/config.js';
+import { countVisit, flushVisibility } from '../../src/services/visibility/visibility-counter.js';
+import { recordBehaviour, flushBehaviour } from '../../src/services/visibility/behaviour-counter.js';
+import { VISIBILITY_MONTH_PREFIX } from '../../src/models/visibility-schemas.js';
+import { behaviourAppKey } from '../../src/models/behaviour-schemas.js';
 
 // The model path is not what these cases test; an IBAN meets the detection rules alone.
 vi.mock('../../src/services/decide/service.js', () => ({
@@ -279,5 +285,66 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
       await eraseDuring(s, p, held, flushTelemetryBuffer());
     } finally { held.restore(); }
     expect(await s.getActivityHistory(p.star)).toEqual([]);
+  });
+
+  // ── The visibility and behaviour counters (services/visibility/) ──
+  const visibilityConfig = {} as AimeatConfig;
+  const months = async (ghii: string) => (await st().listMemory(ghii, { prefix: VISIBILITY_MONTH_PREFIX })).map(r => r.key);
+  const visit = async (ghii: string) => {
+    countVisit(st(), visibilityConfig, { ownerGaii: ghii, target: 'app.html' });
+    // The count reads the owner's switch before it lands in the buffer.
+    await new Promise(r => setTimeout(r, 50));
+  };
+  const view = (ghii: string) => recordBehaviour(st(), { ownerGhii: ghii, app: 'app.html', optedOut: false });
+  const behaviour = (ghii: string) => st().getMemory(ghii, behaviourAppKey('app.html'));
+  const ownerRead = (p: { alice: string }) => (args: unknown[]): boolean => args[0] === p.alice;
+
+  it('visibility counter, WAITING: no month record of the erased owner is stored after the erasure (green before the fix too: the merge reads the owner first)', async () => {
+    const s = st();
+    const p = await people(s);
+    await visit(p.aliceGhii);
+    await visit(p.bobGhii);
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushVisibility(s);
+
+    expect(await months(p.aliceGhii)).toEqual([]);
+    // POSITIVE CONTROL: bob's month record is stored.
+    expect((await months(p.bobGhii)).length).toBe(1);
+  });
+
+  it('visibility counter, BEING WRITTEN: a merge that read the owner before the erasure stores nothing after it', async () => {
+    const s = st();
+    const p = await people(s);
+    await visit(p.aliceGhii);
+    const held = holdFirst(s, 'getOwner', 'after', ownerRead(p));
+    try {
+      await eraseDuring(s, p, held, flushVisibility(s));
+    } finally { held.restore(); }
+    expect(await months(p.aliceGhii)).toEqual([]);
+  });
+
+  it('behaviour counter, WAITING: no app record of the erased owner is stored after the erasure (green before the fix too: the merge reads the owner first)', async () => {
+    const s = st();
+    const p = await people(s);
+    view(p.aliceGhii);
+    view(p.bobGhii);
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushBehaviour(s);
+
+    expect(await behaviour(p.aliceGhii)).toBeNull();
+    expect(await behaviour(p.bobGhii)).not.toBeNull();
+  });
+
+  it('behaviour counter, BEING WRITTEN: a merge that read the owner before the erasure stores nothing after it', async () => {
+    const s = st();
+    const p = await people(s);
+    view(p.aliceGhii);
+    const held = holdFirst(s, 'getOwner', 'after', ownerRead(p));
+    try {
+      await eraseDuring(s, p, held, flushBehaviour(s));
+    } finally { held.restore(); }
+    expect(await behaviour(p.aliceGhii)).toBeNull();
   });
 });

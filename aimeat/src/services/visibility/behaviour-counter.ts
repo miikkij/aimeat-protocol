@@ -16,9 +16,14 @@
  *   User-Agent in the visibility counts.
  *
  *   NEVER THROWS. The caller is a public endpoint whose answer does not depend on the count.
- * @structure recordBehaviour · flushBehaviour · mergeBehaviourDay · BehaviourBeacon
+ * @structure recordBehaviour · flushBehaviour · mergeBehaviourDay · BehaviourBeacon ·
+ *   holdBehaviourForErasure
  * @usage recordBehaviour(storage, { ownerGhii, app, optedOut, vc, scroll, heat, dead, rage });
  * @version-history
+ *   2026-11-14 — holdBehaviourForErasure: before the erasure cascade, a merge in progress answers, the
+ *     owner's waiting views are dropped, and none of the owner's views is kept or merged until it ends.
+ *     A merge that had read the owner before the cascade wrote the app record back after it (register
+ *     finding f-2026-11-13-write-buffers-and-erasure).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.1 — 2026-10-11 — A new record's `spec` is the served contract address (VISIBILITY_MONTH_SPEC).
@@ -35,6 +40,7 @@ import { VISIBILITY_MONTH_SPEC } from '../../models/visibility-schemas.js';
 import { withKeyLock } from '../signals/signal-service.js';
 import { localAccountOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 const FLUSH_MS = 10_000;
 const BUFFER_LIMIT = 300;
@@ -107,6 +113,9 @@ interface Pending {
   timer: NodeJS.Timeout | null;
 }
 const pendingByStorage = new WeakMap<Storage, Pending>();
+/** The owners whose erasure runs now, whose views are not kept or merged, and the merges in
+ *  progress an erasure waits for (holdBehaviourForErasure). */
+const erasing = new ErasureHolds();
 
 function pendingFor(storage: Storage): Pending {
   let p = pendingByStorage.get(storage);
@@ -117,6 +126,8 @@ function pendingFor(storage: Storage): Pending {
 /** Count one page view. Never throws. */
 export function recordBehaviour(storage: Storage, beacon: BehaviourBeacon): void {
   try {
+    // An owner being erased: the cascade deletes the app records, so none is started again.
+    if (erasing.covers(beacon.ownerGhii)) return;
     const delta = beaconDelta(beacon);
     const p = pendingFor(storage);
     const slot = `${beacon.ownerGhii}|${beacon.app}`;
@@ -223,13 +234,36 @@ export async function flushBehaviour(storage: Storage, onlyOwner?: string): Prom
     const cut = slot.indexOf('|');
     const owner = slot.slice(0, cut);
     const app = slot.slice(cut + 1);
+    // An owner whose erasure runs now: the views are not merged (holdBehaviourForErasure).
+    if (erasing.covers(owner)) continue;
     try {
-      // An account erased while its counts waited gets no record back.
-      const name = localAccountOf(owner);
-      if (!name || !(await storage.getOwner(name))) continue;
-      await mergeApp(storage, owner, app, days);
+      // The owner check and the merge are one tracked write, so an erasure that begins between them
+      // waits for the merge and its cascade then deletes what the merge wrote.
+      await erasing.track((async () => {
+        // An account erased while its counts waited gets no record back.
+        const name = localAccountOf(owner);
+        if (!name || !(await storage.getOwner(name))) return;
+        await mergeApp(storage, owner, app, days);
+      })());
     } catch (e) {
       logger.warn('behaviour: a merge failed; these counts are lost', { owner, app, error: String(e) });
     }
   }
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: a merge in progress answers
+ * first so the cascade deletes what it wrote, the owner's waiting views on `storage` are dropped, and
+ * none of the owner's views is kept or merged until the returned function ends the hold.
+ */
+export async function holdBehaviourForErasure(account: ErasedAccount, storage: Storage): Promise<() => void> {
+  const release = erasing.hold(account);
+  await erasing.writesSettled();
+  const p = pendingByStorage.get(storage);
+  if (p) {
+    for (const slot of [...p.apps.keys()]) {
+      if (ErasureHolds.isOf(slot.slice(0, slot.indexOf('|')), account)) p.apps.delete(slot);
+    }
+  }
+  return release;
 }
