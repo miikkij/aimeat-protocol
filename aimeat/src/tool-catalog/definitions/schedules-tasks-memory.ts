@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-14 — aimeat_task_event takes revision_requested, as POST …/tasks/:id/event does
+ *     (AgentTaskEventSchema); both read the task through taskToActOn at the standard readiness level.
  *   2026-11-13 — aimeat_memory_list takes archived (unit 3b).
  *   2026-11-13 — aimeat_task_todo takes completed_at (unit 3b).
  *   2026-11-13 — aimeat_schedule_update takes purpose, constraints and input (unit 3b).
@@ -485,6 +487,7 @@ export const schedulesTasksMemoryTools = [
                 'started', 'progress', 'todo_completed', 'todo_failed',
                 'memory_write', 'extension_install', 'app_publish',
                 'verification', 'completed', 'failed', 'message',
+                'revision_requested',
             ]) },
             message: { type: 'string', required: true, description: 'Event message.' },
             details: { type: 'object', description: 'Optional event details.' },
