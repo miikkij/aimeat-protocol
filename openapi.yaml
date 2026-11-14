@@ -54553,14 +54553,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [vp_token, presentation_submission]
+              required: [vp_token]
               properties:
                 vp_token:
                   type: string
                   description: Verifiable Presentation token (JWT or JSON-LD)
+                state:
+                  type: string
+                  description: The state of a round GET /v1/ghii/verify/eudiw/request opened. Given, it must be this owner's EUDIW round and unexpired.
                 presentation_submission:
                   type: object
-                  description: OpenID4VP presentation submission descriptor
+                  description: OpenID4VP presentation submission descriptor. Left out, an empty one is used.
                   properties:
                     id:
                       type: string
