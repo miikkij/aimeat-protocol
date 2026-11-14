@@ -61284,7 +61284,7 @@ paths:
               properties:
                 name: { type: string }
                 description: { type: string }
-                category: { type: string, enum: [signage, marketplace, iot, social, productivity, communication, other] }
+                category: { type: string, default: other, description: 'Free text the catalogue filters by (GET /v1/packages?category=), such as utility, signage or productivity.' }
                 tags: { type: array, items: { type: string } }
                 visibility: { type: string, pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', default: private, description: 'private, members (every account of this node), organism:<id> (that organism''s active members; the author must be one, else 400 NOT_ORGANISM_MEMBER) or public.' }
                 status:
@@ -61292,15 +61292,17 @@ paths:
                   enum: [draft, published, beta, archived]
                   default: published
                   description: Only a published version can be installed.
+                manifest: { type: string, description: 'The package manifest text, stored with the version.' }
                 components:
                   type: array
                   items:
                     type: object
-                    required: [type, label, content]
+                    required: [type]
                     properties:
+                      id: { type: string, description: 'The component id an install and a migration address it by.' }
                       type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation, skill] }
-                      label: { type: string }
-                      content: { type: string }
+                      label: { type: string, default: '' }
+                      content: { type: string, default: '' }
                       dependencies: { type: array, items: { type: string } }
                       meta:
                         type: object
