@@ -1157,17 +1157,14 @@ await test('B2 RECORDED DIFFERENCE (question: is a page past 100 clamped or refu
 });
 
 // B4: an agent's profile, GET /v1/agents/:gaii and aimeat_agent_profile.
-await test('B4 RECORDED DIFFERENCE (question: should reading a profile recompute and store the trust score): bob\'s agent reads alice\'s worker; the route recomputes and writes the score, the tool reads the stored one, and only the tool lists skills, only the route counts published actions', async () => {
-    const before = await callTool(pbBobMcp, 'aimeat_agent_profile', { gaii: pbWorker.gaii });
-    assert(!before.isError && before.data.gaii === pbWorker.gaii && Array.isArray(before.data.skills), `tool: ${before.text.slice(0, 200)}`);
+await test('B4 DECIDED (developer approval 2026-11-14): bob\'s agent reads the freshly computed trust score of alice\'s worker on the tool and the route alike; only the tool lists skills, only the route counts published actions', async () => {
+    const tool = await callTool(pbBobMcp, 'aimeat_agent_profile', { gaii: pbWorker.gaii });
+    assert(!tool.isError && tool.data.gaii === pbWorker.gaii && Array.isArray(tool.data.skills), `tool: ${tool.text.slice(0, 200)}`);
     const rest = await call('GET', `/v1/agents/${encodeURIComponent(pbWorker.gaii)}`, pbBobAg.token);
     assert(rest.status === 200 && rest.body.data.gaii === pbWorker.gaii, `route: ${show(rest)}`);
     assert(typeof rest.body.data.trust?.score === 'number' && !('skills' in rest.body.data), `route shape: ${show(rest)}`);
-    const after = await callTool(pbBobMcp, 'aimeat_agent_profile', { gaii: pbWorker.gaii });
-    // A fresh agent's stored score is the default; the route's computed one differs, and the tool shows
-    // that only after a route read has stored it.
-    assert(before.data.trust_score !== rest.body.data.trust.score, `the tool's stored score before the route read: ${before.data.trust_score} / ${rest.body.data.trust.score}`);
-    assert(after.data.trust_score === rest.body.data.trust.score, `the tool reads what the route stored: ${after.data.trust_score} / ${rest.body.data.trust.score}`);
+    // The first read of a fresh agent is the tool's, and it already shows the computed score, not the stored default 50.
+    assert(tool.data.trust_score === rest.body.data.trust.score && tool.data.trust_score !== 50, `tool ${tool.data.trust_score} / route ${rest.body.data.trust.score}`);
 });
 
 await test('B4 USE KEPT: an agent that does not exist is not found on both', async () => {

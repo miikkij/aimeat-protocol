@@ -30,6 +30,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.6.11 — 2026-11-14 — core.ts 6 → 5 (B4, agentProfileNow).
  *   v1.6.10 — 2026-11-14 — knowledge.ts 1 → 0, its entry deleted (B15, packageLinksFor).
  *   v1.6.9 — 2026-11-14 — exchange-run.ts 1 → 0, its entry deleted (B14, loadPublicToolManifest).
  *   v1.6.8 — 2026-11-14 — Unit 2b part 2, approved answers: core-admin.ts 3 → 2 (B6, operatorAgentList).
@@ -150,7 +151,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/commerce.ts': 4,
     'src/mcp/core-admin.ts': 2,
     'src/mcp/core-resources.ts': 3,
-    'src/mcp/core.ts': 6,
+    'src/mcp/core.ts': 5,
     'src/mcp/extensions.ts': 2,
     'src/mcp/memory-extended.ts': 1,
     'src/mcp/operator-config.ts': 1,

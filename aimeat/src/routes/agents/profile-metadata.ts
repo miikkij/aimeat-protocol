@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — GET /v1/agents/:gaii reads the agent, its trust score (computed and stored) and its
+ *     avatar through agentProfileNow (services/agent/profile-read.ts), which aimeat_agent_profile asks too (unit 2b, B4).
  *   2026-11-13 — GET /v1/agents asks services/agent/owner-roster.ts for the app refusal, the read and the
  *     run-mode filter, which aimeat_agents_list asks too (structure programme 2026-11, unit 2b).
  *   2026-11-10 — GET /v1/agents reads every agent's onboarding record in one query (getOnboardingMany),
@@ -94,7 +96,7 @@ import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii
 import { setAgentTaskStart, setAgentTaskStartFloor, taskStartView, scopeUseLookup } from '../../services/agent/task-start-write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../../services/agent/refusals.js';
-import { calculateTrustScore } from '../../services/trust.js';
+import { agentProfileNow } from '../../services/agent/profile-read.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
 import { listByAgent as listEngagementsByAgent } from '../../services/workspace/engagements.js';
@@ -111,7 +113,7 @@ import { portRedirectFor } from '../../services/agent/port-redirect.js';
 import { agentInstalls } from '../../services/connector-registry.js';
 import { stoppedView } from '../../services/agent/stop-rules.js';
 import { invitesPeople } from '../../services/agent/invites.js';
-import { avatarView, readAvatar, readAvatarsOrEmpty } from '../../services/agent/avatar.js';
+import { avatarView, readAvatarsOrEmpty } from '../../services/agent/avatar.js';
 
 /** HTTP status for a refusal from services/agent/profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -127,8 +129,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // GAII contains # and @ which need URL encoding. Express 5 has already decoded the parameter; a
     // second decode threw a URIError (500) on `%25zz` (secaudit 2026-10-10 I0).
     const gaii = req.params.gaii as string;
-    const agent = await storage.getAgent(gaii);
-    if (!agent) {
+    // The agent, its trust score computed now and stored, and its avatar: the read
+    // aimeat_agent_profile makes too (services/agent/profile-read.ts).
+    const profile = await agentProfileNow(storage, gaii);
+    if (!profile) {
       // A ported agent's pointer, honoured only towards an active federation peer and built from that
       // peer's own URL (services/agent/port-redirect.ts). This answer goes to anyone, so an address
       // the node does not already trust is treated as no pointer at all.
@@ -148,16 +152,11 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
       return;
     }
 
-    const trust = await calculateTrustScore(gaii, storage);
+    // The picture (services/agent/avatar.ts): a record that is there and cannot be shown says why, so an
+    // agent that wrote its own avatar can read back what went wrong.
+    const { agent, trust, avatar } = profile;
     const actions = await storage.listActions();
     const actionsPublished = actions.filter(a => a.providerGaii === gaii).length;
-
-    // Update cached trust score
-    await storage.updateAgent(gaii, { trustScore: trust.score });
-
-    // The agent's picture (services/agent/avatar.ts). A record that is there and cannot be shown says
-    // why, so an agent that wrote its own avatar can read back what went wrong.
-    const avatar = await readAvatar(storage, gaii);
 
     res.json(success(config.nodeId, {
       gaii: agent.gaii,

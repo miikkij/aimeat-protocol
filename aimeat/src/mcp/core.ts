@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-14 — aimeat_agent_profile reads through agentProfileNow (services/agent/profile-read.ts), as
+ *     GET /v1/agents/:gaii does: the trust score is computed now and stored, not the stored one (unit 2b, B4).
  *   2026-11-14 — aimeat_wallet_balance reads the owner's wallet through walletStanding
  *     (services/wallet/wallet-standing.ts), as GET /v1/wallet does: the escrow is the account's, its
  *     person's and every agent's work, not the calling agent's alone (unit 2b, B3).
@@ -193,6 +195,7 @@ import { resourceEvents } from '../services/resource-events.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, structuredResult } from '../tool-catalog/shape.js';
 import { walletStanding } from '../services/wallet/wallet-standing.js';
+import { agentProfileNow } from '../services/agent/profile-read.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, discoveryCaller, DISCOVERY_TYPES, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skill-agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
@@ -238,7 +241,7 @@ import { presentWorkCost } from '../services/morsel.js';
 import { presentActionPricing } from '../services/action-pacing.js';
 import { memoryVisibilityDefault } from '../services/content-defaults.js';
 import { invitesPeople } from '../services/agent/invites.js';
-import { avatarView, readAvatar, readAvatarsOrEmpty } from '../services/agent/avatar.js';
+import { avatarView, readAvatarsOrEmpty } from '../services/agent/avatar.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -389,8 +392,11 @@ export function registerCoreTools(
         'aimeat_agent_profile',
         { description: descriptionFor('aimeat_agent_profile'), inputSchema: zodShapeFor('aimeat_agent_profile'), outputSchema: agentProfileOutput, annotations: annotationsFor('aimeat_agent_profile') },
         async ({ gaii }) => {
-            const agent = await storage.getAgent(gaii);
-            if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
+            // The agent, its trust score computed now and stored, and its avatar: the read GET
+            // /v1/agents/:gaii makes (services/agent/profile-read.ts).
+            const profile = await agentProfileNow(storage, gaii);
+            if (!profile) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
+            const { agent, avatar } = profile;
             // Linked skills (registry refs) — only exposed for same-owner agents.
             let skills: Array<{ ref: string; name: string; description: string }> = [];
             const callerOwner = localAccountName(agentGaii);
@@ -398,7 +404,6 @@ export function registerCoreTools(
                 const links = await getAgentSkillLinks(storage, config, agent.owner, agent.name);
                 skills = links.map(l => ({ ref: l.ref, name: l.name, description: l.description }));
             }
-            const avatar = await readAvatar(storage, agent.gaii);
             return structuredResult('aimeat_agent_profile', undefined, {
                 gaii: agent.gaii,
                 display_name: agent.displayName,
