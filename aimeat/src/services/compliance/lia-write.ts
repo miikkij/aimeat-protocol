@@ -301,7 +301,7 @@ export async function approveLiaAs(
       await notify(storage, `${contact.privacyContact}@${config.nodeId}`, {
         type: 'compliance_lia_approved',
         title: `The balancing test of the app ${title} was approved`,
-        body: `${by.approvedBy}${by.kind === 'person' ? '' : ', an AI agent of the app\'s owner,'} approved it. The outcome: legitimate interests ${item.outcome?.result === 'suitable' ? 'fit' : 'do not fit'} the processing in the register "${need.register.title}".`,
+        body: `${by.approvedBy}${by.kind === 'agent' ? ', an AI agent of the app\'s owner,' : by.kind === 'app' ? ', an app acting for the app\'s owner,' : ''} approved it. The outcome: legitimate interests ${item.outcome?.result === 'suitable' ? 'fit' : 'do not fit'} the processing in the register "${need.register.title}".`,
         link: `/v1/appcat?app=${scope.ownerName}/${scope.app}`,
         i18n: { key: item.outcome?.result === 'suitable' ? 'compliance_lia_approved' : 'compliance_lia_approved_unsuitable', vars: { app: title, by: by.approvedBy, register: need.register.title } },
       });

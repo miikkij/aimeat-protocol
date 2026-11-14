@@ -157,8 +157,11 @@ export async function liaApproveOp(
     return { kind: 'lias', scope, item: lia, stored: false, complete: !open.unanswered.length && !open.outcome && !open.summary, unfinished: open, note: 'Nothing was written.' };
   }
   if (caller.inPerson || !lia.ownerApproves) {
-    const kind = caller.inPerson ? 'person' as const : caller.kind === 'agent' ? 'agent' as const : 'app' as const;
-    const done = await approveLiaAs(deps, scope, id, { approvedBy: caller.inPerson ? caller.ownerGhii : caller.principal, kind, reviewMonths });
+    // The account holder's own credential is the person, signed in or not; an app grant and an
+    // ecosystem app are an app; an agent is an agent.
+    const kind = caller.kind === 'agent' ? 'agent' as const
+      : caller.kind === 'app' || caller.kind === 'ecosystem' ? 'app' as const : 'person' as const;
+    const done = await approveLiaAs(deps, scope, id, { approvedBy: kind === 'person' ? caller.ownerGhii : caller.principal, kind, reviewMonths });
     if (!done.ok) return raise(done);
     return { kind: 'lias', scope, stored: true, item: done.item };
   }

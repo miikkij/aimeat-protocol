@@ -180,8 +180,8 @@ export function registerComplianceTools(
           const where = { scope, organism_id, app, app_owner };
           // item_id + set changes one entry; value replaces the whole document.
           if (part === 'lias' && (item_id !== undefined || set !== undefined)) {
-            // The one change in place a balancing test has: its owner's approval. This session is an
-            // agent, so the owner's question is filed and nothing is approved until they allow it.
+            // A balancing test's approval (lia-ops.ts). This session is an agent: it approves at once,
+            // named as an agent, unless the owner keeps the approval, when the owner's question is filed.
             if (!caller) return toolError('NOT_AVAILABLE', 'This session cannot ask the owner to approve a balancing test.');
             return text(await liaApproveOp(docDeps, caller(), where, item_id, set, { dryRun: !!dry_run }));
           }

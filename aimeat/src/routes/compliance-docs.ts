@@ -87,8 +87,9 @@ export function complianceDocsRouter(config: AimeatConfig, storage: Storage): Ro
       // The body is { set: { field: value } }, which aimeat_compliance_register_write carries as `set`.
       const body = (req.body ?? {}) as { set?: unknown };
       const where = { scope: req.query.scope, organism_id: req.query.organism_id, app: req.query.app, app_owner: req.query.app_owner };
-      // A balancing test has one change in place: its owner's approval (lia-ops.ts). In person it is
-      // approved now; an agent or an app files the owner's question and answers 202.
+      // A balancing test changes in place only by its approval or the owner's choice to keep the
+      // approval (lia-ops.ts). An approval is stored at once (200), except an agent's or an app's on a
+      // test whose owner keeps the approval: that files the owner's question and answers 202.
       if (req.params.kind === 'lias') {
         const out = await liaApproveOp(deps, callerOf(req, config.nodeId, storage), where, req.params.id, body.set, {
           dryRun: req.query.dry_run === 'true', app: req.auth?.app,
