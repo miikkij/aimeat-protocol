@@ -28,7 +28,7 @@
  *     because a field read that way is a field this gate cannot see.
  *   A ROUTE CAPABILITY HAS AN AGENT PATH (2026-11-14). Every route of openapi.yaml that a caller with a
  *   session can run is a capability `aimeat_invoke` runs with the agent's own credential through the
- *   same route (src/services/route-capabilities.ts). A `rest-only`, `no-twin` or `no-twin-write`
+ *   same route (src/services/invoke/route-capabilities.ts). A `rest-only`, `no-twin` or `no-twin-write`
  *   finding on such a route is therefore reached and needs no entry. An entry the file keeps for one
  *   stays held: it says why the route itself refuses an agent (requireRole('owner'), an operator word
  *   or account:security that no wildcard carries). A finding on a route the catalogue leaves out (a
@@ -68,7 +68,7 @@ import { recordFields, doorReach, type AgentSurface, type Finding } from './inve
 import { srcProgram, AIMEAT } from './inventory/program.js';
 import { loadFacts } from './inventory/field-reach-facts.js';
 import { captureServer, captureConnector, captureCliDispatch, type CapturedTool } from './inventory/mcp-capture.js';
-import { listRouteCapabilities } from '../src/services/route-capabilities.js';
+import { listRouteCapabilities } from '../src/services/invoke/route-capabilities.js';
 import { routeKey } from '../src/services/openapi-body-contract.js';
 
 const EXEMPTIONS = join(AIMEAT, 'security', 'field-reach-exemptions.json');
@@ -102,7 +102,7 @@ function routeKeyOf(route: string): string {
 
 /**
  * The routes `aimeat_invoke` reaches as route capabilities: the catalogue's own list
- * (src/services/route-capabilities.ts), read from openapi.yaml, so this gate and the catalogue agree.
+ * (src/services/invoke/route-capabilities.ts), read from openapi.yaml, so this gate and the catalogue agree.
  */
 function invokableRouteKeys(): Set<string> {
     return new Set(listRouteCapabilities().map(c => routeKey(c.method, c.path)));

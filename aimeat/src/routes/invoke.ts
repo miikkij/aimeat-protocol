@@ -25,8 +25,8 @@
  *   exists gives nobody access to it.
  *
  *   ROUTES AS CAPABILITIES (2026-11-14). The catalogue lists the REST routes of openapi.yaml beside the
- *   tools (services/route-capabilities.ts), id `route:<METHOD> <path>`, and `POST /v1/invoke` runs one
- *   as a request to that route with the caller's bearer (services/route-invoke.ts). The same rule
+ *   tools (services/invoke/route-capabilities.ts), id `route:<METHOD> <path>`, and `POST /v1/invoke` runs one
+ *   as a request to that route with the caller's bearer (services/invoke/route-invoke.ts). The same rule
  *   holds: the route's own gates decide.
  *
  * @structure invokeRouter(config, storage)
@@ -44,7 +44,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { listAllCapabilities, findNodeCapability, searchNodeCapabilities, asRouteCapability } from '../services/node-capabilities.js';
 import { invokeNodeCapability } from '../services/node-invoke.js';
-import { listRouteCapabilities, routeCapabilityContract } from '../services/route-capabilities.js';
+import { listRouteCapabilities, routeCapabilityContract } from '../services/invoke/route-capabilities.js';
 
 /** Never send the whole catalogue at once by accident; a caller that wants it all asks page by page. */
 const MAX_LIST = 100;

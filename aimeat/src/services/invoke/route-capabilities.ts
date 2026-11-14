@@ -1,5 +1,5 @@
 /**
- * @file src/services/route-capabilities.ts
+ * @file src/services/invoke/route-capabilities.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's REST routes as capabilities that `discover` finds and `invoke` runs,
@@ -9,7 +9,7 @@
  *   (security/field-reach-exemptions.json). A new tool per route would grow every tool list past what
  *   a model can hold. A route capability gives an agent the same reach through the two tools it
  *   already has: it finds the route with `aimeat_discover` and runs it with `aimeat_invoke`, with its
- *   own credential, through the same route (services/route-invoke.ts). The route's own gates decide,
+ *   own credential, through the same route (services/invoke/route-invoke.ts). The route's own gates decide,
  *   so an agent the route admits gets the route's answer and an agent it refuses gets its refusal.
  *
  *   GENERATED, NEVER WRITTEN BY HAND. Every operation in openapi.yaml becomes one entry, except the
@@ -31,9 +31,9 @@
  */
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { findOpenApiFile } from './openapi-file.js';
-import { routeKey } from './openapi-body-contract.js';
-import { logger } from '../utils/logger.js';
+import { findOpenApiFile } from '../openapi-file.js';
+import { routeKey } from '../openapi-body-contract.js';
+import { logger } from '../../utils/logger.js';
 
 /** One input field, in the shape the tool catalog uses (tool-catalog/definitions/types.ts ToolInputField). */
 export interface RouteInputField {

@@ -25,7 +25,7 @@
  *   which the table filters against the declared contract. Never a URL: paths come from the table,
  *   so there is nothing here for an SSRF to steer.
  *
- *   A ROUTE CAPABILITY (`route:<METHOD> <path>`) goes to services/route-invoke.ts: the request to that
+ *   A ROUTE CAPABILITY (`route:<METHOD> <path>`) goes to services/invoke/route-invoke.ts: the request to that
  *   route of this node, with the path, query and body the input names, the same bearer and the same
  *   in-process dispatch. Its path comes from the contract, never from the caller.
  *
@@ -33,7 +33,7 @@
  * @usage
  *   const out = await invokeNodeCapability(config, { id, input, bearer, agentName });
  * @version-history
- *   2026-11-14 — A route capability runs through services/route-invoke.ts; its answer carries the
+ *   2026-11-14 — A route capability runs through services/invoke/route-invoke.ts; its answer carries the
  *     route's status.
  *   2026-11-04 — The request goes to the node's own HTTP server in process (services/request-injector.ts)
  *     instead of a fetch to 127.0.0.1, marked for the caller's bearer (auth/injected-request.ts) instead
@@ -50,7 +50,7 @@ import type { AimeatConfig } from '../config.js';
 import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
 import { AimeatClient } from '../tool-dispatch/api-client.js';
 import { findNodeCapability, NON_INVOKABLE, listAllCapabilities, asRouteCapability } from './node-capabilities.js';
-import { invokeRouteCapability } from './route-invoke.js';
+import { invokeRouteCapability } from './invoke/route-invoke.js';
 import { logger } from '../utils/logger.js';
 import { movedToolMessage } from '../tool-catalog/moved-tools.js';
 import { inProcessOrigin, withInProcessFetch } from './request-injector.js';
@@ -104,7 +104,7 @@ export async function invokeNodeCapability(
   }
 
   // A REST route of the contract: the request to that route, with this bearer and nothing else
-  // (services/route-invoke.ts). The route's own middleware decides, exactly as over REST.
+  // (services/invoke/route-invoke.ts). The route's own middleware decides, exactly as over REST.
   const route = asRouteCapability(capability);
   if (route) return invokeRouteCapability(config, route, args.input, args.bearer);
 

@@ -158,10 +158,10 @@
         "aimeat/src/static/app-sw-offline.js",
         "aimeat/src/static/sdk-libs/auth/last-identity.js",
         "aimeat/src/static/sdk-libs/offline/store.js",
-        "aimeat/src/services/route-capabilities.ts",
-        "aimeat/src/services/route-invoke.ts"
+        "aimeat/src/services/invoke/route-capabilities.ts",
+        "aimeat/src/services/invoke/route-invoke.ts"
       ],
-      "digest": "sha256:34328abb6f0211f70edacf0c"
+      "digest": "sha256:fa07aa079b8fe4f8804cc9d0"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-14",
@@ -226,7 +226,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:8e2324ad9e1945984078506f"
+      "digest": "sha256:347aa942c80da4d925063141"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -383,8 +383,8 @@
       "aimeat/src/static/app-sw-offline.js": "a2d64d1dd7bfa006",
       "aimeat/src/static/sdk-libs/auth/last-identity.js": "5bf2640a302bc906",
       "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407",
-      "aimeat/src/services/route-capabilities.ts": "9cc3a9da6f7b9f8f",
-      "aimeat/src/services/route-invoke.ts": "3232689364541b45"
+      "aimeat/src/services/invoke/route-capabilities.ts": "2298a4a32b00b5f3",
+      "aimeat/src/services/invoke/route-invoke.ts": "412b395808dbbdde"
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
@@ -441,7 +441,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "37b7a80399fc0f06",
-      "aimeat/security/process-local-baseline.json": "c3636fe35517afa3",
+      "aimeat/security/process-local-baseline.json": "ba70f472ea8cb811",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",

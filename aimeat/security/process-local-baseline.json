@@ -21,6 +21,14 @@
       "count": 1,
       "reason": "openapi.yaml read once per process; every process reads the same file."
     },
+    "src/services/invoke/route-capabilities.ts :: let :: loaded": {
+      "count": 1,
+      "reason": "openapi.yaml read once per process; every process reads the same file and builds the same route capabilities."
+    },
+    "src/services/node-capabilities.ts :: let :: allCache": {
+      "count": 1,
+      "reason": "The tool catalog and openapi.yaml read once per process; every process builds the same list."
+    },
     "src/services/ephemeral-claims.ts :: map :: local": {
       "count": 1,
       "reason": "The one-time values and counters of a process with no storage registered (a unit test, a CLI command), and the synchronous `here` forms kept for callers that cannot wait; a running node keeps them in the EphemeralClaim table, which every process sees."

@@ -10917,7 +10917,8 @@ paths:
         audit run as over REST, and a refusal is the route's own, with its status and code. A path
         or query name the route does not declare is refused, and a path value cannot be `.` or `..`.
         The answer adds `status`, the route's own HTTP status; a redirect is not followed, and its
-        `result` is the `location`. A text answer comes back as `{ content_type, text }`.
+        `result` is the `location`. A text answer comes back as `{ content_type, text }`. A route
+        answer larger than 8 MB is refused with 502 `ANSWER_TOO_LARGE`.
       tags: [Discovery]
       security:
         - BearerAuth: []

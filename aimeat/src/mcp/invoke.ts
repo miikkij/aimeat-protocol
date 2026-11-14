@@ -16,7 +16,7 @@
  * @structure registerInvokeTool(mcp, config, getToken, getAgentGaii)
  * @usage registerInvokeTool(mcp, config, getToken, () => agentGaii);
  * @version-history
- *   2026-11-14 — A route capability's answer carries the route's own status (services/route-invoke.ts).
+ *   2026-11-14 — A route capability's answer carries the route's own status (services/invoke/route-invoke.ts).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).

@@ -1,8 +1,8 @@
 /**
- * @file src/services/route-invoke.ts
+ * @file src/services/invoke/route-invoke.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Run one route capability (services/route-capabilities.ts) with the caller's own bearer,
+ * @description Run one route capability (services/invoke/route-capabilities.ts) with the caller's own bearer,
  *   through the node's own route.
  *
  *   THE SAME REQUEST THE CALLER COULD SEND. The request goes to the node's own HTTP server in process
@@ -21,20 +21,24 @@
  *
  *   THE ANSWER IS THE ROUTE'S. Its status, and its own error code and message on a refusal, with the
  *   whole envelope in `details`. A redirect is not followed: its status and Location are the answer.
+ *   The answer is read under an 8 MB ceiling; a larger one is refused with 502 ANSWER_TOO_LARGE.
  * @structure invokeRouteCapability(config, cap, input, bearer) → InvokeSuccess | InvokeRefusal
  * @usage const out = await invokeRouteCapability(config, cap, { path: { name } }, bearer);
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial: REST routes reachable through aimeat_invoke.
  */
 import type { RouteCapability } from './route-capabilities.js';
-import { withInProcessFetch } from './request-injector.js';
-import { logger } from '../utils/logger.js';
+import { withInProcessFetch } from '../request-injector.js';
+import { logger } from '../../utils/logger.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 
 export interface RouteInvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
 export interface RouteInvokeSuccess { ok: true; capability: string; status: number; result: unknown; duration_ms: number }
 
 /** How much of a text answer comes back; a longer one is cut and says so. */
 const MAX_TEXT = 256 * 1024;
+/** The largest answer invoke reads from a route at all; past it the call answers ANSWER_TOO_LARGE. */
+const MAX_BODY = 8 * 1024 * 1024;
 
 const refuse = (code: string, message: string, status = 400): RouteInvokeRefusal => ({ ok: false, status, code, message });
 
@@ -111,22 +115,31 @@ export async function invokeRouteCapability(
     const type = res.headers.get('content-type') ?? '';
 
     let payload: unknown;
-    if (/json/i.test(type)) {
-      const text = await res.text();
-      // A route that labels a non-JSON answer as JSON: the caller gets the text as the route sent it.
-      try { payload = text ? JSON.parse(text) : null; }
-      catch (err) {
-        logger.debug('route-invoke: a route answered JSON that does not parse; returning its text', { capability: cap.id, error: String(err) });
-        payload = { text: text.slice(0, MAX_TEXT) };
-      }
-    } else if (res.status >= 300 && res.status < 400) {
+    if (res.status >= 300 && res.status < 400) {
       payload = { location: res.headers.get('location') };
-    } else if (/^text\/|yaml|xml|markdown/i.test(type) || !type) {
-      const text = await res.text();
-      payload = { content_type: type || null, text: text.slice(0, MAX_TEXT), ...(text.length > MAX_TEXT ? { truncated: true } : {}) };
     } else {
-      const bytes = (await res.arrayBuffer()).byteLength;
-      payload = { content_type: type, bytes };
+      // The body is read under a ceiling (utils/read-capped.ts): a model cannot use an answer this
+      // large, and the process must not hold one whole before measuring it.
+      const body = await readBodyCapped(res, MAX_BODY);
+      if (body === null) {
+        return {
+          ok: false, status: 502, code: 'ANSWER_TOO_LARGE',
+          message: `The route answered more than ${MAX_BODY / (1024 * 1024)} MB, which invoke does not carry. Narrow the request with the route's own query values.`,
+        };
+      }
+      const text = body.toString('utf8');
+      if (/json/i.test(type)) {
+        // A route that labels a non-JSON answer as JSON: the caller gets the text as the route sent it.
+        try { payload = text ? JSON.parse(text) : null; }
+        catch (err) {
+          logger.debug('route-invoke: a route answered JSON that does not parse; returning its text', { capability: cap.id, error: String(err) });
+          payload = { text: text.slice(0, MAX_TEXT) };
+        }
+      } else if (/^text\/|yaml|xml|markdown/i.test(type) || !type) {
+        payload = { content_type: type || null, text: text.slice(0, MAX_TEXT), ...(text.length > MAX_TEXT ? { truncated: true } : {}) };
+      } else {
+        payload = { content_type: type, bytes: body.byteLength };
+      }
     }
 
     if (res.status >= 400) {

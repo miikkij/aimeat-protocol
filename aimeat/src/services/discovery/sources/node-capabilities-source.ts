@@ -25,7 +25,7 @@
  * @structure createNodeCapabilitiesSource() → DiscoverySource
  * @usage registry.register(createNodeCapabilitiesSource());
  * @version-history
- *   v1.1.0 — 2026-11-14 — The node's REST routes are entries too (services/route-capabilities.ts),
+ *   v1.1.0 — 2026-11-14 — The node's REST routes are entries too (services/invoke/route-capabilities.ts),
  *     tagged `route`, `method:<METHOD>` and `permission:<word>`.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
@@ -56,7 +56,7 @@ export function createNodeCapabilitiesSource(): DiscoverySource {
 
     toEntry(raw: RawHit, ctx: DiscoveryContext): DiscoveryEntry {
       const cap = raw.record as NodeCapability;
-      // A REST route (services/route-capabilities.ts) says it is one, its method, and the permission
+      // A REST route (services/invoke/route-capabilities.ts) says it is one, its method, and the permission
       // word the contract names, so a caller can tell before it calls whether the route will admit it.
       const route = asRouteCapability(cap);
       const tags = route

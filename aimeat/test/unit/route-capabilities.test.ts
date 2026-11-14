@@ -1,7 +1,7 @@
 /**
  * @file test/unit/route-capabilities.test.ts
- * @description The REST routes as capabilities (services/route-capabilities.ts) and the request a
- *   route capability's input describes (services/route-invoke.ts).
+ * @description The REST routes as capabilities (services/invoke/route-capabilities.ts) and the request a
+ *   route capability's input describes (services/invoke/route-invoke.ts).
  *
  *   What is pinned: the catalogue is generated from the running contract and holds the routes a caller
  *   with a session can run, never a sign-in, token, setup or MCP route, `/v1/invoke`, a route only an
@@ -13,8 +13,8 @@
 import { describe, it, expect } from 'vitest';
 import {
     listRouteCapabilities, findRouteCapability, buildRouteCapabilities, routeExclusion, routeCapabilityContract,
-} from '../../src/services/route-capabilities.js';
-import { routeRequestOf } from '../../src/services/route-invoke.js';
+} from '../../src/services/invoke/route-capabilities.js';
+import { routeRequestOf } from '../../src/services/invoke/route-invoke.js';
 import { listNodeCapabilities, listAllCapabilities, findNodeCapability } from '../../src/services/node-capabilities.js';
 
 describe('route capabilities from openapi.yaml', () => {

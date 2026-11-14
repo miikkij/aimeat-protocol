@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-11-14 -- ROUTE_CEILING 440: GET /v1/ledger/usage/runs is refused to an agent without
+ *     wallet:read by test/e2e-invoke-routes.ts.
  *   2026-11-13 -- ROUTE_CEILING 441: PATCH /v1/agents/{name}/tasks/{id}/todos/{todoId} is refused to
  *     another owner's agent by test/e2e-agent-field-adds.ts.
  *   2026-11-12 -- ROUTE_CEILING 442: POST and DELETE /v1/site/template are refused to an owner who is
@@ -136,7 +138,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 441;
+export const ROUTE_CEILING = 440;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

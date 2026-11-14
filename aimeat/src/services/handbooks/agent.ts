@@ -412,8 +412,9 @@ version; \`purchases\` lists what they bought. Tell your owner the price before 
 **Discover.** \`aimeat_discover\` is the **master directory — start here**: one faceted query across
 EVERY domain (capabilities, workflows, knowledge, decisions, research, produced material, companies +
 offerings, documents, apps, datasets, memory). When no tool does a job, \`type: "capability"\` also
-finds the node's REST routes (id \`route:<METHOD> <path>\`, tag \`route\`); \`aimeat_invoke\` runs one
-as you with \`input: { path, query, body }\`, and the route itself decides whether it admits you. A \`dataset\` is a published data package (a table):
+finds the node's REST routes (id \`route:<METHOD> <path>\`, tag \`route\`); \`POST /v1/invoke\` (and the
+invoke tool of the full and primitives tool sets) runs one as you with \`input: { path, query, body }\`,
+and the route itself decides whether it admits you. A \`dataset\` is a published data package (a table):
 its entry carries the row count, when it was last published and the addresses to read it from
 (descriptor, OData, ODPS sheet), and \`aimeat_datapackage_export\` reads its rows. To build a table
 that refreshes itself from the person's own material (workspace records, an app's publishable data, a

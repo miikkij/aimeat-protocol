@@ -23,7 +23,7 @@
  *
  * @structure
  *   ROUTES TOO (2026-11-14). Beside the tools, every REST route of openapi.yaml that a caller with a
- *   session can run is a capability of kind `route` (services/route-capabilities.ts), id
+ *   session can run is a capability of kind `route` (services/invoke/route-capabilities.ts), id
  *   `route:<METHOD> <path>`. `listNodeCapabilities()` stays the tool half, which the tool tables
  *   (scopes, annotations) describe; `listAllCapabilities()`, `findNodeCapability()` and
  *   `searchNodeCapabilities()` cover both. A route's gate is the route itself, so it needs no entry in
@@ -44,7 +44,7 @@
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
 import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
 import type { ToolInputField } from '../tool-catalog/definitions/types.js';
-import { listRouteCapabilities, findRouteCapability, type RouteCapability } from './route-capabilities.js';
+import { listRouteCapabilities, findRouteCapability, type RouteCapability } from './invoke/route-capabilities.js';
 
 /** One capability, as a caller sees it: enough to decide, and enough to call. */
 export interface NodeCapability {
@@ -109,6 +109,7 @@ export function listNodeCapabilities(): NodeCapability[] {
   return cache;
 }
 
+// process-local: the tool catalog and openapi.yaml read once per process; every process builds the same list.
 let allCache: { caps: NodeCapability[]; text: Array<{ id: string; text: string }> } | null = null;
 
 /** The tools, then the routes, with the lowercased text a search reads, built once. */
@@ -124,7 +125,7 @@ export function listAllCapabilities(): NodeCapability[] {
   return allIndexed().caps;
 }
 
-/** A tool by its id, or a route by `route:<METHOD> <path>` (services/route-capabilities.ts). */
+/** A tool by its id, or a route by `route:<METHOD> <path>` (services/invoke/route-capabilities.ts). */
 export function findNodeCapability(id: string): NodeCapability | undefined {
   if (id.startsWith('route:')) return findRouteCapability(id);
   return listNodeCapabilities().find(c => c.id === id);
