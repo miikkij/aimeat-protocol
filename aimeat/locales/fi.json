@@ -13447,6 +13447,15 @@
   "home.ask.statusNotHelper": "Sinulta ei voi vielä kysyä",
   "home.ask.noTopics": "ei vielä aiheita",
   "home.ask.open": "Avaa",
+  "home.teams.title": "Tiimisi",
+  "home.teams.note": "Mitä kussakin tiimissä odottaa sinua ja toimiiko oma tekoälysi tiimin kanssa.",
+  "home.teams.waiting": "odottaa sinua: {n}",
+  "home.teams.decided": "päätöksiä tällä viikolla: {n}",
+  "home.teams.open": "avoimia asioita: {n}",
+  "home.teams.aiOn": "{name} kytketty",
+  "home.teams.aiOff": "omaa tekoälyäsi ei ole vielä kytketty",
+  "home.teams.lead": "olet vetäjä",
+  "home.teams.member": "jäseniä: {n}",
   "help.card.title": "Kysymys sinulle",
   "help.card.mark": "Kysymys",
   "help.card.why": "Kysymys tuli sinulle, koska aiheisiisi kuuluu {topics}.",
@@ -28621,6 +28630,10 @@
         "ask": {
           "label": "Kuka osaa?",
           "summary": "Kenttä, josta jäsen kysyy. Ennen lähetystä sivusto näyttää säilytetyn vastauksen ja sen, kuka voisi vastata. Näkyy, kun Kysy osaajalta on päällä."
+        },
+        "teams": {
+          "label": "Tiimisi",
+          "summary": "Rivi jokaisesta tiimistä, jossa ihminen on: mikä odottaa häntä, viikon päätökset, avoimet asiat ja onko hänen oma tekoälynsä kytketty. Näkyy vain tiimin jäsenelle."
         }
       },
       "portal": {

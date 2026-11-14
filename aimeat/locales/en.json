@@ -12680,6 +12680,15 @@
   "home.ask.statusNotHelper": "Others cannot ask you yet",
   "home.ask.noTopics": "no topics yet",
   "home.ask.open": "Open",
+  "home.teams.title": "Your teams",
+  "home.teams.note": "What waits for you in each team, and whether your own AI works with the team.",
+  "home.teams.waiting": "waiting for you: {n}",
+  "home.teams.decided": "decisions this week: {n}",
+  "home.teams.open": "open matters: {n}",
+  "home.teams.aiOn": "{name} connected",
+  "home.teams.aiOff": "your AI is not connected yet",
+  "home.teams.lead": "you lead it",
+  "home.teams.member": "members: {n}",
   "help.card.title": "A question for you",
   "help.card.mark": "Question",
   "help.card.why": "It came to you because your topics include {topics}.",
@@ -27873,6 +27882,10 @@
         "ask": {
           "label": "Who knows?",
           "summary": "A field where a member asks a question. Before anything is sent, the site shows a kept answer and who could answer. Shown when Ask someone who knows is on."
+        },
+        "teams": {
+          "label": "Your teams",
+          "summary": "One line per team the person is in: what waits for them, this week's decisions, open matters and whether their own AI is connected. Shown only to someone in a team."
         }
       },
       "portal": {

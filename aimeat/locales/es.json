@@ -12142,6 +12142,15 @@
   "home.ask.statusNotHelper": "Todavía no te pueden preguntar",
   "home.ask.noTopics": "todavía sin temas",
   "home.ask.open": "Abrir",
+  "home.teams.title": "Tus equipos",
+  "home.teams.note": "Lo que te espera en cada equipo y si tu propia IA trabaja con el equipo.",
+  "home.teams.waiting": "te espera: {n}",
+  "home.teams.decided": "decisiones esta semana: {n}",
+  "home.teams.open": "asuntos abiertos: {n}",
+  "home.teams.aiOn": "{name} conectada",
+  "home.teams.aiOff": "tu IA aún no está conectada",
+  "home.teams.lead": "lo diriges",
+  "home.teams.member": "miembros: {n}",
   "help.card.title": "Una pregunta para ti",
   "help.card.mark": "Pregunta",
   "help.card.why": "Te llegó porque entre tus temas está {topics}.",
@@ -26370,6 +26379,10 @@
         "ask": {
           "label": "¿Quién sabe?",
           "summary": "Un campo donde un miembro hace una pregunta. Antes de enviar nada, el sitio muestra una respuesta guardada y quién podría responder. Se muestra cuando Pregunta a quien sabe está activado."
+        },
+        "teams": {
+          "label": "Tus equipos",
+          "summary": "Una línea por cada equipo de la persona: lo que le espera, las decisiones de la semana, los asuntos abiertos y si su propia IA está conectada. Solo se muestra a quien está en un equipo."
         }
       },
       "portal": {

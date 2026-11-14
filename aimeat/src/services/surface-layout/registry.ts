@@ -28,6 +28,8 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   v1.6.0 — 2026-11-14 — Both default homes have home.teams (Your teams): under home.your-turn, and
+ *     under home.ask on the onboarding home.
  *   v1.5.0 — 2026-11-14 — Both default homes have home.ask ("Who knows?") under the door to the chat.
  *   v1.4.0 — 2026-10-10 — The default home has home.agents under the fleet line.
  *   v1.3.0 — 2026-09-14 — The built-in portal is the message frame's page (TARGET-075): seven
@@ -205,6 +207,9 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         // count says something is waiting; this says which conversations, and it renders nothing on
         // a day when nobody is waiting.
         b('home.your-turn'),
+        // The person's teams under what waits for them in conversations: the same question, "what
+        // is mine now", asked of the teams (team setup T15). It renders nothing outside a team.
+        b('home.teams'),
         // The two status lines first and the door after them: on the poster home the door is the
         // coral band, and a band reads as the close of the "now" group, not as a line inside it.
         b('home.fleet'),
@@ -236,6 +241,8 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         // A newcomer asks the people who know from the first day (design canvas "Home", 2026-11-14,
         // shows it beside "Käyttöönottosi 3/7"). Filtered out on a node with the feature off.
         b('home.ask'),
+        // Someone invited into a team arrives here first: the team is why they came (team setup T15).
+        b('home.teams'),
         b('home.install-cta'),
         b('home.feed'),
         b('home.trust'),

@@ -16,6 +16,7 @@
  * @structure TeamStatus · teamStatusFor · listTeamsOf
  * @usage const teams = await teamStatusFor(storage, config, ownerName, locale, orgId);
  * @version-history
+ *   v1.3.0 — 2026-11-14 — `week`: this week's decisions, open matters and what waits, as counts (T15).
  *   v1.2.0 — 2026-11-14 — `team_type`.
  *   v1.1.0 — 2026-11-14 — The team's last day, its dependencies, and for a lead each temporary member's day.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T5, T13).
@@ -26,6 +27,7 @@ import { isOrganismOwner, organismOwners } from '../organism-ownership.js';
 import { readTeamRecord, teamContextKey, teamDisplayName, type TeamRecord } from './record.js';
 import { memoryTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
+import { teamWeekRecords } from './weekly-report.js';
 
 export const MAX_TEAMS_LISTED = 50;
 
@@ -56,6 +58,8 @@ export interface TeamStatus {
     depends_on: { organism_id: string; what: string }[];
     /** A lead's view: the last day of each temporary membership, by account (or address hash before they join). */
     member_until?: Record<string, string>;
+    /** Counts only: decisions made in the last seven days, open matters, and what waits for a person. */
+    week: { decided: number; open: number; waiting: number };
 }
 
 /** The organisms the owner is an active member of that are teams, newest membership first. */
@@ -96,6 +100,7 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
         return { account, lead: leads.includes(account), ai: { connected: agents.length > 0, agents } };
     }).sort((a, b) => Number(b.lead) - Number(a.lead) || a.account.localeCompare(b.account));
     const youLead = isOrganismOwner(organism, caller);
+    const counts = await teamWeekRecords(storage, organism.id, team, Date.now());
     const status: TeamStatus = {
         organism_id: organism.id,
         name: teamDisplayName(team, locale, organism.name),
@@ -107,6 +112,7 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
         context: await contextOf(storage, reader, organism.id, team),
         ends_on: team.endsOn ?? null,
         depends_on: team.dependsOn ?? [],
+        week: { decided: counts.decided.length, open: counts.open, waiting: counts.waiting },
     };
     if (youLead) {
         status.member_until = Object.fromEntries(Object.entries(team.until ?? {}).map(([k, v]) => [k.replace(/^account:/, ''), v]));

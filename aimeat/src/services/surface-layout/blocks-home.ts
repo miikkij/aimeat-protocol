@@ -28,6 +28,7 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   2026-11-14 — home.teams ("Your teams", team setup T15) on both homes.
  *   2026-11-14 — home.ask ("Who knows?", Ask someone who knows; shown when help.enabled is on), and
  *     home.your-turn's helpFirst: questions first among the waiting threads.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -113,6 +114,17 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         },
         maxPerSurface: 1,
         summary: 'Which conversations are waiting on an answer from them.',
+    },
+    {
+        // Team setup T15: one line per team the person is in. It draws nothing for a person in no team.
+        id: 'home.teams',
+        surfaces: ['home', 'home-onboarding'],
+        presence: { kind: 'always' },
+        localeStem: 'home.teams',
+        liveDomains: ['organisms', 'memory'],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'The teams they are in: what waits for them, new decisions, open matters and whether their own AI is connected.',
     },
     {
         // Ask someone who knows (services/help/): only where the operator has it on.

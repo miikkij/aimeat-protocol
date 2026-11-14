@@ -17,6 +17,7 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-14: TeamsBlock, "Your teams" (views/home/teams-band.js, GET /v1/teams/status and /v1/teams/waiting).
  *   2026-11-14: AskBlock, "Who knows?" of Ask someone who knows (views/home/ask-band.js, GET /v1/help/inbox);
  *     YourTurnBlock marks a thread a question opened and lists those first (prop helpFirst).
  *   2026-11-14: AgentsBlock and YourTurnBlock give the home's contents rail their count (agents at
@@ -91,6 +92,7 @@ import { HomeJourney } from '../home/journey.js';
 import { HomeFeed } from '/views/home/feed.js';
 import { AgentsBand } from '/views/home/agents-band.js';
 import { AskBand } from '/views/home/ask-band.js';
+import { TeamsBand } from '/views/home/teams-band.js';
 import { OverviewBand } from '/views/home/overview-band.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { InstallCta } from '/components/InstallCta.js';
@@ -238,6 +240,13 @@ export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any
 export function AskBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
   const { data } = useShared('home-ask', '/v1/help/inbox', ['help']);
   return html`<${AskBand} data=${data} props=${props} />`;
+}
+
+/** Your teams (team setup T15): one line per team, from the team status and what waits for the person. */
+export function TeamsBlock() {
+  const { data: status } = useShared('home-teams', '/v1/teams/status', ['organisms', 'memory']);
+  const { data: waiting } = useShared('home-teams-waiting', '/v1/teams/waiting', ['organisms', 'memory']);
+  return html`<${TeamsBand} status=${status} waiting=${waiting} />`;
 }
 
 export function FleetBlock() {

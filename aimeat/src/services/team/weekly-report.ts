@@ -10,9 +10,10 @@
  *
  *   A team with nothing new this week and nothing open or waiting gets no notice: a report that says
  *   nothing teaches its reader to skip it.
- * @structure weekOf · runTeamWeeklyReports
+ * @structure weekOf · teamWeekRecords · runTeamWeeklyReports
  * @usage registered as the core job team-weekly (services/core-jobs.ts), Fridays at 14:05.
  * @version-history
+ *   v1.2.0 — 2026-11-14 — teamWeekRecords, the counts team status reads for a member's home (T15).
  *   v1.1.0 — 2026-11-14 — Decision titles pass each lead's classification reader; the counts stay whole.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T8).
  */
@@ -45,8 +46,18 @@ function latest(rows: MemoryRecord[], prefix: string): { value: Record<string, u
 /** The week's figures of one team, and this week's decision records. Only counts leave this function
  *  as they are; a decision's title reaches a lead through that lead's classification reader. */
 export async function weekOf(storage: Storage, organism: OrganismRecord, team: TeamRecord, now: number): Promise<{ decided: MemoryRecord[]; open: number; waiting: number; aiConnected: number; members: number }> {
+    const { decided, open, waiting } = await teamWeekRecords(storage, organism.id, team, now);
+    const members = (await storage.listMembers(organism.id)).filter(m => m.status === 'active').map(m => m.ghii);
+    const agents = members.length ? await storage.getAgentsByOwners(members) : {};
+    const aiConnected = members.filter(m => (agents[m] ?? []).some(a => a.mcpLastSeen)).length;
+    return { decided, open, waiting, aiConnected, members: members.length };
+}
+
+/** This week's decision records, and the counts of open matters and of what waits for a person.
+ *  Only the counts may leave as they are; a record passes the reader's classification first. */
+export async function teamWeekRecords(storage: Storage, orgId: string, team: TeamRecord, now: number): Promise<{ decided: MemoryRecord[]; open: number; waiting: number }> {
     const rows = async (ws: string, ns: string) => {
-        const prefix = `organism.${organism.id}.w.${ws}.${ns}.`;
+        const prefix = `organism.${orgId}.w.${ws}.${ns}.`;
         const { items } = await storage.listAllMemory({ prefix, limit: 5000, excludeVersionRows: true });
         return latest(items, prefix);
     };
@@ -54,13 +65,7 @@ export async function weekOf(storage: Storage, organism: OrganismRecord, team: T
     const decisions = (await rows(team.workspaces.decisions, 'shared.decisions')).filter(d => d.at >= since);
     const open = (await rows(team.workspaces.shared, 'shared.items')).filter(o => (o.value.status ?? 'open') === 'open');
     const waiting = (await rows(team.workspaces.waiting, 'shared.waiting')).filter(w => (w.value.status ?? 'open') === 'open');
-    const members = (await storage.listMembers(organism.id)).filter(m => m.status === 'active').map(m => m.ghii);
-    const agents = members.length ? await storage.getAgentsByOwners(members) : {};
-    const aiConnected = members.filter(m => (agents[m] ?? []).some(a => a.mcpLastSeen)).length;
-    return {
-        decided: decisions.map(d => d.rec),
-        open: open.length, waiting: waiting.length, aiConnected, members: members.length,
-    };
+    return { decided: decisions.map(d => d.rec), open: open.length, waiting: waiting.length };
 }
 
 /** Every team's week to its leads. Never throws per team. */
