@@ -11,7 +11,7 @@ description: AIMEAT frontend rules: the styling conventions to write to, and how
 
 Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and passwords in `aimeat/.sandbox.json`; restart it to pick up a backend change), not the shared dev server on 40050, which belongs to the developer and may be restarted by another session: navigate to the page, reach the authenticated state, perform the real interactions, and confirm the expected result actually happens. Elements appear, data persists, edits and deletes take effect.
 
-**A published app is checked signed in, in the sandbox, before anyone sees it in production.** Publish it to the sandbox (`POST /v1/apps` with an owner token from `.sandbox.json`) and open `<baseUrl>/v1/apps/<owner>/<file>?mode=inline`: it redirects to the app's own origin, `<name>.apps.localhost:<port>`, where the pill's Sign In opens the same grant window as on aimeat.io; sign in there with a sandbox owner. Until 2026-09-29 the sandbox ran apps in an opaque frame whose sign-in the browser refused, and Postinjalostamo's corrections were found by Jouni in production instead.
+**A published app is checked signed in, in the sandbox, before anyone sees it in production.** Publish it to the sandbox (`POST /v1/apps` with an owner token from `.sandbox.json`) and open `<baseUrl>/v1/apps/<owner>/<file>?mode=inline`: it redirects to the app's own origin, `<name>.apps.localhost:<port>`, where the pill's Sign In opens the same grant window as on aimeat.io; sign in there with a sandbox owner. Until 2026-09-29 the sandbox ran apps in an opaque frame whose sign-in the browser refused, and the corrections to one mail app were found by Jouni in production instead.
 
 **An HTML page of a workspace is checked in its frame, in the sandbox.** The sandbox runs the page host at `pages.localhost:<port>`, as aimeat.io runs it at pages.aimeat.io: open the page in the workspace view (`<baseUrl>/v1/profile?tab=organisms`), or share and publish it and open its viewer link. The page loads only inside the frame; opened in a tab of its own it goes to the viewer, so a direct load of a `pages.localhost` address proves nothing.
 
@@ -26,7 +26,7 @@ pnpm ui:compare --ref <genre url> --app <app url> --click "Setup" \
   --login <owner>:<password> --node <sandbox baseUrl> --app-ref <owner>/<file>
 ```
 
-It signs the app in (the node's window, as a person does), opens the same view on both with `--click`, and reports two readings into `aimeat/.ui-compare/<time>/`: the kit parts only one screen has and every style that differs on a part both have (background, border, radius, shadow, font, padding), and a pixel diff picture. Parts and styles are the finding; the pixel share also counts different data, so read `diff.png` and `app.png` beside `ref.png` rather than the number. Run it once per view the drawing shows. Postinjalostamo 0.4 went to Jouni with a grey paste box and separate setting boxes where the drawing had a white box and one card; this reading names both.
+It signs the app in (the node's window, as a person does), opens the same view on both with `--click`, and reports two readings into `aimeat/.ui-compare/<time>/`: the kit parts only one screen has and every style that differs on a part both have (background, border, radius, shadow, font, padding), and a pixel diff picture. Parts and styles are the finding; the pixel share also counts different data, so read `diff.png` and `app.png` beside `ref.png` rather than the number. Run it once per view the drawing shows. One app went to Jouni with a grey paste box and separate setting boxes where the drawing had a white box and one card; this reading names both.
 
 If you could not drive the browser (MCP unavailable, server down, no credentials), say so. Do not report it as working.
 
@@ -118,12 +118,11 @@ Automated checks prove overflow, contrast and element counts. They say nothing a
 
 Full guide: `docs/frontend-development-guide.md`. The ones that recur:
 
+- **A new or changed Settings & Controls page or admin page calls the components and writes no class.** It passes data to `components/Action.js`, `Mark.js`, `Note.js`, `List.js`, `Facts.js`, `Field.js`, `SettingsPage.js` and the rest of `public/components/`; a component draws its own class names and the `poster.css` shapes. Find the part in the component catalogue (`src/services/ui-library/entries-*.ts`) or the design lab before you write markup. Skill `aimeat-design-language` says why.
 - No inline `style=""` for layout, colour, spacing or typography, and no CSS constants in JS. All CSS in external `.css` files.
 - Colours, spacing and typography come from `theme.css` variables. Never hardcode `#E8564A` or similar in JS.
 - No `rgba(255,255,255,...)` in CSS (dark-theme-only). Use `var(--card)`, `var(--border)`, `var(--bg-dim)`, `var(--surface)`.
-- Button classes are `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger`, `.btn-success`, `.btn-info`, `.btn-danger-solid`. There is no `.btn` base class, so `class="btn btn-*"` is wrong.
-- Prefix view CSS classes: `pf-` profile, `gn-` portal, `adm-` admin. Profile tab section headers use `.section-title` + `.section-desc`.
-- Reuse `/components/` and the shared components in `views/profile/shared.js` and `views/admin/shared.js`.
+- **The classic classes are for the old views only**, the ones not yet on the components, and the classic shell is not extended. When you edit such a view: button classes are `.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger`, `.btn-success`, `.btn-info`, `.btn-danger-solid`, with no `.btn` base class (`class="btn btn-*"` is wrong); view classes carry the prefix `pf-` profile, `gn-` portal, `adm-` admin; section headers use `.section-title` + `.section-desc`; the shared parts are in `views/profile/shared.js` and `views/admin/shared.js`.
 - All user-visible text through `t()`.
 - No emoji in the interface: not in a heading, a button, a menu item, a dialog title, a label, a
   notice, and not inside a locale string, where they hide until the screen is up. Icons are inline

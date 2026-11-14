@@ -1,6 +1,6 @@
 ---
 name: aimeat-app-building
-description: The research-first precondition for building any app on AIMEAT, and the repo-side rules for the app-building prompt system and the served browser SDK libs. Use when the task is to build, make, publish or fork an AIMEAT application (game or tool), or when editing src/services/build-app-prompt.ts, /v1/app-templates, or anything under src/static/sdk-libs/.
+description: The research-first precondition for building any app on AIMEAT, and the repo-side rules for the app-building prompt system and the served browser SDK libs. Use when the task is to build, make, publish or fork an AIMEAT application (game or tool), or when editing src/services/build-app-prompt.ts or /v1/app-templates. Authoring a served SDK lib is skill aimeat-library-authoring.
 ---
 
 # Building an AIMEAT application
@@ -15,7 +15,7 @@ The moment the task is "build / make / publish an app on AIMEAT":
 
 This is a hard precondition of the build, not an optional preamble, and it comes **before** reading repo source: existing published apps and the KB show which libs and patterns are already proven, so reuse beats re-deriving from lib sources. Skipping it once produced non-theming (hardcoded colours), meta-less, duplicate, low-polish apps.
 
-Four node-side stores answer almost everything, and they are shared by every session:
+Five node-side stores answer almost everything, and they are shared by every session:
 
 - **`aimeat_appdev_overview`**: what apps, extensions and capabilities already exist. Check before building anything.
 - **`aimeat_skill_list`** then **`aimeat_skill_get`**: most published apps carry their own operating guide as a skill (`user:{owner}/{app}-agent-guide`, `cadence-crm`, `operate-exchange`, `node:origami-boards`, …). If you are working on or against a named app, load its skill instead of reconstructing how it works.
@@ -62,7 +62,7 @@ The text about the app is what its page and its App Catalog page show under the 
 
 Three habits keep them from being forgotten:
 
-- **Read the whole publish answer and keep it whole.** Never pipe it through `head` or cut it to its first characters. `next_steps` is the node's list of what the app still owes, and the four booleans above are in it. On 2026-10-10 the Allekirjoitus app reached version 4 with a face and a skill and with neither a data map nor a design spec: the answer was cut to 200 characters on every publish, and until that day `next_steps` did not name those two at all.
+- **Read the whole publish answer and keep it whole.** Never pipe it through `head` or cut it to its first characters. `next_steps` is the node's list of what the app still owes, and the four booleans above are in it. On 2026-10-10 a signing app reached version 4 with a face and a skill and with neither a data map nor a design spec: the answer was cut to 200 characters on every publish, and until that day `next_steps` did not name those two at all.
 - **Write the data map and the design spec straight after the first publish**, while you still know why each thing is where it is. Leave a `why` you do not know empty.
 - **Write them again after a publish that changed the screens, a decision, or where data lives.** A design that is reversed mid-build (a request that kept only a hash, then kept the PDF) is exactly what the next builder cannot work out from the code.
 
@@ -126,10 +126,10 @@ person will repeat.
 
 **Owner memory is the wrong default and it wins by being one line shorter.** Group data stored per
 person follows the PERSON between groups while staying invisible to their own TEAM, wrong in both
-directions at once. The CADENCE campaign work (2026-08-24) made that mistake four times in one
-feature: campaigns, pipeline stages, follow-up thresholds and the permission binding. Nothing had
-shipped, so it cost a rewrite instead of a migration. → appdev pitfalls
-`group-apps/group-data-in-owner-memory` and `group-apps/new-space-needs-a-heal-step`.
+directions at once. The campaign work in one CRM app (2026-08-24) made that mistake four times in
+one feature: campaigns, pipeline stages, follow-up thresholds and the permission binding. Nothing
+had shipped, so it cost a rewrite instead of a migration. → appdev pitfall
+`group-apps/group-data-in-owner-memory`.
 
 ### Memory record shape, decided before the first `set()`
 
@@ -169,7 +169,7 @@ permissions its tools need does the work and then has it refused: measured 2026-
 marketplace tools on an agent that held only the memory permissions.
 
 When the code behind this changes, the facts live in `aimeat/src/models/crew-def-schemas.ts`,
-`aimeat/src/services/app/bundled-crews.ts`, `app-agent-propose.ts`, `app-agent-deploy.ts` and
+`aimeat/src/services/app/bundled-crews.ts`, `app/agent-propose.ts`, `app/agent-deploy.ts` and
 `app-agents/app-agent-link.ts`, and the skill text in `aimeat/src/data/builtin-skills.app-agents.ts`.
 
 ## Served browser SDK libs

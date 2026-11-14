@@ -31,7 +31,7 @@ Copy the folder again from a newer commit, repeat both edits, change the commit 
 
 ## The purpose guard
 
-`AIMEAT-PURPOSE.md` is a local companion, and the paragraph added under `SKILL.md`'s title points every audit to it. Every hunter, verifier, critic and fix agent of an AIMEAT audit reads it next to its own brief: it lists what AIMEAT is for (the uses a fix must keep), the two proofs every fix gives (the attack is refused, the legitimate use still works), and the steps before a fix round goes to main (a capability-loss review, a behaviour-change list the developer approves, then the full sweep once on green). It was written after the October 2026 audit's second wave, whose fixes removed designed uses with every suite green (`docs/pitfalls.md` §126). The same feedback went upstream as https://github.com/cloudflare/security-audit-skill/issues/88.
+`AIMEAT-PURPOSE.md` is a local companion, and the paragraph added under `SKILL.md`'s title points every audit to it. Every hunter, verifier, critic and fix agent of an AIMEAT audit reads it next to its own brief: it lists what AIMEAT is for (the uses a fix must keep), the two proofs every fix gives (the attack is refused, the legitimate use still works), and the steps before a fix round goes to main (a capability-loss review, a behaviour-change list the developer approves, then the targeted suites on both backends and `pnpm gate`; the full sweep runs only on the developer's word). It was written after the October 2026 audit's second wave, whose fixes removed designed uses with every suite green (`docs/pitfalls.md` §126). The same feedback went upstream as https://github.com/cloudflare/security-audit-skill/issues/88.
 
 ## How this project runs it
 

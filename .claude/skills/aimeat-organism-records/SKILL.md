@@ -1,6 +1,9 @@
 ---
 name: aimeat-organism-records
-description: Where AIMEAT design specs, plans and roadmap items are authored (in the AIMEAT organism on aimeat.io, not repo docs/), the dogfood session rituals, LOOM/MACHINE ROOM reference resolution, and the ODPS provider identity block. Use when writing a design spec, plan, roadmap item, room.target/room.card/room.release record, an EXCHANGE listing's ODPS descriptor, or when reading/updating the dev organism's context and handbook.
+description: Where AIMEAT design specs, plans and roadmap items are authored (in the AIMEAT organism on aimeat.io, not repo docs/), where a ruling is recorded (Lifecycle Central), the dogfood session rituals, LOOM/MACHINE ROOM reference resolution, and where the ODPS provider identity is read from. Use when writing a design spec, plan, roadmap item, room.target/room.card/room.release record, an EXCHANGE listing's ODPS descriptor, or when reading/updating the dev organism's context and handbook.
+metadata:
+  updated: 2026-11-15
+  review-by: 2027-05-15
 ---
 
 # Organism records, roadmaps and ODPS listings
@@ -11,7 +14,9 @@ Applies only when an `aimeat_*` MCP server is connected. If none is, skip silent
 
 New design specs, plans and roadmap items are **records in the relevant AIMEAT organism on aimeat.io**, not files in repo `docs/`. Deliberate dogfooding: our own knowledge work runs on our own product, and the data stays in the service we own.
 
-Route to the organism where that product's roadmap lives: each MACHINE ROOM app to its own organism/FABRIC; the AIMEAT platform itself (including `app-catalog`) to the FABRIC roadmap hub.
+Route to the organism where that product's roadmap lives. Platform design work (specs and plans for the node core and the libs it serves, including `app-catalog`) has one home: the **Development** workspace of the dev organism (`ws-mq664uyfz21`), as CLAUDE.md says. Each MACHINE ROOM app goes to its own organism/FABRIC.
+
+**A ruling is not an organism record.** When the developer decides something (a decision, a rule, a "we do it this way"), record it in organism AIMEAT CODING CENTRAL with the Lifecycle Central tool `decision_record` (`aimeat_app_tool_invoke { owner: "happydude500001", app: "lifecycle-central.html", tool: "decision_record", input }`, as agent note-writer does), where every project and session sees it. The dev organism's older `decision` records are history to read, not the place to add a new one.
 
 **Canonical in the repo, unchanged:** `openapi.yaml`, the RFC sections and coding-guideline references under `docs/`, `CLAUDE.md`, `docs/known_gaps.md`.
 
@@ -25,9 +30,9 @@ Organism id `fbb51de5-56d5-4143-9871-b998a1187655`, reached with the node's MCP 
 
 Workspaces: Development `ws-mq664uyfz21`, Handbook `ws-mq6653ry24h`, Protocol `ws-mq665ahqc6b`, Platform Development Notes `ws-mslunjvcgxj`, App Development Notes `ws-mslr8u99kzk`.
 
-1. **Before design work:** read the `context` doc `main-context` in Development and the last few `decision`s. Do not ingest the whole organism.
-2. **Planning a task:** read just-in-time. The area's Handbook page(s), open `feature`/`bug` records, relevant `decision`/`invariant`.
-3. **Finishing significant work:** update the `feature`/`bug`; log a `decision` or `known-gap` (both gated on human approval); update the Handbook page and the sub-context doc's current-state.
+1. **Before design work:** read the `context` doc `main-context` in Development and the last few rulings on Lifecycle Central (`board_read { project }` returns them). Do not ingest the whole organism.
+2. **Planning a task:** read just-in-time. The area's Handbook page(s), open `feature`/`bug` records, relevant `invariant`s and rulings.
+3. **Finishing significant work:** update the `feature`/`bug`; a ruling goes to Lifecycle Central's `decision_record` (above), and a `known-gap` only with the developer's approval; update the Handbook page and the sub-context doc's current-state. What the build cost and left open goes to Platform Development Notes (`ws-mslunjvcgxj`).
 4. **Milestones:** a sub-context draft is the live current-state and can be edited freely. A publish is a milestone and needs the developer's explicit go-ahead.
 5. **Sync:** `docs/known_gaps.md` and the roadmap are kept in step by hand. No command does it; the `pnpm organism:sync` this line used to name was never written.
 
@@ -53,15 +58,8 @@ Write proper Finnish (ä/ö) in every record field. The node is fully UTF-8, and
 
 ## ODPS provider identity
 
-When an EXCHANGE listing's ODPS descriptor asks for the provider's legal identity or jurisdiction and the creator is Jouni / `happydude500001`, these are the values. Fill them in; do not leave them blank and do not ask.
+When an EXCHANGE listing's ODPS descriptor asks for the provider's legal identity or jurisdiction and the creator is the developer, the values are in the developer's own memory on aimeat.io, not in this public repository: `aimeat_memory_read { key: "provider.identity", owner_scope: true }`. Copy its `odps.dataHolder` and `odps.license` into the descriptor as they are; do not leave them blank and do not ask. The record says how it is read, and a change to a value is made there.
 
-```json
-"dataHolder": { "legalName": "Overscale Solutions Oy", "businessID": "3323553-5",
-                "URL": "https://www.overscalesolutions.com",
-                "addressCountry": "FI", "addressLocality": "Espoo" },
-"license":    { "geographicalArea": ["Worldwide"], "applicableLaws": "Finnish law" }
-```
-
-Same block the PRH app-tools already use. With it a listing validates at 100% completeness; without it the validator reports `dataHolder` and `applicableLaws` missing.
+With those two blocks a listing validates at 100% completeness; without them the validator reports `dataHolder` and `applicableLaws` missing. When the key cannot be read (no AIMEAT connection, or another owner's session), say so and leave the two blocks for the developer.
 
 Everything else in the descriptor (valueProposition, SLA, dataQuality, provenance) is stated from what you actually know about the capability. Invent nothing there.

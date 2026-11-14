@@ -13,20 +13,20 @@ mistake, so start by naming which one you are writing.
 | **Served SDK lib** | the browser | `src/static/sdk-libs/<name>/` (ESM) | `/v1/libs/aimeat-<name>.js` |
 | **Cortex lib** | the browser | its own package, installed on the node | `/v1/cortex/<pack>/libs/<file>.js`, or exactly `/v1/cortex/<owner>/<pack>/libs/<file>.js` |
 | **Extension** | the node, QuickJS WASM sandbox | manifest + `scripts/` | `/v1/ext/<name>/<action>`, or exactly `/v1/ext/<owner>%2F<name>/<action>` |
+| **Library pack** | the browser (vendored third-party) | `public/lib/` + registry entry | `/lib/<name>@<major>.js` |
 
 **The owner is part of the address too** (since 2026-10-25, `src/services/component-address.ts`):
 every bare address keeps working, and answers keep `name` and add `owner` and `full_name`. A name
 another account removed is retired: the next install by someone else lands as `<owner>/<name>`, and
 only the full address reaches it. Two accounts holding the same name make the bare name answer 409
 AMBIGUOUS_NAME; the full name always works.
-| **Library pack** | the browser (vendored third-party) | `public/lib/` + registry entry | `/lib/<name>@<major>.js` |
 
 **Two prefixes, never mixed:** AIMEAT SDK libs load from `/v1/libs/`, vendored styling and
 third-party packs from `/lib/`. Mixing them 404s.
 
 ## Served SDK libs (`/v1/libs/aimeat-*.js`)
 
-About forty libs (count the directories under `src/static/sdk-libs/`, leaving out `_core` and `dist`). Authored as **componentized, JSDoc-typed ESM** under `src/static/sdk-libs/<name>/`,
+One directory per lib under `src/static/sdk-libs/` (`_core` and `dist` are not libs; count them there rather than trusting a number here). Authored as **componentized, JSDoc-typed ESM** under `src/static/sdk-libs/<name>/`,
 sharing code through `_core/`, **under 800 lines per file**, esbuild-bundled to a classic IIFE with
 `pnpm build:sdk`, and served with a per-node config prelude by `src/routes/libs.ts`. Guarded by
 `check:sdk` (bundle in sync with sources), which runs in `pnpm gate` and CI, and `typecheck:sdk`, which runs in the pre-commit hook. A stale bundle therefore passes a commit and is caught by the gate, so run `pnpm build:sdk` before you commit.
@@ -146,10 +146,10 @@ guest receives is missing from that table, so change the table in the same commi
   `AIMEAT_MEMORY_MAX_ARCHIVED_KEYS`): past it the call throws `QUOTA_EXCEEDED` and archives none of
   the ids, so a space that archives for ever also deletes the archived records it no longer needs.
 - **A collector writes one key per PERIOD, never one per item fetched.** The namespace carries the
-  same budget as any principal: 1024 kB per value, 1000 keys by default. `ext:halytyskartta-ext` keeps
-  a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; `ext:luotain` kept one
-  key per article and reached 1,014 keys, over the shipped ceiling, while a 448 kB `index` key sat in
-  the same namespace proving the megabyte works. The gate before shipping a scheduled collector: if
+  same budget as any principal: 1024 kB per value, 1000 keys by default. One alert-map extension on
+  this node keeps a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; a
+  news collector kept one key per article and reached 1,014 keys, over the shipped ceiling, while a
+  448 kB `index` key sat in the same namespace proving the megabyte works. The gate before shipping a scheduled collector: if
   `keys_per_day × 365` exceeds 1000, fold. Carry a `<prefix>.__index` key listing the periods held so
   a reader finds them without a scan.
 - The sandbox has no `Date.now()` you should trust for reproducibility: take `input.now` or `ctx.now()`.

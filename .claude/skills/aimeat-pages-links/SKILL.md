@@ -68,7 +68,7 @@ read only for a visitor that check lets in. When a shared, published document st
 classification (`aimeat_classification` action `get`, whose `effective.from` names the workspace or
 organism when one of them decided) before you look for anything else.
 
-Pages' share modal offers both, as "Copy Pages link" and "Copy viewer link".
+Pages' share modal offers both, as "Copy Pages link" and "Copy viewer link". For anyone who may not be signed in as a member, hand out the viewer link: it is the one address whose no-login behaviour this skill can state.
 
 An **HTML page** (a document whose value holds `html`) uses the same viewer link. The viewer shows it
 in a sandboxed frame served from the node's page host (pages.aimeat.io), and a shared HTML page
@@ -88,7 +88,7 @@ owner approves at its `approve_url`.
 Without MCP, the tool runs the same route:
 
 ```bash
-# token: POST https://aimeat.io/v1/ghii/login with the owner credentials (docs/internal/TESTING.md or docs/internal/prod-login-*.json; both are gitignored and exist only in the MAIN checkout on the developer's main machine, never in a worktree, so ask the developer when they are absent)
+# token: POST https://aimeat.io/v1/ghii/login with the owner credentials (docs/internal/TESTING.md; it is gitignored and exists only in the MAIN checkout on the developer's main machine, never in a worktree, so ask the developer when it is absent)
 curl -s -X PUT "https://aimeat.io/v1/organisms/<org>/workspace/share?ws=<ws>" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   --data-binary @share.json
@@ -109,11 +109,3 @@ workspace-wide and you can clobber someone else's setting.
 ```
 https://loom.apps.aimeat.io/?target=TARGET-NNN
 ```
-
-## One thing to check before repeating it
-
-The instructions this skill came from say the app's `parseDeepLink` reads neither `share` nor
-`space`, so the share modal's "Copy Pages link" (`#share=1&org=…&ws=…&space=…&doc=…`) behaves as an
-ordinary deep link and still needs a sign-in. The app source carries a block labelled "no-login share
-view (#share=1&…)", so that may have changed in a later version. When it matters, hand out the
-viewer link, which is unambiguous either way.
