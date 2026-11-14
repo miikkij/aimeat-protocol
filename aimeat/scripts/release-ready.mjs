@@ -44,6 +44,8 @@
  *   node scripts/release-ready.mjs [--sha=<commit>] [--require=ci.yml,e2e-full.yml] [--no-main-check]
  *   AIMEAT_RELEASE_RED_REASON="<why this release cannot wait for the nightly>" npm publish
  * @version-history
+ *   v1.3.1 -- 2026-11-14 -- The missing-cut-off message says `cd aimeat && pnpm release:trust-cutoff`:
+ *     the root package.json no longer proxies that script.
  *   v1.3.0 -- 2026-10-30 -- A node release (one that requires e2e-full.yml) is refused while
  *     ADOPTION_CUTOFF in the released commit's aimeat/src/cli/connect/adoption-cutoff.ts is null; a
  *     commit without that file is not checked; `pnpm release:trust-cutoff` or
@@ -164,7 +166,7 @@ async function main() {
                 problems.push(`${CUTOFF_PATH} could not be read (${e instanceof Error ? e.message : String(e)}).`);
             }
             if (cutoff === null) {
-                problems.push(`ADOPTION_CUTOFF in ${CUTOFF_PATH} is not set. This is the first release whose connector keeps a record of trusted commands, and it carries its own time: run \`pnpm release:trust-cutoff\`, commit the file to main, and release that commit. \`pnpm release:bump\` writes it too.`);
+                problems.push(`ADOPTION_CUTOFF in ${CUTOFF_PATH} is not set. This is the first release whose connector keeps a record of trusted commands, and it carries its own time: run \`cd aimeat && pnpm release:trust-cutoff\`, commit the file to main, and release that commit. \`pnpm release:bump\` writes it too.`);
             } else if (cutoff) {
                 console.log(`  ✓ adoption cut-off: ${cutoff}`);
             }
