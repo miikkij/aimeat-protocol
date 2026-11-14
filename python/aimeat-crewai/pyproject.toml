@@ -85,14 +85,21 @@ Changelog = "https://github.com/miikkij/aimeat-protocol/blob/main/python/aimeat-
 # crewai (1.15.17) pins opentelemetry-api, -sdk and -exporter-otlp-proto-http at ~=1.42.0, and every
 # opentelemetry-api up to 1.45.0 parses a W3C tracestate header without a bound
 # (GHSA-xcq7-p3pf-p88h, moderate). The sdk and the exporter require their own api version exactly,
-# so the three move together. Kept below 2.
+# so the three move together. Kept below 2. 1.45.1 still parses a traceparent header in quadratic
+# time (Dependabot #243), fixed in 1.45.2.
 override-dependencies = [
     "mcp[ws]>=1.30.0,<2",
     "uv>=0.13.4",
-    "opentelemetry-api>=1.45.1,<2",
-    "opentelemetry-sdk>=1.45.1,<2",
-    "opentelemetry-exporter-otlp-proto-http>=1.45.1,<2",
+    "opentelemetry-api>=1.45.2,<2",
+    "opentelemetry-sdk>=1.45.2,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.2,<2",
 ]
+#
+# The lock is resolved for Python 3.11.5 and newer only. Every soupsieve before 4.0.0 carries ReDoS
+# and recursion advisories (Dependabot #239-#242), and the fixed releases need Python 3.11.5, so a
+# lock that also covered 3.11.0-3.11.4 kept soupsieve 2.10 for them. The published package still
+# says >=3.11 above; a pip install on an early 3.11 patch resolves on its own.
+environments = ["python_full_version >= '3.11.5'"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aimeat_crewai"]

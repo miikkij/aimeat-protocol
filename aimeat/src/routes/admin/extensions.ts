@@ -13,6 +13,11 @@
  *   - /scaffold, /:name/actions, GET|PUT /:name/scripts/:actionId: authoring endpoints
  *
  * @version-history
+ *   v1.6.0 -- 2026-11-14 -- Every filesystem path built from a route value goes through
+ *     extensionsPath(): the segment allowlist plus a resolve-and-prefix check against the bundled
+ *     extensions directory (CodeQL js/path-injection). The scaffold writes the description as a JSON
+ *     string, a valid YAML double-quoted scalar, so a backslash in it cannot break the manifest
+ *     (js/incomplete-sanitization).
  *   v1.5.0 -- 2026-10-09 -- The bundled install and the reinstall build the record with
  *     buildExtensionRecordFromManifest and store it with writeExtensionRecord (deployBundled). Their
  *     hand-built copy stored no capabilities, network hosts or host fields and kept secret defaults in
@@ -63,6 +68,21 @@ const __dirname = dirname(__filename);
  */
 function isSafeSegment(s: unknown): s is string {
   return typeof s === 'string' && /^[a-z0-9][a-z0-9._-]*$/.test(s) && !s.includes('..');
+}
+
+/**
+ * The absolute path of `segments` under the bundled extensions directory, or null when a segment is
+ * not a plain name or the resolved path leaves the directory. Every filesystem call in this file
+ * that takes a route value goes through it: the segment allowlist alone was the whole check before,
+ * and CodeQL (js/path-injection, 22 alerts on 2026-11-13) does not follow a type-guard function as a
+ * path check, while it does follow the resolve-and-prefix test below. Both checks stay.
+ */
+function extensionsPath(...segments: string[]): string | null {
+  if (!segments.every(isSafeSegment)) return null;
+  const root = resolve(getBundledExtensionsDir());
+  const full = resolve(root, ...segments);
+  if (!full.startsWith(root + sep)) return null;
+  return full;
 }
 
 function getBundledExtensionsDir(): string {
@@ -142,12 +162,10 @@ function readBundledExtensions(): BundledExtensionInfo[] {
 }
 
 function readBundledExtensionFull(name: string): { manifest: string; scripts: Record<string, string> } | null {
-  if (!isSafeSegment(name)) return null; // defense in depth: never join an unvalidated name into a path
-  const dir = getBundledExtensionsDir();
-  const extDir = join(dir, name);
-  const yamlPath = join(extDir, 'extension.yaml');
-
-  if (!existsSync(yamlPath)) return null;
+  // Defense in depth: never join an unvalidated name into a path.
+  const extDir = extensionsPath(name);
+  const yamlPath = extensionsPath(name, 'extension.yaml');
+  if (!extDir || !yamlPath || !existsSync(yamlPath)) return null;
 
   const manifestYaml = readFileSync(yamlPath, 'utf-8');
 
@@ -157,14 +175,13 @@ function readBundledExtensionFull(name: string): { manifest: string; scripts: Re
 
   const scripts: Record<string, string> = {};
   if (Array.isArray(actions)) {
-    const extDirAbs = resolve(extDir);
     for (const action of actions) {
       const scriptPath = action.script as string | undefined;
       if (!scriptPath) continue;
       // The script path comes from the on-disk manifest; contain it to extDir so a `../` in a
       // hand-edited manifest cannot read outside the extension's own directory.
       const fullPath = resolve(extDir, scriptPath);
-      if (fullPath !== extDirAbs && !fullPath.startsWith(extDirAbs + sep)) continue;
+      if (!fullPath.startsWith(extDir + sep)) continue;
       if (existsSync(fullPath)) {
         scripts[scriptPath] = readFileSync(fullPath, 'utf-8');
       }
@@ -308,8 +325,15 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
         return;
       }
 
-      const dir = getBundledExtensionsDir();
-      const extDir = join(dir, name);
+      const extDir = extensionsPath(name);
+      const actionsDir = extensionsPath(name, 'actions');
+      const yamlPath = extensionsPath(name, 'extension.yaml');
+      const listPath = extensionsPath(name, 'actions', 'list.js');
+      const createPath = extensionsPath(name, 'actions', 'create.js');
+      if (!extDir || !actionsDir || !yamlPath || !listPath || !createPath) {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name'));
+        return;
+      }
       if (existsSync(extDir)) {
         res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS', `Extension directory "${name}" already exists`));
         return;
@@ -317,7 +341,7 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
 
       // Create directory structure
       const { mkdirSync, writeFileSync } = await import('node:fs');
-      mkdirSync(join(extDir, 'actions'), { recursive: true });
+      mkdirSync(actionsDir, { recursive: true });
 
       // Generate extension.yaml
       const apisYaml = apis.map(a => `  - ${a}`).join('\n');
@@ -337,7 +361,7 @@ instances:
 metadata:
   name: "${name}"
   version: "1.0.0"
-  description: "${description.replace(/"/g, '\\"')}"
+  description: ${JSON.stringify(String(description))}
   author: "custom"
 
 required_apis:
@@ -435,9 +459,9 @@ actions:
 }
 `;
 
-      writeFileSync(join(extDir, 'extension.yaml'), yaml, 'utf-8');
-      writeFileSync(join(extDir, 'actions', 'list.js'), listScript, 'utf-8');
-      writeFileSync(join(extDir, 'actions', 'create.js'), createScript, 'utf-8');
+      writeFileSync(yamlPath, yaml, 'utf-8');
+      writeFileSync(listPath, listScript, 'utf-8');
+      writeFileSync(createPath, createScript, 'utf-8');
 
       logger.info(`Extension scaffolded on disk: ${name}`, { dir: extDir, by: req.auth!.sub });
 
@@ -458,9 +482,8 @@ actions:
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
-      if (!isSafeSegment(name) || !isSafeSegment(actionId)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name or action id')); return; }
-      const dir = getBundledExtensionsDir();
-      const scriptPath = join(dir, name, 'actions', `${actionId}.js`);
+      const scriptPath = isSafeSegment(actionId) ? extensionsPath(name, 'actions', `${actionId}.js`) : null;
+      if (!scriptPath) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name or action id')); return; }
 
       if (!existsSync(scriptPath)) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Script "${actionId}" not found for extension "${name}"`));
@@ -480,7 +503,10 @@ actions:
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
-      if (!isSafeSegment(name) || !isSafeSegment(actionId)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name or action id')); return; }
+      const extDir = extensionsPath(name);
+      const actionsDir = extensionsPath(name, 'actions');
+      const scriptPath = isSafeSegment(actionId) ? extensionsPath(name, 'actions', `${actionId}.js`) : null;
+      if (!extDir || !actionsDir || !scriptPath) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name or action id')); return; }
       const body = req.body as Record<string, unknown>;
       const scriptContent = body.scriptContent as string;
 
@@ -489,21 +515,18 @@ actions:
         return;
       }
 
-      const dir = getBundledExtensionsDir();
-      const extDir = join(dir, name);
       if (!existsSync(extDir)) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found on disk`));
         return;
       }
 
-      const actionsDir = join(extDir, 'actions');
       if (!existsSync(actionsDir)) {
         const { mkdirSync } = await import('node:fs');
         mkdirSync(actionsDir, { recursive: true });
       }
 
       const { writeFileSync: wfs } = await import('node:fs');
-      wfs(join(actionsDir, `${actionId}.js`), scriptContent, 'utf-8');
+      wfs(scriptPath, scriptContent, 'utf-8');
 
       logger.info(`Extension script saved: ${name}/actions/${actionId}.js`, { by: req.auth!.sub });
       res.json(success(config.nodeId, { actionId, saved: true }));
@@ -526,9 +549,10 @@ actions:
         return;
       }
 
-      const dir = getBundledExtensionsDir();
-      const extDir = join(dir, name);
-      const yamlPath = join(extDir, 'extension.yaml');
+      const yamlPath = extensionsPath(name, 'extension.yaml');
+      const actionsDir = extensionsPath(name, 'actions');
+      const scriptPath = extensionsPath(name, 'actions', `${id}.js`);
+      if (!yamlPath || !actionsDir || !scriptPath) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name or action id')); return; }
 
       if (!existsSync(yamlPath)) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found on disk`));
@@ -572,7 +596,6 @@ actions:
       wfs(yamlPath, yamlStringify(manifest, { lineWidth: 120 }), 'utf-8');
 
       // Create script file with template
-      const actionsDir = join(extDir, 'actions');
       if (!existsSync(actionsDir)) mkdirSync(actionsDir, { recursive: true });
 
       const scriptTemplate = `// Action: ${id}
@@ -587,7 +610,7 @@ log('${id} called by ' + caller.gaii);
 
 return { ok: true };
 `;
-      wfs(join(actionsDir, `${id}.js`), scriptTemplate, 'utf-8');
+      wfs(scriptPath, scriptTemplate, 'utf-8');
 
       logger.info(`New action added: ${name}/${id}`, { by: req.auth!.sub });
       res.json(success(config.nodeId, { id, method: actionMethod, created: true }));

@@ -13,6 +13,8 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   2026-11-14 — POST /v1/admin/federation/join trims the address with stripTrailingSlashes, not a
+ *     regex that is quadratic on many trailing slashes (CodeQL js/polynomial-redos).
  *   2026-10-27 — secaudit2026oct26: POST /v1/admin/restore hands the restoring actor to restoreBackup,
  *     which writes the operator trail per person and bounds the clearance an operator's agent restores.
  *   Backup reader — 2026-10-25 — GET /v1/admin/backup reads a delegated caller's memory records through
@@ -66,7 +68,7 @@ import { RoleGrantSchema, validateBody } from '../../models/schemas.js';
 import { randomBytes } from 'node:crypto';
 import { generateKeyPair, sign } from '../../auth/keypair.js';
 import { emitChange } from '../../services/event-bus.js';
-import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch, stripTrailingSlashes } from '../../utils/url-validator.js';
 import { readJson } from '../../utils/read-capped.js';
 
 /** A node card, an introduction answer or a join status: a few kilobytes (secaudit 2026-10, C6). */
@@ -156,7 +158,8 @@ export function adminMonitoringRouter(
             return;
         }
         const joinRole = (role === 'operator' || role === 'contributor') ? role : 'contributor';
-        const targetUrl = genesis_url.replace(/\/+$/, '');
+        // A scan, not /\/+$/: that pattern is quadratic on an address ending in many slashes.
+        const targetUrl = stripTrailingSlashes(genesis_url);
 
         // SSRF validation before outbound fetch
         const ssrfCheck = await validateOutboundUrl(targetUrl);

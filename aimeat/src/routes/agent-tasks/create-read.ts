@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.2 — 2026-11-14 — A sibling agent's read of the list is fenced by ownerCoordinate(), the
+ *     owner GHII behind the resolved identity, instead of the raw token subject (Semgrep
+ *     owner-data-must-resolve-identity, code scanning 1792-1793). Same value for an agent token.
  *   v1.9.1 — 2026-11-13 — POST /v1/agents/:name/tasks reads the agent and decides who may give it work
  *     in services/agent/task-access.ts taskCreateTarget, which aimeat_task_create calls too; every
  *     refusal keeps its status and body (structure programme 2026-11, unit 2b).
@@ -45,7 +48,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
-import { isOwnerInPerson, mayActOnAgent, ownerGhiiOf, resolveIdentity } from '../../utils/gaii.js';
+import { isOwnerInPerson, mayActOnAgent, ownerCoordinate, resolveIdentity } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
 import { createTask } from '../../services/agent/task-write.js';
@@ -190,7 +193,7 @@ export function registerTaskCreateReadRoutes(
       && mayManageSiblingTasks(startCallerOf(req.auth!, resolve(req)), agentGaii, 'task:read');
     const actAsOwner = isOwnerSession || isAppReading || isSiblingReading;
     // The owner's GHII the owner-scoped read is fenced by: an agent's own identity is its GAII.
-    const ownerKey = isSiblingReading ? ownerGhiiOf(req.auth!.sub) : resolve(req);
+    const ownerKey = isSiblingReading ? ownerCoordinate(req.auth!, config.nodeId) : resolve(req);
 
     const status = req.query.status as string | undefined;
     const bucket = req.query.bucket as string | undefined;

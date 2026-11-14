@@ -24,6 +24,8 @@
  * @structure FIND_WORDS · tagsOf() · checkInput() · checkTextField() · main()
  * @usage cd aimeat && pnpm check:find-fields
  * @version-history
+ *   v1.0.1 — 2026-11-14 — namingText removes event handlers until nothing changes (CodeQL
+ *     js/incomplete-multi-character-sanitization).
  *   v1.0.0 — 2026-11-14 — Initial.
  */
 import { execFileSync } from 'node:child_process';
@@ -69,7 +71,14 @@ export function tagsOf(src: string, open: string): Array<{ line: number; text: s
 
 /** The parts of a tag that name the field: its attributes, its event handlers left out. */
 function namingText(tag: string): string {
-    return tag.replace(/\bon[A-Z][A-Za-z]*=\$\{[^}]*\}/g, '').replace(/\bon[a-z]+=["'][^"']*["']/g, '');
+    // Until nothing changes: one pass can join the text around a removed handler into a new one.
+    let out = tag;
+    let prev: string;
+    do {
+        prev = out;
+        out = out.replace(/\bon[A-Z][A-Za-z]*=\$\{[^}]*\}/g, '').replace(/\bon[a-z]+=["'][^"']*["']/g, '');
+    } while (out !== prev);
+    return out;
 }
 
 /** A refusal for an `<input>` tag, or null when it is fine. */
