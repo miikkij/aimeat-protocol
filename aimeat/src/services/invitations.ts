@@ -21,6 +21,8 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-11-14 — acceptNameInvitation makes the accepter an owner when the invitation was sent to make
+ *     a team lead (services/team/leads.ts promotePendingLead).
  *   2026-11-12 — addOrganismMember and acceptNameInvitation close the new member's open join
  *     requests (services/organism-join-requests/requests.ts closeJoinRequestsOnMembership), so a request
  *     answered by a direct add leaves the approvers' list and its notices lose their buttons.
@@ -97,6 +99,7 @@ import { LOCALES } from '../i18n.js';
 import { emailTemplateLang } from './email-templates.js';
 import { takeInviteEmailOnNode } from './account-limits.js';
 import { sendMail, type ThirdPartyCount } from './mail-gate.js';
+import { promotePendingLead } from './team/leads.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
@@ -676,6 +679,8 @@ export async function acceptNameInvitation(
   // A join request the invitee had open is decided by the invitation they accepted.
   await closeJoinRequestsOnMembership({ storage, config }, organism, invitee,
     { owner: invitee, principal: invitee.includes('@') ? invitee : `${invitee}@${config.nodeId}` });
+  // A team lead's invitation makes its accepter an owner of the team.
+  await promotePendingLead(storage, config, organism.id, invitee, `name:${membership.id}`);
   if (membership.invitedBy) {
     await notify(storage, `${membership.invitedBy}@${config.nodeId}`, {
       type: 'organism_invitation_accepted',

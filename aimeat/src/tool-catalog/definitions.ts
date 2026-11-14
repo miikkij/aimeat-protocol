@@ -15,6 +15,7 @@
  * @version-history
  *   v1.x -- 2026-11-14 -- definitions/help.ts: aimeat_help_find, _ask, _inbox, _respond, _close,
  *     _profile_set, _report_data and _report_write (Ask someone who knows).
+ *   v1.x -- 2026-11-14 -- definitions/teams.ts: aimeat_team_setup and aimeat_team_status.
  *   v1.x -- 2026-11-14 -- definitions/secret-shares.ts: aimeat_secret_share_create, _list, _get,
  *     _deposit, _pickup and _revoke.
  *   v1.x -- 2026-11-12 -- definitions/organism-join-requests.ts: aimeat_access_request,
@@ -124,6 +125,7 @@ import { fileStoreTools } from './definitions/file-store.js';
 import { dmGroupTools } from './definitions/dm-groups.js';
 import { dmReactionTools } from './definitions/dm-reactions.js';
 import { organismAgentTools } from './definitions/organism-agents.js';
+import { teamTools } from './definitions/teams.js';
 import { organismJoinRequestTools } from './definitions/organism-join-requests.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
@@ -185,6 +187,7 @@ const CATALOG = [
     ...dmGroupTools,
     ...dmReactionTools,
     ...organismAgentTools,
+    ...teamTools,
     ...organismJoinRequestTools,
     ...publishRequestTools,
     ...accountRightsTools,

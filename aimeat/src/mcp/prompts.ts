@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-14 — The handbook carries the teams the person is in after their contexts
+ *     (services/team/index-line.ts).
  *   2026-11-13 — The prompt tiers fill their {{variables}} from services/prompts/handbook-fill.ts, which
  *     GET /v1/agents/me/handbook fills from too (structure programme 2026-11, unit 2b).
  *   2026-11-08 — The handbook carries the person's context index (services/context/index-line.ts)
@@ -72,6 +74,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { handbookForRole } from '../services/handbooks/index.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
 import { contextIndexLine } from '../services/context/index-line.js';
+import { teamIndexLine } from '../services/team/index-line.js';
 import { skillsBySituation } from '../services/skills-by-situation.js';
 import { journeyHandbookFor } from '../services/journey-state.js';
 import { substituteVariables } from '../services/prompt-variables.js';
@@ -152,7 +155,9 @@ export function registerPromptsTools(
                     ? await contextIndexLine(storage, config, ownerName, parseGaiiLoose(getAgentGaii()).agent !== '', Date.now(),
                         readerForAgent({ storage, config }, getAgentGaii(), session.scopes))
                     : null;
-                const text = [handbookForRole(which), skills, journey, contexts, guidance].filter(Boolean).join('\n\n');
+                // The teams the person is in, the same lines the handshake carried.
+                const teams = session && session.has('memory:read') ? await teamIndexLine(storage, ownerName) : null;
+                const text = [handbookForRole(which), skills, journey, contexts, teams, guidance].filter(Boolean).join('\n\n');
                 return { content: [{ type: 'text' as const, text }] };
             }
             const tierKey = tier;

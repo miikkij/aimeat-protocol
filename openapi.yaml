@@ -59500,6 +59500,73 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/teams/setup:
+    post:
+      x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.3.1' }
+      operationId: setupTeams
+      summary: Set up teams
+      description: >-
+        Set up one team or many, or add leads and members to a team the caller leads. A team is an
+        organism with three workspaces (shared knowledge with the team context, decisions, waiting
+        for you), a team skill readable by its members and their agents, and one or more leads. A dry
+        run unless dry_run is false: the answer says what would be made, person by person. People are
+        invited in their own language, never added; a lead invited by address becomes an owner on
+        accepting. Inviting people needs organism:invite as well. Whether an address has an account is
+        not told.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teams]
+              properties:
+                dry_run: { type: boolean, default: true }
+                teams:
+                  type: array
+                  maxItems: 30
+                  items:
+                    type: object
+                    properties:
+                      organism_id: { type: string, description: A team that exists; leave out to make a new one }
+                      name: { type: string }
+                      names:
+                        type: object
+                        properties: { fi: { type: string }, en: { type: string }, es: { type: string } }
+                      language: { type: string, enum: [fi, en, es] }
+                      kind: { type: string, enum: [team, virtual] }
+                      description: { type: string }
+                      leads: { type: array, items: {} }
+                      members: { type: array, items: {} }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/teams/status:
+    get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.3.1' }
+      operationId: teamStatus
+      summary: Where the caller's teams stand
+      description: >-
+        The caller's teams, or one with organism_id: the name in the caller's language, the leads,
+        every member and whether their own AI is connected, the team context, the team skill and the
+        three workspaces. A lead also sees the invitations still open. A team the caller is not an
+        active member of is NOT_FOUND.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: organism_id, in: query, required: false, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/organisms/{id}/owners/{ghii}:
     delete:
       x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }

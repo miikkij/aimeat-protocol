@@ -10,6 +10,7 @@
  *
  * @version-history
  *   2026-11-14 — helpRouter and helpAdminRouter mounted (Ask someone who knows).
+ *   2026-11-14 — teamsRouter mounted beside the organisms (team setup and status).
  *   2026-11-14 — secretSharesRouter mounted beside the vault (secret shares and requests).
  *   2026-11-04 — createEmailService gets storage, so mail retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — buildWithYouRouter (routes/build-with-you.ts): "Rakennamme kanssasi", the place's trail and the operator's relay.
@@ -155,6 +156,7 @@ import { adminSsoRouter } from '../routes/admin/sso.js';
 import { scimRouter } from '../routes/scim.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
+import { teamsRouter } from '../routes/teams.js';
 import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin/security.js';
 import { adminCorsRouter } from '../routes/admin/cors.js';
@@ -588,6 +590,7 @@ export async function mountRoutes(
   // BR-04: the SCIM provisioning door — its own credential family (requireScimConnection).
   app.use(scimRouter(config, storage));
   app.use(organismsRouter(config, storage));
+  app.use(teamsRouter(config, storage));
   app.use(notificationsRouter(config, storage));
   app.use(adminSecurityRouter(config, storage));
   app.use(adminCorsRouter(config, storage));

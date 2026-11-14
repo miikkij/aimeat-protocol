@@ -1887,6 +1887,8 @@ const ALL_SUITES = [
     // the node MCP endpoint with an agent that holds exactly the scopes the case needs
     // (test/helpers/mcp-session.ts). scripts/check-mcp-test-calls.ts holds the count.
     'test/e2e-mcp-organism-admin-tools.ts',
+    // Teams: setup with a dry run, leads, invitations, status and the team lines (services/team/).
+    'test/e2e-team-setup.ts',
     'test/e2e-mcp-workspace-content-tools.ts',
     'test/e2e-mcp-memory-misc-tools.ts',
     'test/e2e-mcp-operator-site-tools.ts',

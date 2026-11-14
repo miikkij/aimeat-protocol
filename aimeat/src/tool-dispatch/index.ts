@@ -5,6 +5,7 @@
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
  *   v1.24.0 -- 2026-11-14 -- helpCliTools: aimeat_help_* (Ask someone who knows).
+ *   v1.25.0 -- 2026-11-14 -- teamCliTools: aimeat_team_setup and aimeat_team_status.
  *   v1.23.0 -- 2026-11-14 -- secretShareCliTools: aimeat_secret_share_create, _list, _get, _deposit, _pickup and _revoke.
  *   v1.22.0 -- 2026-11-07 -- csmCliTools: aimeat_csm, the account's data descriptions (CSM).
  *   v1.22.0 -- 2026-11-07 -- receiverCliTools: aimeat_receiver and aimeat_admin_receivers.
@@ -82,6 +83,7 @@ import { companyCliTools } from './tool-call-defs-companies.js';
 import { beneficiaryCliTools } from './tool-call-defs-beneficiaries.js';
 import { exchangeRunCliTools } from './tool-call-defs-exchange-run.js';
 import { organismOwnerCliTools } from './tool-call-defs-organism-owners.js';
+import { teamCliTools } from './tool-call-defs-teams.js';
 import { notifyUsageCliTools } from './tool-call-defs-notify-usage.js';
 import { exposureCliTools } from './tool-call-defs-exposure.js';
 import { internetOpeningCliTools } from './tool-call-defs-internet-opening.js';
@@ -145,6 +147,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...beneficiaryCliTools,
     ...exchangeRunCliTools,
     ...organismOwnerCliTools,
+    ...teamCliTools,
     ...notifyUsageCliTools,
     ...exposureCliTools,
     ...internetOpeningCliTools,

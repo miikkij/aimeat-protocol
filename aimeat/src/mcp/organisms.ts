@@ -11,6 +11,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — Registers the team tools (mcp/teams.ts): aimeat_team_setup and aimeat_team_status.
  *   2026-11-14 — aimeat_organism_list's member half calls listedOrganisms (services/organism-read/
  *     list.ts), the member list GET /v1/organisms?member=<owner> serves; the parity section MEMBER-LIST
  *     gives the owner's agent, another owner's agent and the operator's agent one answer. This file
@@ -143,6 +144,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { resourceRefusal } from './resource-refusal.js';
 import { registerOrganismJoinRequestTools } from './organism-join-requests.js';
+import { registerTeamTools } from './teams.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -461,6 +463,9 @@ export function registerOrganismsTools(
     // ── Email-invitation tools (invite_email, invitations_email, invitation_email_cancel) ──
     // Extracted to organisms-email-invites.ts; registered here to preserve tool order.
     registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
+
+    // ── Team tools (team_setup, team_status) ── services/team/, as /v1/teams/* calls.
+    registerTeamTools(mcp, storage, config, caller);
 
     // ── Tool: aimeat_organism_search ── (content search across readable workspaces)
     mcp.registerTool(

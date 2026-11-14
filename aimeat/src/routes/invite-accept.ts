@@ -25,6 +25,8 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-11-14 — An accepted invitation that was sent to make a team lead makes the accepter an owner
+ *     of the team (services/team/leads.ts promotePendingLead).
  *   2026-11-12 — An account made here gets `email_verification` { verification_id, sent } in the answer:
  *     the address code it was mailed, which the accept page now asks for before it leaves. The page
  *     never asked, so the invited address stayed unproven and a forgotten password locked the person
@@ -94,6 +96,7 @@ import { startRegistrationEmailVerification } from '../services/email-verificati
 import { createEmailService } from '../services/email.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { logger } from '../utils/logger.js';
+import { promotePendingLead } from '../services/team/leads.js';
 
 /** The one organism helper this flow needs: resolve a workspace's registry entry for display. */
 export interface InviteAcceptDeps {
@@ -434,6 +437,8 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
 
     // Apply the workspace grants (resolve each workspace's creator = the consent owner — shared core).
     const grantedWs = await applyInvitationWorkspaceGrants(storage, config, { orgId: organismId, grants: inv.workspaces, grantee: ownerName, invitedBy: inv.invitedBy });
+    // A team lead's invitation makes its accepter an owner of the team (services/team/leads.ts).
+    await promotePendingLead(storage, config, organismId, ownerName, `email:${inv.id}`);
 
     // Consume the invite (single-use) + tell the inviter.
     await storage.updateInvitation(inv.id, { status: 'accepted', acceptedAt: nowIso, acceptedBy: ownerName });

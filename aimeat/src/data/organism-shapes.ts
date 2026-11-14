@@ -18,12 +18,15 @@
  * @structure ORGANISM_SHAPES · shapeById · shapeWorkspaceInput(shape, index, lang) · publicShapes(lang)
  * @usage const input = shapeWorkspaceInput(shapeById('team')!, 0, 'fi');
  * @version-history
+ *   2026-11-14 — ShapeId names 'team-kit', the team setup's shape (data/team-kit.ts), which the
+ *     starting-shape list does not carry.
  *   v1.0.0 — 2026-10-01 — Initial. The project shape moved here from organisms.workspace-gen.js.
  */
 
 export type ShapeLang = 'en' | 'fi' | 'es';
 type L = Record<ShapeLang, string>;
-export type ShapeId = 'own-work' | 'team' | 'company' | 'family' | 'club' | 'project';
+/** 'team-kit' is the team setup's own shape (data/team-kit.ts); it is not one of the starting shapes a page lists. */
+export type ShapeId = 'own-work' | 'team' | 'company' | 'family' | 'club' | 'project' | 'team-kit';
 
 interface ShapeSpace {
     name: string;

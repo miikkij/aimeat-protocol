@@ -17,6 +17,8 @@
  *   means the instructions say what they always said.
  * @structure readBuildInputs(storage, config, owner, cached) · BUILD_INPUTS_TTL_MS · clearBuildInputs()
  * @version-history
+ *   v1.2.0 — 2026-11-14 — The teams the owner is in follow the contexts (services/team/index-line.ts),
+ *     in the same cached value, so a member's AI knows its teams on the first turn.
  *   v1.1.0 — 2026-11-08 — The owner's context index, for a session that reads memory, cached per
  *     owner and reader kind on the 2026-07-28 path like the guidance.
  *   v1.0.0 — 2026-10-20 — Moved out of createMcpServer (mcp/index.ts), plus the cache for the
@@ -28,6 +30,7 @@ import { logger } from '../utils/logger.js';
 import { proactiveGuidance } from './proactive-mode.js';
 import { resolveSupportRoute } from './message-alias.js';
 import { contextIndexLine } from './context/index-line.js';
+import { teamIndexLine } from './team/index-line.js';
 import type { ContentReader } from './classification/reader.js';
 
 export interface BuildInputs { guidance: string | null; supportAnsweredBy: string | null; contexts: string | null }
@@ -50,14 +53,23 @@ export interface BuildReader {
 // storage, at most BUILD_INPUTS_TTL_MS apart; nothing is lost, as with guidanceByOwner.
 const contextsByReader = new Map<string, { at: number; value: string | null }>();
 
+/** The owner's contexts, then the teams they are in: one block of the instructions. */
+async function contextAndTeamLines(storage: Storage, config: AimeatConfig, owner: string, reader: BuildReader, now: number): Promise<string | null> {
+    const [contexts, teams] = await Promise.all([
+        contextIndexLine(storage, config, owner, reader.agentSession, now, reader.content),
+        teamIndexLine(storage, owner),
+    ]);
+    return [contexts, teams].filter(Boolean).join('\n\n') || null;
+}
+
 async function readContexts(storage: Storage, config: AimeatConfig, owner: string | undefined, reader: BuildReader, cached: boolean, now: number): Promise<string | null> {
     if (!owner || !reader.readsMemory) return null;
-    if (!cached) return contextIndexLine(storage, config, owner, reader.agentSession, now, reader.content);
+    if (!cached) return contextAndTeamLines(storage, config, owner, reader, now);
     // Per principal, because each has its own classification reader and its own scopes.
     const k = `${owner}\u0000${reader.identity ?? ''}\u0000${reader.agentSession ? 'a' : 'o'}`;
     const hit = contextsByReader.get(k);
     if (hit && now - hit.at < BUILD_INPUTS_TTL_MS) return hit.value;
-    const value = await contextIndexLine(storage, config, owner, reader.agentSession, now, reader.content);
+    const value = await contextAndTeamLines(storage, config, owner, reader, now);
     contextsByReader.set(k, { at: now, value });
     if (contextsByReader.size > 10_000) {
         for (const [key, v] of contextsByReader) if (now - v.at >= BUILD_INPUTS_TTL_MS) contextsByReader.delete(key);
