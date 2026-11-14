@@ -78,6 +78,16 @@
       ],
       "digest": "sha256:eb66ed922a0db8baf0cdd0e2"
     },
+    "node:aimeat-find-my-app": {
+      "reviewedOn": "2026-11-14",
+      "watches": [
+        "aimeat/src/mcp/apps.ts",
+        "aimeat/src/tool-catalog/definitions/apps-publish.ts",
+        "aimeat/src/services/usage/usage-read.ts",
+        "aimeat/public/views/appcat.js"
+      ],
+      "digest": "sha256:781a5204ba528fe0e7afc812"
+    },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
       "watches": [
@@ -296,12 +306,12 @@
       "digest": "sha256:15254ffdc6201798b8cc4a79"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:23e1e1c3862f611e4f51b33d"
+      "digest": "sha256:b7758aebebb88a3eeab8fc2d"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -687,7 +697,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "20a39b2f3af68bd0",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "26a67367e224834f"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "4673e1e1ed9ec147"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
@@ -904,6 +914,12 @@
       "aimeat/src/services/compliance/lia-ops.ts": "21a80f122141436c",
       "aimeat/src/services/compliance/lia-schemas.ts": "de43b51d7741b6e8",
       "aimeat/src/data/compliance-lia.ts": "74f01d1647048d9b"
+    },
+    "node:aimeat-find-my-app": {
+      "aimeat/src/mcp/apps.ts": "4b39ed403c83973f",
+      "aimeat/src/tool-catalog/definitions/apps-publish.ts": "79030c17d24f151a",
+      "aimeat/src/services/usage/usage-read.ts": "5d85342c8a5aeebd",
+      "aimeat/public/views/appcat.js": "325750f08208eb54"
     }
   }
 }

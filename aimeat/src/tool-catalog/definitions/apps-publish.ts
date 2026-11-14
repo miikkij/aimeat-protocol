@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-11-14 — aimeat_app_list's `search` says it reads the file name too, as both storages do.
  *   2026-11-13 — aimeat_app_draft_save takes mime_type (unit 3b).
  *   2026-11-13 — aimeat_app_publish takes toll_morsels and license_type, as POST /v1/apps does
  *     (structure programme 2026-11, unit 3b).
@@ -118,7 +119,7 @@ export const appPublishTools = [
         surfaces: ['appdev', 'chat'],
         input: {
             building: { type: 'boolean', description: 'List apps another owner lets you build; opt-in and separate from your own.' },
-            search: { type: 'string', description: 'Free-text search over name and description.' },
+            search: { type: 'string', description: 'Free-text search over the name, the description and the file name.' },
             category: { type: 'string', description: 'Filter by category.' },
             tag: { type: 'string', description: 'Filter by tag.' },
             own: { type: 'boolean', description: "List only your own owner's apps." },

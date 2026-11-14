@@ -8,9 +8,11 @@
  *   nothing), the favourites (every starred app, own and others', drawn as the community's rows), and
  *   the foot on ink. One row open at a time in each list. Drawn with PageSection list, List index,
  *   EmptyState and InkFoot; no class here.
- * @structure LibraryList(props) · CommunityList(props) · FavouritesList(props) · BuildingList(props) · CatFoot({ loaded, n })
+ * @structure LibraryList(props) · RestingList(props) · CommunityList(props) · FavouritesList(props) · BuildingList(props) · CatFoot({ loaded, n })
  * @usage html`<${LibraryList} rows=${rows} total=${own.length} … />`
  * @version-history
+ *   v1.4.0 — 2026-11-14 — RestingList: the own apps not used nor changed in six months, folded under
+ *     Your apps; a search finds them in Your apps itself (wish-omien-sovellusten-l-yt-minen-kun-niit-on-satoja).
  *   v1.3.0 — 2026-11-01 — With no apps the foot leaves out its count sentence ("Jokainen 0
  *     sovelluksestasi…"), and on a node the store sold the empty list says to ask the chat for an app,
  *     without the file formats (Jouni's review, K39).
@@ -134,6 +136,26 @@ export function FavouritesList({ rows, order, total, favourites, closeOn }) {
     ${total === 0
       ? html`<${EmptyState} line text=${x('fav.empty')} hint=${x('fav.emptyHint')} />`
       : html`<${List} cols=${CUT} index>${rowsOf(rows, false, favourites, openRef, toggle, order)}<//>`}
+  <//>`;
+}
+
+let restingOpen = false; // the fold stays as the person left it while they switch views
+
+/**
+ * The person's own apps they have neither used nor changed in six months (model.js resting), under
+ * Your apps and folded, so the apps in use stand out and none is lost. The shell draws it only while
+ * no search or tag is on: a search finds these apps in Your apps itself.
+ * @param {{ rows: any[], favourites: Set<string>, closeOn: any[] }} props
+ */
+export function RestingList({ rows, favourites, closeOn }) {
+  const [openRef, toggle] = useOpenRow(closeOn, rows);
+  const [open, setOpenState] = useState(restingOpen);
+  const setOpen = (v) => { restingOpen = v; setOpenState(v); };
+  if (!rows.length) return null;
+  const folded = !open;
+  return html`<${PageSection} list title=${x('resting.title')} count=${'· ' + rows.length} foot=${folded ? null : x('resting.foot')}
+    onFold=${() => setOpen(folded)} folded=${folded} foldLabel=${x('resting.title')}>
+    <${List} cols=${CUT} index>${rowsOf(rows, true, favourites, openRef, toggle)}<//>
   <//>`;
 }
 

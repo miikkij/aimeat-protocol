@@ -15,6 +15,7 @@
  *   Design: docs/internal/telemetria/02-design.md
  * @usage cd aimeat && pnpm exec vitest run test/unit/usage-read-grouping.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-14 — A group's `last_bucket`: the day apps-used last saw each app.
  *   v1.0.0 — 2026-08-15 — Initial: the three grouping rules, after all three were found by eye.
  */
 
@@ -194,5 +195,20 @@ describe('owner scoping', () => {
     });
     expect(report.totals.calls).toBe(7);
     expect(report.groups).toHaveLength(2);
+  });
+});
+
+describe('a group says when it was last used', () => {
+  it('apps-used gives each app the latest day with a call, whatever order the rows come in', async () => {
+    await seed([
+      delta({ cut: 'call.owner.app', ownerGhii: OWNER, appId: 'alice/notes.html', bucket: '2026-08-20', calls: 2 }),
+      delta({ cut: 'call.owner.app', ownerGhii: OWNER, appId: 'alice/notes.html', bucket: '2026-08-03', calls: 5 }),
+      delta({ cut: 'call.owner.app', ownerGhii: OWNER, appId: 'alice/hello.html', bucket: '2026-08-11', calls: 1 }),
+    ]);
+    const report = await readUsageReport(storage, { report: 'apps-used', scope: 'owner', ownerGhii: OWNER, ...window });
+    const last = Object.fromEntries(report.groups.map((g) => [g.dims.appId, g.last_bucket]));
+    expect(last).toEqual({ 'alice/notes.html': '2026-08-20', 'alice/hello.html': '2026-08-11' });
+    // The totals are sums of every group and date nothing.
+    expect('last_bucket' in report.totals).toBe(false);
   });
 });

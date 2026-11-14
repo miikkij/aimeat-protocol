@@ -12,6 +12,8 @@
  *
  *   Design: docs/internal/telemetria/02-design.md
  * @version-history
+ *   v1.2.0 -- 2026-11-14 -- apps-used rows carry last_bucket, the day the reader last used the app,
+ *     and another owner's report never shows that open.
  *   v1.1.0 -- 2026-10-02 -- chat_agent.metered_here is true on a node without the shared chat key.
  *   v1.0.0 -- 2026-08-14 -- Initial: the ingest → fold → serve chain plus its authorization gates.
  */
@@ -146,6 +148,49 @@ await test('CROSS-OWNER: an owner cannot ask for another owner rows via a query 
     const models = body.data.groups.map((g: any) => g.key);
     assert(!models.includes('openai/gpt-5'), 'a query parameter must not widen an owner-scoped read');
     assert(body.data.owner === `${opName}@${NODE_ID}`, `report stays on the caller identity, got ${body.data.owner}`);
+});
+
+// ── The day an app was last used ────────────────────────────────────────────────────────────────
+// My Apps reads apps-used for Recently opened and for the apps not used in six months: each row's
+// last_bucket is the day the reader last used that app. The open is read live, before any fold.
+
+const appFile = `lastused${Date.now()}.html`;
+
+/** Open an app as `auth`, following a redirect to the app's own origin with the same session. */
+async function openApp(owner: string, filename: string, auth: Record<string, string>): Promise<number> {
+    let url = `${BASE}/v1/apps/${owner}/${filename}?mode=inline`;
+    for (let hop = 0; hop < 3; hop++) {
+        const res = await fetch(url, { headers: auth, redirect: 'manual' });
+        const to = res.headers.get('location');
+        if (res.status < 300 || res.status >= 400 || !to) return res.status;
+        url = new URL(to, url).toString();
+    }
+    return 0;
+}
+
+await test('apps-used says the day the reader last used each app (last_bucket)', async () => {
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Last used</title></head><body>x</body></html>';
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: authOp(),
+        body: JSON.stringify({ filename: appFile, content: Buffer.from(html).toString('base64'), mime_type: 'text/html', name: 'Last used', description: 'e2e', category: 'tools', version: '1.0.0' }),
+    });
+    assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+    const opened = await openApp(opName, appFile, authOp());
+    assert(opened === 200, `open: ${opened}`);
+    const today = new Date().toISOString().slice(0, 10);
+    const { status, body } = await json(`/v1/usage/summary?report=apps-used&from=${today}&series=false`, { headers: authOp() });
+    assert(status === 200, `summary: ${status}`);
+    const row = body.data.groups.find((g: any) => g.dims?.appId === `${opName}/${appFile}`);
+    assert(!!row, `the opened app is a row: ${JSON.stringify(body.data.groups.map((g: any) => g.key))}`);
+    assert(row.last_bucket === today, `last_bucket is today: ${row.last_bucket}`);
+    assert(!('last_bucket' in body.data.totals), 'the totals carry no day');
+});
+
+await test('CROSS-OWNER: another owner\'s apps-used has no row for an app only the first opened', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { status, body } = await json(`/v1/usage/summary?report=apps-used&from=${today}&series=false`, { headers: authOther() });
+    assert(status === 200, `summary: ${status}`);
+    assert(!body.data.groups.some((g: any) => g.dims?.appId === `${opName}/${appFile}`), 'no row for the other owner\'s open');
 });
 
 await test('An unknown report name is refused, and says what exists', async () => {

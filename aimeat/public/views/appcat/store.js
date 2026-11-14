@@ -16,10 +16,13 @@
  *   answered, success or failure (F41). The stars (F181, F182) and the bound skills (F180, the "No
  *   skill" row) are read beside it; a star is flipped at once and the whole set written back.
  * @structure useCatalog() · getCatalog() · reloadCatalog() · toggleFavourite(ref) · notice(text, kind) ·
- *   clearNotice() · openDetail(app) · closeDetail() · appRef(app) · isOwn(app) · findApp(owner, filename) ·
- *   subscribe(fn) · setState(patch)
+ *   clearNotice() · openDetail(app) · closeDetail() · appRef(app) · openedOn(app) · isOwn(app) ·
+ *   findApp(owner, filename) · subscribe(fn) · setState(patch)
  * @usage const cat = useCatalog(); cat.own.map(…)
  * @version-history
+ *   v1.3.0 — 2026-11-14 — `opened`: the day the signed-in person last used each app, from their own
+ *     usage report (apps-used, last_bucket), read beside the listing; openedOn(app) reads it. Recently
+ *     opened (recent.js) and the six-month section (lists.js) stand on it.
  *   v1.2.0 — 2026-10-16 — `favouritesLoaded`: a star is written only after the stored set was read once;
  *     before that the press is refused with a notice, because the write replaces the whole set (QA
  *     audit F6-04).
@@ -41,14 +44,20 @@ import { t } from '/js/i18n.js';
  * `notice` is { text, kind, at } or null; `skillsLoaded` says the bound skills have been read.
  * @typedef {{ loaded: boolean, error: string|null, me: string|null, all: any[], own: any[],
  *   community: any[], building: any[], favourites: Set<string>, favouritesLoaded: boolean,
- *   skillsBound: Set<string>, skillsLoaded: boolean,
+ *   skillsBound: Set<string>, skillsLoaded: boolean, opened: Map<string, string>|null,
  *   detail: any|null, notice: { text: string, kind: string, at: number }|null }} CatalogState
  */
 /** @type {CatalogState} */
 const state = {
   loaded: false, error: null, me: null, all: [], own: [], community: [], building: [], favourites: new Set(),
-  favouritesLoaded: false, skillsBound: new Set(), skillsLoaded: false, detail: null, notice: null,
+  favouritesLoaded: false, skillsBound: new Set(), skillsLoaded: false, opened: null, detail: null, notice: null,
 };
+
+/**
+ * How far back the days the person used their apps are read: the six months after which an own app
+ * nobody changed moves to its own section (model.js STALE_DAYS), and one day more.
+ */
+const OPENED_WINDOW_DAYS = 181;
 const listeners = new Set();
 const FAV_KEY = 'app-catalog.favorites';
 const PAGE = 200; // the node caps limit at 200
@@ -76,6 +85,16 @@ const sameOwner = (a, b) => !!b && !!bare(a) && bare(a) === bare(b);
 
 /** "owner/filename" for a listing row. */
 export function appRef(app) { return app ? `${app.owner}/${app.filename}` : ''; }
+
+/**
+ * The day (`YYYY-MM-DD`) the signed-in person last used this app inside the read window, '' when not
+ * in it, null when it is not known (signed out, or the read failed): a caller never takes null for
+ * "not used".
+ */
+export function openedOn(app) {
+  if (!state.opened || !app) return null;
+  return state.opened.get(`${bare(app.owner)}/${app.filename}`) || '';
+}
 
 /** Whether the signed-in person owns the app (bare names, as the old page compared them). */
 export function isOwn(app) { return !!(app && state.me && sameOwner(app.owner, state.me)); }
@@ -138,6 +157,31 @@ async function fetchSkillsBound() {
   return bound;
 }
 
+/**
+ * The day the person last used each app, from their own usage report (GET /v1/usage/summary,
+ * report apps-used: an open while signed in, and the app's calls in their name), keyed
+ * "owner/filename" with the bare owner. Null when it cannot be read: then nothing is called unused.
+ */
+async function fetchOpened() {
+  const from = new Date(Date.now() - OPENED_WINDOW_DAYS * 864e5).toISOString().slice(0, 10);
+  try {
+    const json = await api(`/v1/usage/summary?report=apps-used&from=${from}&series=false&limit=2000`, { method: 'GET' });
+    // A node whose usage fold never ran has no history to read, and every app would look unused.
+    if (!json?.data?.computed_through) return null;
+    const opened = new Map();
+    for (const g of json.data.groups || []) {
+      const id = g?.dims?.appId;
+      const slash = typeof id === 'string' ? id.indexOf('/') : -1;
+      if (slash <= 0 || typeof g.last_bucket !== 'string') continue;
+      opened.set(`${bare(id.slice(0, slash))}/${id.slice(slash + 1)}`, g.last_bucket.slice(0, 10));
+    }
+    return opened;
+  } catch (err) {
+    console.warn('[appcat] the days you used your apps could not be read', err);
+    return null;
+  }
+}
+
 let round = 0;
 
 /**
@@ -148,16 +192,17 @@ export async function reloadCatalog() {
   const mine = ++round;
   const session = getSession();
   const me = session?.owner || null;
-  const [listing, fav, building] = await Promise.all([
+  const [listing, fav, building, opened] = await Promise.all([
     fetchAll().then((rows) => ({ rows, error: null }), (err) => ({ rows: [], error: err?.message || String(err) })),
     fetchFavourites(),
     me ? fetchBuilding() : Promise.resolve([]),
+    me ? fetchOpened() : Promise.resolve(null),
   ]);
   if (mine !== round) return;
   const all = listing.rows;
   const own = me ? all.filter((a) => sameOwner(a.owner, me)) : [];
   const community = me ? all.filter((a) => !sameOwner(a.owner, me)) : all;
-  setState({ loaded: true, error: listing.error || null, me, all, own, community, building, favourites: fav.refs, favouritesLoaded: fav.ok });
+  setState({ loaded: true, error: listing.error || null, me, all, own, community, building, favourites: fav.refs, favouritesLoaded: fav.ok, opened });
   if (!me || listing.error) { setState({ skillsBound: new Set(), skillsLoaded: !!me }); return; }
   // The skills are read after the lists are up, so a slow or refused read only delays that one row.
   try {

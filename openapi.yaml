@@ -74116,7 +74116,9 @@ paths:
         Reads the precomputed serving layer, never a raw table, so the cost of an answer does not
         grow with the node traffic. Always scoped to the owner behind the session: there is no
         parameter on this endpoint that can name another owner. The computed_through field in the
-        response states how fresh the precomputed layer is.
+        response states how fresh the precomputed layer is. Every group carries last_bucket, the
+        latest bucket in the window with a call of that group: on apps-used, the day the owner last
+        used each app.
         Requires the wallet:read scope for agent, ecosystem and app-grant sessions (owner sessions
         bypass scopes): a usage report is the owner's whole spend and activity history, which is the
         same sensitivity class as their balance.

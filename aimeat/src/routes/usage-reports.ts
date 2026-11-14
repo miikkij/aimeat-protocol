@@ -24,6 +24,7 @@
  *   import { usageReportsRouter } from './routes/usage-reports.js';
  *   app.use(usageReportsRouter(config, storage));
  * @version-history
+ *   v1.0.1 — 2026-11-14 — The apps-used line names last_bucket, the day each app was last used.
  *   v1.0.0 — 2026-08-14 — Initial: the owner-facing usage reports.
  */
 import { Router } from 'express';
@@ -45,7 +46,7 @@ const REPORT_HELP: Record<string, string> = {
   agent: 'AI spend per agent',
   tool: 'which tools you call, and which of them refuse or fail',
   surface: 'how you work: MCP, the web, apps',
-  'apps-used': 'which apps you actually open',
+  'apps-used': 'which apps you actually open, and the day you last used each (last_bucket)',
   activity: 'your call volume over time',
   sold: 'what others bought from you, and what you refused',
 };

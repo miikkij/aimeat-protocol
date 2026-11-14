@@ -20,6 +20,9 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.6.0 — 2026-11-14 — Recently opened (recent.js) over Your apps, and the own apps not used nor
+ *     changed in six months in a folded section under it (RestingList), while no search, tag or state
+ *     is on (wish-omien-sovellusten-l-yt-minen-kun-niit-on-satoja).
  *   v1.5.0 — 2026-11-14 — The page installs as an app of its own (manifest-apps.json, installAs): a
  *     phone's home screen gets a My Apps icon that opens straight to the apps. A signed-in person
  *     sees the offer under the masthead (InstallCta id "apps"), on a browser that makes one.
@@ -45,18 +48,19 @@ import { useSession } from '/js/use-session.js';
 import { relayLiveUpdates } from '/lib/live-updates.js';
 import { onLocaleChange } from '/js/i18n.js';
 import { x } from '/views/appcat/i18n.js';
-import { useCatalog, reloadCatalog, closeDetail, clearNotice, appRef, findApp, isOwn, openDetail, notice } from '/views/appcat/store.js';
+import { useCatalog, reloadCatalog, closeDetail, clearNotice, appRef, findApp, isOwn, openDetail, notice, openedOn } from '/views/appcat/store.js';
 import { DialogHost, openDialog } from '/views/appcat/dialogs/host.js';
 import * as detailModule from '/views/appcat/detail.js';
 import { CatRail } from '/views/appcat/rail.js';
 import { CatMasthead, openAdd } from '/views/appcat/masthead.js';
 import { CatBand, CatTools, CortexBar, SEARCH_ID } from '/views/appcat/tools.js';
-import { LibraryList, CommunityList, FavouritesList, BuildingList, CatFoot } from '/views/appcat/lists.js';
+import { LibraryList, RestingList, CommunityList, FavouritesList, BuildingList, CatFoot } from '/views/appcat/lists.js';
 import { StartedList } from '/views/appcat/started.js';
+import { RecentList } from '/views/appcat/recent.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { installAs } from '/js/install-prompt.js';
 import { t } from '/js/i18n.js';
-import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts } from '/views/appcat/model.js';
+import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts, resting } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
 const VIEWS = ['library', 'community', 'favorites', 'building'];
@@ -196,6 +200,13 @@ export default function AppCat() {
   const favRowsAll = cat.all.filter((sa) => cat.favourites.has(appRef(sa)));
   const filtering = !!(q.trim() || tag);
   const ownRows = sortRows(filterRows(cat.own, { tag, state: stateFilter, q, bound: cat.skillsBound, own: true }), sort);
+  // The own apps not used nor changed in six months rest in a section of their own under Your apps,
+  // while no search or tag is on: a search looks through every app in Your apps. When every app
+  // rests, Your apps keeps them all, since an empty list over a folded one would read as no apps.
+  const restingRows = filtering || stateFilter ? [] : ownRows.filter((sa) => resting(sa, openedOn(sa)));
+  const activeRows = restingRows.length && restingRows.length < ownRows.length
+    ? ownRows.filter((sa) => !restingRows.includes(sa)) : ownRows;
+  const shownResting = activeRows === ownRows ? [] : restingRows;
   // The community and the favourites keep each row's number from the ordered list under a search
   // or a tag (the old page hid rows without numbering them anew).
   const communityOrder = sortRows(cat.community, sort);
@@ -223,8 +234,10 @@ export default function AppCat() {
       ${view === 'library' && cat.loaded && cat.own.length > 0 ? html`<${CatBand} counts=${counts} n=${cat.own.length} />` : null}
       <${CatTools} q=${q} onQuery=${setQ} sort=${sort} onSort=${setSort} />
       ${view === 'library' ? html`<${CortexBar} />` : null}
+      ${view === 'library' && cat.me && !filtering && !stateFilter ? html`<${RecentList} rows=${cat.all} />` : null}
       ${view === 'library' ? html`<${StartedList} signedIn=${!!cat.me} />` : null}
-      ${view === 'library' ? html`<${LibraryList} rows=${ownRows} total=${cat.own.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
+      ${view === 'library' ? html`<${LibraryList} rows=${activeRows} total=${cat.own.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
+      ${view === 'library' ? html`<${RestingList} rows=${shownResting} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
       ${view === 'community' ? html`<${CommunityList} rows=${communityRows} order=${communityOrder} total=${cat.community.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
       ${view === 'favorites' ? html`<${FavouritesList} rows=${favRows} order=${favOrder} total=${favRowsAll.length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
       ${view === 'building' ? html`<${BuildingList} rows=${buildingRows} order=${buildingOrder} total=${(cat.building || []).length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}

@@ -23,6 +23,8 @@
  * @usage
  *   const report = await readUsageReport(storage, { report: 'model', ownerGhii, from, to });
  * @version-history
+ *   2026-11-14 — Every group carries `last_bucket`, the latest bucket with a call: `apps-used` then
+ *     says when the person last used each app (My Apps' Recently opened and its six-month section).
  *   2026-10-25 — The hot window comes from the config (usage-settings.ts), not from process.env.
  *   2026-10-05 — OWNER_REPORTS moved unchanged to models/tool-input-vocabulary.ts and is re-exported:
  *     the tool catalog states it (secaudit 2026-10, M3).
@@ -93,7 +95,15 @@ export interface UsageGroup {
   duration_ms_max: number;
   /** Distinct actors, undercounted across fold batches. Never use for billing. */
   actors_seen_approx: number;
+  /**
+   * The latest bucket inside the window that holds a call of this group (`YYYY-MM-DD`, or
+   * `YYYY-MM-DDTHH` on the hour grain): on `apps-used`, the day the person last used each app.
+   */
+  last_bucket: string;
 }
+
+/** A group's sums, without what names the group or dates it: the shape of `totals`. */
+type UsageSums = Omit<UsageGroup, 'key' | 'dims' | 'last_bucket'>;
 
 export interface UsageReport {
   report: string;
@@ -106,7 +116,7 @@ export interface UsageReport {
   /** Buckets in chronological order, for a chart. Empty unless `series` was asked for. */
   series: Array<{ bucket: string; calls: number; cost_usd: number; total_tokens: number }>;
   groups: UsageGroup[];
-  totals: Omit<UsageGroup, 'key' | 'dims'>;
+  totals: UsageSums;
   /**
    * The oldest point both raw streams have been folded through. Everything after it may be missing
    * from these numbers. Stated rather than implied, because a dashboard that silently lags is a
@@ -117,7 +127,7 @@ export interface UsageReport {
   beyond_hot_window: boolean;
 }
 
-function emptyTotals(): Omit<UsageGroup, 'key' | 'dims'> {
+function emptyTotals(): UsageSums {
   return {
     calls: 0, errors: 0, refusals: 0, tokens_in: 0, tokens_out: 0, total_tokens: 0,
     cost_usd: 0, unpriced_calls: 0, charged_units: 0,
@@ -208,7 +218,7 @@ export async function queryUsageRollupLive(
 }
 
 /** Fold one stored row into a group accumulator. */
-function addRow(target: Omit<UsageGroup, 'key' | 'dims'>, r: UsageRollupRow, durationCalls: { n: number; sum: number }): void {
+function addRow(target: UsageSums, r: UsageRollupRow, durationCalls: { n: number; sum: number }): void {
   target.calls += r.calls;
   target.errors += r.errors;
   target.refusals += r.refusals;
@@ -307,10 +317,11 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
 
     let entry = groups.get(groupKey);
     if (!entry) {
-      entry = { g: { key, dims, ...emptyTotals() }, d: { n: 0, sum: 0 } };
+      entry = { g: { key, dims, ...emptyTotals(), last_bucket: r.bucket }, d: { n: 0, sum: 0 } };
       groups.set(groupKey, entry);
     }
     addRow(entry.g, r, entry.d);
+    if (r.bucket > entry.g.last_bucket) entry.g.last_bucket = r.bucket;
     addRow(totals, r, totalDuration);
 
     if (args.series) {

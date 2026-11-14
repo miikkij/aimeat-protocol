@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-14 — aimeat_usage_report's description names last_bucket (the day apps-used last saw each app).
  *   2026-11-13 — aimeat_agents_list takes run_mode (unit 3b).
  *   2026-11-13 — aimeat_message_history takes direction (unit 3b).
  *   2026-11-12 — aimeat_agent_propose says which permissions make every task of the agent wait for
@@ -198,7 +199,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_usage_report',
-        description: 'Answer "what did we actually use, and what did it cost" for the owner behind this session: spend per model, per app, per agent, per day, plus which tools get called and which of them refuse or fail. Reads a precomputed layer, so it is cheap however large the history is, and it says how fresh it is. Scoped to this owner and to nobody else. Use it for a spend or usage question; use aimeat_agent_activity for one agent own counters.',
+        description: 'Answer "what did we actually use, and what did it cost" for the owner behind this session: spend per model, per app, per agent, per day, plus which tools get called and which of them refuse or fail. Every row carries last_bucket, the latest day with use: report apps-used then says when the person last used each app. Reads a precomputed layer, so it is cheap however large the history is, and it says how fresh it is. Scoped to this owner and to nobody else. Use it for a spend or usage question; use aimeat_agent_activity for one agent own counters.',
         // 'agent' in the catalog's sense (the caller is a session principal), though an owner session
         // reaches it too — both resolve to the same human account, which is the only account it can
         // report on.

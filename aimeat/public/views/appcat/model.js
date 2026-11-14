@@ -11,10 +11,12 @@
  *   server-io.js rules, features.md F19–F20, F32–F33, F46, F73–F76, F156–F161).
  * @structure KUNTO_KEYS · STATES · LISTINGS · OPEN_TO · openToOf(sa) · openToPlace(sa) ·
  *   openToSentenceKey(sa, nodeSignedIn) · appName · appIcon · appDesc · appTags · shipsAgents · kunto(sa, bound) ·
- *   stateOf(sa) · tagCounts(rows) · filterRows(rows, f) · sortRows(rows, mode) · stateCounts(rows, bound) ·
- *   fmtKb(bytes) · fmtDate(iso) · fmtNum(n) · host()
+ *   stateOf(sa) · STALE_DAYS · resting(sa, opened) · tagCounts(rows) · filterRows(rows, f) · sortRows(rows, mode) ·
+ *   stateCounts(rows, bound) · fmtKb(bytes) · fmtDate(iso) · fmtNum(n) · host()
  * @usage import { filterRows, sortRows } from '/views/appcat/model.js';
  * @version-history
+ *   v1.5.0 — 2026-11-14 — resting(sa, opened): an own app its owner has neither used nor changed in
+ *     six months (STALE_DAYS), for the section of its own under Your apps.
  *   v1.4.0 — 2026-10-25 — openToSentenceKey says an app opened to the internet on a closed node is open to anyone (`open_to_internet`).
  *   v1.3.0 — 2026-10-18 — Who may open an app: OPEN_TO, openToOf, openToPlace and openToSentenceKey
  *     read the row's `open_to` (plan doc-mvcn6c7e4e5q, V2.5).
@@ -108,6 +110,23 @@ export function kunto(sa, bound) {
  * or 'unlisted' (its owner only). The listing's `listing`; a node before it answers `parked` alone.
  */
 export const stateOf = (sa) => sa.listing || (sa.parked ? 'unlisted' : 'listed');
+
+/** Six months: an own app neither used by its owner nor changed for this long rests in its own section. */
+export const STALE_DAYS = 180;
+
+/**
+ * Whether an own app rests: its owner has not used it in STALE_DAYS (`opened` is store.openedOn's
+ * answer, '' for not used in the window) and no version of it is newer than that (`created_at` is
+ * the time of the latest version). An unknown `opened` (null) never rests, so a failed read moves
+ * nothing.
+ * @param {any} sa a listing row
+ * @param {string|null} opened
+ */
+export function resting(sa, opened, now = Date.now()) {
+  if (opened !== '') return false;
+  const changed = sa && sa.created_at ? Date.parse(sa.created_at) : NaN;
+  return Number.isFinite(changed) && now - changed > STALE_DAYS * 864e5;
+}
 
 /** The counts the rail and the band say for the own list: each listing, draft waiting, opens, and each condition. */
 export function stateCounts(rows, bound) {

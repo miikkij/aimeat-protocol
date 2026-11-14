@@ -56,6 +56,8 @@
  *     The maker is gone, it lost the permission its kind needs (`ai:use`, `work:request`), or the
  *     file a publishing schedule names is one the maker may no longer read (secaudit 2026-10,
  *     services/schedule-actor.ts, services/scheduler-remote-jobs.ts, services/schedule-file-access.ts).
+ *   2026-11-14 -- aimeat-find-my-app (public): how an AI finds one app among hundreds from what the person
+ *     remembers, and hands back its address (builtin-skills.find-my-app.ts). A new name, so seeding creates it.
  *   2026-10-19 -- agent-avatar (public): how an agent makes and sets its own picture at agent.avatar
  *     (builtin-skills.agent-avatar.ts). A new name, so seeding creates it on an existing node too.
  *   2026-10-18 -- use-app-bound-skills: on a node closed to strangers a public skill is saved at members, with a warning (plan V1.6).
@@ -272,6 +274,7 @@ import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
 import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
 import { AGENT_AVATAR_SKILL_ENTRY } from './builtin-skills.agent-avatar.js';
 import { APP_AGENTS_SKILL_ENTRY } from './builtin-skills.app-agents.js';
+import { FIND_MY_APP_SKILL_ENTRY } from './builtin-skills.find-my-app.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -294,6 +297,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,
   APP_AGENTS_SKILL_ENTRY,
+  FIND_MY_APP_SKILL_ENTRY,
   DECIDE_SKILL_ENTRY,
   REFINERY_SKILL_ENTRY,
   CONTENT_CLASSES_SKILL_ENTRY,
