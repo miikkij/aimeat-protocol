@@ -19,6 +19,9 @@
  *   with code 1 (codebase analysis 2026-11-03, HA stage 1).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-graceful-shutdown
  * @version-history
+ *   v1.0.1 — 2026-11-14 — The new-connection check waits for the drain to begin and opens a raw TCP
+ *     connection: a fixed 500 ms wait and fetch's keep-alive pool made the nightly SQLite sweep read
+ *     a reused connection's 503 as a new connection accepted.
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, HA stage 1: drain-first shutdown).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -141,10 +144,21 @@ try {
 
     const stoppedAt = Date.now();
     stopNode();
-    await sleep(500);
+    // The drain closes the listening socket and ends the live streams in the same tick
+    // (server-bootstrap/drain.ts), so the stream's end says the listener is closed. A fixed wait
+    // raced the stop on a loaded runner: the handler awaits its imports before the drain begins.
+    const drainDeadline = stoppedAt + 3_000;
+    while (!streamEndedAt && Date.now() < drainDeadline) await sleep(50);
 
     await test('a new connection after the stop is refused', async () => {
-        const r = await fetch(`${BASE}/v1/health/ready`, { signal: AbortSignal.timeout(3_000) }).then((res) => `answered ${res.status}`, (err: Error) => `refused: ${String((err as any).cause?.code ?? err.message)}`);
+        // A raw TCP connect, never fetch: fetch's pool reuses a keep-alive connection opened before
+        // the stop, and that one is answered 503 by design (the probe test below covers it).
+        const r = await new Promise<string>((resolve) => {
+            const socket = net.connect(PORT, '127.0.0.1');
+            socket.setTimeout(3_000, () => { socket.destroy(); resolve('timed out'); });
+            socket.once('connect', () => { socket.destroy(); resolve('accepted'); });
+            socket.once('error', (err: NodeJS.ErrnoException) => resolve(`refused: ${err.code ?? err.message}`));
+        });
         assert(r.startsWith('refused'), `a new connection was ${r}`);
     });
 
