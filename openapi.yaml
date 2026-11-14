@@ -3763,11 +3763,12 @@ components:
 
     EmailVerificationRequest:
       type: object
-      required: [verificationId, code]
+      required: [verification_id, code]
       properties:
-        verificationId:
+        verification_id:
           type: string
-          description: Verification session ID from registration
+          minLength: 1
+          description: Verification session ID, as POST /v1/ghii/register-web or POST /v1/ghii/login/attach-email returned it
         code:
           type: string
           pattern: '^\d{6}$'

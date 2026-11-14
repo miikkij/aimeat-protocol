@@ -8,6 +8,7 @@
  *   be neither looser nor stricter than the route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-contract-class-b.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-14 — POST /v1/ghii/verify-email.
  *   v1.2.0 — 2026-11-14 — POST /v1/federation/message.
  *   v1.1.0 — 2026-11-14 — POST /v1/federation/catalogue-sync.
  *   v1.0.0 — 2026-11-14 — Initial: POST /v1/agents/{name}/tasks/{id}/event.
@@ -136,6 +137,28 @@ describe('POST /v1/federation/message', () => {
         }
         for (const b of refused) {
             assert.notEqual(verdict(v, b), MATCH, `contract accepts ${JSON.stringify(b).slice(0, 80)}`);
+        }
+    });
+});
+
+describe('POST /v1/ghii/verify-email', () => {
+    const v = validatorFor('POST', '/v1/ghii/verify-email');
+
+    it('matches the body the sign-in modal sends (verification_id, code)', () => {
+        // src/static/sdk-libs/auth/modal-email-step.js; routes/ghii/web-verify.ts reads these two names.
+        assert.equal(verdict(v, { verification_id: '9f86d081884c7d659a2feaa0c55ad015', code: '123456' }), MATCH);
+    });
+
+    it('refuses the bodies the route answers 400', () => {
+        const refused = [
+            { verificationId: '9f86d081884c7d659a2feaa0c55ad015', code: '123456' },
+            { verification_id: '9f86d081884c7d659a2feaa0c55ad015' },
+            { verification_id: '', code: '123456' },
+            { verification_id: 5, code: '123456' },
+            { code: '123456' },
+        ];
+        for (const b of refused) {
+            assert.notEqual(verdict(v, b), MATCH, `contract accepts ${JSON.stringify(b)}`);
         }
     });
 });
