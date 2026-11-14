@@ -30,6 +30,10 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.6.12 — 2026-11-14 — Structure programme unit 2b, batch 4: 58 lines in 22 files → 32 lines in 16.
+ *     Part 1 (organism, board, workspace tools) lowered boards.ts 3 → 1 and deleted organisms.ts and
+ *     workspaces.ts (11 lines); part 2 (agent, app, wallet, consent, knowledge, admin tools) the 15
+ *     lines listed below.
  *   v1.6.11 — 2026-11-14 — core.ts 6 → 5 (B4, agentProfileNow).
  *   v1.6.10 — 2026-11-14 — knowledge.ts 1 → 0, its entry deleted (B15, packageLinksFor).
  *   v1.6.9 — 2026-11-14 — exchange-run.ts 1 → 0, its entry deleted (B14, loadPublicToolManifest).

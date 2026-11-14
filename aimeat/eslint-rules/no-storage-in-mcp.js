@@ -41,6 +41,9 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.3.6 — 2026-11-14 — Structure programme unit 2b, batch 4: six files leave EXEMPT (23 → 17).
+ *     Part 1: organisms.ts and workspaces.ts; part 2: apps-fork.ts, consent.ts, exchange-run.ts and
+ *     knowledge.ts (the lines below). boards.ts keeps its entry for its one remaining read.
  *   v1.3.5 — 2026-11-14 — knowledge.ts leaves EXEMPT; its links read moved with the package rule to
  *     services/knowledge/package-links.ts, which GET /v1/knowledge/:id/links calls too.
  *   v1.3.4 — 2026-11-14 — exchange-run.ts leaves EXEMPT; its manifest read moved to
