@@ -1059,16 +1059,16 @@ await test('B15 REFUSED: alice\'s private package is not found for bob\'s agent,
     }
 });
 
-await test('B15 RECORDED DIFFERENCE (question: are another account\'s public packages readable on the tool): alice\'s public package, the route gives bob\'s agent its links and the tool answers not found', async () => {
+await test('B15 DECIDED (developer approval 2026-11-14): alice\'s public package gives bob\'s agent its links on the route and the tool alike', async () => {
     const rest = await pkgLinks(PB_PKG_PUBLIC, pbBobAg.token);
     assert(rest.status === 200, `route: ${show(rest)}`);
     const tool = await callTool(pbBobMcp, 'aimeat_knowledge_links', { package_id: PB_PKG_PUBLIC });
-    assert(tool.isError && tool.text.startsWith('Package not found'), `tool: ${tool.text.slice(0, 200)}`);
+    assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
 });
 
-await test('B15 RECORDED DIFFERENCE (question: does memory:read-as-owner reach the owner\'s packages on the route): alice\'s private package, the tool gives the links to her agent holding the word and the route answers 404', async () => {
+await test('B15 DECIDED (developer approval 2026-11-14): alice\'s private package gives the links to her agent holding memory:read-as-owner on the route and the tool alike', async () => {
     const rest = await pkgLinks(PB_PKG_PRIVATE, pbReaderAg.token);
-    assert(rest.status === 404, `route: ${show(rest)}`);
+    assert(rest.status === 200, `route: ${show(rest)}`);
     const tool = await callTool(pbReaderMcp, 'aimeat_knowledge_links', { package_id: PB_PKG_PRIVATE });
     assert(!tool.isError, `tool: ${tool.text.slice(0, 200)}`);
 });

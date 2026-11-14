@@ -6,6 +6,9 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-14 — GET /v1/knowledge/:id/links reads through packageLinksFor (services/knowledge/package-links.ts),
+ *     which aimeat_knowledge_links asks too: an agent holding memory:read-as-owner reaches its owner's
+ *     private package (structure programme 2026-11, unit 2b, B15).
  *   2026-11-05 — An imported entry at 'group' is stored private: an import names no group.
  *   2026-11-04 — No prefix scan for a storage without getMemoryByKeysAnyOwner: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
@@ -87,6 +90,8 @@ import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../servi
 import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
+import { packageLinksFor } from '../../services/knowledge/package-links.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { updateMemoryRecord, UNCHANGED } from '../../services/record-cas.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
@@ -491,26 +496,22 @@ export function registerPackagesCoreRoutes(
   /* ── GET /v1/knowledge/:id/links — List links for a package ── */
   router.get('/v1/knowledge/:id/links', async (req, res) => {
     const packageId = req.params.id as string;
-    const manifestKey = `packages/${packageId}/manifest`;
     const direction = (req.query.direction as string) ?? 'both';
     const relation = req.query.relation as string | undefined;
 
-    // The links of a package are read on the terms of the package itself (helpers.ts
-    // findReadableManifest): a package this caller may not read answers like a missing one. The
-    // caller's own package first, so another account's record at the same key never stands in for it.
-    const found = await findReadableManifest(req, manifestKey, { preferOwn: true });
-    if (!found) {
+    // The links of a package are read on the terms of the package itself, the one rule
+    // aimeat_knowledge_links asks too (services/knowledge/package-links.ts): a package this caller may
+    // not read answers like a missing one, the caller's own package comes first, and the rows are
+    // those of the namespace that holds the manifest found (secaudit 2026-10, v78).
+    const signedIn = !!req.auth && !isAnonymousPrincipal(req.auth);
+    const found = await packageLinksFor(storage, config,
+      { caller: signedIn ? callerOf(req, config.nodeId, storage) : null, auth: req.auth },
+      packageId, { direction: direction as 'outgoing' | 'incoming' | 'both', relation });
+    if (!found.found) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
       return;
     }
-
-    // The outgoing rows are those of the namespace that holds the manifest found above, never of
-    // another account that wrote a record at the same key (secaudit 2026-10, v78).
-    const links = await storage.listLinks(manifestKey, {
-      direction: direction as 'outgoing' | 'incoming' | 'both',
-      relation,
-      sourceOwner: found.record.ownerGaii,
-    });
+    const links = found.links;
 
     res.json(success(config.nodeId, { links, count: links.length }));
   });

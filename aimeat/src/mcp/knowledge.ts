@@ -11,6 +11,9 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_knowledge_links reads through packageLinksFor (services/knowledge/package-links.ts),
+ *     as GET /v1/knowledge/:id/links does: another account's public package is found, and an agent
+ *     reaches its owner's private package with memory:read-as-owner, on both (unit 2b, B15).
  *   2026-11-13 — aimeat_knowledge_links filters by relation, as GET /v1/knowledge/:id/links does (unit 3b).
  *   2026-10-22 — SECURITY: aimeat_knowledge_links lists the outgoing rows of the namespace that holds
  *     the package it read, so another account's record at the same key no longer brings that
@@ -76,6 +79,7 @@ import {
 } from '../services/knowledge-package-entry.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import { packageLinksFor } from '../services/knowledge/package-links.js';
 import { presentKnowledgeManifest } from '../services/toll-morsels-names.js';
 import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
 
@@ -336,22 +340,17 @@ export function registerKnowledgeTools(
             annotations: annotationsFor('aimeat_knowledge_links'),
         },
         async ({ package_id, direction, relation }) => {
-            // The package read first, as GET /v1/knowledge/:id/links asks it: links of a package the
-            // agent may not read answer the same as a package that does not exist.
-            const read = await readPackage(package_id);
+            // The package and its links on the one rule GET /v1/knowledge/:id/links asks
+            // (services/knowledge/package-links.ts): a public package for anyone, the account's own for the
+            // owner's agents holding memory:read-as-owner. A package the agent may not read answers the
+            // same as one that does not exist.
+            const session = caller();
+            const read = await packageLinksFor(storage, config, { caller: session, auth: session.auth }, package_id,
+                { direction: direction ?? 'both', relation });
             if (!read.found) {
-                return { content: [{ type: 'text' as const, text: notFoundText(package_id, read.omitted) }], isError: true };
+                return { content: [{ type: 'text' as const, text: notFoundText(package_id, read.omitted ? 1 : 0) }], isError: true };
             }
-            const manifestKey = `packages/${package_id}/manifest`;
-            // The outgoing rows of the namespace that holds the manifest read above, as GET
-            // /v1/knowledge/:id/links lists them: never another account's rows at the same key
-            // (secaudit 2026-10, v78).
-            const links = await storage.listLinks(manifestKey, {
-                direction: direction ?? 'both',
-                // The same read filter the route passes (unit 3b).
-                ...(relation ? { relation } : {}),
-                sourceOwner: read.found.manifest.ownerGaii,
-            });
+            const links = read.links;
             return {
                 content: [{
                     type: 'text' as const,
