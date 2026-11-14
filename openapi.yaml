@@ -59559,10 +59559,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [ghii]
+              required: [target_ghii]
               properties:
-                ghii:
+                target_ghii:
                   type: string
+                  description: The bare owner name of an active member to promote.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
