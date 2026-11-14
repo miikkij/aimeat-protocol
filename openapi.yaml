@@ -3250,14 +3250,23 @@ components:
     # === Federation ===
     PeeringRequest:
       type: object
-      required: [target_node_url]
+      description: As models/schemas.ts PeeringRequestSchema reads it.
+      required: [target_url]
       properties:
-        target_node_url:
+        target_url:
           type: string
           format: uri
+          maxLength: 2048
           example: https://aimeat-eu-001-berlin.example.com
+        target_node_id:
+          type: string
+          maxLength: 256
+        public_key:
+          type: string
+          maxLength: 100000
         message:
           type: string
+          maxLength: 10000
           example: Requesting peering for cross-node action discovery
 
     PeeringDecision:
