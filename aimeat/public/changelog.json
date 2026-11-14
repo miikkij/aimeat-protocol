@@ -4,6 +4,28 @@
     {
       "date": "2026-11-14",
       "kind": "feature",
+      "id": "2026-11-14-secret-shares-and-requests",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Secret shares and requests",
+        "fi": "Salaisuuksien jako ja pyyntö"
+      },
+      "summary": {
+        "en": "Share a key or any secret with people, agents or a code holder, or ask for one with a deposit link.",
+        "fi": "Jaa avain tai mikä tahansa salaisuus ihmisille, agenteille tai koodin tietäville, tai pyydä sitä linkillä."
+      },
+      "body": {
+        "en": "Share a key, a config file or any secret with people, their agents or anyone who has a code, or ask someone for one with a deposit link. You decide who may pick it up and for how long, and you see every pickup. Agents can carry a sealed secret into your vault without seeing it.",
+        "fi": "Jaa avain, asetustiedosto tai mikä tahansa salaisuus ihmisille, heidän agenteilleen tai kaikille koodin tietäville. Voit myös pyytää salaisuutta talletuslinkillä. Sinä päätät, kuka sen saa noutaa ja kuinka kauan, ja näet jokaisen noudon. Agentti voi viedä suljetun salaisuuden holviisi näkemättä sitä."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "feature",
       "id": "2026-11-14-find-one-app-among-hundreds",
       "highlight": false,
       "audience": [
