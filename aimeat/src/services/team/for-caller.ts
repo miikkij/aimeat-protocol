@@ -17,6 +17,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { emitChange } from '../event-bus.js';
+import { readerFor } from '../classification/reader.js';
 import { parseTeamSetup, planOrApplyTeams, type TeamOutcome } from './setup.js';
 import { teamStatusFor, type TeamStatus } from './status.js';
 
@@ -45,7 +46,8 @@ export async function teamSetupForCaller(deps: Deps, caller: CallerContext, body
 /** The caller's teams, or the one named. */
 export async function teamStatusForCaller(deps: Deps, caller: CallerContext, orgId: string | null): Promise<TeamDoorRefusal | { ok: true; teams: TeamStatus[] }> {
     if (!caller.owner || caller.visitor) return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Teams belong to an account of this node' };
-    const teams = await teamStatusFor(deps.storage, deps.config, caller.owner, await localeOf(deps.storage, caller.owner), orgId);
+    const reader = readerFor(deps, caller.auth);
+    const teams = await teamStatusFor(deps.storage, deps.config, reader, caller.owner, await localeOf(deps.storage, caller.owner), orgId);
     if (!teams) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'No team with that organism_id that you are in' };
     return { ok: true, teams };
 }

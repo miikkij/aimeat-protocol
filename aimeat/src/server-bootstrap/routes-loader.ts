@@ -156,7 +156,7 @@ import { adminSsoRouter } from '../routes/admin/sso.js';
 import { scimRouter } from '../routes/scim.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
-import { teamsRouter } from '../routes/teams.js';
+import { teamsRouter } from '../routes/organisms/teams.js';
 import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin/security.js';
 import { adminCorsRouter } from '../routes/admin/cors.js';

@@ -35,6 +35,7 @@
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 import { createOrganismRecord } from '../organism-lifecycle.js';
 import { applyOrganismShape } from '../organism-shape-apply.js';
 import { addOrganismOwner, isOrganismOwner } from '../organism-ownership.js';
@@ -50,7 +51,6 @@ import {
 
 export const MAX_TEAMS = 30;
 export const MAX_PEOPLE = 200;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ACCOUNT_RE = /^[a-z0-9][a-z0-9._-]{1,62}$/i;
 
 export interface PersonInput { email: string | null; account: string | null; language: TeamLang | null; who: string }
@@ -72,7 +72,7 @@ function person(raw: unknown): PersonInput | string {
     const r = raw as Record<string, unknown>;
     const email = typeof r.email === 'string' ? r.email.trim().toLowerCase() : null;
     const account = typeof r.account === 'string' ? r.account.trim() : null;
-    if (email && !EMAIL_RE.test(email)) return `"${email}" is not an email address`;
+    if (email && !isValidEmail(email)) return `"${email}" is not an email address`;
     if (account && !ACCOUNT_RE.test(account)) return `"${account}" is not an account name`;
     if (!email && !account) return 'a person needs an email or an account';
     return { email, account: email ? null : account, language: teamLang(r.language), who: email ?? account! };

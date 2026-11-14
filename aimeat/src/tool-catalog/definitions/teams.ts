@@ -12,29 +12,11 @@
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
-import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
+import { TeamSetupTeams } from '../../models/write-body-schemas.js';
 
-const lang = z.enum(['fi', 'en', 'es']);
-const personShape = z.union([
-    z.string().describe('An email address or an account name.'),
-    z.object({
-        email: z.string().optional().describe('The person\'s email address.'),
-        account: z.string().optional().describe('An account name on this node, when there is no address.'),
-        language: lang.optional().describe('The language of this person\'s invitation; the team\'s language when left out.'),
-    }),
-]);
-const teamsShape = z.array(z.object({
-    organism_id: z.string().optional().describe('A team that exists: add leads and members, or correct its names. Leave out to make a new team.'),
-    name: z.string().optional().describe('The team\'s name in its working language.'),
-    names: z.object({ fi: z.string().optional(), en: z.string().optional(), es: z.string().optional() }).optional()
-        .describe('The name in each language, written by you. Every member sees the name in their own language.'),
-    language: lang.optional().describe('The team\'s working language: its workspaces, context and skill are written in it. The caller\'s language when left out.'),
-    kind: z.enum(['team', 'virtual']).optional().describe('"virtual" for a team formed around a theme across other teams.'),
-    description: z.string().optional().describe('What the team does, in a sentence or two. It starts the team context.'),
-    leads: z.array(personShape).optional().describe('Leads besides you. A lead who is already a member becomes one at once; anyone else is invited and becomes a lead on accepting.'),
-    members: z.array(personShape).optional().describe('Members to invite. Each gets an invitation in their own language.'),
-}));
+/** The same bounded shape POST /v1/teams/setup validates its body with. */
+const teamsShape = TeamSetupTeams;
 
 export const teamTools = [
     {

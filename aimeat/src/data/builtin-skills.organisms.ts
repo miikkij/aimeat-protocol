@@ -13,6 +13,8 @@
  * @structure ORGANISMS_SKILL_ENTRY
  * @usage import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';
  * @version-history
+ *   2026-11-14 — A team with people, or several teams at once, is set up with aimeat_team_setup
+ *     (services/team/setup.ts).
  *   2026-11-12 — "Who can see and change what" has asking for access: aimeat_access_request,
  *     aimeat_organism_join_requests, aimeat_organism_join_request_review and access_requests.
  *   2026-11-11 — "Who can see and change what" names aimeat_organism_agent_attach and _detach for the
@@ -83,6 +85,10 @@ with \`aimeat_workspace_create\`.
 | \`family\` | a family | Family (pages, tasks) |
 | \`club\` | a club, members join with approval | Club (pages, events) |
 | \`project\` | a project with goals and gates | Project (goals, plans, deliverables, decisions, resources) |
+
+**A team with people to invite, or several teams at once**: use \`aimeat_team_setup\` instead. It
+makes a team (three workspaces, a team context, a team skill its members' AIs read, one or more
+leads) and invites the people, each in their own language, after a dry run you show the person.
 
 A shape sets the join policy and visibility too: everything is private and by invitation, except a
 club, which is listed and takes join requests. The person can change either afterwards. Nothing fits:

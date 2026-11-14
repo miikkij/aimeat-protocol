@@ -2524,6 +2524,18 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
     },
+    "src/services/team/record.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-14 (team setup): the read is the team record at organism.{id}.meta.team, the node's own record of what the team setup made (names, workspace ids, skill ref, pending lead invitations). It is no content a person wrote; the team's content is read through status.ts with the caller's reader."
+    },
+    "src/services/team/status.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-14 (team setup): the team context record reaches the caller only through reader.show (contextOf), the caller's classification reader, as showOrganismReadme does."
+    },
     "src/services/organism-readme.ts": {
       "reads": {
         "listAllMemory": 1

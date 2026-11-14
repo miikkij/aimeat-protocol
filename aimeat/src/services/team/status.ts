@@ -22,6 +22,8 @@ import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { isOrganismOwner, organismOwners } from '../organism-ownership.js';
 import { readTeamRecord, teamContextKey, teamDisplayName, type TeamRecord } from './record.js';
+import { memoryTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
 
 export const MAX_TEAMS_LISTED = 50;
 
@@ -62,16 +64,18 @@ export async function listTeamsOf(storage: Storage, owner: string, limit = MAX_T
     return out;
 }
 
-async function contextOf(storage: Storage, orgId: string, team: TeamRecord): Promise<TeamStatus['context']> {
+/** The team context the reader may see: it passes the caller's classification reader, as any content does. */
+async function contextOf(storage: Storage, reader: ContentReader, orgId: string, team: TeamRecord): Promise<TeamStatus['context']> {
     const key = teamContextKey(orgId, team.workspaces.shared);
     const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    const rec = items.find(r => r.key === key);
+    const found = items.find(r => r.key === key);
+    const [rec] = found ? await reader.show([found], r => memoryTarget(r.ownerGaii, r.key)) : [];
     if (!rec || !rec.value || typeof rec.value !== 'object') return null;
     const v = rec.value as { summary?: unknown; core?: unknown };
     return { key, summary: typeof v.summary === 'string' ? v.summary : '', core: typeof v.core === 'string' ? v.core : '', updated_at: rec.updatedAt ?? null };
 }
 
-async function statusOf(storage: Storage, organism: OrganismRecord, team: TeamRecord, caller: string, locale: string | null): Promise<TeamStatus> {
+async function statusOf(storage: Storage, reader: ContentReader, organism: OrganismRecord, team: TeamRecord, caller: string, locale: string | null): Promise<TeamStatus> {
     const memberships = (await storage.listMembers(organism.id)).filter(m => m.status === 'active');
     const accounts = memberships.map(m => m.ghii);
     const agentsBy = accounts.length ? await storage.getAgentsByOwners(accounts) : {};
@@ -90,7 +94,7 @@ async function statusOf(storage: Storage, organism: OrganismRecord, team: TeamRe
         ai_connected: members.filter(m => m.ai.connected).length,
         workspaces: team.workspaces,
         skill: team.skill?.ref ?? null,
-        context: await contextOf(storage, organism.id, team),
+        context: await contextOf(storage, reader, organism.id, team),
     };
     if (youLead) {
         const pendingLead = new Set(team.leadsPending.map(p => p.invitation));
@@ -107,15 +111,15 @@ async function statusOf(storage: Storage, organism: OrganismRecord, team: TeamRe
  * The caller's teams, or the one named. Answers null when the named organism is not a team the
  * caller is an active member of, which the doors report as NOT_FOUND.
  */
-export async function teamStatusFor(storage: Storage, _config: AimeatConfig, owner: string, locale: string | null, orgId?: string | null): Promise<TeamStatus[] | null> {
+export async function teamStatusFor(storage: Storage, _config: AimeatConfig, reader: ContentReader, owner: string, locale: string | null, orgId?: string | null): Promise<TeamStatus[] | null> {
     if (orgId) {
         const membership = await storage.getMembership(orgId, owner);
         const organism = membership?.status === 'active' ? await storage.getOrganism(orgId) : null;
         const team = organism && !organism.archived ? await readTeamRecord(storage, orgId) : null;
-        return organism && team ? [await statusOf(storage, organism, team, owner, locale)] : null;
+        return organism && team ? [await statusOf(storage, reader, organism, team, owner, locale)] : null;
     }
     const teams = await listTeamsOf(storage, owner);
     const out: TeamStatus[] = [];
-    for (const { organism, team } of teams) out.push(await statusOf(storage, organism, team, owner, locale));
+    for (const { organism, team } of teams) out.push(await statusOf(storage, reader, organism, team, owner, locale));
     return out;
 }

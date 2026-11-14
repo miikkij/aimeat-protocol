@@ -21,6 +21,7 @@
  *   CommentCreateBody · CONTACT_LIMITS · ContactAddBody · ContactUpdateBody · ProfileUpdateBody
  * @usage router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), validateBody(OrganismCreateBody, config.nodeId), …)
  * @version-history
+ *   v1.2.0 — 2026-11-14 — TeamSetupBody and TeamSetupTeams: POST /v1/teams/setup and aimeat_team_setup.
  *   v1.1.0 — 2026-11-12 — AccessRequestBody: the optional message of an access request.
  *   v1.0.0 — 2026-10-27 — Initial (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
@@ -48,6 +49,36 @@ const organismFields = {
 export const OrganismCreateBody = z.looseObject({
     name: requiredText(INPUT_LIMITS.name),
     ...organismFields,
+});
+
+const teamLang = z.enum(['fi', 'en', 'es']);
+const teamName = () => safeText(INPUT_LIMITS.name);
+const teamPerson = z.union([
+    z.string().max(INPUT_LIMITS.email).describe('An email address or an account name.'),
+    z.object({
+        email: z.string().max(INPUT_LIMITS.email).optional().describe('The person\'s email address.'),
+        account: z.string().max(INPUT_LIMITS.id).optional().describe('An account name on this node, when there is no address.'),
+        language: teamLang.optional().describe('The language of this person\'s invitation; the team\'s language when left out.'),
+    }),
+]);
+
+/** The teams of POST /v1/teams/setup and aimeat_team_setup (tool-catalog/definitions/teams.ts). */
+export const TeamSetupTeams = z.array(z.object({
+    organism_id: z.string().max(INPUT_LIMITS.id).optional().describe('A team that exists: add leads and members, or correct its names. Leave out to make a new team.'),
+    name: teamName().optional().describe('The team\'s name in its working language.'),
+    names: z.object({ fi: teamName().optional(), en: teamName().optional(), es: teamName().optional() }).optional()
+        .describe('The name in each language, written by you. Every member sees the name in their own language.'),
+    language: teamLang.optional().describe('The team\'s working language: its workspaces, context and skill are written in it. The caller\'s language when left out.'),
+    kind: z.enum(['team', 'virtual']).optional().describe('"virtual" for a team formed around a theme across other teams.'),
+    description: safeText(2000).optional().describe('What the team does, in a sentence or two. It starts the team context.'),
+    leads: z.array(teamPerson).max(200).optional().describe('Leads besides you. A lead who is already a member becomes one at once; anyone else is invited and becomes a lead on accepting.'),
+    members: z.array(teamPerson).max(200).optional().describe('Members to invite. Each gets an invitation in their own language.'),
+})).max(30);
+
+/** POST /v1/teams/setup. The service reads the people and refuses what is not an address or an account. */
+export const TeamSetupBody = z.looseObject({
+    teams: TeamSetupTeams,
+    dry_run: z.boolean().optional(),
 });
 
 /** PUT /v1/organisms/:id: every field optional; `readme` is a Markdown page. */

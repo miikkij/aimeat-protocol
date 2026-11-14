@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The team tools on the CLI dispatch (`aimeat connect call` and `POST /local/call/<tool>`):
- *   thin REST proxies over POST /v1/teams/setup and GET /v1/teams/status (src/routes/teams.ts).
+ *   thin REST proxies over POST /v1/teams/setup and GET /v1/teams/status (src/routes/organisms/teams.ts).
  *   Every rule is the route's (services/team/); this file adds none.
  * @structure teamCliTools[] — the handler table, spread by index.ts
  * @usage import { teamCliTools } from './tool-call-defs-teams.js';

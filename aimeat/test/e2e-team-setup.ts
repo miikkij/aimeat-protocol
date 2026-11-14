@@ -262,5 +262,15 @@ await test('t16 refusals: no invite permission, bad input, a dry run allowed wit
     assert(!st.body.data.teams.some((t: any) => t.name === 'Talous'), 'no Talous team was made');
 });
 
+await test('t17 the REST routes refuse an agent without the permission word and a caller with no token', async () => {
+    const noWords = await makeAgent(BASE, lead, ['memory:read']);
+    const setup = await json('/v1/teams/setup', { method: 'POST', headers: auth(noWords.token), body: JSON.stringify({ teams: [{ name: 'X' }] }) });
+    assert(setup.status === 403, `setup without organism:write: ${setup.status}`);
+    const status = await json('/v1/teams/status', { headers: auth(noWords.token) });
+    assert(status.status === 403, `status without organism:read: ${status.status}`);
+    const anon = await json('/v1/teams/status');
+    assert(anon.status === 401, `status with no token: ${anon.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);
