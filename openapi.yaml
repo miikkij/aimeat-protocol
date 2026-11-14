@@ -38819,14 +38819,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [subdomain, kind, target]
+              required: [subdomain, target]
               properties:
                 subdomain:
                   type: string
-                  pattern: '^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$'
+                  pattern: '^\s*[A-Za-z0-9][A-Za-z0-9-]{0,61}[A-Za-z0-9]\s*$'
+                  description: 2 to 63 letters, digits and hyphens, not starting or ending with a hyphen. Stored in lower case without surrounding spaces, so an upper-case copy of a mapped name is a conflict.
                 kind:
                   type: string
                   enum: [app, redirect]
+                  default: app
                 target:
                   type: string
                   description: '"owner/filename" of a published app, or an absolute http(s) URL'
