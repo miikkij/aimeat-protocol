@@ -33,6 +33,7 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-14 -- The `compliance` section (compliance.balancing_test) stands in Identity and access, beside classification.
  *   2026-11-07 -- The `csm` section (csm.default_visibility, who reads a new data description) stands
  *     under Integrations, beside the outbound connections.
  *   2026-11-05 -- The "Node" group shows the data keys and the re-encrypt job under its settings
@@ -157,7 +158,7 @@ const SOURCE_BADGE = {
 const DOMAINS = [
   { id: 'ai', groups: ['ai', 'decide', 'content_class', 'agent','agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
-  { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
+  { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'compliance', 'security', 'moderation', 'account_events', 'echat'] },
   { id: 'data_out', groups: ['data_out'] },
   { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'usage', 'features', 'packages'] },
   { id: 'limits', groups: ['quota', 'file_store', 'rate_limits', 'boards', 'extensions', 'realtime', 'schedules'] },

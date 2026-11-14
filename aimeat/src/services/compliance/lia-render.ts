@@ -17,6 +17,8 @@
  * @structure LiaRenderContext · LiaRow · liaRows() · liaMarkdown() · renderLiaPdf() · renderLiaXlsx()
  * @usage const pdf = await renderLiaPdf(lia, { app: 'crm.html', registerTitle: 'Customers', standing: 'approved' });
  * @version-history
+ *   v1.1.0 — 2026-11-14 — An approval by an agent or an app says so beside the approver, and the one who
+ *     asked for an owner's approval has a row.
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import PDFDocument from 'pdfkit';
@@ -94,7 +96,10 @@ export function liaRows(lia: ComplianceLia, ctx: LiaRenderContext): LiaRow[] {
   rows.push({ kind: 'section', label: t.outcome });
   rows.push({ kind: 'fact', label: t.outcome, value: lia.outcome?.result === 'suitable' ? t.suitable : lia.outcome?.result === 'not-suitable' ? t.notSuitable : t.unanswered, source: lia.outcome ? src('outcome') : '' });
   rows.push({ kind: 'text', label: t.summary, value: lia.outcome?.summary ?? '', source: lia.outcome?.summary ? src('outcome') : '' });
-  rows.push({ kind: 'fact', label: t.approvedBy, value: lia.approvedBy ?? '' });
+  // An agent's or an app's approval says so beside its name, so the file never reads as a person's.
+  const byWhat = lia.approvedByKind === 'agent' ? ` (${t.byAgent})` : lia.approvedByKind === 'app' ? ` (${t.byApp})` : '';
+  rows.push({ kind: 'fact', label: t.approvedBy, value: lia.approvedBy ? `${lia.approvedBy}${byWhat}` : '' });
+  if (lia.requestedBy) rows.push({ kind: 'fact', label: t.requestedBy, value: lia.requestedBy });
   rows.push({ kind: 'fact', label: t.approvedAt, value: day(lia.approvedAt) });
   rows.push({ kind: 'fact', label: t.reviewAt, value: day(lia.reviewAt) });
   rows.push({ kind: 'fact', label: t.preparedBy, value: [lia.updatedBy, day(lia.updatedAt)].filter(Boolean).join(', ') });

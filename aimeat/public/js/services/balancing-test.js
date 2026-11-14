@@ -6,9 +6,10 @@
  *   6(1)(f)) as the app's owner reads it on the app's page: whether the app needs one and where each
  *   test stands, the owner's own approval, and the test as a PDF or an Excel file. Thin calls on the
  *   compliance routes (src/routes/compliance-docs.ts); every rule is the server's.
- * @structure readBalancingTests(app, lang) · approveBalancingTest(app, id) · downloadBalancingTest(app, id, format)
+ * @structure readBalancingTests(app, lang) · approveBalancingTest(app, id) · setOwnerApproves(app, id, on) · downloadBalancingTest(app, id, format)
  * @usage const data = await readBalancingTests('crm.html', 'fi');
  * @version-history
+ *   v1.1.0 — 2026-11-14 — setOwnerApproves: the owner keeps the approval of one test for themselves.
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import { apiGet, apiPatch } from '/js/api.js';
@@ -25,6 +26,12 @@ export async function readBalancingTests(app, lang) {
 /** The owner approves one test in person (PATCH /v1/compliance/docs/lias/:id). */
 export async function approveBalancingTest(app, id) {
   const resp = await apiPatch(`/v1/compliance/docs/lias/${enc(id)}?scope=app&app=${enc(app)}`, { set: { status: 'approved' } });
+  return resp?.data ?? null;
+}
+
+/** The owner, signed in, decides whether only they approve one test (PATCH set { ownerApproves }). */
+export async function setOwnerApproves(app, id, on) {
+  const resp = await apiPatch(`/v1/compliance/docs/lias/${enc(id)}?scope=app&app=${enc(app)}`, { set: { ownerApproves: !!on } });
   return resp?.data ?? null;
 }
 

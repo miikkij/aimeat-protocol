@@ -15,6 +15,8 @@
  *   import { dataAccessDefaults } from './data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.9.0 — 2026-11-14 — balancingTest (AIMEAT_COMPLIANCE_BALANCING_TEST: required | optional, the
+ *     default | off): whether the node asks for the balancing test of an app on legitimate interests.
  *   v1.8.0 — 2026-11-02 — secaudit2026nov02d round 13: appPartySignupsPerHour
  *     (AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30) and appPartyPendingHours (AIMEAT_APP_PARTY_PENDING_HOURS,
  *     24); 0 is no limit for each.
@@ -91,6 +93,9 @@ export function dataAccessDefaults() {
     // Whether this node runs a data intermediation service (EU 2022/868), and who provides it
     // (services/data-intermediation/). report, the code default, refuses nothing.
     dataIntermediation: parseDataIntermediationMode(process.env.AIMEAT_DATA_INTERMEDIATION),
+    // Whether the node asks for the balancing test of an app on legitimate interests (services/compliance/lia-need.ts).
+    // optional, the default: the test is there to use and nothing asks for it.
+    balancingTest: parseBalancingTestMode(process.env.AIMEAT_COMPLIANCE_BALANCING_TEST),
     // Whether an app's own users may register as outside parties of its owner (services/app-parties/).
     // off, the default, refuses every signup; a node that shows its content to signed-in accounts only forces off.
     partySelfRegistration: parsePartySelfRegistration(process.env.AIMEAT_PARTY_SELF_REGISTRATION),
@@ -128,6 +133,21 @@ export const DATA_INTERMEDIATION_MODES: readonly DataIntermediationMode[] = ['re
 /** An unknown value is `report`, the one that refuses nothing. */
 export function parseDataIntermediationMode(v: unknown): DataIntermediationMode {
   return DATA_INTERMEDIATION_MODES.find(m => m === v) ?? 'report';
+}
+
+/**
+ * The balancing test of an app whose record of processing names legitimate interests (GDPR art.
+ * 6(1)(f)). required: a missing, unapproved or reopened test is a compliance gap, and a publish, a
+ * data map write and a register write say when one is due. optional: the draft, the save, the
+ * approval and the files work, and nothing asks for a test. off: no test is drafted or written, and
+ * the tests stored before stay readable (a closed environment that does not keep them).
+ */
+export type BalancingTestMode = 'required' | 'optional' | 'off';
+export const BALANCING_TEST_MODES: readonly BalancingTestMode[] = ['required', 'optional', 'off'];
+
+/** An unknown value is `optional`, the default. */
+export function parseBalancingTestMode(v: unknown): BalancingTestMode {
+  return BALANCING_TEST_MODES.find(m => m === v) ?? 'optional';
 }
 
 /** A whole number from 0 to `max`; anything else is `fallback`. */

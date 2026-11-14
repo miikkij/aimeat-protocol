@@ -4,6 +4,29 @@
     {
       "date": "2026-11-14",
       "kind": "feature",
+      "id": "2026-11-14-balancing-test-for-apps",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Balancing test for apps",
+        "fi": "Tasapainotesti sovelluksille"
+      },
+      "summary": {
+        "en": "AIMEAT drafts your app's balancing test from its own data. Your AI asks the open questions, you approve.",
+        "fi": "AIMEAT luonnostelee sovelluksesi tasapainotestin sen omista tiedoista. Tekoälysi kysyy, sinä hyväksyt."
+      },
+      "body": {
+        "en": "When your app goes into use with other people and rests on legitimate interests, AIMEAT drafts the balancing test from the app's own data. Your AI asks you the open questions, you approve. Demos are asked nothing.",
+        "fi": "Kun sovelluksesi menee muiden käyttöön ja käsittelyperuste on oikeutettu etu, AIMEAT luonnostelee tasapainotestin sovelluksen omista tiedoista. Tekoälysi kysyy sinulta avoimet kohdat, ja sinä hyväksyt. Demoilta ei kysytä mitään."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "feature",
       "id": "2026-11-14-my-apps-on-your-home-screen",
       "highlight": false,
       "audience": [

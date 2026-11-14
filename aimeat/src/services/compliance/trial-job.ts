@@ -15,6 +15,7 @@
  * @structure TRIAL_REASK_DAYS · askOwnersAboutExpiredTrials()
  * @usage scheduler core handler 'compliance-ask-makers' (core-jobs.ts), daily
  * @version-history
+ *   v1.1.0 — 2026-11-14 — Runs only when the setting compliance.balancing_test is required.
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -37,6 +38,8 @@ export async function askOwnersAboutExpiredTrials(
   storage: Storage, config: AimeatConfig, opts: { now?: Date } = {},
 ): Promise<{ asked: number }> {
   const now = opts.now ?? new Date();
+  // A trial exempts an app from a test the server requires; where nothing requires one, nothing is asked.
+  if (config.balancingTest !== 'required') return { asked: 0 };
   let asked = 0;
   for (const { scope, doc } of await listDocs(storage, config.nodeId, 'trial')) {
     if (scope.kind !== 'app' || trialState(doc, now.getTime()) !== 'expired') continue;

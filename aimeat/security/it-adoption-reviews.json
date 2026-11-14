@@ -64,7 +64,7 @@
       "digest": "sha256:b1de3df2589ca9939303389b"
     },
     "05-data-protection.md": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
@@ -72,7 +72,7 @@
         "aimeat/src/services/connections/drive-files.ts",
         "aimeat/src/services/context/history-keys.ts"
       ],
-      "digest": "sha256:74fc05b9d54c82ca6bf24d15"
+      "digest": "sha256:53c3d5717a1c0c7ac2893347"
     },
     "06-ai-and-models.md": {
       "reviewedOn": "2026-11-13",
@@ -162,12 +162,12 @@
       "digest": "sha256:1ba30b4f81d8b369210a745c"
     },
     "14-compliance-mapping.md": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/services/compliance/derived.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts"
       ],
-      "digest": "sha256:c6da9d147311981e66165fe0"
+      "digest": "sha256:d175956b4ec8d15054fe8ccf"
     },
     "15-operations-runbook.md": {
       "reviewedOn": "2026-11-05",
@@ -323,7 +323,7 @@
     "05-data-protection.md": {
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
-      "docs/data-classification.md": "f8b9fd5d82798aef",
+      "docs/data-classification.md": "ef9289f308c69418",
       "aimeat/src/services/connections/drive-files.ts": "b49a3a7cea3b7bbe",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68"
     },
@@ -384,7 +384,7 @@
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
-      "aimeat/src/tool-catalog/definitions/compliance.ts": "1db7ab7b2d4b52f9"
+      "aimeat/src/tool-catalog/definitions/compliance.ts": "f5a6c3ac83872f8d"
     },
     "15-operations-runbook.md": {
       "docs/operations/production-deployment.md": "2385ad9aadd29152",

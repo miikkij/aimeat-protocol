@@ -14,6 +14,7 @@
  *       decision, and no balancing test is asked until the owner says the app goes into use.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-lia.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The setting compliance.balancing_test: only required shows a gap or asks the owner; off refuses a write.
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -173,7 +174,8 @@ describe('a trial that ended', () => {
 
   beforeAll(async () => {
     storage = new SqliteStorage(':memory:') as unknown as Storage;
-    config = { ...loadConfig().config, nodeId: NODE, baseUrl: 'https://node.test' };
+    // A trial exempts an app from a test the server requires; under the default, optional, nothing is asked.
+    config = { ...loadConfig().config, nodeId: NODE, baseUrl: 'https://node.test', balancingTest: 'required' };
     const at = new Date(t0 - DAY).toISOString();
     await storage.createOwner({ name: OWNER, displayName: OWNER, publicKey: 'pk', roles: ['owner'], createdAt: at } as never);
     const data = Buffer.from('<html></html>');
@@ -227,6 +229,23 @@ describe('a trial that ended', () => {
     expect(k).not.toContain('app-trial-expired');
     expect(k).toContain('lia-missing');
     expect(await askOwnersAboutExpiredTrials(storage, config, { now: new Date(later + 30 * DAY) })).toEqual({ asked: 0 });
+  });
+
+  it('the setting decides: optional and off show no gap and ask nobody, off refuses a write; required asks', async () => {
+    const later = t0 + 120 * DAY;
+    const restart = await prepareTrialWrite({ storage, config }, scope, { days: 10 }, later - 30 * DAY);
+    if (!restart.ok) throw new Error(restart.message);
+    await writeDoc(storage, NODE, 'trial', scope, restart.doc, OWNER);
+    const under = (mode: 'required' | 'optional' | 'off') => ({ storage, config: { ...config, balancingTest: mode } });
+    for (const mode of ['optional', 'off'] as const) {
+      const k = (await scopeGaps(under(mode), scope, { now: later })).map(g => g.kind);
+      expect(k.filter(x => x.startsWith('lia-') || x === 'app-trial-expired')).toEqual([]);
+      expect(await askOwnersAboutExpiredTrials(storage, under(mode).config, { now: new Date(later) })).toEqual({ asked: 0 });
+    }
+    expect(await prepareTrialWrite(under('off'), scope, { days: 5 })).toMatchObject({ ok: false, code: 'BALANCING_TEST_OFF' });
+    expect((await prepareTrialWrite(under('optional'), scope, { days: 5 })).ok).toBe(true);
+    const req = (await scopeGaps(under('required'), scope, { now: later })).map(g => g.kind);
+    expect(req).toContain('app-trial-expired');
   });
 
   it('a trial is 1 to 180 days, and an app that is no trial has none to end', async () => {

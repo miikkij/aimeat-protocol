@@ -3,8 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner allowed the approval of a balancing test that one of their agents or apps
- *   asked for (services/compliance/lia-ops.ts filed it, marked `in_person`: only the account holder
- *   signed in themselves allows it). The applier approves exactly the test the request names, as the
+ *   asked for. The question is filed only for a test whose owner asked to approve it themselves
+ *   (`ownerApproves`; services/compliance/lia-ops.ts filed it, marked `in_person`: only the account
+ *   holder signed in themselves allows it). The applier approves exactly the test the request names, as the
  *   owner, recording who asked. A test changed since the question was filed is not approved: the
  *   request binds the digest of its content, and the applier ends such a request with the reason.
  * @structure applyLiaApproval
@@ -30,7 +31,7 @@ export async function applyLiaApproval(
     return { ok: false, reason: 'only the account holder, signed in themselves, approves a balancing test' };
   }
   const done = await approveLiaAs(ctx, { kind: 'app', ownerName, app }, lia, {
-    approvedBy: ownerGhii, requestedBy: request.requested_by.principal, digest,
+    approvedBy: ownerGhii, kind: 'person', requestedBy: request.requested_by.principal, digest,
     ...(typeof months === 'number' ? { reviewMonths: months } : {}),
   });
   return done.ok ? { ok: true } : { ok: false, reason: done.message };

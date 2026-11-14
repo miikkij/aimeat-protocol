@@ -14550,6 +14550,7 @@
     "cfgGroup_consent": "Consentimiento",
     "cfgGroup_dataspace": "Espacios de datos",
     "cfgGroup_classification": "Clasificación",
+    "cfgGroup_compliance": "Cumplimiento",
     "cfgGroup_content_class": "Clases de contenido",
     "cfg_content_class_mode": "Clases de contenido",
     "cfg_content_class_ffprobe_path": "Programa ffprobe",
@@ -14588,6 +14589,9 @@
     "cfgOpt_consent_party_self_registration_off": "Nadie se registra en una aplicación",
     "cfgOpt_consent_party_self_registration_apps-ask": "El propietario de la aplicación lo pide y el operador lo aprueba",
     "cfgOpt_consent_party_self_registration_on": "El propietario de la aplicación abre el registro",
+    "cfgOpt_compliance_balancing_test_required": "Obligatoria",
+    "cfgOpt_compliance_balancing_test_optional": "Opcional",
+    "cfgOpt_compliance_balancing_test_off": "Desactivada",
     "cfgOpt_content_class_mode_on": "Activadas, cada propietario decide",
     "cfgOpt_content_class_mode_off": "Desactivadas",
     "cfgOpt_content_class_profile_labels_auto": "El modelo de decisión cuando está activo",
@@ -14768,6 +14772,7 @@
     "cfg_consent_party_reads_per_minute": "Lecturas por minuto de una parte externa",
     "cfg_consent_party_purchases_per_hour": "Compras que una dirección puede iniciar por hora",
     "cfg_consent_data_intermediation": "Servicio de intermediación de datos (UE 2022/868)",
+    "cfg_compliance_balancing_test": "Prueba de ponderación de las aplicaciones (interés legítimo)",
     "cfg_consent_party_self_registration": "Registro en aplicaciones sin una cuenta",
     "cfg_consent_app_party_signups_per_hour": "Registros en aplicaciones desde una dirección en una hora",
     "cfg_consent_app_party_pending_hours": "Horas que un registro sin confirmar conserva su plaza",
@@ -14981,6 +14986,7 @@
     "cfgGroup_data_out": "Salida de datos",
     "cfgDesc_consent_data_intermediation": "Si este servidor intermedia datos entre otros como servicio. El modo «Solo informe» no cambia nada: muestra lo que encuentra en la página de Compliance.",
     "cfgDesc_consent_party_self_registration": "Si una aplicación puede dejar que la gente se registre sin una cuenta en este servidor. Siempre desactivado en un servidor que solo muestra su contenido a las cuentas con sesión iniciada.",
+    "cfgDesc_compliance_balancing_test": "Si este servidor pide la prueba de ponderación de una aplicación cuyo registro indica el interés legítimo. Opcional por defecto: la prueba está disponible y nada la pide.",
     "cfgDesc_consent_app_party_signups_per_hour": "Cuántas veces una misma dirección de red puede registrarse en las aplicaciones de este servidor en una hora. 0 significa sin límite.",
     "cfgDesc_consent_app_party_pending_hours": "Cuánto tiempo sigue en la lista de la aplicación una persona que se registró y no abrió el enlace del correo. Después la plaza queda libre y la persona puede registrarse de nuevo. 0: sigue en la lista hasta que el propietario de la aplicación la quite.",
     "cfgDesc_dataspace_enabled": "Abre este servidor a los conectores de los espacios de datos de la UE. Los emisores de confianza se configuran por separado para cada espacio de datos.",
@@ -26431,6 +26437,12 @@
     "dataMap.liaReviewDue": "La fecha de revisión ya pasó.",
     "dataMap.liaApprove": "Aprobar",
     "dataMap.liaApprovedNow": "La prueba quedó aprobada.",
+    "dataMap.liaByAgent": "{by}, un agente de IA que actúa por ti,",
+    "dataMap.liaOnlyMe": "Solo yo apruebo",
+    "dataMap.liaOnlyMeState": "Solo tú apruebas esta prueba.",
+    "dataMap.liaAgentsMay": "Mis agentes pueden aprobar",
+    "dataMap.liaOnlyMeNow": "Ahora solo tú apruebas esta prueba. Un agente que la apruebe te pregunta primero.",
+    "dataMap.liaAgentsMayNow": "Tus agentes con el permiso compliance:write pueden volver a aprobar esta prueba.",
     "dataMap.liaSpecial": "El registro «{register}» indica el interés legítimo para datos de categorías especiales, como datos de salud. Esa base no cubre esos datos. Elige otra base en el registro y escribe una evaluación de impacto.",
     "dataMap.liaHow": "Tu IA completa la prueba contigo. Dile: «Haz la prueba de ponderación de {app}». Te hace las preguntas abiertas. La conclusión la sacas tú, y apruebas la prueba aquí.",
     "dataMap.invitesLabel": "A quién invita",
@@ -29673,6 +29685,20 @@
           "what": "Cada agente puede tener una clasificación más alta que puede leer. El contenido con una clasificación más alta queda oculto para el agente y se cuenta. Este ajuste da ese valor a cada agente creado después del cambio. Los agentes que ya existen conservan el suyo, y cada propietario puede cambiarlo en la página del agente. Solo se aplica mientras la clasificación está activada.",
           "range": "El identificador de una clasificación de la política de clasificación de este servicio, como sisainen para Interno o luottamuksellinen para Confidencial. Vacío (el valor predeterminado): sin límite.",
           "tip": "Déjalo vacío salvo que los agentes de este servicio deban empezar limitados. En un servicio de empresa donde los agentes atienden a muchas personas, Interno es un buen valor inicial."
+        }
+      },
+      "compliance": {
+        "balancing_test": {
+          "title": "Prueba de ponderación de las aplicaciones",
+          "short": "Si este servidor pide la prueba de ponderación de una aplicación cuyo registro indica el interés legítimo como base jurídica. Opcional por defecto.",
+          "what": "El interés legítimo es una de las bases jurídicas para tratar datos personales, y exige una prueba de ponderación por escrito (RGPD art. 6.1.f). Este servidor redacta la prueba a partir del registro y del mapa de datos de la aplicación, y el propietario de la aplicación o su IA completa el resto y la aprueba. El ajuste decide cuánto insiste el servidor. Obligatoria: si el registro de una aplicación indica el interés legítimo y otras personas pueden ver los datos, o la aplicación guarda datos regulados, una prueba que falta, sin aprobar o abierta de nuevo aparece entre las carencias de cumplimiento, y publicar la aplicación o escribir su mapa de datos o su registro avisa que la prueba hace falta. Nada se bloquea. Opcional: todo funciona igual y el servidor no pide nada. Desactivada: no se redacta ni se guarda ninguna prueba, y las pruebas guardadas antes se pueden seguir leyendo. En ningún modo se pide nada a una aplicación cuyos datos solo ve quien la usa.",
+          "range": "Una de tres: Obligatoria, Opcional (por defecto) o Desactivada.",
+          "low": "Desactivada: el servidor no redacta ni guarda pruebas de ponderación.",
+          "high": "Obligatoria: una prueba que falta aparece como carencia y el propietario recibe un aviso cuando hace falta.",
+          "ex1": "Obligatoria: un servidor de empresa donde la empresa responde por los datos personales que tratan sus aplicaciones.",
+          "ex2": "Opcional: un servidor público o compartido donde el propietario de una aplicación hace la prueba cuando quiere.",
+          "ex3": "Desactivada: un entorno cerrado que lleva sus registros de actividades de tratamiento en otro lugar.",
+          "tip": "Un agente con el permiso compliance:write puede aprobar una prueba en cualquier modo, salvo que el propietario de la aplicación haya pedido aprobar esa prueba personalmente. Es una ayuda para la evaluación, no asesoría legal."
         }
       },
       "visibility": {

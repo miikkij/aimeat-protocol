@@ -8,14 +8,18 @@
  *
  *   - liaDraftOp: whether the app needs a test, and the draft of each one it needs, filled from the
  *     app's own records (lia-draft.ts), with the question set in the reader's language. Stored nowhere.
- *   - liaApproveOp: the account holder approves a test. In person it is approved at once. An agent or
- *     an app that asks files the owner's question (the approval standard, approval-standard.ts): the
- *     owner allows it in person, the one who asked hears the answer, and nothing is approved until
- *     then. A model drafts; a person concludes.
+ *   - liaApproveOp: a test is approved by the account holder in person or by an agent or an app with
+ *     compliance:write, and the record says which. A test whose owner keeps the approval for
+ *     themselves (`ownerApproves`) files the owner's question instead (the approval standard,
+ *     approval-standard.ts): the owner allows it in person and the one who asked hears the answer.
+ *     The setting compliance.balancing_test off refuses every approval.
  *   - liaDocumentOp: the test as Markdown, a PDF or an Excel workbook (lia-render.ts).
  * @structure liaDraftOp() · liaApproveOp() · liaDocumentOp() · LIA_APPROVAL_KIND · liaLang()
  * @usage const out = await liaDraftOp(deps, caller, { scope: 'app', app: 'crm.html' }, 'fi');
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The draft answers the server's `mode` (off answers no draft). An agent or an
+ *     app with compliance:write approves a test at once unless its owner keeps the approval
+ *     (`ownerApproves`, set by the owner in person); Jouni, 2026-11-14.
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -26,13 +30,15 @@ import type { CallerContext } from '../caller-context.js';
 import type { OperatorCaller } from '../operator-principal.js';
 import { fileAsk, publishRequestedBody, requesterOf } from '../publish-requests/ask.js';
 import { complianceDocAccess } from './docs-access.js';
-import type { ComplianceScope } from './docs.js';
+import { patchDocItem, type ComplianceScope } from './docs.js';
 import { ComplianceDocError, scopeFrom, type ScopeInput } from './docs-ops.js';
+import { DOC_SCHEMAS } from './docs-schemas.js';
+import type { ComplianceLia } from './lia-schemas.js';
 import { liaDraftItem } from './lia-draft.js';
 import { appLiaReading } from './lia-need.js';
 import { renderLiaPdf, renderLiaXlsx, liaMarkdown, type LiaRenderContext } from './lia-render.js';
 import {
-  approveLiaAs, liaDigest, liaIncomplete, liasForRead, liaUnfinished, trialForRead, SPECIAL_REFUSAL, type LiaRefusal,
+  approveLiaAs, liaDigest, liaIncomplete, liaOff, liasForRead, liaUnfinished, trialForRead, SPECIAL_REFUSAL, type LiaRefusal,
 } from './lia-write.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -68,6 +74,13 @@ const NO_NEED: Record<string, string> = {
 export async function liaDraftOp(deps: Deps, caller: OperatorCaller, input: ScopeInput, lang: LiaLang = 'en'): Promise<Record<string, unknown>> {
   const scope = appScope(input, caller);
   await allowed(deps, caller, scope, 'read');
+  const mode = deps.config.balancingTest;
+  if (mode === 'off') {
+    return {
+      scope, mode, needed: false, items: [],
+      how: 'The operator of this server has switched the balancing test off (the setting compliance.balancing_test). No test is drafted or written here; tests stored before are read with part "lias".',
+    };
+  }
   const reading = await appLiaReading(deps, scope);
   const stored = liasForRead(reading);
   const items: Array<Record<string, unknown>> = [];
@@ -90,7 +103,8 @@ export async function liaDraftOp(deps: Deps, caller: OperatorCaller, input: Scop
   }
   const needed = reading.needs.some(n => n.need === 'required');
   return {
-    scope, needed, items,
+    // `mode` required: a missing test is a gap. optional: the test is there to use, and nothing asks for it.
+    scope, mode, needed, items,
     ...(notNeeded.length ? { not_needed: notNeeded } : {}),
     ...(notAllowed.length ? { not_allowed: notAllowed } : {}),
     trial: trialForRead(reading.trial),
@@ -102,15 +116,20 @@ export async function liaDraftOp(deps: Deps, caller: OperatorCaller, input: Scop
     how: reading.needs.length === 0
       ? 'No register of this app names legitimate interests as its legal basis, so no balancing test is asked. The basis is set in the register (part "registers").'
       : 'Each item is a draft: `facts` is what the server reads from the app, and the answers it carries are the ones it can see. Ask the person the open questions, one section at a time, and write their reasoning into `notes` (by section id or question id). '
-        + 'Leave a question out when the person has not answered it. Save with aimeat_compliance_register_write { part: "lias", app, value: { items: [...] } }. The person, not you, decides the outcome and approves: '
-        + 'aimeat_compliance_register_write { part: "lias", app, item_id, set: { "status": "approved" } } asks them.',
+        + 'Leave a question out when the person has not answered it. Save with aimeat_compliance_register_write { part: "lias", app, value: { items: [...] } }. The outcome is the person\'s conclusion: ask them for it. '
+        + 'aimeat_compliance_register_write { part: "lias", app, item_id, set: { "status": "approved" } } approves the test when the person says so; for a test whose owner approves it themselves (`ownerApproves`) it asks them instead.',
     note: NOT_LEGAL_ADVICE,
   };
 }
 
 /**
- * Approve one test. `set` is { status: "approved", review_months? }. The account holder in person:
- * approved now. An agent or an app: the owner's question is filed and nothing changes until they allow it.
+ * The two changes in place a balancing test has. `set` { status: "approved", review_months? } approves
+ * it: the account holder in person, or an agent or an app with compliance:write (which the route and
+ * the tool already demand), approves at once and the record says which. When the owner asked to
+ * approve this test themselves (`ownerApproves`), an agent or an app files the owner's question
+ * instead, and nothing changes until they allow it in person. `set` { ownerApproves: true | false }
+ * is that choice, and only the account holder in person makes it (Jouni, 2026-11-14: an agent may do
+ * what its person may do; the person may keep one decision for themselves).
  */
 export async function liaApproveOp(
   deps: Deps, caller: CallerContext, input: ScopeInput, itemId: unknown, set: unknown, opts: { dryRun?: boolean; app?: string } = {},
@@ -118,27 +137,33 @@ export async function liaApproveOp(
   const id = typeof itemId === 'string' && itemId.trim() ? itemId.trim() : '';
   if (!id) throw new ComplianceDocError(400, 'INVALID_INPUT', 'item_id names the balancing test.');
   const s = (set && typeof set === 'object' && !Array.isArray(set) ? set : {}) as Record<string, unknown>;
-  const extra = Object.keys(s).filter(k => k !== 'status' && k !== 'review_months');
-  if (s.status !== 'approved' || extra.length) {
-    throw new ComplianceDocError(400, 'INVALID_INPUT', 'One entry of a balancing test is not changed in place. To change answers, notes or the outcome, send the whole test as value. To approve it, send set { "status": "approved" }, with "review_months" when the review is not in 12 months.');
+  const keys = Object.keys(s);
+  const choice = keys.length === 1 && typeof s.ownerApproves === 'boolean';
+  const approve = s.status === 'approved' && keys.every(k => k === 'status' || k === 'review_months');
+  if (!choice && !approve) {
+    throw new ComplianceDocError(400, 'INVALID_INPUT', 'One entry of a balancing test is not changed in place. To change answers, notes or the outcome, send the whole test as value. To approve it, send set { "status": "approved" }, with "review_months" when the review is not in 12 months. The owner, signed in themselves, sends set { "ownerApproves": true } to approve the test only themselves.');
   }
-  const reviewMonths = typeof s.review_months === 'number' && Number.isFinite(s.review_months) ? s.review_months : undefined;
+  const off = liaOff(deps.config);
+  if (off) return raise(off);
   const scope = appScope(input, caller.auth);
   await allowed(deps, caller.auth, scope, 'write');
   const reading = await appLiaReading(deps, scope);
   const lia = reading.lias.find(l => l.id === id);
   if (!lia) throw new ComplianceDocError(404, 'NOT_FOUND', `No balancing test ${id} for this app. Save it first (part "lias", value).`);
+  if (choice) return ownerChoiceOp(deps, caller, scope, lia, s.ownerApproves === true, !!opts.dryRun);
+  const reviewMonths = typeof s.review_months === 'number' && Number.isFinite(s.review_months) ? s.review_months : undefined;
   const open = liaUnfinished(lia);
   if (opts.dryRun) {
     return { kind: 'lias', scope, item: lia, stored: false, complete: !open.unanswered.length && !open.outcome && !open.summary, unfinished: open, note: 'Nothing was written.' };
   }
-  if (caller.inPerson) {
-    const done = await approveLiaAs(deps, scope, id, { approvedBy: caller.ownerGhii, reviewMonths });
+  if (caller.inPerson || !lia.ownerApproves) {
+    const kind = caller.inPerson ? 'person' as const : caller.kind === 'agent' ? 'agent' as const : 'app' as const;
+    const done = await approveLiaAs(deps, scope, id, { approvedBy: caller.inPerson ? caller.ownerGhii : caller.principal, kind, reviewMonths });
     if (!done.ok) return raise(done);
     return { kind: 'lias', scope, stored: true, item: done.item };
   }
-  // An agent or an app asks. The person is asked only about a test they can approve: complete, and
-  // of a register the rule still asks a test of.
+  // The owner approves this test themselves. The person is asked only about a test they can approve:
+  // complete, and of a register the rule still asks a test of.
   const need = reading.needs.find(n => n.register.id === lia.registerId);
   if (!need) throw new ComplianceDocError(409, 'LIA_NOT_APPLICABLE', 'The register of this test no longer names legitimate interests as its legal basis.');
   if (need.need === 'not-allowed') return raise(SPECIAL_REFUSAL(need.register.title));
@@ -165,6 +190,27 @@ export async function liaApproveOp(
   });
   if (!filed.ok) throw new ComplianceDocError(filed.status, filed.code, filed.message);
   return { kind: 'lias', scope, stored: false, item: lia, approval_request: publishRequestedBody(deps, filed) };
+}
+
+/** The owner's choice to approve one test only themselves. Only the account holder in person makes it. */
+async function ownerChoiceOp(
+  deps: Deps, caller: CallerContext, scope: AppScope, lia: ComplianceLia, on: boolean, dryRun: boolean,
+): Promise<Record<string, unknown>> {
+  if (!caller.inPerson) {
+    throw new ComplianceDocError(403, 'NOT_ALLOWED', 'Whether only the owner approves this test is the owner\'s own choice: they make it signed in themselves, on the app\'s page.');
+  }
+  const next: ComplianceLia = { ...lia };
+  if (on) next.ownerApproves = true;
+  else delete next.ownerApproves;
+  if (dryRun) return { kind: 'lias', scope, item: next, stored: false, note: 'Nothing was written.' };
+  const saved = await patchDocItem(deps.storage, deps.config.nodeId, 'lias', scope, lia.id, (item) => {
+    const changed = { ...item };
+    if (on) changed.ownerApproves = true;
+    else delete changed.ownerApproves;
+    return changed;
+  }, d => DOC_SCHEMAS.lias.parse(d), caller.ownerGhii);
+  if (!saved) throw new ComplianceDocError(404, 'NOT_FOUND', `No balancing test ${lia.id} for this app.`);
+  return { kind: 'lias', scope, stored: true, item: saved };
 }
 
 const FORMATS = {

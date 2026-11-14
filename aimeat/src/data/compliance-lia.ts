@@ -21,6 +21,7 @@
  * @structure LiaLang · LiaQuestion · LiaSection · LIA_SECTIONS · LIA_QUESTION_IDS · LIA_LABELS · liaQuestionById()
  * @usage for (const s of LIA_SECTIONS) for (const q of s.questions) print(q.text[lang]);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — byAgent, byApp and requestedBy: the files say when an agent or an app approved.
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 
@@ -138,6 +139,8 @@ export const LIA_LABELS: Record<LiaLang, {
   sources: Record<'human' | 'ai' | 'evidence' | 'proposed', string>; notLegalAdvice: string; none: string;
   /** The legal bases of GDPR art. 6(1) and who can see the data, in the words the Compliance pages use. */
   bases: Record<string, string>; reaches: Record<'none' | 'self' | 'shared' | 'exposed' | 'unknown', string>;
+  /** Beside an approver that is an agent or an app; who asked for an approval the owner gave. */
+  byAgent: string; byApp: string; requestedBy: string;
 }> = {
   en: {
     title: 'Balancing test (legitimate interests)', app: 'App', register: 'Register', status: 'Status', draft: 'Draft', approved: 'Approved', reopened: 'Approved, open again',
@@ -146,9 +149,10 @@ export const LIA_LABELS: Record<LiaLang, {
     nodeSafeguards: 'Safeguards of the server', appSafeguards: 'Safeguards of this app', reminders: 'To check',
     outcome: 'Outcome', suitable: 'Legitimate interests fit this processing', notSuitable: 'Legitimate interests do not fit this processing', summary: 'Summary', approvedBy: 'Approved by', approvedAt: 'Approved on', reviewAt: 'Review by', preparedBy: 'Last edited by',
     sources: { human: 'a person', ai: 'an AI', evidence: 'read from the app', proposed: 'proposed by the server' },
-    notLegalAdvice: 'The server filled in what it reads from the app. A person gave or checked every answer and made the conclusion. This document is not legal advice.', none: 'None.',
+    notLegalAdvice: 'The server filled in what it reads from the app. Each answer says who gave it, and the last rows say who approved the test. This document is not legal advice.', none: 'None.',
     bases: { consent: 'Consent', contract: 'Contract', 'legal-obligation': 'Legal obligation', 'vital-interests': 'Vital interests', 'public-task': 'Public task', 'legitimate-interests': 'Legitimate interests' },
     reaches: { none: 'Nobody: the data is not kept on the server', self: 'Only the person who uses the app', shared: 'Named people or an organism', exposed: 'Anyone, the maker or an outside service', unknown: 'The data map does not say' },
+    byAgent: "an AI agent acting for the app's owner", byApp: "an app acting for the app's owner", requestedBy: 'Asked for by',
   },
   fi: {
     title: 'Tasapainotesti (oikeutettu etu)', app: 'Sovellus', register: 'Rekisteri', status: 'Tila', draft: 'Luonnos', approved: 'Hyväksytty', reopened: 'Hyväksytty, avattu uudelleen',
@@ -157,9 +161,10 @@ export const LIA_LABELS: Record<LiaLang, {
     nodeSafeguards: 'Palvelimen suojatoimet', appSafeguards: 'Tämän sovelluksen suojatoimet', reminders: 'Tarkistettavaa',
     outcome: 'Lopputulos', suitable: 'Oikeutettu etu soveltuu tähän käsittelyyn', notSuitable: 'Oikeutettu etu ei sovellu tähän käsittelyyn', summary: 'Yhteenveto', approvedBy: 'Hyväksyjä', approvedAt: 'Hyväksytty', reviewAt: 'Tarkistettava viimeistään', preparedBy: 'Viimeksi muokannut',
     sources: { human: 'ihminen', ai: 'tekoäly', evidence: 'luettu sovelluksesta', proposed: 'palvelimen ehdotus' },
-    notLegalAdvice: 'Palvelin täytti sen, minkä se lukee sovelluksesta. Ihminen antoi tai tarkisti jokaisen vastauksen ja teki johtopäätöksen. Tämä asiakirja ei ole oikeudellista neuvontaa.', none: 'Ei ole.',
+    notLegalAdvice: 'Palvelin täytti sen, minkä se lukee sovelluksesta. Jokaisen vastauksen kohdalla lukee, kuka sen antoi, ja viimeisillä riveillä, kuka testin hyväksyi. Tämä asiakirja ei ole oikeudellista neuvontaa.', none: 'Ei ole.',
     bases: { consent: 'Suostumus', contract: 'Sopimus', 'legal-obligation': 'Lakisääteinen velvoite', 'vital-interests': 'Elintärkeä etu', 'public-task': 'Yleisen edun mukainen tehtävä', 'legitimate-interests': 'Oikeutettu etu' },
     reaches: { none: 'Ei kukaan: tietoja ei säilytetä palvelimella', self: 'Vain käyttäjä itse', shared: 'Nimetyt ihmiset tai organismi', exposed: 'Kuka tahansa, tekijä tai ulkoinen palvelu', unknown: 'Datakartta ei kerro' },
+    byAgent: 'sovelluksen omistajan puolesta toimiva tekoälyagentti', byApp: 'sovelluksen omistajan puolesta toimiva sovellus', requestedBy: 'Hyväksyntää pyysi',
   },
   es: {
     title: 'Prueba de ponderación (interés legítimo)', app: 'Aplicación', register: 'Registro', status: 'Estado', draft: 'Borrador', approved: 'Aprobada', reopened: 'Aprobada, abierta de nuevo',
@@ -168,8 +173,9 @@ export const LIA_LABELS: Record<LiaLang, {
     nodeSafeguards: 'Garantías del servidor', appSafeguards: 'Garantías de esta aplicación', reminders: 'Por revisar',
     outcome: 'Resultado', suitable: 'El interés legítimo es adecuado para este tratamiento', notSuitable: 'El interés legítimo no es adecuado para este tratamiento', summary: 'Resumen', approvedBy: 'Aprobada por', approvedAt: 'Aprobada el', reviewAt: 'Revisar antes del', preparedBy: 'Última edición de',
     sources: { human: 'una persona', ai: 'una IA', evidence: 'leído de la aplicación', proposed: 'propuesta del servidor' },
-    notLegalAdvice: 'El servidor completó lo que lee de la aplicación. Una persona dio o revisó cada respuesta y sacó la conclusión. Este documento no es asesoría legal.', none: 'Ninguna.',
+    notLegalAdvice: 'El servidor completó lo que lee de la aplicación. Cada respuesta dice quién la dio, y las últimas filas dicen quién aprobó la prueba. Este documento no es asesoría legal.', none: 'Ninguna.',
     bases: { consent: 'Consentimiento', contract: 'Contrato', 'legal-obligation': 'Obligación legal', 'vital-interests': 'Intereses vitales', 'public-task': 'Misión de interés público', 'legitimate-interests': 'Interés legítimo' },
     reaches: { none: 'Nadie: los datos no se guardan en el servidor', self: 'Solo la persona que usa la aplicación', shared: 'Personas nombradas o un organismo', exposed: 'Cualquiera, el autor o un servicio externo', unknown: 'El mapa de datos no lo dice' },
+    byAgent: 'un agente de IA que actúa por el propietario de la aplicación', byApp: 'una aplicación que actúa por el propietario de la aplicación', requestedBy: 'Lo pidió',
   },
 };

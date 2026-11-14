@@ -15419,6 +15419,7 @@
     "cfgGroup_consent": "Consent",
     "cfgGroup_dataspace": "Data spaces",
     "cfgGroup_classification": "Classification",
+    "cfgGroup_compliance": "Compliance",
     "cfgGroup_content_class": "Content classes",
     "cfg_content_class_mode": "Content classes",
     "cfg_content_class_ffprobe_path": "ffprobe program",
@@ -15457,6 +15458,9 @@
     "cfgOpt_consent_party_self_registration_off": "Nobody registers to an app",
     "cfgOpt_consent_party_self_registration_apps-ask": "An app's owner asks, the operator approves",
     "cfgOpt_consent_party_self_registration_on": "An app's owner opens the signup",
+    "cfgOpt_compliance_balancing_test_required": "Required",
+    "cfgOpt_compliance_balancing_test_optional": "Optional",
+    "cfgOpt_compliance_balancing_test_off": "Off",
     "cfgOpt_content_class_mode_on": "On, each owner decides",
     "cfgOpt_content_class_mode_off": "Off",
     "cfgOpt_content_class_profile_labels_auto": "The decision model when it is on",
@@ -15637,6 +15641,7 @@
     "cfg_consent_party_reads_per_minute": "Reads an outside party may make a minute",
     "cfg_consent_party_purchases_per_hour": "Purchases one address may start an hour",
     "cfg_consent_data_intermediation": "Data intermediation service (EU 2022/868)",
+    "cfg_compliance_balancing_test": "Balancing test for apps (legitimate interests)",
     "cfg_consent_party_self_registration": "People register to apps without an account",
     "cfg_consent_app_party_signups_per_hour": "Signups to apps from one address in an hour",
     "cfg_consent_app_party_pending_hours": "Hours an unconfirmed signup keeps its place",
@@ -15850,6 +15855,7 @@
     "cfgGroup_data_out": "Data out",
     "cfgDesc_consent_data_intermediation": "Whether this server passes data between others as a service. \"Report only\" changes nothing: it shows what it finds on the Compliance page.",
     "cfgDesc_consent_party_self_registration": "Whether an app may let people register without an account on this server. Always off on a server that shows its content to signed-in accounts only.",
+    "cfgDesc_compliance_balancing_test": "Whether this server asks for the balancing test of an app whose register names legitimate interests. Optional by default: the test is there to use, and nothing asks for it.",
     "cfgDesc_consent_app_party_signups_per_hour": "How many times one network address may sign up to this server's apps in an hour. 0 means no limit.",
     "cfgDesc_consent_app_party_pending_hours": "How long a person who signed up to an app and never opened the mailed link stays on the app's list. After that the place is free again, and the person can sign up again. 0 keeps them until the app's owner removes them.",
     "cfgDesc_dataspace_enabled": "Opens this server to the connectors of EU data spaces. The trusted issuers are set one data space at a time.",
@@ -28061,6 +28067,12 @@
     "dataMap.liaReviewDue": "The review date has passed.",
     "dataMap.liaApprove": "Approve",
     "dataMap.liaApprovedNow": "The test is approved.",
+    "dataMap.liaByAgent": "{by}, an AI agent acting for you,",
+    "dataMap.liaOnlyMe": "Only I approve",
+    "dataMap.liaOnlyMeState": "Only you approve this test.",
+    "dataMap.liaAgentsMay": "Let my agents approve",
+    "dataMap.liaOnlyMeNow": "Only you approve this test now. An agent that approves it asks you first.",
+    "dataMap.liaAgentsMayNow": "Your agents with the compliance:write permission may approve this test again.",
     "dataMap.liaSpecial": "The register \"{register}\" names legitimate interests for special category data, such as health data. That basis does not cover such data. Choose another basis in the register and write an impact assessment.",
     "dataMap.liaHow": "Your AI fills the test with you. Tell it: \"Do the balancing test of {app}.\" It asks you the open questions. You make the conclusion and approve the test here.",
     "dataMap.invitesLabel": "Who it invites",
@@ -31303,6 +31315,20 @@
           "what": "Each agent can have a highest classification it may read. Content classified higher is hidden from the agent and counted. This setting gives that value to every agent created after the change. Agents that already exist keep what they have, and each owner can change it on the agent's page. It applies only while classification is on.",
           "range": "The id of a classification of this service's classification policy, such as sisainen for Internal or luottamuksellinen for Confidential. Empty (the default): no limit.",
           "tip": "Leave it empty unless the agents on this service should start limited. A company service where agents serve many people can start them at Internal."
+        }
+      },
+      "compliance": {
+        "balancing_test": {
+          "title": "Balancing test for apps",
+          "short": "Whether this server asks for the balancing test of an app whose register names legitimate interests as its legal basis. Optional by default.",
+          "what": "Legitimate interests is one of the legal bases for processing personal data, and it needs a written balancing test (GDPR art. 6(1)(f)). This server drafts the test from the app's own register and data map, and the app's owner or their AI fills in the rest and approves it. The setting decides how hard the server asks. Required: an app whose register names legitimate interests and whose data others can see, or that keeps regulated data, shows a missing, unapproved or reopened test in the compliance gaps, and publishing the app, writing its data map or its register says the test is due. Nothing is blocked. Optional: everything works the same, and the server asks for nothing. Off: no test is drafted or written, and the tests stored before stay readable. In every mode an app only its user sees is asked nothing.",
+          "range": "One of three: Required, Optional (the default) or Off.",
+          "low": "Off: the server drafts and stores no balancing test.",
+          "high": "Required: a missing test shows as a gap and the owner hears when one is due.",
+          "ex1": "Required: a company server where the company answers for the personal data its apps process.",
+          "ex2": "Optional: a public or shared server where an app's owner writes the test when they want it.",
+          "ex3": "Off: a closed environment that keeps its records of processing elsewhere.",
+          "tip": "An agent with the compliance:write permission may approve a test in every mode, unless the app's owner has asked to approve that test themselves. This is a help for the assessment, not legal advice."
         }
       },
       "visibility": {

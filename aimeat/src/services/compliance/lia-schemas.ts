@@ -12,8 +12,10 @@
  *               node's own safeguards). The node writes them on every save; a caller cannot.
  *     answers   yes or no per question of data/compliance-lia.ts, and `notes`, the reasoning per
  *               section or question. A person or their AI writes them; `answerSources` says which.
- *     outcome   suitable or not, with a summary. Approval is a person's (services/compliance/lia-ops.ts):
- *               `approvedBy` is the account holder, `requestedBy` the agent that asked, when one did.
+ *     outcome   suitable or not, with a summary. Approval (services/compliance/lia-ops.ts) records who
+ *               approved (`approvedBy`, `approvedByKind`: the account holder, an agent or an app) and,
+ *               when the owner allowed an agent's request, `requestedBy`. `ownerApproves` is the
+ *               owner's own choice that only they approve this test.
  *
  *   `approvedOn` keeps who could see the data and which regulated data the app held at approval, so a
  *   later change of either reads as "open again" without a write (lia-need.ts).
@@ -23,6 +25,8 @@
  * @structure LiaFactsSchema · LiaSchema · TrialSchema · ContactSchema · the inferred types · TRIAL_DEFAULT_DAYS · TRIAL_MAX_DAYS
  * @usage const parsed = LiaSchema.safeParse(item);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — approvedByKind and ownerApproves: an agent with compliance:write may approve
+ *     a test unless its owner asked to approve it themselves (Jouni, 2026-11-14).
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import { z } from 'zod';
@@ -70,7 +74,14 @@ export const LiaSchema = z.object({
   notes: z.record(z.string().max(60), text(4000)).optional(),
   outcome: z.object({ result: z.enum(['suitable', 'not-suitable']), summary: text(4000).optional() }).optional(),
   approvedBy: z.string().max(300).optional(),
+  /** Who approved: the account holder in person, one of their agents, or one of their apps. */
+  approvedByKind: z.enum(['person', 'agent', 'app']).optional(),
   approvedAt: iso.optional(),
+  /**
+   * True when the owner asked to approve this test themselves: an agent or an app that approves it
+   * then asks the owner, who allows it signed in. Only the account holder in person sets or clears it.
+   */
+  ownerApproves: z.boolean().optional(),
   /** The agent or app that asked the owner to approve, when the owner did not start it in person. */
   requestedBy: z.string().max(300).optional(),
   reviewAt: iso.optional(),

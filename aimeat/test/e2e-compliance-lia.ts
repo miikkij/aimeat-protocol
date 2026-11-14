@@ -13,9 +13,12 @@
  *       yes or no is answered without evidence;
  *     - health data on legitimate interests: no test is drafted or stored (409), the person is
  *       pointed to another basis;
- *     - an agent saves the test (its answers marked `ai`) and asks for approval: nothing is approved,
- *       an agent may not allow it, the owner in person allows it, and the test names both; a test
+ *     - an agent saves the test (its answers marked `ai`) and, holding compliance:write, approves it,
+ *       named as an agent; only the owner in person keeps the approval for themselves, and then an
+ *       agent's approval is a question no agent may allow and the owner allows in person; a test
  *       changed after the question is not approved by the old question;
+ *     - the operator's setting: optional asks for nothing and the test works, off drafts and writes
+ *       none and keeps what is stored (the suite runs under required and ends on the default);
  *     - the approved test is in the operator's report, its Excel workbook and PDF download, the
  *       organism's privacy contact hears of it, and a wider reach opens it again;
  *     - a trial: a shared app with no regulated data is asked no test while the trial runs;
@@ -24,6 +27,8 @@
  *   The trial that ended is in test/unit/compliance-lia.test.ts: it needs the clock moved.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-lia
  * @version-history
+ *   v1.1.0 — 2026-11-14 — An agent with compliance:write approves; the owner keeps the approval in
+ *     person; the setting compliance.balancing_test (Jouni, 2026-11-14).
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -85,6 +90,7 @@ const register = (over: Record<string, unknown> = {}) => ({
 const putRegister = (owner: RegisteredOwner, app: string, over: Record<string, unknown> = {}) =>
     call('PUT', `/v1/compliance/docs/registers?${q(app)}`, owner.token, { items: [register(over)] });
 const liaGaps = (kinds: string[]) => kinds.filter(k => k.startsWith('lia-') || k === 'legitimate-interests-special-category' || k === 'app-trial-expired');
+const setMode = (value: 'required' | 'optional' | 'off') => call('PUT', '/v1/admin/config', op.token, { changes: [{ path: 'compliance.balancing_test', value }] });
 
 await test('Setup: an operator, alice with an organism bob belongs to, her agents, and four apps', async () => {
     op = await registerOwner(BASE, `liaop${stamp}`);
@@ -102,6 +108,9 @@ await test('Setup: an operator, alice with an organism bob belongs to, her agent
     const bare = await makeAgent(BASE, alice, ['*'], `liab${stamp % 100000}`);
     aliceOtherAgentToken = bare.token;
     aliceBareMcp = await openSession(BASE, bare.token, 'balancing test, no words');
+    // The default is optional; the acceptance terms are about a server that requires the test.
+    const mode = await setMode('required');
+    assert(mode.status === 200, `the operator requires the balancing test: ${err(mode)}`);
 });
 
 // ─── Acceptance 1 ───
@@ -185,19 +194,37 @@ await test('HEALTH: health data on legitimate interests gets no test: no draft, 
     assert(other.status === 200 && !('balancing_test' in other.body.data), `with another basis nothing is said: ${err(other)}`);
 });
 
-// ─── Acceptance 5: an agent prepares, a person approves ───
+// ─── Acceptance 5: an agent prepares and may approve; the owner may keep the approval ───
 const answersAll = (): Record<string, string> => Object.fromEntries(questionIds.map(id => [id, id.startsWith('basis-') || id === 'necessity-less-intrusive' || id === 'balance-harm' ? 'no' : 'yes']));
+const saveByAgent = (summary: string, extra: Record<string, unknown> = {}) => callTool(aliceMcp, 'aimeat_compliance_register_write', {
+    part: 'lias', app: TEAM,
+    value: { items: [{ id: liaId, registerId: 'usage', language: 'en', answers: answersAll(), notes: { basis: 'No contract or law covers this.' }, outcome: { result: 'suitable', summary }, ...extra }] },
+});
 let requestId = '';
-await test('AGENT: an agent saves the test as a draft marked `ai`, and its approval waits for the owner', async () => {
-    const save = await callTool(aliceMcp, 'aimeat_compliance_register_write', {
-        part: 'lias', app: TEAM,
-        value: { items: [{ id: liaId, registerId: 'usage', status: 'approved', approvedBy: 'someone', language: 'en', answers: answersAll(), notes: { basis: 'No contract or law covers this.' }, outcome: { result: 'suitable', summary: 'A small effect on the team.' } }] },
-    });
+await test('AGENT: an agent saves the test as a draft marked `ai`, and with compliance:write it approves it, named as an agent', async () => {
+    const save = await saveByAgent('A small effect on the team.', { status: 'approved', approvedBy: 'someone', ownerApproves: true });
     assert(!save.isError && save.data?.items?.length === 1, `save: ${save.text.slice(0, 300)}`);
     const it = save.data.items[0];
     assert(it.status === 'draft' && it.approvedBy === undefined, `DENIAL, a write approves nothing: ${JSON.stringify({ status: it.status, approvedBy: it.approvedBy })}`);
+    assert(it.ownerApproves === undefined, 'DENIAL, an agent does not set the owner\'s own choice');
     assert(it.answerSources['answers.interest-lawful'] === 'ai' && it.answerSources['notes.basis'] === 'ai' && it.answerSources.outcome === 'ai', `an agent's answers are marked ai: ${JSON.stringify(it.answerSources)}`);
     assert(it.answerSources['answers.balance-dependent'] === 'evidence' && it.answerSources.facts === 'evidence', 'what the server read stays evidence');
+    const ok = await callTool(aliceMcp, 'aimeat_compliance_register_write', { part: 'lias', app: TEAM, item_id: liaId, set: { status: 'approved' } });
+    assert(!ok.isError && ok.data?.stored === true && ok.data?.item?.status === 'approved', `the agent approves: ${ok.text.slice(0, 400)}`);
+    assert(ok.data.item.approvedBy === aliceAgentGaii && ok.data.item.approvedByKind === 'agent', `named as an agent: ${ok.data.item.approvedBy} ${ok.data.item.approvedByKind}`);
+    const g = await call('GET', `/v1/compliance/gaps?${q(TEAM)}`, alice.token);
+    assert(liaGaps(kindsOf(g.body)).length === 0, `no gap after the agent's approval: ${kindsOf(g.body)}`);
+    const md = await call('GET', `/v1/compliance/lia/${liaId}/document?app=${TEAM}&format=md`, alice.token);
+    assert(md.bytes.toString('utf8').includes('an AI agent acting for the app\'s owner'), 'the file says an agent approved');
+});
+
+await test('OWNER KEEPS IT: only the owner in person sets "only I approve"; then an agent\'s approval waits for the owner', async () => {
+    const byAgent = await call('PATCH', `/v1/compliance/docs/lias/${liaId}?${q(TEAM)}`, aliceAgentToken, { set: { ownerApproves: true } });
+    assert(byAgent.status === 403, `DENIAL, an agent does not make the owner's choice: ${err(byAgent)}`);
+    const keep = await call('PATCH', `/v1/compliance/docs/lias/${liaId}?${q(TEAM)}`, alice.token, { set: { ownerApproves: true } });
+    assert(keep.status === 200 && keep.body.data.item.ownerApproves === true && keep.body.data.item.status === 'approved', `the owner keeps the approval, the test stays approved: ${err(keep)}`);
+    const save = await saveByAgent('A small effect on the team, said again.');
+    assert(!save.isError && save.data.items[0].status === 'draft' && save.data.items[0].ownerApproves === true, `an agent's edit is a draft and keeps the owner's choice: ${save.text.slice(0, 300)}`);
     const ask = await callTool(aliceMcp, 'aimeat_compliance_register_write', { part: 'lias', app: TEAM, item_id: liaId, set: { status: 'approved' } });
     assert(!ask.isError && ask.data?.stored === false && ask.data?.approval_request?.status === 'awaiting_owner', `the owner is asked: ${ask.text.slice(0, 400)}`);
     requestId = ask.data.approval_request.request_id;
@@ -223,7 +250,7 @@ await test('AGENT: an agent may not allow its own question; the owner in person 
     const after = await call('GET', `/v1/compliance/docs/lias?${q(TEAM)}`, alice.token);
     const it = after.body.data.items[0];
     assert(it.status === 'approved' && it.standing.state === 'approved', `approved: ${JSON.stringify({ status: it.status, standing: it.standing })}`);
-    assert(String(it.approvedBy).startsWith(`${alice.name}@`) && it.requestedBy === aliceAgentGaii, `who approved and who asked: ${it.approvedBy}, ${it.requestedBy}`);
+    assert(String(it.approvedBy).startsWith(`${alice.name}@`) && it.approvedByKind === 'person' && it.requestedBy === aliceAgentGaii, `who approved and who asked: ${it.approvedBy}, ${it.approvedByKind}, ${it.requestedBy}`);
     assert(it.approvedOn.reach === 'shared' && it.approvedOn.domains.join() === 'employment' && Date.parse(it.reviewAt) > Date.now() + 300 * 86_400_000, `what it was approved on, and a review date: ${JSON.stringify(it.approvedOn)} ${it.reviewAt}`);
     assert(it.answerSources['answers.interest-lawful'] === 'ai', 'the record still says a model drafted the answers');
     const g = await call('GET', `/v1/compliance/gaps?${q(TEAM)}`, alice.token);
@@ -311,6 +338,41 @@ await test('TRIAL: a shared app with no regulated data is asked no test while it
     assert(kindsOf(g2.body).includes('lia-missing'), `in use, the test is asked: ${kindsOf(g2.body)}`);
 });
 
+// ─── The operator's setting ───
+await test('MODES: optional asks for nothing and the test still works; off drafts and writes none and keeps what is stored', async () => {
+    assert((await setMode('optional')).status === 200, 'optional');
+    const g = await call('GET', `/v1/compliance/gaps?${q(TEAM)}`, alice.token);
+    assert(liaGaps(kindsOf(g.body)).length === 0, `optional: no balancing test gap: ${kindsOf(g.body)}`);
+    const p = await publish(alice, TEAM, 'Team AI use');
+    assert(p.status === 201 && !('balancing_test' in (p.body.data.next_steps ?? {})), `optional: the publish says nothing: ${JSON.stringify(p.body.data.next_steps?.balancing_test)}`);
+    const m = await putMap(alice, TEAM, [row({ where: 'owner-memory-public', readers: 'anyone', domains: ['employment'] })]);
+    assert(m.status === 200 && !('balancing_test' in m.body.data), 'optional: the map write says nothing');
+    const d = await call('GET', `/v1/compliance/lia/draft?app=${TEAM}`, alice.token);
+    assert(d.status === 200 && d.body.data.mode === 'optional' && d.body.data.items.length === 1, `optional: the draft works: ${err(d)}`);
+    const saved = await saveByAgent('Saved while optional.');
+    assert(!saved.isError && saved.data.items[0].status === 'draft', `optional: a save works: ${saved.text.slice(0, 200)}`);
+
+    assert((await setMode('off')).status === 200, 'off');
+    const d2 = await call('GET', `/v1/compliance/lia/draft?app=${TEAM}`, alice.token);
+    assert(d2.status === 200 && d2.body.data.mode === 'off' && d2.body.data.items.length === 0, `off: no draft: ${err(d2)}`);
+    const w = await call('PUT', `/v1/compliance/docs/lias?${q(TEAM)}`, alice.token, { items: [] });
+    assert(w.status === 409 && w.body.error.code === 'BALANCING_TEST_OFF', `DENIAL, off: no write: ${err(w)}`);
+    const a = await call('PATCH', `/v1/compliance/docs/lias/${liaId}?${q(TEAM)}`, alice.token, { set: { status: 'approved' } });
+    assert(a.status === 409 && a.body.error.code === 'BALANCING_TEST_OFF', `DENIAL, off: no approval: ${err(a)}`);
+    const t = await call('PUT', `/v1/compliance/docs/trial?${q(TEAM)}`, alice.token, { days: 10 });
+    assert(t.status === 409 && t.body.error.code === 'BALANCING_TEST_OFF', `DENIAL, off: no trial mark: ${err(t)}`);
+    const kept = await call('GET', `/v1/compliance/docs/lias?${q(TEAM)}`, alice.token);
+    assert(kept.status === 200 && kept.body.data.items.length === 1, 'off: the stored test is still read');
+    const file = await call('GET', `/v1/compliance/lia/${liaId}/document?app=${TEAM}&format=md`, alice.token);
+    assert(file.status === 200, `off: its file still downloads: ${file.status}`);
+    const g2 = await call('GET', `/v1/compliance/gaps?${q(TEAM)}`, alice.token);
+    assert(liaGaps(kindsOf(g2.body)).length === 0, `off: no gap: ${kindsOf(g2.body)}`);
+
+    assert((await setMode('required')).status === 200, 'back to required');
+    const g3 = await call('GET', `/v1/compliance/gaps?${q(TEAM)}`, alice.token);
+    assert(kindsOf(g3.body).includes('lia-incomplete'), `POSITIVE CONTROL, required again: the draft is a gap: ${kindsOf(g3.body)}`);
+});
+
 // ─── Who may ───
 await test('ACCESS: another owner reads, writes and approves nothing (404); an agent without the words is refused (403)', async () => {
     const asBob = `scope=app&app=${TEAM}&app_owner=${alice.name}`;
@@ -352,6 +414,11 @@ await test('DELETED: a deleted app takes its balancing tests and its trial mark 
     assert(del.status === 200, `delete the trial app: ${err(del)}`);
     const trials = await call('GET', '/v1/compliance/docs/trial?scope=all', op.token);
     assert(!(trials.body.data.places as Body[]).some(p => String(p.place.app).startsWith(`liatrial${tag}`)), `the deleted app's trial mark is gone: ${JSON.stringify((trials.body.data.places as Body[]).map(p => p.place.app))}`);
+});
+
+await test('Teardown: the setting goes back to its default, optional', async () => {
+    const r = await setMode('optional');
+    assert(r.status === 200, `optional: ${err(r)}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

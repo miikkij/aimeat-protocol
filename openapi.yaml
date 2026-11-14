@@ -24389,7 +24389,8 @@ paths:
           `lias` (app) holds the app's balancing tests, the legitimate interests assessment of GDPR
           art. 6(1)(f): an item `{ id, registerId, status: draft | approved, language?, facts,
           answers: { <question id>: yes | no }, notes: { <section or question id>: text },
-          outcome?: { result: suitable | not-suitable, summary }, approvedBy?, approvedAt?,
+          outcome?: { result: suitable | not-suitable, summary }, approvedBy?,
+          approvedByKind?: person | agent | app, ownerApproves?, approvedAt?,
           requestedBy?, reviewAt?, approvedOn?, answerSources }`. A read adds `standing` to each
           (draft, approved, reopened, review-due) and `documents`, the addresses of its PDF and
           Excel file. `trial` (app) is the app's trial mark `{ startedAt, expiresAt, days, note?,
@@ -24528,13 +24529,17 @@ paths:
         field whose name ends in At is the node's clock. A request set to done or refused gets its
         closedAt. The whole document is validated as on PUT. The same writers as PUT, and something
         acting for a person needs `compliance:write`. 404 when the scope has no entry with that id.
-        Kind `lias` has one change in place, the owner's approval of a balancing test: `set` is
-        { status: approved, review_months? }. The account holder signed in themselves approves it
-        at once (200). An agent or an app files the owner's question instead and gets 202 with
+        Kind `lias` has two changes in place. `set` { status: approved, review_months? } approves a
+        balancing test at once (200), by the account holder signed in themselves or by an agent or
+        an app holding `compliance:write`; the test records `approvedBy` and `approvedByKind`
+        (person, agent, app). When the owner keeps the approval for themselves (`ownerApproves` on
+        the test), an agent or an app files the owner's question instead and gets 202 with
         `approval_request`; nothing is approved until the owner allows it in person
         (POST /v1/publish-requests/{id}/decision), and a test changed after the question is not
-        approved by it. 409 LIA_INCOMPLETE while a question is unanswered or the outcome or its
-        summary is missing.
+        approved by it. `set` { ownerApproves: true | false } is that choice, and only the account
+        holder in person makes it (403 otherwise). 409 LIA_INCOMPLETE while a question is
+        unanswered or the outcome or its summary is missing; 409 BALANCING_TEST_OFF when the
+        setting compliance.balancing_test is off.
       security:
         - BearerAuth: []
       requestBody:
@@ -24594,9 +24599,11 @@ paths:
       summary: Whether an app needs a balancing test, and the draft of each one
       tags: [Compliance]
       description: >
-        The balancing test is the legitimate interests assessment of GDPR art. 6(1)(f). `needed` is
-        true when a personal register of the app names legitimate interests and others can see the
-        data or the app keeps regulated data. `items` holds one test per such register: the stored
+        The balancing test is the legitimate interests assessment of GDPR art. 6(1)(f). `mode` is
+        the operator's setting compliance.balancing_test: required (a missing test is a compliance
+        gap), optional (the default: the test works and nothing asks for it) or off (no draft;
+        `items` is empty). `needed` is true when a personal register of the app names legitimate
+        interests and others can see the data or the app keeps regulated data. `items` holds one test per such register: the stored
         one, or a draft (`stored: false`) whose `facts` the node filled from the register, the data
         map, the privacy notice and its own safeguards. A draft answers only the questions the node
         can see in the app, marked `evidence`; `unfinished` names what is open. `not_needed` gives

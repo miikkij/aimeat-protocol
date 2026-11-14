@@ -10,6 +10,8 @@
  * @structure BALANCING_TEST_SKILL_ENTRY
  * @usage import { BALANCING_TEST_SKILL_ENTRY } from './builtin-skills.balancing-test.js';
  * @version-history
+ *   v1.1.0 -- 2026-11-14 -- The server's mode (required, optional, off), and an agent with compliance:write
+ *     approves a test unless its owner keeps the approval (Jouni, 2026-11-14).
  *   v1.0.0 -- 2026-11-13 -- Initial.
  */
 
@@ -28,7 +30,18 @@ metadata:
 Legitimate interests is one of the six legal bases for processing personal data. It needs a written
 test: is the interest real, is the processing needed, and do the interests of the people the data is
 about weigh more. The server drafts the test from what the app already states. The person answers
-the questions of judgement and makes the conclusion. You prepare; you do not conclude.
+the questions of judgement and makes the conclusion. You prepare, write down what they decide, and
+approve it when they tell you to.
+
+## What this server asks
+
+The draft's \`mode\` is the operator's setting (\`compliance.balancing_test\`):
+
+| \`mode\` | What it means |
+|---|---|
+| \`required\` | A missing, unapproved or reopened test is a compliance gap, and publishing the app or writing its data map or register says the test is due. Nothing is blocked. |
+| \`optional\` (the default) | Everything works the same, and the server asks for nothing. Offer the test when the person goes into use with other people; do not insist. |
+| \`off\` | No test is drafted, written or approved here (409 BALANCING_TEST_OFF). Tests stored before are still read with \`part: "lias"\`. Say so in one sentence and stop. |
 
 ## When a test is needed
 
@@ -105,22 +118,28 @@ every answer and note you wrote as \`ai\`; what the person writes on the app's p
 The record keeps both, so a reader of the test sees what a model drafted. A write replaces the whole
 document: send every test of the app you want to keep.
 
-## Approval is the person's
+## Approval
 
-When \`unfinished\` is empty, ask for approval:
+When \`unfinished\` is empty and the person says the test is right, approve it:
 
 \`\`\`
 aimeat_compliance_register_write { part: "lias", app: "<file>.html", item_id: "<test id>", set: { "status": "approved" } }
 \`\`\`
 
-From an agent this approves nothing. It files a question to the owner and answers with
-\`approval_request\`: tell the owner in one sentence that the test waits for them, and give them the
-address in the answer. The owner reads the test on the app's page and allows it signed in themselves;
-another agent cannot. You hear the answer as a message. A test edited after you asked is not approved
-by the old question: ask again.
+With the permission \`compliance:write\` you approve it at once, and the record names you as an AI
+agent acting for the owner, so every reader of the test and its files sees that an agent approved
+it. Approve only what the person decided.
 
-An approved test carries who approved it, who asked, and a review date twelve months on
-(\`review_months\` in \`set\` changes it).
+The owner can keep the approval of a test for themselves (\`ownerApproves: true\` on the test, set by
+them signed in, on the app's page or with \`set: { "ownerApproves": true }\`; you cannot change it).
+Then the same call approves nothing: it files a question to the owner and answers with
+\`approval_request\`. Tell the owner in one sentence that the test waits for them, and give them the
+address in the answer. They allow it signed in themselves; another agent cannot. You hear the answer
+as a message. A test edited after you asked is not approved by the old question: ask again.
+
+An approved test carries who approved it and whether a person, an agent or an app did, who asked
+when the owner allowed an agent's question, and a review date twelve months on (\`review_months\` in
+\`set\` changes it).
 
 ## After approval
 
@@ -133,8 +152,9 @@ An approved test carries who approved it, who asked, and a review date twelve mo
 - **Open again.** \`standing.state\` is \`reopened\` when more people can see the data than at approval,
   or the app keeps new regulated data. The approval is kept; the owner reads the test against the
   change and approves again.
-- **Not suitable.** A test approved with \`not-suitable\` leaves a gap until the register names another
-  basis or the processing stops.
+- **Not suitable.** A test approved with \`not-suitable\` means legitimate interests do not carry the
+  processing: the register needs another basis, or the processing stops. Where the server requires
+  the test it stays a gap until one of the two happens.
 - **Privacy contact.** An organism can name a member who hears when a test of an app shared with it is
   approved: \`aimeat_compliance_register_write { part: "contact", scope: "organism", organism_id, value: { "privacyContact": "<account name>", "notifyApprovedLia": true } }\`,
   written by the organism's creator or an admin.
@@ -150,7 +170,8 @@ it does, and the test is asked from then on. To close the app instead, the owner
 
 ## What you never do
 
-- Answer a question of judgement for the person, or pick the outcome.
+- Answer a question of judgement for the person, pick the outcome, or approve a test the person has
+  not said is right.
 - Tell the person the processing is lawful. The test orders the thinking; it is not legal advice.
 - Start a test for a demo because the app keeps personal data. Read \`needed\` first.
 `,

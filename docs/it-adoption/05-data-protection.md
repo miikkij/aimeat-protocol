@@ -1,6 +1,6 @@
 # 05 Data protection
 
-> Checked against AIMEAT node 4.3.1 (commit def156c0e) on 2026-11-13. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit f25c4a828) on 2026-11-14. Maintained with the code: see the README for how.
 
 This page is for the DPO, the security officer and the database administrator. It answers: which data the node keeps, where it keeps it, whether it is personal data, how long it stays and how it is deleted; what the node encrypts itself and what it leaves to the operator; how data classification works and how to set it for an organisation; what the GDPR export and the account deletion do; and which data leaves the operator's own systems.
 

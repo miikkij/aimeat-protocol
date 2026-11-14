@@ -13,7 +13,8 @@
  *   An approved test sent back unchanged stays approved; one sent back changed is a draft again,
  *   because the person approved other content.
  *
- *   APPROVAL IS A PERSON'S (approveLiaAs). It is refused while a question is unanswered or the
+ *   APPROVAL (approveLiaAs) records who approved: the account holder or an agent or app acting for
+ *   them (lia-ops.ts decides who may). It is refused while a question is unanswered or the
  *   outcome is missing: the node checks that the test is complete and never what it concludes. The
  *   approval keeps who could see the data and the regulated data at that moment (lia-need.ts reads a
  *   later change as "open again"), and tells the privacy contact of each organism the app is shared
@@ -29,6 +30,10 @@
  *   prepareContactWrite() · liasForRead() · trialForRead() · approveLiaAs() · BalancingTestStep · balancingTestStepOf() · balancingTestStep()
  * @usage const p = await prepareLiasWrite(deps, caller, scope, doc); if (!p.ok) throw new ComplianceDocError(p.status, p.code, p.message);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The operator's setting compliance.balancing_test: off refuses every write and
+ *     approval (liaOff), and only required makes a publish or a map or register write say a test is
+ *     due. An approval records its kind (person, agent, app); only the owner in person sets or clears
+ *     `ownerApproves` (Jouni, 2026-11-14).
  *   v1.0.0 — 2026-11-13 — Initial.
  */
 import { createHash } from 'node:crypto';
@@ -93,6 +98,16 @@ export function liaIncomplete(l: ComplianceLia): LiaRefusal | null {
     ].filter(Boolean).join('; ') + '.');
 }
 
+/**
+ * The refusal of a write on a server whose operator switched the balancing test off
+ * (AIMEAT_COMPLIANCE_BALANCING_TEST, config/data-access.ts). Null in the other two modes.
+ */
+export function liaOff(config: Pick<AimeatConfig, 'balancingTest'>): LiaRefusal | null {
+  return config.balancingTest === 'off'
+    ? refuse(409, 'BALANCING_TEST_OFF', 'The operator of this server has switched the balancing test off (the setting compliance.balancing_test), so no test is drafted, written or approved here. Tests stored before can still be read.')
+    : null;
+}
+
 export const SPECIAL_REFUSAL = (title: string) => refuse(409, 'LIA_SPECIAL_CATEGORY',
   `The register "${title}" holds special category data (health, biometric or genetic data, or another special category). Legitimate interests alone do not carry that data: GDPR art. 9(2) names the grounds. `
   + 'No balancing test is written for it. Choose the ground in the register (specialBasis, and the legal basis that goes with it), and write the impact assessment (part "dpias").');
@@ -101,6 +116,8 @@ export const SPECIAL_REFUSAL = (title: string) => refuse(409, 'LIA_SPECIAL_CATEG
 export async function prepareLiasWrite(
   deps: Deps, caller: OperatorCaller, scope: AppScope, doc: ComplianceDocs['lias'],
 ): Promise<{ ok: true; doc: ComplianceDocs['lias'] } | LiaRefusal> {
+  const off = liaOff(deps.config);
+  if (off) return off;
   const reading = await appLiaReading(deps, scope);
   const who = actsForSomeone(caller) ? 'ai' as const : 'human' as const;
   const seen = new Set<string>();
@@ -116,7 +133,16 @@ export async function prepareLiasWrite(
     }
     if (need.need === 'not-allowed') return SPECIAL_REFUSAL(reg.title);
     const prev = reading.lias.find(s => s.id === inc.id);
-    if (prev?.status === 'approved' && editable(prev) === editable(inc)) { items.push(prev); continue; }
+    // The owner's choice to approve this test themselves: only they set or clear it, and only by sending
+    // the field. A write by an agent or an app, or one that leaves the field out, keeps what was stored.
+    const ownerApproves = who === 'human' && inc.ownerApproves !== undefined ? inc.ownerApproves : prev?.ownerApproves;
+    const withChoice = (l: ComplianceLia): ComplianceLia => {
+      const next = { ...l };
+      if (ownerApproves) next.ownerApproves = true;
+      else delete next.ownerApproves;
+      return next;
+    };
+    if (prev?.status === 'approved' && editable(prev) === editable(inc)) { items.push(withChoice(prev)); continue; }
     const lang = inc.language ?? prev?.language ?? 'en';
     const facts = liaFacts(deps.config, reading, reg, lang);
     const evidence = factAnswers(facts);
@@ -132,13 +158,13 @@ export async function prepareLiasWrite(
       sources[key] = prev?.notes?.[k] === v && kept(key) ? kept(key)! : who;
     }
     if (inc.outcome) sources.outcome = prev?.outcome && stableStringify(prev.outcome) === stableStringify(inc.outcome) && kept('outcome') ? kept('outcome')! : who;
-    items.push({
+    items.push(withChoice({
       id: inc.id, registerId: reg.id, status: 'draft', language: lang, facts,
       ...(inc.answers && Object.keys(inc.answers).length ? { answers: inc.answers } : {}),
       ...(Object.keys(notes).length ? { notes } : {}),
       ...(inc.outcome ? { outcome: inc.outcome } : {}),
       answerSources: sources,
-    });
+    }));
   }
   return { ok: true, doc: { items } };
 }
@@ -157,6 +183,8 @@ const TrialInput = z.object({
 export async function prepareTrialWrite(
   deps: Deps, scope: AppScope, body: unknown, now = Date.now(),
 ): Promise<{ ok: true; doc: ComplianceTrial } | LiaRefusal> {
+  const off = liaOff(deps.config);
+  if (off) return off;
   const parsed = TrialInput.safeParse(body ?? {});
   if (!parsed.success) {
     return refuse(400, 'VALIDATION_ERROR', `That trial mark was not stored: send { "days": 1 to ${TRIAL_MAX_DAYS}, "note": "..." } to start a trial, or { "end": true } when the app goes into use. `
@@ -225,14 +253,17 @@ function organismsOf(reading: AppLiaReading): string[] {
 }
 
 /**
- * Approve one test as `approvedBy`, the account holder. `digest`, when given, is the content the
- * person was shown: a test changed since is not approved. Answers the stored test or why not.
+ * Approve one test as `approvedBy`: the account holder (`kind` person) or one of their agents or apps.
+ * `digest`, when given, is the content the person was shown: a test changed since is not approved.
+ * The caller decides who may approve (lia-ops.ts); this records it. Answers the stored test or why not.
  */
 export async function approveLiaAs(
   deps: Deps, scope: AppScope, liaId: string,
-  by: { approvedBy: string; requestedBy?: string; digest?: string; reviewMonths?: number; now?: number },
+  by: { approvedBy: string; kind: 'person' | 'agent' | 'app'; requestedBy?: string; digest?: string; reviewMonths?: number; now?: number },
 ): Promise<{ ok: true; item: ComplianceLia } | LiaRefusal> {
   const { storage, config } = deps;
+  const off = liaOff(config);
+  if (off) return off;
   const now = by.now ?? Date.now();
   const reading = await appLiaReading(deps, scope, { now });
   const lia = reading.lias.find(l => l.id === liaId);
@@ -248,7 +279,7 @@ export async function approveLiaAs(
   review.setUTCMonth(review.getUTCMonth() + months);
   const saved = await patchDocItem(storage, config.nodeId, 'lias', scope, liaId, (item) => {
     const next: Record<string, unknown> = {
-      ...item, status: 'approved', approvedBy: by.approvedBy, approvedAt: new Date(now).toISOString(), reviewAt: review.toISOString(),
+      ...item, status: 'approved', approvedBy: by.approvedBy, approvedByKind: by.kind, approvedAt: new Date(now).toISOString(), reviewAt: review.toISOString(),
       approvedOn: { reach: reading.reach.reach, domains: need.domains },
     };
     // Who asked for this approval; an earlier approval's asker does not carry over.
@@ -270,7 +301,7 @@ export async function approveLiaAs(
       await notify(storage, `${contact.privacyContact}@${config.nodeId}`, {
         type: 'compliance_lia_approved',
         title: `The balancing test of the app ${title} was approved`,
-        body: `${by.approvedBy} approved it. The outcome: legitimate interests ${item.outcome?.result === 'suitable' ? 'fit' : 'do not fit'} the processing in the register "${need.register.title}".`,
+        body: `${by.approvedBy}${by.kind === 'person' ? '' : ', an AI agent of the app\'s owner,'} approved it. The outcome: legitimate interests ${item.outcome?.result === 'suitable' ? 'fit' : 'do not fit'} the processing in the register "${need.register.title}".`,
         link: `/v1/appcat?app=${scope.ownerName}/${scope.app}`,
         i18n: { key: item.outcome?.result === 'suitable' ? 'compliance_lia_approved' : 'compliance_lia_approved_unsuitable', vars: { app: title, by: by.approvedBy, register: need.register.title } },
       });
@@ -295,6 +326,8 @@ export interface BalancingTestStep {
  * Null when nothing is asked: no register on legitimate interests, data only its user sees, a trial.
  */
 export function balancingTestStepOf(config: AimeatConfig, scope: AppScope, reading: AppLiaReading, now = Date.now()): BalancingTestStep | null {
+  // Only a server that requires the test asks for it (AIMEAT_COMPLIANCE_BALANCING_TEST).
+  if (config.balancingTest !== 'required') return null;
   const url = `${(config.baseUrl || '').replace(/\/$/, '')}/v1/appcat?app=${scope.ownerName}/${scope.app}`;
   const special = reading.needs.filter(n => n.need === 'not-allowed');
   if (special.length) {
@@ -324,6 +357,7 @@ export function balancingTestStepOf(config: AimeatConfig, scope: AppScope, readi
 
 /** balancingTestStepOf for an app named by its owner and filename. Never throws: an answer is not failed by a hint. */
 export async function balancingTestStep(deps: Deps, ownerName: string, app: string): Promise<BalancingTestStep | null> {
+  if (deps.config.balancingTest !== 'required') return null;
   try {
     const scope: AppScope = { kind: 'app', ownerName, app };
     return balancingTestStepOf(deps.config, scope, await appLiaReading(deps, scope));

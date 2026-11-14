@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.34.0 — 2026-11-14 — balancingTest (AIMEAT_COMPLIANCE_BALANCING_TEST: required | optional | off).
  *   2026-11-08 — memoryMaxArchivedKeysPerAgent (secaudit2026nov08b round 15b, storage/memory-totals:
  *     postgres-archived-rows-count-no-bytes).
  *   v1.33.0 — 2026-11-07 — microservicesCentralUrl.
@@ -140,7 +141,7 @@ import type { AccountSecurityConfig } from './config/types-account-security.js';
 import type { CapabilitiesConfig } from './config/types-capabilities.js';
 import type { ThemesConfig } from './config/themes.js';
 import type { PackagesConfig } from './config/types-packages.js';
-import type { ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config/data-access.js';
+import type { BalancingTestMode, ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config/data-access.js';
 import type { UpdateCheckConfig } from './config/update-check.js';
 import type { AppAuditConfig } from './config/app-audit.js';
 import type { AgentAccessConfig } from './config/types-agent-access.js';
@@ -506,6 +507,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   partyPurchasesPerHour: number;
   /** Whether this node runs a data intermediation service and who provides it (services/data-intermediation/). */
   dataIntermediation: DataIntermediationMode;
+  /** Whether the node asks for the balancing test of an app on legitimate interests (services/compliance/lia-need.ts). */
+  balancingTest: BalancingTestMode;
   /** Whether an app's users may register as outside parties of its owner (services/app-parties/). */
   partySelfRegistration: PartySelfRegistration;
   /** Signups to apps one network address may make in an hour (routes/app-parties.ts); 0 = no limit. */

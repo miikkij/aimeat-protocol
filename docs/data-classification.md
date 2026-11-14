@@ -143,7 +143,7 @@ an app's by its owner. The operator reads all of them; an organism's members rea
 | `requests` | data subject requests with their one-month deadline; an account export and an erasure log themselves | node, organism, app |
 | `breaches` | personal data breaches with the 72-hour clock (GDPR) and the 60-day one (HIPAA) | node, organism, app |
 | `dpias` | data protection impact assessments (art. 35) | node, organism, app |
-| `lias` | balancing tests: the legitimate interests assessment (art. 6(1)(f)) of a register that names that basis, drafted from the app and approved by its owner in person | app |
+| `lias` | balancing tests: the legitimate interests assessment (art. 6(1)(f)) of a register that names that basis, drafted from the app and approved by its owner or their agent; `AIMEAT_COMPLIANCE_BALANCING_TEST` (`required`, `optional` default, `off`) decides whether a missing one is a gap | app |
 | `trial` | an app's trial mark, with its end date; a shared trial with no regulated data is asked no balancing test | app |
 | `contact` | an organism's privacy contact, who hears when a balancing test of an app shared with it is approved | organism |
 | `frameworks` | answers to GDPR, NIS2, DORA, CRA, EAA, DSA, HIPAA and export-control question sets; an unanswered one reads unclassified, never "does not apply" | node, organism |

@@ -16,6 +16,7 @@
  * @structure meta · agentsOfMap(map) · DataMapSection({ d })
  * @usage const mod = await import('./sections/datamap.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.3.1 — 2026-11-14 — An approval by an agent says so, and the owner switches "Only I approve" per test.
  *   v1.3.0 — 2026-11-13 — "Balancing test", for the app's owner: where the test of each register on
  *     legitimate interests stands, its PDF and Excel file, and the owner's approval.
  *   v1.2.0 — 2026-10-24 — "Personal data this app keeps": the app's records of processing as the map
@@ -37,7 +38,7 @@ import { Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import { readHomeAgents } from '/js/services/agent-draft.js';
 import { untieApp } from '/js/services/agent-ties.js';
-import { readBalancingTests, approveBalancingTest, downloadBalancingTest } from '/js/services/balancing-test.js';
+import { readBalancingTests, approveBalancingTest, downloadBalancingTest, setOwnerApproves } from '/js/services/balancing-test.js';
 import { x, lang } from '/views/appcat/i18n.js';
 import { date } from '/js/format.js';
 import { tOr } from '/js/i18n.js';
@@ -170,11 +171,18 @@ function BalancingTests({ d }) {
   // What is still open in a test: each unanswered question, and the outcome with its summary as one.
   const open = (it) => (it.unfinished?.unanswered?.length || 0) + (it.unfinished?.outcome || it.unfinished?.summary ? 1 : 0);
   const day = (iso) => (iso ? date(iso) : '');
+  // The owner's own choice reads in the row as well as on its button, so it shows after a reload.
   const words = (it) => {
+    const base = stateWords(it);
+    return it.stored && it.ownerApproves ? `${base} ${x('dataMap.liaOnlyMeState')}` : base;
+  };
+  const stateWords = (it) => {
     if (!it.stored) return x('dataMap.liaNotStarted');
     const state = it.standing?.state;
     if (state === 'draft') return open(it) ? x('dataMap.liaDraftOpen', { n: String(open(it)) }) : x('dataMap.liaDraftReady');
-    const approved = x('dataMap.liaApproved', { by: it.approvedBy || '', date: day(it.approvedAt), review: day(it.reviewAt) });
+    const who = it.approvedByKind === 'agent' || it.approvedByKind === 'app'
+      ? x('dataMap.liaByAgent', { by: it.approvedBy || '' }) : (it.approvedBy || '');
+    const approved = x('dataMap.liaApproved', { by: who, date: day(it.approvedAt), review: day(it.reviewAt) });
     if (state === 'reopened') return `${approved} ${x('dataMap.liaReopened')}`;
     if (state === 'review-due') return `${approved} ${x('dataMap.liaReviewDue')}`;
     return approved;
@@ -191,6 +199,7 @@ function BalancingTests({ d }) {
         action: it.stored ? html`
           <${Actions}>
             ${mayApprove(it) ? html`<${Action} small onClick=${() => run(() => approveBalancingTest(d.filename, it.id), x('dataMap.liaApprovedNow'))}>${x('dataMap.liaApprove')}<//>` : null}
+            <${Action} small soft onClick=${() => run(() => setOwnerApproves(d.filename, it.id, !it.ownerApproves), it.ownerApproves ? x('dataMap.liaAgentsMayNow') : x('dataMap.liaOnlyMeNow'))}>${it.ownerApproves ? x('dataMap.liaAgentsMay') : x('dataMap.liaOnlyMe')}<//>
             <${Action} small soft onClick=${() => run(() => downloadBalancingTest(d.filename, it.id, 'pdf'))}>PDF<//>
             <${Action} small soft onClick=${() => run(() => downloadBalancingTest(d.filename, it.id, 'xlsx'))}>Excel<//>
           <//>` : undefined,

@@ -16186,6 +16186,7 @@
     "cfgGroup_consent": "Suostumus",
     "cfgGroup_dataspace": "Data-avaruudet",
     "cfgGroup_classification": "Luokittelu",
+    "cfgGroup_compliance": "Vaatimustenmukaisuus",
     "cfgGroup_content_class": "Sisältöluokat",
     "cfg_content_class_mode": "Sisältöluokat",
     "cfg_content_class_ffprobe_path": "ffprobe-ohjelma",
@@ -16224,6 +16225,9 @@
     "cfgOpt_consent_party_self_registration_off": "Kukaan ei rekisteröidy sovellukseen",
     "cfgOpt_consent_party_self_registration_apps-ask": "Sovelluksen omistaja pyytää, ylläpitäjä hyväksyy",
     "cfgOpt_consent_party_self_registration_on": "Sovelluksen omistaja avaa rekisteröitymisen",
+    "cfgOpt_compliance_balancing_test_required": "Pakollinen",
+    "cfgOpt_compliance_balancing_test_optional": "Vapaaehtoinen",
+    "cfgOpt_compliance_balancing_test_off": "Pois",
     "cfgOpt_content_class_mode_on": "Päällä, jokainen omistaja päättää",
     "cfgOpt_content_class_mode_off": "Pois käytöstä",
     "cfgOpt_content_class_profile_labels_auto": "Päätösmalli, kun se on käytössä",
@@ -16404,6 +16408,7 @@
     "cfg_consent_party_reads_per_minute": "Ulkopuolisen osapuolen lukukerrat minuutissa",
     "cfg_consent_party_purchases_per_hour": "Yhdestä osoitteesta aloitetut ostot tunnissa",
     "cfg_consent_data_intermediation": "Datan välityspalvelu (EU 2022/868)",
+    "cfg_compliance_balancing_test": "Sovellusten tasapainotesti (oikeutettu etu)",
     "cfg_consent_party_self_registration": "Sovelluksiin rekisteröidytään ilman tiliä",
     "cfg_consent_app_party_signups_per_hour": "Rekisteröitymiset sovelluksiin samasta osoitteesta tunnissa",
     "cfg_consent_app_party_pending_hours": "Vahvistamaton rekisteröityminen pitää paikkansa (tuntia)",
@@ -16617,6 +16622,7 @@
     "cfgGroup_data_out": "Data ulos",
     "cfgDesc_consent_data_intermediation": "Välittääkö tämä palvelin dataa muiden puolesta. Seuranta ei muuta mitään, vaan näyttää havainnot Compliance-sivulla.",
     "cfgDesc_consent_party_self_registration": "Saako sovellus päästää käyttäjiä rekisteröitymään ilman tiliä tällä palvelimella. Aina pois, jos palvelin näyttää sisältönsä vain kirjautuneille.",
+    "cfgDesc_compliance_balancing_test": "Pyytääkö palvelin tasapainotestin sovellukselta, jonka rekisterin käsittelyperuste on oikeutettu etu. Oletuksena vapaaehtoinen: testi on käytettävissä, mutta palvelin ei pyydä sitä.",
     "cfgDesc_consent_app_party_signups_per_hour": "Montako kertaa samasta verkko-osoitteesta voi rekisteröityä tämän palvelimen sovelluksiin tunnin aikana. 0 tarkoittaa, ettei rajaa ole.",
     "cfgDesc_consent_app_party_pending_hours": "Kuinka kauan henkilö pysyy sovelluksen listalla, jos hän rekisteröityi mutta ei avannut sähköpostin linkkiä. Sen jälkeen paikka vapautuu, ja hän voi rekisteröityä uudelleen. 0: hän pysyy listalla, kunnes sovelluksen omistaja poistaa hänet.",
     "cfgDesc_dataspace_enabled": "Avaa palvelimen EU:n data-avaruuksien liittimille. Luotetut myöntäjät asetetaan data-avaruus kerrallaan.",
@@ -28809,6 +28815,12 @@
     "dataMap.liaReviewDue": "Tarkistuspäivä on mennyt.",
     "dataMap.liaApprove": "Hyväksy",
     "dataMap.liaApprovedNow": "Testi on hyväksytty.",
+    "dataMap.liaByAgent": "{by} (puolestasi toimiva tekoälyagentti)",
+    "dataMap.liaOnlyMe": "Vain minä hyväksyn",
+    "dataMap.liaOnlyMeState": "Vain sinä hyväksyt tämän testin.",
+    "dataMap.liaAgentsMay": "Agenttini saavat hyväksyä",
+    "dataMap.liaOnlyMeNow": "Nyt vain sinä hyväksyt tämän testin. Agentti, joka hyväksyy sen, kysyy ensin sinulta.",
+    "dataMap.liaAgentsMayNow": "Agenttisi, joilla on compliance:write-oikeus, saavat taas hyväksyä tämän testin.",
     "dataMap.liaSpecial": "Rekisterin ”{register}” käsittelyperuste on oikeutettu etu, ja siinä on erityisiä henkilötietoja, kuten terveystietoja. Oikeutettu etu ei riitä niiden käsittelyyn. Valitse rekisteriin toinen peruste ja tee vaikutustenarviointi.",
     "dataMap.liaHow": "Tekoälysi täyttää testin kanssasi. Sano sille: ”Tee sovelluksen {app} tasapainotesti.” Se kysyy sinulta avoimet kohdat. Johtopäätöksen teet sinä, ja hyväksyt testin tässä.",
     "dataMap.invitesLabel": "Ketä se kutsuu",
@@ -32051,6 +32063,20 @@
           "what": "Jokaisella agentilla voi olla korkein luokitus, jonka se saa lukea. Agentti ei näe korkeammin luokiteltua sisältöä, ja jokainen piiloon jäänyt kerta kirjataan lokiin. Tämä asetus antaa arvon jokaiselle agentille, joka luodaan muutoksen jälkeen. Olemassa olevat agentit pitävät arvonsa, ja omistaja voi muuttaa sen agentin sivulla. Asetus on voimassa vain, kun luokittelu on päällä.",
           "range": "Palvelun luokittelukäytännön luokituksen tunniste, esimerkiksi sisainen (Sisäinen) tai luottamuksellinen (Luottamuksellinen). Tyhjä (oletus): ei rajaa.",
           "tip": "Jätä tyhjäksi, ellei agenttien pidä aloittaa rajattuina. Yrityksen palvelussa, jossa agentit palvelevat monia ihmisiä, aloitusarvo Sisäinen on hyvä."
+        }
+      },
+      "compliance": {
+        "balancing_test": {
+          "title": "Sovellusten tasapainotesti",
+          "short": "Pyytääkö palvelin tasapainotestin sovellukselta, jonka rekisterin käsittelyperuste on oikeutettu etu. Oletuksena vapaaehtoinen.",
+          "what": "Oikeutettu etu on yksi henkilötietojen käsittelyperusteista, ja se vaatii kirjallisen tasapainotestin (tietosuoja-asetuksen 6 artiklan 1 kohdan f alakohta). Palvelin luonnostelee testin sovelluksen omasta rekisteristä ja datakartasta, ja sovelluksen omistaja tai hänen tekoälynsä täydentää ja hyväksyy sen. Asetus määrää, kuinka painokkaasti palvelin testiä pyytää. Pakollinen: jos sovelluksen rekisterin peruste on oikeutettu etu ja tiedot näkee muukin kuin käyttäjä tai sovellus säilyttää säänneltyä tietoa, puuttuva, hyväksymätön tai uudelleen avattu testi näkyy vaatimustenmukaisuuden aukkona. Sovelluksen julkaisu, datakartan kirjoitus ja rekisterin kirjoitus kertovat, että testi on tehtävä. Mitään ei estetä. Vapaaehtoinen: kaikki toimii samoin, mutta palvelin ei pyydä mitään. Pois: testiä ei luonnostella eikä tallenneta, ja aiemmin tallennetut testit voi yhä lukea. Missään tilassa ei kysytä mitään sovellukselta, jonka tiedot näkee vain käyttäjä itse.",
+          "range": "Yksi kolmesta: Pakollinen, Vapaaehtoinen (oletus) tai Pois.",
+          "low": "Pois: palvelin ei luonnostele eikä tallenna tasapainotestejä.",
+          "high": "Pakollinen: puuttuva testi näkyy aukkona, ja omistaja kuulee, kun testi on tehtävä.",
+          "ex1": "Pakollinen: yrityksen palvelin, jossa yritys vastaa sovellustensa käsittelemistä henkilötiedoista.",
+          "ex2": "Vapaaehtoinen: julkinen tai jaettu palvelin, jossa sovelluksen omistaja tekee testin silloin, kun haluaa.",
+          "ex3": "Pois: suljettu ympäristö, joka pitää käsittelytoimien selosteet muualla.",
+          "tip": "Agentti, jolla on compliance:write-oikeus, saa hyväksyä testin kaikissa tiloissa, ellei sovelluksen omistaja ole pyytänyt hyväksymään juuri sitä testiä itse. Asetus on apu arviointiin, ei oikeudellista neuvontaa."
         }
       },
       "visibility": {

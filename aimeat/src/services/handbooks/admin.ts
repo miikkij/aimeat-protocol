@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.36.1 -- 2026-11-14 -- The balancing test setting (required, optional, off) and who approves.
  *   v1.36.0 -- 2026-11-13 -- Records of processing: an app's balancing test (legitimate interests),
  *     read across every app with part lias, and the gaps that name it.
  *   v1.35.1 -- 2026-11-08 -- A receiver is an incoming webhook and its key an API key in what the
@@ -279,10 +280,12 @@ register of its own only when someone other than its user sees its personal data
 regulated data: \`aimeat_compliance_report\` with \`scope: "node"\` lists every app's \`reach\` in
 \`processing.apps\`, and what a person keeps through an app only they see is in the node's record
 \`node-user-content\`. An app whose register names legitimate interests, and whose data others can
-see, needs a balancing test: its owner writes it with their own AI (skill \`node:balancing-test\`) and
-approves it in person. You read each one with \`part: "lias"\`, \`scope: "all"\`; the report counts
-them in \`processing.lias\`, and \`part: "gaps"\` names a missing, unapproved or reopened test and a
-trial that ended with no decision.
+see, has a balancing test: its owner writes it with their own AI (skill \`node:balancing-test\`), and
+the owner or an agent with \`compliance:write\` approves it. The setting \`compliance.balancing_test\`
+(AIMEAT_COMPLIANCE_BALANCING_TEST) decides how hard the server asks: \`required\` makes a missing,
+unapproved or reopened test and a trial that ended with no decision a gap in \`part: "gaps"\`,
+\`optional\` (the default) asks for nothing, \`off\` drafts and stores none. You read each one with
+\`part: "lias"\`, \`scope: "all"\`, and the report counts them in \`processing.lias\`.
 
 **Data intermediation (operator).** The setting AIMEAT_DATA_INTERMEDIATION (Config, consent) says
 whether this node runs a data intermediation service under the EU Data Governance Act: \`report\`

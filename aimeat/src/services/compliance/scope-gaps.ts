@@ -22,7 +22,8 @@
  *   v1.4.0 — 2026-11-13 — An app's register that rests on legitimate interests: a missing, unapproved,
  *     reopened, overdue or negative balancing test, legitimate interests named for special category
  *     data, and a trial that ended with no decision (lia-need.ts). An app whose data only its user
- *     sees gets none of them.
+ *     sees gets none of them, and neither does any app unless the setting compliance.balancing_test
+ *     is required (2026-11-14).
  *   v1.3.1 — 2026-11-05 — Moved unchanged from src/services/compliance-scope-gaps.ts to src/services/compliance/scope-gaps.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.3.0 — 2026-10-29 — An app's gaps follow who can see its data (compliance-app-reach.ts): an app
  *     whose data only its user sees gets no register, notice or domain gap, an unsaid row matters only
@@ -270,6 +271,8 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
  * (lia-need.ts). An app whose data only its user sees, or that is a running trial, gets none.
  */
 async function balancingTestGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app' }>, regs: ComplianceRegister[], now: number): Promise<ScopeGap[]> {
+  // A gap only where the operator requires the test (AIMEAT_COMPLIANCE_BALANCING_TEST); optional and off ask nothing.
+  if (deps.config.balancingTest !== 'required') return [];
   const out: ScopeGap[] = [];
   const at = scopeName(scope);
   const expired = (trial: ComplianceTrial): void => {
