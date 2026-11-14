@@ -34948,7 +34948,7 @@ paths:
         '404':
           description: No public manifest / unknown tool / missing backing capability
         '422':
-          description: Unpriced tool with no capability binding
+          description: Unpriced tool with no capability binding (TOOL_NOT_INVOKABLE), or a public tool manifest that does not parse (INVALID_TOOL_MANIFEST)
 
   /ucp/2026-08-25/checkout-sessions:
     post:

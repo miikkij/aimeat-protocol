@@ -17,6 +17,9 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   2026-11-14 — POST .../webmcp/tools/:tool reads the manifest through loadPublicToolManifest
+ *     (services/app-tools/manifest-read.ts), which aimeat_app_tool_invoke asks too: a public manifest
+ *     that does not parse answers 422 INVALID_TOOL_MANIFEST, not 404 (structure programme 2026-11, unit 2b, B14).
  *   2026-11-08 — A failed tool call carries the backing route's error details, so a refusal the
  *     extension's script named reads EXTENSION_REFUSED with its reason (extension-access/script-refusal.ts).
  *   v1.11.2 — 2026-10-31 — The metered path resolves the binding of a contracted or granted call inside
@@ -86,6 +89,7 @@ import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../servic
 import { appToolBindingRefusal } from '../services/capability-invoke.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
 import { appToolsKey, isToolPriced, toolMoneyPrices, presentToolPacing, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
+import { loadPublicToolManifest } from '../services/app-tools/manifest-read.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered-settlement.js';
@@ -118,16 +122,6 @@ interface BoundTool { cap: CapabilityRecord; pinnedVersion: number | undefined; 
  * The test lives in services/app/ai-use.ts, so the "Use with your AI" mark and this listing agree.
  */
 const isRestricted = (config: AimeatConfig, app: AppRecord): boolean => appHiddenFromPublicSurfaces(config, app);
-
-/** Load the PUBLIC tool manifest of owner/filename, or null (missing, private, malformed). */
-async function loadPublicManifest(
-  storage: Storage,
-  config: AimeatConfig,
-  ownerName: string,
-  filename: string,
-): Promise<AppTool[] | null> {
-  return (await loadPublicManifestRecord(storage, config, ownerName, filename)).tools;
-}
 
 /** The public tools and the manifest record's own provenance id, when it carries one. */
 async function loadPublicManifestRecord(
@@ -242,12 +236,18 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     const ownerName = localAccountName(decodeURIComponent(req.params.owner as string));
     const filename = decodeURIComponent(req.params.filename as string);
     const toolName = decodeURIComponent(req.params.tool as string);
-    const tools = await loadPublicManifest(storage, config, ownerName, filename);
-    if (!tools) {
+    // The read aimeat_app_tool_invoke asks (services/app-tools/manifest-read.ts): a manifest that does
+    // not parse is INVALID_TOOL_MANIFEST on both, as the checkout resolver answers it.
+    const manifest = await loadPublicToolManifest(storage, config.nodeId, ownerName, filename);
+    if (manifest.state === 'absent') {
       res.status(404).json(error(config.nodeId, 'APP_TOOLS_NOT_FOUND', `App "${ownerName}/${filename}" declares no public tool manifest`));
       return;
     }
-    const tool = tools.find((t) => t.name === toolName);
+    if (manifest.state === 'malformed') {
+      res.status(422).json(error(config.nodeId, 'INVALID_TOOL_MANIFEST', `App "${ownerName}/${filename}" has a malformed tool manifest`));
+      return;
+    }
+    const tool = manifest.tools.find((t) => t.name === toolName);
     if (!tool) {
       res.status(404).json(error(config.nodeId, 'TOOL_NOT_FOUND', `Tool not found on app "${ownerName}/${filename}": ${toolName}`));
       return;

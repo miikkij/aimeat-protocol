@@ -1017,9 +1017,9 @@ await test('Setup (B14): alice in person writes a public tool manifest that does
     assert(w.status === 201 || w.status === 200, `write: ${show(w)}`);
 });
 
-await test('B14 RECORDED DIFFERENCE (question: is a manifest that does not parse absent, or malformed): both refuse bob\'s agent, the route with 404 APP_TOOLS_NOT_FOUND and the tool with INVALID_TOOL_MANIFEST', async () => {
+await test('B14 DECIDED (developer approval 2026-11-14): a manifest that does not parse is INVALID_TOOL_MANIFEST on the route (422) and the tool alike', async () => {
     const rest = await call('POST', `/v1/apps/${pbAlice.name}/${encodeURIComponent(PB_BROKEN)}/webmcp/tools/summarise`, pbBobAg.token, { input: {} });
-    assert(rest.status === 404 && rest.body.error.code === 'APP_TOOLS_NOT_FOUND', `route: ${show(rest)}`);
+    assert(rest.status === 422 && rest.body.error.code === 'INVALID_TOOL_MANIFEST', `route: ${show(rest)}`);
     const tool = await callTool(pbBobMcp, 'aimeat_app_tool_invoke', { owner: pbAlice.name, app: PB_BROKEN, tool: 'summarise', input: {} });
     assert(tool.isError && tool.text.startsWith('INVALID_TOOL_MANIFEST'), `tool: ${tool.text.slice(0, 200)}`);
 });

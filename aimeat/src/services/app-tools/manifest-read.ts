@@ -9,13 +9,35 @@
  * @structure appToolManifestIds
  * @usage const near = await appToolManifestIds(storage, ownerGhii, includePrivate);
  * @version-history
+ *   v1.2.0 — 2026-11-14 — loadPublicToolManifest: the invoke read both surfaces ask (unit 2b, B14).
  *   v1.1.0 — 2026-11-14 — Another account's hint leaves out the manifest of an app the operator hid (unit 2b, B12).
  *   v1.0.0 — 2026-11-13 — Initial (structure programme unit 2).
  */
 import type { Storage } from '../../storage/interface.js';
 import { withoutHiddenToolManifests } from '../app/tools-manifest-reach.js';
-import { appIdFromToolsKey } from '../../models/app-tool-schemas.js';
+import { appIdFromToolsKey, appToolsKey, AppToolsDocSchema, type AppTool } from '../../models/app-tool-schemas.js';
 import { logger } from '../../utils/logger.js';
+
+/** An app's public tool manifest as an invoke reads it: absent (missing or not public), malformed, or its tools. */
+export type PublicToolManifest =
+    | { state: 'absent' }
+    | { state: 'malformed' }
+    | { state: 'ok'; tools: AppTool[] };
+
+/**
+ * The public tool manifest of `ownerName`/`filename` for an invoke. POST .../webmcp/tools/:tool and
+ * aimeat_app_tool_invoke both ask it, so a manifest that does not parse is INVALID_TOOL_MANIFEST on
+ * both, as the checkout resolver and the extension purchase already answer it; the route answered it
+ * as absent and the tool as malformed (structure programme 2026-11, unit 2b, B14).
+ */
+export async function loadPublicToolManifest(
+    storage: Storage, nodeId: string, ownerName: string, filename: string,
+): Promise<PublicToolManifest> {
+    const rec = await storage.getMemory(`${ownerName}@${nodeId}`, appToolsKey(filename));
+    if (!rec || rec.visibility !== 'public') return { state: 'absent' };
+    const parsed = AppToolsDocSchema.safeParse(rec.value);
+    return parsed.success ? { state: 'ok', tools: parsed.data.tools } : { state: 'malformed' };
+}
 
 /**
  * The app ids this owner publishes a tool manifest for — the signpost on an APP_TOOLS_NOT_FOUND.

@@ -41,6 +41,8 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.3.4 — 2026-11-14 — exchange-run.ts leaves EXEMPT; its manifest read moved to
+ *     services/app-tools/manifest-read.ts loadPublicToolManifest, which POST .../webmcp/tools/:tool calls too.
  *   v1.3.3 — 2026-11-14 — Unit 2b part 2, phase B: apps-fork.ts leaves EXEMPT; its source read and the
  *     three fork gates moved to services/app/fork-gate.ts, which POST .../fork calls too.
  *   v1.3.2 — 2026-11-14 — Unit 2b part 2, phase B: consent.ts leaves EXEMPT; its record read and the
@@ -90,7 +92,6 @@ const EXEMPT = new Set([
   'src/mcp/core-admin.ts',
   'src/mcp/core-resources.ts',         // extraction out of core.ts (max-file-lines): the same four storage reads
   'src/mcp/core.ts',
-  'src/mcp/exchange-run.ts',
   'src/mcp/extensions.ts',
   'src/mcp/knowledge.ts',
   'src/mcp/memory-extended.ts',
