@@ -2,8 +2,8 @@
  * @file check-skill-reviews.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Every skill carries the day somebody last read it against the code, and the gate
- *   notices when the code it describes has changed since.
+ * @description Every skill and every subagent definition carries the day somebody last read it
+ *   against the code, and the gate notices when the code it describes has changed since.
  *
  *   WHY. On 2026-09-19 every built-in and project skill was read against the code for the first
  *   time: 68 statements were wrong or stale in about 45 skills. The pattern in the game skills was
@@ -32,8 +32,12 @@
  * @usage
  *   pnpm check:skill-reviews                     # gate (check:fast, CI)
  *   pnpm check:skill-reviews --record aimeat-phaser-boot
- *   pnpm check:skill-reviews --list              # every skill, its date and what it watches
+ *   pnpm check:skill-reviews --list              # every skill and agent, its date and what it watches
+ *   pnpm check:skill-reviews --record agent:gatekeeper
  * @version-history
+ *   v1.1.0 — 2026-11-15 — Subagents too: every `.claude/agents/<name>.md` is `agent:<name>` in the
+ *     same ledger, with the files it describes as its watches. The instruction audit of 2026-11-14
+ *     found four of six agents out of date with the gate, the sandbox and the skills they cite.
  *   v1.0.0 — 2026-09-19 — Initial, with the first content audit of every skill.
  */
 import { createHash } from 'node:crypto';
@@ -46,6 +50,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const REPO = join(here, '..', '..');
 const LEDGER = join(here, '..', 'security', 'skill-reviews.json');
 const PROJECT_SKILLS = join(REPO, '.claude', 'skills');
+const PROJECT_AGENTS = join(REPO, '.claude', 'agents');
 
 /** A skill with nothing to watch is re-read at least this often. */
 const MAX_AGE_DAYS = 180;
@@ -85,13 +90,21 @@ function digestOf(watches: string[]): { digest: string; files: Record<string, st
     return { digest: lines ? 'sha256:' + createHash('sha256').update(lines, 'utf8').digest('hex').slice(0, 24) : '', files, missing };
 }
 
-/** Every skill the repository ships: `node:<name>` for a built-in one, `project:<name>` for .claude/skills. */
+/**
+ * Every skill and subagent the repository ships: `node:<name>` for a built-in skill,
+ * `project:<name>` for .claude/skills, `agent:<name>` for a subagent in .claude/agents. An agent
+ * definition makes claims about code as a skill does (the gate's tiers, the sandbox's port, the
+ * E2E runner's flags), and until 2026-11-15 nothing asked anyone to re-read one when that code moved.
+ */
 function skillNames(): string[] {
     const builtin = BUILTIN_SKILLS.map(s => `node:${s.name}`);
     const project = existsSync(PROJECT_SKILLS)
         ? readdirSync(PROJECT_SKILLS).filter(n => existsSync(join(PROJECT_SKILLS, n, 'SKILL.md'))).map(n => `project:${n}`)
         : [];
-    return [...builtin, ...project].sort();
+    const agents = existsSync(PROJECT_AGENTS)
+        ? readdirSync(PROJECT_AGENTS).filter(n => n.endsWith('.md')).map(n => `agent:${n.slice(0, -3)}`)
+        : [];
+    return [...builtin, ...project, ...agents].sort();
 }
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -131,7 +144,7 @@ function main(): void {
     const problems: string[] = [];
     for (const name of names) if (!ledger.skills[name]) problems.push(`${name} has no entry in security/skill-reviews.json. Read it against the code, add the entry with what it watches, then run --record ${name}.`);
     for (const [name, entry] of Object.entries(ledger.skills)) {
-        if (!names.includes(name)) { problems.push(`security/skill-reviews.json names "${name}", which is not a skill this repository ships. Remove the entry.`); continue; }
+        if (!names.includes(name)) { problems.push(`security/skill-reviews.json names "${name}", which is not a skill or agent this repository ships. Remove the entry.`); continue; }
         const { digest, files, missing } = digestOf(entry.watches);
         for (const m of missing) problems.push(`${name} watches "${m}", which does not exist. Point the entry at where that code lives now.`);
         if (!missing.length && digest !== entry.digest) {
@@ -147,7 +160,8 @@ function main(): void {
         for (const p of problems) console.error(`    ${p}`);
         process.exit(1);
     }
-    console.log(`✓ every skill was read against the code it describes, and that code has not changed since (${names.length} skills)`);
+    const agentCount = names.filter(n => n.startsWith('agent:')).length;
+    console.log(`✓ every skill and agent was read against the code it describes, and that code has not changed since (${names.length - agentCount} skills, ${agentCount} agents)`);
 }
 
 main();
