@@ -21,6 +21,7 @@
  *   CommentCreateBody · CONTACT_LIMITS · ContactAddBody · ContactUpdateBody · ProfileUpdateBody
  * @usage router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), validateBody(OrganismCreateBody, config.nodeId), …)
  * @version-history
+ *   v1.3.0 — 2026-11-14 — TeamSetupTeams: `type`, the team type (TEAM_TYPE_IDS).
  *   v1.2.0 — 2026-11-14 — TeamSetupBody and TeamSetupTeams: POST /v1/teams/setup and aimeat_team_setup.
  *   v1.1.0 — 2026-11-12 — AccessRequestBody: the optional message of an access request.
  *   v1.0.0 — 2026-10-27 — Initial (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -52,6 +53,9 @@ export const OrganismCreateBody = z.looseObject({
 });
 
 const teamLang = z.enum(['fi', 'en', 'es']);
+/** The ids of data/team-kit.ts TEAM_TYPES; test/unit/team-types.test.ts holds the two lists equal. */
+export const TEAM_TYPE_IDS = ['general', 'leadership', 'ai-strategy', 'sales', 'design', 'software', 'hardware', 'mechanics',
+    'marketing', 'hr', 'finance', 'support', 'project', 'partner', 'board'] as const;
 const teamName = () => safeText(INPUT_LIMITS.name);
 const teamPerson = z.union([
     z.string().max(INPUT_LIMITS.email).describe('An email address or an account name.'),
@@ -71,6 +75,7 @@ export const TeamSetupTeams = z.array(z.object({
         .describe('The name in each language, written by you. Every member sees the name in their own language.'),
     language: teamLang.optional().describe('The team\'s working language: its workspaces, context and skill are written in it. The caller\'s language when left out.'),
     kind: z.enum(['team', 'virtual']).optional().describe('"virtual" for a team formed around a theme across other teams.'),
+    type: z.enum(TEAM_TYPE_IDS).optional().describe('What the team works on, for a new team: it adds the spaces that work needs (sales gets customers, software gets incidents, the AI strategy group gets the register of AI uses, a board gets minutes) and a line in the team skill. "general" when left out.'),
     description: safeText(2000).optional().describe('What the team does, in a sentence or two. It starts the team context.'),
     descriptions: z.object({ fi: safeText(2000).optional(), en: safeText(2000).optional(), es: safeText(2000).optional() }).optional()
         .describe('The description in each language, written by you, as with `names`. Every member reads it in their own language.'),

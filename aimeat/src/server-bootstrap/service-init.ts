@@ -599,6 +599,7 @@ export async function initializeServices(
         .catch(err => logger.warn('team end sweep failed', { error: String(err) }));
     });
     setTimeout(teamEnds, 50_000);
+    // process-local: nothing; each process ticks, and claimedSweep lets one of them run the sweep.
     setInterval(teamEnds, TEAM_END_SWEEP_MS);
   }
 

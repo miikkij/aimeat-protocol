@@ -21,6 +21,7 @@
  *   const made = await applyOrganismShape(deps, orgId, owner, TEAM_KIT, 'fi');
  *   const md = teamSkillMarkdown({ lang: 'fi', skillName, teamName, orgId, ws });
  * @version-history
+ *   v1.1.0 — 2026-11-14 — TEAM_TYPES, teamTypeOf, teamKitFor and the type line in the team skill (T18).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T1, T5, T24).
  */
 import type { OrganismShape } from './organism-shapes.js';
@@ -100,6 +101,70 @@ export const TEAM_KIT: OrganismShape = {
     ],
 };
 
+type L = Record<TeamLang, string>;
+type Space = OrganismShape['workspaces'][number]['spaces'][number];
+const status = (values: string[]) => ({ type: 'string', enum: values });
+const recordSpace = (name: string, namespace: string, required: string[], props: Record<string, unknown>): Space =>
+    ({ name, namespace, mode: 'records', writeRole: 'member', versioned: true, schema: req(['id', ...required], { id: str, ...props }) });
+
+/** What a team type adds: spaces in the shared-knowledge workspace, and one line for the team skill. */
+export interface TeamType { id: string; label: L; spaces: Space[]; skillLine: L }
+
+/** The team types the setup knows (team setup T18). Each is the same team, with what its work needs. */
+export const TEAM_TYPES: TeamType[] = [
+    { id: 'general', label: { en: 'Team', fi: 'Tiimi', es: 'Equipo' }, spaces: [], skillLine: { en: '', fi: '', es: '' } },
+    { id: 'leadership', label: { en: 'Management team', fi: 'Johtoryhmä', es: 'Comité de dirección' }, spaces: [],
+        skillLine: { en: 'This is a management team: what is prepared here stays here until it is decided, and a decision is shared only with the teams it concerns.', fi: 'Tämä on johtoryhmä: valmisteltava asia pysyy täällä, kunnes se on päätetty, ja päätös jaetaan vain niille tiimeille, joita se koskee.', es: 'Es un comité de dirección: lo que se prepara aquí se queda aquí hasta que se decide, y una decisión se comparte solo con los equipos a los que afecta.' } },
+    { id: 'ai-strategy', label: { en: 'AI strategy group', fi: 'AI-strategiaryhmä', es: 'Grupo de estrategia de IA' },
+        spaces: [recordSpace('ai-use', 'shared.ai-uses', ['name'], { name: str, purpose: str, provider: str, risk: status(['minimal', 'limited', 'high']), owner: str })],
+        skillLine: { en: 'This group keeps the register of how the organisation uses AI (space ai-use): every use, its purpose, its provider and its risk class.', fi: 'Tämä ryhmä pitää rekisteriä siitä, miten organisaatio käyttää tekoälyä (tila ai-use): jokainen käyttö, sen tarkoitus, toimittaja ja riskiluokka.', es: 'Este grupo lleva el registro de cómo usa la IA la organización (espacio ai-use): cada uso, su finalidad, su proveedor y su clase de riesgo.' } },
+    { id: 'sales', label: { en: 'Sales', fi: 'Myynti', es: 'Ventas' },
+        spaces: [recordSpace('customer', 'shared.customers', ['name'], { name: str, contact: str, status: str, notes: str })],
+        skillLine: { en: 'Customers are records in the space customer. A draft to a customer always waits for a person.', fi: 'Asiakkaat ovat tietueita tilassa customer. Luonnos asiakkaalle odottaa aina ihmistä.', es: 'Los clientes son registros en el espacio customer. Un borrador para un cliente siempre espera a una persona.' } },
+    { id: 'design', label: { en: 'Design', fi: 'Design', es: 'Diseño' }, spaces: [],
+        skillLine: { en: 'Pictures and large files go to the file store; a page here links them. An approved look is recorded as a decision.', fi: 'Kuvat ja isot tiedostot tallennetaan tiedostovarastoon, ja täällä oleva sivu linkittää ne. Hyväksytty ilme kirjataan päätökseksi.', es: 'Las imágenes y los archivos grandes van al almacén de archivos; una página aquí los enlaza. Un aspecto aprobado se registra como decisión.' } },
+    { id: 'software', label: { en: 'Software development', fi: 'Ohjelmistokehitys', es: 'Desarrollo de software' },
+        spaces: [recordSpace('incident', 'shared.incidents', ['title'], { title: str, status: status(['open', 'done']), notes: str, owner: str })],
+        skillLine: { en: 'Something broken is an incident (space incident) until it is fixed; an architecture choice is a decision with its reason.', fi: 'Rikki oleva asia on häiriö (tila incident), kunnes se on korjattu. Arkkitehtuurivalinta on päätös perusteluineen.', es: 'Algo roto es una incidencia (espacio incident) hasta que se arregla; una elección de arquitectura es una decisión con su motivo.' } },
+    { id: 'hardware', label: { en: 'Hardware design', fi: 'Laitesuunnittelu', es: 'Diseño de hardware' },
+        spaces: [recordSpace('requirement', 'shared.requirements', ['title'], { title: str, status: status(['open', 'done']), notes: str }),
+            recordSpace('change-request', 'shared.change-requests', ['title'], { title: str, status: status(['proposed', 'approved', 'rejected']), why: str })],
+        skillLine: { en: 'Requirements and change requests are records; a change request waits for a lead\'s approval.', fi: 'Vaatimukset ja muutospyynnöt ovat tietueita. Muutospyyntö odottaa vetäjän hyväksyntää.', es: 'Los requisitos y las solicitudes de cambio son registros; una solicitud de cambio espera la aprobación de un responsable.' } },
+    { id: 'mechanics', label: { en: 'Mechanics', fi: 'Mekaniikka', es: 'Mecánica' },
+        spaces: [recordSpace('requirement', 'shared.requirements', ['title'], { title: str, status: status(['open', 'done']), notes: str }),
+            recordSpace('change-request', 'shared.change-requests', ['title'], { title: str, status: status(['proposed', 'approved', 'rejected']), why: str })],
+        skillLine: { en: 'Requirements, test results and change requests are records; compare a test result with its requirement.', fi: 'Vaatimukset, testitulokset ja muutospyynnöt ovat tietueita. Vertaa testitulosta sen vaatimukseen.', es: 'Los requisitos, los resultados de pruebas y las solicitudes de cambio son registros; compara un resultado con su requisito.' } },
+    { id: 'marketing', label: { en: 'Marketing', fi: 'Markkinointi', es: 'Marketing' },
+        spaces: [recordSpace('campaign', 'shared.campaigns', ['title'], { title: str, status: status(['open', 'done']), due: str, notes: str })],
+        skillLine: { en: 'Anything made public waits for its owner\'s approval first.', fi: 'Kaikki julkiseksi tehtävä odottaa ensin omistajan hyväksyntää.', es: 'Todo lo que se hace público espera primero la aprobación de su propietario.' } },
+    { id: 'hr', label: { en: 'HR', fi: 'HR', es: 'Recursos humanos' }, spaces: [],
+        skillLine: { en: 'Personal data stays here; nothing about a person is written or changed without a person.', fi: 'Henkilötiedot pysyvät täällä. Ihmisestä ei kirjoiteta eikä muuteta mitään ilman ihmistä.', es: 'Los datos personales se quedan aquí; nada sobre una persona se escribe o cambia sin una persona.' } },
+    { id: 'finance', label: { en: 'Finance', fi: 'Talous', es: 'Finanzas' }, spaces: [],
+        skillLine: { en: 'Every payment waits for a person.', fi: 'Jokainen maksu odottaa ihmistä.', es: 'Cada pago espera a una persona.' } },
+    { id: 'support', label: { en: 'Customer support', fi: 'Asiakastuki', es: 'Atención al cliente' },
+        spaces: [recordSpace('ticket', 'shared.tickets', ['title'], { title: str, status: status(['open', 'done']), notes: str, owner: str })],
+        skillLine: { en: 'A customer\'s matter is a ticket; a reply to a customer is a draft that waits for a person.', fi: 'Asiakkaan asia on tiketti. Vastaus asiakkaalle on luonnos, joka odottaa ihmistä.', es: 'Un asunto de un cliente es un ticket; una respuesta a un cliente es un borrador que espera a una persona.' } },
+    { id: 'project', label: { en: 'Project', fi: 'Projekti', es: 'Proyecto' },
+        spaces: [recordSpace('deliverable', 'shared.deliverables', ['title'], { title: str, status: status(['open', 'done']), due: str })],
+        skillLine: { en: 'The project ends on its last day; deliverables are records with their due day.', fi: 'Projekti päättyy viimeisenä päivänään. Tuotokset ovat tietueita määräpäivineen.', es: 'El proyecto termina en su último día; los entregables son registros con su fecha.' } },
+    { id: 'partner', label: { en: 'Partner team', fi: 'Kumppanitiimi', es: 'Equipo con socios' }, spaces: [],
+        skillLine: { en: 'People from another company work here; write only what may be shared with them.', fi: 'Täällä työskentelee toisen yrityksen ihmisiä. Kirjoita vain se, minkä saa jakaa heille.', es: 'Aquí trabajan personas de otra empresa; escribe solo lo que se puede compartir con ellas.' } },
+    { id: 'board', label: { en: 'Board', fi: 'Hallitus', es: 'Consejo' },
+        spaces: [{ name: 'minutes', namespace: 'shared.minutes', mode: 'document', writeRole: 'member', versioned: true }],
+        skillLine: { en: 'Minutes are documents in the space minutes, and are signed with the node\'s signing.', fi: 'Pöytäkirjat ovat dokumentteja tilassa minutes, ja ne allekirjoitetaan sähköisesti.', es: 'Las actas son documentos en el espacio minutes, y se firman electrónicamente.' } },
+];
+
+export function teamTypeOf(id: unknown): TeamType {
+    return TEAM_TYPES.find(t => t.id === id) ?? TEAM_TYPES[0];
+}
+
+/** TEAM_KIT with a type's spaces added to the shared-knowledge workspace. */
+export function teamKitFor(type: TeamType): OrganismShape {
+    if (!type.spaces.length) return TEAM_KIT;
+    const workspaces = TEAM_KIT.workspaces.map((w, i) => i === TEAM_WS.shared ? { ...w, spaces: [...w.spaces, ...type.spaces] } : w);
+    return { ...TEAM_KIT, workspaces };
+}
+
 const CONTEXT_START: Record<TeamLang, (team: string, what: string) => string> = {
     fi: (team, what) => `# ${team}\n\n${what || 'Kerro tähän, mitä tiimi tekee.'}\n\n## Mikä on nyt auki\n\nEi vielä mitään. Jäsenten AI:t täydentävät tätä työn edetessä.\n`,
     en: (team, what) => `# ${team}\n\n${what || 'Write here what the team does.'}\n\n## What is open now\n\nNothing yet. The members' AIs add to this as the work goes on.\n`,
@@ -111,7 +176,7 @@ export function teamContextStart(lang: TeamLang, team: string, what: string): st
     return CONTEXT_START[lang](team, what.trim());
 }
 
-interface SkillArgs { lang: TeamLang; skillName: string; teamName: string; orgId: string; ws: { shared: string; decisions: string; waiting: string } }
+interface SkillArgs { lang: TeamLang; skillName: string; teamName: string; orgId: string; ws: { shared: string; decisions: string; waiting: string }; typeLine?: string }
 
 const SKILL_TEXT: Record<TeamLang, (a: SkillArgs) => { description: string; body: string }> = {
     fi: a => ({
@@ -204,5 +269,6 @@ Un miembro no cambia esta skill directamente. Pon la propuesta en Pendiente de t
 export function teamSkillMarkdown(a: SkillArgs): string {
     const { description, body } = SKILL_TEXT[a.lang](a);
     const fm = `---\nname: ${a.skillName}\ndescription: ${JSON.stringify(description)}\nlicense: MIT\nmetadata:\n  audience: agent\n---\n\n`;
-    return fm + body;
+    const heading = { fi: 'Tämän tiimin työ', en: 'This team\'s work', es: 'El trabajo de este equipo' }[a.lang];
+    return fm + body + (a.typeLine ? `\n## ${heading}\n\n${a.typeLine}\n` : '');
 }

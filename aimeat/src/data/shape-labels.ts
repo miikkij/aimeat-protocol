@@ -12,6 +12,8 @@
  * @structure SPACE_LABELS · FIELD_LABELS · manifestI18n
  * @usage const i18n = manifestI18n(shape.workspaces[0].spaces);
  * @version-history
+ *   v1.2.0 — 2026-11-14 — The spaces, fields and choices the team types add (ai-use, incident, requirement,
+ *     change-request, campaign, ticket, minutes; purpose, provider, risk; minimal, limited, high).
  *   v1.1.0 — 2026-11-14 — VALUE_LABELS: a field's choices (its enum) at "<namespace>.<field>.<value>",
  *     which the form's options and the record view show in the reader's language.
  *   v1.0.0 — 2026-11-14 — Initial (team setup T24: a workspace reads in its reader's language).
@@ -31,6 +33,13 @@ export const SPACE_LABELS: Record<string, L> = {
     item: { en: 'Open matters', fi: 'Avoimet asiat', es: 'Asuntos abiertos' },
     context: { en: 'Team context', fi: 'Tiimin konteksti', es: 'Contexto del equipo' },
     waiting: { en: 'Waiting for a person', fi: 'Odottaa ihmistä', es: 'Pendiente de una persona' },
+    'ai-use': { en: 'AI uses', fi: 'Tekoälyn käytöt', es: 'Usos de la IA' },
+    incident: { en: 'Incidents', fi: 'Häiriöt', es: 'Incidencias' },
+    requirement: { en: 'Requirements', fi: 'Vaatimukset', es: 'Requisitos' },
+    'change-request': { en: 'Change requests', fi: 'Muutospyynnöt', es: 'Solicitudes de cambio' },
+    campaign: { en: 'Campaigns', fi: 'Kampanjat', es: 'Campañas' },
+    ticket: { en: 'Tickets', fi: 'Tiketit', es: 'Tickets' },
+    minutes: { en: 'Minutes', fi: 'Pöytäkirjat', es: 'Actas' },
 };
 
 export const FIELD_LABELS: Record<string, L> = {
@@ -66,6 +75,9 @@ export const FIELD_LABELS: Record<string, L> = {
     origin: { en: 'Origin', fi: 'Alkuperä', es: 'Origen' },
     pointer: { en: 'Location', fi: 'Sijainti', es: 'Ubicación' },
     visibility: { en: 'Visibility', fi: 'Näkyvyys', es: 'Visibilidad' },
+    purpose: { en: 'Purpose', fi: 'Tarkoitus', es: 'Finalidad' },
+    provider: { en: 'Provider', fi: 'Toimittaja', es: 'Proveedor' },
+    risk: { en: 'Risk class', fi: 'Riskiluokka', es: 'Clase de riesgo' },
 };
 
 /** The choices of the shapes' fields (their schema `enum`), shown at "<namespace>.<field>.<value>". */
@@ -102,6 +114,9 @@ export const VALUE_LABELS: Record<string, L> = {
     approve: { en: 'Approval', fi: 'Hyväksyntä', es: 'Aprobación' },
     'skill-change': { en: 'Change to the team skill', fi: 'Muutos tiimiskilliin', es: 'Cambio en la skill del equipo' },
     other: { en: 'Other', fi: 'Muu', es: 'Otro' },
+    minimal: { en: 'Minimal', fi: 'Vähäinen', es: 'Mínimo' },
+    limited: { en: 'Limited', fi: 'Rajoitettu', es: 'Limitado' },
+    high: { en: 'High', fi: 'Suuri', es: 'Alto' },
 };
 
 /** The `manifest.i18n` block for a workspace: its summary ("summary"), every space, every labelled

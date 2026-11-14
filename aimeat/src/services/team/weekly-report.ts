@@ -13,6 +13,7 @@
  * @structure weekOf · runTeamWeeklyReports
  * @usage registered as the core job team-weekly (services/core-jobs.ts), Fridays at 14:05.
  * @version-history
+ *   v1.1.0 — 2026-11-14 — Decision titles pass each lead's classification reader; the counts stay whole.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T8).
  */
 import type { Storage, MemoryRecord, OrganismRecord } from '../../storage/interface.js';
@@ -21,26 +22,29 @@ import { logger } from '../../utils/logger.js';
 import { notify } from '../notify.js';
 import { organismOwners } from '../organism-ownership.js';
 import { readTeamRecord, TEAM_ORGANISM_TYPES, type TeamRecord } from './record.js';
+import { readerFor } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
 
 const WEEK_MS = 7 * 86_400_000;
 
 /** The newest row of each record in a space: `.latest` over `.draft` over the bare key. */
-function latest(rows: MemoryRecord[], prefix: string): { value: Record<string, unknown>; at: string }[] {
+function latest(rows: MemoryRecord[], prefix: string): { value: Record<string, unknown>; at: string; rec: MemoryRecord }[] {
     const rank = (key: string) => key.endsWith('.latest') ? 3 : key.endsWith('.draft') ? 2 : 1;
-    const best = new Map<string, { rank: number; value: Record<string, unknown>; at: string }>();
+    const best = new Map<string, { rank: number; value: Record<string, unknown>; at: string; rec: MemoryRecord }>();
     for (const r of rows) {
         if (!r.key.startsWith(prefix) || !r.value || typeof r.value !== 'object') continue;
         const id = r.key.slice(prefix.length).replace(/\.(latest|draft)$/, '');
         if (!id || id.includes('.')) continue;
         const k = rank(r.key);
         const at = r.createdAt ?? r.updatedAt ?? '';
-        if ((best.get(id)?.rank ?? 0) < k) best.set(id, { rank: k, value: r.value as Record<string, unknown>, at });
+        if ((best.get(id)?.rank ?? 0) < k) best.set(id, { rank: k, value: r.value as Record<string, unknown>, at, rec: r });
     }
     return [...best.values()];
 }
 
-/** The week's figures of one team. Reads its three workspaces (the node's own summary for its leads). */
-export async function weekOf(storage: Storage, organism: OrganismRecord, team: TeamRecord, now: number): Promise<{ decided: string[]; open: number; waiting: number; aiConnected: number; members: number }> {
+/** The week's figures of one team, and this week's decision records. Only counts leave this function
+ *  as they are; a decision's title reaches a lead through that lead's classification reader. */
+export async function weekOf(storage: Storage, organism: OrganismRecord, team: TeamRecord, now: number): Promise<{ decided: MemoryRecord[]; open: number; waiting: number; aiConnected: number; members: number }> {
     const rows = async (ws: string, ns: string) => {
         const prefix = `organism.${organism.id}.w.${ws}.${ns}.`;
         const { items } = await storage.listAllMemory({ prefix, limit: 5000, excludeVersionRows: true });
@@ -54,7 +58,7 @@ export async function weekOf(storage: Storage, organism: OrganismRecord, team: T
     const agents = members.length ? await storage.getAgentsByOwners(members) : {};
     const aiConnected = members.filter(m => (agents[m] ?? []).some(a => a.mcpLastSeen)).length;
     return {
-        decided: decisions.map(d => String(d.value.title ?? d.value.decision ?? '')).filter(Boolean).slice(0, 5),
+        decided: decisions.map(d => d.rec),
         open: open.length, waiting: waiting.length, aiConnected, members: members.length,
     };
 }
@@ -73,11 +77,17 @@ export async function runTeamWeeklyReports(storage: Storage, config: AimeatConfi
                     if (!team) continue;
                     const w = await weekOf(storage, organism, team, now);
                     if (!w.decided.length && !w.open && !w.waiting) continue;
-                    const vars = {
-                        decided: w.decided.length, decisions: w.decided.join('; ') || '-',
-                        open: w.open, waiting: w.waiting, ai: w.aiConnected, members: w.members,
-                    };
                     for (const lead of organismOwners(organism)) {
+                        // The titles this lead may read: a classified decision above the lead's
+                        // clearance is counted, never named.
+                        const reader = readerFor({ storage, config }, { sub: lead, owner: lead, roles: ['owner'] });
+                        const shown = await reader.show(w.decided, r => memoryTarget(r.ownerGaii, r.key));
+                        const titles = shown.map(r => r.value as Record<string, unknown>)
+                            .map(v => String(v.title ?? v.decision ?? '')).filter(Boolean).slice(0, 5);
+                        const vars = {
+                            decided: w.decided.length, decisions: titles.join('; ') || '-',
+                            open: w.open, waiting: w.waiting, ai: w.aiConnected, members: w.members,
+                        };
                         await notify(storage, `${lead}@${config.nodeId}`, {
                             type: 'team_weekly',
                             title: `The week in the team: ${w.decided.length} decisions, ${w.waiting} waiting`,

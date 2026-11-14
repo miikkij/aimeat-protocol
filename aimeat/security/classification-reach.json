@@ -2536,6 +2536,12 @@
       },
       "why": "Reviewed 2026-11-14 (team setup): the team context record reaches the caller only through reader.show (contextOf), the caller's classification reader, as showOrganismReadme does."
     },
+    "src/services/team/weekly-report.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-14 (team setup T8): the weekly report counts a team's decisions, open matters and waiting records; a decision's title reaches a lead only through that lead's classification reader (reader.show in runTeamWeeklyReports). Counts carry no content."
+    },
     "src/services/organism-readme.ts": {
       "reads": {
         "listAllMemory": 1

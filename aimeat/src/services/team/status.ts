@@ -16,6 +16,7 @@
  * @structure TeamStatus · teamStatusFor · listTeamsOf
  * @usage const teams = await teamStatusFor(storage, config, ownerName, locale, orgId);
  * @version-history
+ *   v1.2.0 — 2026-11-14 — `team_type`.
  *   v1.1.0 — 2026-11-14 — The team's last day, its dependencies, and for a lead each temporary member's day.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T5, T13).
  */
@@ -39,6 +40,8 @@ export interface TeamStatus {
     names: TeamRecord['names'];
     language: TeamRecord['language'];
     kind: TeamRecord['kind'];
+    /** The team type (data/team-kit.ts TEAM_TYPES); "general" for a team made before types existed. */
+    team_type: string;
     you_lead: boolean;
     leads: string[];
     members: TeamMemberStatus[];
@@ -96,7 +99,7 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
     const status: TeamStatus = {
         organism_id: organism.id,
         name: teamDisplayName(team, locale, organism.name),
-        names: team.names, language: team.language, kind: team.kind,
+        names: team.names, language: team.language, kind: team.kind, team_type: team.teamType ?? 'general',
         you_lead: youLead, leads, members,
         ai_connected: members.filter(m => m.ai.connected).length,
         workspaces: team.workspaces,

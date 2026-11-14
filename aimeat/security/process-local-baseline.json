@@ -282,7 +282,7 @@
       "reason": "DEBT"
     },
     "src/server-bootstrap/service-init.ts :: interval :: initializeServices": {
-      "count": 6,
+      "count": 7,
       "reason": "DEBT"
     },
     "src/server-bootstrap/static-files.ts :: let :: nodeRobotsTxt": {

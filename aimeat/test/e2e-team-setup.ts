@@ -18,6 +18,7 @@
  * @structure t01..t16 in order; each later test reads what the earlier ones made.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=team-setup
  * @version-history
+ *   v1.1.0 — 2026-11-14 — t13: team types add their spaces, named in every language; status names the type.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -219,10 +220,10 @@ await test('t13 many teams in one call: a flat organisation with a virtual team 
     const spec = {
         dry_run: false,
         teams: [
-            { name: 'Johtoryhmä', names: { en: 'Management team', es: 'Comité de dirección' }, members: [liisa.name] },
-            { name: 'AI-strategia', names: { en: 'AI strategy', es: 'Estrategia de IA' }, kind: 'virtual', members: [aino.name, liisa.name] },
+            { name: 'Johtoryhmä', names: { en: 'Management team', es: 'Comité de dirección' }, type: 'leadership', members: [liisa.name] },
+            { name: 'AI-strategia', names: { en: 'AI strategy', es: 'Estrategia de IA' }, kind: 'virtual', type: 'ai-strategy', members: [aino.name, liisa.name] },
             { name: 'Diseño', names: { fi: 'Design', en: 'Design' }, language: 'es', members: [aino.name] },
-            { name: 'Ohjelmistokehitys', names: { en: 'Software development', es: 'Desarrollo de software' } },
+            { name: 'Ohjelmistokehitys', names: { en: 'Software development', es: 'Desarrollo de software' }, type: 'software' },
         ],
     };
     const r = await callTool(leadAi, 'aimeat_team_setup', spec);
@@ -236,6 +237,18 @@ await test('t13 many teams in one call: a flat organisation with a virtual team 
     const ws = await json(`/v1/organisms/${es.organism_id}/workspace?ws=${es.workspaces[2]}`, { headers: auth(lead.token) });
     assert(ws.body.data.manifest?.name === 'Pendiente de ti', `Spanish workspace names: ${ws.body.data.manifest?.name}`);
     assert(r.data.teams[1].kind === 'virtual', 'the virtual team');
+    // A team type adds the spaces its work needs to the shared-knowledge workspace, named in every language.
+    const ai = r.data.teams[1];
+    const shared = await json(`/v1/organisms/${ai.organism_id}/workspace?ws=${ai.workspaces[0]}`, { headers: auth(lead.token) });
+    const spaces = (shared.body.data.manifest?.objectTypes ?? []).map((s: any) => s.name);
+    assert(spaces.includes('ai-use') && spaces.includes('page'), `AI strategy spaces: ${spaces}`);
+    const i18n = shared.body.data.manifest?.i18n ?? {};
+    assert(i18n.fi?.['type.ai-use'] === 'Tekoälyn käytöt' && i18n.en?.['shared.ai-uses.risk.high'] === 'High', `ai-use labels: ${JSON.stringify(i18n.fi?.['type.ai-use'])}`);
+    const plain = await json(`/v1/organisms/${es.organism_id}/workspace?ws=${es.workspaces[0]}`, { headers: auth(lead.token) });
+    assert(!(plain.body.data.manifest?.objectTypes ?? []).some((s: any) => s.name === 'ai-use'), 'a general team gets no AI register');
+    const st = await json('/v1/teams/status', { headers: auth(lead.token) });
+    const types = Object.fromEntries(st.body.data.teams.map((t: any) => [t.organism_id, t.team_type]));
+    assert(types[ai.organism_id] === 'ai-strategy' && types[es.organism_id] === 'general' && types[r.data.teams[3].organism_id] === 'software', `team types: ${JSON.stringify(types)}`);
 });
 
 await test('t14 one person in several teams: Aino joins two more and her AI is told about all three, in English', async () => {

@@ -59538,6 +59538,10 @@ paths:
                         properties: { fi: { type: string }, en: { type: string }, es: { type: string } }
                       language: { type: string, enum: [fi, en, es] }
                       kind: { type: string, enum: [team, virtual] }
+                      type:
+                        type: string
+                        enum: [general, leadership, ai-strategy, sales, design, software, hardware, mechanics, marketing, hr, finance, support, project, partner, board]
+                        description: What the team works on, for a new team; adds the spaces that work needs and a line in the team skill
                       description: { type: string }
                       descriptions:
                         type: object

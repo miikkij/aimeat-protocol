@@ -30,6 +30,7 @@
  *   const parsed = parseTeamSetup(req.body, callerLocale);
  *   const out = await planOrApplyTeams({ storage, config }, caller, parsed, dryRun);
  * @version-history
+ *   v1.2.0 — 2026-11-14 — The team type (`type`, T18): its spaces in the shared workspace, its line in the skill.
  *   v1.1.0 — 2026-11-14 — A team keeps its workspaces' names in every language from the kit, and its
  *     description in every language the AI writes (`descriptions`), so every part of the team reads
  *     in its reader's language.
@@ -47,7 +48,7 @@ import { publishSkill } from '../skills.js';
 import { parseDay } from './expiry.js';
 import { parseDependsOn, applyTeamChanges, untilKeyOf, type TeamChanges } from './changes.js';
 import {
-    TEAM_KIT, TEAM_LANGS, TEAM_WS, TEAM_CONTEXT_ID, teamContextStart, teamLang, teamSkillMarkdown, type TeamLang,
+    TEAM_KIT, TEAM_LANGS, TEAM_WS, TEAM_CONTEXT_ID, teamContextStart, teamLang, teamSkillMarkdown, teamKitFor, teamTypeOf, type TeamLang,
 } from '../../data/team-kit.js';
 import {
     TEAM_RECORD_TYPE, readTeamRecordWithVersion, teamContextKey, teamDisplayName, writeTeamRecord,
@@ -66,6 +67,8 @@ export interface TeamInput {
     names: Partial<Record<TeamLang, string>>;
     language: TeamLang;
     kind: 'team' | 'virtual';
+    /** The team type (data/team-kit.ts TEAM_TYPES): what spaces its work needs. */
+    teamType: string;
     description: string;
     /** The description in other languages, written by the caller's AI. */
     descriptions: Partial<Record<TeamLang, string>>;
@@ -143,6 +146,7 @@ export function parseTeamSetup(body: unknown, callerLocale: string | null | unde
         teams.push({
             organismId, name: name.slice(0, 120), names, language,
             kind: t.kind === 'virtual' ? 'virtual' : 'team',
+            teamType: teamTypeOf(t.type).id,
             description: typeof t.description === 'string' ? t.description.trim().slice(0, 2000) : (descriptions[language] ?? ''),
             descriptions, leads, members, remove, endsOn, dependsOn,
         });
@@ -239,7 +243,8 @@ async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOut
     if (!created.ok) { out.problems.push(`${created.code}: ${created.message}`); return null; }
     const orgId = created.organism.id;
     out.organism_id = orgId;
-    const shaped = await applyOrganismShape(deps, orgId, caller.owner, TEAM_KIT, t.language);
+    const type = teamTypeOf(t.teamType);
+    const shaped = await applyOrganismShape(deps, orgId, caller.owner, teamKitFor(type), t.language);
     if (shaped.made.length !== TEAM_KIT.workspaces.length) {
         out.problems.push(...shaped.notCreated.map(n => `workspace "${n.name}" was not created: ${n.reason}`));
         return null;
@@ -261,7 +266,7 @@ async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOut
     try {
         await publishSkill(storage, config, {
             scope: 'user', owner: caller.owner, publisher: caller.principal, visibility: `organism:${orgId}`,
-            files: new Map([['SKILL.md', teamSkillMarkdown({ lang: t.language, skillName, teamName, orgId, ws })]]),
+            files: new Map([['SKILL.md', teamSkillMarkdown({ lang: t.language, skillName, teamName, orgId, ws, typeLine: type.skillLine[t.language] })]]),
         });
         skill = { name: skillName, ref: `user:${caller.owner}/${skillName}` };
         out.skill = skill.ref;
@@ -276,7 +281,7 @@ async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOut
     };
     const descriptions = t.description ? { ...t.descriptions, [t.language]: t.description } : t.descriptions;
     const team: TeamRecord = {
-        type: TEAM_RECORD_TYPE, names: t.names, language: t.language, kind: t.kind, workspaces: ws, workspaceNames, descriptionByLang: descriptions, skill,
+        type: TEAM_RECORD_TYPE, names: t.names, language: t.language, kind: t.kind, teamType: type.id, workspaces: ws, workspaceNames, descriptionByLang: descriptions, skill,
         leadsPending: [], createdBy: caller.owner, createdAt: now, updatedAt: now,
     };
     if (!(await writeTeamRecord(storage, config, orgId, team, null, caller.owner))) {
