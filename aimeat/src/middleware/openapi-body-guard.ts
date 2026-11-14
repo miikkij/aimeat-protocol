@@ -40,7 +40,9 @@
  *   A route's schema is compiled at its first request. Matching a path and validating a body cost
  *   under a microsecond each (measurements in the commit that added this file).
  *
- *   LOG VOLUME. One line per mismatching request, at warn, up to LOG_LINES_PER_MINUTE lines a minute;
+ *   LOG VOLUME. One line per mismatching request, at warn ('openapi body mismatch' when observed,
+ *   'openapi body mismatch refused' with mode enforce when refused; the refusals are not counted in
+ *   observations()), up to LOG_LINES_PER_MINUTE lines a minute;
  *   past that the lines of the minute are counted and one line says how many were left out. The
  *   counts in observations() are exact either way.
  * @structure openapiBodyGuard(nodeId, opts) → middleware with observations() and ready()
@@ -48,7 +50,7 @@
  * @version-history
  *   v1.2.0 — 2026-11-14 — Options `mode` and `exempt`: the node setting security.request_body_check
  *     enforces every route except the exempt ones, or observes every route; `enforced` no longer
- *     defaults to a list in data/ (structure programme 2026-11, unit 1).
+ *     defaults to a list in data/ (structure programme 2026-11, unit 1). A refusal is logged too.
  *   v1.1.0 — 2026-11-13 — Option hasSession: an enforced route refuses a body only from a caller with
  *     a session, so a caller without one keeps the route's 401 (structure programme 2026-11, unit 1).
  *   v1.0.0 — 2026-11-04 — Initial, observe mode only (codebase analysis 2026-11-03, item B5).
@@ -178,7 +180,11 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
         if (!c) { c = { route, field, reason: issue.reason, count: 0, accepted: 0, refused: 0 }; counters.set(key, c); }
         c.count++;
         if (status > 0 && status < 400) c.accepted++; else c.refused++;
+        line('openapi body mismatch', { mode: 'observe', route, field: c.field, reason: issue.reason, status, count: c.count, accepted: c.accepted });
+    };
 
+    /** One log line within the minute's budget; past it the line is only counted. */
+    const line = (message: string, fields: Record<string, unknown>): void => {
         const now = Math.floor(Date.now() / 60_000);
         if (now !== minute) {
             if (leftOut > 0) logger.warn('openapi body mismatch lines left out', { left_out: leftOut, limit_per_minute: linesPerMinute });
@@ -186,7 +192,7 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
         }
         if (linesThisMinute >= linesPerMinute) { leftOut++; return; }
         linesThisMinute++;
-        logger.warn('openapi body mismatch', { mode: 'observe', route, field: c.field, reason: issue.reason, status, count: c.count, accepted: c.accepted });
+        logger.warn(message, fields);
     };
 
     // Recorded when the response is done, so the line says whether the route accepted the body: a
@@ -221,7 +227,12 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
             if (!issue) return undefined;
             // A caller without a session is the route's to answer (401), whatever its body: refusing
             // the body first would change that answer to 400. Its mismatch is observed instead.
-            if (isEnforced(op.key) && (!opts.hasSession || opts.hasSession(req))) return issue;
+            if (isEnforced(op.key) && (!opts.hasSession || opts.hasSession(req))) {
+                // The same line budget as the observed mismatches, so an operator sees which route
+                // refuses which field, and when to switch the setting back.
+                line('openapi body mismatch refused', { mode: 'enforce', route: op.route, field: issue.field, reason: issue.reason, status: 400 });
+                return issue;
+            }
             observe(op.route, issue, res);
         } catch (err) {
             logger.warn('openapi body guard: check failed; the request goes on unchecked', { error: String(err) });

@@ -79,6 +79,15 @@ describe('security.request_body_check', () => {
         assert.equal((await put(base, '/v1/things/a', { name: 'ok' }, true)).status, 201, 'a matching body is answered by the route');
     });
 
+    it('a refusal is logged with the route, the field and the reason, and never the value', async () => {
+        const warn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+        const base = await app({ mode: () => 'enforce' });
+        await put(base, '/v1/loose/a', { name: 'secret-value-never-logged' }, true);
+        const lines = warn.mock.calls.filter(c => c[0] === 'openapi body mismatch refused');
+        assert.deepEqual(lines.map(c => c[1]), [{ mode: 'enforce', route: 'PUT /v1/loose/{id}', field: 'name', reason: 'too_long', status: 400 }]);
+        assert.ok(!JSON.stringify(warn.mock.calls).includes('secret-value-never-logged'));
+    });
+
     it('an exempt route is observed in enforce mode', async () => {
         vi.spyOn(logger, 'warn').mockImplementation(() => logger);
         const base = await app({ mode: () => 'enforce', exempt: ['PUT /v1/loose/{id}'] });
