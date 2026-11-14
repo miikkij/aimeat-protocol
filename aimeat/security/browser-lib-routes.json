@@ -23,6 +23,12 @@
       ],
       "apps": []
     },
+    "/v1/appcat": {
+      "portal": [
+        "q"
+      ],
+      "apps": []
+    },
     "/v1/apps": {
       "portal": [
         "building",
