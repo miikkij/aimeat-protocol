@@ -43,6 +43,7 @@ import { logger } from '../utils/logger.js';
 const PAGE_FILE = 'not-found.html';
 
 /** The template, read once. Null when the package shipped without public/, and then JSON is sent. */
+// process-local: nothing breaks; it is a copy of a file shipped with the code, read once per process.
 let template: string | null | undefined;
 function pageTemplate(): string | null {
   if (template !== undefined) return template;

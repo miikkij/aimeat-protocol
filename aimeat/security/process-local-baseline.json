@@ -5,6 +5,10 @@
       "count": 1,
       "reason": "Each process shares its own computes of one cache key; a second process computes its own once."
     },
+    "src/middleware/not-found-page.ts :: let :: template": {
+      "count": 1,
+      "reason": "A copy of public/not-found.html, a file shipped with the code; every process reads the same file once."
+    },
     "src/services/config/strictness.ts :: let :: ranks": {
       "count": 1,
       "reason": "Derived from the config schema in the code; every process builds the same table."
