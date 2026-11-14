@@ -11,6 +11,7 @@
  *   - PUT /v1/admin/agents/:gaii/cors: refuse a missing agent, then services/cors-overview.ts setCorsList
  *
  * @version-history
+ *   v1.5.1 — 2026-11-14 — GET /v1/admin/agents reads through operatorAgentList (services/node-admin/agent-list.ts), which aimeat_admin_agents now asks too (unit 2b, B6).
  *   v1.5.0 — 2026-10-19 — GET /v1/admin/agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read.
  *   v1.4.0 — 2026-10-06 — GET /v1/admin/agents reads `limit`, as aimeat_admin_agents does on the
  *     node's MCP (secaudit 2026-10 follow-up, Part B).
@@ -37,7 +38,7 @@ import { setCorsList } from '../../services/cors-overview.js';
 import { parseAppScopes } from '../../services/protected-resource.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { readAvatarsOrEmpty } from '../../services/agent/avatar.js';
+import { operatorAgentList } from '../../services/node-admin/agent-list.js';
 
 /**
  * What the app behind a grant target declares TODAY, or null when it declares nothing.
@@ -72,12 +73,10 @@ export function adminAgentsRouter(
 
     // GET /v1/admin/agents — list all agents with full details (operator only)
     router.get('/v1/admin/agents', requireAuth(), requireOperator(storage), async (req, res) => {
-        const agents = await storage.listAgents();
-        // `limit` is what aimeat_admin_agents publishes and the node's MCP applies; the route ignored
-        // it, so the connector, which calls this route, could not (secaudit 2026-10 follow-up, Part B).
-        const limit = Number.parseInt(String(req.query.limit ?? ''), 10);
-        const shown = Number.isFinite(limit) && limit > 0 ? agents.slice(0, limit) : agents;
-        const avatars = await readAvatarsOrEmpty(storage, shown.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/admin/agents');
+        // `limit` is what aimeat_admin_agents publishes; the route ignored it, so the connector, which
+        // calls this route, could not (secaudit 2026-10 follow-up, Part B). The list, the page rule and
+        // the avatars are one function both surfaces call (services/node-admin/agent-list.ts).
+        const { shown, total, avatars } = await operatorAgentList(storage, req.query.limit, 'GET /v1/admin/agents');
 
         res.json(success(config.nodeId, {
             agents: shown.map(a => ({
@@ -95,7 +94,7 @@ export function adminAgentsRouter(
                 // "how many agents would a new scope gate refuse" a question with no answer.
                 default_scopes: a.defaultScopes ?? null,
             })),
-            total: agents.length,
+            total,
         }));
     });
 

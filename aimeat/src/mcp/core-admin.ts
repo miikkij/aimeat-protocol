@@ -13,6 +13,8 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-11-14 — aimeat_admin_agents reads through operatorAgentList (services/node-admin/agent-list.ts), as
+ *     GET /v1/admin/agents does: a limit that is not a positive whole number lists every agent (unit 2b, B6).
  *   2026-11-13 — aimeat_admin_stats reads through services/node-admin/activity.ts, the reads and 24-hour
  *     count GET /v1/admin/dashboard reads; aimeat_admin_organism_ownership reads through
  *     services/node-admin/organism-ownership-view.ts, as GET /v1/admin/organisms/:id/ownership does
@@ -68,7 +70,7 @@ import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { registerKeyReencryptTool } from './key-reencrypt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { readAvatarsOrEmpty } from '../services/agent/avatar.js';
+import { operatorAgentList } from '../services/node-admin/agent-list.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -138,8 +140,8 @@ export function registerCoreAdminTools(
         },
         async ({ limit }) => {
             if (!(await isOperator())) return notOperator;
-            const agents = await storage.listAgents();
-            const subset = limit ? agents.slice(0, limit) : agents;
+            // The list, the page rule and the avatars GET /v1/admin/agents reads (services/node-admin/agent-list.ts).
+            const { shown: subset, avatars } = await operatorAgentList(storage, limit, 'aimeat_admin_agents');
             const ownerBalances = new Map<string, number>();
             for (const a of subset) {
                 if (!ownerBalances.has(a.owner)) {
@@ -147,7 +149,6 @@ export function registerCoreAdminTools(
                     ownerBalances.set(a.owner, ghii?.morselBalance ?? 0);
                 }
             }
-            const avatars = await readAvatarsOrEmpty(storage, subset.map(a => a.gaii), logger.warn.bind(logger), 'aimeat_admin_agents');
             const result = subset.map(a => ({
                 gaii: a.gaii, owner: a.owner, display_name: a.displayName,
                 avatar: avatars.get(a.gaii) ?? null,

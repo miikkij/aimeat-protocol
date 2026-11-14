@@ -660,14 +660,14 @@ await test('B6 USE KEPT: aimeat_admin_agents and GET /v1/admin/agents answer lim
         `tool ${JSON.stringify(tool.data).slice(0, 120)} / route ${rest.body.data.agents.length}`);
 });
 
-await test('B6 RECORDED DIFFERENCE (question: what a negative limit means): limit=-1, the tool leaves out the last agent and the route lists every agent', async () => {
+await test('B6 DECIDED (developer approval 2026-11-14): limit=-1 lists every agent on the tool and the route alike', async () => {
     const tool = await callTool(pbOpMcp, 'aimeat_admin_agents', { limit: -1 });
     const rest = await call('GET', '/v1/admin/agents?limit=-1', pbOpAgent.token);
     assert(rest.status === 200, `route: ${show(rest)}`);
     const all = rest.body.data.agents.length as number;
     assert(all === rest.body.data.total, `route lists ${all} of ${rest.body.data.total}`);
     assert(!tool.isError && Array.isArray(tool.data), `tool: ${tool.text.slice(0, 200)}`);
-    assert(tool.data.length === all - 1, `tool lists ${tool.data.length}, route ${all}`);
+    assert(tool.data.length === all, `tool lists ${tool.data.length}, route ${all}`);
 });
 
 // The owners of the sections above are deleted by their cleanup, so phase B makes its own.
