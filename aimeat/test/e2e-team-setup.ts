@@ -74,6 +74,7 @@ const salesSpec = () => ({
     teams: [{
         name: 'Myyntitiimi', names: { en: 'Sales team', es: 'Equipo de ventas' }, language: 'fi',
         description: 'Tarjoukset julkisen sektorin asiakkaille.',
+        descriptions: { en: 'Tenders for public sector customers.' },
         leads: [liisa.name, { email: newLeadEmail }],
         members: [{ account: aino.name, language: 'en' }],
     }],
@@ -239,6 +240,10 @@ await test('t14 one person in several teams: Aino joins two more and her AI is t
     const list = await json(`/v1/organisms?member=${aino.name}`, { headers: auth(aino.token) });
     const sales = list.body.data.organisms.find((o: any) => o.id === salesId);
     assert(sales?.team_names?.names?.en === 'Sales team' && sales.team_names.language === 'fi', `list team_names: ${JSON.stringify(sales?.team_names)}`);
+    // The workspaces and the description in every language, for the page to pick the reader's.
+    const wsNames = Object.values(sales.team_names.workspaces ?? {}).map((n: any) => n.en).sort();
+    assert(JSON.stringify(wsNames) === JSON.stringify(['Decisions', 'Shared knowledge', 'Waiting for you']), `workspace names in English: ${wsNames}`);
+    assert(sales.team_names.descriptions?.en === 'Tenders for public sector customers.' && sales.team_names.descriptions?.fi === 'Tarjoukset julkisen sektorin asiakkaille.', `descriptions: ${JSON.stringify(sales.team_names.descriptions)}`);
 });
 
 await test('t15 the names can be corrected; the language and the workspaces stay', async () => {

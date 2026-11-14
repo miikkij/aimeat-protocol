@@ -10,6 +10,7 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.21.1 -- 2026-11-14 -- A team workspace's row is named in the reader's language (wsDisplayName, team setup T24).
  *   v1.21.0 -- 2026-11-08 -- The archived mark, the to-review mark and the archived fold's title have no
  *     emoji (no emoji in the interface).
  *   v1.20.0 -- 2026-10-27 -- The new workspace's name stops at the node's name limit (js/input-limits.js).
@@ -89,7 +90,7 @@ import { Row as Line } from '/components/Layout.js';
 import { List, Row, Name, Cell, Lead, Stats, Stat, Doors } from '/components/List.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
-import { fmtDate, relTime } from '/views/profile/organisms/helpers.js';
+import { fmtDate, relTime, wsDisplayName } from '/views/profile/organisms/helpers.js';
 import { OrgSearch } from '/views/profile/organisms/panels.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState, LoadFailed } from '/js/load-state.js';
@@ -398,7 +399,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
         <${Lead} text=${'🗂'} />
         <${Name} onOpen=${locked ? undefined : () => onOpen(w.id)}
           after=${html`${w.archived ? html` <${Mark} kind="status" tone="off" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}${reviews > 0 ? html` <${Mark} kind="status" tone="attention">${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}<//>` : null}`}
-          meta=${locked ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?') : metaLine(w)}>${(w.name || w.id)}<//>
+          meta=${locked ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?') : metaLine(w)}>${wsDisplayName(org, w.id, w.name || w.id)}<//>
         <${Cell} line>${locked ? html`<span>${'🔒'}</span>` : null}<//>
         <${Stats}>
           ${people > 0 ? html`<${Stat}><${Tab} tone="fold" on=${peopleOpen} pressed=${peopleOpen} title=${t('organisms.participants') || 'Who works here'}

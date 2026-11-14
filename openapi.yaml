@@ -59539,6 +59539,9 @@ paths:
                       language: { type: string, enum: [fi, en, es] }
                       kind: { type: string, enum: [team, virtual] }
                       description: { type: string }
+                      descriptions:
+                        type: object
+                        properties: { fi: { type: string }, en: { type: string }, es: { type: string } }
                       leads: { type: array, items: {} }
                       members: { type: array, items: {} }
       responses:

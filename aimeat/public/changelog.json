@@ -4,6 +4,28 @@
     {
       "date": "2026-11-14",
       "kind": "feature",
+      "id": "2026-11-14-teams-for-you-and-your-colleagues-ais",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Teams for you and your colleagues' AIs",
+        "fi": "Tiimit sinulle ja kollegoidesi tekoälyille"
+      },
+      "body": {
+        "en": "Your AI sets up one team or many in one call, shows you first what it makes, and invites people in their own language. Each member's own AI knows the team from its first turn, and a lead sees whose AI is connected.",
+        "fi": "Tekoälysi perustaa yhden tai monta tiimiä yhdellä kutsulla, näyttää ensin, mitä syntyy, ja kutsuu ihmiset heidän omalla kielellään. Jokaisen jäsenen oma tekoäly tuntee tiimin heti ensimmäisestä vastauksesta, ja vetäjä näkee, kenen tekoäly on kytketty."
+      },
+      "summary": {
+        "en": "Your AI sets up teams in one call; every member's own AI knows the team at once.",
+        "fi": "Tekoälysi perustaa tiimit yhdellä kutsulla, ja jokaisen jäsenen tekoäly tuntee tiimin heti."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "feature",
       "id": "2026-11-14-ask-someone-who-knows",
       "highlight": true,
       "audience": [

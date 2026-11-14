@@ -18,11 +18,14 @@
  *   const team = await readTeamRecord(storage, orgId);
  *   const name = team ? teamDisplayName(team, 'en', organism.name) : organism.name;
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The record keeps each workspace's name and the description in every
+ *     language (workspaceNames, descriptions); teamNamesFor serves them, so a page shows the whole
+ *     team in its reader's language. A team made before has its workspace names from the kit.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { TEAM_CONTEXT_ID, TEAM_CONTEXT_SPACE, TEAM_LANGS, type TeamLang } from '../../data/team-kit.js';
+import { TEAM_CONTEXT_ID, TEAM_CONTEXT_SPACE, TEAM_KIT, TEAM_LANGS, TEAM_WS, type TeamLang } from '../../data/team-kit.js';
 
 export const TEAM_RECORD_TYPE = 'aimeat.team/v1';
 
@@ -35,6 +38,10 @@ export interface TeamRecord {
     language: TeamLang;
     kind: 'team' | 'virtual';
     workspaces: { shared: string; decisions: string; waiting: string };
+    /** Each workspace's name in every language, by workspace id (data/team-kit.ts). */
+    workspaceNames?: Record<string, Partial<Record<TeamLang, string>>>;
+    /** The team's description in every language the AI wrote it in; the working language's is the organism's own. */
+    descriptions?: Partial<Record<TeamLang, string>>;
     skill: { name: string; ref: string } | null;
     leadsPending: PendingLead[];
     createdBy: string;
@@ -102,16 +109,35 @@ export async function writeTeamRecord(
 /** The organism types a team setup writes (setup.ts); only these are read for a team record. */
 export const TEAM_ORGANISM_TYPES = new Set(['team', 'virtual team']);
 
+/** Each team workspace's name in every language: the stored map, or, for a team set up before it was
+ *  stored, the kit's names by the workspace's place. */
+export function teamWorkspaceNames(team: Pick<TeamRecord, 'workspaces' | 'workspaceNames'>): Record<string, Partial<Record<TeamLang, string>>> {
+    if (team.workspaceNames && Object.keys(team.workspaceNames).length) return team.workspaceNames;
+    return {
+        [team.workspaces.shared]: TEAM_KIT.workspaces[TEAM_WS.shared].name,
+        [team.workspaces.decisions]: TEAM_KIT.workspaces[TEAM_WS.decisions].name,
+        [team.workspaces.waiting]: TEAM_KIT.workspaces[TEAM_WS.waiting].name,
+    };
+}
+
+/** What a page needs to show a team in its reader's language. */
+export interface TeamNames {
+    names: TeamRecord['names'];
+    language: TeamLang;
+    workspaces: Record<string, Partial<Record<TeamLang, string>>>;
+    descriptions: Partial<Record<TeamLang, string>>;
+}
+
 /**
- * The team names of the listed organisms that are teams, by organism id: what a page needs to show a
- * team in its reader's language. Organisms of other types cost no read.
+ * The team names of the listed organisms that are teams, by organism id: the team's name, its
+ * workspaces' names and its description in every language. Organisms of other types cost no read.
  */
-export async function teamNamesFor(storage: Storage, organisms: readonly { id: string; type?: string | null }[]): Promise<Map<string, Pick<TeamRecord, 'names' | 'language'>>> {
-    const out = new Map<string, Pick<TeamRecord, 'names' | 'language'>>();
+export async function teamNamesFor(storage: Storage, organisms: readonly { id: string; type?: string | null }[]): Promise<Map<string, TeamNames>> {
+    const out = new Map<string, TeamNames>();
     for (const o of organisms) {
         if (!TEAM_ORGANISM_TYPES.has(String(o.type ?? ''))) continue;
         const team = await readTeamRecord(storage, o.id);
-        if (team) out.set(o.id, { names: team.names, language: team.language });
+        if (team) out.set(o.id, { names: team.names, language: team.language, workspaces: teamWorkspaceNames(team), descriptions: team.descriptions ?? {} });
     }
     return out;
 }

@@ -30,6 +30,9 @@
  *   const parsed = parseTeamSetup(req.body, callerLocale);
  *   const out = await planOrApplyTeams({ storage, config }, caller, parsed, dryRun);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — A team keeps its workspaces' names in every language from the kit, and its
+ *     description in every language the AI writes (`descriptions`), so every part of the team reads
+ *     in its reader's language.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T1, T2, T22, T24).
  */
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
@@ -61,6 +64,8 @@ export interface TeamInput {
     language: TeamLang;
     kind: 'team' | 'virtual';
     description: string;
+    /** The description in other languages, written by the caller's AI. */
+    descriptions: Partial<Record<TeamLang, string>>;
     leads: PersonInput[];
     members: PersonInput[];
 }
@@ -89,13 +94,18 @@ export function parseTeamSetup(body: unknown, callerLocale: string | null | unde
         if (!raw || typeof raw !== 'object') return { ok: false, message: `teams[${i}] must be an object` };
         const t = raw as Record<string, unknown>;
         const organismId = typeof t.organism_id === 'string' && t.organism_id.trim() ? t.organism_id.trim() : null;
-        const names: Partial<Record<TeamLang, string>> = {};
-        if (t.names && typeof t.names === 'object') {
-            for (const [k, v] of Object.entries(t.names as Record<string, unknown>)) {
-                const lang = teamLang(k);
-                if (lang && typeof v === 'string' && v.trim()) names[lang] = v.trim().slice(0, 120);
+        const byLang = (raw: unknown, max: number): Partial<Record<TeamLang, string>> => {
+            const out: Partial<Record<TeamLang, string>> = {};
+            if (raw && typeof raw === 'object') {
+                for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+                    const lang = teamLang(k);
+                    if (lang && typeof v === 'string' && v.trim()) out[lang] = v.trim().slice(0, max);
+                }
             }
-        }
+            return out;
+        };
+        const names = byLang(t.names, 120);
+        const descriptions = byLang(t.descriptions, 2000);
         const language = teamLang(t.language) ?? fallbackLang;
         const given = typeof t.name === 'string' ? t.name.trim() : '';
         const name = given || names[language] || Object.values(names)[0] || '';
@@ -116,8 +126,8 @@ export function parseTeamSetup(body: unknown, callerLocale: string | null | unde
         teams.push({
             organismId, name: name.slice(0, 120), names, language,
             kind: t.kind === 'virtual' ? 'virtual' : 'team',
-            description: typeof t.description === 'string' ? t.description.trim().slice(0, 2000) : '',
-            leads, members,
+            description: typeof t.description === 'string' ? t.description.trim().slice(0, 2000) : (descriptions[language] ?? ''),
+            descriptions, leads, members,
         });
     }
     return { ok: true, teams };
@@ -240,8 +250,14 @@ async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOut
         logger.warn('team: the team skill was not published', { orgId, error: String(err) });
         out.problems.push(`the team skill was not published: ${err instanceof Error ? err.message : String(err)}`);
     }
+    const workspaceNames = {
+        [ws.shared]: TEAM_KIT.workspaces[TEAM_WS.shared].name,
+        [ws.decisions]: TEAM_KIT.workspaces[TEAM_WS.decisions].name,
+        [ws.waiting]: TEAM_KIT.workspaces[TEAM_WS.waiting].name,
+    };
+    const descriptions = t.description ? { ...t.descriptions, [t.language]: t.description } : t.descriptions;
     const team: TeamRecord = {
-        type: TEAM_RECORD_TYPE, names: t.names, language: t.language, kind: t.kind, workspaces: ws, skill,
+        type: TEAM_RECORD_TYPE, names: t.names, language: t.language, kind: t.kind, workspaces: ws, workspaceNames, descriptions, skill,
         leadsPending: [], createdBy: caller.owner, createdAt: now, updatedAt: now,
     };
     if (!(await writeTeamRecord(storage, config, orgId, team, null, caller.owner))) {
@@ -300,8 +316,8 @@ export async function planOrApplyTeams(deps: Deps, caller: Caller, teams: TeamIn
             if (!made) continue;
             read = { team: made.team, version: made.version, ownerGaii: made.ownerGaii };
             org = await storage.getOrganism(made.orgId);
-        } else if (read && Object.keys(t.names).length) {
-            const team = { ...read.team, names: out.names };
+        } else if (read && (Object.keys(t.names).length || Object.keys(t.descriptions).length)) {
+            const team = { ...read.team, names: out.names, descriptions: { ...(read.team.descriptions ?? {}), ...t.descriptions } };
             if (await writeTeamRecord(storage, config, org.id, team, read, read.team.createdBy)) read = await readTeamRecordWithVersion(storage, org.id);
         }
         if (!org || !read) continue;

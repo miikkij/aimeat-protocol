@@ -15,6 +15,7 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   v1.14.2 -- 2026-11-14 -- A team workspace's title and its team in the crumb are in the reader's language (team setup T24).
  *   v1.14.1 -- 2026-10-18 -- The figure strip's "{n} types" and "{n} spaces" in the language's plural form (i18n.js tn): "1 space".
  *   v1.14.0 -- 2026-10-16 -- A document space's head offers "+ HTML page" beside "+ New document".
  *   v1.13.0 -- 2026-09-26 -- Every part is a library component that takes data: the cover and every page
@@ -52,7 +53,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import * as orgService from '/js/services/organisms.js';
-import { relTime, fmtDate } from '/views/profile/organisms/helpers.js';
+import { relTime, fmtDate, orgName, wsDisplayName } from '/views/profile/organisms/helpers.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
@@ -148,7 +149,7 @@ function crumb(ctx, last) {
   const home = () => guardWsDirty(() => { setShowSettings(false); pickTab('overview'); });
   return [
     { label: tr('organisms.title', 'Organisms'), onClick: onBackToList || onBack },
-    { label: org.name || org.id || '', onClick: onBack },
+    { label: orgName(org), onClick: onBack },
     ...(last ? [{ label: name, onClick: home }, last] : [name]),
   ];
 }
@@ -292,7 +293,7 @@ function renderCover(ctx) {
     <//>`;
 
   return html`
-    <${SettingsPage} crumb=${crumb(ctx, null)} title=${ws.manifest?.name || ctx.wsName || ctx.org.name}
+    <${SettingsPage} crumb=${crumb(ctx, null)} title=${wsDisplayName(ctx.org, ctx.wsId, ws.manifest?.name) || ctx.wsName || orgName(ctx.org)}
       marks=${[
         { kind: 'status', tone: (ws.manifest?.status || 'active') === 'active' ? 'fine' : 'off', label: ws.manifest?.status || 'active' },
         unseen > 0 ? { tone: 'sun', label: newWords(unseen) } : null,

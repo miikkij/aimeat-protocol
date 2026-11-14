@@ -10,6 +10,7 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-11-14 — A team workspace and its team are named in the reader's language (wsDisplayName, orgName; team setup T24).
  *   2026-10-16 — A page saved with "An AI made this" ticked carries the declaration as its provenance (js/page-authorship.js).
  *   2026-10-16 — An HTML page is saved through the drafts route (js/services/html-pages.js), which checks it and writes its text.
  *   2026-10-16 — Opening one document from elsewhere moves to workspace-open-doc.js (max-file-lines),
@@ -91,6 +92,7 @@ import { aiDeclarationFor } from '/js/page-authorship.js';
 import { getGhii } from '/js/services/auth.js';
 import { copyToClipboard } from '/js/utils.js';
 import { recordRecent } from '/js/recents.js';
+import { orgName, wsDisplayName } from '/views/profile/organisms/helpers.js';
 import { useHomePrefs } from '/views/surface/home-prefs.js';
 // Extracted sibling modules (relative imports — no importmap entry needed).
 import { WorkspaceGenerator } from './workspace/generator.js';
@@ -118,7 +120,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     let cancelled = false;
     orgService.listWorkspaces(orgId).then(list => {
       if (cancelled) return;
-      const name = (list.find(w => w.id === wsId)?.name) || '';
+      const name = wsDisplayName(org, wsId, (list.find(w => w.id === wsId)?.name) || '');
       setWsName(name);
       // Feed the home page's "Continue" list with a real display name.
       recordRecent({ type: 'workspace', id: `${orgId}/${wsId}`, label: name || wsId, sub: org.name || '', data: { orgId, wsId } });
@@ -718,7 +720,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     return html`
       <div>
         <${Crumb} steps=${back} />
-        <${PageSection} first title=${(org.name || 'Organism')}>
+        <${PageSection} first title=${orgName(org) || 'Organism'}>
           <${HeadDesc}>${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}<//>
           <${Line} above="small"><${Loud} control onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}<//><//>
           <${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}

@@ -71,6 +71,8 @@ export const TeamSetupTeams = z.array(z.object({
     language: teamLang.optional().describe('The team\'s working language: its workspaces, context and skill are written in it. The caller\'s language when left out.'),
     kind: z.enum(['team', 'virtual']).optional().describe('"virtual" for a team formed around a theme across other teams.'),
     description: safeText(2000).optional().describe('What the team does, in a sentence or two. It starts the team context.'),
+    descriptions: z.object({ fi: safeText(2000).optional(), en: safeText(2000).optional(), es: safeText(2000).optional() }).optional()
+        .describe('The description in each language, written by you, as with `names`. Every member reads it in their own language.'),
     leads: z.array(teamPerson).max(200).optional().describe('Leads besides you. A lead who is already a member becomes one at once; anyone else is invited and becomes a lead on accepting.'),
     members: z.array(teamPerson).max(200).optional().describe('Members to invite. Each gets an invitation in their own language.'),
 })).max(30);

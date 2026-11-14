@@ -11,6 +11,7 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
+ *   v1.5.1 -- 2026-11-14 -- The crumb names a team in the reader's language (orgName, team setup T24).
  *   v1.5.0 -- 2026-10-16 -- isDocPublic reads the share's end dates (`until`), as the node does.
  *   v1.4.0 -- 2026-09-26 -- buildBreadcrumb returns the crumb's steps as data for the library's Crumb
  *     (components/Crumb.js); the module writes no markup (page migration G2b).
@@ -25,6 +26,7 @@
 import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
 import { cap, PRIMARY_FIELD } from './helpers.js';
+import { orgName } from '/views/profile/organisms/helpers.js';
 
 // Same breadcrumb pattern as the organism home: Organisms / {org} / {workspace} — both ancestors
 // are links, so the list is one click away from inside a workspace too. The steps are data for the
@@ -34,7 +36,7 @@ export function buildBreadcrumb(ctx) {
   const name = wsName || ws?.manifest?.name || '…';
   return [
     { label: t('organisms.title') || 'Organisms', onClick: onBackToList || onBack },
-    { label: org.name || org.id || '', onClick: onBack },
+    { label: orgName(org), onClick: onBack },
     ...(showSettings
       ? [{ label: name, onClick: () => guardWsDirty(() => setShowSettings(false)) }, t('organisms.settings') || 'Settings']
       : [name]),
