@@ -12,6 +12,9 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-15 -- manage-my-agents: a new agent has two ways in. aimeat_agent_propose for an agent this
+ *     node makes and runs, device authorization for an AI the owner already runs elsewhere; the
+ *     closing line had named device authorization alone, against the skill's own first section.
  *   2026-11-12 -- manage-my-agents: another agent's waiting tasks (aimeat_task_list target_agent_name,
  *     aimeat_task_delete), removing an agent the AI registered (aimeat_agent_delete), and which
  *     permissions make a proposed agent's tasks wait for the owner
@@ -224,7 +227,7 @@ until it is bound again on the Hooks page.
     name: 'manage-my-agents',
     skillMd: `---
 name: manage-my-agents
-description: User-level runbook for managing the owner's AI agents on an AIMEAT node — listing them, checking onboarding and activity, attaching skills, and connecting new agents via device authorization. Use when the owner asks about their agents, wants to add capabilities to one, or connect a new one.
+description: User-level runbook for managing the owner's AI agents on an AIMEAT node — listing them, checking onboarding and activity, attaching skills, proposing a new agent the node runs, and connecting an AI the owner runs elsewhere via device authorization. Use when the owner asks about their agents, wants to add capabilities to one, or connect a new one.
 license: MIT
 metadata:
   audience: owner
@@ -378,9 +381,12 @@ flowchart LR
 - **Give an agent expertise:** browse \`aimeat_skill_list\` (view "library"), then
   \`aimeat_skill_link\` with the skill's ref and the target \`agent_name\`. Links are
   references — the agent loads current content at start.
-- **Connect a NEW agent:** agents are never created implicitly. The new agent runs the
-  device-authorization flow (RFC 8628) and the owner approves it in the profile Agents tab,
-  choosing its scopes. Point the owner there; do not try to mint credentials yourself.
+- **A NEW agent, two ways, and never implicitly.** An agent this node makes and runs (a worker,
+  above) is proposed with \`aimeat_agent_propose\`, and the owner's approval at its
+  \`approval_url\` creates it. An AI the owner already runs somewhere else (another chat app, a
+  coding tool, their own program) connects itself with the device-authorization flow (RFC 8628),
+  and the owner approves it in the profile Agents tab, choosing its scopes. Point the owner to the
+  right one; do not try to mint credentials yourself.
 
 ## Principles
 - Least privilege: when the owner approves an agent, recommend only the scopes the agent's
