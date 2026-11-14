@@ -65518,14 +65518,14 @@ paths:
           application/json:
             schema:
               type: object
-              description: The whole override, stored as sent. A request with no body clears it.
+              description: The whole override, stored as sent. A request with no body clears it, and a field sent as null is stored as no value.
               properties:
                 disabled:
-                  type: boolean
+                  type: [boolean, 'null']
                   description: True switches the capability off for invocation and leaves it out of aggregation.
-                summary: { type: string, maxLength: 10000 }
-                visibility: { type: string, enum: [private, owner, public] }
-                notes: { type: string, maxLength: 2048 }
+                summary: { type: [string, 'null'], maxLength: 10000 }
+                visibility: { type: [string, 'null'], enum: [private, owner, public, null] }
+                notes: { type: [string, 'null'], maxLength: 2048 }
       responses:
         '200':
           description: Updated with override
