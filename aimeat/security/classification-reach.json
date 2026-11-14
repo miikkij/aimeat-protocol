@@ -162,12 +162,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/mcp/exchange-run.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A tool manifest read to route an invocation, and public manifest app ids for a hint."
-    },
     "src/mcp/memory-extended.ts": {
       "reads": {
         "getMemory": 1
@@ -897,9 +891,10 @@
     },
     "src/services/app-tools/manifest-read.ts": {
       "reads": {
-        "listMemory": 1
+        "listMemory": 1,
+        "getMemory": 1
       },
-      "why": "Moved 2026-11-13 from src/mcp/commerce.ts and src/mcp/exchange-run.ts with appToolManifestIds (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: app-id key names for a hint, private ones only for the owner."
+      "why": "Moved 2026-11-13 from src/mcp/commerce.ts and src/mcp/exchange-run.ts with appToolManifestIds (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: app-id key names for a hint, private ones only for the owner. Moved 2026-11-14 from src/mcp/exchange-run.ts with loadPublicToolManifest (structure programme 2026-11, unit 2b, B14), the node's own read: a public tool manifest read to route an invocation, which POST .../webmcp/tools/:tool and aimeat_app_tool_invoke both ask."
     },
     "src/services/organism-read/workspace-access-requests.ts": {
       "reads": {

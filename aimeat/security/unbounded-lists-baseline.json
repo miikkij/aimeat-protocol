@@ -104,9 +104,6 @@
     "src/config/overrides.ts": {
       "getAllConfigValues": 1
     },
-    "src/mcp/core-admin.ts": {
-      "listAgents": 1
-    },
     "src/routes/admin/agent-integration.ts": {
       "listAgents": 2
     },
@@ -114,7 +111,6 @@
       "listOwners": 1
     },
     "src/routes/admin/agents.ts": {
-      "listAgents": 1,
       "listAppGrants": 1
     },
     "src/routes/admin/features.ts": {
@@ -341,6 +337,9 @@
       "listOwners": 1
     },
     "src/services/node-admin/activity.ts": {
+      "listAgents": 1
+    },
+    "src/services/node-admin/agent-list.ts": {
       "listAgents": 1
     },
     "src/services/openrouter-settings-migration.ts": {
