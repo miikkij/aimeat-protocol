@@ -80904,11 +80904,11 @@ paths:
               type: object
               description: Arbitrary portfolio configuration object. An optional `tags` array is used as the stored memory tags; `enabled` toggles public showcase visibility.
               properties:
-                enabled: { type: boolean }
+                enabled:
+                  description: True switches the page on, false off. Any other truthy value is read and stored as true; it goes through the same publish gate.
                 tags: { type: array, items: { type: string } }
                 access:
-                  type: string
-                  nullable: true
+                  type: [string, 'null']
                   description: "Who may open the page: 'anyone', 'signed-in' or 'organism:<organism id>'."
       responses:
         '202':
