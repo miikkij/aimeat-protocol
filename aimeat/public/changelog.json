@@ -3,6 +3,79 @@
   "entries": [
     {
       "date": "2026-11-14",
+      "kind": "feature",
+      "id": "2026-11-14-your-agent-sees-the-consents-you-allow-it-to-see",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Your agent sees the consents you allow it to see",
+        "fi": "Agenttisi näkee ne luvat, jotka sallit sen nähdä"
+      },
+      "summary": {
+        "en": "An agent now sees only the consents it gave itself, in chat and on the API alike.",
+        "fi": "Agentti näkee nyt vain itse antamansa luvat, keskustelussa ja rajapinnassa samoin."
+      },
+      "body": {
+        "en": "An agent now sees only the consents it gave itself, in chat and on the API alike. When you want an agent to see all the consents of your account, tick \"See all the permissions you and your other agents have given to other people and services, as you see them yourself\" for it in the agent's permissions. An agent that listed your whole account's consents through its tool now lists only its own until you give it the new permission.",
+        "fi": "Agentti näkee nyt vain itse antamansa luvat, keskustelussa ja rajapinnassa samoin. Kun haluat agentin näkevän tilisi kaikki luvat, valitse agentin oikeuksista \"Näe kaikki luvat, jotka sinä ja muut agenttisi olette antaneet muille ihmisille ja palveluille, samoin kuin itse näet ne\". Agentti, joka listasi työkalullaan koko tilisi luvat, listaa nyt vain omansa, kunnes annat sille uuden oikeuden."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "security",
+      "id": "2026-11-14-a-publish-goes-through-the-publish-routes-checks",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "operator"
+      ],
+      "title": {
+        "en": "A publish goes through the publish route's checks",
+        "fi": "Julkaisu kulkee aina julkaisureitin tarkistusten kautta"
+      },
+      "summary": {
+        "en": "The generic approval route no longer takes a publish request.",
+        "fi": "Yleinen hyväksyntäreitti ei enää ota vastaan julkaisupyyntöä. Julkaisu tehdään julkaisureitillä, joka tarkistaa oikeudet ja julkaisuportin."
+      },
+      "body": {
+        "en": "The generic approval route no longer takes a publish request. A publish goes through the publish route, which checks the rights and the publish gate.",
+        "fi": "Yleinen hyväksyntäreitti ei enää ota vastaan julkaisupyyntöä. Julkaisu tehdään julkaisureitillä, joka tarkistaa oikeudet ja julkaisuportin."
+      },
+      "impact": {
+        "en": "A tool that filed a publish request on the generic approval route now gets an error that names the publish route.",
+        "fi": "Jos jokin työkalu teki julkaisupyynnön yleisellä hyväksyntäreitillä, se saa nyt virheen ja ohjeen käyttää julkaisureittiä."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "security",
+      "id": "2026-11-14-erasing-an-account-leaves-nothing-behind-in-the-write-queues",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Erasing an account leaves nothing behind in the write queues",
+        "fi": "Tilin poisto ei jätä mitään kirjoitusjonoihin"
+      },
+      "summary": {
+        "en": "When an account is erased, the rows waiting to be written, and those being written, go with it and are not stored after the erasure.",
+        "fi": "Kun tili poistetaan, odottavat ja parhaillaan kirjoitettavat rivit poistuvat sen mukana, eivätkä ne enää tallennu poiston jälkeen."
+      },
+      "body": {
+        "en": "When an account is erased, the rows waiting to be written, and those being written, go with it and are not stored after the erasure.",
+        "fi": "Kun tili poistetaan, odottavat ja parhaillaan kirjoitettavat rivit poistuvat sen mukana, eivätkä ne enää tallennu poiston jälkeen."
+      },
+      "impact": {
+        "en": "Nothing changes in use, and you need to do nothing.",
+        "fi": "Käyttö ei muutu, eikä sinun tarvitse tehdä mitään."
+      }
+    },
+    {
+      "date": "2026-11-14",
       "kind": "fix",
       "id": "2026-11-14-your-ai-gets-one-answer-whichever-way-it-asks",
       "highlight": false,
