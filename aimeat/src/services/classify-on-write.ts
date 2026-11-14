@@ -42,9 +42,13 @@
  *   detection rules only, in the same list as the writes.
  * @structure WriteClassifier · WriteQueue · MAX_TEXT · contentText() · setWriteClassifier() ·
  *   classifyAfterWrite() · classifyContainerAfterWrite() · flushWriteClassification() ·
- *   pendingWriteClassifications()
+ *   pendingWriteClassifications() · holdWriteClassificationForErasure()
  * @usage classifyAfterWrite({ storage, config }, record.ownerGaii, record.key, record.value);
  * @version-history
+ *   v1.4.0 — 2026-11-14 — holdWriteClassificationForErasure: before the erasure cascade, the account's
+ *     waiting writes are dropped and the one being judged answers, and no write in the account's own
+ *     scope is queued until it ends. A waiting write was labelled after the cascade, and the label
+ *     named the erased person's key (register finding f-2026-11-13-write-buffers-and-erasure).
  *   v1.3.0 — 2026-10-18 — classifyContainerAfterWrite: a container's name and description meet the
  *     detection rules written for its kind (plan doc-mvdipuyqraas, L1.6).
  *   v1.2.0 — 2026-09-30 — At most MAX_PENDING_PER_OWNER writes of one owner are held with their
@@ -59,6 +63,7 @@ import { logger } from '../utils/logger.js';
 import type { ClassificationPolicy } from './classification/defaults.js';
 import { memoryTarget } from './classification/labels.js';
 import { activePolicies } from './classification/reader.js';
+import { ErasureHolds, type ErasedAccount } from './erasure/holds.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
@@ -98,6 +103,12 @@ const overflow: Array<{ deps: Deps; target: ContentLabelTarget }> = [];
 let overflowFlush: Promise<void> | null = null;
 let dropped = 0;
 let saidUnset = false;
+/** The accounts whose erasure runs now, whose own-scope writes are not judged, and the judgement in
+ *  progress an erasure waits for (holdWriteClassificationForErasure). */
+const erasing = new ErasureHolds();
+/** The scope a label of the write lands in: the person's own, or an organism's (which outlives them). */
+const scopeOf = (item: { ownerGaii: string; key: string; target?: ContentLabelTarget }): string =>
+  item.target?.scope ?? memoryTarget(item.ownerGaii, item.key).scope;
 
 /** Set the classifier the write hook calls, and the queue it hands overflow to. Called once at boot. */
 export function setWriteClassifier(fn: WriteClassifier | null, queue: WriteQueue | null = null): void {
@@ -142,11 +153,14 @@ async function flushOverflow(): Promise<void> {
     const first = overflow[0]!.deps;
     const batch: ContentLabelTarget[] = [];
     for (let i = 0; i < overflow.length && batch.length < OVERFLOW_BATCH;) {
-      if (overflow[i]!.deps === first) batch.push(overflow.splice(i, 1)[0]!.target);
-      else i++;
+      if (overflow[i]!.deps === first) {
+        const target = overflow.splice(i, 1)[0]!.target;
+        if (!erasing.covers(target.scope)) batch.push(target);
+      } else i++;
     }
+    if (!batch.length) continue;
     try {
-      await writeQueue(first, batch, { origin: 'write' });
+      await erasing.track(writeQueue(first, batch, { origin: 'write' }));
     } catch (e) {
       dropped += batch.length;
       logger.warn('classification: writes past the in-process limit could not be queued; they are not classified on write', { count: batch.length, dropped, error: String(e) });
@@ -168,7 +182,9 @@ async function drain(): Promise<void> {
   for (let item = pending.shift(); item; item = pending.shift()) {
     const n = (pendingByOwner.get(item.ownerGaii) ?? 1) - 1;
     if (n > 0) pendingByOwner.set(item.ownerGaii, n); else pendingByOwner.delete(item.ownerGaii);
-    if (classifier) await classifyOne(classifier, item);
+    // Queued before an erasure began and reached after it: the erased person's content is not judged.
+    if (erasing.covers(scopeOf(item))) continue;
+    if (classifier) await erasing.track(classifyOne(classifier, item));
   }
 }
 
@@ -189,6 +205,8 @@ function startWorker(): void {
 export function classifyAfterWrite(deps: Deps, ownerGaii: string, key: string, value: unknown): void {
   if (deps.config.classificationMode === 'off') return;
   if (!isContentWrite(ownerGaii, key, value)) return;
+  // A write in the own scope of an account being erased: the cascade deletes its labels.
+  if (erasing.covers(scopeOf({ ownerGaii, key }))) return;
   if (!classifier) {
     if (!saidUnset) {
       saidUnset = true;
@@ -223,7 +241,7 @@ export function classifyAfterWrite(deps: Deps, ownerGaii: string, key: string, v
  * persistent queue reads a memory value, which a container is not.
  */
 export function classifyContainerAfterWrite(deps: Deps, target: ContentLabelTarget, name: string, description?: string | null): void {
-  if (deps.config.classificationMode === 'off' || !classifier) return;
+  if (deps.config.classificationMode === 'off' || !classifier || erasing.covers(target.scope)) return;
   const text = [name, description ?? ''].filter(Boolean).join('\n');
   if (!text.trim() || pending.length >= MAX_PENDING) return;
   pending.push({ deps, ownerGaii: target.scope, key: target.key, value: text, target });
@@ -237,6 +255,30 @@ export async function flushWriteClassification(): Promise<void> {
     if (worker) await worker;
     if (overflowFlush) await overflowFlush;
   }
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no write in the account's own
+ * scope is queued from now on, its waiting writes are dropped (those held here and those on their way
+ * to the persistent queue), and the judgement in progress answers first, so the cascade deletes a
+ * label it stored. Only that one is waited for: the worker goes on with other accounts' writes, and
+ * none of this account's starts once it is held. A write the person made into an organism's
+ * workspace is the organism's and stays. The returned function ends the hold, after the cascade.
+ */
+export async function holdWriteClassificationForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  for (let i = pending.length - 1; i >= 0; i--) {
+    const item = pending[i]!;
+    if (!ErasureHolds.isOf(scopeOf(item), account)) continue;
+    pending.splice(i, 1);
+    const n = (pendingByOwner.get(item.ownerGaii) ?? 1) - 1;
+    if (n > 0) pendingByOwner.set(item.ownerGaii, n); else pendingByOwner.delete(item.ownerGaii);
+  }
+  for (let i = overflow.length - 1; i >= 0; i--) {
+    if (ErasureHolds.isOf(overflow[i]!.target.scope, account)) overflow.splice(i, 1);
+  }
+  await erasing.currentWritesSettled();
+  return release;
 }
 
 /** How many writes wait for the classifier, the one in progress included, and those on their way to the queue. */

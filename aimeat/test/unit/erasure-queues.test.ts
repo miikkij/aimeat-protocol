@@ -23,11 +23,12 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-queues.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-queues.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-14 — The write-time classification queue.
  *   v1.2.0 — 2026-11-14 — The receiver delivery log.
  *   v1.1.0 — 2026-11-14 — The outside party read log.
  *   v1.0.0 — 2026-11-14 — Initial: the call timings.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { recordCallDuration, flushCallTimings, timingKey } from '../../src/services/call-timing.js';
@@ -36,6 +37,15 @@ import { PARTY_READS_PREFIX } from '../../src/services/parties/contract.js';
 import { logDelivery, flushReceiverLogs } from '../../src/services/receivers/deliveries.js';
 import { RECEIVER_LOG_PREFIX } from '../../src/services/receivers/contract.js';
 import { serviceNamespaceOf } from '../../src/utils/service-namespace.js';
+import { loadConfig } from '../../src/config.js';
+import { classifyAfterWrite, flushWriteClassification, setWriteClassifier } from '../../src/services/classify-on-write.js';
+import { installWriteClassifier } from '../../src/services/classification-queue-job.js';
+import { memoryTarget } from '../../src/services/classification/labels.js';
+
+// The model path is not what these cases test; an IBAN meets the detection rules alone.
+vi.mock('../../src/services/decide/service.js', () => ({
+  decideForOwner: vi.fn(async () => ({ decision_id: 'stub-decision', answers: { label: { value: 'luottamuksellinen', confidence: 0.95 } } })),
+}));
 import { twoProviders, NODE, people, holdFirst, eraseDuring } from './erasure-test-kit.js';
 
 requirePostgresWhenAsked('erasure-queues');
@@ -146,5 +156,44 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
       await eraseDuring(s, p, held, flushReceiverLogs(p.aliceGhii));
     } finally { held.restore(); }
     expect(await receiverLog(s, p.aliceGhii, 'meter')).toBeNull();
+  });
+
+  // ── The write-time classification queue (services/classify-on-write.ts) ──
+  describe('write-time classification', () => {
+    const IBAN = 'Pay to FI2112345600000785 by Friday.';
+    const deps = () => ({ storage: st(), config: { ...loadConfig().config, nodeId: NODE, classificationMode: 'all' as const, aiProvenance: false } });
+    const label = (ghii: string, key: string) => st().getContentLabel(memoryTarget(ghii, key));
+    beforeEach(() => { installWriteClassifier(); });
+    afterEach(async () => { await flushWriteClassification(); setWriteClassifier(null); });
+
+    it('WAITING: no label of the erased account is stored after the erasure', async () => {
+      const s = st();
+      const p = await people(s);
+      // The queue's worker starts on setImmediate; that is taken off here, so the writes wait.
+      vi.useFakeTimers({ toFake: ['setImmediate'] });
+      try {
+        classifyAfterWrite(deps(), p.aliceGhii, 'notes.invoice', { text: IBAN });
+        classifyAfterWrite(deps(), p.bobGhii, 'notes.invoice', { text: IBAN });
+        await eraseOwner(s, NODE, p.alice);
+        vi.runOnlyPendingTimers();
+      } finally { vi.useRealTimers(); }
+      await flushWriteClassification();
+
+      expect(await label(p.aliceGhii, 'notes.invoice')).toBeUndefined();
+      // POSITIVE CONTROL: bob's write is labelled.
+      expect(await label(p.bobGhii, 'notes.invoice')).toBeDefined();
+    });
+
+    it('BEING WRITTEN: a label whose write is in progress is not stored after the erasure', async () => {
+      const s = st();
+      const p = await people(s);
+      const held = holdFirst(s, 'putContentLabel', 'before',
+        args => (args[0] as { scope?: string } | undefined)?.scope === p.aliceGhii);
+      try {
+        classifyAfterWrite(deps(), p.aliceGhii, 'notes.held', { text: IBAN });
+        await eraseDuring(s, p, held, flushWriteClassification());
+      } finally { held.restore(); }
+      expect(await label(p.aliceGhii, 'notes.held')).toBeUndefined();
+    });
   });
 });
