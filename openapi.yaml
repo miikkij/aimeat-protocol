@@ -6532,20 +6532,31 @@ components:
 
     DirectMessageWire:
       type: object
-      description: The message payload carried in a federation delivery (subset of the record).
+      description: >-
+        The message payload carried in a federation delivery (subset of the record), as
+        services/message-delivery.ts builds it: an optional field the message lacks is sent as null.
+      required: [id, senderGhii, recipientGhii]
       properties:
         id: { type: string, format: uuid }
         conversationId: { type: string }
+        subject: { type: [string, 'null'] }
         senderGhii: { type: string }
-        recipientGhii: { type: string }
+        recipientGhii: { type: string, description: The actual recipient; may be an agent or app identity. }
+        deliveryGhii: { type: string, description: The person whose mailbox the copy lands in. An older sender omits it and the recipient is used. }
         body: { type: string }
         attachments:
-          type: array
+          type: [array, 'null']
           items:
             $ref: '#/components/schemas/DirectMessageAttachment'
         interactive:
-          $ref: '#/components/schemas/InteractivePayload'
-        replyToId: { type: string, format: uuid }
+          anyOf:
+            - $ref: '#/components/schemas/InteractivePayload'
+            - type: 'null'
+        broadcastId: { type: [string, 'null'] }
+        respondable: { type: [boolean, 'null'] }
+        replyToId: { type: [string, 'null'], format: uuid }
+        sentByAgent: { type: [string, 'null'], description: The sender's agent that sent it in the sender's name; kept only when it is an agent of the sender on the signing node. }
+        sentByAgentName: { type: [string, 'null'] }
         createdAt: { type: string, format: date-time }
 
     DirectMessageSend:
