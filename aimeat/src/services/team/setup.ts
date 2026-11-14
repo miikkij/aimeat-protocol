@@ -44,6 +44,8 @@ import { applyOrganismShape } from '../organism-shape-apply.js';
 import { addOrganismOwner, isOrganismOwner } from '../organism-ownership.js';
 import { createEmailInvitation, createNameInvitation, InvitationError, inviteEmailHash } from '../invitations.js';
 import { publishSkill } from '../skills.js';
+import { parseDay } from './expiry.js';
+import { parseDependsOn, applyTeamChanges, untilKeyOf, type TeamChanges } from './changes.js';
 import {
     TEAM_KIT, TEAM_LANGS, TEAM_WS, TEAM_CONTEXT_ID, teamContextStart, teamLang, teamSkillMarkdown, type TeamLang,
 } from '../../data/team-kit.js';
@@ -56,7 +58,8 @@ export const MAX_TEAMS = 30;
 export const MAX_PEOPLE = 200;
 const ACCOUNT_RE = /^[a-z0-9][a-z0-9._-]{1,62}$/i;
 
-export interface PersonInput { email: string | null; account: string | null; language: TeamLang | null; who: string }
+/** `until`: the last day (YYYY-MM-DD) of a temporary membership (services/team/expiry.ts). */
+export interface PersonInput { email: string | null; account: string | null; language: TeamLang | null; who: string; until: string | null }
 export interface TeamInput {
     organismId: string | null;
     name: string;
@@ -68,6 +71,12 @@ export interface TeamInput {
     descriptions: Partial<Record<TeamLang, string>>;
     leads: PersonInput[];
     members: PersonInput[];
+    /** People to take out of a team that exists (changes.ts). */
+    remove: PersonInput[];
+    /** The team's last day; null clears it; undefined leaves it. */
+    endsOn: string | null | undefined;
+    /** Teams this one depends on, replacing the list when given. */
+    dependsOn: { organism_id: string; what: string }[] | undefined;
 }
 export type TeamSetupInput = { ok: true; teams: TeamInput[] } | { ok: false; message: string };
 
@@ -80,7 +89,9 @@ function person(raw: unknown): PersonInput | string {
     if (email && !isValidEmail(email)) return `"${email}" is not an email address`;
     if (account && !ACCOUNT_RE.test(account)) return `"${account}" is not an account name`;
     if (!email && !account) return 'a person needs an email or an account';
-    return { email, account: email ? null : account, language: teamLang(r.language), who: email ?? account! };
+    const until = r.until === undefined || r.until === null ? null : parseDay(r.until);
+    if (r.until !== undefined && r.until !== null && !until) return `"${String(r.until)}" is not a day (YYYY-MM-DD)`;
+    return { email, account: email ? null : account, language: teamLang(r.language), who: email ?? account!, until };
 }
 
 /** Read the request body. Answers the first thing wrong with it, in words the AI can fix. */
@@ -113,7 +124,7 @@ export function parseTeamSetup(body: unknown, callerLocale: string | null | unde
         // A new team's name stands in for its working language. A team that exists keeps the names it
         // has, so correcting one language changes that language alone.
         if (name && !names[language] && (!organismId || given)) names[language] = name.slice(0, 120);
-        const people = (key: 'leads' | 'members'): PersonInput[] | string => {
+        const people = (key: 'leads' | 'members' | 'remove'): PersonInput[] | string => {
             const list = t[key] === undefined ? [] : t[key];
             if (!Array.isArray(list)) return `teams[${i}].${key} must be an array`;
             const out: PersonInput[] = [];
@@ -122,19 +133,25 @@ export function parseTeamSetup(body: unknown, callerLocale: string | null | unde
         };
         const leads = people('leads'); if (typeof leads === 'string') return { ok: false, message: leads };
         const members = people('members'); if (typeof members === 'string') return { ok: false, message: members };
-        if (leads.length + members.length > MAX_PEOPLE) return { ok: false, message: `teams[${i}]: at most ${MAX_PEOPLE} people in one call` };
+        const remove = people('remove'); if (typeof remove === 'string') return { ok: false, message: remove };
+        if (remove.length && !organismId) return { ok: false, message: `teams[${i}].remove needs organism_id: people are removed from a team that exists` };
+        if (leads.length + members.length + remove.length > MAX_PEOPLE) return { ok: false, message: `teams[${i}]: at most ${MAX_PEOPLE} people in one call` };
+        const endsOn = t.ends_on === undefined ? undefined : t.ends_on === null || t.ends_on === '' ? null : parseDay(t.ends_on);
+        if (endsOn === null && t.ends_on !== null && t.ends_on !== '') return { ok: false, message: `teams[${i}].ends_on "${String(t.ends_on)}" is not a day (YYYY-MM-DD)` };
+        const dependsOn = parseDependsOn(t.depends_on);
+        if (typeof dependsOn === 'string') return { ok: false, message: `teams[${i}].depends_on: ${dependsOn}` };
         teams.push({
             organismId, name: name.slice(0, 120), names, language,
             kind: t.kind === 'virtual' ? 'virtual' : 'team',
             description: typeof t.description === 'string' ? t.description.trim().slice(0, 2000) : (descriptions[language] ?? ''),
-            descriptions, leads, members,
+            descriptions, leads, members, remove, endsOn, dependsOn,
         });
     }
     return { ok: true, teams };
 }
 
 /** `accept_url` is the address an emailed invitation opens, as the organism's email invitation route answers it to the inviter. */
-export interface PersonOutcome { who: string; lead: boolean; result: 'creator' | 'lead_now' | 'invite' | 'invited' | 'already' | 'refused'; language?: TeamLang; reason?: string; accept_url?: string }
+export interface PersonOutcome { who: string; lead: boolean; result: 'creator' | 'lead_now' | 'invite' | 'invited' | 'already' | 'refused'; language?: TeamLang; reason?: string; accept_url?: string; until?: string }
 export interface TeamOutcome {
     organism_id: string | null;
     action: 'create' | 'update';
@@ -147,6 +164,8 @@ export interface TeamOutcome {
     context_key: string | null;
     people: PersonOutcome[];
     problems: string[];
+    /** People taken out, the team's end day and its dependencies, as changes.ts made or would make them. */
+    changes?: TeamChanges;
 }
 
 interface Caller { owner: string; principal: string; locale: string | null }
@@ -309,7 +328,12 @@ export async function planOrApplyTeams(deps: Deps, caller: Caller, teams: TeamIn
                 planned.push({ p, plan: await personPlan(storage, org, p, lead, language) });
             }
         }
-        if (dryRun) { out.people.push(...planned.map(x => x.plan)); continue; }
+        for (const x of planned) if (x.p.until) x.plan.until = x.p.until;
+        if (dryRun) {
+            out.people.push(...planned.map(x => x.plan));
+            out.changes = await applyTeamChanges(deps, caller, org, t, true);
+            continue;
+        }
 
         if (!org) {
             const made = await createTeam(deps, caller, t, out);
@@ -327,14 +351,18 @@ export async function planOrApplyTeams(deps: Deps, caller: Caller, teams: TeamIn
             out.people.push(r.out);
             if (r.pending) pending.push(r.pending);
         }
-        if (pending.length) {
+        // The people's end days, keyed so the end sweep finds them whether or not they accepted yet.
+        const until: Record<string, string> = {};
+        for (const { p } of planned) if (p.until) until[untilKeyOf(p)] = p.until;
+        if (pending.length || Object.keys(until).length) {
             for (let attempt = 0; attempt < 3; attempt++) {
                 const now = await readTeamRecordWithVersion(storage, org.id);
                 if (!now) break;
-                const team = { ...now.team, leadsPending: [...now.team.leadsPending, ...pending] };
+                const team = { ...now.team, leadsPending: [...now.team.leadsPending, ...pending], until: { ...(now.team.until ?? {}), ...until } };
                 if (await writeTeamRecord(storage, config, org.id, team, now, now.team.createdBy)) break;
             }
         }
+        out.changes = await applyTeamChanges(deps, caller, await storage.getOrganism(org.id), t, false);
     }
     return results;
 }

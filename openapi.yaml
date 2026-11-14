@@ -59544,11 +59544,83 @@ paths:
                         properties: { fi: { type: string }, en: { type: string }, es: { type: string } }
                       leads: { type: array, items: {} }
                       members: { type: array, items: {} }
+                      remove: { type: array, items: {}, description: People to take out of a team that exists }
+                      ends_on: { type: string, nullable: true, description: The team's last day (YYYY-MM-DD) }
+                      depends_on:
+                        type: array
+                        items:
+                          type: object
+                          properties: { organism_id: { type: string }, what: { type: string } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/teams/waiting:
+    get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.3.1' }
+      operationId: teamWaiting
+      summary: What waits for the caller across their teams
+      description: >-
+        The open records of each team's "Waiting for you" workspace that name the caller, or name
+        nobody when the caller leads the team, and the team approvals the caller may decide.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/teams/{id}/prompt:
+    get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.3.1' }
+      operationId: teamPrompt
+      summary: The team as a prompt for an AI without MCP
+      description: >-
+        The team's context, latest decisions, open matters and what waits for the caller as text, in
+        the caller's language, ending with how to tag the answer (DECISION:, OPEN:, WAITING:) that
+        POST /v1/teams/{id}/paste brings back. Only for a team the caller is an active member of.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/teams/{id}/paste:
+    post:
+      x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.3.1' }
+      operationId: teamPaste
+      summary: Bring an AI's tagged answer back into the team
+      description: >-
+        Reads the DECISION:, OPEN: and WAITING: lines of a pasted answer and, unless dry_run is
+        true (the default), writes them as drafts in the team's workspaces with the caller's own
+        rights. A dry run answers what would be written.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+                dry_run: { type: boolean, default: true }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/teams/status:
     get:

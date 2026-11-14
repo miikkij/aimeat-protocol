@@ -10,9 +10,14 @@
  *   POST /v1/teams/setup  — dry run unless `dry_run: false`. organism:write; inviting people also
  *                           needs organism:invite.
  *   GET  /v1/teams/status — the caller's teams, or one with ?organism_id=. organism:read.
+ *   GET  /v1/teams/waiting — what waits for the caller across their teams (T6). organism:read.
+ *   GET  /v1/teams/:id/prompt — the team as a prompt for an AI without MCP (T9). organism:read.
+ *   POST /v1/teams/:id/paste — that AI's tagged answer back into the team; a dry run unless
+ *                              `dry_run: false` (T9). organism:write.
  * @structure teamsRouter
  * @usage app.use(teamsRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-11-14 — /v1/teams/waiting, /v1/teams/:id/prompt and /v1/teams/:id/paste (T6, T9).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
 import { Router } from 'express';
@@ -22,11 +27,30 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { callerOf } from '../../middleware/caller.js';
 import { validateBody } from '../../models/schemas.js';
-import { TeamSetupBody } from '../../models/write-body-schemas.js';
-import { teamSetupForCaller, teamStatusForCaller } from '../../services/team/for-caller.js';
+import { TeamSetupBody, TeamPasteBody } from '../../models/write-body-schemas.js';
+import { teamSetupForCaller, teamStatusForCaller, teamWaitingForCaller } from '../../services/team/for-caller.js';
+import { buildTeamPrompt, importTeamPaste } from '../../services/team/prompt.js';
 
 export function teamsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
+
+    router.get('/v1/teams/waiting', requireAuth(), requireScope('organism:read'), async (req, res) => {
+        const out = await teamWaitingForCaller({ storage, config }, callerOf(req, config.nodeId, storage));
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.json(success(config.nodeId, { items: out.items, approvals: out.approvals }));
+    });
+
+    router.get('/v1/teams/:id/prompt', requireAuth(), requireScope('organism:read'), async (req, res) => {
+        const out = await buildTeamPrompt({ storage, config }, callerOf(req, config.nodeId, storage), req.params.id as string);
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.json(success(config.nodeId, { prompt: out.prompt, language: out.language }));
+    });
+
+    router.post('/v1/teams/:id/paste', requireAuth(), requireScope('organism:write'), validateBody(TeamPasteBody, config.nodeId), async (req, res) => {
+        const out = await importTeamPaste({ storage, config }, callerOf(req, config.nodeId, storage), req.params.id as string, req.body?.text, req.body?.dry_run !== false);
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.status(out.dry_run ? 200 : 201).json(success(config.nodeId, { dry_run: out.dry_run, entries: out.entries, written: out.written }));
+    });
 
     router.post('/v1/teams/setup', requireAuth(), requireScope('organism:write'), validateBody(TeamSetupBody, config.nodeId), async (req, res) => {
         const out = await teamSetupForCaller({ storage, config }, callerOf(req, config.nodeId, storage), req.body);

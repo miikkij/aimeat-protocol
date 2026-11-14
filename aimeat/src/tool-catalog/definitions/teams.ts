@@ -33,6 +33,16 @@ export const teamTools = [
         },
     },
     {
+        name: 'aimeat_team_waiting',
+        description: 'Everything that waits for the person across their teams, in one read: the open records of each team\'s "Waiting for you" workspace that name them, or name nobody when they lead the team, and the team approvals they may decide. Use it when the person asks "what waits for me". To decide a waiting record, write its status (approved, rejected or done) with aimeat_workspace_write in that workspace\'s `waiting` space; a team approval is decided by the person signed in, at its `decide_url`.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'What Waits for You', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'organism:read',
+        surfaces: ['agent', 'service'],
+        input: {},
+    },
+    {
         name: 'aimeat_team_status',
         description: 'Where the person\'s teams stand, or one team: its name in the person\'s language, the leads, every member and whether their own AI is connected, the team context (what the team does and what is open), the team skill to load with aimeat_skill_get, and the three workspaces. A lead also sees the invitations still open. Read it before you answer or write anything about a team, and when the person asks who has not connected an AI yet.',
         caller: 'agent',

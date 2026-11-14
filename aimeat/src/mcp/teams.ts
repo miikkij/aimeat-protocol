@@ -8,6 +8,7 @@
  * @structure registerTeamTools
  * @usage registerTeamTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — aimeat_team_waiting (T6).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
 import { McpServer } from '@modelcontextprotocol/server';
@@ -18,7 +19,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
-import { teamSetupForCaller, teamStatusForCaller } from '../services/team/for-caller.js';
+import { teamSetupForCaller, teamStatusForCaller, teamWaitingForCaller } from '../services/team/for-caller.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -29,6 +30,15 @@ export function registerTeamTools(mcp: McpServer, storage: Storage, config: Aime
         async (input) => {
             const out = await teamSetupForCaller({ storage, config }, caller(), input);
             return out.ok ? text({ dry_run: out.dryRun, teams: out.teams }) : toolError(out.code, out.message);
+        },
+    );
+
+    mcp.registerTool(
+        'aimeat_team_waiting',
+        { description: descriptionFor('aimeat_team_waiting'), inputSchema: zodShapeFor('aimeat_team_waiting'), annotations: annotationsFor('aimeat_team_waiting') },
+        async () => {
+            const out = await teamWaitingForCaller({ storage, config }, caller());
+            return out.ok ? text({ items: out.items, approvals: out.approvals }) : toolError(out.code, out.message);
         },
     );
 

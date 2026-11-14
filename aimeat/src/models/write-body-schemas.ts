@@ -59,6 +59,7 @@ const teamPerson = z.union([
         email: z.string().max(INPUT_LIMITS.email).optional().describe('The person\'s email address.'),
         account: z.string().max(INPUT_LIMITS.id).optional().describe('An account name on this node, when there is no address.'),
         language: teamLang.optional().describe('The language of this person\'s invitation; the team\'s language when left out.'),
+        until: z.string().max(10).optional().describe('The last day of a temporary membership (YYYY-MM-DD). The person leaves the team after it, and the leads are told a week before.'),
     }),
 ]);
 
@@ -75,7 +76,19 @@ export const TeamSetupTeams = z.array(z.object({
         .describe('The description in each language, written by you, as with `names`. Every member reads it in their own language.'),
     leads: z.array(teamPerson).max(200).optional().describe('Leads besides you. A lead who is already a member becomes one at once; anyone else is invited and becomes a lead on accepting.'),
     members: z.array(teamPerson).max(200).optional().describe('Members to invite. Each gets an invitation in their own language.'),
+    remove: z.array(teamPerson).max(200).optional().describe('People to take out of a team that exists ("Pekka leaves"). Their own AI loses its access with them; what they wrote stays. The last lead is never removed this way.'),
+    ends_on: z.string().max(10).nullable().optional().describe('The team\'s last day (YYYY-MM-DD), for a project team; null clears it. The team is archived after it, and the leads are told a week before.'),
+    depends_on: z.array(z.object({
+        organism_id: z.string().max(INPUT_LIMITS.id).describe('A team this one needs something from.'),
+        what: safeText(300).optional().describe('What it needs, in a few words.'),
+    })).max(30).optional().describe('The teams this team depends on, shown on the team map. Replaces the list.'),
 })).max(30);
+
+/** POST /v1/teams/:id/paste: an AI's tagged answer brought back into the team (services/team/prompt.ts). */
+export const TeamPasteBody = z.looseObject({
+    text: documentText(),
+    dry_run: z.boolean().optional(),
+});
 
 /** POST /v1/teams/setup. The service reads the people and refuses what is not an address or an account. */
 export const TeamSetupBody = z.looseObject({

@@ -8,6 +8,7 @@
  * @structure teamCliTools[] — the handler table, spread by index.ts
  * @usage import { teamCliTools } from './tool-call-defs-teams.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — aimeat_team_waiting → GET /v1/teams/waiting.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -22,6 +23,11 @@ export const teamCliTools: ConnectCliToolDefinition[] = [
             const dryRun = optionalBoolean(input, 'dry_run'); if (dryRun !== undefined) body.dry_run = dryRun;
             return client.post('/v1/teams/setup', body);
         },
+    },
+    {
+        // → GET /v1/teams/waiting
+        name: 'aimeat_team_waiting',
+        handler: ({ client }) => client.get('/v1/teams/waiting'),
     },
     {
         // → GET /v1/teams/status

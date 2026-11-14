@@ -44,6 +44,18 @@ export interface TeamRecord {
     descriptionByLang?: Partial<Record<TeamLang, string>>;
     skill: { name: string; ref: string } | null;
     leadsPending: PendingLead[];
+    /** The day (YYYY-MM-DD) a person's membership ends, keyed `account:<name>` or `email:<hash>` (expiry.ts). */
+    until?: Record<string, string>;
+    /** The day the whole team ends and is archived (expiry.ts). */
+    endsOn?: string;
+    /** The day it ended, once the sweep archived it. */
+    endedOn?: string;
+    /** Which endings the leads were already told about, so each is told once. */
+    noticed?: Record<string, string>;
+    /** Teams this team depends on, by organism id, with what it needs from each (the team map). */
+    dependsOn?: { organism_id: string; what: string }[];
+    /** The team type the setup made it as (data/team-kit.ts TEAM_TYPES). */
+    teamType?: string;
     createdBy: string;
     createdAt: string;
     updatedAt: string;

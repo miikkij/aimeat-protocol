@@ -11,6 +11,7 @@
  *   const out = await teamSetupForCaller({ storage, config }, caller, req.body);
  *   if (!out.ok) → out.status, out.code, out.message
  * @version-history
+ *   v1.1.0 — 2026-11-14 — teamWaitingForCaller: what waits for the person across their teams (T6).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -20,6 +21,7 @@ import { emitChange } from '../event-bus.js';
 import { readerFor } from '../classification/reader.js';
 import { parseTeamSetup, planOrApplyTeams, type TeamOutcome } from './setup.js';
 import { teamStatusFor, type TeamStatus } from './status.js';
+import { teamWaitingFor } from './waiting.js';
 
 export interface TeamDoorRefusal { ok: false; status: number; code: string; message: string }
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -41,6 +43,12 @@ export async function teamSetupForCaller(deps: Deps, caller: CallerContext, body
     const teams = await planOrApplyTeams(deps, { owner: caller.owner, principal: caller.principal, locale }, parsed.teams, dryRun);
     if (!dryRun) emitChange('organisms');
     return { ok: true, dryRun, teams };
+}
+
+/** What waits for the caller across their teams (waiting.ts). */
+export async function teamWaitingForCaller(deps: Deps, caller: CallerContext): Promise<TeamDoorRefusal | ({ ok: true } & Awaited<ReturnType<typeof teamWaitingFor>>)> {
+    if (!caller.owner || caller.visitor) return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Teams belong to an account of this node' };
+    return { ok: true, ...(await teamWaitingFor(deps, caller)) };
 }
 
 /** The caller's teams, or the one named. */

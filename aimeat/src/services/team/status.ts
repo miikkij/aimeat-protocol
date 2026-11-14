@@ -16,6 +16,7 @@
  * @structure TeamStatus · teamStatusFor · listTeamsOf
  * @usage const teams = await teamStatusFor(storage, config, ownerName, locale, orgId);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The team's last day, its dependencies, and for a lead each temporary member's day.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T5, T13).
  */
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
@@ -46,6 +47,12 @@ export interface TeamStatus {
     skill: string | null;
     context: { key: string; summary: string; core: string; updated_at: string | null } | null;
     invitations?: { who: string; lead: boolean; sent_at: string }[];
+    /** The team's last day (a project team), when it has one. */
+    ends_on: string | null;
+    /** The teams this one needs something from (the team map). */
+    depends_on: { organism_id: string; what: string }[];
+    /** A lead's view: the last day of each temporary membership, by account (or address hash before they join). */
+    member_until?: Record<string, string>;
 }
 
 /** The organisms the owner is an active member of that are teams, newest membership first. */
@@ -95,8 +102,11 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
         workspaces: team.workspaces,
         skill: team.skill?.ref ?? null,
         context: await contextOf(storage, reader, organism.id, team),
+        ends_on: team.endsOn ?? null,
+        depends_on: team.dependsOn ?? [],
     };
     if (youLead) {
+        status.member_until = Object.fromEntries(Object.entries(team.until ?? {}).map(([k, v]) => [k.replace(/^account:/, ''), v]));
         const pendingLead = new Set(team.leadsPending.map(p => p.invitation));
         const byEmail = (await storage.listInvitationsByOrganism(organism.id, { status: 'pending' }))
             .map(i => ({ who: i.email, lead: pendingLead.has(`email:${i.id}`), sent_at: i.createdAt }));

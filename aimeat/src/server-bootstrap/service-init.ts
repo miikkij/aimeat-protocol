@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-14 — The hourly team-end sweep (services/team/expiry.ts): temporary members and team end days.
  *   2026-11-07 — seedCsmTemplates is imported from services/csm/seed.ts, where it moved unchanged.
  *   2026-11-05 — resumeReencryptAtBoot: a data key re-encrypt job left running is taken up again
  *     (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
@@ -180,6 +181,7 @@ import { logger } from '../utils/logger.js';
 import { claimedSweep } from '../services/process-lease.js';
 import { errorFields } from '../utils/error-fields.js';
 import { sweepLapsedMemberships } from '../services/app/member-sweep.js';
+import { sweepTeamEnds } from '../services/team/expiry.js';
 import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai/disclosure-sweep.js';
 import { scheduleAgreementSweep } from '../services/compliance/agreements-gaps.js';
@@ -586,6 +588,18 @@ export async function initializeServices(
     });
     setTimeout(sweep, 45_000); // once shortly after boot, so a restart closes anything overdue
     setInterval(sweep, SWEEP_INTERVAL_MS);
+  }
+
+  {
+    // Team setup T17: a temporary member leaves on their day, a project team is archived on its
+    // last day, and the leads are told a week before (services/team/expiry.ts).
+    const TEAM_END_SWEEP_MS = 3_600_000;
+    const teamEnds = claimedSweep(storage, config, 'team-ends', TEAM_END_SWEEP_MS, () => {
+      sweepTeamEnds(storage, config)
+        .catch(err => logger.warn('team end sweep failed', { error: String(err) }));
+    });
+    setTimeout(teamEnds, 50_000);
+    setInterval(teamEnds, TEAM_END_SWEEP_MS);
   }
 
   // TARGET-058: the mechanism that catches the case nobody thought of. Every other gate in that
