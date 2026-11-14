@@ -2412,9 +2412,8 @@ components:
             type: string
           example: [research, climate]
         ttl_hours:
-          type: integer
-          nullable: true
-          description: Time-to-live in hours (null = permanent)
+          type: [number, 'null']
+          description: Time-to-live in hours, a fraction allowed (0.5 is thirty minutes); null = permanent
         expected_version:
           type: integer
           minimum: 0
@@ -20489,8 +20488,8 @@ paths:
                   items:
                     type: string
                 ttl_hours:
-                  type: integer
-                  nullable: true
+                  type: [number, 'null']
+                  description: Time-to-live in hours, a fraction allowed; null = permanent
                 version:
                   type: integer
                   description: Expected current version (optimistic lock)
