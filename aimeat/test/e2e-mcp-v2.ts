@@ -20,6 +20,9 @@
 // 2026-10-31: the chat lists its start tools in short words (mcp/chat-tool-text.ts, v31 K63):
 // memory_write under 800 characters, the start set under 26 000 (45 769 before), a call without the
 // required key still refused, and the full surface keeps the full text.
+// 2026-11-14: the size failure names the eight largest start tools. Red in the nightly sweep at
+// 28 276 because the source grew (aimeat_task_create gained five fields on 2026-11-13); green again
+// once chat-tool-text.ts lists them off the chat surface.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
 import { MCP_SURFACES } from '../src/tool-catalog/surfaces.js';
@@ -243,7 +246,10 @@ await test('chat lists its start tools in short words, and a bad call is still r
     assert(JSON.stringify({ name: write.name, description: write.description, inputSchema: write.inputSchema }).length < 800,
         `memory_write is listed in under 800 characters: ${JSON.stringify(write).length}`);
     assert(write.inputSchema?.required?.includes('key') && write.inputSchema?.properties?.ai_provenance, 'its parameters and their types stay');
-    assert(size < 26_000, `the start set is listed in under 26 000 characters (45 769 before): ${size}`);
+    // The failure names the largest tools, so the one that grew is in the message.
+    const largest = listed.map((t: any) => `${t.name} ${JSON.stringify(t).length}`)
+        .sort((a: string, b: string) => Number(b.split(' ')[1]) - Number(a.split(' ')[1])).slice(0, 8).join(', ');
+    assert(size < 26_000, `the start set is listed in under 26 000 characters (45 769 before): ${size}; largest: ${largest}`);
     const bad = await s.call('aimeat_memory_write', { value: 'no key' });
     assert(bad.isError === true, `a call without the required key is still refused: ${JSON.stringify(bad).slice(0, 200)}`);
     const full = await openSession(agent.gaii, agent.key, 'full');

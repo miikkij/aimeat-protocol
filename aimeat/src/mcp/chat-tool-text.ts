@@ -18,6 +18,10 @@
  * @structure CHAT_TOOL_TEXT · listedForChat(json, params) · shortenChatTools(mcp, names)
  * @usage in createMcpServer, for role 'chat', after keepOnly(): shortenChatTools(mcp, toolsForSurface('chat'))
  * @version-history
+ *   v1.2.0 — 2026-11-14 — aimeat_task_create gets a short text and leaves rules, verification,
+ *     todos, resources and parent_task_id off the chat listing: the five fields the tool gained on
+ *     2026-11-13 took the start set to 28 299 characters, over 26 000. aimeat_skill_get and
+ *     aimeat_app_list get short texts too.
  *   v1.1.1 — 2026-11-10 — aimeat_memory_write's `patch` is listed as plain JSON with no words, as
  *     `value` is: its full text made the tool 1 128 characters on the chat surface, over 800.
  *   v1.1.0 — 2026-11-02 — aimeat_home_feed, a start tool since crew70.
@@ -71,6 +75,18 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
     },
     aimeat_agent_propose: {
         description: 'Propose a new agent; nothing exists until the person approves it. Read first what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in `purpose`. Send `crew_def` (the smallest that runs: {"agents":[{"role":"Reader","goal":"…","backstory":"…","tools":["memory"]}],"tasks":[{"id":"main","agent":"Reader","description":"… {{ctx.prompt}} …","expected_output":"…"}]}), the `scopes` the job needs (never more than you hold) and `schedule` for work on a clock. Give the person `approval_url` and `next_step` from the answer.',
+    },
+    // The plan, rules, checks and reading list a task may carry stay off the chat listing: a person
+    // asking their chat for a task names what to do, and the agent plans it. A call may still send them.
+    aimeat_task_create: {
+        description: 'Queue a task for one of the person\'s agents (yourself or another agent of the same owner). The person sees it on their dashboard. `files` hands the agent documents to work on, as references, never bytes.',
+        unlisted: ['rules', 'verification', 'todos', 'resources', 'parent_task_id'],
+    },
+    aimeat_skill_get: {
+        description: 'Read one skill, the operating guide for one capability, by `name` or full `ref`. `body_only: true` gives its instructions alone; then `path` reads one file they point at.',
+    },
+    aimeat_app_list: {
+        description: 'List the apps published on this node, each with its `url`: give the person that address to open one. `search` finds by words, `own: true` keeps to the person\'s own. Paged: call again with offset += limit while `has_more` is true.',
     },
     aimeat_handbook_get: {
         description: 'This node\'s guide. With no arguments: the guide for this chat and the node\'s skills, one line each. `tier: "build-app-atelier"` is the app build specification; `tier: "settings/concept.<word>"` explains one of this system\'s words.',
