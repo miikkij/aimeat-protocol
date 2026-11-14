@@ -41193,7 +41193,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [part]
+              description: >-
+                The part inside `part`, or the part's own fields (id, kind, title, summary, body,
+                tags) at the top of the body, which is read when `part` is absent.
               properties:
                 part:
                   type: object
