@@ -2674,6 +2674,46 @@ components:
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
 
+    ActionUpdate:
+      type: object
+      description: >-
+        The fields PUT /v1/actions/{id} changes, as models/schemas.ts ActionUpdateSchema reads them:
+        every one is optional, and the action's id comes from the path.
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        category:
+          type: string
+          maxLength: 64
+        input_schema:
+          type: object
+          description: JSON Schema for action input
+        output_schema:
+          type: object
+          description: JSON Schema for action output
+        pricing:
+          $ref: '#/components/schemas/ActionPricing'
+        estimated_time_seconds:
+          type: integer
+          minimum: 1
+        max_input_size_bytes:
+          type: integer
+          minimum: 1
+        tags:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 64
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
+
     ActionPricing:
       type: object
       description: >
@@ -31766,7 +31806,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ActionPublish'
+              $ref: '#/components/schemas/ActionUpdate'
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
