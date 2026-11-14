@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-15: check:design-language-publish, the node copy of skill aimeat-design-language is the repository copy as last published (decision P7 of the instruction audit).
  *  - 2026-11-14: check:find-fields, every find field is one the autofill guard sees (type="search" or data-find); Edge on Android wrote the sign-in name into the App Catalog search.
  *  - 2026-11-10: check:owner-agent-reads, the direct getAgentsByOwner calls in src/services/ may only fall (performance work, architecture item 1).
  *  - 2026-11-10: check:blocked-names, no served file's address is blocked by EasyList, EasyPrivacy or uBlock Origin's Privacy list (EasyPrivacy's `/fingerprint.js^` took the admin page down on 2026-11-09).
@@ -61,6 +62,9 @@ export const FAST_CHECKS = [
     { script: 'check:openapi-routes', label: 'The contract and the code name the same routes' },
     { script: 'check:skill-reviews', label: 'Every skill was read against the code it describes, and that code has not changed since' },
     { script: 'check:skill-evals', label: 'A skill with an eval suite that changed has the developer\'s decision: eval run or skipped' },
+    // Instruction audit 2026-11-14, decision P7: the repository copy of aimeat-design-language is
+    // the source, and the node copy had drifted five commits behind it with nothing to say so.
+    { script: 'check:design-language-publish', label: 'The node copy of skill aimeat-design-language is the repository copy, published and recorded' },
     { script: 'check:it-adoption', label: 'Every page of the IT adoption package was read against the code it describes, that code has not changed since, and the settings and tools it names exist' },
     { script: 'check:app-catalog', label: 'app-catalog.html ↔ sources in sync' },
     { script: 'check:everything', label: 'everything.json ↔ docs/AIMEAT-Feature-List.md in sync' },

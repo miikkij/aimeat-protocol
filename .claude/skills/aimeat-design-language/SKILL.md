@@ -1,9 +1,9 @@
 ---
 name: aimeat-design-language
-description: "The look of the node's OWN screens under aimeat/public/ and aimeat/src/static/: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use only when changing or judging one of those screens, or a font or colour token they read. Not for an app published on the node, whatever its name: an app forks a Design Book genre and has a look of its own (Jouni, 2026-10-09)."
+description: "The look of the node's OWN screens under aimeat/public/ and aimeat/src/static/: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens), with the token map and the shape tables in references/. Use only when changing or judging one of those screens, or a font or colour token they read. Not for an app published on the node, whatever its name: an app forks a Design Book genre and has a look of its own."
 metadata:
-  version: 1.13.1
-  updated: 2026-10-09
+  version: 1.14.0
+  updated: 2026-11-15
   owner: Jouni Miikki
 ---
 
@@ -34,7 +34,7 @@ weights are tokens too (`--text-2xs` … `--text-xl`, `--weight-regular` … `--
 theme can change the type scale in one place. `--text-2xs` is 11px, the smallest text a page shows
 (the Status and the time read it; Jouni, 2026-10-25): a size below it is a finding. The shared shapes live in
 `aimeat/public/css/poster.css`. A view composes a shape by class and owns its layout. Change the
-token or shape at its home; the maps below show which surfaces follow. Existing copies are
+token or shape at its home; `references/token-map.md` and `references/shapes.md` show which surfaces follow. Existing copies are
 recorded migration debt, not examples for a new view.
 
 ## The faces
@@ -219,18 +219,10 @@ under the MCP connection, not above it.)
 
 Change the token in `aimeat/public/css/theme.css`; a new face is first vendored into
 `aimeat/public/lib/fonts/` and declared in `aimeat/public/lib/aimeat-fonts.css`. Then the surfaces
-below follow on their own. The standalone pages (`public/connect*.html`, `public/front-*.html`,
-`public/wiifm*.html`, `public/aimeat-developers.html`, the app catalog's template) link that
-same sheet and name their faces in their own inline CSS, so a change of face reaches them only
-by hand; the list here is the checklist.
-
-| Token | Read by |
-|---|---|
-| `--font-headline` | through `--font-showroom`: `landing-showroom.css`, `landing.css`, `help.css`, `members.css`, `changelog.css`, `build-story.css`, `static-page.css`, `portal-dev.css`; through `--font-poster`: `home.css`, `chat.css`, `profile.css`, `profile-poster.css`, `surface.css`, `app-catalog-poster.css`, the sign-in dialog (`sdk-libs/auth/modal-styles.js`), the top bar in `css/components/top-bar.css` |
-| `--font-body` | all of the above through `--font-showroom-body` and `--font-poster-section`, and every classic-shell sheet (admin, the older tabs, form controls) through `--font` |
-| `--font-mono` | every sheet that shows an address, a command, an id or a key; no sheet spells a monospace family |
-| `--font-headline` again, through the palette bridge | `lib/aimeat-theme.css` gives every `h1`-`h6` the palette's display face, and the house palette's display face is `var(--font-headline, 'Archivo Black', …)`: on the node the classic shell's headings follow the token; a published app without `theme.css` keeps the vendored Archivo Black; a chosen palette (paper, circuit, …) keeps its own face on purpose |
-| `--sun`, `--on-sun`, `--accent`, `--text`, `--bg` | every sheet; the auth pill and dialog read them with a fallback so an app origin without the tokens still gets the design |
+that read the token follow on their own. Some do not: the standalone pages name their faces in their
+own inline CSS, and code that runs outside the node carries literal values. **Before you change a
+token, read `references/token-map.md`**: it lists every sheet a token reaches and the surfaces that
+need a hand, and it is the checklist for the change.
 
 ### The shape values: what a theme changes once
 
@@ -241,25 +233,7 @@ value, so a theme that sets them reaches every component, the ones made later in
 them in Themes & Styles (the Shapes tab) or with `aimeat_theme_save` `shapes`; colours stay the
 style's, faces stay the style's.
 
-| Token | Built-in value | What it shapes |
-|---|---|---|
-| `--shape-corner` | `0` | a box, a panel, a frame, a record, a sticker |
-| `--shape-corner-control` | `0` | a field, an icon button, a choice, a menu row, a chat row |
-| `--shape-corner-pill` | `0` | the loud action, a tab, a count, the morsel badge (not the action link: a line under words has no corner to round) |
-| `--shape-corner-dialog` | `0` | a dialog, the bell's menu |
-| `--shape-corner-soft` / `--shape-corner-card` | `8px` / `10px` | the app catalogue's own softer drawing (appcat): a statement box, a state line, a picture and the empty box of a search preview / the search result card |
-| `--shape-frame` / `--shape-frame-heavy` | `2px` / `3px` | a box's or a control's frame / the heavy frame, the rule under an action, the page's rules |
-| `--shape-frame-colour` / `--shape-rule-colour` / `--shape-field-colour` | `var(--text)` each | a box's frame / a rule and a control's frame / a field's frame |
-| `--shape-ring` | `3px` | a spinner's ring |
-| `--shape-chosen-ground` | `var(--sun)` | the ground of a chosen row or item: a pressed menu row, a ticked choice, an opened row, a chosen value |
-| `--shape-shadow` | `none` | a box at rest |
-| `--shape-shadow-raised` | `8px 8px 0 var(--sun)` | a record, an open step, an open menu |
-| `--shape-shadow-dialog` | `12px 12px 0 var(--sun)` | a dialog |
-| `--shape-shadow-action` / `-pressed` | `4px 4px 0` / `2px 2px 0 var(--sun)` | the loud action, and under the pointer |
-| `--shape-shadow-chosen` | `4px 4px 0 var(--text)` | a chosen choice |
-| `--shape-case-heading`, `--font-poster-weight`, `--font-poster-tracking`, `--font-poster-leading` | `uppercase`, `400`, `.01em`, `1` | every headline |
-| `--shape-case-action`, `--shape-tracking-action` | `uppercase`, `.04em` | the loud action, an action link, a tab |
-| `--shape-case-label`, `--shape-tracking-label` | `uppercase`, `.1em` | the small coral label |
+The values, token by token, are in `references/shapes.md` ("The shape values").
 
 **A component sheet reads a shape value wherever one exists**, and writes its own corner, frame
 width, shadow or letter case only where none does (a circle, a 1px hairline, a 4px sun bar). A
@@ -275,32 +249,7 @@ it: a ratchet of the literals still written, which only falls.
 values of these shapes. Compose them in markup; a view sheet keeps its grid, placement and
 dimensions. It does not re-declare the shape's font, rule, fill, padding or shadow.
 
-| Shape | Class |
-|---|---|
-| Page title | `.poster-page-title` |
-| Opened record title | `.poster-record-title` |
-| Section and B1 headline | `.poster-section`, `.poster-section-title` |
-| Area governed by the selected tab | `.poster-panel` |
-| Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
-| Small coral label | `.poster-label` (also the prompt card's label; Jouni's decision "Row label"); `--block` stands it on a line of its own |
-| Underlined action, and its tones | `.poster-action`; `--more` ("Show all", every small way on inside a part), `--quiet` (a side column action), `--back` (the way back), `--text` (Listen, Copy, "Not now"), `--notice` ("What does that mean?"), `--jump` (the jump to the latest message), `--danger` (coral: an act that removes or revokes); in Settings & Controls a way on in a page head or a section is `--small`, a quiet one `--lower` (no capitals), and one in a list row's door cell `--row` (Jouni's decision "Settings door"); `--control` stands the same word and line in a box as tall as the control cut (44px), the touch target on a phone for a page that asks one thing or a panel's buttons (Action `control`, 2026-10-21); on a touch screen (`pointer: coarse`) every action link and tab takes the finger in an invisible area 44px high around its words, with no change to its look (2026-10-25); `:disabled` is dimmed; `.is-on` (a pale coral ground) while what it started runs, as Listen while it reads (Jouni's decisions "Action link", "Panel action", "Step button", "Dismiss", "Small link"). Every button of a small panel, and a first step's button that is not the next move, is this link |
-| Tab and selected tab, and its tones | `.poster-tab`, `.poster-tab.is-on`; `.poster-tab--fold` (a small switch in a row, "Recent / Mine", and every button that shows or hides a panel and stays pressed while it is shown), `.poster-tab--tile` (a choice among named looks, the background pattern), `--filter` (what a list shows: small typewriter words in a grey frame), `--attention` (a filter whose items need the person); `:disabled` is dimmed; a Count inside a chosen tab takes the chosen tab's own words' colour (dark on the sun in AIMEAT; light on the accent in a style such as Pebble that chooses on the accent) (Jouni's decisions "Tabs and filters", "Choice") |
-| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large`; the one big button of a place, and only the next move in the first steps (Jouni's decision "Loud action") |
-| Icon button | `.poster-icon` (44px, the composer), `.poster-icon--small` (28px, everywhere else): a square in a 2px ink frame, the sun under the pointer; a card's menu keeps its state fill; `.is-on` (ink ground) for a button that stays pressed (Jouni's decision "Icon button") |
-| Menu row | `.poster-menu-row`: one choice in an opened menu, plain words on a quiet ground, a thin line between rows; the menu around it is a column; `--danger` keeps a delete coral (Jouni's decision "Menu row") |
-| Box; frame; opened record | `.poster-box` with the tones `--copy` (a text to copy, on grey: the prompt card), `--row` (one result in a list) and `--raised` (the one thing that stands out: an opened row's panel, the way to take first; heavy frame and the raised shadow) (Jouni's decisions "Object box", "Box"); `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
-| Dashed coral aside | `.poster-aside` with the tones `--waiting` (the next move is elsewhere) and `--suggestion` (a line to wave away) (Jouni's decision "Attention note") |
-| Tag; a row of tags; crumb | `.poster-chip` with the tones `--sun` ("you", "public"), `--coral` (a guest, "anyone", a broken rule), `--ink`, `--dim` (a tag that counts nothing yet: "0 workspaces"), `--fine` (green: a role that is granted, in css/components/mark.css); `.poster-chips` for a row; `.poster-chip-x`, the ✗ that takes a tag or a member off, grey and coral under the pointer (Jouni's decisions "Tag", "Remove mark"); `.poster-crumb` |
-| Word that says a state | `.poster-status` with `--fine` (green), `--attention` (sun), `--danger` (coral), `--off` (grey) (Jouni's decision "Status") |
-| Small number: waiting (on coral), tally (no ground), small (on an icon) | `.poster-count`, `--waiting`, `--tally`, `--small` (Jouni's decision "Count"; the bell and the open items use it; the morsel badge stays its own) |
-| When a thing happened | `.poster-time` (Jouni's decision "Timestamp"; the chat's message time and the home timeline) |
-| Heading over a list; quiet over a record | `.poster-day-title`, `.poster-day-title--quiet` (Jouni's decision "Group heading"; the history, the chat's side column, the chat's work log) |
-| Numeral row and its number | `.poster-stat`, `.poster-stat-number` |
-| Showroom ink band and sun band | `.showroom-band`, `.showroom-band--sun` |
-| Showroom section and coral shadow | `.showroom-section`, `.showroom-section--coral` |
-| Showroom underlined door | `.showroom-door` |
-| Showroom slab and its named colours | `.showroom-slab`, `--hot`, `--sun`, `--ink` modifiers |
-| A way into a store that does not take orders yet | `.store-soon` on the door or slab (components/StoreDoor.js): the same shape, "Opens soon" for words, no pointer, and a door without its underline; `.store-soon-note`, the sentence that says so. With a discount code set (site.store_soon_code) the control is `.store-soon-ask`, pressable in its own shape, and the press shows `.store-soon-code`: the code in an ink frame with a copy button. Only while site.store_status is "soon" |
+The shape-to-class table, every tone of every class, is in `references/shapes.md` ("Shape to class").
 
 Only page and section headline sizes take per-view properties: `--poster-page-size` and
 `--poster-section-size`, set on the view root. A deviating cut becomes a shared modifier only
@@ -311,28 +260,7 @@ Modifiers name a role or size, never a page. Each shape has at most two size mod
 `--small` and `--large`; a third size raises a shape question in the notes and does not create
 another modifier. A view never re-declares a modifier's values.
 
-| Shape | Shared variant | Values and reason |
-|---|---|---|
-| Loud action | `.poster-slab--large` | 1.02rem, 8px sun shadow; the named big door role (brief 10.3). Base stays .8rem, 600, 4px sun shadow. |
-| Loud action | `.poster-slab--control` | A 44px control in a row of controls: inline-flex, centred, `0 16px` padding, weight 800, the parent's face; the chat's New conversation and Send (formerly chat.css), and a dialog's Save or Confirm. Dimmed to .45 when disabled. |
-| Loud action | `.poster-slab--danger` | An action that cannot be undone (a dialog's Delete): `--accent` ground, white words, a `4px 4px 0 --text` shadow (Jouni's decision "Dialog actions"). |
-| Section headline | `.poster-section-title--large` | 2.4rem, and 1.7rem with `.45rem .8rem .4rem` padding at 560px; the home's bands and the layout engine's band (formerly home.css and surface.css). |
-| Box | `.poster-box--avatar` | Square initials mark, .95rem poster face, no padding or margin, transparent ground; Contacts, Email and Notifications share this cut. Dimensions remain layout. |
-| Box initials mark | `.poster-box--avatar.poster-box--small` | .85rem; Apps, Companies and MCP share the smaller initials cut. |
-| Box initials mark | `.poster-box--avatar.poster-box--agent` | A dashed frame and grey initials: an agent's mark (and a mark for something not connected yet) in Contacts, Notifications, Email and MCP. |
-| Box | `.poster-box--meter` | Paper ground, no padding or margin, sun fill for SVG data geometry; the filled numerical meter role. |
-| Box meter | `.poster-box--quota` | Card ground with coral consumption; `.is-full` changes the fill to danger. The quota meter is a named data role, with its ratio carried by SVG geometry. The figure written on a meter is `.poster-meter-figure` (typewriter .72rem, at the left). |
-| Aside | `.poster-aside--small` | .9rem 1.1rem padding, .92rem / 1.55 text; the compact explanation used throughout organism settings and admin pages. |
-| Aside | `.poster-aside--large` | 1.25rem 1.5rem padding, surrounding body size and leading; Members and the shared human contact card. |
-| Aside | `.poster-aside--irreversible` | Solid coral border; the named irreversible-act explanation, composed with the same aside geometry. |
-| Numeral | `.poster-stat-number--small` | 1.35rem, unit leading and normal tracking; the recurring row number in Access, Data Wallet, Discover, Offers, Scheduler, Wallet and admin rosters. |
-| Numeral | `.poster-stat-number--large` | 3.4rem; Database and Metrics share the larger headline count. Base stays 3rem. The source phone cut is 2.2rem at 560px for base and large. |
-| Numeral | `.poster-stat-number--step` | Coral for the numbered instruction step, repeated across admin Apps, CORS, Cortex, MSM, Portal and Prompts; composes with the compact numeral. |
-| Numeral | `.poster-stat-number--band` | Paper words on the ink band; the number keeps its shared typography. |
-| Record title | `.poster-record-title--small` | 1.8rem and the poster leading; Agents and Extensions share this cut. Base 1.9rem / 1.05 is shared by Boards, CSM and Skills. |
-| Showroom band | `.showroom-band--sun` | Sun ground and ink words; the money band role. |
-| Showroom section | `.showroom-section--coral` | 8px coral shadow; the named coral room cut. |
-| Showroom slab | `.showroom-slab--hot`, `--sun`, `--ink` | Named hot, sun and ink action colours; each shares the showroom slab geometry. |
+The shared variants, with their values and the pages that share each cut, are in `references/shapes.md` ("Shared variants").
 
 The parts a page is composed of are components: one module in `public/components/` (the markup)
 and one sheet in `public/css/components/` (the look, composing the shapes above), named by role:
@@ -372,7 +300,7 @@ with the spring hand beside them in `--ak-spring-*`, read off the element the ki
 served with `theme.css` inherits the house and an app served without it still looks finished. The
 same contract is documented to an AI in `aimeat/src/data/library-packs/sdk-ui.ts`, which is the
 `aimeat-atelier` pack's `aiDoc` and the answer an agent gets when it asks what the kit is. So the
-map above reaches the kit too: a value changes in one place, and the apps built on it follow.
+token map reaches the kit too: a value changes in one place, and the apps built on it follow.
 
 `--ak-tilt` belongs to an app's own register, not to this skill's flat poster face. The difference
 is scope, not disagreement: a genre that commits to a tilted photograph is that app's statement,
@@ -385,10 +313,6 @@ a token wants. The signal is the page's own declaration and not its register, be
 names what a page IS while keeping a fixed palette is a fact about how it was built. And the kit's light `--ak-accent` carries a lightness cap,
 because white is the action ink on paper and the house coral at `#E8564A` measured 3.58:1 under it:
 inside the kit it deepens to `#cf3e35`; the house surfaces above keep the coral as it is.
-
-Code that runs **outside** the node cannot read a token: the portfolio prompt a person carries to
-their own AI, the auth library's fallbacks, an app built elsewhere. Those carry the literal values
-from the table above and are the second half of the checklist when a value changes.
 
 A finished surface is verified in a real browser at 1280×900, 390×844 and 1280×460 (skill
 `aimeat-frontend-verify`), and the words on it follow `aimeat-writing`.
