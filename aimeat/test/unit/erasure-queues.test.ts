@@ -23,6 +23,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-queues.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-queues.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-14 — The receiver delivery log.
  *   v1.1.0 — 2026-11-14 — The outside party read log.
  *   v1.0.0 — 2026-11-14 — Initial: the call timings.
  */
@@ -32,6 +33,9 @@ import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { recordCallDuration, flushCallTimings, timingKey } from '../../src/services/call-timing.js';
 import { logPartyRead, flushOwner, readLogKey } from '../../src/services/parties/activity.js';
 import { PARTY_READS_PREFIX } from '../../src/services/parties/contract.js';
+import { logDelivery, flushReceiverLogs } from '../../src/services/receivers/deliveries.js';
+import { RECEIVER_LOG_PREFIX } from '../../src/services/receivers/contract.js';
+import { serviceNamespaceOf } from '../../src/utils/service-namespace.js';
 import { twoProviders, NODE, people, holdFirst, eraseDuring } from './erasure-test-kit.js';
 
 requirePostgresWhenAsked('erasure-queues');
@@ -105,5 +109,42 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
       await eraseDuring(s, p, held, flushOwner(p.aliceGhii));
     } finally { held.restore(); }
     expect(await s.getMemory(p.aliceGhii, readLogKey())).toBeNull();
+  });
+
+  // ── The receiver delivery log (services/receivers/deliveries.ts) ──
+  const delivery = () => ({ at: new Date().toISOString(), verb: 'write', status: 201, bytes: 10 });
+  const receiverLog = (s: ReturnType<typeof st>, ghii: string, name: string) =>
+    s.getMemory(serviceNamespaceOf(ghii), `${RECEIVER_LOG_PREFIX}${name}`);
+
+  it('receiver log, WAITING: no delivery log of the erased owner is stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    // The log writes five seconds later on its own timer; that timer is taken off here.
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    logDelivery(s, p.aliceGhii, 'sensor', delivery());
+    logDelivery(s, p.bobGhii, 'sensor', delivery());
+    vi.useRealTimers();
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushReceiverLogs(p.aliceGhii);
+    await flushReceiverLogs(p.bobGhii);
+
+    expect(await receiverLog(s, p.aliceGhii, 'sensor')).toBeNull();
+    // POSITIVE CONTROL: bob's delivery log is stored.
+    expect(await receiverLog(s, p.bobGhii, 'sensor')).not.toBeNull();
+  });
+
+  it('receiver log, BEING WRITTEN: a delivery log whose write is in progress is not stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    // The write reads the log record, then writes it: held after the read.
+    const held = holdFirst(s, 'getMemory', 'after', keyArg(RECEIVER_LOG_PREFIX));
+    try {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      logDelivery(s, p.aliceGhii, 'meter', delivery());
+      vi.useRealTimers();
+      await eraseDuring(s, p, held, flushReceiverLogs(p.aliceGhii));
+    } finally { held.restore(); }
+    expect(await receiverLog(s, p.aliceGhii, 'meter')).toBeNull();
   });
 });

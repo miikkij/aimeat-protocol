@@ -21,9 +21,14 @@
  *   several processes lets each count its own day, so the limit is a ceiling per process, which is
  *   said in the setting's explanation and the IT adoption page.
  * @structure LOG_CAP · DeliveryEntry · ReceiverLog · parseReceiverLog · logDelivery · noteWrongKey ·
- *   takeMinuteSlot · takeDaySlot · flushReceiverLogs · flushAllReceiverLogs · readReceiverLog
+ *   takeMinuteSlot · takeDaySlot · flushReceiverLogs · flushAllReceiverLogs · readReceiverLog ·
+ *   holdReceiverLogsForErasure
  * @usage logDelivery(storage, ownerGhii, 'ruuvi', { at, verb: 'write', status: 201, bytes: 120, key: 'ruuvit.olohuone' });
  * @version-history
+ *   v1.1.0 — 2026-11-14 — holdReceiverLogsForErasure: before the erasure cascade, the owner's waiting
+ *     delivery entries are dropped and a write in progress answers, and none of the owner's is kept
+ *     until it ends. A waiting entry wrote the receiver's log back into the erased person's service
+ *     namespace (register finding f-2026-11-13-write-buffers-and-erasure).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -33,6 +38,7 @@ import { takeReadSlot } from '../parties/activity.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { RECEIVER_LOG_PREFIX } from './contract.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 /** The most entries a receiver's log keeps: the newest ones. */
 export const LOG_CAP = 200;
@@ -80,6 +86,9 @@ export function parseReceiverLog(v: unknown): ReceiverLog {
 interface Pending { storage: Storage; byName: Map<string, { entries: DeliveryEntry[]; wrongKeys: number }>; timer?: ReturnType<typeof setTimeout> }
 // process-local: a second process keeps its own batch; both write on the record's version, so only a stopping process's last seconds are lost.
 const pending = new Map<string, Pending>();
+/** The owners whose erasure runs now, whose entries are not kept, and the writes in progress an
+ *  erasure waits for (holdReceiverLogsForErasure). */
+const erasing = new ErasureHolds();
 
 function pendingOf(storage: Storage, ownerGhii: string): Pending {
     let p = pending.get(ownerGhii);
@@ -101,6 +110,8 @@ function schedule(ownerGhii: string, p: Pending): void {
 
 /** One delivery of the receiver, for its log. */
 export function logDelivery(storage: Storage, ownerGhii: string, name: string, entry: DeliveryEntry): void {
+    // An owner being erased: the cascade deletes the log, so it is not started again.
+    if (erasing.covers(ownerGhii)) return;
     const p = pendingOf(storage, ownerGhii);
     slotOf(p, name).entries.push(entry.reason && entry.reason.length > 300 ? { ...entry, reason: entry.reason.slice(0, 300) } : entry);
     schedule(ownerGhii, p);
@@ -108,6 +119,7 @@ export function logDelivery(storage: Storage, ownerGhii: string, name: string, e
 
 /** A wrong key was presented for the receiver. */
 export function noteWrongKey(storage: Storage, ownerGhii: string, name: string): void {
+    if (erasing.covers(ownerGhii)) return;
     const p = pendingOf(storage, ownerGhii);
     slotOf(p, name).wrongKeys++;
     schedule(ownerGhii, p);
@@ -150,10 +162,11 @@ export async function flushReceiverLogs(ownerGhii: string): Promise<void> {
     if (p.timer) { clearTimeout(p.timer); p.timer = undefined; }
     const batch = new Map(p.byName);
     p.byName.clear();
+    if (erasing.covers(ownerGhii)) return;
     for (const [name, slot] of batch) {
         if (!slot.entries.length && !slot.wrongKeys) continue;
         try {
-            await updateRecord(p.storage, serviceNamespaceOf(ownerGhii), `${RECEIVER_LOG_PREFIX}${name}`, parseReceiverLog, cur => {
+            await erasing.track(updateRecord(p.storage, serviceNamespaceOf(ownerGhii), `${RECEIVER_LOG_PREFIX}${name}`, parseReceiverLog, cur => {
                 const delivered = slot.entries.filter(e => e.status < 400 && !e.dryRun);
                 const refused = slot.entries.filter(e => e.status >= 400);
                 return {
@@ -163,7 +176,7 @@ export async function flushReceiverLogs(ownerGhii: string): Promise<void> {
                     lastRefusalAt: refused.length ? refused[refused.length - 1].at : cur.lastRefusalAt,
                     days: addToDays(cur.days, slot.entries),
                 };
-            }, { tag: 'receiver-log' });
+            }, { tag: 'receiver-log' }));
         } catch (err) {
             logger.warn('receiver log: a batch could not be written; those entries are lost', { owner: ownerGhii, receiver: name, entries: slot.entries.length, error: String(err) });
         }
@@ -176,6 +189,23 @@ export async function flushReceiverLogs(ownerGhii: string): Promise<void> {
 /** Write every owner's pending entries now: the operator's counts read this first. */
 export async function flushAllReceiverLogs(): Promise<void> {
     for (const owner of [...pending.keys()]) await flushReceiverLogs(owner);
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no delivery entry of the owner
+ * is kept from now on, a write in progress answers first so the cascade deletes what it stored, and
+ * the owner's waiting entries are dropped with their timer. The returned function ends the hold,
+ * after the cascade.
+ */
+export async function holdReceiverLogsForErasure(account: ErasedAccount): Promise<() => void> {
+    const release = erasing.hold(account);
+    await erasing.writesSettled();
+    for (const [owner, p] of [...pending]) {
+        if (!ErasureHolds.isOf(owner, account)) continue;
+        if (p.timer) clearTimeout(p.timer);
+        pending.delete(owner);
+    }
+    return release;
 }
 
 /** The log of one receiver as stored (call flushReceiverLogs first for a current view). */
