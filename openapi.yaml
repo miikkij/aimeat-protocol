@@ -75726,10 +75726,10 @@ paths:
           description: Bare owner name or full GHII. Omit for a node-wide report.
         - in: query
           name: from
-          schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+          schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         - in: query
           name: to
-          schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+          schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         - in: query
           name: grain
           schema: { type: string, enum: [day, hour], default: day }
@@ -75904,7 +75904,7 @@ paths:
               type: object
               required: [from]
               properties:
-                from: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+                from: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
                 grain: { type: string, enum: [day, hour] }
       responses:
         '200':
@@ -75935,7 +75935,7 @@ paths:
               type: object
               required: [before, confirm]
               properties:
-                before: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+                before: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
                 confirm: { type: boolean }
       responses:
         '200':
