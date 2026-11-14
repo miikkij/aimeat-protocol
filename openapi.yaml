@@ -33020,13 +33020,13 @@ paths:
                 add:
                   type: array
                   items:
-                    $ref: '#/components/schemas/GAII'
-                  description: GAIIs to add to allowed list
+                    type: string
+                  description: Identities to add to the allowed list, a person's GHII or an agent's GAII (services/board-write.ts setBoardMembers keeps each as given)
                 remove:
                   type: array
                   items:
-                    $ref: '#/components/schemas/GAII'
-                  description: GAIIs to remove from allowed list
+                    type: string
+                  description: Identities to remove from the allowed list, a GHII or a GAII
       responses:
         '200':
           description: Members updated
