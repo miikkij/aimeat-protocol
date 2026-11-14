@@ -25,10 +25,16 @@
  *   which the table filters against the declared contract. Never a URL: paths come from the table,
  *   so there is nothing here for an SSRF to steer.
  *
+ *   A ROUTE CAPABILITY (`route:<METHOD> <path>`) goes to services/route-invoke.ts: the request to that
+ *   route of this node, with the path, query and body the input names, the same bearer and the same
+ *   in-process dispatch. Its path comes from the contract, never from the caller.
+ *
  * @structure invokeNodeCapability(config, args) → { ok, status, body } | refusal
  * @usage
  *   const out = await invokeNodeCapability(config, { id, input, bearer, agentName });
  * @version-history
+ *   2026-11-14 — A route capability runs through services/route-invoke.ts; its answer carries the
+ *     route's status.
  *   2026-11-04 — The request goes to the node's own HTTP server in process (services/request-injector.ts)
  *     instead of a fetch to 127.0.0.1, marked for the caller's bearer (auth/injected-request.ts) instead
  *     of carrying a loopback pass. The route, its gates, the headers it reads and the answer are the
@@ -43,13 +49,15 @@
 import type { AimeatConfig } from '../config.js';
 import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
 import { AimeatClient } from '../tool-dispatch/api-client.js';
-import { findNodeCapability, NON_INVOKABLE, listNodeCapabilities } from './node-capabilities.js';
+import { findNodeCapability, NON_INVOKABLE, listAllCapabilities, asRouteCapability } from './node-capabilities.js';
+import { invokeRouteCapability } from './route-invoke.js';
 import { logger } from '../utils/logger.js';
 import { movedToolMessage } from '../tool-catalog/moved-tools.js';
 import { inProcessOrigin, withInProcessFetch } from './request-injector.js';
 
 export interface InvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
-export interface InvokeSuccess { ok: true; capability: string; result: unknown; duration_ms: number }
+/** `status` is the route's own HTTP status, for a route capability. */
+export interface InvokeSuccess { ok: true; capability: string; result: unknown; duration_ms: number; status?: number }
 
 export interface InvokeArgs {
   /** The capability id, e.g. `aimeat_memory_write`. */
@@ -82,7 +90,7 @@ export async function invokeNodeCapability(
   if (!capability) {
     // A near-miss list beats "not found" for a caller that guessed at a name, and it is free: the
     // catalogue is in memory.
-    const near = listNodeCapabilities()
+    const near = listAllCapabilities()
       .filter(c => c.id.includes(id) || id.includes(c.segment))
       .slice(0, SUGGEST_LIMIT).map(c => c.id);
     return {
@@ -94,6 +102,11 @@ export async function invokeNodeCapability(
   if (!args.bearer) {
     return { ok: false, status: 401, code: 'AUTH_REQUIRED', message: 'Sign in first. A capability runs as whoever called it, so this needs your credential.' };
   }
+
+  // A REST route of the contract: the request to that route, with this bearer and nothing else
+  // (services/route-invoke.ts). The route's own middleware decides, exactly as over REST.
+  const route = asRouteCapability(capability);
+  if (route) return invokeRouteCapability(config, route, args.input, args.bearer);
 
   const tool = CONNECT_CLI_TOOLS.find(t => t.name === id);
   if (!tool) {

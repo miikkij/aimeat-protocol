@@ -10804,6 +10804,16 @@ paths:
         catalog the three MCP surfaces share. A capability appears here only if `invoke` can
         actually run it, so the catalogue cannot list something that does not work.
 
+        ROUTES TOO. Beside the tools (`kind: tool`), every route of this contract that a caller with
+        a session can run is a capability of `kind: route`, with the id `route:<METHOD> <path>`
+        (for example `route:GET /v1/ledger/usage/runs`), its `method`, its `path` and the
+        `permission` word the route names (`x-aimeat-scope`). The entries are generated from this
+        file, and the route decides who it admits. Left out: sign-in, token, setup and MCP routes,
+        `/v1/invoke`, explicitly public routes that take no session, routes only an outside
+        credential or a federation peer's signature reaches, routes whose body is not JSON, and
+        routes that answer a stream or only a binary file. At the same search score a tool comes
+        before a route.
+
         Unauthenticated, because it describes the NODE and not any account. Knowing that a
         capability exists gives nobody access to it; the gate is on the call.
       tags: [Discovery]
@@ -10843,25 +10853,40 @@ paths:
                               type: object
                               properties:
                                 id: { type: string }
+                                kind: { type: string, enum: [tool, route] }
                                 title: { type: string }
                                 segment: { type: string }
                                 description: { type: string }
                                 required:
                                   type: array
                                   items: { type: string }
+                                method: { type: string, description: 'A route: its HTTP method.' }
+                                path: { type: string, description: "A route: the contract's path template." }
+                                permission:
+                                  type: object
+                                  description: 'A route: the permission word an agent needs there (the owner in person needs none).'
+                                  properties:
+                                    word: { type: string }
+                                    or_scope: { type: string }
+                                    enforced_in: { type: string }
+                                    self_exempt: { type: boolean }
 
   /v1/capabilities/node/{id}:
     get:
       operationId: getNodeCapability
       summary: One capability's contract
-      description: What it takes, what is required, and who it is for. Read this before invoking one you have not called before.
+      description: |
+        What it takes, what is required, and who it is for. Read this before invoking one you have not
+        called before. A route capability also lists its `parameters` (each path and query value, with
+        its schema) and, when it takes a body, `body_schema`: the JSON schema of the body, with its
+        component references written out.
       tags: [Discovery]
       parameters:
         - name: id
           in: path
           required: true
           schema: { type: string }
-          description: 'The capability id, e.g. `aimeat_memory_write`.'
+          description: 'The capability id, e.g. `aimeat_memory_write` or `route:GET /v1/ledger/usage/runs` (URL-encoded).'
       responses:
         '200':
           description: The contract
@@ -10884,6 +10909,15 @@ paths:
 
         A parameter the capability does not declare is REFUSED, not dropped, so a call that answers
         ok did everything you asked. `aimeat_invoke` cannot be invoked.
+
+        A ROUTE CAPABILITY (`route:<METHOD> <path>`) takes `input` as `{ path, query, body }`: the
+        values of the route's path parameters, its declared query values, and the body, sent as JSON
+        as given. The request goes to that route of this node with your bearer and nothing else (no
+        cookie, no admin password), so its sign-in, scope, readiness, rate limit, body check and
+        audit run as over REST, and a refusal is the route's own, with its status and code. A path
+        or query name the route does not declare is refused, and a path value cannot be `.` or `..`.
+        The answer adds `status`, the route's own HTTP status; a redirect is not followed, and its
+        `result` is the `location`. A text answer comes back as `{ content_type, text }`.
       tags: [Discovery]
       security:
         - BearerAuth: []
@@ -10897,10 +10931,10 @@ paths:
               properties:
                 capability:
                   type: string
-                  description: 'The id from the catalogue, e.g. `aimeat_memory_write`.'
+                  description: 'The id from the catalogue, e.g. `aimeat_memory_write` or `route:GET /v1/ledger/usage/runs`.'
                 input:
                   type: object
-                  description: That capability's own parameters.
+                  description: "That capability's own parameters. For a route capability: `path`, `query` and `body`."
       responses:
         '200':
           description: What the capability answered
@@ -10915,12 +10949,15 @@ paths:
                         type: object
                         properties:
                           capability: { type: string }
+                          status: { type: integer, description: "A route capability: the route's own HTTP status." }
                           result: {}
                           duration_ms: { type: integer }
         '400':
           description: |
-            No capability named, `NOT_INVOKABLE`, or the capability itself refused — its own error
-            code and message come back whole, with the full envelope in `details`.
+            No capability named, `NOT_INVOKABLE`, an input a route capability does not take
+            (`INVALID_INPUT`), or the capability itself refused — its own error code and message come
+            back whole, with the full envelope in `details`. A route's refusal carries the route's own
+            status, which may be any 4xx or 5xx.
         '401':
           description: Not authenticated
         '404':

@@ -838,6 +838,10 @@ const ALL_SUITES = [
     // itself, the proof that the old door is unchanged — the same call refused by scope directly is
     // refused through invoke, and nothing reachable before stopped being reachable.
     'test/e2e-agent-v2-primitives.ts',
+    // A REST route as a node capability: found with discover, run with invoke, and every call made
+    // twice (REST and invoke) so the pair must give the same status and code, for the owner-only route,
+    // the missing permission word, another owner's agent and a body the route does not take.
+    'test/e2e-invoke-routes.ts',
     // Agent v2 V4: the turn between two principals, and the delivery target that reaches one
     // which is not connected. Starts a REAL loopback listener and reads what actually left the
     // node: the envelope, the echoed token, the Authorization header. Half the suite asserts

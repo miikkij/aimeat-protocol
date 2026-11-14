@@ -24,9 +24,16 @@
  *   same list `/v1/spec` and every MCP tool listing already publish. Knowing that a capability
  *   exists gives nobody access to it.
  *
+ *   ROUTES AS CAPABILITIES (2026-11-14). The catalogue lists the REST routes of openapi.yaml beside the
+ *   tools (services/route-capabilities.ts), id `route:<METHOD> <path>`, and `POST /v1/invoke` runs one
+ *   as a request to that route with the caller's bearer (services/route-invoke.ts). The same rule
+ *   holds: the route's own gates decide.
+ *
  * @structure invokeRouter(config, storage)
  * @usage app.use(invokeRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-11-14 — Route capabilities: listed with kind, method, path and permission; a contract
+ *     read gives the body schema; an invoke answer carries the route's status.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import { Router } from 'express';
@@ -35,14 +42,18 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { listNodeCapabilities, findNodeCapability, searchNodeCapabilities } from '../services/node-capabilities.js';
+import { listAllCapabilities, findNodeCapability, searchNodeCapabilities, asRouteCapability } from '../services/node-capabilities.js';
 import { invokeNodeCapability } from '../services/node-invoke.js';
+import { listRouteCapabilities, routeCapabilityContract } from '../services/route-capabilities.js';
 
 /** Never send the whole catalogue at once by accident; a caller that wants it all asks page by page. */
 const MAX_LIST = 100;
 
 export function invokeRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
+  // The route capabilities are read from openapi.yaml once per process (about a second); read them
+  // off the start path, as the body guard reads the contract, so the first discover does not wait.
+  setTimeout(() => { listRouteCapabilities(); }, 0).unref();
 
   // ── GET /v1/capabilities/node — the catalogue ──
   router.get('/v1/capabilities/node', (req, res) => {
@@ -51,13 +62,19 @@ export function invokeRouter(config: AimeatConfig, _storage: Storage): Router {
     const rawLimit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : NaN;
     const limit = Math.min(Number.isFinite(rawLimit) ? Math.max(rawLimit, 1) : 20, MAX_LIST);
     const found = searchNodeCapabilities(q, segment, limit);
-    const all = listNodeCapabilities();
+    const all = listAllCapabilities();
     res.json(success(config.nodeId, {
       total: all.length,
       returned: found.length,
       // The families a caller can filter on, so browsing does not start with a guess.
       segments: [...new Set(all.map(c => c.segment))].sort(),
-      capabilities: found.map(c => ({ id: c.id, title: c.title, segment: c.segment, description: c.description, required: c.required })),
+      capabilities: found.map(c => {
+        const route = asRouteCapability(c);
+        return {
+          id: c.id, kind: c.kind, title: c.title, segment: c.segment, description: c.description, required: c.required,
+          ...(route ? { method: route.method, path: route.path, ...(route.permission ? { permission: route.permission } : {}) } : {}),
+        };
+      }),
     }, [
       { description: 'Read one capability\'s contract', method: 'GET', url: '/v1/capabilities/node/{id}' },
       { description: 'Run one', method: 'POST', url: '/v1/invoke' },
@@ -71,7 +88,8 @@ export function invokeRouter(config: AimeatConfig, _storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NO_SUCH_CAPABILITY', 'This node has nothing by that name. Browse what it does have, or search for what you need.'));
       return;
     }
-    res.json(success(config.nodeId, { capability: cap }, [
+    const route = asRouteCapability(cap);
+    res.json(success(config.nodeId, { capability: route ? routeCapabilityContract(route) : cap }, [
       { description: 'Run it', method: 'POST', url: '/v1/invoke' },
     ]));
   });
@@ -101,6 +119,8 @@ export function invokeRouter(config: AimeatConfig, _storage: Storage): Router {
     }
     res.json(success(config.nodeId, {
       capability: out.capability,
+      // A route capability answers with the route's own status (200, 201, 204 or a redirect).
+      ...(out.status !== undefined ? { status: out.status } : {}),
       result: out.result,
       duration_ms: out.duration_ms,
     }));

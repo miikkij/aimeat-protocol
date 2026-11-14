@@ -22,28 +22,42 @@
  *   gain dispatch entries.
  *
  * @structure
+ *   ROUTES TOO (2026-11-14). Beside the tools, every REST route of openapi.yaml that a caller with a
+ *   session can run is a capability of kind `route` (services/route-capabilities.ts), id
+ *   `route:<METHOD> <path>`. `listNodeCapabilities()` stays the tool half, which the tool tables
+ *   (scopes, annotations) describe; `listAllCapabilities()`, `findNodeCapability()` and
+ *   `searchNodeCapabilities()` cover both. A route's gate is the route itself, so it needs no entry in
+ *   the tool tables.
+ *
+ * @structure
  *   - NodeCapability — one catalogue entry
- *   - listNodeCapabilities() / findNodeCapability() / searchNodeCapabilities()
+ *   - listNodeCapabilities() (tools) / listAllCapabilities() (tools and routes)
+ *   - findNodeCapability() / searchNodeCapabilities() — over both
  *   - NON_INVOKABLE — the ids `invoke` refuses, and why
  * @usage
  *   import { searchNodeCapabilities } from '../services/node-capabilities.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — Route capabilities: the catalogue lists the REST routes beside the tools,
+ *     and a tool outranks a route at the same search score.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
 import { CONNECT_CLI_TOOLS } from '../tool-dispatch/index.js';
 import type { ToolInputField } from '../tool-catalog/definitions/types.js';
+import { listRouteCapabilities, findRouteCapability, type RouteCapability } from './route-capabilities.js';
 
 /** One capability, as a caller sees it: enough to decide, and enough to call. */
 export interface NodeCapability {
   /** The name `invoke` takes. The same string the tool has, so one name means one thing. */
   id: string;
+  /** A tool of the shared catalog, or a REST route of the contract. */
+  kind: 'tool' | 'route';
   title: string;
   description: string;
   /** Coarse family, derived from the id (`aimeat_memory_write` → `memory`). What `discover` facets on. */
   segment: string;
-  /** The input contract, verbatim from the shared catalog. */
-  input: Record<string, ToolInputField>;
+  /** The input contract, verbatim from the shared catalog; for a route, its `path`, `query` and `body`. */
+  input: Record<string, Pick<ToolInputField, 'type' | 'required' | 'description'>>;
   /** Which inputs must be present. Pulled out so a caller does not have to read the whole schema. */
   required: string[];
   /** Who the catalog says calls this: agent, owner, operator or public. */
@@ -79,8 +93,9 @@ export function listNodeCapabilities(): NodeCapability[] {
   const dispatchable = new Set(CONNECT_CLI_TOOLS.map(t => t.name));
   cache = CLI_FALLBACK_TOOL_DEFINITIONS
     .filter(def => dispatchable.has(def.name) && !NON_INVOKABLE.has(def.name))
-    .map(def => ({
+    .map((def): NodeCapability => ({
       id: def.name,
+      kind: 'tool',
       // The catalog has no separate title. The id without its prefix, in words, is a better label
       // than repeating the first sentence of the description.
       title: def.name.replace(/^aimeat_/, '').replace(/_/g, ' '),
@@ -94,8 +109,30 @@ export function listNodeCapabilities(): NodeCapability[] {
   return cache;
 }
 
+let allCache: { caps: NodeCapability[]; text: Array<{ id: string; text: string }> } | null = null;
+
+/** The tools, then the routes, with the lowercased text a search reads, built once. */
+function allIndexed(): NonNullable<typeof allCache> {
+  if (allCache) return allCache;
+  const caps: NodeCapability[] = [...listNodeCapabilities(), ...listRouteCapabilities()];
+  allCache = { caps, text: caps.map(c => ({ id: c.id.toLowerCase(), text: `${c.id} ${c.description}`.toLowerCase() })) };
+  return allCache;
+}
+
+/** Every capability `invoke` runs: the tools, then the routes. */
+export function listAllCapabilities(): NodeCapability[] {
+  return allIndexed().caps;
+}
+
+/** A tool by its id, or a route by `route:<METHOD> <path>` (services/route-capabilities.ts). */
 export function findNodeCapability(id: string): NodeCapability | undefined {
+  if (id.startsWith('route:')) return findRouteCapability(id);
   return listNodeCapabilities().find(c => c.id === id);
+}
+
+/** The route capability behind a node capability, when it is one. */
+export function asRouteCapability(cap: NodeCapability): RouteCapability | undefined {
+  return cap.kind === 'route' ? cap as RouteCapability : undefined;
 }
 
 /**
@@ -104,23 +141,24 @@ export function findNodeCapability(id: string): NodeCapability | undefined {
  * Deliberately a plain substring score and not an index: the catalogue is a few hundred entries of
  * static text in memory, and an index would be a second thing to keep in step with the catalog for
  * no measurable gain. An id match outranks a description match, because somebody typing `memory
- * write` means the tool and not every sentence mentioning it.
+ * write` means the tool and not every sentence mentioning it. At the same score a tool comes before a
+ * route: the tool was written for an agent, the route for whoever calls it.
  */
 export function searchNodeCapabilities(q: string | undefined, segment?: string, limit = 20): NodeCapability[] {
-  const all = listNodeCapabilities().filter(c => !segment || c.segment === segment);
+  const { caps, text } = allIndexed();
+  const indexes = caps.map((_, i) => i).filter(i => !segment || caps[i].segment === segment);
   const needle = (q ?? '').trim().toLowerCase();
-  if (!needle) return all.slice(0, limit);
+  if (!needle) return indexes.slice(0, limit).map(i => caps[i]);
   const words = needle.split(/\s+/).filter(Boolean);
-  const scored = all.map(c => {
-    const id = c.id.toLowerCase();
-    const text = `${c.id} ${c.description}`.toLowerCase();
+  const rank = (c: NodeCapability): number => (c.kind === 'tool' ? 0 : 1);
+  const scored = indexes.map(i => {
     let score = 0;
     for (const w of words) {
-      if (id.includes(w)) score += 10;
-      else if (text.includes(w)) score += 1;
+      if (text[i].id.includes(w)) score += 10;
+      else if (text[i].text.includes(w)) score += 1;
     }
-    return { c, score };
+    return { c: caps[i], score };
   }).filter(x => x.score > 0);
-  scored.sort((a, b) => b.score - a.score || a.c.id.localeCompare(b.c.id));
+  scored.sort((a, b) => b.score - a.score || rank(a.c) - rank(b.c) || a.c.id.localeCompare(b.c.id));
   return scored.slice(0, limit).map(x => x.c);
 }

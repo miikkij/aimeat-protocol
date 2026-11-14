@@ -25,10 +25,12 @@
  * @structure createNodeCapabilitiesSource() → DiscoverySource
  * @usage registry.register(createNodeCapabilitiesSource());
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The node's REST routes are entries too (services/route-capabilities.ts),
+ *     tagged `route`, `method:<METHOD>` and `permission:<word>`.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
-import { searchNodeCapabilities, type NodeCapability } from '../../node-capabilities.js';
+import { searchNodeCapabilities, asRouteCapability, type NodeCapability } from '../../node-capabilities.js';
 
 export const NODE_CAPABILITIES_SOURCE_ID = 'node-capabilities';
 const MAX_LIMIT = 100;
@@ -54,6 +56,12 @@ export function createNodeCapabilitiesSource(): DiscoverySource {
 
     toEntry(raw: RawHit, ctx: DiscoveryContext): DiscoveryEntry {
       const cap = raw.record as NodeCapability;
+      // A REST route (services/route-capabilities.ts) says it is one, its method, and the permission
+      // word the contract names, so a caller can tell before it calls whether the route will admit it.
+      const route = asRouteCapability(cap);
+      const tags = route
+        ? ['node', 'route', `method:${route.method}`, ...(route.permission ? [`permission:${route.permission.word}`] : []), ...(cap.required.length ? ['needs-input'] : [])]
+        : ['node', `caller:${cap.caller}`, ...(cap.required.length ? ['needs-input'] : [])];
       return {
         type: 'capability',
         segment: cap.segment,
@@ -62,7 +70,7 @@ export function createNodeCapabilitiesSource(): DiscoverySource {
         description: cap.description,
         // What a caller needs before deciding: that this one runs here and now, who it is for, and
         // whether it will ask for anything.
-        tags: ['node', `caller:${cap.caller}`, ...(cap.required.length ? ['needs-input'] : [])],
+        tags,
         visibility: 'public',
         // The node itself offers these, not any account. An owner field naming a person would be a
         // claim nobody made.

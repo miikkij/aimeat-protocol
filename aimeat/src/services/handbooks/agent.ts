@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.70.0 -- 2026-11-14 -- Discover names route capabilities: a REST route found by type capability
+ *     and run with aimeat_invoke.
  *   v1.69.0 -- 2026-11-14 -- Teams: what waits (aimeat_team_waiting), removals, end days, dependencies
  *     and the team type.
  *   v1.67.0 -- 2026-11-14 -- Ask someone who knows: the aimeat_help_* tools, the draft rule and the skill.
@@ -409,7 +411,9 @@ version; \`purchases\` lists what they bought. Tell your owner the price before 
 
 **Discover.** \`aimeat_discover\` is the **master directory — start here**: one faceted query across
 EVERY domain (capabilities, workflows, knowledge, decisions, research, produced material, companies +
-offerings, documents, apps, datasets, memory). A \`dataset\` is a published data package (a table):
+offerings, documents, apps, datasets, memory). When no tool does a job, \`type: "capability"\` also
+finds the node's REST routes (id \`route:<METHOD> <path>\`, tag \`route\`); \`aimeat_invoke\` runs one
+as you with \`input: { path, query, body }\`, and the route itself decides whether it admits you. A \`dataset\` is a published data package (a table):
 its entry carries the row count, when it was last published and the addresses to read it from
 (descriptor, OData, ODPS sheet), and \`aimeat_datapackage_export\` reads its rows. To build a table
 that refreshes itself from the person's own material (workspace records, an app's publishable data, a

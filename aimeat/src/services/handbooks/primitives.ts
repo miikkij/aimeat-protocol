@@ -7,6 +7,7 @@
  * @structure PRIMITIVES_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=primitives
  * @usage import { PRIMITIVES_HANDBOOK } from './primitives.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — A paragraph on route capabilities: a REST route run with aimeat_invoke.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2).
  */
 export const PRIMITIVES_HANDBOOK = `# Working here with twelve tools
@@ -24,6 +25,11 @@ memory record", "publish an app", "invite somebody to an organism". Each result 
 Unsure what a capability takes? Read its contract at \`GET /v1/capabilities/node/{id}\` before you
 call it. A parameter it does not declare is REFUSED, not ignored, so a call that returns ok did
 everything you asked.
+
+**When no tool does the job, a route may.** Every REST route of this node is a capability too, with
+an id like \`route:GET /v1/ledger/usage/runs\` and the tag \`route\`. Run it with \`aimeat_invoke\` and
+\`input: { path, query, body }\`: the route's path values, its query values, and the body as JSON. The
+answer carries the route's own \`status\`, and a refusal is the route's own.
 
 ## What running one means
 
