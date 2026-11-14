@@ -6,6 +6,7 @@
  * must retain changed suites, shared security code must select the guard tier, and a storage,
  * identity, door or runner change must select the PostgreSQL legs without being asked.
  * @version-history
+ *   2026-11-14 -- The version-aware suite list is gone with the nightly 4.0.0 run it fed.
  *   2026-10-21 -- The purpose tier is selected wherever the guard tier is, on the same backends; red on
  *     the planner before the change (wish wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni).
  *   2026-10-18 -- aimeat-crewai, the offer and signal schemas and the shape allowlist select the Python
@@ -71,8 +72,7 @@ describe('the gate selects what the change can affect', { timeout: 30_000 }, () 
         'aimeat/src/tool-catalog/memory.ts', 'aimeat/src/tool-dispatch/memory.ts', 'aimeat/src/models/x.ts',
         'aimeat/package.json',
         // The E2E machinery itself (QA audit P2-06):
-        'aimeat/test/run-e2e-server.ts', 'aimeat/test/helpers/owner-login.ts', 'aimeat/test/fixtures/x.json',
-        'aimeat/test/version-aware-suites.txt'])(
+        'aimeat/test/run-e2e-server.ts', 'aimeat/test/helpers/owner-login.ts', 'aimeat/test/fixtures/x.json'])(
         'selects guards for %s', path => { expect(plan(path)).toContain('guard tier, SQLite'); });
     it('keeps a served browser library change off the guard tier', () => {
         expect(plan('aimeat/src/static/sdk-libs/x.js')).not.toContain('guard tier, SQLite');
@@ -88,11 +88,6 @@ describe('the gate selects what the change can affect', { timeout: 30_000 }, () 
     });
     it('runs a changed registered suite that has no e2e- prefix', () => {
         expect(plan('aimeat/test/federation-messages.ts')).toContain('own E2E suite(s), SQLite: federation-messages');
-    });
-    it('checks the version-aware suite list when a suite or the list changes, and not for source alone', () => {
-        expect(plan('aimeat/test/e2e-example.ts')).toContain('version-aware suite list');
-        expect(plan('aimeat/test/version-aware-suites.txt')).toContain('version-aware suite list');
-        expect(plan('aimeat/src/services/board-ttl.ts')).not.toContain('version-aware suite list');
     });
     it('runs the unit tests a runner change reaches', () => {
         expect(plan('aimeat/test/run-e2e-server.ts')).toContain('unit tests reaching');

@@ -12,8 +12,7 @@
  *
  *   FLAGS.
  *     --plan       print the plan and stop
- *     --full       add the release-4-0-0 job whole, the upgrade test on both backends and the pack
- *                  start (about twenty minutes)
+ *     --full       add the whole unit suite, the upgrade test on both backends and the pack start
  *     --since=SHA  compare with this commit instead of the last nightly's
  *     --dispatch   when every step is green, HEAD is origin/main, CI on main is not red and no
  *                  nightly is running, start the nightly (`gh workflow run e2e-full.yml`)
@@ -24,10 +23,11 @@
  *   makes sure the run is not spent finding what was already knowable.
  * @usage cd aimeat && pnpm nightly:preflight [--plan] [--full] [--since=<sha>] [--dispatch]
  * @version-history
+ *   v1.1.0 — 2026-11-14 — No 4.0.0 steps: the nightly's release-4-0-0 job is gone.
  *   v1.0.0 — 2026-11-14 — Initial.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { readCiState, describeState, NIGHTLY_WORKFLOW } from './lib/ci-runs.mjs';
 import { redFromLog, planSteps, type Step, type JobReds } from './lib/nightly-preflight-plan.js';
 import { manifestChangedBeyondScripts } from './lib/package-manifest-change.js';
@@ -80,14 +80,12 @@ if (base) {
     console.log('  No finished nightly to compare with; pass --since=<sha>.');
 }
 
-const versionAware = readFileSync('test/version-aware-suites.txt', 'utf8').split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
-const steps = planSteps({ reds, failedJobs, changed, versionAware, full });
+const steps = planSteps({ reds, failedJobs, changed, full });
 
 const label = (s: Step): string => {
     switch (s.kind) {
-        case 'e2e': return `E2E ${s.backend}${s.version ? ` as ${s.version}` : ''}: ${s.suites.join(', ')}`;
-        case 'e2e-list': return `E2E ${s.backend} as ${s.version}: ${s.file}`;
-        case 'unit': return `unit${s.version ? ` as ${s.version}` : ''}: ${s.files.length ? s.files.join(', ') : 'every file'}`;
+        case 'e2e': return `E2E ${s.backend}: ${s.suites.join(', ')}`;
+        case 'unit': return 'unit: every file';
         case 'upgrade': return `upgrade from the last release, ${s.backend}`;
         case 'pack-smoke': return 'pack, install and start the npm package';
         case 'skip': return 'skipped';
@@ -112,17 +110,13 @@ for (const step of steps) {
     const started = Date.now();
     let ok = false;
     let note: string | undefined;
-    const version: Record<string, string> = 'version' in step && step.version ? { AIMEAT_TEST_SOFTWARE_VERSION: step.version } : {};
     console.log(`\n=== ${label(step)} ===`);
-    if (step.kind === 'e2e' || step.kind === 'e2e-list') {
+    if (step.kind === 'e2e') {
         const ef = envFile(step.backend);
         if (!ef) note = `.env.test.${step.backend} is missing: run \`pnpm test:env:init\``;
-        else {
-            const which = step.kind === 'e2e' ? step.suites.map(s => `--test=${s}`) : [`--tests-file=${step.file}`, '--workers=4'];
-            ok = run(node, [ef, '--import', 'tsx', 'test/run-e2e-ci.ts', ...which], version);
-        }
+        else ok = run(node, [ef, '--import', 'tsx', 'test/run-e2e-ci.ts', ...step.suites.map(s => `--test=${s}`)]);
     } else if (step.kind === 'unit') {
-        ok = run('pnpm', ['exec', 'vitest', 'run', ...step.files], { ...version, AIMEAT_TEST_MODE: 'true', AIMEAT_BASE_URL: 'http://localhost:40050' });
+        ok = run('pnpm', ['exec', 'vitest', 'run']);
     } else if (step.kind === 'upgrade') {
         const ef = envFile(step.backend);
         if (!ef) note = `.env.test.${step.backend} is missing: run \`pnpm test:env:init\``;

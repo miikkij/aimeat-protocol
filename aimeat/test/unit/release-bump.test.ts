@@ -66,7 +66,7 @@ describe('release:bump', () => {
         const files = readdirSync(dir).filter(f => f.endsWith('.test.ts'))
             .map(f => ({ path: `test/unit/${f}`, text: readFileSync(path.join(dir, f), 'utf-8') }));
         const picked = versionReaders(files);
-        for (const f of ['test/unit/service-summary-form.test.ts', 'test/unit/version-aware-suites.test.ts', 'test/unit/relay-claim-default-follows-the-release.test.ts', 'test/unit/feature-map-stamp.test.ts']) {
+        for (const f of ['test/unit/service-summary-form.test.ts', 'test/unit/relay-claim-default-follows-the-release.test.ts', 'test/unit/feature-map-stamp.test.ts']) {
             expect(picked).toContain(f);
         }
         expect(picked).not.toContain('test/unit/check-unit-ports.test.ts');

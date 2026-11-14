@@ -141,70 +141,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # THE 4.0.0 HALF OF THE VERSION-AWARE SUITES, EVERY NIGHT. A suite whose expected answer depends on
-  # the release (removedOn, helpers/node-release, a *_REMOVED_IN constant) asserts the 3.x answer in
-  # the sweep above and the 4.0.0 answer only on a node run as 4.0.0. Until 2026-10-13 that second
-  # half ran only when somebody started it by hand (docs-audit 2026-10, 4.0-testimuutokset.md §4
-  # item 4). AIMEAT_TEST_SOFTWARE_VERSION is honoured only by a test node on a loopback address
-  # (src/utils/version.ts testVersionOverride), which is what the runner starts. The list is
-  # test/version-aware-suites.txt; test/unit/version-aware-suites.test.ts refuses a version-aware
-  # suite that is not on it, so a new one is added there and nowhere else. SQLite only: the backend
-  # is not what the release changes, and the sweep above runs both backends at the package version.
-  release-4-0-0:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24.x
-          cache: 'pnpm'
-          cache-dependency-path: aimeat/pnpm-lock.yaml
-
-      - name: Install dependencies
-        working-directory: aimeat
-        run: pnpm install --frozen-lockfile
-
-      - name: Prepare the E2E env file (from the committed example)
-        working-directory: aimeat
-        run: cp .env.test.sqlite.example .env.test.sqlite
-
-      # Same reason as in the sweep above: the E2E ports stay out of the kernel's ephemeral range.
-      - name: Reserve the E2E port range
-        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
-
-      # Same reason as in the sweep above: every node starts from dist/, not through tsx.
-      - name: Build the node the run starts
-        working-directory: aimeat
-        run: pnpm build
-
-      - name: Version-aware suites as node 4.0.0 (sqlite)
-        working-directory: aimeat
-        env:
-          AIMEAT_E2E_NODE_ENTRY: dist
-          AIMEAT_TEST_SOFTWARE_VERSION: '4.0.0'
-        run: node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --tests-file=test/version-aware-suites.txt --workers=4
-
-      # The unit tests branch on the release too (a *_REMOVED_IN constant, unprovenFormatLive,
-      # legacyMorselFieldsLive), so the whole unit suite runs as 4.0.0 here, with no list: a new
-      # version-aware unit test is covered the night it lands. The override needs test mode and a
-      # loopback base URL (src/utils/version.ts testVersionOverride). It runs even when the step above
-      # is red, so one night reports both halves.
-      - name: Unit suite as node 4.0.0
-        if: ${{ !cancelled() }}
-        working-directory: aimeat
-        env:
-          AIMEAT_TEST_SOFTWARE_VERSION: '4.0.0'
-          AIMEAT_TEST_MODE: 'true'
-          AIMEAT_BASE_URL: 'http://localhost:40050'
-        run: pnpm test
+  # NO SEPARATE 4.0.0 RUN since 2026-11-14. From 2026-10-13 a job ran the version-aware suites and
+  # the unit suite as node 4.0.0, while the package was still 3.x, so the 4.0.0 answers were proven
+  # before the release. The package is past 4.0.0 now, so the sweep above and CI's unit job already
+  # run every one of those answers, and the job repeated them for 22 minutes a night. Before the
+  # next major, AIMEAT_TEST_SOFTWARE_VERSION (src/utils/version.ts testVersionOverride) runs a sweep
+  # as that release again.
 
   # THE PACKAGE AN OPERATOR INSTALLS, STARTED EVERY NIGHT (QA audit 2026-10-16, P6-04). Nothing packed
   # the npm tarball, installed it into an empty directory with production dependencies only and
@@ -352,12 +294,12 @@ jobs:
   # THE ISSUE IS WRITTEN BY A JOB OF ITS OWN. The sweep installs and runs the whole dependency tree,
   # so it holds a token that can only read; this job holds the one that writes issues and runs
   # nothing but the gh CLI the runner carries. It reads each leg's result from this run (a sweep leg
-  # is named "sweep (<backend>)" after its job id and matrix value, the 4.0.0 run "release-4-0-0")
+  # is named "sweep (<backend>)" after its job id and matrix value)
   # and does what the sweep's own last two steps did: a red leg opens or updates its issue, a green
   # one closes it. Each leg has its own issue title, and no title contains another, because the
   # lookup is a phrase search on the title.
   issue:
-    needs: [sweep, release-4-0-0, pack-smoke, stripe-testmode, upgrade-from-release]
+    needs: [sweep, pack-smoke, stripe-testmode, upgrade-from-release]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -375,9 +317,6 @@ jobs:
           - job: sweep (postgres-kysely)
             title: Nightly E2E sweep is red on postgres-kysely
             what: The full E2E sweep on **postgres-kysely**
-          - job: release-4-0-0
-            title: Nightly 4.0.0 run of the version-aware suites is red
-            what: The version-aware suites (test/version-aware-suites.txt) run as node **4.0.0** on sqlite
           - job: pack-smoke
             title: Nightly start of the packed npm package is red
             what: The npm tarball packed, installed with production dependencies only and started (aimeat/scripts/pack-smoke.mjs)

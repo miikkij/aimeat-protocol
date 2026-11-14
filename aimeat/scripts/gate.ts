@@ -42,7 +42,8 @@
  * @version-history
  *   2026-11-14 -- Unit files that fail in the parallel run are run again alone before the gate refuses,
  *     and the closing lines name the ones that passed alone (machine load); a package.json change
- *     that touches only `scripts` reaches no unit test, one beyond it runs the whole suite.
+ *     that touches only `scripts` reaches no unit test, one beyond it runs the whole suite. The
+ *     version-aware suite list check is gone with the nightly 4.0.0 run it fed.
  *   2026-10-26 -- The Agent Skills validator (pnpm check:skills-standard, skills-ref through uv) runs when
  *     a built-in skill, the SKILL.md parser or the check changed (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
  *   2026-10-21 -- The purpose tier runs wherever the guard tier runs (pnpm test:e2e:purpose:*), so a fix
@@ -107,7 +108,7 @@ function registeredSuites(): Set<string> {
  * six directories, src/tool-catalog among them, which holds the scope each MCP tool asks. A change to
  * any of them finished the gate without the tier (QA audit P2-05, P8-06, P1-03).
  */
-const GUARDED = /^aimeat\/(?:src\/(?!static\/)|package\.json$|pnpm-lock\.yaml$|test\/(?:run-e2e-[^/]+\.ts$|helpers\/|fixtures\/|version-aware-suites\.txt$))/;
+const GUARDED = /^aimeat\/(?:src\/(?!static\/)|package\.json$|pnpm-lock\.yaml$|test\/(?:run-e2e-[^/]+\.ts$|helpers\/|fixtures\/))/;
 /**
  * Paths whose change runs the PostgreSQL legs as well, without --postgres: the storage layer, the
  * identity layer, the doors (REST routes and MCP tools) and the E2E machinery, which decides how
@@ -196,13 +197,6 @@ function plan(files: string[], mergeBase: string): Step[] {
     } else if (unitFiles.length > 0) {
         steps.push({ name: `unit tests reaching ${unitFiles.length} changed file(s)`, cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', '--changed', mergeBase, '--passWithNoTests'], why: unitFiles.slice(0, 4).join(', ') + (unitFiles.length > 4 ? ', …' : ''), unit: true });
     }
-    // test/unit/version-aware-suites.test.ts reads the suites' TEXT, so `vitest --changed` (an import
-    // graph) never selects it for a changed suite. A suite that started to name a *_REMOVED_IN constant
-    // reached main unlisted and turned CI's unit job red on 2026-10-16 (a5549bad6).
-    if (!FULL && (ownSuites.length > 0 || files.includes('aimeat/test/version-aware-suites.txt'))) {
-        steps.push({ name: 'version-aware suite list', cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', 'test/unit/version-aware-suites.test.ts'], why: 'a suite changed: test/version-aware-suites.txt must name every suite that branches on the release' });
-    }
-
     // The gate has run check:python-shapes (names, from the Python source) in check:fast since
     // 2026-10-18; this runs the pytest half (values) through uv, and fails with its reason when uv is
     // missing rather than passing without having checked.
