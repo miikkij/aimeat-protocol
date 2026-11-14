@@ -12564,6 +12564,8 @@
   "notifpage.group.appsSub": "app memberships and app events",
   "notifpage.group.accountSub": "budget, quota, mailbox, compliance",
   "notifpage.group.otherSub": "everything else, including what you send yourself",
+  "notiftext.team_weekly.title": "{org} this week: {decided} decisions, {waiting} waiting",
+  "notiftext.team_weekly.body": "Decided: {decisions}. Open: {open}. Waiting for a person: {waiting}. Own AI connected: {ai} of {members}.",
   "notiftext.team_member_ending.title": "{who} leaves {org} on {date}",
   "notiftext.team_member_ending.body": "Their membership ends then, and their own AI loses its access with them. Extend it by setting a later day.",
   "notiftext.team_member_ended.title": "{who} left {org}",

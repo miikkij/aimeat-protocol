@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-11-14 — Seed core:team-weekly (Fridays 14:05): the team's week to its leads.
  *   2026-11-14 — Seed core:help-sweep (hourly at :23) and core:help-report (daily 04:30): Ask someone who knows.
  *   2026-11-04 — Seed core:outbox-sweep (every minute): stored webhook and mail retries resumed (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — Seed core:datapackage-freshness (hourly at :47): owners of stale data packages are told once (plan D6.2).
@@ -163,6 +164,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // The fixing agent of on-page behaviour (AI visibility, layer D), weekly on Monday at 06:17. A node
   // where no owner switched it on reads one key prefix and stops.
   jobs.push({ id: 'core:behaviour-fixer', name: 'Behaviour Fixing Agent', coreHandler: 'behaviour-fixer', cron: '17 6 * * 1' });
+  // The team's week to its leads (services/team/weekly-report.ts), Fridays at 14:05.
+  jobs.push({ id: 'core:team-weekly', name: 'Team Weekly Report', coreHandler: 'team-weekly', cron: '5 14 * * 5' });
   // The Content Classifier's queue (TARGET-082 V3), hourly at :25. Seeded on every node, because
   // seeding is create-if-absent and an operator may turn classification on later; the handler reads
   // nothing while AIMEAT_CLASSIFICATION is off.

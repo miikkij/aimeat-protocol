@@ -13331,6 +13331,8 @@
   "notifpage.group.appsSub": "sovellusten jäsenyydet ja tapahtumat",
   "notifpage.group.accountSub": "budjetti, kiintiöt, postilaatikko, vaatimustenmukaisuus",
   "notifpage.group.otherSub": "kaikki muu, myös se, minkä lähetät itsellesi",
+  "notiftext.team_weekly.title": "{org} tällä viikolla: {decided} päätöstä, {waiting} odottaa",
+  "notiftext.team_weekly.body": "Päätettiin: {decisions}. Auki: {open}. Odottaa ihmistä: {waiting}. Oma tekoäly kytketty: {ai}/{members}.",
   "notiftext.team_member_ending.title": "{who} lähtee tiimistä {org} {date}",
   "notiftext.team_member_ending.body": "Silloin jäsenyys päättyy, ja myös hänen oman tekoälynsä pääsy päättyy. Voit jatkaa jäsenyyttä antamalla myöhemmän päivän.",
   "notiftext.team_member_ended.title": "{who} lähti tiimistä {org}",

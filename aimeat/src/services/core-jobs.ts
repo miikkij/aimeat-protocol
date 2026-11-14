@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-14 — team-weekly: the team's week to its leads (services/team/weekly-report.ts).
  *   2026-11-14 — help-sweep and help-report: the hourly round and the report job of Ask someone who knows.
  *   2026-11-08 — tidyStoredFiles, once a minute after start and before the daily file store sweep: the
  *     content class fingerprint loop's leftovers are removed, then every file a store does not take is
@@ -190,6 +191,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('behaviour-fixer', async () => {
     const { runWeeklyBehaviourFixer } = await import('./visibility/behaviour-fixer.js');
     await runWeeklyBehaviourFixer(storage, config);
+  });
+  // The team's week to its leads, in each lead's language (team setup T8). A node with no team reads
+  // two organism lists and stops.
+  scheduler.registerCoreHandler('team-weekly', async () => {
+    const { runTeamWeeklyReports } = await import('./team/weekly-report.js');
+    await runTeamWeeklyReports(storage, config);
   });
 
   // The operator's monthly compliance report, built from the month that ended and stored under

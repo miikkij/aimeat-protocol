@@ -12026,6 +12026,8 @@
   "notifpage.group.appsSub": "membresías y eventos de aplicaciones",
   "notifpage.group.accountSub": "presupuesto, cuotas, buzón, cumplimiento",
   "notifpage.group.otherSub": "todo lo demás, incluido lo que te envías a ti",
+  "notiftext.team_weekly.title": "{org} esta semana: {decided} decisiones, {waiting} pendientes",
+  "notiftext.team_weekly.body": "Se decidió: {decisions}. Abiertos: {open}. Pendiente de una persona: {waiting}. IA propia conectada: {ai} de {members}.",
   "notiftext.team_member_ending.title": "{who} deja {org} el {date}",
   "notiftext.team_member_ending.body": "Su membresía termina entonces, y su propia IA pierde el acceso con ella. Amplíala con una fecha posterior.",
   "notiftext.team_member_ended.title": "{who} dejó {org}",
