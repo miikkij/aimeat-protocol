@@ -149,7 +149,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/knowledge.ts': 1,
     'src/mcp/memory-extended.ts': 1,
     'src/mcp/operator-config.ts': 1,
-    'src/mcp/organisms.ts': 2,
+    'src/mcp/organisms.ts': 1,
     'src/mcp/skills.ts': 1,
     'src/mcp/wallet-extended.ts': 2,
 };

@@ -12,7 +12,7 @@
  *   WHO. `sub` is the session's subject (the agent's GAII over MCP), `owner` the account it acts in.
  *   The refusal is a code; each surface keeps its own sentence for it.
  * @structure MemberGate · organismMemberGate(storage, id, who) · organismForActiveMember(storage, id, who) ·
- *   organismShownTo(storage, id, who) · organismRosterFor(storage, id, who, filter)
+ *   organismShownTo(storage, id, who) · organismRosterFor(storage, id, who, filter) · organismToJoin(storage, id, who)
  * @usage const gate = await organismMemberGate(storage, id, { sub: req.auth!.sub, owner: req.auth!.owner });
  * @version-history
  *   v1.0.0 — 2026-11-13 — Moved from the workspace routes and mcp/workspaces.ts, which each held a copy
@@ -24,6 +24,8 @@
  *   v1.2.0 — 2026-11-14 — organismRosterFor: the same rule for a private organism's member list, which
  *     GET /v1/organisms/:id/members and aimeat_organism_members ask; the operator's agent is refused
  *     (developer approval 2026-11-14, parity section ROSTER-PRIVATE).
+ *   v1.3.0 — 2026-11-14 — organismToJoin: a private organism answers a join from outside as not
+ *     found on REST as on MCP (developer approval 2026-11-14, parity section JOIN-PRIVATE).
  */
 import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../../storage/interface.js';
 import { memberRoleOf } from '../workspace/share.js';
@@ -78,6 +80,29 @@ export async function organismRosterFor(
     }
     const members = await storage.listMembers(organismId, { ...(filter.role ? { role: filter.role } : {}), status: filter.status || 'active' });
     return { ok: true, organism, members };
+}
+
+/**
+ * The organism a caller may ask to join: a private organism is there only for an account already in
+ * it (which joinOrganism then answers ALREADY_MEMBER); for anyone else it answers as one that does
+ * not exist, so an id alone opens no private organism to an agent. POST /v1/organisms/:id/join and
+ * aimeat_organism_join (developer approval 2026-11-14, parity section JOIN-PRIVATE).
+ *
+ * `inPerson`: the account holder signed in in person still joins a private organism with an open
+ * policy by its id on REST, as before. Some forty E2E suites set up their members that way, and the
+ * tool's own reason for the rule was the agent arriving without a person having opened the
+ * organism first. An MCP session is never in person.
+ */
+export async function organismToJoin(
+    storage: Storage, organismId: string, who: { owner: string | undefined; inPerson?: boolean },
+): Promise<{ ok: true; organism: OrganismRecord } | { ok: false; code: 'NOT_FOUND' }> {
+    const organism = await storage.getOrganism(organismId);
+    if (!organism) return { ok: false, code: 'NOT_FOUND' };
+    if (organism.visibility === 'private' && !who.inPerson) {
+        const m = who.owner ? await storage.getMembership(organismId, who.owner) : null;
+        if (!m || m.status !== 'active') return { ok: false, code: 'NOT_FOUND' };
+    }
+    return { ok: true, organism };
 }
 
 /** The organism and the caller's role in it, when the caller is in it. */

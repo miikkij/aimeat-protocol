@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_organism_join asks services/organism-read/member.ts organismToJoin, the rule
+ *     POST /v1/organisms/:id/join now asks too (developer approval 2026-11-14).
  *   2026-11-14 — aimeat_organism_members reads through services/organism-read/member.ts
  *     organismRosterFor: a private organism's member list is for its active members only, as on
  *     GET /v1/organisms/:id/members and GET /v1/organisms/:id (developer approval 2026-11-14).
@@ -118,7 +120,7 @@ import { searchOrganismContent } from '../services/organism-search.js';
 import { organismArchiveOp } from '../services/organism-archive-op.js';
 import { addComment, listComments } from '../services/organism-comments.js';
 import { commentWorkspace, deleteCommentIn } from '../services/organism-read/comments.js';
-import { organismMemberGate, organismForActiveMember, organismShownTo, organismRosterFor } from '../services/organism-read/member.js';
+import { organismMemberGate, organismForActiveMember, organismShownTo, organismRosterFor, organismToJoin } from '../services/organism-read/member.js';
 import { organismForManager } from '../services/organism-read/manager.js';
 import { listedOrganisms } from '../services/organism-read/list.js';
 import { leaveOrganismAs } from '../services/organism-read/leave.js';
@@ -169,13 +171,6 @@ export function registerOrganismsTools(
             ownerName: session.owner,
             isOperator: await session.operator(),
         };
-    }
-
-    /** Check if an organism is visible to the current agent. */
-    async function canSeeOrganism(organism: { visibility: string; members: string[] }): Promise<boolean> {
-        if (organism.visibility === 'public' || organism.visibility === 'listed') return true;
-        const ownerName = getOwnerName();
-        return organism.members.includes(ownerName);
     }
 
     // ── Resource: organism details ──
@@ -355,14 +350,12 @@ export function registerOrganismsTools(
             annotations: annotationsFor('aimeat_organism_join'),
         },
         async ({ organism_id, message }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            // A private organism an agent cannot see answers as if it did not exist. The HTTP door
-            // has no such check (an id is enough there); it stays on this surface because a tool
-            // call is the one that arrives without a person having navigated to the organism first.
-            if (organism.visibility === 'private' && !(await canSeeOrganism(organism))) {
-                return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            }
+            // A private organism a caller is not in answers as if it did not exist, here as on
+            // POST /v1/organisms/:id/join: services/organism-read/member.ts organismToJoin, which both
+            // ask, so an id alone opens no private organism (developer approval 2026-11-14).
+            const target = await organismToJoin(storage, organism_id, { owner: getOwnerName() });
+            if (!target.ok) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const organism = target.organism;
 
             // The membership checks, capacity, the policy branch and the approver notifications are
             // the shared writer's (services/organism-lifecycle.ts, same call POST /:id/join makes).

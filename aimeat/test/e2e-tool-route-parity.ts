@@ -25,8 +25,8 @@
  *   Unit 2b, phase B (each section red on the code it was written against, where the two disagree):
  *     BOARD-RES      the aimeat://boards/{id} resource gives a reader holding the board owner's
  *                    consent the posts GET /v1/boards/:id/posts and aimeat_board_read give it.
- *     JOIN-PRIVATE   joining a private organism with an open join policy (a question: the tool
- *                    answers it not found on purpose).
+ *     JOIN-PRIVATE   a private organism answers an outside agent's join as not found on both
+ *                    surfaces (developer decision 2026-11-14).
  *     BOARD-MEMBERS  an owner's agent holding social:members changes a shared board's reader list
  *                    (a question: REST takes the owner in person only, the tool admits the agent on
  *                    purpose).
@@ -36,11 +36,12 @@
  *                    surfaces (developer decision 2026-11-14).
  *     ARCHIVED-LIST  an archived organism in the owner's own list, for the owner's agent.
  *     WS-UPDATE      an attached agent whose owner left changes a workspace's structure.
- *   JOIN-PRIVATE and BOARD-MEMBERS assert today's two answers and name the question.
+ *   BOARD-MEMBERS asserts today's two answers and names the question.
  *   The operator (the suite's first account) turns classification on for the FILES section only and
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.6.0 — 2026-11-14 — JOIN-PRIVATE asserts the developer's decision instead of today's answers.
  *   v1.5.0 — 2026-11-14 — ROSTER-PRIVATE asserts the developer's decision instead of today's answers.
  *   v1.4.0 — 2026-11-14 — ORG-READ, ROSTER-PRIVATE, ARCHIVED-LIST and WS-UPDATE; the question sections
  *     assert today's two answers (structure programme 2026-11, unit 2b, phase B).
@@ -415,14 +416,23 @@ await test('Setup: alice\'s private organism with an open join policy; bob\'s ag
     jpOrg = await organism(alice.token, `U2b join ${stamp}`, { visibility: 'private' });
 });
 
-await test('QUESTION for the developer (today\'s two answers): an outside agent joins a private organism by id on REST; aimeat_organism_join answers it not found, on purpose per the tool', async () => {
+await test('DECIDED (developer, 2026-11-14): a private organism answers an outside agent\'s join as not found, on POST /v1/organisms/:id/join and aimeat_organism_join', async () => {
     // Both agents hold social:write, the word both surfaces ask for a join, so neither answer is a scope refusal.
     const restAgent = await makeAgent(BASE, bob, ['organism:read', 'organism:write', 'social:write'], N('jprest'));
     const rest = await call('POST', `/v1/organisms/${jpOrg}/join`, restAgent.token, {});
     const toolAgent = await makeAgent(BASE, carol, ['organism:read', 'organism:write', 'social:write'], N('jptool'));
     const tool = await callTool(await openSession(BASE, toolAgent.token, 'u2b-join'), 'aimeat_organism_join', { organism_id: jpOrg });
-    assert(rest.status === 201, `REST today joins: ${show(rest)}`);
-    assert(tool.isError && /Organism not found/.test(tool.text), `tool today answers not found: ${tool.text.slice(0, 200)}`);
+    assert(rest.status === 404, `REST: ${show(rest)}`);
+    assert(tool.isError && /Organism not found/.test(tool.text), `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('USE KEPT: an agent joins a public organism with an open join policy on REST; carol in person joins the private one by its id', async () => {
+    const pub = await organism(alice.token, `U2b join public ${stamp}`);
+    const agent = await makeAgent(BASE, bob, ['organism:read', 'organism:write', 'social:write'], N('jppub'));
+    const rest = await call('POST', `/v1/organisms/${pub}/join`, agent.token, {});
+    assert(rest.status === 201, `agent, public: ${show(rest)}`);
+    const person = await call('POST', `/v1/organisms/${jpOrg}/join`, carol.token, {});
+    assert(person.status === 201, `carol in person, private: ${show(person)}`);
 });
 
 // ─── BOARD-MEMBERS ───

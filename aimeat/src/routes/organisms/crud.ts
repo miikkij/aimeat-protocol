@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-14 — POST /v1/organisms/:id/join asks services/organism-read/member.ts organismToJoin: a
+ *     private organism answers an agent outside it 404, as aimeat_organism_join answers it (developer
+ *     approval 2026-11-14); the person in person joins as before.
  *   2026-11-14 — GET /v1/organisms/:id reads through services/organism-read/member.ts organismShownTo,
  *     which aimeat_organism_get and the organism resource ask too; the answers are unchanged
  *     (structure programme 2026-11, unit 2b phase B).
@@ -104,7 +107,7 @@ import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { organismForManager } from '../../services/organism-read/manager.js';
 import { listedOrganisms } from '../../services/organism-read/list.js';
 import { leaveOrganismAs } from '../../services/organism-read/leave.js';
-import { organismShownTo } from '../../services/organism-read/member.js';
+import { organismShownTo, organismToJoin } from '../../services/organism-read/member.js';
 import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
 import { isOwnerInPerson, resolveIdentity } from '../../utils/gaii.js';
 import { agentBarred, organismsAdmitting } from '../../services/organism-agent-access.js';
@@ -397,11 +400,15 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const id = req.params.id as string;
     const { message } = req.body ?? {};
 
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
+    // The organism, and a private one answers an agent outside it as one that does not exist, so an
+    // id alone opens no private organism to an agent: services/organism-read/member.ts, which
+    // aimeat_organism_join asks too (developer approval 2026-11-14). The person in person joins as before.
+    const target = await organismToJoin(storage, id, { owner: ghii, inPerson: isOwnerInPerson(req.auth) });
+    if (!target.ok) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
       return;
     }
+    const organism = target.organism;
 
     // Membership checks, capacity, the policy branch and the approver notifications live in
     // services/organism-lifecycle.ts, shared with aimeat_organism_join.
