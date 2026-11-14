@@ -35,7 +35,7 @@ flowchart TD
 | Node package `aimeat` | npm registry | Carries `npm-shrinkwrap.json`, so `npm install -g aimeat` and `npx aimeat` install the exact dependency versions the lock file pins, each checked against its integrity hash | `aimeat/scripts/gen-shrinkwrap.mjs` |
 | Source | Git tag `vX.Y.Z` on GitHub | Build from source with `pnpm install` and `pnpm build` in the aimeat folder | [Upgrading](../operations/upgrading.md#the-update) |
 | MCP registry entry | The name in `server.json` | Points at the project's demo node, not at your node; it is not an installable artefact | `server.json` |
-| Docker image | Not published | Build it yourself from `aimeat/Dockerfile`: `docker compose up --build` in `aimeat/`, or `docker build --build-context repo=.. .` there for the image alone; the base image is pinned by digest | `aimeat/Dockerfile` |
+| Docker image | Not published | Build it yourself from `aimeat/Dockerfile`: `docker compose up --build` in `aimeat/`, or `docker build --build-context repo=.. .` there for the image alone; the base image is pinned by digest, and the nightly workflow builds and starts the image | `aimeat/Dockerfile`, `.github/workflows/e2e-full.yml` |
 | CrewAI package `aimeat-crewai` | PyPI | Published with PyPI trusted publishing (OIDC, no stored token); the log prints the SHA256 of each uploaded file | `.github/workflows/publish-aimeat-crewai.yml` |
 | Desktop app installers | GitHub Releases on `desktop-v*` tags | The files the in-app updater installs are signed with the Tauri updater key (minisign). The installers are not code-signed for Windows or macOS | `.github/workflows/release-desktop.yml` |
 

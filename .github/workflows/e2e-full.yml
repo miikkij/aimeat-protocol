@@ -291,6 +291,54 @@ jobs:
           DATABASE_URL: postgresql://appuser:devpassword123@localhost:5432/aimeat_kysely_e2e
         run: pnpm test:upgrade
 
+  # THE DOCKER IMAGE AN OPERATOR BUILDS (2026-11-14). From 2026-09-08 to 2026-11-14 aimeat/Dockerfile
+  # did not build at all: the build reads files from the repository root, outside the aimeat/ build
+  # context, and nothing built the image, so nobody saw it. This job builds the image the way the
+  # Dockerfile header says (aimeat/ as the context, the repository root as the `repo` context),
+  # starts it on SQLite with no secrets, waits for /v1/health/ready, and fails on a missing module in
+  # the start log (the production stage carries only the production dependencies). It needs nothing
+  # from the other jobs, so a red image is a red line of its own.
+  docker-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      IMAGE: aimeat-nightly:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the image (aimeat/ as the context, the repository root as repo)
+        working-directory: aimeat
+        run: docker build --build-context repo=.. -t "$IMAGE" .
+
+      - name: Start the image on SQLite and wait for /v1/health/ready
+        run: |
+          docker run -d --name aimeat-nightly -p 127.0.0.1:40050:40050 \
+            -e AIMEAT_PORT=40050 -e AIMEAT_NODE_ID=aimeat-nightly-001 \
+            -e AIMEAT_ADMIN_PASSWORD="nightly-$(openssl rand -hex 16)" \
+            -e AIMEAT_STORAGE=sqlite -e AIMEAT_SQLITE_PATH=/data/aimeat.db \
+            "$IMAGE"
+          code=000
+          for _ in $(seq 1 90); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:40050/v1/health/ready || true)"
+            [ "$code" = 200 ] && break
+            sleep 2
+          done
+          docker logs aimeat-nightly > "$RUNNER_TEMP/node.log" 2>&1
+          if grep -E 'Cannot find (module|package)|ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND' "$RUNNER_TEMP/node.log"; then
+            echo "::error title=Docker image::the node's start log names a missing module"
+            exit 1
+          fi
+          if [ "$code" != 200 ]; then
+            tail -n 80 "$RUNNER_TEMP/node.log"
+            echo "::error title=Docker image::/v1/health/ready answered $code, not 200, within 180 seconds"
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:40050/v1/build
+          echo
+          echo "The image builds, starts and answers /v1/health/ready with 200."
+
   # THE ISSUE IS WRITTEN BY A JOB OF ITS OWN. The sweep installs and runs the whole dependency tree,
   # so it holds a token that can only read; this job holds the one that writes issues and runs
   # nothing but the gh CLI the runner carries. It reads each leg's result from this run (a sweep leg
@@ -299,7 +347,7 @@ jobs:
   # one closes it. Each leg has its own issue title, and no title contains another, because the
   # lookup is a phrase search on the title.
   issue:
-    needs: [sweep, pack-smoke, stripe-testmode, upgrade-from-release]
+    needs: [sweep, pack-smoke, stripe-testmode, upgrade-from-release, docker-image]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -329,6 +377,9 @@ jobs:
           - job: upgrade-from-release (postgres-kysely)
             title: Nightly upgrade from the previous release is red on postgres-kysely
             what: The current code started on a **postgres-kysely** database written by the previous release
+          - job: docker-image
+            title: Nightly build and start of the Docker image is red
+            what: The Docker image built from aimeat/Dockerfile with the repository root as the repo context, started on SQLite
     steps:
       - name: Read this leg's result
         id: sweep
