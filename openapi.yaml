@@ -953,9 +953,17 @@ components:
             score: an array of 2-10 level descriptions, lowest first. In English.
 
     DecideRequest:
-      type: object
-      required: [state]
       description: Give `questions`, or `rule`. A call that names a rule sends only the state.
+      allOf:
+        - $ref: '#/components/schemas/DecideOptions'
+        - type: object
+          required: [state]
+
+    DecideOptions:
+      type: object
+      description: >-
+        The fields of a decision call. POST /v1/ai/decide adds the required `state`; a run
+        (POST /v1/ai/decide/runs) gives its states as `items`, `keys` or `prefix` instead.
       properties:
         state:
           description: What is being judged. A string, an object with named fields, or an array.
@@ -23263,7 +23271,7 @@ paths:
           application/json:
             schema:
               allOf:
-                - $ref: '#/components/schemas/DecideRequest'
+                - $ref: '#/components/schemas/DecideOptions'
                 - type: object
                   properties:
                     items:
