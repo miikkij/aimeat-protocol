@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-14: check:find-fields, every find field is one the autofill guard sees (type="search" or data-find); Edge on Android wrote the sign-in name into the App Catalog search.
  *  - 2026-11-10: check:owner-agent-reads, the direct getAgentsByOwner calls in src/services/ may only fall (performance work, architecture item 1).
  *  - 2026-11-10: check:blocked-names, no served file's address is blocked by EasyList, EasyPrivacy or uBlock Origin's Privacy list (EasyPrivacy's `/fingerprint.js^` took the admin page down on 2026-11-09).
  *  - 2026-11-05: check:services-flat, the number of flat files in src/services/ may only fall (codebase analysis 2026-11-03, item D-h).
@@ -48,6 +49,7 @@ export const FAST_CHECKS = [
     { script: 'typecheck:audit-tests', label: 'Architecture regression tests use the current typed contracts' },
     { script: 'check:docs', label: 'Documentation catalog, links, data syntax and help copies agree' },
     { script: 'check:importmap', label: 'Importmap ↔ imports in sync' },
+    { script: 'check:find-fields', label: 'Every find field is one the autofill guard sees' },
     { script: 'check:blocked-names', label: 'No served file name is one a content blocker blocks' },
     { script: 'check:prompt-groups', label: 'Every prompt group has a translated heading on the admin page' },
     { script: 'check:profile-tabs', label: 'Every profile tab reachable from the menu' },

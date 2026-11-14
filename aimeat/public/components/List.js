@@ -100,6 +100,9 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.18.2 — 2026-11-14 — SearchLine's field is a find field the browser's autofill cannot fill
+ *     (data-find, typedByPerson; js/find-field-guard.js): Edge on Android wrote the owner's sign-in
+ *     name into the App Catalog search, whose field is type="text".
  *   v1.18.1 — 2026-10-29 — SearchLine's field is kept out of password managers (autocomplete off,
  *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the
  *     owner's sign-in name into a find field.
@@ -195,6 +198,7 @@ import { Note } from '/components/Note.js';
 import { CardMenu } from '/components/CardMenu.js';
 import { Tab } from '/components/Tabs.js';
 import { Avatar } from '/components/Avatar.js';
+import { typedByPerson } from '/components/Field.js';
 
 const html = htm.bind(h);
 /* No class at all rather than an empty one: the dense tone's words rule finds a plain cell by it. */
@@ -535,9 +539,9 @@ export function SearchLine({ value, onInput, onEnter, onClear, placeholder, labe
   return html`<div class=${cx('search-line', beside && 'search-line--beside', big && 'search-line--big')}>
     ${find ? html`<svg class="search-line-glass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.3-4.3" /></svg>` : null}
     <input class="og-input" id=${id} type=${text ? 'text' : 'search'} value=${value} placeholder=${placeholder} aria-label=${label || placeholder}
-      autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
+      autocomplete="off" data-find data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
       spellcheck=${big ? false : undefined}
-      autofocus=${autofocus} onInput=${onInput} onKeyDown=${onEnter ? (e) => { if (e.key === 'Enter') onEnter(e); } : undefined} />
+      autofocus=${autofocus} onInput=${onInput ? (e) => { if (typedByPerson(e, value ?? '')) onInput(e); } : undefined} onKeyDown=${onEnter ? (e) => { if (e.key === 'Enter') onEnter(e); } : undefined} />
     ${onClear && value ? html`<button type="button" class="poster-icon poster-icon--small" title=${clearLabel} aria-label=${clearLabel} onClick=${onClear}>✕</button>` : null}
     ${children}
     ${note !== undefined && note !== null && note !== '' ? html`<small>${note}</small>` : null}

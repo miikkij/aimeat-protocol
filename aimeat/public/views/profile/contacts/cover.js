@@ -14,6 +14,8 @@
  * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.15.1 -- 2026-11-14 -- The contact search is a TextField `search`: a find field the browser's
+ *     autofill cannot fill with the sign-in name (js/find-field-guard.js).
  *   v1.15.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart and the title's question mark concept.contact; the fold "Where contacts are used"
  *     (ct-where) is gone, its six places are in the concept.
@@ -148,7 +150,7 @@ function secPeople(ctx) {
     <${Tab} tone="fold" on=${ctx.searchOpen} pressed=${ctx.searchOpen} onClick=${() => ctx.setSearchOpen(!ctx.searchOpen)}>${c('search')}<//>`;
   return html`
     <${PageSection} id="ct-people" num="01" title=${c('secPeople')} count=${`${ctx.people.length} · ${c('secPeopleSub')}`} doors=${doors} first>
-      ${ctx.searchOpen ? html`<${Space} below="medium"><${TextField} size="medium" placeholder=${c('searchPlaceholder')} value=${ctx.q} onInput=${(v) => ctx.setQ(v)} autoFocus /><//>` : null}
+      ${ctx.searchOpen ? html`<${Space} below="medium"><${TextField} search size="medium" placeholder=${c('searchPlaceholder')} value=${ctx.q} onInput=${(v) => ctx.setQ(v)} autoFocus /><//>` : null}
       ${ctx.contactsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />`
         : ctx.loading && !ctx.contacts.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
         : !shown.length ? html`<${Note} kind="quiet">${ctx.people.length ? c('emptyFiltered') : c('emptyPeople')}<//>`

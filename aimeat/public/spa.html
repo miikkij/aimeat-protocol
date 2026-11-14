@@ -578,6 +578,7 @@
       "/js/open-item.js": "/js/open-item.js",
       "/js/intake.js": "/js/intake.js",
       "/js/install-prompt.js": "/js/install-prompt.js",
+      "/js/find-field-guard.js": "/js/find-field-guard.js",
       "/components/InstallCta.js": "/components/InstallCta.js",
       "/components/McpInstall.js": "/components/McpInstall.js",
       "/js/services/admin.js": "/js/services/admin.js",
@@ -1127,6 +1128,9 @@
     // Side-effect import, and EARLY on purpose: the browser fires `beforeinstallprompt` once,
     // shortly after load, and the module must be listening before views lazy-load.
     import '/js/install-prompt.js';
+    // Side-effect import, before any view: every find field on every page refuses the browser's
+    // own autofill (the sign-in name written into a search).
+    import '/js/find-field-guard.js';
     // Side-effect import, before any view: on a signed-in-only node every same-origin request
     // carries the session, or the gate refuses the plain reads of what is public elsewhere.
     import '/js/closed-node-fetch.js';

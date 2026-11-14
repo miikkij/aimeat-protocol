@@ -15,6 +15,7 @@
       frame the app controls is a frame the app can position, resize and overlay — the choice has to
       happen somewhere the app cannot dress up.
     @version-history
+      v1.0.3 — 2026-11-14 — Loads js/find-field-guard.js: the browser's own autofill cannot write the sign-in name into the filter field.
       v1.0.2 — 2026-10-29 — The filter field is kept out of password managers (data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's sign-in name into a find field.
       v1.0.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
       v1.0.0 — 2026-08-17 — TARGET-063 phase 3.
@@ -54,6 +55,7 @@
     <div id="body"></div>
     <p class="foot" id="foot"></p>
   </div>
+  <script type="module" src="/js/find-field-guard.js"></script>
   <script src="/contact-picker.js"></script>
 </body>
 </html>

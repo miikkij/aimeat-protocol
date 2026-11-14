@@ -40,6 +40,9 @@
  *        html`<${Field} label=${t('x.who')} hint=${t('x.whoHint')} group>…<//>`
  *        html`<${FormActions}><${Loud} control onClick=${save}>${t('x.save')}<//><//>`
  * @version-history
+ *   v1.11.1 — 2026-11-14 — typedByPerson refuses the browser's own autofill too (js/find-field-guard.js
+ *     refusedInput): Edge on Android wrote the sign-in name into the App Catalog search with a
+ *     trusted input event. An emptied field is never refused.
  *   v1.11.0 — 2026-10-31 — typedByPerson(e, current): the find fields (MenuFind, SearchBar,
  *     TextField `search`, the time zone search) drop an input event no person made. LastPass still
  *     filled the owner's sign-in name into the Settings & Controls find after 849c5578c told it to
@@ -81,6 +84,7 @@ import { useId, useContext, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { Note } from '/components/Note.js';
 import { HelpLabel } from '/components/HelpTip.js';
+import { refusedInput } from '/js/find-field-guard.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -134,15 +138,16 @@ export function messageOf(message, error) {
 }
 
 /**
- * True when a field's input event came from the person: typing, pasting, dictation, an IME and the
- * browser's own autofill all have `isTrusted` true. An event a page script or an extension dispatched
- * has it false, and then the field is set back to `current` (the value the component holds) and the
- * caller drops the event. A find field calls it: LastPass wrote the owner's sign-in name into the
- * Settings & Controls find and dispatched `input` for it, although the field carried autocomplete="off",
- * data-lpignore, data-1p-ignore, data-bwignore and data-form-type="other".
+ * True when a find field's input event came from the person: typing, pasting, dictation and an IME.
+ * An event a page script or an extension dispatched (`isTrusted` false) and the browser's own
+ * autofill (the field in the `:autofill` state) are refused: the field is set back to `current`
+ * (the value the component holds) and the caller drops the event. LastPass wrote the owner's
+ * sign-in name into the Settings & Controls find with an untrusted event; Edge on Android wrote it
+ * into the App Catalog search with a trusted one. The rules are in js/find-field-guard.js, which
+ * also refuses the same events for every find field on the page before a component sees them.
  */
 export function typedByPerson(e, current = '') {
-  if (e.isTrusted) return true;
+  if (!refusedInput(e)) return true;
   const el = e.currentTarget || e.target;
   if (el && el.value !== current) el.value = current;
   return false;

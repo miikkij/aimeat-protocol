@@ -13,6 +13,8 @@
  * @usage import { ContactPicker } from '/components/ContactPicker.js';
  *   <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} />
  * @version-history
+ *   v1.2.3 — 2026-11-14 — The field is marked data-find, so js/find-field-guard.js keeps the
+ *     browser's own autofill (the owner's sign-in name) out of it.
  *   v1.2.2 — 2026-10-29 — The field is kept out of password managers (autocomplete off,
  *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): it takes a name or an
  *     email, which is what LastPass fills with the owner's own sign-in name.
@@ -134,7 +136,7 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
   return html`
     <div class="contact-picker" ref=${rootRef}>
       <input class="input-field contact-picker-input" autofocus=${autofocus} disabled=${disabled}
-        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
+        autocomplete="off" data-find data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
         placeholder=${placeholder || (t('contacts.pickerPlaceholder') || 'owner name, email, or pick a contact')}
         value=${value}
         onInput=${(e) => { onChange?.(e.target.value); setOpen(true); setHi(-1); }}

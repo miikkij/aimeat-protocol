@@ -19,6 +19,8 @@
  * @usage html`<${MenuFind} label=${t('menuFind.labelSettings')} placeholder=${t('menuFind.placeholderSettings')}
  *   groups=${groups} other=${adminGroups} otherTitle=${t('menuFind.otherOperator')} onOpen=${openRow}>${menu}<//>`
  * @version-history
+ *   v1.1.3 — 2026-11-14 — The field is marked data-find, so js/find-field-guard.js keeps the
+ *     browser's own autofill out of it too (the field is type="text" for its look).
  *   v1.1.2 — 2026-10-31 — The field drops an input event no person made (typedByPerson, Field.js):
  *     LastPass still wrote the owner's sign-in name into it on /v1/profile?tab=ai, a page with a key
  *     field, despite the attributes of v1.1.1.
@@ -177,7 +179,7 @@ export function MenuFind({ tone = 'settings', label, placeholder, groups, other,
         <div class="menu-find-field">
           ${glass}
           <input id=${id} ref=${inputRef} class="menu-find-input" type="text" value=${q} placeholder=${placeholder}
-            autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
+            autocomplete="off" data-find data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
             spellcheck=${false} aria-describedby=${searching ? `${id}-count` : undefined}
             onInput=${(e) => { if (typedByPerson(e, q)) setQ(e.currentTarget.value); }} onKeyDown=${onKeyDown} />
           ${q

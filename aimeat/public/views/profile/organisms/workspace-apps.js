@@ -11,6 +11,8 @@
  * @structure WorkspaceApps
  * @usage import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
  * @version-history
+ *   v2.0.1 — 2026-11-14 — The app picker's search is a TextField `search`: a find field the
+ *     browser's autofill cannot fill with the sign-in name (js/find-field-guard.js).
  *   v2.0.0 — 2026-09-26 — Every part is a library component that takes data: the strip is the Object box
  *     (Box), its head a Layout row of the Sub-heading, the Hint and the Manage action, a pinned app the
  *     Card (the whole card its door, Enter and Space too) in a CardGrid, the picker a Split with the
@@ -134,7 +136,7 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
       ${showPicker ? html`
         <${Split} gap="small">
           <${HeadDesc}>${t('organisms.apps.pickerDesc') || 'Pick published apps to show in this workspace. Pinning only adds a launch card — data access follows workspace access.'}<//>
-          <${TextField} placeholder=${searchWords} ariaLabel=${searchWords} value=${q} onInput=${setQ} />
+          <${TextField} search placeholder=${searchWords} ariaLabel=${searchWords} value=${q} onInput=${setQ} />
           <${List} cols="name-tags-doors" keepCols loading=${catalog === null ? '…' : false}
             empty=${ql ? (t('organisms.apps.noMatch') || 'No apps match.') : (t('organisms.apps.catalogEmpty') || 'No published apps on this node yet.')}>
             ${pickerRows.map(a => {
