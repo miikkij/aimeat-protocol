@@ -55341,9 +55341,9 @@ paths:
                   type: string
                   description: HTML template content with optional {{type:key}} tags
                 lang:
-                  type: string
-                  pattern: '^[a-z]{2}$'
-                  description: The language version to store, as the query parameter of the same name. Leave out for the default page.
+                  type: [string, 'null']
+                  pattern: '^\s*([A-Za-z]{2})?\s*$'
+                  description: The language version to store, a two-letter code read without case or surrounding spaces, as the query parameter of the same name. Leave out, or send null or an empty string, for the default page.
       responses:
         '200':
           description: Template uploaded
