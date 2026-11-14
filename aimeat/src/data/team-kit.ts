@@ -21,6 +21,7 @@
  *   const made = await applyOrganismShape(deps, orgId, owner, TEAM_KIT, 'fi');
  *   const md = teamSkillMarkdown({ lang: 'fi', skillName, teamName, orgId, ws });
  * @version-history
+ *   v1.2.0 — 2026-11-15 — A decision may carry where it was shared from, and a record may withdraw a share (T19).
  *   v1.1.0 — 2026-11-14 — TEAM_TYPES, teamTypeOf, teamKitFor and the type line in the team skill (T18).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T1, T5, T24).
  */
@@ -79,7 +80,13 @@ export const TEAM_KIT: OrganismShape = {
             },
             spaces: [
                 { name: 'decision', namespace: 'shared.decisions', mode: 'records', writeRole: 'member', versioned: false, append: true,
-                    schema: req(['id', 'title', 'decision'], { id: str, title: str, decision: str, why: str, date: str, by: str }) },
+                    // from, shared_by and shared_at: a copy shared from another team; status and
+                    // withdraws: the record that withdraws such a copy (services/team/share-decision.ts).
+                    schema: req(['id', 'title', 'decision'], {
+                        id: str, title: str, decision: str, why: str, date: str, by: str,
+                        from: { type: 'object', properties: { organism_id: str, team: str, decision_id: str } },
+                        shared_by: str, shared_at: str, status: str, withdraws: str, withdrawn_at: str,
+                    }) },
             ],
         },
         {

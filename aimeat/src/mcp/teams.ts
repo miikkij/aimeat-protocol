@@ -8,6 +8,7 @@
  * @structure registerTeamTools
  * @usage registerTeamTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.2.0 — 2026-11-15 — aimeat_team_decision_share (T19, services/team/share-decision.ts).
  *   v1.1.0 — 2026-11-14 — aimeat_team_waiting (T6).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
@@ -20,6 +21,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { teamSetupForCaller, teamStatusForCaller, teamWaitingForCaller } from '../services/team/for-caller.js';
+import { shareTeamDecision } from '../services/team/share-decision.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -39,6 +41,17 @@ export function registerTeamTools(mcp: McpServer, storage: Storage, config: Aime
         async () => {
             const out = await teamWaitingForCaller({ storage, config }, caller());
             return out.ok ? text({ items: out.items, approvals: out.approvals }) : toolError(out.code, out.message);
+        },
+    );
+
+    mcp.registerTool(
+        'aimeat_team_decision_share',
+        { description: descriptionFor('aimeat_team_decision_share'), inputSchema: zodShapeFor('aimeat_team_decision_share'), annotations: annotationsFor('aimeat_team_decision_share') },
+        async ({ organism_id, decision, to, withdraw, dry_run }) => {
+            const out = await shareTeamDecision({ storage, config }, caller(), {
+                organismId: String(organism_id), decisionId: String(decision), to, withdraw: withdraw === true, dryRun: dry_run !== false,
+            });
+            return out.ok ? text({ dry_run: out.dry_run, decision: out.decision, targets: out.targets }) : toolError(out.code, out.message);
         },
     );
 

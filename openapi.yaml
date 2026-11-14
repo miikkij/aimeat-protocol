@@ -59879,6 +59879,43 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/teams/{id}/decisions/{decision}/share:
+    post:
+      x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.3.1' }
+      operationId: teamDecisionShare
+      summary: Share a team decision with other teams, or withdraw the share
+      description: >-
+        Writes a copy of one decision into the Decisions of each named team the caller is an active
+        member of. The copy carries `from` (the team and the decision it came from), `shared_by` and
+        `shared_at`. With `withdraw: true` a new record marked withdrawn is written instead; nothing
+        is deleted, because Decisions only takes new records. A team the caller is not in comes back
+        `refused` with the reason. The source decision is read with the caller's own read rule, so a
+        decision the caller cannot read cannot be shared, and a copy cannot be shared on. A dry run
+        (the default) answers what would be written. The MCP twin is aimeat_team_decision_share.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: decision, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { type: array, minItems: 1, maxItems: 20, items: { type: string } }
+                withdraw: { type: boolean, default: false }
+                dry_run: { type: boolean, default: true }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/teams/status:
     get:
       x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.3.1' }

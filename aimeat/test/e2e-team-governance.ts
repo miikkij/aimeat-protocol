@@ -86,5 +86,80 @@ await test('t04 refusals: an owner, an agent without operator:admin, no token', 
     assert(anon.status === 401, `no token: ${anon.status}`);
 });
 
+// ── T19: a decision shared with other teams ──
+let salesId = '', boardId = '', decisionId = '';
+
+await test('t05 setup: the lead also leads a sales team; a board team has the member only', async () => {
+    const made = await json('/v1/teams/setup', {
+        method: 'POST', headers: auth(lead.token),
+        body: JSON.stringify({ dry_run: false, teams: [{ name: `Myynti ${stamp}`, language: 'fi' }] }),
+    });
+    assert(made.status === 201, `sales ${made.status}`);
+    salesId = made.body.data.teams[0].organism_id;
+    const board = await json('/v1/teams/setup', {
+        method: 'POST', headers: auth(member.token),
+        body: JSON.stringify({ dry_run: false, teams: [{ name: `Board ${stamp}`, language: 'en' }] }),
+    });
+    assert(board.status === 201, `board ${board.status}`);
+    boardId = board.body.data.teams[0].organism_id;
+    const st = await json(`/v1/teams/status?organism_id=${teamId}`, { headers: auth(lead.token) });
+    const ws = st.body.data.teams[0].workspaces.decisions;
+    const read = await json(`/v1/organisms/${teamId}/workspace?ws=${ws}`, { headers: auth(lead.token) });
+    const key = JSON.stringify(read.body).match(/(pasted-[a-z0-9]+-1)/)?.[1];
+    assert(key, `the pasted decision's id: ${JSON.stringify(read.body).slice(0, 300)}`);
+    decisionId = key;
+});
+
+await test('t06 a dry run names what would be written and writes nothing; a team the sharer is not in is refused', async () => {
+    const r = await json(`/v1/teams/${teamId}/decisions/${decisionId}/share`, {
+        method: 'POST', headers: auth(lead.token), body: JSON.stringify({ to: [salesId, boardId] }),
+    });
+    assert(r.status === 200 && r.body.data.dry_run === true, `dry run ${r.status} ${JSON.stringify(r.body.error ?? '')}`);
+    const t = Object.fromEntries(r.body.data.targets.map((x: any) => [x.organism_id, x]));
+    assert(t[salesId].result === 'share' && t[boardId].result === 'refused' && /ask one of its members/.test(t[boardId].reason), `targets ${JSON.stringify(r.body.data.targets)}`);
+    const st = await json(`/v1/teams/status?organism_id=${salesId}`, { headers: auth(lead.token) });
+    assert(st.body.data.teams[0].week.decided === 0, 'nothing written by the dry run');
+});
+
+await test('t07 the share writes a copy that names where it came from; a copy cannot be shared on', async () => {
+    const r = await json(`/v1/teams/${teamId}/decisions/${decisionId}/share`, {
+        method: 'POST', headers: auth(lead.token), body: JSON.stringify({ to: [salesId], dry_run: false }),
+    });
+    assert(r.status === 201 && r.body.data.targets[0].result === 'share', `share ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+    const st = await json(`/v1/teams/status?organism_id=${salesId}`, { headers: auth(lead.token) });
+    const ws = st.body.data.teams[0].workspaces.decisions;
+    const read = await json(`/v1/organisms/${salesId}/workspace?ws=${ws}`, { headers: auth(lead.token) });
+    const text = JSON.stringify(read.body);
+    assert(text.includes(SECRET_TITLE) && text.includes(teamId), 'the copy carries the title and the source team');
+    const copyId = r.body.data.targets[0].record_id;
+    const again = await json(`/v1/teams/${salesId}/decisions/${copyId}/share`, {
+        method: 'POST', headers: auth(lead.token), body: JSON.stringify({ to: [teamId], dry_run: false }),
+    });
+    assert(again.status === 400, `a copy shared on: ${again.status}`);
+});
+
+await test('t08 the share is withdrawn with a new record, through the MCP tool', async () => {
+    const agent = await makeAgent(BASE, lead, ['organism:write', 'organism:read']);
+    const ai = await openSession(BASE, agent.token, 'team-share-ai');
+    const r = await callTool(ai, 'aimeat_team_decision_share', { organism_id: teamId, decision: decisionId, to: [salesId], withdraw: true, dry_run: false });
+    assert(!r.isError && r.data.targets[0].result === 'withdraw', `withdraw: ${r.text.slice(0, 200)}`);
+    const st = await json(`/v1/teams/status?organism_id=${salesId}`, { headers: auth(lead.token) });
+    const ws = st.body.data.teams[0].workspaces.decisions;
+    const read = await json(`/v1/organisms/${salesId}/workspace?ws=${ws}`, { headers: auth(lead.token) });
+    assert(JSON.stringify(read.body).includes('"withdrawn"'), 'a withdrawn record is in the sales team');
+});
+
+await test('t09 refusals: a non-member of the source team, an agent without organism:write', async () => {
+    const outsider = await json(`/v1/teams/${teamId}/decisions/${decisionId}/share`, {
+        method: 'POST', headers: auth(operator.token), body: JSON.stringify({ to: [salesId], dry_run: false }),
+    });
+    assert(outsider.status === 404, `outsider ${outsider.status}`);
+    const reader = await makeAgent(BASE, lead, ['organism:read']);
+    const noWrite = await json(`/v1/teams/${teamId}/decisions/${decisionId}/share`, {
+        method: 'POST', headers: auth(reader.token), body: JSON.stringify({ to: [salesId] }),
+    });
+    assert(noWrite.status === 403, `without organism:write: ${noWrite.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

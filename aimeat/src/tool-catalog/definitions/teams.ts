@@ -10,10 +10,11 @@
  * @structure teamTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.1.0 — 2026-11-15 — aimeat_team_decision_share (T19), over POST /v1/teams/:id/decisions/:decision/share.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
-import { TeamSetupTeams } from '../../models/write-body-schemas.js';
+import { TeamSetupTeams, TeamDecisionShareBody } from '../../models/write-body-schemas.js';
 
 /** The same bounded shape POST /v1/teams/setup validates its body with. */
 const teamsShape = TeamSetupTeams;
@@ -41,6 +42,22 @@ export const teamTools = [
         scope: 'organism:read',
         surfaces: ['agent', 'service'],
         input: {},
+    },
+    {
+        name: 'aimeat_team_decision_share',
+        description: 'Share one decision of a team with other teams the person is in, or withdraw such a share. The node writes a copy into each named team\'s Decisions that says which team and decision it came from; a withdrawal is a new record marked withdrawn, nothing is deleted. A team the person is not in is refused with the reason: then ask one of its members or leads to share it there. ALWAYS call first with dry_run true (the default), tell the person which teams get it, and call again with dry_run false after they say yes. The decision id is the record id in the team\'s Decisions (from aimeat_workspace_read).',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Share a Team Decision', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'organism:write',
+        surfaces: ['agent', 'service'],
+        input: {
+            organism_id: { type: 'string', required: true, description: 'The team the decision is in.' },
+            decision: { type: 'string', required: true, description: 'The decision\'s record id in that team\'s Decisions.' },
+            to: { type: 'array', required: true, description: 'The organism_id of each team to share it with, at most 20.', zod: TeamDecisionShareBody.shape.to },
+            withdraw: { type: 'boolean', description: 'True withdraws an earlier share from those teams.' },
+            dry_run: { type: 'boolean', description: 'True (the default) shows what would be written and writes nothing.' },
+        },
     },
     {
         name: 'aimeat_team_status',

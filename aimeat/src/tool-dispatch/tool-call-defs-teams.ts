@@ -8,6 +8,7 @@
  * @structure teamCliTools[] — the handler table, spread by index.ts
  * @usage import { teamCliTools } from './tool-call-defs-teams.js';
  * @version-history
+ *   v1.2.0 — 2026-11-15 — aimeat_team_decision_share → POST /v1/teams/:id/decisions/:decision/share.
  *   v1.1.0 — 2026-11-14 — aimeat_team_waiting → GET /v1/teams/waiting.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
@@ -28,6 +29,16 @@ export const teamCliTools: ConnectCliToolDefinition[] = [
         // → GET /v1/teams/waiting
         name: 'aimeat_team_waiting',
         handler: ({ client }) => client.get('/v1/teams/waiting'),
+    },
+    {
+        // → POST /v1/teams/:id/decisions/:decision/share
+        name: 'aimeat_team_decision_share',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { to: input.to ?? [] };
+            const withdraw = optionalBoolean(input, 'withdraw'); if (withdraw !== undefined) body.withdraw = withdraw;
+            const dryRun = optionalBoolean(input, 'dry_run'); if (dryRun !== undefined) body.dry_run = dryRun;
+            return client.post(`/v1/teams/${encodeURIComponent(String(input.organism_id ?? ''))}/decisions/${encodeURIComponent(String(input.decision ?? ''))}/share`, body);
+        },
     },
     {
         // → GET /v1/teams/status
