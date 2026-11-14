@@ -3747,19 +3747,40 @@ components:
 
     WebRegistrationResponse:
       type: object
-      required: [ghii, verificationLevel]
+      description: What POST /v1/ghii/register-web answers in `data` (routes/ghii/web-verify.ts).
+      required: [ghii, owner, private_key, public_key, verification_id]
       properties:
         ghii:
+          type: object
+          description: The new owner's GHII record.
+          required: [ghii, username, display_name, verification_level, created_at]
+          properties:
+            ghii: { type: string, description: The new owner's GHII, example: jane-doe@aimeat-local-001-dev }
+            username: { type: string, example: jane-doe }
+            display_name: { type: string }
+            locale: { type: string }
+            verification_level:
+              type: integer
+              enum: [0, 1, 2, 3]
+              description: 0 none, 1 email, 2 eIDAS or FTN, 3 EU wallet. A new account starts at 0.
+            magic_link_enabled: { type: boolean }
+            created_at: { type: string, format: date-time }
+        owner:
+          type: object
+          required: [name, roles]
+          properties:
+            name: { type: string }
+            roles: { type: array, items: { type: string } }
+        private_key:
           type: string
-          description: The generated GHII for the new owner
-          example: jane-doe
-        verificationId:
+          description: The owner's Ed25519 private key. Shown once; the node does not keep it.
+        public_key:
           type: string
-          description: Verification session ID (present when email provided)
-        verificationLevel:
+        verification_id:
+          type: [string, 'null']
+          description: The verification to confirm at POST /v1/ghii/verify-email with the emailed code; null when no email was given or the node sends no email.
+        note:
           type: string
-          enum: [none, email_pending, email_verified]
-          description: Current verification level
 
     EmailVerificationRequest:
       type: object
@@ -47714,7 +47735,7 @@ paths:
       description: |
         Register a new human owner via the web portal. Creates an owner record,
         GHII, and profile. No authentication required. If email is provided,
-        a verification code is sent and the response includes a verificationId.
+        a verification code is sent and the response includes a verification_id.
         When the node's email gate is on (`AIMEAT_EMAIL_CONFIRMATION_REQUIRED`),
         an email is REQUIRED (missing → `400 EMAIL_REQUIRED`); an email already
         verified on another account → `409 EMAIL_TAKEN`.
