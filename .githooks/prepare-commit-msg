@@ -17,6 +17,11 @@
 # session without AIMEAT_SESSION is refused; a person is never asked. A message that already
 # carries a Session: trailer (an amend, a rebase) is left alone.
 #
+# Since 2026-11-15 an agent other than Claude Code counts as a session too: AGENTS.md tells Codex,
+# Cursor and the rest to export AIMEAT_SESSION, and a commit made with it set is stamped like a
+# Claude Code session's (lib-session.sh holds the test). Only a Claude Code session can be refused
+# for a missing name, because only it is known to be a session without one.
+#
 # Since 2026-09-06 the floor holds more than one repository, so a second trailer names the
 # PROJECT the session works in: `Project:` from AIMEAT_PROJECT, the id the project's own
 # CLAUDE.md paragraph gives (this repository: aimeat-protocol). It is stamped when set and never
@@ -34,8 +39,9 @@ if grep -qi '^Session:' "$MSG" 2>/dev/null; then
   exit 0
 fi
 
-# Not a Claude Code session: the developer's own commit. Nothing to stamp, nothing to refuse.
-if [ -z "$CLAUDECODE" ]; then
+# Not an agent session: the developer's own commit. Nothing to stamp, nothing to refuse.
+. "$(dirname "$0")/lib-session.sh"
+if ! agent_session; then
   exit 0
 fi
 

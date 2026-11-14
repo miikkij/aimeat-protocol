@@ -67,10 +67,12 @@ else
   fi
 fi
 
-# The git hooks run only when core.hooksPath names .githooks. The root package's prepare script sets
-# it, and this recipe installs in aimeat/ only, so a clone made this way committed and pushed with no
-# hook at all (QA audit 2026-10-16, P2-07). The setting is in the clone's shared config: setting it
-# here turns the hooks on for every worktree of the clone. A relative path resolves against the
+# The git hooks run only when core.hooksPath names .githooks. This recipe installs in aimeat/ only,
+# and until the aimeat/ package got its own prepare script (scripts/hooks-on.mjs) a clone made this
+# way committed and pushed with no hook at all (QA audit 2026-10-16, P2-07). That script sets it now;
+# this line stays as the safety net for an install that skipped scripts, and for the hook's own test,
+# which installs nothing. The setting is in the clone's shared config: setting it here turns the
+# hooks on for every worktree of the clone. A relative path resolves against the
 # worktree a hook runs in, so each worktree runs its own .githooks.
 if [ "$(git -C "$dir" config --get core.hooksPath 2>/dev/null || true)" != ".githooks" ]; then
   git -C "$dir" config core.hooksPath .githooks

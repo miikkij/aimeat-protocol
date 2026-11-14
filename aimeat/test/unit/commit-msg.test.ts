@@ -11,9 +11,11 @@
  *   the first version of this one rejected a real 131-character subject from the repo's own log.
  * @version-history
  *   v1.0.0 — 2026-08-14 — Initial, with the gate.
+ *   v1.1.0 -- 2026-11-15 -- isAgentSession: AIMEAT_SESSION marks an agent session as CLAUDECODE does.
  */
 import { describe, it, expect } from 'vitest';
 import { lintCommitMessage } from '../../scripts/check-commit-msg.js';
+import { isAgentSession } from '../../scripts/lib/session-env.mjs';
 
 describe('commit message gate', () => {
     it('refuses the here-string wreckage that started this', () => {
@@ -83,7 +85,7 @@ describe('commit message gate', () => {
     });
 });
 
-describe('commit message gate, for a Claude Code session', () => {
+describe('commit message gate, for an agent session', () => {
     const session = { session: true };
     const TRAILERS = '\n\nSession: cc-jouni-example\nProject: aimeat-protocol\n';
 
@@ -142,5 +144,19 @@ describe('commit message gate, for a Claude Code session', () => {
         expect(revert.length).toBeGreaterThan(72);
         expect(lintCommitMessage(`${merge}\n`, session)).toEqual([]);
         expect(lintCommitMessage(`${revert}\n\nThis reverts commit 0123456789abcdef.\n`, session)).toEqual([]);
+    });
+});
+
+describe('which commit is an agent session\'s', () => {
+    it('Claude Code (CLAUDECODE) and any agent that names its session (AIMEAT_SESSION)', () => {
+        expect(isAgentSession({ CLAUDECODE: '1' })).toBe(true);
+        expect(isAgentSession({ AIMEAT_SESSION: 'cx-alice-fix' })).toBe(true);
+        expect(isAgentSession({ CLAUDECODE: '1', AIMEAT_SESSION: 'cc-alice-fix' })).toBe(true);
+    });
+
+    it('the developer\'s own commit carries neither, and an empty value is not a name', () => {
+        expect(isAgentSession({})).toBe(false);
+        expect(isAgentSession({ AIMEAT_SESSION: '  ', CLAUDECODE: '' })).toBe(false);
+        expect(isAgentSession({ CLAUDECODE: '0', AIMEAT_PROJECT: 'aimeat-protocol' })).toBe(false);
     });
 });

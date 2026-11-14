@@ -23,10 +23,13 @@
  * @structure slugOf · portFor · render · databaseOf · ensureDatabase · reportPortConflicts · main
  * @usage cd aimeat && pnpm test:env:init            (refuses to overwrite an existing file)
  *        cd aimeat && pnpm test:env:init --force    (rewrites them)
- *        AIMEAT_E2E_PORT=40282 pnpm test:env:init   (take the port your claim names)
+ *        AIMEAT_E2E_PORT=40282 pnpm test:env:init   (take the port your claim names; 40251-40499,
+ *                                                  anything else is refused)
  *        AIMEAT_TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/x pnpm test:env:init --force
  *                                                  (your PostgreSQL account instead of the CI one)
  * @version-history
+ *   v1.3.0 -- 2026-11-15 -- An AIMEAT_E2E_PORT outside 40251-40499 is refused with the range, instead
+ *     of being replaced by the hashed port in silence.
  *   v1.2.0 — 2026-11-11 — After its own database is there, drops the E2E databases of worktrees that
  *     no longer exist (scripts/test-db-prune.ts); the slug rule lives in lib/e2e-databases.ts.
  *   v1.1.0 — 2026-10-16 — Takes the PostgreSQL account from AIMEAT_TEST_DATABASE_URL (the examples carry
@@ -68,10 +71,24 @@ function slugOf(): string {
  * An explicit AIMEAT_E2E_PORT wins, and that is the one to use: the board is the authority on who
  * holds what, and a hash cannot read it. This is the sensible default for a session that has not
  * claimed one yet, not a substitute for claiming.
+ *
+ * AN EXPLICIT PORT OUTSIDE 40251-40499 IS REFUSED, never replaced. It used to fall back to the hash
+ * in silence, so a session that claimed 40600 ran its suites on a port no claim named, beside
+ * whoever held the hashed one (instruction review 2026-11-14, C1). 40600 upward is the sandboxes'.
  */
+const PORT_MIN = 40251;
+const PORT_MAX = 40499;
+
 function portFor(slug: string): number {
-  const explicit = Number(process.env.AIMEAT_E2E_PORT);
-  if (Number.isInteger(explicit) && explicit >= 40251 && explicit <= 40499) return explicit;
+  const raw = process.env.AIMEAT_E2E_PORT?.trim();
+  if (raw) {
+    const explicit = Number(raw);
+    if (Number.isInteger(explicit) && explicit >= PORT_MIN && explicit <= PORT_MAX) return explicit;
+    console.error(`\nAIMEAT_E2E_PORT=${raw} is refused: the E2E port is ${PORT_MIN} to ${PORT_MAX}, and one no active claim names.`);
+    console.error(`  Claim a free port in that range on the Lifecycle Central board, then: AIMEAT_E2E_PORT=<port> pnpm test:env:init --force`);
+    console.error(`  Nothing was written.`);
+    process.exit(1);
+  }
   let h = 0;
   for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return 40251 + (h % 140); // 40251-40390, clear of the dev server and of the lane range

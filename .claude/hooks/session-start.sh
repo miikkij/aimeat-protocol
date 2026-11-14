@@ -15,6 +15,11 @@
 #
 # 2026-10-16 — Also prints whether the git hooks are on and main's CI and nightly state (QA audit
 # W07 P2-01, P4-01, P8-01, P2-03; W09 P2-07).
+#
+# 2026-11-15 — The ritual is the Lifecycle Central tool flow with the project (board_read with
+# project, claim_open with project), and the hook prints AIMEAT_PROJECT. It named two workspace ids
+# and no project, while a claim without a project is refused; the ids live in skill aimeat-dev-session
+# now, the one home of the ritual (instruction review 2026-11-14, X6).
 set -u
 
 # Claude Code hands the hook a JSON object on stdin, and its session_id is the one thing a session
@@ -33,6 +38,12 @@ if [ -n "${AIMEAT_SESSION:-}" ]; then
 else
   printf 'Session name: NOT SET. Export AIMEAT_SESSION=cc-<owner>-<tag> before your first commit,\n'
   printf '  or the commit carries no Session: trailer and the claims board cannot match it.\n'
+fi
+if [ -n "${AIMEAT_PROJECT:-}" ]; then
+  printf 'Project: %s (stamped as a Project: trailer; every claim names it)\n' "$AIMEAT_PROJECT"
+else
+  printf 'Project: NOT SET. Export AIMEAT_PROJECT=aimeat-protocol: Lifecycle Central refuses a claim\n'
+  printf '  without a project.\n'
 fi
 
 if [ -n "$session_id" ]; then
@@ -110,26 +121,27 @@ fi
 
 cat <<'RITUAL'
 
-Before your first edit, in this order (skill `aimeat-dev-session` on the node has the detail,
-read it with aimeat_skill_get):
+Before your first edit, in this order. The tools are Lifecycle Central's, called with
+aimeat_app_tool_invoke; skill `aimeat-dev-session` on the node (aimeat_skill_get) has the detail.
 
-  1. Read the incidents board — what is broken on main right now.
-       organism da438a5f-609b-41e5-ad9f-8dd2cc76cbe1, workspace ws-mtnpi7c68e4
-  2. Read the claims board — who holds which files and which E2E port.
-       workspace ws-mtnphyhh8hc
-  3. WRITE YOUR OWN CLAIM before editing: the area you will touch, the port you will run
-     E2E on (any free one from 40251 up that no active claim names), your intent, and the
-     session id printed above.
-     A claim written afterwards is a claim that protected nobody.
-  4. Heartbeat it at least hourly, and whenever the area changes. Three hours old reads
-     as stale to everyone else.
-  5. Release or hand off when you stop.
+  1. Name the session and the project (both lines above): AIMEAT_SESSION=cc-<owner>-<tag>
+     and AIMEAT_PROJECT=aimeat-protocol, exported in the shell that commits.
+  2. Read the board with your project: board_read { project: "aimeat-protocol" }. It gives
+     the open incidents (what is broken on main), the active claims (who holds which area
+     and which E2E port), and what the goals your project serves have broken, ruled and asked.
+  3. WRITE YOUR OWN CLAIM before editing: claim_open with the project, the area you will
+     touch, the E2E port (a free one in 40251-40499 that no active claim names; pass it to
+     pnpm test:env:init as AIMEAT_E2E_PORT), your intent, and the session id printed above.
+     A claim without a project is refused. A claim written afterwards protected nobody.
+  4. Heartbeat it at least hourly (claim_heartbeat), and whenever the area changes. Three
+     hours old reads as stale to everyone else.
+  5. Release (claim_release) or hand off (claim_handoff) when you stop.
 
 And two rules this repo learned the hard way, both on 2026-09-05:
 
   - VERIFY THE SIGNED-IN PATH BEFORE CALLING ANYTHING DONE. An app's write path was
     "verified" five times against production while signed out, and the one interaction
-    nobody could run — a person pressing a button while logged in — was the broken one.
+    nobody could run (a person pressing a button while logged in) was the broken one.
     `pnpm sandbox` gives you a node with real owners and real passwords in ten seconds.
   - COORDINATION NOISE DOES NOT REACH THE DEVELOPER. A peer session's port fix, a rebase,
     a claim update: do it, do not report it. He reads what changed for him.

@@ -18,8 +18,8 @@
  *   from an organisation node's own lists, and leaves out every term the public tree already holds,
  *   since such a word is ordinary vocabulary here and refusing it would refuse every commit.
  *
- *   WHO IS REFUSED. A term found refuses everybody. A missing list refuses a Claude Code session
- *   (CLAUDECODE=1) and warns a person, whose commit from VS Code must not stop on a machine where
+ *   WHO IS REFUSED. A term found refuses everybody. A missing list refuses an agent session
+ *   (CLAUDECODE=1 or AIMEAT_SESSION set, lib/session-env.mjs) and warns a person, whose commit from VS Code must not stop on a machine where
  *   nobody built the list yet.
  * @usage
  *   node scripts/check-private-terms.mjs --commit .git/COMMIT_EDITMSG     # the commit-msg hook
@@ -32,10 +32,12 @@
  *   node's aimeat_contact_list, aimeat_app_list and aimeat_organism_list answers.
  * @version-history
  *   v1.0.0 — 2026-11-04 — Initial.
+ *   v1.1.0 -- 2026-11-15 -- A missing list refuses any agent session, not only Claude Code's.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { addedLines, compileTerms, deriveTerms, findHits, parseTerms } from './lib/private-terms.mjs';
+import { isAgentSession } from './lib/session-env.mjs';
 
 const args = process.argv.slice(2);
 const git = (gitArgs, input) => execFileSync('git', gitArgs, { encoding: 'utf8', input, maxBuffer: 512 * 1024 * 1024, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'ignore'] });
@@ -50,7 +52,7 @@ function loadTerms() {
     const path = listPath();
     if (existsSync(path)) return parseTerms(readFileSync(path, 'utf8'));
     const say = `[private-terms] no list at ${path}. Build it from the organisation node's lists: node scripts/check-private-terms.mjs build <node-lists.json> (the file's header says how).`;
-    if (process.env.CLAUDECODE) { console.error(say); process.exit(1); }
+    if (isAgentSession()) { console.error(say); process.exit(1); }
     console.error(`${say} Going on without the check.`);
     process.exit(0);
 }

@@ -27,14 +27,15 @@
  *   For every commit the checks are structural, never stylistic: they refuse only the shapes that
  *   mean something upstream mangled the text.
  *
- *   A CLAUDE CODE SESSION'S COMMIT gets three more (CLAUDECODE=1, the key every session-only rule
- *   uses; a commit from VS Code or a terminal is never held to them): a subject of at most 72
+ *   AN AGENT SESSION'S COMMIT gets three more (CLAUDECODE=1 or AIMEAT_SESSION set, the test every
+ *   session-only rule uses, lib/session-env.mjs; a commit from VS Code or a terminal is never held
+ *   to them): a subject of at most 72
  *   characters, a body of at most 600, and no line that says who approved or asked for the change.
  *   The written rule had asked for a 72-character subject since 2026-09-27 and 230 of the 300
  *   subjects after it were longer; bodies ran to 3,400 characters and carried the developer's
  *   one-word approvals as quotes. A rule nothing holds is not kept.
  * @structure lintCommitMessage(raw, { session }) → string[] of problems · main(): reads argv[2],
- *   passes session when CLAUDECODE=1, exits 1 on any
+ *   passes session when isAgentSession(), exits 1 on any
  * @usage
  *   pnpm check:commit-msg .git/COMMIT_EDITMSG    # what the hook runs
  *   Unit-tested in test/unit/commit-msg.test.ts — the validator is a pure function on purpose.
@@ -42,8 +43,11 @@
  *   v1.0.0 — 2026-08-14 — Initial, after three `@`-titled commits reached main.
  *   v1.1.0 -- 2026-11-11 -- A session's commit: subject at most 72 characters, body at most 600,
  *     no approval line.
+ *   v1.2.0 -- 2026-11-15 -- An agent session is also one with AIMEAT_SESSION set, so Codex, Cursor
+ *     and the other agents AGENTS.md names are held to the same limits.
  */
 import { readFileSync } from 'node:fs';
+import { isAgentSession } from './lib/session-env.mjs';
 
 /**
  * Runaway guard, not a style rule.
@@ -87,7 +91,7 @@ const TRAILER = /^(Session|Project|Wish|Red-CI|Red-Nightly|Signed-off-by): /;
 const APPROVAL_LINE = /\bJouni\b|\b([Aa]pproved|[Aa]ccepted|[Rr]uled|[Rr]equested|[Oo]rdered|[Aa]sked for)\s+by\s+the\s+developer\b/;
 
 export interface LintOptions {
-    /** The commit is made by a Claude Code session (CLAUDECODE=1). */
+    /** The commit is made by an agent session (CLAUDECODE=1 or AIMEAT_SESSION set). */
     session?: boolean;
 }
 
@@ -182,7 +186,7 @@ function main(): void {
         console.error('usage: check-commit-msg <path to commit message file>');
         process.exit(2);
     }
-    const problems = lintCommitMessage(readFileSync(path, 'utf-8'), { session: process.env.CLAUDECODE === '1' });
+    const problems = lintCommitMessage(readFileSync(path, 'utf-8'), { session: isAgentSession() });
     if (problems.length === 0) return;
 
     console.error('');

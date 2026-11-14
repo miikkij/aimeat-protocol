@@ -13,12 +13,17 @@
  *      an unknown state refuses nothing (QA audit P2-01).
  *   4. A worktree made by the WorktreeCreate hook runs the pre-commit hook on its first commit
  *      (QA audit P2-07).
+ *   5. An agent that is not Claude Code is a session when AIMEAT_SESSION is set: its push on a red
+ *      CI is refused, its commit is stamped, and a missing private-terms list refuses it
+ *      (instruction review 2026-11-14, X2).
  * @version-history
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W07, W09).
+ *   v1.1.0 -- 2026-11-15 -- AIMEAT_SESSION marks an agent session; the session-start ritual names the
+ *     project and the port range.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,7 +66,7 @@ const OFFLINE = fixture('offline', { __offline: true });
 function env(fixtureFile: string, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
     const e: NodeJS.ProcessEnv = { ...process.env, AIMEAT_CI_API_FIXTURE: fixtureFile, AIMEAT_CI_REPO: SLUG,
         AIMEAT_CI_STATE_CACHE: join(scratch, `cache-${Math.random().toString(36).slice(2)}.json`), ...extra };
-    delete e.CLAUDECODE; delete e.AIMEAT_RED_CI_REASON; delete e.AIMEAT_RED_CI_REFUSE; delete e.AIMEAT_CI_STATE;
+    delete e.CLAUDECODE; delete e.AIMEAT_SESSION; delete e.AIMEAT_PROJECT; delete e.AIMEAT_RED_CI_REASON; delete e.AIMEAT_RED_CI_REFUSE; delete e.AIMEAT_CI_STATE;
     return { ...e, ...extra };
 }
 
@@ -118,6 +123,59 @@ describe('the session-start hook says whether the git hooks are on', { timeout: 
     });
 });
 
+describe('the session-start ritual is the Lifecycle Central flow', { timeout: 90_000 }, () => {
+    it('names the session and the project, reads the board with the project, and gives the port range', () => {
+        const unnamed = sessionStart(REPO, env(OFFLINE));
+        expect(unnamed).toContain('Project: NOT SET');
+        const named = sessionStart(REPO, env(OFFLINE, { AIMEAT_SESSION: 'cc-alice-x', AIMEAT_PROJECT: 'aimeat-protocol' }));
+        expect(named).toContain('Session name: cc-alice-x');
+        expect(named).toContain('Project: aimeat-protocol');
+        expect(named).toContain('board_read');
+        expect(named).toContain('40251-40499');
+        // The workspace ids belong to the skill, which can move them; the hook names none.
+        expect(named).not.toMatch(/ws-[a-z0-9]{11}/);
+    });
+});
+
+describe('an agent other than Claude Code is a session when AIMEAT_SESSION is set', { timeout: 90_000 }, () => {
+    const PREPARE = join(REPO, '.githooks', 'prepare-commit-msg');
+    const PRIVATE_TERMS = join(AIMEAT, 'scripts', 'check-private-terms.mjs');
+    const dir = join(scratch, 'agent-session');
+    gitRepo(dir);
+    const prepare = (extra: Record<string, string>) => {
+        const msg = join(dir, `msg-${Math.random().toString(36).slice(2)}.txt`);
+        writeFileSync(msg, 'fix(x): a subject\n');
+        const r = spawnSync('bash', [PREPARE, msg, 'message'], { cwd: dir, env: env(OFFLINE, extra), encoding: 'utf8' });
+        return { status: r.status, stderr: r.stderr, text: readFileSync(msg, 'utf8') };
+    };
+
+    it('the commit hook stamps its Session: and Project: trailers', () => {
+        const r = prepare({ AIMEAT_SESSION: 'cx-alice-fix', AIMEAT_PROJECT: 'aimeat-protocol' });
+        expect(r.status).toBe(0);
+        expect(r.text).toContain('Session: cx-alice-fix');
+        expect(r.text).toContain('Project: aimeat-protocol');
+    });
+
+    it('the developer\'s own commit is neither stamped nor refused', () => {
+        const r = prepare({});
+        expect(r.status).toBe(0);
+        expect(r.text).not.toContain('Session:');
+    });
+
+    it('a missing private-terms list refuses the agent and warns the developer', () => {
+        const msg = join(dir, 'terms-msg.txt');
+        writeFileSync(msg, 'fix(x): a subject\n');
+        const check = (extra: Record<string, string>) => spawnSync(process.execPath, [PRIVATE_TERMS, '--commit', msg],
+            { cwd: dir, env: env(OFFLINE, { AIMEAT_PRIVATE_TERMS: join(dir, 'no-such-list.txt'), ...extra }), encoding: 'utf8' });
+        const agent = check({ AIMEAT_SESSION: 'cx-alice-fix' });
+        expect(agent.status).toBe(1);
+        expect(agent.stderr).toContain('no list at');
+        const person = check({});
+        expect(person.status).toBe(0);
+        expect(person.stderr).toContain('Going on without the check');
+    });
+});
+
 describe('a push on top of a red CI needs a named reason', { timeout: 90_000 }, () => {
     const dir = join(scratch, 'push');
     const git = gitRepo(dir);
@@ -132,6 +190,12 @@ describe('a push on top of a red CI needs a named reason', { timeout: 90_000 }, 
         expect(r.status).toBe(1);
         expect(r.stderr).toContain('refused: CI on main is red');
         expect(r.stderr).toContain('Red-CI:');
+    });
+
+    it('refuses another agent that names its session with AIMEAT_SESSION', () => {
+        const r = push(RED, { AIMEAT_SESSION: 'cx-alice-fix' });
+        expect(r.status).toBe(1);
+        expect(r.stderr).toContain('refused: CI on main is red');
     });
 
     it('lets the session go with AIMEAT_RED_CI_REASON, and says the reason', () => {

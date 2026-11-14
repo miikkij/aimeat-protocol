@@ -13,8 +13,8 @@
  *
  *   A PUSH ON A RED CI NEEDS A NAMED REASON (--push-check). When the newest finished CI run on main
  *   is red, a push has to say why it goes on top of it: a `Red-CI: <reason>` trailer in one of the
- *   commits it pushes (kept in history), or AIMEAT_RED_CI_REASON for this one push. A Claude Code
- *   session (CLAUDECODE=1) is refused without one; a person's push gets the same message as a
+ *   commits it pushes (kept in history), or AIMEAT_RED_CI_REASON for this one push. An agent
+ *   session (CLAUDECODE=1 or AIMEAT_SESSION set, lib/session-env.mjs) is refused without one; a person's push gets the same message as a
  *   warning and goes on, because a refusal from a hook is easy to miss in VS Code and broke the
  *   developer's Sync Changes once already (2026-09-05). AIMEAT_RED_CI_REFUSE=all refuses for
  *   everybody. An unknown state (offline, GitHub down) never refuses.
@@ -25,8 +25,10 @@
  *   node scripts/ci-state.mjs --push-check --range=origin/main..HEAD   # the pre-push hook
  * @version-history
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W07: P2-01, P4-01, P8-01, P2-03).
+ *   v1.1.0 -- 2026-11-15 -- A session is also one with AIMEAT_SESSION set (isAgentSession).
  */
 import { execFileSync } from 'node:child_process';
+import { isAgentSession } from './lib/session-env.mjs';
 import { describeState, readCiState } from './lib/ci-runs.mjs';
 
 const args = process.argv.slice(2);
@@ -68,7 +70,7 @@ async function main() {
         console.error(`[pre-push] CI on main is red, and this push names its reason: ${reasons.join(' | ')}`);
         return;
     }
-    const session = process.env.CLAUDECODE === '1';
+    const session = isAgentSession();
     const refuse = session || process.env.AIMEAT_RED_CI_REFUSE === 'all';
     console.error(`[pre-push] ${refuse ? 'refused' : 'warning'}: CI on main is red, and this push names no reason for going on top of it.`);
     for (const l of lines) console.error(`  ${l}`);
