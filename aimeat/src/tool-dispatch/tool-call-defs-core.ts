@@ -457,6 +457,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
             {
                 v: 1,
                 blocks: input.blocks,
+                ...(typeof input.contents_menu === 'boolean' ? { contentsMenu: input.contents_menu } : {}),
                 ...(input.note ? { meta: { note: input.note } } : {}),
                 ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
                 ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),

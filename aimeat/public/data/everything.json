@@ -3678,6 +3678,15 @@
      "plain": "Blocks you arrange An operator picks, orders and hides the parts of the front page and of the members' home, and writes text between them, by hand or by telling their AI. Every change keeps the one before it. /v1/site/layout, aimeat_surface_layout_get"
     },
     {
+     "slug": "g-16-contents-menu-on-the-home",
+     "cells": [
+      "<strong>Contents menu on the home</strong>",
+      "Beside the home and the Settings &amp; Controls overview stands the same contents menu as on every Settings page: the parts the page shows, in its order, as numbered links, with a number where a part has one (the system updates since the last visit, the conversations that wait for an answer, the agents at work), and the ways on (on the home: all system updates, the home settings and Settings &amp; Controls). A press on a line moves the page to that part. A part that shows nothing is not in the menu. On a screen narrower than 1100 pixels the menu is one closed row at the top of the page. The operator turns the home's menu off in Admin &gt; Portal &gt; Home, or their AI does it; it is on by default. Limits: the setting covers only the home members see once their account is set up; the home shown while an account is being set up has no menu, the overview always has one, and a member cannot hide it for themselves. A part is listed under the heading it draws, so a part without a heading (the unread mail line, the agents' health line) is not listed.",
+      "Home, Settings &amp; Controls, Admin Portal page; <code>contentsMenu</code> on <code>PUT /v1/site/layout/home</code>; MCP <code>aimeat_surface_layout_set { contents_menu }</code>"
+     ],
+     "plain": "Contents menu on the home Beside the home and the Settings & Controls overview stands the same contents menu as on every Settings page: the parts the page shows, in its order, as numbered links, with a number where a part has one (the system updates since the last visit, the conversations that wait for an answer, the agents at work), and the ways on (on the home: all system updates, the home settings and Settings & Controls). A press on a line moves the page to that part. A part that shows nothing is not in the menu. On a screen narrower than 1100 pixels the menu is one closed row at the top of the page. The operator turns the home's menu off in Admin > Portal > Home, or their AI does it; it is on by default. Limits: the setting covers only the home members see once their account is set up; the home shown while an account is being set up has no menu, the overview always has one, and a member cannot hide it for themselves. A part is listed under the heading it draws, so a part without a heading (the unread mail line, the agents' health line) is not listed. Home, Settings & Controls, Admin Portal page; contentsMenu on PUT /v1/site/layout/home; MCP aimeat_surface_layout_set { contents_menu }"
+    },
+    {
      "slug": "g-16-your-own-front-page-in-each-language-you-write",
      "cells": [
       "<strong>Your own front page, in each language you write</strong>",
@@ -5045,6 +5054,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 517
+  "rows": 518
  }
 }

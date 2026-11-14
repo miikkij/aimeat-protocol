@@ -34214,5 +34214,18 @@
   "admin.compliance.di.list.openRegistration": "avoin rekisteröityminen",
   "admin.compliance.di.list.empty": "Luvun takana ei ole mitään.",
   "admin.compliance.di.list.capped": "Listassa on ensimmäiset 500, kaikkiaan {n}.",
-  "admin.compliance.di.list.privacy": "Ylläpitäjä näkee aineiston nimen, omistajan, kenelle se on jaettu ja lukijoiden määrän. Ylläpitäjä ei näe aineiston rivejä, eikä hän näe nimetyn vastaanottajan yhteystietoja."
+  "admin.compliance.di.list.privacy": "Ylläpitäjä näkee aineiston nimen, omistajan, kenelle se on jaettu ja lukijoiden määrän. Ylläpitäjä ei näe aineiston rivejä, eikä hän näe nimetyn vastaanottajan yhteystietoja.",
+  "home.rail.title": "Kotisivullasi",
+  "home.rail.pages": "Sivut",
+  "home.rail.news": "Järjestelmäpäivitykset",
+  "home.rail.allUpdates": "Kaikki järjestelmäpäivitykset",
+  "profile.landing.railTitle": "Tällä sivulla",
+  "profile.landing.railPages": "Sivut",
+  "admin.portal.contentsMenu": "Näytä sisältövalikko",
+  "explain.site.contentsMenu.title": "Kotisivun sisältövalikko",
+  "explain.site.contentsMenu.short": "Luettelo kotisivun osista. Osan vieressä on luku, kun osalla on sellainen. Kun painat riviä, sivu siirtyy siihen osaan.",
+  "explain.site.contentsMenu.what": "Sisältövalikko luettelee ne kotisivun osat, joissa on jotain näytettävää, samassa järjestyksessä kuin sivu. Osan vieressä on luku, kun osalla on sellainen: järjestelmäpäivitykset edellisen käynnin jälkeen, vastaustasi odottavat keskustelut ja työssä olevat agentit. Kun painat riviä, sivu siirtyy siihen osaan. Osien alla on linkit kaikkiin järjestelmäpäivityksiin, kodin asetuksiin ja Asetukset ja hallinta -sivulle. Leveällä näytöllä valikko on sivun vieressä. Alle 1100 pikselin levyisellä näytöllä se on sivun yläosassa yksi suljettu rivi. Valikko on oletuksena päällä. Asetus koskee vain kotisivua, jonka jäsen näkee, kun hänen tilinsä on otettu käyttöön. Käyttöönoton aikana kotisivulla on vaiheet eikä valikkoa, ja Asetukset ja hallinta -etusivulla valikko on aina.",
+  "explain.site.contentsMenu.ex1": "Jäsentesi kotisivulla on toistakymmentä osaa, ja ihmiset vierittävät etsimänsä ohi. Pidä valikko päällä: he näkevät heti, mitä sivulla on ja kuinka paljon heitä odottaa.",
+  "explain.site.contentsMenu.ex2": "Kotisivullasi on vain kaksi tai kolme osaa. Ota valikko pois: sivun osat saavat silloin koko leveyden.",
+  "explain.site.contentsMenu.tip": "Tekoälysi voi kytkeä valikon päälle tai pois puolestasi. Sano sille: \"Ota sisältövalikko pois jäsenten kotisivulta.\" Se käyttää samaa työkalua, jolla se järjestää kotisivun."
 }

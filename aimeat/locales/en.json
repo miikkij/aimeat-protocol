@@ -33472,5 +33472,18 @@
   "admin.compliance.di.list.openRegistration": "open registration",
   "admin.compliance.di.list.empty": "Nothing stands behind this number.",
   "admin.compliance.di.list.capped": "The list shows the first 500 of {n}.",
-  "admin.compliance.di.list.privacy": "The administrator sees the dataset's name, its owner, who it is shared with and how many read it. The administrator does not see the rows of the data, or a named recipient's contact details."
+  "admin.compliance.di.list.privacy": "The administrator sees the dataset's name, its owner, who it is shared with and how many read it. The administrator does not see the rows of the data, or a named recipient's contact details.",
+  "home.rail.title": "On your home",
+  "home.rail.pages": "Pages",
+  "home.rail.news": "System updates",
+  "home.rail.allUpdates": "All system updates",
+  "profile.landing.railTitle": "On this page",
+  "profile.landing.railPages": "Pages",
+  "admin.portal.contentsMenu": "Show the contents menu",
+  "explain.site.contentsMenu.title": "The contents menu on the home",
+  "explain.site.contentsMenu.short": "A list of the home's parts, with a number where a part has one. A press on a line moves the page to that part.",
+  "explain.site.contentsMenu.what": "The contents menu lists the parts of the home that show something, in the order of the page, with a number where the part has one: the system updates since the last visit, the conversations that wait for an answer, the agents at work. A press on a line moves the page to that part. Under the parts it links to all system updates, the home settings and Settings & Controls. On a wide screen the menu stands beside the page; on a screen narrower than 1100 pixels it is one closed row at the top of the page. It is on by default. This setting changes only the home that members see once their account is set up: the home they see while they set up their account shows its steps and has no menu, and the Settings & Controls overview always has its menu.",
+  "explain.site.contentsMenu.ex1": "Your members' homes have a dozen parts, and people scroll past what they came for. Keep the menu on: they see at once what the page holds and how much waits for them.",
+  "explain.site.contentsMenu.ex2": "Your home has only two or three parts. Turn the menu off: the page then uses the whole width for its parts.",
+  "explain.site.contentsMenu.tip": "Your AI can turn it on or off for you. Say to it: \"Turn off the contents menu on the members' home.\" It uses the same tool that arranges the home."
 }

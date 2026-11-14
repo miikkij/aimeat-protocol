@@ -17,6 +17,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.25.0 — 2026-11-14 — The overview has a contents rail beside it, as every Settings page does:
+ *     its panels as numbered links (Agents with its count), then Home and, for an operator, Admin
+ *     (components/ContentsRail.js; Jouni's design review, 2026-11-14).
  *   v3.24.0 — 2026-11-09 — The app strip asks for the owner's own apps (listApps({ own: true })) instead
  *     of walking the node's whole catalogue on every Settings page; the same apps, 600 kB less at 288
  *     apps on the node.
@@ -159,6 +162,9 @@ import {
   SIDEBAR_GROUPS, SIDEBAR_ITEM_BY_ID, INFRA_TAB_IDS, DEFAULT_PINS, BASIC_TAB_IDS, CUSTOMER_TAB_IDS,
 } from "./landing-page.cards.js";
 import { customerNode, storeOrdersHref, contactHref } from '/js/site.js';
+import { Rail } from '/components/Rail.js';
+import { railFold } from '/components/SettingsPage.js';
+import { useRailSections, contentsRail } from '/components/ContentsRail.js';
 
 /** The menu before "Show all tools": the customer's eight on a node the store made, else the basic one. */
 const basicTabs = () => (customerNode() ? CUSTOMER_TAB_IDS : BASIC_TAB_IDS);
@@ -171,6 +177,14 @@ const labelOf = (it) => {
   }
   return t(it.labelKey);
 };
+
+/**
+ * One panel of the overview as a section of its contents rail: a marker with no box of its own
+ * (css/components/tab-page.css .rail-mark), named and counted for the rail (components/ContentsRail.js).
+ */
+const railMark = (key, label, panel, count = null) => html`
+  <div class="rail-mark" data-rail=${key} data-rail-label=${label}
+    data-rail-count=${count == null ? undefined : String(count)}>${panel}</div>`;
 
 /* ───── Tier heuristic ───── */
 
@@ -260,6 +274,9 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     } catch { return false; }
   });
   // Extensions promo: shown once the path's apps stage is done or there are three apps (CortexSection decides), dismissable for good.
+  // The overview's contents rail reads the panels it has drawn (components/ContentsRail.js).
+  const [railRoot, setRailRoot] = useState(null);
+  const railSections = useRailSections(railRoot);
   const [showPromo, setShowPromo] = useState(() => { try { return localStorage.getItem('aimeat.cortexPromoDismissed') !== '1'; } catch { return true; } });
   const dismissPromo = () => { setShowPromo(false); try { localStorage.setItem('aimeat.cortexPromoDismissed', '1'); } catch { /* noop */ } };   // eslint-disable-line aimeat/no-silent-catch -- noop
 
@@ -551,6 +568,18 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         })()}
         <//>`;
 
+  // The overview's contents rail: its panels as they draw, then the home and, for an operator, the
+  // admin. The side menu already lists every Settings page, so the rail names no other page.
+  const overviewRail = !openView ? contentsRail({
+    title: t('profile.landing.railTitle'),
+    sections: railSections,
+    pagesLabel: t('profile.landing.railPages'),
+    pages: [
+      { key: 'home', label: t('nav.home'), href: '/v1/home' },
+      isOperator ? { key: 'admin', label: t('nav.admin'), href: '/v1/admin' } : null,
+    ],
+  }) : null;
+
   return html`
     <${SettingsFrame} open=${drawerOpen} onToggle=${() => setDrawerOpen(o => !o)} onClose=${() => setDrawerOpen(false)}
       menuLabel=${t('profile.landing.menu')} menu=${menu} overview=${!openView}
@@ -570,22 +599,28 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
           <${SettingsFrameHead} crumb=${getTabLabel(openView.tabId)} />
           <${SettingsFrameBody}>${renderTab(openView.tabId)}<//>
         ` : html`
+          ${overviewRail && railFold([overviewRail])}
+          <div class="og-grid">
+          <div class="og-main og-main--flow" ref=${setRailRoot}>
           <${ProfileCard} tier=${tier} stats=${stats} session=${session}
             onEditProfile=${() => setEditOpen(true)}
             switchTab=${(id) => open(id, 'main')} />
-          <${WaitingForYou} owner=${owner} />
-          <${NextSteps} switchTab=${(id) => open(id, 'main')} />
+          ${/* Each panel is a section of the contents rail: a marker with no box of its own, listed
+                once the panel has drawn something (components/ContentsRail.js). */''}
+          ${railMark('waiting', t('profile.landing.waitingTitle'), html`<${WaitingForYou} owner=${owner} />`)}
+          ${railMark('next', t('profile.landing.nextTitle'), html`<${NextSteps} switchTab=${(id) => open(id, 'main')} />`)}
           <${CardGrid} cols="panels">
-            <${ContinueCard} />
-            <${AgentsCard} owner=${owner} initialAgents=${homeAgents} />
+            ${railMark('continue', t('profile.landing.continueTitle'), html`<${ContinueCard} />`)}
+            ${railMark('agents', t('profile.landing.agentsTitle'), html`<${AgentsCard} owner=${owner} initialAgents=${homeAgents} />`,
+              typeof stats?.agents === 'number' && stats.agents > 0 ? stats.agents : null)}
             ${/* Inventory (quotas, spend, commerce) stays OFF the first screen until the account
                   has produced something. A brand-new account measurably read the zero-rows as a
                   half-finished tool (UX-remake v3, P5); an established one still gets them. */
               hasOwnContent ? html`
-              <${UsageCard} switchTab=${(id) => open(id, 'main')} initialUsage=${homeUsage} />
-              <${AiSpendCard} />
-              <${AgentLedgerCard} />
-              <${CommerceCard} />` : null}
+              ${railMark('usage', t('profile.landing.usageTitle'), html`<${UsageCard} switchTab=${(id) => open(id, 'main')} initialUsage=${homeUsage} />`)}
+              ${railMark('ai-spend', t('profile.landing.aiSpendTitle'), html`<${AiSpendCard} />`)}
+              ${railMark('agent-ledger', t('profile.landing.agentLedgerTitle'), html`<${AgentLedgerCard} />`)}
+              ${railMark('commerce', t('profile.landing.commerceTitle'), html`<${CommerceCard} />`)}` : null}
           <//>
           ${showPromo ? html`
             <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo}
@@ -594,6 +629,10 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
                 foot of this overview as a footer preference. The way to the home itself is the
                 header and the top of the sidebar; this only decides the start page. */''}
           <${StartPageSetting} footer />
+          </div>
+          ${/* An empty column while no panel has drawn keeps the page column at its width. */''}
+          ${overviewRail ? html`<${Rail} ...${overviewRail} />` : html`<div></div>`}
+          </div>
         `}
     <//>
   `;

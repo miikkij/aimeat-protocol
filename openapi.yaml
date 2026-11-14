@@ -1701,6 +1701,11 @@ components:
             properties:
               ref: { type: string }
               format: { type: string, enum: [markdown] }
+        contentsMenu:
+          type: boolean
+          description: |
+            The home only. Whether the contents menu (the page's parts as numbered links with
+            their counts) is drawn beside the page. Absent means drawn.
         meta:
           type: object
           properties:
@@ -1738,6 +1743,11 @@ components:
             properties:
               ref: { type: string }
               format: { type: string, enum: [markdown] }
+        contentsMenu:
+          type: boolean
+          description: |
+            The home only (refused on the other surfaces): true draws the contents menu, false
+            hides it. Left out, the value stored now stays.
         meta:
           type: object
           properties:

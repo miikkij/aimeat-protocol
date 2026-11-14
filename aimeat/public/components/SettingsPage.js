@@ -41,12 +41,14 @@
  *   - help: a term whose question mark stands after the title words (see PageHead.js).
  *   - start: what stands under the head, before the figure strip (a slot: the PageStart component,
  *     what the page is for, what to do first and what happens next).
- * @structure SettingsPage(props) · settingsRail(props)
+ * @structure SettingsPage(props) · settingsRail(props) · railFold(rails)
  * @usage html`<${SettingsPage} name="skills" crumb=${[t('nav.profile'), t('profile.landing.menuBuildShare'), t('skills.tabLabel')]}
  *          title=${t('skills.tabLabel')} sub=${x('titleSub')} marks=${marks} desc=${x('desc')} actions=${actions}
  *          strip=${strip} railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pages}
  *          after=${html`<${ctx.ConfirmUI} />`}>…the sections…<//>`
  * @version-history
+ *   v1.5.1 — 2026-11-14 — railFold is exported: the home and the Settings & Controls overview draw
+ *     the same closed row for their contents rail (components/ContentsRail.js).
  *   v1.5.0 — 2026-11-09 — On a narrow screen the rails are one closed row after the strip and before
  *     the sections (railFold), not the last thing on the page; Jouni's choice "Suljettuna". A wide
  *     screen is unchanged, and a page with `side` (an organism workspace's tree) keeps its place.
@@ -89,7 +91,7 @@ export function settingsRail({ railTitle, sections, back, pages, pagesLabel, rai
  * stands under the whole page, so its contents were the last thing on it (Jouni, 2026-11-09:
  * "eikö tuon menun pitäisi näkyä aika ylhäällä"). A link in it closes it.
  */
-function railFold(rails) {
+export function railFold(rails) {
   const first = rails[0];
   const count = (first.groups?.[0]?.items || []).filter((it) => it && !it.back).length;
   // Closed in the capture phase, before the link's own handler scrolls: closed after it, the fold's

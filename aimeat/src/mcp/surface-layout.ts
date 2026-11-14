@@ -24,6 +24,7 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-11-14 — aimeat_surface_layout_set takes `contents_menu` (the home's contents menu on or off).
  *   2026-10-08 — aimeat_surface_layout_set passes the session's scopes with the passage provenance
  *     (aiprov E9).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -137,7 +138,7 @@ export function registerSurfaceLayoutTools(
             inputSchema: zodShapeFor('aimeat_surface_layout_set'),
             annotations: annotationsFor('aimeat_surface_layout_set'),
         },
-        async ({ surface, blocks, note, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
+        async ({ surface, blocks, note, contents_menu, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
             if (!await isOperator()) return notOperator();
             if (!SurfaceLayoutService.isSurface(surface)) {
                 return out({ error: 'SURFACE_NOT_FOUND', message: `This node has no page called "${surface}".` }, true);
@@ -148,7 +149,11 @@ export function registerSurfaceLayoutTools(
             // number to go back to is the whole of the undo story.
             const before = await svc.versions(target, 1);
             try {
-                const submission: LayoutSubmission = { v: 1, blocks, ...(note ? { meta: { note } } : {}) };
+                const submission: LayoutSubmission = {
+                    v: 1, blocks,
+                    ...(typeof contents_menu === 'boolean' ? { contentsMenu: contents_menu } : {}),
+                    ...(note ? { meta: { note } } : {}),
+                };
                 // A passage is prose on a page every member lands on, and an AI is exactly who an
                 // operator asks to write one. Declaring is optional; silence stays UNSTATED rather
                 // than becoming a claim that a person wrote it.

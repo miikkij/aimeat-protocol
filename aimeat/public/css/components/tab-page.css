@@ -10,6 +10,9 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.9.0 — 2026-11-14 — .og-main--flow (a page column that keeps its parts' own spacing) and
+ *     .rail-mark (a section marker with no box), for the contents rail of the home and of the
+ *     Settings & Controls overview (components/ContentsRail.js).
  *   v1.8.0 — 2026-11-09 — Under 1100px the rails are one closed row after the strip (.og-rail-fold,
  *     SettingsPage railFold), and the rails in the side column are hidden there; Jouni's choice
  *     "Suljettuna". Wider screens are unchanged.
@@ -31,6 +34,11 @@
 .og { --poster-page-size: 2.8rem; --poster-section-size: 1.6rem; font-family: var(--font-showroom-body); color: var(--text); }
 .og-grid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 2.75rem; align-items: start; margin-top: .5rem; }
 .og-main { display: flex; flex-direction: column; gap: 1.4rem; min-width: 0; }
+/* A page column that keeps the spacing its parts already had (their own margins), for the home and
+   the Settings & Controls overview beside their contents rail (components/ContentsRail.js). */
+.og-main--flow { display: block; }
+/* A contents-rail section marker that draws no box of its own (ContentsRail.js). */
+.rail-mark { display: contents; }
 .og-rail { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding: 1rem 1.1rem; background: var(--ink-ground); color: var(--on-ink-ground); border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow-raised); }
 .og-rail-label { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: var(--shape-case-heading); font-size: .75rem; letter-spacing: calc(var(--shape-tracking-label) * .6); color: var(--sun); margin-bottom: .25rem; }
 .og-rail-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 800; line-height: 1.4; color: var(--on-ink-ground); text-decoration: none; opacity: .65; }

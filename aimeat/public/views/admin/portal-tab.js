@@ -24,6 +24,8 @@
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   2026-11-14 — On the Home tab, "Show the contents menu" (the layout's `contentsMenu`, on by
+ *     default), saved with the arrangement and counted as one waiting change.
  *   2026-11-12 — The AI paste takes a bundle that holds only language versions (`templates`), and
  *     its message counts every HTML page stored. The HTML page's section copies the site prompt.
  *   2026-11-12 — The HTML page has language versions: the editor opens the default page or one
@@ -64,6 +66,7 @@ import { Note } from '/components/Note.js';
 import { SettingBox } from '/components/Box.js';
 import { Tabs } from '/components/Tabs.js';
 import { SaveBar } from '/components/SaveBar.js';
+import { Check } from '/components/Check.js';
 import { Beside, Stack, Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import {
@@ -173,6 +176,9 @@ export default function PortalTab({ data, reload }) {
   const [catalog, setCatalog] = useState([]);
   const [passages, setPassages] = useState({});
   const [source, setSource] = useState('default');
+  // The home only: whether the members' home draws its contents menu (the layout's `contentsMenu`;
+  // absent means drawn).
+  const [contentsMenu, setContentsMenu] = useState(true);
   const [problems, setProblems] = useState([]);
   const [openPart, setOpenPart] = useState(null);
   // How many changes are waiting. A count of edits rather than a diff: the operator asked for
@@ -206,6 +212,7 @@ export default function PortalTab({ data, reload }) {
       setBlocks(layoutRes.data?.layout?.blocks ?? []);
       setPassages(layoutRes.data?.freeform ?? {});
       setSource(layoutRes.data?.source ?? 'default');
+      setContentsMenu(layoutRes.data?.layout?.contentsMenu !== false);
       setProblems(layoutRes.data?.problems ?? []);
       setCatalog(blocksRes.data?.blocks ?? []);
       setPending(0);
@@ -272,7 +279,7 @@ export default function PortalTab({ data, reload }) {
       const payload = blocks.map(b => (b.id === 'common.freeform' && passages[b.key] !== undefined
         ? { ...b, body: passages[b.key] }
         : b));
-      await saveSurfaceLayout(surface, { v: 1, blocks: payload });
+      await saveSurfaceLayout(surface, { v: 1, blocks: payload, ...(surface === 'home' ? { contentsMenu } : {}) });
       showOk(P('saved'));
       setPending(0);
       setTouched(new Set());
@@ -529,6 +536,9 @@ export default function PortalTab({ data, reload }) {
           onSelect=${(s) => { setSurface(s); setOpenPart(null); }}
           items=${SURFACES.map(s => ({ value: s, label: P('surface.' + s) }))} />
         <${Note} kind="hint">${P('surface.' + surface + 'Note')}<//>
+        ${surface === 'home' && html`
+          <${Check} checked=${contentsMenu} help="site.contentsMenu"
+            onChange=${(on) => { setContentsMenu(on); setPending(c => c + 1); }}>${P('contentsMenu')}<//>`}
 
         ${problems.length > 0 && html`
           <${SettingBox} label=${P('parts.leftOut')}>

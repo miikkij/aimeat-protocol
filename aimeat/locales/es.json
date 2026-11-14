@@ -31836,5 +31836,18 @@
   "admin.compliance.di.list.openRegistration": "registro abierto",
   "admin.compliance.di.list.empty": "No hay nada detrás de este número.",
   "admin.compliance.di.list.capped": "La lista muestra los primeros 500 de {n}.",
-  "admin.compliance.di.list.privacy": "El administrador ve el nombre del conjunto de datos, su dueño, con quién se comparte y cuántos lo leen. El administrador no ve las filas de los datos ni los datos de contacto de un destinatario con nombre."
+  "admin.compliance.di.list.privacy": "El administrador ve el nombre del conjunto de datos, su dueño, con quién se comparte y cuántos lo leen. El administrador no ve las filas de los datos ni los datos de contacto de un destinatario con nombre.",
+  "home.rail.title": "En tu inicio",
+  "home.rail.pages": "Páginas",
+  "home.rail.news": "Actualizaciones del sistema",
+  "home.rail.allUpdates": "Todas las actualizaciones del sistema",
+  "profile.landing.railTitle": "En esta página",
+  "profile.landing.railPages": "Páginas",
+  "admin.portal.contentsMenu": "Mostrar el menú de contenido",
+  "explain.site.contentsMenu.title": "El menú de contenido del inicio",
+  "explain.site.contentsMenu.short": "Una lista de las partes del inicio, con un número cuando la parte tiene uno. Al pulsar una línea, la página va a esa parte.",
+  "explain.site.contentsMenu.what": "El menú de contenido lista las partes del inicio que muestran algo, en el orden de la página, con un número cuando la parte tiene uno: las actualizaciones del sistema desde la última visita, las conversaciones que esperan tu respuesta y los agentes que trabajan. Al pulsar una línea, la página va a esa parte. Debajo de las partes hay enlaces a todas las actualizaciones del sistema, a la configuración del hogar y a Configuración y controles. En una pantalla ancha el menú está al lado de la página; en una pantalla de menos de 1100 píxeles es una fila cerrada arriba de la página. Está activado por defecto. Este ajuste cambia solo el inicio que ven los miembros cuando su cuenta ya está lista: el inicio que ven mientras preparan su cuenta muestra sus pasos y no tiene menú, y la portada de Configuración y controles siempre tiene su menú.",
+  "explain.site.contentsMenu.ex1": "El inicio de tus miembros tiene una docena de partes, y la gente pasa de largo lo que buscaba. Deja el menú activado: ven enseguida qué tiene la página y cuánto les espera.",
+  "explain.site.contentsMenu.ex2": "Tu inicio tiene solo dos o tres partes. Desactiva el menú: las partes de la página usan entonces todo el ancho.",
+  "explain.site.contentsMenu.tip": "Tu IA puede activarlo o desactivarlo por ti. Dile: \"Desactiva el menú de contenido del inicio de los miembros.\" Usa la misma herramienta con la que ordena el inicio."
 }

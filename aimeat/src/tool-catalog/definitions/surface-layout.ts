@@ -17,6 +17,7 @@
  * @structure surfaceLayoutTools
  * @usage import { surfaceLayoutTools } from './surface-layout.js';
  * @version-history
+ *   2026-11-14 — aimeat_surface_layout_set takes `contents_menu`: the home's contents menu on or off.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -54,6 +55,7 @@ export const surfaceLayoutTools = [
             surface: { type: 'string', required: true, description: "Which page: 'portal', 'home' or 'home-onboarding'." },
             blocks: { type: 'array', required: true, description: 'The blocks in the order they should appear. Each is { id, key } with optional props, titles, hidden, children and — on a free-form block — body.', zod: z.array(z.record(z.string(), z.unknown())) },
             note: { type: 'string', description: 'One line on what this change was for. It shows in the node change log.' },
+            contents_menu: { type: 'boolean', description: "The home only ('home'): true shows the contents menu, the list of the page's parts with their counts beside the page (one closed row on a phone); false hides it. Leave it out to keep what is set now; a home nobody has set shows it." },
             ai_provenance: { type: 'object', description: 'What you did to produce the words in a free-form block, if you wrote them. Optional; saying nothing leaves it unstated rather than claiming a person wrote it.', zod: AiProvenanceBlockSchema },
             ai_provenance_id: { type: 'string', description: 'An existing provenance record of your own to attach instead of declaring a new one.' },
         },

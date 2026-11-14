@@ -189,6 +189,7 @@ everywhere at once, and say so in the Changes section.
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
 | the account holder | the human who owns everything here | owner | omistaja | propietario |
 | this product's settings area | where a person changes their own things | Settings & Controls | Asetukset ja hallinta | Configuración y controles |
+| the list of a page's parts beside it | the dark column of numbered links with their counts beside a Settings page, the home and the Settings & Controls overview; one closed row on a phone. An operator word for the setting in Admin > Portal > Home; the column itself is headed by where you are ("On this page", "On your home") | contents menu | sisältövalikko | menú de contenido |
 | one piece of this AIMEAT's own screens | an entry of the interface library (one with a module, or a shape of the design language), as the design lab and Themes & Styles list it; never an app | component | komponentti | componente |
 | a component no page draws today | kept until the developer says keep or delete | unused | käyttämätön | sin uso |
 | the values a theme sets | colours, faces and sizes that a component reads from the theme | theme tokens | teeman arvot | valores del tema |

@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-14: AgentsBlock and YourTurnBlock give the home's contents rail their count (agents at
+ *     work, threads waiting) on a marker with no box of its own (components/ContentsRail.js).
  *   2026-11-10: YourTurnBlock asks for the waiting threads of its window only, the first `max` and
  *     the count of all (GET /v1/messages/conversations?waiting&since&limit&preview); the same rows
  *     and the same "N more are waiting".
@@ -213,8 +215,12 @@ export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any
   if (!data) return null;
   // How far back the band looks is the person's choice, kept in home.prefs so it follows them to
   // every device and an AI can read or set it with the memory tools.
-  return html`<${YourTurn} threads=${data.threads} total=${data.total} anyTime=${data.anyTime} max=${max}
-    days=${prefs?.turnDays} onDays=${(d) => writePrefs({ turnDays: d })} />`;
+  // The count the home's contents rail shows beside this band: every thread waiting in the window.
+  const waiting = data.total ?? data.threads.length;
+  return html`<div class="rail-mark" data-rail-count=${waiting ? String(waiting) : ''}>
+    <${YourTurn} threads=${data.threads} total=${data.total} anyTime=${data.anyTime} max=${max}
+      days=${prefs?.turnDays} onDays=${(d) => writePrefs({ turnDays: d })} />
+  </div>`;
 }
 
 export function FleetBlock() {
@@ -247,7 +253,11 @@ export function AgentsBlock(/** @type {{ ctx?: any, props?: Record<string, any>,
   const { data } = useShared('home-agents', state?.initialized ? `/v1/home/agents?limit=${max}` : '',
     ['agents', 'open-items', 'scheduler']);
   if (!state?.initialized || !data) return null;
-  return html`<${AgentsBand} data=${data} navigate=${ctx?.navigate} />`;
+  // The count the home's contents rail shows beside this band: the agents at work, all of them.
+  const atWork = data.worker_total ?? (data.workers ?? []).length;
+  return html`<div class="rail-mark" data-rail-count=${atWork ? String(atWork) : ''}>
+    <${AgentsBand} data=${data} navigate=${ctx?.navigate} />
+  </div>`;
 }
 
 /**

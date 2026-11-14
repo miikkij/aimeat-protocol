@@ -25,6 +25,10 @@
  *   const { layout, freeform, ready } = useSurfaceLayout('home');
  *   html`<${SurfaceRenderer} surface="home" layout=${layout} freeform=${freeform} ctx=${ctx} placeholders=${true} />`
  * @version-history
+ *   2026-11-14: A block's slot carries `data-rail` (its key), so the home's contents rail lists the
+ *     blocks that drew something, under their own headings (components/ContentsRail.js); a group is
+ *     one section under its heading. A block's height is measured through a child with no box of
+ *     its own (the rail's count marker).
  *   2026-11-09: `placeholders` (the home): while a block's code or data is on its way, its place shows
  *     its heading and the loading line at the height it last had in this browser, and drops it when
  *     the block draws, when every shared read has answered with the block still empty, or after 8 s.
@@ -204,11 +208,20 @@ function rememberBlock(key, px, title, locale) {
   try { localStorage.setItem(HEIGHTS_KEY, JSON.stringify(map)); } catch (err) { swallowed('surface: remember block height', err); }
 }
 
+/** The first (or last) element at or under `el` that has a box: a child without one (display:
+ *  contents, the contents-rail marker a block may wrap itself in) is measured by its own children. */
+function boxed(el, last) {
+  let box = el;
+  while (box && getComputedStyle(box).display === 'contents') box = last ? box.lastElementChild : box.firstElementChild;
+  return box;
+}
+
 /** The drawn height of a wrapper that has no box: its first child's top to its last child's bottom. */
 function drawnHeight(el) {
-  const kids = el.children;
-  if (!kids.length) return 0;
-  return kids[kids.length - 1].getBoundingClientRect().bottom - kids[0].getBoundingClientRect().top;
+  const first = boxed(el.firstElementChild, false);
+  const last = boxed(el.lastElementChild, true);
+  if (!first || !last) return 0;
+  return last.getBoundingClientRect().bottom - first.getBoundingClientRect().top;
 }
 
 /** A block's own heading as it drew it: the words of its first section title, without a question mark. */
@@ -279,7 +292,7 @@ function Block({ block, ctx, freeform, freeformProvenance, locale, placeholders 
       ${waiting && html`<div class="surface-slot-wait" ref=${keepHeight}>
         ${title ? html`<${Band} tight=${true} title=${title}><${Note} kind="loading" /><//>` : html`<${Note} kind="loading" />`}
       </div>`}
-      <div class="surface-slot-content" ref=${content}>${drawn}</div>
+      <div class="surface-slot-content" ref=${content} data-rail=${block.key}>${drawn}</div>
     </div>`;
 }
 
@@ -298,10 +311,14 @@ export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, freeformProve
       const kids = block.children.filter(c => !c.hidden);
       const heading = titleOf(block, locale);
       const term = helpTermOf(block);
+      // A group is one section of the home's contents rail, under its own heading; the blocks inside
+      // it are not listed again (components/ContentsRail.js). The marker draws no box.
       return html`
-        <${Band} tight=${true} title=${heading && term ? html`${heading} <${HelpTip} term=${term} label=${heading} />` : heading} key=${block.key}>
+        <div class="rail-mark" data-rail=${block.key} key=${block.key}>
+        <${Band} tight=${true} title=${heading && term ? html`${heading} <${HelpTip} term=${term} label=${heading} />` : heading}>
           ${kids.map(child => html`<${Block} key=${child.key} block=${child} ctx=${ctx} freeform=${freeform} freeformProvenance=${freeformProvenance} locale=${locale} placeholders=${placeholders} />`)}
-        <//>`;
+        <//>
+        </div>`;
     }
     return html`<${Block} key=${block.key} block=${block} ctx=${ctx} freeform=${freeform} freeformProvenance=${freeformProvenance} locale=${locale} placeholders=${placeholders} />`;
   })}`;

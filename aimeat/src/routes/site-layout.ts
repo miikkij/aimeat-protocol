@@ -26,6 +26,8 @@
  * @structure siteLayoutRouter(config, storage)
  * @usage Mounted from siteRouter() so it inherits the site family's LB guard.
  * @version-history
+ *   v1.3.0 — 2026-11-14 — The import keeps the home's stored `contentsMenu` when the paste leaves it
+ *     out (SurfaceLayoutService.keepContentsMenu), as a save does.
  *   v1.2.0 — 2026-10-16 — The layout reads carry `freeform_provenance`: each passage's provenance block,
  *     so the front page and the home show the AI label a passage owes. The passages' records were
  *     dropped here.
@@ -258,7 +260,10 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
         try {
             // Check every surface first, then write them. A refusal on the second must not leave the
             // first one applied.
-            const prepared = entries.map(([name, submission]) =>
+            // A paste that leaves the home's contents menu out keeps the stored choice, as a save does.
+            const kept = await Promise.all(entries.map(async ([name, submission]) =>
+                [name, await svc.keepContentsMenu(name as SurfaceId, submission)] as const));
+            const prepared = kept.map(([name, submission]) =>
                 svc.prepare(name as SurfaceId, submission, req.auth!.sub, 'import'));
             const declared = passageProvenance(req);
             // Refused before the first surface is written, like every other refusal of a paste.

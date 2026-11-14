@@ -78,6 +78,8 @@ html[data-margin-pattern] #app::after {
 /* ── Where the strips are, page by page ────────────────────────────────────────────────────── */
 /* The home: a 1180px box in the middle (components/page-frame.css); the strip reaches 40px into its padding. */
 #app:has(.poster-page) { --mp-wl: max(0px, calc((100vw - 1180px) / 2 + 40px)); --mp-wr: var(--mp-wl); }
+/* The home with its contents rail: the box is wider by the rail and its gap (page-frame.css). */
+#app:has(.poster-page--rail) { --mp-wl: max(0px, calc((100vw - 1180px - 240px - 2.75rem) / 2 + 40px)); --mp-wr: var(--mp-wl); }
 /* The chat: a 1440px grid plus 32px of padding a side (1504px outside); the strips stop where the
    rail begins, so the rail and the conversation sit on clean paper. */
 #app:has(.poster-conversation) { --mp-wl: max(0px, calc((100vw - 1504px) / 2 + 32px)); --mp-wr: var(--mp-wl); }

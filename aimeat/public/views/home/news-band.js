@@ -15,6 +15,8 @@
  * @structure default NewsBand({ session, navigate }) · whoWords · rowOf
  * @usage html`<${NewsBand} session=${session} navigate=${navigate} />` (views/home/index.js)
  * @version-history
+ *   v1.1.0 — 2026-11-14 — A contents-rail marker around the band (name "System updates", the count of
+ *     the changes it holds), with no box of its own.
  *   v1.0.0 — 2026-10-18 — Initial (wish-uutta-aimeatissa-mit-on-tullut-sitten-viime-katselun-kenelle).
  */
 import { h } from 'preact';
@@ -87,7 +89,11 @@ export default function NewsBand({ session, navigate }) {
     ? tr('news.titleWindow', 'The most important changes of the last {n} days').replace('{n}', String(WINDOW_DAYS))
     : tr('news.titleSince', 'New since you last looked');
 
+  // The home's contents rail lists this band under a short name, with every change it holds counted
+  // (components/ContentsRail.js); the marker draws no box of its own.
+  const total = news.highlights.length + news.others.length + news.hidden;
   return html`
+    <div class="rail-mark" data-rail="news" data-rail-label=${tr('home.rail.news', 'System updates')} data-rail-count=${String(total)}>
     <${Stack} below="part">
     <${Band} title=${title}>
       ${news.highlights.length > 0 && html`
@@ -116,5 +122,6 @@ export default function NewsBand({ session, navigate }) {
         <${Action} tone="more" href="/v1/changelog" onClick=${history}>${tr('news.history', 'Everything that has changed →')}<//>
       <//>
     <//>
-    <//>`;
+    <//>
+    </div>`;
 }

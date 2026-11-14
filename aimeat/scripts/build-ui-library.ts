@@ -123,6 +123,7 @@ export const NOT_PARTS: Record<string, string> = {
     '/components/useViewCSS.js': 'A hook that loads a view\'s stylesheet; it draws nothing.',
     '/components/data-map/model.js': 'The data model of the data map (what is where), no markup.',
     '/components/ai-label-icons.js': 'The icon data the AI label draws; the part is ai-label.',
+    '/components/ContentsRail.js': 'A hook that reads the sections a page has drawn and the rail data built from them; it draws nothing, the part is rail.',
 };
 
 /** What a person does with a part: the fixed words `use` takes (08-component-rules.md). */

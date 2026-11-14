@@ -28,6 +28,7 @@
  * @usage
  *   import { validateLayout, parseLayout } from './validate.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — `contentsMenu`: true or false, on the home only; kept on read for the home.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -149,6 +150,12 @@ export function validateLayout(input: unknown, surface: SurfaceId, config: Aimea
     if (raw.binding !== undefined && (raw.binding as { kind?: string }).kind !== 'node') {
         fail('LAYOUT_INVALID', 'Only a node-level layout can be written on this node today.');
     }
+    if (raw.contentsMenu !== undefined) {
+        if (typeof raw.contentsMenu !== 'boolean') fail('LAYOUT_INVALID', '"contentsMenu" must be true or false.');
+        if (surface !== 'home') {
+            fail('LAYOUT_INVALID', `The contents menu is a setting of the home page only; leave "contentsMenu" out of the ${surface} layout.`);
+        }
+    }
     if (!Array.isArray(raw.blocks)) fail('LAYOUT_INVALID', 'The layout has no list of blocks.');
 
     const flat = walk(raw.blocks as SurfaceBlockInstance[]);
@@ -243,6 +250,7 @@ export function validateLayout(input: unknown, surface: SurfaceId, config: Aimea
         binding: { kind: 'node' },
         blocks: raw.blocks as SurfaceBlockInstance[],
         ...(Object.keys(freeform).length ? { freeform: raw.freeform as SurfaceLayout['freeform'] } : {}),
+        ...(typeof raw.contentsMenu === 'boolean' ? { contentsMenu: raw.contentsMenu } : {}),
         meta: {
             updatedAt: new Date().toISOString(),
             updatedBy: raw.meta?.updatedBy ?? 'unknown',
@@ -342,6 +350,9 @@ export function parseLayout(stored: unknown, surface: SurfaceId, config: AimeatC
             binding: { kind: 'node' },
             blocks,
             ...(Object.keys(freeform).length ? { freeform } : {}),
+            // Read only where it is a setting; a value on another surface's record is dropped quietly,
+            // because the page draws the same either way.
+            ...(surface === 'home' && typeof rec.contentsMenu === 'boolean' ? { contentsMenu: rec.contentsMenu } : {}),
             meta: {
                 updatedAt: typeof rec.meta?.updatedAt === 'string' ? rec.meta.updatedAt : new Date(0).toISOString(),
                 updatedBy: typeof rec.meta?.updatedBy === 'string' ? rec.meta.updatedBy : 'unknown',

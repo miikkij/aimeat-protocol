@@ -25,6 +25,8 @@
  * @usage
  *   import type { SurfaceLayout, SurfaceId } from './types.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — `contentsMenu` on the home's layout: the operator's choice whether the
+ *     contents menu is drawn (absent = drawn).
  *   v1.0.0 — 2026-08-26 — Initial: the record, its binding, the block instance and what a read
  *     returns when the stored value had to be repaired.
  */
@@ -88,6 +90,12 @@ export interface SurfaceLayout {
     blocks: SurfaceBlockInstance[];
     /** Instance key → where its words are stored. */
     freeform?: Record<string, FreeformRef>;
+    /**
+     * The home only: whether the contents menu (the page's parts as numbered links with their
+     * counts, beside the page on a wide screen and one closed row on a phone) is drawn. Absent means
+     * drawn, which is the default; false leaves it out. Refused on the other surfaces.
+     */
+    contentsMenu?: boolean;
     meta: {
         updatedAt: string;
         updatedBy: string;

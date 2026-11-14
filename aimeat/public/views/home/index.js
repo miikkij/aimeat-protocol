@@ -16,6 +16,10 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-14: The finished home has the contents rail beside it (components/ContentsRail.js): its
+ *     drawn sections as numbered links with their counts, and the ways on (all system updates, the
+ *     home settings, Settings & Controls). The operator turns it off in Admin > Portal > Home; the
+ *     onboarding home has none (Jouni's design review, 2026-11-14).
  *   2026-11-09: The frame first. Until /v1/home/state answers, the home this account had on its last
  *     visit in this browser picks the layout, so the frame and every block's place draw at once; each
  *     place shows its heading and the loading line until its data arrives (renderer `placeholders`,
@@ -100,6 +104,9 @@ import { BuildWithYou } from './build-with-you.js';
 import { MorningDigestOffer } from './morning-digest.js';
 import { MadeForYouOffer } from './made-for-you.js';
 import { useHomeVisit } from './visits.js';
+import { Rail } from '/components/Rail.js';
+import { railFold } from '/components/SettingsPage.js';
+import { useRailSections, contentsRail } from '/components/ContentsRail.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const addressAsksForSettings = () => new URLSearchParams(location.search).get('settings') === '1';
@@ -165,6 +172,9 @@ export default function HomeView({ navigate }) {
   const surface = initialized ? finished : onboarding;
   // Which visit this is: the store's place times its two offers by it (visits.js).
   const visit = useHomeVisit(!!session);
+  // The contents rail reads the sections the page column has drawn (components/ContentsRail.js).
+  const [railRoot, setRailRoot] = useState(null);
+  const railSections = useRailSections(railRoot);
 
   // One line of feedback, and only for things that went wrong: the steps themselves report by
   // changing, which is louder than a message that fades.
@@ -228,8 +238,21 @@ export default function HomeView({ navigate }) {
     renderSteps: () => html`<${HomeJourney} />`,
   };
 
-  return html`
-    <${PageFrame}>
+  // The contents rail: on the finished home, unless the operator turned it off in Admin > Portal >
+  // Home (the layout's `contentsMenu`). The onboarding home has its steps instead (Jouni, 2026-11-14).
+  const withRail = !!initialized && surface.layout?.contentsMenu !== false;
+  const rail = withRail ? contentsRail({
+    title: tr('home.rail.title', 'On your home'),
+    sections: railSections,
+    pagesLabel: tr('home.rail.pages', 'Pages'),
+    pages: [
+      { key: 'updates', label: tr('home.rail.allUpdates', 'All system updates'), onClick: () => navigate('/v1/changelog') },
+      { key: 'home-settings', label: tr('home.settings.open', 'Home settings'), onClick: openSettings },
+      { key: 'controls', label: tr('nav.profile', 'Settings & Controls'), onClick: () => navigate('/v1/profile') },
+    ],
+  }) : null;
+
+  const page = html`
       ${/* What is new since the person last looked, on both homes, so the count on the header's Home
             link always points at something here. Outside the layout, because it goes away by being
             read rather than by being arranged. */''}
@@ -253,7 +276,17 @@ export default function HomeView({ navigate }) {
         freeformProvenance=${surface.freeformProvenance}
         ctx=${ctx}
         locale=${getLocale()}
-        placeholders=${true} />
+        placeholders=${true} />`;
+
+  return html`
+    <${PageFrame} width=${withRail ? 'rail' : 'wide'}>
+      ${withRail ? html`
+        ${rail && railFold([rail])}
+        <div class="og-grid">
+          <div class="og-main og-main--flow" ref=${setRailRoot}>${page}</div>
+          ${/* An empty column while no section has drawn keeps the page column at its width. */''}
+          ${rail ? html`<${Rail} ...${rail} />` : html`<div></div>`}
+        </div>` : page}
       <${HomeSettingsDialog} open=${settingsOpen} onClose=${closeSettings}
         session=${session} showToast=${showToast} />
       <${ToastBox} toast=${toast ? { msg: toast, type: 'error' } : null} hold role="status" />

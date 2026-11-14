@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-11-14 — .poster-page--rail: the home's column plus its contents rail.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -31,3 +32,6 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 /* Narrower than the home. This page is read top to bottom, and a line of running text across a
    wide screen is one a reader loses their place in. */
 .poster-page--narrow { max-width: 46rem; }
+/* The home with its contents rail: the wide column (1180px) plus the rail (240px) and the gap
+   between them (2.75rem), so the page's own column keeps its width. */
+.poster-page--rail { max-width: calc(1180px + 240px + 2.75rem); }

@@ -27,6 +27,8 @@
  *   const svc = new SurfaceLayoutService(config, storage);
  *   const { layout, degraded } = await svc.resolve('home');
  * @version-history
+ *   v1.4.0 — 2026-11-14 — keepContentsMenu(): write() and the import keep the home's stored
+ *     `contentsMenu` when a submission leaves it out.
  *   v1.3.0 — 2026-10-16 — readFreeformWithProvenance: each passage's provenance record id beside its
  *     words, so the page shows the AI label a passage owes; the layout read dropped it.
  *   v1.2.0 — 2026-10-08 — A portal passage is stored public (the portal is read without a session), so
@@ -95,6 +97,8 @@ export interface LayoutSubmission {
      */
     blocks?: unknown[];
     freeform?: Record<string, { ref: string; format: 'markdown' }>;
+    /** The home only. Left out, the stored value stays (see write()). */
+    contentsMenu?: boolean;
     meta?: { note?: string };
 }
 
@@ -197,9 +201,23 @@ export class SurfaceLayoutService {
         source: SurfaceLayout['meta']['source'],
         provenance?: PassageProvenance,
     ): Promise<ResolvedLayout> {
-        const prepared = this.prepare(surface, submission, changedBy, source);
+        const prepared = this.prepare(surface, await this.keepContentsMenu(surface, submission), changedBy, source);
         await this.refuseProvenance([prepared], provenance);
         return this.commit(prepared, changedBy, provenance);
+    }
+
+    /**
+     * The submission with the home's stored `contentsMenu` when it leaves the field out. The menu is
+     * one switch beside the blocks, and the callers that rearrange the blocks (an AI with
+     * aimeat_surface_layout_set, a pasted import, "start from the built-in layout") do not all send
+     * it, so moving a block never turns a hidden menu back on. Every write path calls this before
+     * prepare(): write() itself, and the import route for each surface it holds.
+     */
+    async keepContentsMenu(surface: SurfaceId, submission: LayoutSubmission): Promise<LayoutSubmission> {
+        if (surface !== 'home' || submission.contentsMenu !== undefined) return submission;
+        const current = await this.resolve(surface);
+        if (current.source !== 'stored' || typeof current.layout.contentsMenu !== 'boolean') return submission;
+        return { ...submission, contentsMenu: current.layout.contentsMenu };
     }
 
     /**

@@ -13,6 +13,8 @@
  *   pressing the delete cross beside a JSON blob they did not recognise.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=surface-layout
  * @version-history
+ *   v1.3.0 — 2026-11-14 — The home's contents menu (`contentsMenu`): stored and read by a member,
+ *     kept when a write leaves it out, refused when not true or false and on the portal.
  *   v1.2.0 — 2026-09-15 — home.own-aimeat is offered on both homes with a store and built into neither.
  *   v1.1.0 — 2026-08-28 — The showroom: the portal catalogue offers the six new blocks and the
  *     config-gated store, the built-in portal layout is the showroom order, and /v1/pricing
@@ -314,6 +316,53 @@ await test('A refused write leaves the previous layout exactly as it was', async
     }));
     const after = await homeBlockIds();
     assert(JSON.stringify(before) === JSON.stringify(after), `layout changed: ${before} → ${after}`);
+});
+
+// ─── The home's contents menu ───
+console.log('\nThe home\'s contents menu');
+
+const homeContentsMenu = async (token: (o?: RequestInit) => RequestInit = op) =>
+    (await json('/v1/site/layout/home', token())).body.data?.layout?.contentsMenu;
+
+await test('PUT home with contentsMenu false → stored, and a member reads it on their own home', async () => {
+    const { status } = await json('/v1/site/layout/home', op({ method: 'PUT', body: JSON.stringify({ ...GOOD_HOME, contentsMenu: false }) }));
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(await homeContentsMenu() === false, 'operator does not read contentsMenu false');
+    assert(await homeContentsMenu(member) === false, 'member does not read contentsMenu false');
+});
+
+await test('PUT home without contentsMenu keeps the stored choice (moving a block does not turn the menu back on)', async () => {
+    const { status } = await json('/v1/site/layout/home', op({ method: 'PUT', body: JSON.stringify(GOOD_HOME) }));
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(await homeContentsMenu() === false, `contentsMenu is ${await homeContentsMenu()} after a write that left it out`);
+});
+
+await test('PUT home with contentsMenu that is not true or false → 422, and the stored choice stays', async () => {
+    const { status, body } = await json('/v1/site/layout/home', op({ method: 'PUT', body: JSON.stringify({ ...GOOD_HOME, contentsMenu: 'no' }) }));
+    assert(status === 422, `expected 422, got ${status}`);
+    assert(String(body.error?.message).includes('contentsMenu'), `message: ${body.error?.message}`);
+    assert(await homeContentsMenu() === false, 'a refused write changed contentsMenu');
+});
+
+await test('PUT a portal layout with contentsMenu → 422, and the message names the home', async () => {
+    const { status, body } = await json('/v1/site/layout/portal', op({
+        method: 'PUT',
+        body: JSON.stringify({ v: 1, blocks: [{ id: 'portal.hero', key: 'portal.hero' }], contentsMenu: true }),
+    }));
+    assert(status === 422, `expected 422, got ${status}`);
+    assert(String(body.error?.message).includes('home page only'), `message: ${body.error?.message}`);
+});
+
+await test('POST /v1/site/layout-import without contentsMenu keeps the stored choice too', async () => {
+    const { status } = await json('/v1/site/layout-import', op({ method: 'POST', body: JSON.stringify({ layout: { home: GOOD_HOME } }) }));
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(await homeContentsMenu() === false, `contentsMenu is ${await homeContentsMenu()} after an import that left it out`);
+});
+
+await test('PUT home with contentsMenu true → the menu is on again', async () => {
+    const { status } = await json('/v1/site/layout/home', op({ method: 'PUT', body: JSON.stringify({ ...GOOD_HOME, contentsMenu: true }) }));
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(await homeContentsMenu() === true, `contentsMenu is ${await homeContentsMenu()}`);
 });
 
 // ─── Free-form passages ───
