@@ -54762,10 +54762,9 @@ paths:
               required: [allowed_origins]
               properties:
                 allowed_origins:
-                  type: array
+                  type: [array, 'null']
                   items:
                     type: string
-                  nullable: true
                   description: Array of origin URLs, or null to inherit node default
                   example: ["https://myapp.example.com", "https://localhost:3000"]
       responses:
