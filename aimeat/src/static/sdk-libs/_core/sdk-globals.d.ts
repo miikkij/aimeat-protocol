@@ -10,6 +10,7 @@
  *   casts, and is shared by every lib (e.g. audio also needs webkitAudioContext).
  * @usage Picked up by tsconfig.sdk.json (its include globs the sdk-libs .d.ts files). No runtime effect.
  * @version-history
+ *   v1.6.0 — 2026-11-14 — __AIMEAT_HEADER_CFG__: what the served header needs from the node for its bar.
  *   v1.5.0 — 2026-11-11 — __AIMEAT_AUTH_CFG__.signInTexts: the operator's sign-in dialog texts per language.
  *   v1.4.0 — 2026-11-02 — __AIMEAT_AUTH_CFG__.passwordSignIn and twoStepRequired: the sign-in policy.
  *   v1.3.0 — 2026-10-31 — __AIMEAT_SDK_CFG__.defaultLocale: the node's own language (site.default_locale).
@@ -29,6 +30,9 @@ interface Window {
   AIMEATAgentFace?: Record<string, any>;
   /** Serve-time config prelude prepended to each bundle (see _core/config.js + libs/sdk-serve.ts). */
   __AIMEAT_SDK_CFG__?: { nodeId: string; baseUrl: string; heartbeatMs?: number; defaultLocale?: string };
+  /** aimeat-header's extra serve-time prelude (routes/libs/sdk-serve.ts headerPrelude): the node's
+   *  Learn address, whether it is a customer's node, and whether it is signed-in only. */
+  __AIMEAT_HEADER_CFG__?: { learn?: string; customerNode?: boolean; signedInOnly?: boolean };
   /** aimeat-auth's extra serve-time prelude (server-computed, see routes/libs.ts): the OIDC providers
    *  enabled on the node, and whether the node's registration gate demands an email. */
   __AIMEAT_AUTH_CFG__?: {

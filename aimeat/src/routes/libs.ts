@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.19.0 - 2026-11-14 - The aimeat-header prelude says what the bar needs from the node (headerPrelude: the Learn link, a customer's node, a signed-in-only node).
  * v2.18.0 - 2026-11-11 - The aimeat-auth prelude carries the operator's sign-in dialog texts per language (signInTexts: auth.sign_in_title_*, auth.sign_in_line_*).
  * v2.17.0 - 2026-11-10 - Serves aimeat-offline.js (an app opens and keeps working with no connection).
  * v2.16.0 - 2026-11-01 - Serves aimeat-parties.js, which answered 404 since D4 shipped it (WP9d).
@@ -191,7 +192,7 @@
 import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { sdkLibSource, configPrelude, readSdkBundle } from './libs/sdk-serve.js';
+import { sdkLibSource, configPrelude, headerPrelude, readSdkBundle } from './libs/sdk-serve.js';
 import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 import { buildLibsCatalogue } from '../data/library-packs.js';
 import { logger } from '../utils/logger.js';
@@ -273,6 +274,8 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // non-aimeat URL) are wired explicitly after the loop.
   for (const name of SDK_LIB_NAMES) {
     router.get(`/v1/libs/aimeat-${name}.js`, (_req, res) => {
+      // The header draws the shell's bar, so it also gets what the shell knows about this node.
+      if (name === 'header') { sendJavascriptLibrary(res, configPrelude(config) + headerPrelude(config) + readSdkBundle('header')); return; }
       sendJavascriptLibrary(res, sdkLibSource(config, name));
     });
   }
