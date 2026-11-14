@@ -25,7 +25,7 @@
       "digest": "sha256:cb4f360a6f0187b8e72b5aff"
     },
     "02-architecture.md": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/storage/storage-factory.ts",
         "aimeat/deploy/aimeat.service",
@@ -35,7 +35,7 @@
         "aimeat/src/services/connections/providers-files.ts",
         "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:d4f3a9cca9083afc02b09339"
+      "digest": "sha256:d8d23a05a0a11ea0408e7aed"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-13",
@@ -296,7 +296,7 @@
     "02-architecture.md": {
       "aimeat/src/storage/storage-factory.ts": "fd01b973fcdeec83",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
-      "aimeat/Dockerfile": "a730e25abfdcb643",
+      "aimeat/Dockerfile": "6f4a40d6b0dbd3c5",
       "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
       "docs/operations/production-deployment.md": "2385ad9aadd29152",
       "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",

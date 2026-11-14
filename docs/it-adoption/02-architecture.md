@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.2.0 (commit f36018fcd) on 2026-11-05. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit a4b2342fd) on 2026-11-14. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
@@ -22,7 +22,7 @@ This page is for the architect and the network or firewall owner. It names the c
 
 There is no Redis, message queue or search cluster. The cache is an in-process map by design (`aimeat/src/services/cache.ts`).
 
-The Docker image runs as the unprivileged `node` user, pins its base image by digest and preloads jemalloc (`aimeat/Dockerfile`). The systemd unit runs as a dedicated user with `NoNewPrivileges=true` and `PrivateTmp=true` (`aimeat/deploy/aimeat.service`). Neither compose file keeps the node key directory on a volume: mount one or set `AIMEAT_NODE_KEY_PATH` ([Production deployment](../operations/production-deployment.md#process-manager)).
+The Docker image runs as the unprivileged `node` user, pins its base image by digest, preloads jemalloc and carries only the production dependencies: the build stage drops the development dependencies with `pnpm prune --prod` before the image copies `node_modules` (`aimeat/Dockerfile`). The systemd unit runs as a dedicated user with `NoNewPrivileges=true` and `PrivateTmp=true` (`aimeat/deploy/aimeat.service`). Neither compose file keeps the node key directory on a volume: mount one or set `AIMEAT_NODE_KEY_PATH` ([Production deployment](../operations/production-deployment.md#process-manager)).
 
 ```mermaid
 flowchart LR

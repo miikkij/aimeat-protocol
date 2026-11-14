@@ -20,9 +20,12 @@ COPY public/ public/
 COPY docs/ docs/
 COPY .env.example ./
 RUN pnpm run build
+# The build is done with the dev dependencies (TypeScript, the test runners, the linters), so
+# drop them before the production stage copies node_modules.
+RUN pnpm prune --prod
 
-# Production image. Carries the full node_modules from the build stage (better-sqlite3
-# native bindings + the pg client for postgres-kysely).
+# Production image. Carries the build stage's node_modules after the prune: the production
+# dependencies only (better-sqlite3 native bindings, the pg client for postgres-kysely and the rest).
 FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
