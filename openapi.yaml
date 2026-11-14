@@ -75511,10 +75511,17 @@ paths:
                 identifier:
                   type: string
                   description: GAII or GHII of the member to add
-                role:
+                identifier_type:
                   type: string
-                  enum: [reader, writer, admin]
-                  default: reader
+                  enum: [gaii, ghii]
+                  description: Whether `identifier` is an agent (gaii) or a person (ghii). The route refuses a body without it (400 INVALID_INPUT).
+                permissions:
+                  type: object
+                  required: [read, write]
+                  description: Omitted, the group's default permissions.
+                  properties:
+                    read: { type: boolean }
+                    write: { type: boolean }
       responses:
         '201':
           description: Member added
@@ -75565,11 +75572,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [role]
+              required: [permissions]
               properties:
-                role:
-                  type: string
-                  enum: [reader, writer, admin]
+                permissions:
+                  type: object
+                  required: [read, write]
+                  properties:
+                    read: { type: boolean }
+                    write: { type: boolean }
       responses:
         '200':
           description: Member role updated
