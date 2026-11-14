@@ -20935,13 +20935,14 @@ paths:
                   maxItems: 1000
                   items:
                     type: object
-                    required: [key, value]
+                    description: >-
+                      One record to write. An entry the write cannot take (no key, a key it may not
+                      write, a visibility it refuses) fails under failed[] and the others are written.
                     properties:
                       key: { type: string }
                       value: {}
                       visibility:
-                        allOf:
-                          - $ref: '#/components/schemas/Visibility'
+                        type: string
                         description: >-
                           The visibilities POST /v1/memory takes, `organism:<organism id>` included;
                           absent means private. Any other value, `workspace` included, fails that entry
