@@ -23,6 +23,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-queues.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-queues.test.ts
  * @version-history
+ *   v1.4.0 — 2026-11-14 — The content intake queue.
  *   v1.3.0 — 2026-11-14 — The write-time classification queue.
  *   v1.2.0 — 2026-11-14 — The receiver delivery log.
  *   v1.1.0 — 2026-11-14 — The outside party read log.
@@ -41,6 +42,9 @@ import { loadConfig } from '../../src/config.js';
 import { classifyAfterWrite, flushWriteClassification, setWriteClassifier } from '../../src/services/classify-on-write.js';
 import { installWriteClassifier } from '../../src/services/classification-queue-job.js';
 import { memoryTarget } from '../../src/services/classification/labels.js';
+import { contentAfterStore, flushContentIntake } from '../../src/services/content/intake.js';
+import { getFacts, sourceIdOf } from '../../src/services/content/facts-store.js';
+import { writeStorageFile } from '../../src/services/storage-file-write.js';
 
 // The model path is not what these cases test; an IBAN meets the detection rules alone.
 vi.mock('../../src/services/decide/service.js', () => ({
@@ -194,6 +198,53 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
         await eraseDuring(s, p, held, flushWriteClassification());
       } finally { held.restore(); }
       expect(await label(p.aliceGhii, 'notes.held')).toBeUndefined();
+    });
+  });
+
+  // ── The content intake queue (services/content/intake.ts) ──
+  describe('content intake', () => {
+    const deps = () => ({ storage: st(), config: { ...loadConfig().config, nodeId: NODE, contentClassMode: 'on' as const } });
+    const store = async (ghii: string, key: string) => {
+      const out = await writeStorageFile(deps(), ghii, { key, data: Buffer.from('Quarterly notes. '.repeat(40)), mimeType: 'text/plain' });
+      expect(out.ok).toBe(true);
+    };
+    const facts = (ghii: string, key: string) => getFacts(st(), ghii, sourceIdOf({ kind: 'file', owner: ghii, key }));
+    const ownRecords = async (ghii: string) => (await st().listMemory(ghii, { prefix: 'contentclass.' })).map(r => r.key);
+    afterEach(async () => { await flushContentIntake(); });
+
+    it('WAITING: no facts of the erased account are stored after the erasure (green before the fix too: the item reads the file again, and the erasure removed it)', async () => {
+      const s = st();
+      const p = await people(s);
+      await store(p.aliceGhii, 'docs/a.txt');
+      await store(p.bobGhii, 'docs/b.txt');
+      // The queue's worker starts on setImmediate; that is taken off here, so the items wait.
+      vi.useFakeTimers({ toFake: ['setImmediate'] });
+      try {
+        contentAfterStore(deps(), p.aliceGhii, 'docs/a.txt');
+        contentAfterStore(deps(), p.bobGhii, 'docs/b.txt');
+        await eraseOwner(s, NODE, p.alice);
+        vi.runOnlyPendingTimers();
+      } finally { vi.useRealTimers(); }
+      await flushContentIntake();
+
+      expect(await facts(p.aliceGhii, 'docs/a.txt')).toBeNull();
+      expect(await ownRecords(p.aliceGhii)).toEqual([]);
+      // POSITIVE CONTROL: bob's file gets its facts.
+      expect(await facts(p.bobGhii, 'docs/b.txt')).not.toBeNull();
+    });
+
+    it('BEING WRITTEN: facts whose write is in progress are not stored after the erasure', async () => {
+      const s = st();
+      const p = await people(s);
+      await store(p.aliceGhii, 'docs/held.txt');
+      // The inspection reads the facts record, then writes it: held after that read.
+      const held = holdFirst(s, 'getMemory', 'after', args => args[0] === p.aliceGhii && String(args[1]).startsWith('contentclass.facts.'));
+      try {
+        contentAfterStore(deps(), p.aliceGhii, 'docs/held.txt');
+        await eraseDuring(s, p, held, flushContentIntake());
+      } finally { held.restore(); }
+      expect(await facts(p.aliceGhii, 'docs/held.txt')).toBeNull();
+      expect(await ownRecords(p.aliceGhii)).toEqual([]);
     });
   });
 });

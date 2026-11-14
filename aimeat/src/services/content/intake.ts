@@ -27,9 +27,13 @@
  *   the node's reserved and server-written keys, app icons and screenshots, the node's own and
  *   anonymous namespaces, and an extension's or ecosystem app's namespace.
  * @structure contentAfterStore · contentAfterRemove · installContentIntake · flushContentIntake ·
- *   pendingContentIntake
+ *   pendingContentIntake · holdContentIntakeForErasure
  * @usage contentAfterStore({ storage, config }, file.ownerGaii, file.key);
  * @version-history
+ *   v1.4.0 — 2026-11-14 — holdContentIntakeForErasure: before the erasure cascade, the account's
+ *     waiting items are dropped and the inspection in progress answers, and no item of the account is
+ *     queued until it ends. An inspection that had read the facts record before the cascade stored the
+ *     facts of the erased person's file after it (register finding f-2026-11-13-write-buffers-and-erasure).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.0.1 — 2026-11-02 — A removed file's profile sections file goes with its facts.
  *   v1.1.0 — 2026-11-03 — A published workspace document gets its shared fingerprint on arrival when
@@ -55,6 +59,7 @@ import { makeSharedProfile } from './shared-profile.js';
 import { autoProfileOn } from './shared-profile-settings.js';
 import { workspaceDocOfKey } from './shared-profile-key.js';
 import type { ContentSource } from './types.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
@@ -67,6 +72,9 @@ const pendingByOwner = new Map<string, number>();
 let worker: Promise<void> | null = null;
 let dropped = 0;
 let installed = false;
+/** The accounts whose erasure runs now, whose items are not queued, and the inspection in progress
+ *  an erasure waits for (holdContentIntakeForErasure). */
+const erasing = new ErasureHolds();
 
 /** `contentclass-` covers every file the pipeline stores itself: its kept text (`contentclass-text/`)
  *  and a fingerprint's sections (`contentclass-profile/`). Reading one of them would make a new one. */
@@ -82,6 +90,8 @@ function ownerOf(identity: string, nodeId: string): string | null {
 }
 
 function enqueue(deps: Deps, source: ContentSource, ownerGhii: string): void {
+  // An item of an account being erased: the cascade deletes its facts, so none is read again.
+  if (erasing.covers(ownerGhii)) return;
   if (pending.length >= MAX_PENDING || (pendingByOwner.get(ownerGhii) ?? 0) >= MAX_PENDING_PER_OWNER) {
     dropped += 1;
     if (dropped === 1 || dropped % 200 === 0) {
@@ -138,7 +148,9 @@ async function drain(): Promise<void> {
     const owner = ownerOf(item.source.owner, item.deps.config.nodeId) ?? '';
     const n = (pendingByOwner.get(owner) ?? 1) - 1;
     if (n > 0) pendingByOwner.set(owner, n); else pendingByOwner.delete(owner);
-    await inspectOne(item);
+    // Queued before an erasure began and reached after it: the erased person's item is not read.
+    if (erasing.covers(owner)) continue;
+    await erasing.track(inspectOne(item));
   }
 }
 
@@ -230,6 +242,32 @@ export function installContentIntake(deps: Deps): void {
 /** Resolves when every arrived item has been inspected. For tests and an orderly shutdown. */
 export async function flushContentIntake(): Promise<void> {
   while (worker) await worker;
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no item of the account is queued
+ * from now on, its waiting items and its memory records still settling are dropped, and the inspection
+ * in progress answers first, so the cascade deletes the facts it stored. Only that one is waited for:
+ * the worker goes on with other accounts' items, and none of this account's starts once it is held.
+ * The returned function ends the hold, after the cascade.
+ */
+export async function holdContentIntakeForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  for (let i = pending.length - 1; i >= 0; i--) {
+    const item = pending[i]!;
+    if (!ErasureHolds.isOf(item.source.owner, account)) continue;
+    pending.splice(i, 1);
+    const owner = ownerOf(item.source.owner, item.deps.config.nodeId) ?? '';
+    const n = (pendingByOwner.get(owner) ?? 1) - 1;
+    if (n > 0) pendingByOwner.set(owner, n); else pendingByOwner.delete(owner);
+  }
+  for (const [id, timer] of [...waiting]) {
+    if (!ErasureHolds.isOf(id.split('\u0000')[0], account)) continue;
+    clearTimeout(timer);
+    waiting.delete(id);
+  }
+  await erasing.currentWritesSettled();
+  return release;
 }
 
 /** How many arrived items wait, the one in progress and the memory records still settling included. */
