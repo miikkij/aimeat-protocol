@@ -15,6 +15,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.39.0 — 2026-11-09 — An unknown app, portfolio or company address answers a browser with the
+ *     not-found page in its language (middleware/not-found-page.ts); every other caller gets the same
+ *     JSON 404 as before. A person who mistyped an app address saw the JSON envelope.
  *   v1.38.0 — 2026-11-06 — The app body carries the owner's text about the app, and its `lang` is that
  *     text's language instead of the language the app declares (TARGET-093).
  *   v1.37.0 — 2026-11-06 — An app a search engine may index is served with its name and its owner's
@@ -174,6 +177,7 @@ import type { AimeatConfig } from '../config.js';
 import { applyAppProtection, hasAnyProtection } from '../utils/app-protect.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { error } from '../middleware/envelope.js';
+import { sendNotFound } from '../middleware/not-found-page.js';
 import { readCompanyPortfolioPage } from '../services/company/company-portfolio.js';
 import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
@@ -482,7 +486,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         return;
       }
       const portfolioNotFound = () =>
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown portfolio'));
+        sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', 'Unknown portfolio'));
       if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return portfolioNotFound();
       const resolved = await resolvePublishedPortfolio(storage, sub);
       if (!resolved.ok || !resolved.html) return portfolioNotFound();
@@ -518,7 +522,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       // "This one is not available…" — and a 404 that says "available" turns this uniform failure
       // into the company-enumeration oracle the comment above says it must not be.
       const companyNotFound = () =>
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown company address', undefined, undefined, []));
+        sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', 'Unknown company address', undefined, undefined, []));
       if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return companyNotFound();
       const company = await storage.getCompanyBySlug(sub);
       if (!company || company.status !== 'active') return companyNotFound();
@@ -567,9 +571,10 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
     // Reserved (non-www) and unknown/disabled subdomains all return the same
-    // 404 — no disclosure of which subdomains exist or are reserved.
+    // 404 — no disclosure of which subdomains exist or are reserved. A browser gets the same page
+    // for each of them (middleware/not-found-page.ts), so the page discloses nothing either.
     const notFound = () =>
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown subdomain'));
+      sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', 'Unknown subdomain'));
 
     if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return notFound();
     // A label the apex does not serve (a node name, or a publisher's label) answers with its app
@@ -706,7 +711,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // On the shared host a grant cookie is scoped to this app's path, the only part of the address
     // that tells one app from another here.
     const grantSpec = { cookie: APP_ACCESS_COOKIE, path: req.path, verify: (t: unknown) => appAccessGranted(t, app.ownerName, app.filename) };
-    const refuse = () => { if (!unlockRedirect(req, res, config, app)) res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app')); };
+    const refuse = () => { if (!unlockRedirect(req, res, config, app)) sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', 'Unknown app')); };
     // The query grant is not moved here: the per-app origin below receives it and moves it there.
     if (restricted && await originGrant(req, res, config, grantSpec, { moveToCookie: false }) === 'refused') { refuse(); return; }
     const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);

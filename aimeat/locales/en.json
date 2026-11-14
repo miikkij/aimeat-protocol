@@ -20797,6 +20797,13 @@
       "refused": "The button was not used, because it does not belong to this service."
     }
   },
+  "notFoundPage": {
+    "title": "Page not found",
+    "headline": "Nothing here",
+    "lead": "No app or page answers at this address.",
+    "hint": "The address can have a typing error, or the owner removed the app or gave it a new address. If someone sent you the link, ask them for the correct one.",
+    "home": "Go to the front page"
+  },
   "oauthConsent": {
     "title": "Connect {client} to AIMEAT",
     "titleNoName": "Connect your AI to AIMEAT",

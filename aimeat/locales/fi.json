@@ -21564,6 +21564,13 @@
       "refused": "Painiketta ei käytetty, koska se ei kuulu tähän palveluun."
     }
   },
+  "notFoundPage": {
+    "title": "Sivua ei löydy",
+    "headline": "Täällä ei ole mitään",
+    "lead": "Tässä osoitteessa ei ole sovellusta eikä sivua.",
+    "hint": "Osoitteessa voi olla kirjoitusvirhe, tai omistaja on poistanut sovelluksen tai vaihtanut sen osoitteen. Jos sait linkin joltakulta, pyydä häneltä oikea osoite.",
+    "home": "Siirry etusivulle"
+  },
   "oauthConsent": {
     "title": "Yhdistä {client} AIMEATiin",
     "titleNoName": "Yhdistä tekoälysi AIMEATiin",

@@ -13,20 +13,27 @@
  *
  *   A 500 still passes through hideInternalErrorText (internal-error-text.ts) and the fault reporter
  *   (system-fault.ts), which read the envelope's code; nothing here changes what they see.
- * @structure notFoundHandler(nodeId) · errorHandler(nodeId)
- * @usage app.use(notFoundHandler(config.nodeId)); app.use(errorHandler(config.nodeId));
+ * @structure notFoundHandler(config) · errorHandler(nodeId)
+ * @usage app.use(notFoundHandler(config)); app.use(errorHandler(config.nodeId));
  * @version-history
+ *   2026-11-09 — The 404 answers a browser's navigation with the not-found page (middleware/not-found-page.ts); it takes the config for the base URL and the node's language.
  *   2026-10-15 — A 4xx error a route threw keeps its own sentence as the message; only a body the parser could not read gets the generic sentence (the Design Book adopt refusal, e2e-designbook).
  *   2026-10-15 — Moved out of server.ts and built with error() (feature-list audit #194).
  */
 import type { Request, Response, NextFunction } from 'express';
+import type { AimeatConfig } from '../config.js';
 import { error } from './envelope.js';
+import { sendNotFound } from './not-found-page.js';
 import { logger } from '../utils/logger.js';
 
-/** The JSON 404: Express would otherwise answer an unknown address with an HTML page. */
-export function notFoundHandler(nodeId: string) {
+/**
+ * The 404 for an address no route answers. A browser's navigation gets the not-found page
+ * (middleware/not-found-page.ts); every other caller gets this JSON. Express's own answer would be
+ * its bare HTML page for everyone.
+ */
+export function notFoundHandler(config: AimeatConfig) {
   return (req: Request, res: Response): void => {
-    res.status(404).json(error(nodeId, 'NOT_FOUND',
+    sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND',
       'Nothing on this node answers that address. Check the address and the method in the API reference.',
       404, { method: req.method, path: req.path },
       [{ description: 'Read the API reference', method: 'GET', url: '/v1/docs' }]));

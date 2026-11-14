@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-15 — notFoundHandler takes the config: a browser's navigation to an unknown address gets the not-found page.
  *   2026-11-15 — The comment on openapiBodyGuard(): its refusal runs after the route's own middleware.
  *   2026-11-14 — openapiBodyGuard() is given mode, config.requestBodyCheck (security.request_body_check,
  *     default enforce): every route with a JSON body schema is enforced but the exempt ones.
@@ -414,9 +415,9 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     invalidateHasOwnersCache: guards.invalidateHasOwnersCache,
   });
 
-  // JSON 404 handler — prevent Express from returning HTML for unknown routes — and the global
-  // error handler, both built with the shared error() envelope (middleware/fallback-handlers.ts).
-  app.use(notFoundHandler(config.nodeId));
+  // The 404 handler (JSON for a client, the not-found page for a browser's navigation) and the
+  // global error handler, both built with the shared error() envelope (middleware/fallback-handlers.ts).
+  app.use(notFoundHandler(config));
   app.use(errorHandler(config.nodeId));
 
   // The boot is done: GET /v1/health/ready answers 200 from here until a stop marks the process draining.

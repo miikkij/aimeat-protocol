@@ -10,6 +10,7 @@
  *     route pattern, and answers an address with no rule `valid: null, checked: false`, not `valid: true`.
  * @usage cd aimeat && pnpm exec vitest run test/unit/envelope-refusals.test.ts
  * @version-history
+ *   2026-11-09 — The 404 answers a browser's navigation with the not-found page, and every other caller with the JSON.
  *   2026-10-15 — Initial (feature-list audit #186, #187, #194).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -32,7 +33,7 @@ beforeAll(async () => {
   app.use('/v1/ext-only', requireExtendedFeatures({ nodeId: NODE, extendedFeaturesEnabled: false }));
   app.use(validateRouter({ nodeId: NODE } as AimeatConfig));
   app.get('/v1/throws', () => { throw new Error('a variable named secretThing was undefined'); });
-  app.use(notFoundHandler(NODE));
+  app.use(notFoundHandler({ nodeId: NODE, baseUrl: 'https://node.test' } as AimeatConfig));
   app.use(errorHandler(NODE));
   server = await new Promise<http.Server>((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -65,6 +66,34 @@ describe('#194 the 404 and the global error handler use the shared envelope', ()
     expectEnvelope(r.body, 'NOT_FOUND');
     expect(r.body.error.details).toEqual({ method: 'GET', path: '/v1/no-such-thing' });
     expect(r.body.error.message).not.toContain('/v1/no-such-thing');
+  });
+
+  // A browser's navigation, as Chrome sends it.
+  const BROWSER_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8';
+
+  it('a browser navigation gets the not-found page in its language, not the JSON', async () => {
+    const res = await fetch(`${base}/v1/no-such-thing`, { headers: { Accept: BROWSER_ACCEPT, 'Accept-Language': 'fi-FI,fi;q=0.9' } });
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-type')).toMatch(/^text\/html; charset=utf-8/);
+    expect(res.headers.get('vary')).toMatch(/Accept/);
+    const html = await res.text();
+    expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
+    expect(html).toContain('<html lang="fi">');
+    expect(html).toContain('href="https://node.test/"');
+    // Every token filled, and nothing from the request on the page.
+    expect(html).not.toMatch(/\{\{\w+\}\}/);
+    expect(html).not.toContain('no-such-thing');
+  });
+
+  it('curl, fetch() and an agent keep the JSON; so does a browser that is not navigating', async () => {
+    for (const accept of ['*/*', 'application/json', 'application/json, text/html;q=0.5']) {
+      const res = await fetch(`${base}/v1/no-such-thing`, { headers: { Accept: accept } });
+      expect(res.status).toBe(404);
+      expect(res.headers.get('content-type')).toMatch(/^application\/json/);
+      expectEnvelope(await res.json(), 'NOT_FOUND');
+    }
+    const post = await fetch(`${base}/v1/no-such-thing`, { method: 'POST', headers: { Accept: BROWSER_ACCEPT } });
+    expect(post.headers.get('content-type')).toMatch(/^application\/json/);
   });
 
   it('a thrown error is 500 INTERNAL_ERROR and does not carry the exception text', async () => {

@@ -19621,6 +19621,13 @@
       "refused": "No se usó el botón porque no pertenece a este servicio."
     }
   },
+  "notFoundPage": {
+    "title": "Página no encontrada",
+    "headline": "Aquí no hay nada",
+    "lead": "Ninguna aplicación ni página responde en esta dirección.",
+    "hint": "Puede que la dirección tenga un error, o que el propietario haya eliminado la aplicación o le haya dado otra dirección. Si alguien te envió el enlace, pídele la dirección correcta.",
+    "home": "Ir a la página principal"
+  },
   "oauthConsent": {
     "title": "Conecta {client} a AIMEAT",
     "titleNoName": "Conecta tu IA a AIMEAT",

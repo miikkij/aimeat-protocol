@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!--
+  @file public/not-found.html
+  @description The page a browser gets when no app or page answers an address: an unknown or
+    mistyped app address, a removed app, an address no route answers. A client that asks for JSON
+    (curl, fetch, an agent) gets the JSON envelope instead; middleware/not-found-page.ts decides
+    which. A TEMPLATE: the {{TOKENS}} are filled from locales/<lang>.json (notFoundPage.*) and the
+    node's base URL, escaped, so a direct request for this file is redirected (static-files.ts).
+    No script: the page has nothing to do but say where the visitor is and offer the front page.
+    The icon and the faces load from the origin that answered (the node's CSP allows 'self' only,
+    and this page is also served on an app origin); the links go to the node's front page.
+    The same page for every failure, so it says nothing about which addresses exist.
+  @version-history
+    v1.0.0 — 2026-11-09 — Initial, in the house face of the maintenance page.
+-->
+<html lang="{{LANG}}"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex"/>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/lib/aimeat-fonts.css">
+<title>{{TITLE}}</title>
+<style>
+:root{--text:#1A1A2E;--bg:#FAFAF8;--dim:#6B7280;--accent:#E8564A;--sun:#FFB52E;--on-accent:#1A1A2E;
+--headline:'Fjalla One','Arial Narrow',sans-serif;--body:'Archivo',system-ui,-apple-system,sans-serif;
+--wordmark:'Archivo Black','Archivo',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--text:#EDEEF2;--bg:#14151A;--dim:#A4A9B6;--accent:#FF6F62;--on-accent:#14151A}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:100vh;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:3px solid var(--text)}
+.mark{display:inline-flex;align-items:center;font-family:var(--wordmark);font-size:1.3rem;letter-spacing:-.01em;color:var(--text);text-decoration:none}
+.mark svg{width:.78em;height:.78em;margin:0 -.04em;fill:var(--accent)}
+.mark .at{color:var(--accent)}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 20px 56px}
+h1{font-family:var(--headline);font-weight:400;font-size:clamp(2.4rem,7vw,4.2rem);line-height:1.05;letter-spacing:.01em;text-transform:uppercase;margin-bottom:22px;max-width:16ch}
+.msg{font-size:1.15rem;font-weight:600;line-height:1.5;max-width:36ch}
+.sub{margin-top:18px;font-size:.98rem;line-height:1.6;color:var(--dim);max-width:44ch}
+.go{display:inline-block;margin-top:30px;padding:13px 24px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:1rem;text-decoration:none;border:3px solid var(--text)}
+.go:hover,.go:focus-visible{background:var(--text);color:var(--bg)}
+.go:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
+.rule{width:64px;height:4px;background:var(--sun);margin:30px auto 0}
+footer{display:flex;justify-content:center;padding:14px 20px 22px;font-family:var(--mono);font-size:.72rem;color:var(--dim)}
+</style></head><body>
+<div class="bar">
+  <a class="mark" href="{{BASE_URL}}/">AIME<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5.1-8-10.4A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 3.6C20 15.9 12 21 12 21z"/></svg><span class="at">AT</span></a>
+</div>
+<main>
+  <h1>{{HEADLINE}}</h1>
+  <p class="msg">{{LEAD}}</p>
+  <p class="sub">{{HINT}}</p>
+  <a class="go" href="{{BASE_URL}}/">{{HOME}}</a>
+  <div class="rule"></div>
+</main>
+<footer><span>404</span></footer>
+</body></html>

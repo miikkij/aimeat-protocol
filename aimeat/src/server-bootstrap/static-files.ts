@@ -11,6 +11,8 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.19.0 -- 2026-11-15 -- /not-found.html, the not-found page's template (middleware/not-found-page.ts),
+ *     answers 301 to `/` like the other templates.
  *   v1.18.0 -- 2026-11-10 -- /sw-offline.js on an app origin: the worker of an app that opens with
  *     no connection (src/static/app-sw-offline.js). /sw.js is unchanged.
  *   v1.17.0 -- 2026-11-09 -- A .js, .mjs or .css file asked for under its current content tag
@@ -265,6 +267,8 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       '/llms-full-template.txt':    '/llms-full.txt',
       '/llms-template.txt':         '/llms-full.txt',
       '/robots.node.txt':           '/robots.txt',
+      // The not-found page's template (middleware/not-found-page.ts fills it for a 404).
+      '/not-found.html':            '/',
     };
     app.use((req, res, next) => {
       const target = STATIC_REDIRECTS[req.path];
