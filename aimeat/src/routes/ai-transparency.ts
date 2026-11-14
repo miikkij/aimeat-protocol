@@ -28,6 +28,8 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.6.1 — 2026-11-15 — The flag link says what POST /v1/flags needs (a sign-in and social:write),
+ *     not "anyone can".
  *   v1.6.0 — 2026-11-01 — `ai_processing_region`: where the node's AI key has prompts processed, the
  *     buyer's choice (ai.region_mode) and what it switches off (Jouni, 2026-11-01).
  *   v1.5.2 — 2026-10-16 — The operator report and the owner's view count what an open workspace share serves to anyone as public.
@@ -389,7 +391,7 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
         },
       }, [
         { description: 'The node\'s public transparency statement', method: 'GET', url: '/v1/ai-transparency' },
-        { description: 'Report unlabelled AI content (anyone can)', method: 'POST', url: '/v1/flags' },
+        { description: 'Report unlabelled AI content (signed in, with social:write)', method: 'POST', url: '/v1/flags' },
       ]));
     });
 

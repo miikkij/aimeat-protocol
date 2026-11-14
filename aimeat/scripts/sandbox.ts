@@ -52,6 +52,8 @@
  *                                          # the same node on PostgreSQL, with its own state file
  *   AIMEAT_SANDBOX_PRELOAD=scripts/perf/trace-preload.mjs pnpm sandbox   # extra --import modules
  * @version-history
+ *   v1.10.1 — 2026-11-15 — The printed report says that openrouter-type providers answer from the
+ *     stand-in, so a session that wants a real model knows to add an openai-compatible one.
  *   v1.10.0 — 2026-11-09 — AIMEAT_SANDBOX_DB_URL runs the sandbox on PostgreSQL (postgres-kysely, the
  *     production backend), with its own .sandbox-pg.json and .sandbox-pg.log, so a SQLite sandbox and
  *     a PostgreSQL one stand side by side; the database is created when missing and dropped on
@@ -589,6 +591,8 @@ function report(s: SandboxState): void {
     if (s.apps.length) console.log(`  apps          ${s.apps.map(a => `${s.baseUrl}/v1/apps/${a}?mode=inline`).join('\n                ')}\n                (each opens on its own origin, <name>.apps.localhost:${s.port}, and signs in there)`);
     if (s.agent) console.log(`  mcp           ${s.baseUrl}/v1/mcp   with the ${s.agent.name} token above`);
     if (s.mailbox) console.log(`  mailbox       ${s.owners[0]?.name}'s connection ${s.mailbox} to the test mailbox (19 messages, 2 PDFs) on :${s.mailPort}`);
+    // A real model needs a provider of another type: every openrouter-type provider goes to the stand-in.
+    if (s.mailPort) console.log(`  ai            every openrouter-type provider answers from the local stand-in on :${s.mailPort}; for a real model add an openai-compatible provider`);
     console.log(`  data          ${s.dbPath}`);
     console.log(`  log           ${LOG_FILE}`);
     console.log(`  credentials   ${STATE_FILE}  (gitignored; tokens refresh on every \`pnpm sandbox\`)`);
