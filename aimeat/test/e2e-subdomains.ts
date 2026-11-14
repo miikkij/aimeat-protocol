@@ -8,6 +8,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=subdomains
  * @version-history
+ *   v1.3.0 — 2026-11-15 — The not-found page: an unknown subdomain and an address no route answers give
+ *     a browser's navigation the page in its language, a client that asks for JSON the envelope, and
+ *     a direct request for /not-found.html a 301 to the front page.
  *   v1.2.0 — 2026-10-25 — Every subdomain request addresses a real `<sub>.<apex>` Host through
  *     helpers/host-request.ts (fetch drops Host). X-Subdomain on the apex Host, or naming another
  *     site than the Host, no longer chooses the site: the redirect site's 301 on the apex was the
@@ -285,6 +288,46 @@ await test('Apex GET / behaves exactly as before (no subdomain)', async () => {
 await test('Unknown subdomain → 404', async () => {
     const { status } = await onSub('/', 'nosuchsubdomain');
     assert(status === 404, `expected 404, got ${status}`);
+});
+
+// A browser's navigation, as Chrome sends it (middleware/not-found-page.ts).
+const BROWSER_ACCEPT = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8';
+
+// The page language is the served-page order (i18n.ts servedPageLocale): ?lang first, so the test
+// does not depend on the node's own language.
+await test('Unknown subdomain, browser navigation → the not-found page in the page language', async () => {
+    const { status, body, headers } = await onSub('/?lang=fi', 'nosuchsubdomain', { Accept: BROWSER_ACCEPT, 'Accept-Language': 'fi-FI,fi;q=0.9' });
+    assert(status === 404, `expected 404, got ${status}`);
+    assert(/^text\/html/.test(headers.get('content-type') ?? ''), `expected HTML, got ${headers.get('content-type')}`);
+    assert(/Accept/.test(headers.get('vary') ?? ''), `Vary names Accept: ${headers.get('vary')}`);
+    const page = String(body._raw ?? '');
+    assert(page.includes('<html lang="fi">'), 'the page is in Finnish');
+    assert(page.includes('Sivua ei löydy'), 'the Finnish title is on the page');
+    assert(!/\{\{\w+\}\}/.test(page), 'every token is filled');
+    // The same page for every unknown address: it names nothing from the request.
+    assert(!page.includes('nosuchsubdomain'), 'the page does not name the address asked for');
+});
+
+await test('Unknown subdomain, a client that asks for JSON → the JSON envelope, not the page', async () => {
+    for (const accept of ['*/*', 'application/json']) {
+        const { status, body } = await onSub('/', 'nosuchsubdomain', { Accept: accept });
+        assert(status === 404, `${accept}: expected 404, got ${status}`);
+        assert(body.ok === false && body.error?.code === 'NOT_FOUND', `${accept}: the JSON envelope: ${JSON.stringify(body).slice(0, 200)}`);
+    }
+});
+
+await test('An address no route answers: a browser gets the page, a POST keeps the JSON', async () => {
+    const page = await json('/v1/no-such-address-e2e?lang=en', { headers: { Accept: BROWSER_ACCEPT, 'Accept-Language': 'en' } });
+    assert(page.status === 404 && /^text\/html/.test(page.body._ct ?? ''), `GET: expected the HTML 404, got ${page.status} ${page.body._ct}`);
+    assert(String(page.body._raw).includes('<html lang="en">'), 'the page is in English');
+    const post = await json('/v1/no-such-address-e2e', { method: 'POST', headers: { Accept: BROWSER_ACCEPT }, body: '{}' });
+    assert(post.status === 404 && post.body.error?.code === 'NOT_FOUND', `POST: expected the JSON 404, got ${post.status}`);
+});
+
+await test('The not-found template itself is not served: /not-found.html → 301 to /', async () => {
+    const r = await json('/not-found.html', { headers: { Accept: BROWSER_ACCEPT } });
+    assert(r.status === 301, `expected 301, got ${r.status}`);
+    assert((r.headers.get('location') ?? '').endsWith('/'), `Location is the front page: ${r.headers.get('location')}`);
 });
 
 await test('Reserved subdomain www → 301 to apex', async () => {

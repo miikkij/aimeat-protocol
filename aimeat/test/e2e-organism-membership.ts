@@ -5,6 +5,8 @@
  *   and creator/admin revoking (removing) a member → removed-member notification. Also covers the
  *   guardrails: the creator cannot be removed, and a non-admin cannot review or remove.
  * @version-history
+ *   2026-11-15 — Tests 2, 6 and 7 read the notice's link: the request and the approval open the
+ *     organism, the decline opens the list of organisms.
  *   2026-09-28 — Test 22 registers the agent it attaches: the setup no longer matched the code, which now
  *     refuses a local agent nobody holds (404).
  *   v1.0.0 — 2026-06-09 — Initial: join-request notify + review + remove-member (revoke) flow.
@@ -57,6 +59,13 @@ const hasNotif = async (token: string, type: string) => {
     const r = await json('/v1/notifications', { headers: auth(token) });
     return r.status === 200 && (r.body.data.notifications || []).some((n: any) => n.type === type);
 };
+/** The link of the newest notice of this type, or null when there is none. */
+const notifLink = async (token: string, type: string): Promise<string | null> => {
+    const r = await json('/v1/notifications', { headers: auth(token) });
+    const n = (r.body.data?.notifications || []).find((x: any) => x.type === type);
+    return n ? String(n.link ?? '') : null;
+};
+const organismLink = (id: string) => `/v1/profile?tab=organisms&org=${encodeURIComponent(id)}`;
 
 console.log('\n=== AIMEAT Organism Membership E2E ===\n');
 
@@ -98,6 +107,9 @@ await test('1. B requests to join → pending (202)', async () => {
 
 await test('2. A (creator) gets an organism_join_request notification', async () => {
     assert(await hasNotif(A.token, 'organism_join_request'), 'A should have a join-request notification');
+    // The notice opens the organism, whose home lists the requests, not the list of organisms.
+    const link = await notifLink(A.token, 'organism_join_request');
+    assert(link === organismLink(orgId), `the request notice opens the organism: ${link}`);
 });
 
 await test('3. B (non-admin) cannot list join requests (403)', async () => {
@@ -123,6 +135,8 @@ await test('5. A approves B → B becomes an active member', async () => {
 
 await test('6. B gets an organism_join_approved notification', async () => {
     assert(await hasNotif(B.token, 'organism_join_approved'), 'B should have an approval notification');
+    const link = await notifLink(B.token, 'organism_join_approved');
+    assert(link === organismLink(orgId), `the approval opens the organism B joined: ${link}`);
 });
 
 await test('7. C requests, A rejects → C is NOT a member, C notified', async () => {
@@ -136,6 +150,9 @@ await test('7. C requests, A rejects → C is NOT a member, C notified', async (
     const m = await json(`/v1/organisms/${orgId}/members`, { headers: auth(A.token) });
     assert(!(m.body.data.members || []).some((x: any) => x.ghii === C.name), 'C must not be a member after rejection');
     assert(await hasNotif(C.token, 'organism_join_rejected'), 'C should have a rejection notification');
+    // A declined person is outside the organism, so the notice opens the list, never the organism.
+    const link = await notifLink(C.token, 'organism_join_rejected');
+    assert(link === '/v1/profile#organisms', `the decline opens the list of organisms: ${link}`);
 });
 
 await test('8. B (non-admin) cannot remove a member (403)', async () => {
