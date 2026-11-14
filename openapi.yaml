@@ -62978,19 +62978,26 @@ paths:
           application/json:
             schema:
               type: object
-              required: [components]
               properties:
                 changelog: { type: string }
+                status:
+                  type: string
+                  enum: [draft, published, beta, archived]
+                  default: draft
+                manifest: { type: string, description: 'Absent: the previous version''s manifest.' }
                 components:
                   type: array
+                  description: Absent keeps the previous version's components.
                   items:
                     type: object
-                    required: [type, label, content]
+                    required: [type]
                     properties:
+                      id: { type: string, description: 'The component id an install and a migration address it by.' }
                       type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation, skill] }
-                      label: { type: string }
-                      content: { type: string }
+                      label: { type: string, default: '' }
+                      content: { type: string, default: '' }
                       dependencies: { type: array, items: { type: string } }
+                      meta: { type: object, additionalProperties: true }
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
