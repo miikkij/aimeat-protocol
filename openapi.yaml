@@ -32086,28 +32086,22 @@ paths:
     post:
       operationId: reportProgress
       summary: Report work progress
-      description: Update progress on an accepted work item (0-100%).
+      description: >-
+        The provider marks an accepted work item as started: accepted becomes in_progress and the
+        requester's callback hears work.in_progress. The route reads no body field; a body sent is
+        ignored.
       tags: [Work Queue]
       security:
         - BearerAuth: []
       parameters:
         - $ref: '#/components/parameters/TrackingCode'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               type: object
-              required: [progress]
-              properties:
-                progress:
-                  type: integer
-                  minimum: 0
-                  maximum: 100
-                  description: Completion percentage
-                note:
-                  type: string
-                  description: Optional progress note
+              description: Not read.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
