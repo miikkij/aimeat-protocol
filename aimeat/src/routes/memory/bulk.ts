@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — GET /v1/memory/discover names the tool manifest of an app the operator hid only to that
+ *     app's account and the operator (services/memory-discover.ts; unit 2b, B12).
  *   2026-11-08 — The bundle asks the labels a data package version keeps of a package file, as GET /v1/pub
  *     does (datapackage/source-labels.ts storedFileShownTo; secaudit2026nov08b round 15b).
  *   2026-11-08 — The schema lock is asked with the caller, on bulk and on import: a CSM's own lock does not
@@ -146,6 +148,7 @@ import { discoverMemory } from '../../services/memory-discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 import { signedInOnly } from '../../config/visibility.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -733,6 +736,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const items = await discoverMemory(storage, config, callerGaii, {
       prefix: prefix || undefined, owner: owner || undefined, q, limit, offset,
+      readerOwner: req.auth!.owner as string, readerIsOperator: await isOperatorCaller(storage, req.auth),
     });
 
     stats?.increment('memory_discover');

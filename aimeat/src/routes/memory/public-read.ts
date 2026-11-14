@@ -16,6 +16,8 @@
  * @structure registerPublicReadRoute(router, ctx)
  * @usage registerPublicReadRoute(router, ctx);   // from registerKeyRoutes, last
  * @version-history
+ *   2026-11-14 — The tool manifest of an app the operator hid (apps.<file>.tools) answers as absent to
+ *     anyone but the app's account and the operator (services/app/tools-manifest-reach.ts; unit 2b, B12).
  *   2026-10-26 — A signed-in account reads its own extension's memory by the short name too:
  *     `ext:<name>` falls back to `ext:<account>/<name>` when the account holds that extension (owner
  *     namespaces, secaudit2026oct22).
@@ -55,6 +57,7 @@ import { denyScope403 } from '../../auth/deny.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { isOrganismVisibilityWord } from '../../utils/visibility-words.js';
 import { ownExtensionMemoryOwner } from '../../services/component-address.js';
+import { toolsManifestHiddenFrom } from '../../services/app/tools-manifest-reach.js';
 
 export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, stats, resolve } = ctx;
@@ -89,6 +92,10 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
     const ownForm = signedIn ? await ownExtensionMemoryOwner(storage, gaii, req.auth!.owner as string) : null;
     const stored = await storage.getMemory(gaii, key) ?? (ownForm ? await storage.getMemory(ownForm, key) : null);
     if (!stored) { miss(); return; }
+    // The tool manifest of an app the operator hid answers as absent to anyone but the app's account
+    // and the operator, as the catalogue and the WebMCP listing answer (services/app/tools-manifest-reach.ts).
+    if (await toolsManifestHiddenFrom(storage, config, stored.ownerGaii, stored.key,
+      { owner: signedIn ? req.auth!.owner as string : null, auth: signedIn ? req.auth : null })) { miss(); return; }
 
     // The reader, resolved: an OWNER session carries a bare `sub`, while memberships, group shares
     // and consent grants are keyed under the resolved identity (see the non-public branch below).

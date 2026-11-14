@@ -274,7 +274,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
     registerExtensionsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
     registerCatalogueTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerMemoryExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerMemoryExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerWalletExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConsentTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAccessTools(mcp, storage, config, agentGaii);

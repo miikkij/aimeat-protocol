@@ -985,13 +985,28 @@ await test('B12 USE KEPT: bob\'s agent reads the listed app\'s tools on the tool
     assert(!tool.isError && JSON.stringify(tool.data.manifest).includes(PB_TOOL.name), `tool: ${tool.text.slice(0, 200)}`);
 });
 
-await test('B12 RECORDED DIFFERENCE (question: should aimeat_app_tools_get hide an app the WebMCP listing hides): the hidden app\'s manifest, the listing answers 404, the tool and the raw public record give it to bob\'s agent', async () => {
+const rawManifest = (token: string) => call('GET', `/v1/memory/${encodeURIComponent(pbAlice.ghii)}/${encodeURIComponent(`apps.${PB_HIDDEN}.tools`)}`, token);
+await test('B12 DECIDED (developer approval 2026-11-14): the hidden app\'s manifest is not found for bob\'s agent on the listing, aimeat_app_tools_get, the raw record, aimeat_memory_read_public and the discover list', async () => {
     const rest = await webmcp(PB_HIDDEN, pbBobAg.token);
     assert(rest.status === 404 && rest.body.error.code === 'APP_NOT_FOUND', `route: ${show(rest)}`);
     const tool = await callTool(pbBobMcp, 'aimeat_app_tools_get', { owner: pbAlice.name, app_id: PB_HIDDEN });
-    assert(!tool.isError && JSON.stringify(tool.data.manifest).includes(PB_TOOL.name), `tool: ${tool.text.slice(0, 200)}`);
-    const raw = await call('GET', `/v1/memory/${encodeURIComponent(pbAlice.ghii)}/${encodeURIComponent(`apps.${PB_HIDDEN}.tools`)}`, pbBobAg.token);
-    assert(raw.status === 200 && raw.text.includes(PB_TOOL.name), `raw record: ${show(raw)}`);
+    // The hint names the owner's other manifests, never the hidden one.
+    assert(tool.isError && tool.text.startsWith('APP_TOOLS_NOT_FOUND') && !(tool.text.split('publishes')[1] ?? '').includes(PB_HIDDEN), `tool: ${tool.text.slice(0, 300)}`);
+    const raw = await rawManifest(pbBobAg.token);
+    assert(raw.status === 404, `raw record: ${show(raw)}`);
+    const pub = await callTool(pbBobMcp, 'aimeat_memory_read_public', { gaii: pbAlice.ghii, key: `apps.${PB_HIDDEN}.tools` });
+    assert(pub.isError && pub.text === 'Memory entry not found', `read_public: ${pub.text.slice(0, 200)}`);
+    const disc = await call('GET', `/v1/memory/discover?${q({ prefix: 'apps.', owner: pbAlice.name, limit: '200' })}`, pbBobAg.token);
+    assert(disc.status === 200 && !disc.text.includes(`apps.${PB_HIDDEN}.tools`) && disc.text.includes(`apps.${PB_APP}.tools`), `discover: ${show(disc)}`);
+});
+
+await test('B12 USE KEPT: alice\'s agent and the operator\'s agent still read the hidden app\'s manifest on the tool and the raw record', async () => {
+    for (const [ag, s] of [[pbAliceAg, pbAliceMcp], [pbOpWide, pbOpWideMcp]] as const) {
+        const tool = await callTool(s, 'aimeat_app_tools_get', { owner: pbAlice.name, app_id: PB_HIDDEN });
+        assert(!tool.isError && JSON.stringify(tool.data.manifest).includes(PB_TOOL.name), `tool ${ag.name}: ${tool.text.slice(0, 200)}`);
+        const raw = await rawManifest(ag.token);
+        assert(raw.status === 200 && raw.text.includes(PB_TOOL.name), `raw ${ag.name}: ${show(raw)}`);
+    }
 });
 
 // B14: a public tool manifest that does not parse, invoked on aimeat_app_tool_invoke and

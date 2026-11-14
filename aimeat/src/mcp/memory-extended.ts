@@ -11,6 +11,8 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-14 — aimeat_memory_read_public answers the tool manifest of an app the operator hid as absent,
+ *     as GET /v1/memory/:gaii/:key does (services/app/tools-manifest-reach.ts; unit 2b, B12).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — aimeat_memory_search calls searchMemoryRecords (services/memory-query.ts), the one
@@ -55,6 +57,8 @@ import { shareCarriesKey } from '../services/group-shares-classification.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { readProvenance } from '../services/ai/provenance-result.js';
 import { searchMemoryRecords } from '../services/memory-query.js';
+import { toolsManifestHiddenFrom } from '../services/app/tools-manifest-reach.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -63,6 +67,8 @@ export function registerMemoryExtendedTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's caller (register-all.ts); without one, an agent of its own account with no words. */
+    sessionCaller?: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -155,7 +161,12 @@ export function registerMemoryExtendedTools(
             // The one presentation of a memory value (classification reader + credential mask,
             // TARGET-082). A record this agent may not see answers as an absent one.
             const stored = await storage.getMemory(gaii, key);
-            const record = stored ? await presentMemory(readerForAgent({ storage, config }, agentGaii), stored) : null;
+            // The tool manifest of an app the operator hid answers as absent, as on GET /v1/memory/:gaii/:key
+            // (services/app/tools-manifest-reach.ts).
+            const session = sessionCaller ? sessionCaller() : agentSessionCaller(agentGaii, '', [], config.nodeId, storage);
+            const hiddenManifest = stored ? await toolsManifestHiddenFrom(storage, config, stored.ownerGaii, stored.key,
+                { owner: session.owner, auth: session.auth }) : false;
+            const record = stored && !hiddenManifest ? await presentMemory(readerForAgent({ storage, config }, agentGaii), stored) : null;
 
             if (!record) {
                 return {

@@ -9,9 +9,11 @@
  * @structure appToolManifestIds
  * @usage const near = await appToolManifestIds(storage, ownerGhii, includePrivate);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — Another account's hint leaves out the manifest of an app the operator hid (unit 2b, B12).
  *   v1.0.0 — 2026-11-13 — Initial (structure programme unit 2).
  */
 import type { Storage } from '../../storage/interface.js';
+import { withoutHiddenToolManifests } from '../app/tools-manifest-reach.js';
 import { appIdFromToolsKey } from '../../models/app-tool-schemas.js';
 import { logger } from '../../utils/logger.js';
 
@@ -22,7 +24,9 @@ import { logger } from '../../utils/logger.js';
  */
 export async function appToolManifestIds(storage: Storage, ownerGhii: string, includePrivate: boolean): Promise<string[]> {
     try {
-        const recs = await storage.listMemory(ownerGhii, { prefix: 'apps.' });
+        const all = await storage.listMemory(ownerGhii, { prefix: 'apps.' });
+        // Another account's hint names no manifest of an app the operator hid (services/app/tools-manifest-reach.ts).
+        const recs = includePrivate ? all : await withoutHiddenToolManifests(storage, all, null);
         return recs
             .filter(r => includePrivate || r.visibility === 'public')
             .map(r => appIdFromToolsKey(r.key))

@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_app_tools_get answers the manifest of an app the operator hid as missing to anyone
+ *     but its account and the operator, as the WebMCP listing does (services/app/tools-manifest-reach.ts; unit 2b, B12).
  *   2026-10-29 — aimeat_admin_possible_payouts: the operator lists the open possible payouts and marks one
  *     arrived with a reference (secaudit2026oct26 round 8c).
  *   2026-10-27 — aimeat_commerce_beneficiary_payout takes possible_payment_not_arrived and shows the open
@@ -105,6 +107,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { canonicalAppToolsId } from '../services/app/tools-key.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
+import { toolsManifestHiddenFrom } from '../services/app/tools-manifest-reach.js';
 import { AppToolsDocSchema, appToolsKey, isToolPriced, legacyToolPriceRefusal, normalizeToolPacing, toolTollMorsels } from '../models/app-tool-schemas.js';
 import { loadAgentOffers, publishAgentOffers } from '../services/agent/offers-write.js';
 import { normalizeOfferPacing, presentOfferPacing, TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
@@ -342,8 +345,12 @@ export function registerCommerceTools(
             const targetOwner = localAccountName(ownerArg ?? owner);
             const rec = await storage.getMemory(`${targetOwner}@${config.nodeId}`, appToolsKey(app_id));
             // Cross-owner reads require the record to be PUBLIC — a private manifest is
-            // indistinguishable from a missing one (mirrors the WebMCP listing gate).
-            if (!rec || (targetOwner !== owner && rec.visibility !== 'public')) {
+            // indistinguishable from a missing one (mirrors the WebMCP listing gate). The manifest of an
+            // app the operator hid reads as missing too, for anyone but its account and the operator, as
+            // on GET /v1/memory/:gaii/:key (services/app/tools-manifest-reach.ts).
+            const session = caller();
+            const hiddenApp = rec ? await toolsManifestHiddenFrom(storage, config, rec.ownerGaii, rec.key, { owner: session.owner, auth: session.auth }) : false;
+            if (!rec || hiddenApp || (targetOwner !== owner && rec.visibility !== 'public')) {
                 // Name the manifests this owner DOES publish. An app id is a filename and carries its
                 // extension, while the app's own subdomain does not: an agent that read
                 // `nuotta.apps.aimeat.io` asked for "nuotta", was told the app declares no manifest,
