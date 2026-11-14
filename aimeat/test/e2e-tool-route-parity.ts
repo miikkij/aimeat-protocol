@@ -32,15 +32,16 @@
  *                    purpose).
  *     ORG-READ       who reads a private organism on GET /v1/organisms/:id, aimeat_organism_get and
  *                    the aimeat://organisms resource: one answer per caller.
- *     ROSTER-PRIVATE who reads a private organism's member list (a question: REST admits the
- *                    operator's agent, the tool does not).
+ *     ROSTER-PRIVATE a private organism's member list is for its active members only, on all three
+ *                    surfaces (developer decision 2026-11-14).
  *     ARCHIVED-LIST  an archived organism in the owner's own list, for the owner's agent.
  *     WS-UPDATE      an attached agent whose owner left changes a workspace's structure.
- *   JOIN-PRIVATE, BOARD-MEMBERS and ROSTER-PRIVATE assert today's two answers and name the question.
+ *   JOIN-PRIVATE and BOARD-MEMBERS assert today's two answers and name the question.
  *   The operator (the suite's first account) turns classification on for the FILES section only and
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.5.0 — 2026-11-14 — ROSTER-PRIVATE asserts the developer's decision instead of today's answers.
  *   v1.4.0 — 2026-11-14 — ORG-READ, ROSTER-PRIVATE, ARCHIVED-LIST and WS-UPDATE; the question sections
  *     assert today's two answers (structure programme 2026-11, unit 2b, phase B).
  *   v1.3.0 — 2026-11-13 — BOARD-RES, JOIN-PRIVATE and BOARD-MEMBERS (structure programme 2026-11,
@@ -489,11 +490,13 @@ await test('SAME ANSWER: the operator\'s agent, not a member, gets one answer on
 // ─── ROSTER-PRIVATE ───
 console.log('\nROSTER-PRIVATE: who reads a private organism\'s member list');
 
-await test('QUESTION for the developer (today\'s two answers): the operator\'s agent reads a private roster on GET /v1/organisms/:id/members; aimeat_organism_members (and GET /v1/organisms/:id, ORG-READ) refuse it', async () => {
+await test('DECIDED (developer, 2026-11-14): a private organism\'s member list is for its active members only; the operator\'s agent is refused on GET /v1/organisms/:id/members, aimeat_organism_members and GET /v1/organisms/:id', async () => {
     const rest = await call('GET', `/v1/organisms/${orOrg}/members`, orOperator.token);
     const tool = await callTool(await openSession(BASE, orOperator.token, 'u2b-roster'), 'aimeat_organism_members', { organism_id: orOrg });
-    assert(rest.status === 200, `REST today admits the operator's agent: ${show(rest)}`);
-    assert(tool.isError && /Access denied/.test(tool.text), `tool today refuses it: ${tool.text.slice(0, 200)}`);
+    const detail = await call('GET', `/v1/organisms/${orOrg}`, orOperator.token);
+    assert(rest.status === 404, `REST members: ${show(rest)}`);
+    assert(tool.isError && /Access denied/.test(tool.text), `tool: ${tool.text.slice(0, 200)}`);
+    assert(detail.status === 404, `REST detail: ${show(detail)}`);
 });
 
 await test('USE KEPT: the member\'s agent reads the list on both; the outsider\'s agent on neither', async () => {

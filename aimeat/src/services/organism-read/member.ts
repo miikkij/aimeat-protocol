@@ -12,7 +12,7 @@
  *   WHO. `sub` is the session's subject (the agent's GAII over MCP), `owner` the account it acts in.
  *   The refusal is a code; each surface keeps its own sentence for it.
  * @structure MemberGate · organismMemberGate(storage, id, who) · organismForActiveMember(storage, id, who) ·
- *   organismShownTo(storage, id, who)
+ *   organismShownTo(storage, id, who) · organismRosterFor(storage, id, who, filter)
  * @usage const gate = await organismMemberGate(storage, id, { sub: req.auth!.sub, owner: req.auth!.owner });
  * @version-history
  *   v1.0.0 — 2026-11-13 — Moved from the workspace routes and mcp/workspaces.ts, which each held a copy
@@ -21,6 +21,9 @@
  *   v1.1.0 — 2026-11-14 — organismShownTo: the private-organism rule of GET /v1/organisms/:id, which
  *     aimeat_organism_get and the organism resource now ask instead of the organism's members list
  *     (one answer per caller, parity section ORG-READ; structure programme 2026-11, unit 2b phase B).
+ *   v1.2.0 — 2026-11-14 — organismRosterFor: the same rule for a private organism's member list, which
+ *     GET /v1/organisms/:id/members and aimeat_organism_members ask; the operator's agent is refused
+ *     (developer approval 2026-11-14, parity section ROSTER-PRIVATE).
  */
 import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../../storage/interface.js';
 import { memberRoleOf } from '../workspace/share.js';
@@ -52,13 +55,28 @@ export async function organismForActiveMember(
 export async function organismShownTo(
     storage: Storage, organismId: string, who: { owner: string | undefined },
 ): Promise<{ ok: true; organism: OrganismRecord; members: OrganismMembershipRecord[] } | { ok: false; code: 'NOT_FOUND' | 'HIDDEN' }> {
+    return organismRosterFor(storage, organismId, who, {});
+}
+
+/**
+ * The organism and its member rows (role and status filters; active by default), when the caller may
+ * read it: the rule of organismShownTo, so a private organism's member list is for its active members
+ * only. The operator's agent is refused like anyone else who is not in it (developer approval
+ * 2026-11-14). `operatorInPerson` keeps the operator signed in in person reading a private roster on
+ * the REST route, as it did before (e2e-own-reach-oct26 MEMBERS); an MCP session never is one.
+ * GET /v1/organisms/:id/members and aimeat_organism_members.
+ */
+export async function organismRosterFor(
+    storage: Storage, organismId: string, who: { owner: string | undefined; operatorInPerson?: boolean },
+    filter: { role?: string; status?: string },
+): Promise<{ ok: true; organism: OrganismRecord; members: OrganismMembershipRecord[] } | { ok: false; code: 'NOT_FOUND' | 'HIDDEN' }> {
     const organism = await storage.getOrganism(organismId);
     if (!organism) return { ok: false, code: 'NOT_FOUND' };
-    if (organism.visibility === 'private') {
+    if (organism.visibility === 'private' && !who.operatorInPerson) {
         const m = who.owner ? await storage.getMembership(organismId, who.owner) : null;
         if (!m || m.status !== 'active') return { ok: false, code: 'HIDDEN' };
     }
-    const members = await storage.listMembers(organismId, { status: 'active' });
+    const members = await storage.listMembers(organismId, { ...(filter.role ? { role: filter.role } : {}), status: filter.status || 'active' });
     return { ok: true, organism, members };
 }
 

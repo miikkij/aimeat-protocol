@@ -7,6 +7,10 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — GET /v1/organisms/:id/members reads through services/organism-read/member.ts
+ *     organismRosterFor: a private organism's member list is for its active members only; the
+ *     operator's agent is refused there as on GET /v1/organisms/:id and aimeat_organism_members
+ *     (developer approval 2026-11-14). The operator in person reads it as before.
  *   2026-11-13 — The invite-admin gate, the two owner routes, GET /invitations/mine and POST
  *     /:id/invitations/accept read through services/organism-read/manager.ts and name-invitations.ts,
  *     which the name invitation tools ask too; the answers are unchanged (structure programme 2026-11,
@@ -61,12 +65,13 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
-import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
+import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { canSeeMembers, rosterAgentsFor, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism-ownership.js';
 import { organismForManager, organismForOwner } from '../../services/organism-read/manager.js';
 import { nameInvitationsOf, nameInvitationTo } from '../../services/organism-read/name-invitations.js';
+import { organismRosterFor } from '../../services/organism-read/member.js';
 import { removeOrganismMember, MemberRemoveError } from '../../services/organism-member-remove.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
@@ -86,32 +91,23 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const id = req.params.id as string;
     const { role, status } = req.query;
 
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
-    }
-
     // The shared anonymous identity is treated as unauthenticated (rosterCallerFromAuth).
     const rosterCaller = await rosterCallerFromAuth(storage, req.auth);
 
-    // A private organism is not there for a caller who is not in it, here as on GET /v1/organisms/:id
-    // and aimeat_organism_members: an active member (an agent of one by its owner's name), an agent
-    // attached to the organism, or the operator. The roster tier below decides only how much of the
-    // roster a caller who may see the organism reads.
-    if (organism.visibility === 'private' && !rosterCaller.isOperator) {
-      const membership = rosterCaller.ownerName ? await storage.getMembership(id, rosterCaller.ownerName) : null;
-      const attached = !!req.auth && organism.agentGaiis.includes(resolveIdentity(req.auth, config.nodeId));
-      if (membership?.status !== 'active' && !attached) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-        return;
-      }
+    // A private organism's member list is for its active members only (an agent of one by its
+    // owner's name; an attached agent's owner is always one), here as on GET /v1/organisms/:id and
+    // aimeat_organism_members, which ask the same function: services/organism-read/member.ts. The
+    // operator's agent is refused like anyone else who is not in it (developer approval 2026-11-14);
+    // the operator signed in in person reads it as before.
+    // The roster tier below decides only how much of the roster a caller who may see it reads.
+    const operatorInPerson = rosterCaller.isOperator && isOwnerInPerson(req.auth);
+    const shown = await organismRosterFor(storage, id, { owner: rosterCaller.ownerName, operatorInPerson },
+      { role: typeof role === 'string' ? role : undefined, status: typeof status === 'string' ? status : undefined });
+    if (!shown.ok) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
     }
-
-    const members = await storage.listMembers(id, {
-      role: role as string,
-      status: (status as string) || 'active',
-    });
+    const { organism, members } = shown;
 
     // Roster privacy (memberVisibility): below the tier the listing shrinks to the accountability
     // rows — creator/admins + the caller's own row — while the TRUE total stays (count ≠ identity).

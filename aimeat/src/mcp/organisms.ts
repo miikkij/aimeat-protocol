@@ -11,6 +11,9 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_organism_members reads through services/organism-read/member.ts
+ *     organismRosterFor: a private organism's member list is for its active members only, as on
+ *     GET /v1/organisms/:id/members and GET /v1/organisms/:id (developer approval 2026-11-14).
  *   2026-11-14 — aimeat_organism_get and the organism resource read through services/organism-read/
  *     member.ts organismShownTo, the visibility rule GET /v1/organisms/:id asks: a private organism by
  *     an active membership row in place of the organism's members list, one answer per caller
@@ -115,7 +118,7 @@ import { searchOrganismContent } from '../services/organism-search.js';
 import { organismArchiveOp } from '../services/organism-archive-op.js';
 import { addComment, listComments } from '../services/organism-comments.js';
 import { commentWorkspace, deleteCommentIn } from '../services/organism-read/comments.js';
-import { organismMemberGate, organismForActiveMember, organismShownTo } from '../services/organism-read/member.js';
+import { organismMemberGate, organismForActiveMember, organismShownTo, organismRosterFor } from '../services/organism-read/member.js';
 import { organismForManager } from '../services/organism-read/manager.js';
 import { listedOrganisms } from '../services/organism-read/list.js';
 import { leaveOrganismAs } from '../services/organism-read/leave.js';
@@ -408,14 +411,12 @@ export function registerOrganismsTools(
             annotations: annotationsFor('aimeat_organism_members'),
         },
         async ({ organism_id, role, status }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            if (!(await canSeeOrganism(organism))) return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
-
-            const allMembers = await storage.listMembers(organism_id, {
-                role,
-                status: status || 'active',
-            });
+            // The organism, the rule (a private organism's member list is for its active members
+            // only) and the member rows: services/organism-read/member.ts, which
+            // GET /v1/organisms/:id/members asks too (developer approval 2026-11-14).
+            const shown = await organismRosterFor(storage, organism_id, { owner: getOwnerName() }, { role, status });
+            if (!shown.ok) return { content: [{ type: 'text' as const, text: shown.code === 'NOT_FOUND' ? 'Organism not found' : 'Access denied' }], isError: true };
+            const { organism, members: allMembers } = shown;
 
             // Roster privacy (memberVisibility): below the tier the listing shrinks to the
             // accountability rows — creator/admins + the caller's own row (matches REST /members).
