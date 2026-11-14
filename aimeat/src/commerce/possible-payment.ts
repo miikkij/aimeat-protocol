@@ -26,6 +26,7 @@
  *   try { settled = await facilitator.settle(p, r); } catch (e) { throw new PossiblePaymentError(reference, {...}); }
  *   if (err instanceof PossiblePaymentError) await recordPossiblePayment(ctx, { reference, sellerGhii, buyer, amount, currency, rail, possible: err.possible });
  * @version-history
+ *   2026-11-10 -- The seller's notice opens the wallet (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, lead 4432).
  */
 import type { CheckoutSessionRecord, PaymentContext } from './types.js';
@@ -162,5 +163,7 @@ export async function recordPossiblePayment(ctx: PaymentContext, input: Possible
     title: `A payment of ${money} may have arrived`,
     body: `The payment service did not answer when a buyer paid you, so it is not known whether the money arrived. Check your payout address for a transfer from ${possible.payer}. If it arrived, deliver the order or return the payment. Reference: ${reference}.`,
     i18n: { key: 'payment_possible', vars: { amount: money, payer: possible.payer, reference } },
+    // The wallet lists the purchases and sales and the payout rails; without a link a press did nothing.
+    link: '/v1/profile?tab=wallet',
   });
 }

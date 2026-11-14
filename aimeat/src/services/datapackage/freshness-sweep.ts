@@ -21,6 +21,7 @@
  * @structure FRESHNESS_NOTICES_KEY · onFreshnessSwept · SweptPackage · sweepStalePackages · parseNotices
  * @usage const out = await sweepStalePackages(storage, config);
  * @version-history
+ *   2026-11-10 — The notice and its button open "Data you share" at the product, not the Offers page it left (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.1.0 — 2026-11-01 — onFreshnessSwept: hooks get the packages each check read (plan D6).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.2).
  */
@@ -32,6 +33,7 @@ import { SCHEDULED_BY_NATURE, type Freshness } from './freshness.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
+import { sharedDataLink } from '../notifications/links.js';
 import { logger } from '../../utils/logger.js';
 
 /** The owner's record of which stale packages were told about. Service-owned (utils/reserved-keys.ts). */
@@ -118,15 +120,18 @@ export async function sweepStalePackages(storage: Storage, config: AimeatConfig,
         if (!fresh.length) continue;
         const names = fresh.map(p => p.title || p.name).join(', ');
         const one = fresh.length === 1;
+        // "Data you share" holds the data products since they left Offers: one product opens itself,
+        // several open the page. `#offers` was the page they had left.
+        const where = sharedDataLink(one ? fresh[0]!.name : null);
         await notify(storage, ownerGhii, {
             type: 'datapackage_stale',
             title: one ? `Your data package "${names}" is out of date` : `${fresh.length} of your data packages are out of date`,
             body: one
                 ? 'It has missed three updates its schedule promised. Readers keep getting the last version. Check what produces it, or change or remove the schedule.'
                 : `They have missed three updates their schedule promised: ${names}. Readers keep getting the last version. Check what produces them, or change or remove the schedule.`,
-            link: '/v1/profile#offers',
+            link: where,
             i18n: one ? { key: 'datapackage_stale_one', vars: { name: names } } : { key: 'datapackage_stale_many', vars: { count: fresh.length, names } },
-            actions: [{ id: 'open', label: 'See your data packages', kind: 'navigate', link: '/v1/profile#offers', i18n: { key: 'datapackage_stale.open' } }],
+            actions: [{ id: 'open', label: 'See your data packages', kind: 'navigate', link: where, i18n: { key: 'datapackage_stale.open' } }],
         });
         emitChange('notifications', ownerGhii);
         out.notified++;

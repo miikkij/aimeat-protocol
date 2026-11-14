@@ -17,6 +17,7 @@
  *   res.json(success(nodeId, { task, start: startAnswer(decision, task.status) }));
  *   if (!alreadyWaitingWithPlan(taskBefore)) void notifyTaskWaiting(storage, task, decision);
  * @version-history
+ *   v1.5.0 — 2026-11-15 — The notice and its Open button open the task on the home (/v1/home?agent=&work=) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.4.0 — 2026-11-12 — alreadyWaitingWithPlan(): a plan proposed again on a task that still
  *     waits is not announced again. On aimeat.io one waiting task was announced four times in 78
  *     minutes, once per start of the agent's worker
@@ -119,7 +120,8 @@ export async function notifyTaskWaiting(
         const steps = (task.todos ?? []).filter(t => t.status !== 'outdated').length;
         const reason = waitReason(who, decision ?? { waitsBecause: 'setting', floorScopes: [], effects: [] });
         const held = decision?.waitsBecause === 'floor' || decision?.waitsBecause === 'effects';
-        const link = `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`;
+        // The task on the home (views/home/agent-work.js); `?tab=agents&task=` was read by no page.
+        const link = `/v1/home?agent=${encodeURIComponent(agentName)}&work=${encodeURIComponent(task.id)}`;
         await notify(storage, task.ownerGaii, {
             type: 'task_waiting',
             title: `${who} waits for your OK: ${task.title}`.slice(0, 200),

@@ -35,6 +35,7 @@
  * @usage
  *   const r = await decideSuggestion({ storage, config }, caller, { orgId, id, decision: 'approve' });
  * @version-history
+ *   2026-11-15 — The deciders' notice carries the workspace id, so it opens that workspace (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-10 — listSuggestions lets an active member's attached agent list as its owner does
  *     (attachedAsParticipant takes the membership).
  *   2026-10-13 — Approving a suggestion hands the approver's session (its scopes included) to the
@@ -171,7 +172,7 @@ async function fileSuggestion(
     await deps.storage.createPendingApproval(record);
     const deciders = await decidersOf(deps, orgId, standing, caller.owner);
     await noticeDeciders(deps.storage, deps.config.nodeId, deciders, {
-        organismId: orgId, suggestionId: record.id, kind: args.kind, wsName: args.ws_name, label: args.label,
+        organismId: orgId, suggestionId: record.id, kind: args.kind, wsName: args.ws_name, ws: args.ws, label: args.label,
         who: caller.owner, count: args.ops?.length,
     });
     emitChange('organisms');

@@ -31,6 +31,7 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.10.0 — 2026-11-15 — The blanket invitation's notice opens the App development page (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.9.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
  *     language (notiftext.app_dev_grant_all_<rung>).
  *   v1.9.0 — 2026-11-01 — GET members/me takes a person registered to the app (an app party token) and
@@ -266,6 +267,8 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         type: 'app_dev_grant',
         title: `${me} invited you to build their apps`,
         body: `You may ${actsFor(level).join(', ')} on any app of theirs. Your agents are covered by the same invitation.`,
+        // The App development page lists the apps the person may build; without a link a press did nothing.
+        link: '/v1/profile?tab=appdev',
         i18n: { key: `app_dev_grant_all_${levelName(level)}`, vars: { who: me } },
       });
     } catch (err) {

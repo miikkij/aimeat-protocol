@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Time, tab-navigation, and number/byte format helpers. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-11-15 — syncTabHistory also keeps `agent`, `package` and a fragment that names
+ *     an item (#agreements/<id>), so a notification's link reaches the tab it opens
+ *     (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.4.1 — 2026-11-14 — syncTabHistory keeps `org`, `ws` and `joined`. It dropped them on load, so a link
  *     into one organism opened the list, and the welcome banner after an accepted invitation never showed.
  *   v1.4.0 — 2026-11-02 — redirectMovedTab: ?tab=offers&product=… opens the product on "Data you share" (WP11).
@@ -109,14 +112,18 @@ export function syncTabHistory(tabId, replace) {
     // A link inside the profile that already put this tab and its own item in the address (openTabAt:
     // ?tab=offers&product=…, ?tab=dataWallet&party=…) keeps them, and adds no second history entry.
     const arrived = !!tabId && here.get('tab') === tabId;
+    // A notification's link names its item the same way (?agent=, ?org=&ws=, ?package=) and may carry a
+    // fragment the page reads (#agreements/<id>); the tab reads them when it mounts, after this runs.
     if (replace || arrived) {
       // org, ws and joined: a link into one organism (?tab=organisms&org=…&ws=…) and the invitation
-      // accept's ?joined=1, which the organisms tab reads after it loads.
-      for (const k of ['open', 'test', 'section', 'product', 'party', 'org', 'ws', 'joined']) if (here.get(k)) q.set(k, here.get(k));
+      // accept's ?joined=1, which the organisms tab reads after it loads. agent and package: a
+      // notification's link to one agent or one package.
+      for (const k of ['open', 'test', 'section', 'product', 'party', 'agent', 'org', 'ws', 'joined', 'package']) if (here.get(k)) q.set(k, here.get(k));
     }
     if (arrived) replace = true;
     const qs = q.toString();
-    const path = qs ? `/v1/profile?${qs}` : '/v1/profile';
+    const keepHash = arrived && /^#[a-z]+\/./i.test(window.location.hash) ? window.location.hash : '';
+    const path = (qs ? `/v1/profile?${qs}` : '/v1/profile') + keepHash;
     const state = { aimeatTab: tabId || null };
     if (replace) history.replaceState(state, '', path);
     else history.pushState(state, '', path);

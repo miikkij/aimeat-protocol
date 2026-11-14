@@ -33,6 +33,7 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   2026-11-15 — The mode-change notice opens the agent's card (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-13 — VALID_MODES comes from models/agent-onboarding-schemas.ts, not from a route file
  *     (structure programme 2026-11, unit 4).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
@@ -580,7 +581,8 @@ async function noticeAgentModeChange(storage: Storage, ownerGhii: string, agent:
         type: self ? 'agent_mode_self_set' : 'agent_mode_set_by_agent',
         title: self ? `Your agent ${agent} changed its own mode` : `Your agent ${by} changed the mode of ${agent}`,
         body: `The mode of ${agent} is now "${mode}". In the "workstation" mode an agent may answer for you the steps of your goals that wait for you. You can change the mode on the agent's page.`,
-        link: '/v1/profile#agents',
+        // The agent's own card, where the body says the mode is changed.
+        link: `/v1/profile?tab=agents&agent=${encodeURIComponent(agent)}`,
         i18n: { key: self ? 'agent_mode_self_set' : 'agent_mode_set_by_agent', vars: { agent, mode, ...(self ? {} : { by }) } },
     }).catch((err: unknown) => logger.warn('agent mode: the owner could not be told about a mode change', { agent, error: String(err) }));
 }

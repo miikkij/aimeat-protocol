@@ -13,6 +13,15 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.13.0 — 2026-11-10 — A notice's text can be selected and copied: the notice is no longer one
+ *     button (a browser selects no text inside a button); its title is the button, and a press on the
+ *     text opens the link unless text was being selected. A notice without a link does nothing and
+ *     keeps the list open. A link to one agent opens that agent also when the Agents page is already
+ *     open (openItem); before, the press reloaded the page the person was on and nothing changed
+ *     (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida). A link to a Settings & Controls page
+ *     keeps what it names (?agent=, ?open=, ?org=&ws=, ?package=, #agreements/<id>), which the bell
+ *     used to cut off (openProfileLink); a page already open that reads its item only on mount is
+ *     loaded again. A Design Book preview is a full load, and so is an admin link from the admin page.
  *   v1.12.0 — 2026-10-31 — A link on another origin (an extension's notice that leads into its app,
  *     `https://<app>.apps.<apex>/…`) is opened as that address. It was cut to its path, so the SPA
  *     routed `/?…` and the click landed on the home page (Jouni, 2026-10-31).
@@ -55,6 +64,7 @@ import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf, ma
 import { HelpTip } from '/components/HelpTip.js';
 import { Tooltip } from '/components/Tooltip.js';
 import { ago } from '/js/format.js';
+import { openItem } from '/js/open-item.js';
 const html = htm.bind(h);
 
 async function api(path, opts = {}) {
@@ -117,30 +127,73 @@ export function openNotificationLink(link, onNavigate) {
   if (url.pathname === '/v1/profile') {
     const hashMatch = /^#([a-z]+)(?:\/(.+))?$/i.exec(url.hash || '');
     const rawTab = url.searchParams.get('tab') || (hashMatch ? hashMatch[1] : '');
-    if (rawTab) {
-      const tabId = rawTab.toLowerCase() === 'inbox' ? 'messages' : rawTab;
-      const rest = hashMatch ? (hashMatch[2] || '') : '';
-      try {
-        sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
-        if (tabId === 'messages' && rest) sessionStorage.setItem('aimeat.inbox.open', rest);
-        // `?tab=agents&agent=<name>` names one agent: the navigation below drops the query, so the
-        // name goes where the Agents tab looks for it on mount, as it does for the home card.
-        const agent = url.searchParams.get('agent');
-        if (tabId === 'agents' && agent) sessionStorage.setItem('aimeat.agents.open', agent);
-      // eslint-disable-next-line aimeat/no-silent-catch -- noop
-      } catch { /* noop */ }
-      if (onNavigate) onNavigate('/v1/profile');
-      setTimeout(() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } })), 60);
-      return;
-    }
+    if (rawTab) { openProfileLink(url, rawTab, hashMatch, onNavigate); return; }
   }
-  // App pages ('/v1/apps/<owner>/<file>') and other non-SPA documents are served by the
-  // backend (and may 301 to the isolated app origin) — a hard navigation, not SPA routing.
-  if (/^\/v1\/apps\//.test(url.pathname) || /\.html$/i.test(url.pathname)) {
+  // Pages the server draws, not SPA routes: app pages ('/v1/apps/<owner>/<file>', which may 301 to
+  // the app's own origin), an .html document and a Design Book part's preview. A hard navigation;
+  // the SPA would show its front page for them.
+  if (/^\/v1\/apps\//.test(url.pathname) || /^\/v1\/designbook\//.test(url.pathname) || /\.html$/i.test(url.pathname)) {
+    window.location.assign(url.pathname + url.search + url.hash);
+    return;
+  }
+  // The admin page reads its ?tab= only when it loads, so from the admin page itself a link to one of
+  // its tabs loads the page again; from anywhere else the SPA navigation loads it anyway.
+  if (/^\/v1\/admin(\/|$)/.test(url.pathname) && /^\/v1\/admin(\/|$)/.test(window.location.pathname)) {
     window.location.assign(url.pathname + url.search + url.hash);
     return;
   }
   if (onNavigate) onNavigate(url.pathname + url.search + url.hash);
+}
+
+/** The pages that take one item while they are open (useOpenItem in js/open-item.js). */
+const OPEN_ITEM_TABS = new Set(['agents', 'companies', 'contacts', 'extensions', 'goals', 'scheduler', 'skills', 'workflows']);
+
+/**
+ * A link to a Settings & Controls page, with what it names on that page kept whole: the item in the
+ * query (?agent=, ?open=, ?org=&ws=, ?package=, ?product=) and the fragment (#agreements/<id>). The
+ * page reads them when it mounts, and a page that is already open hears openItem (agents, and every
+ * page that takes ?open=). A page already open that reads its item only when it mounts is loaded
+ * again, because otherwise the press changes nothing on the screen.
+ * @param {URL} url @param {string} rawTab @param {RegExpExecArray|null} hashMatch
+ * @param {(path: string) => void} [onNavigate]
+ */
+function openProfileLink(url, rawTab, hashMatch, onNavigate) {
+  const tabId = rawTab.toLowerCase() === 'inbox' ? 'messages' : rawTab;
+  const rest = hashMatch ? (hashMatch[2] || '') : '';
+  const q = new URLSearchParams(url.search);
+  q.set('tab', tabId);
+  // The hash form ('#organisms', '#inbox/<id>') names the tab, not a fragment the page reads; a
+  // conversation goes to the inbox through sessionStorage below.
+  const hash = url.searchParams.get('tab') && tabId !== 'messages' ? url.hash : '';
+  const target = `/v1/profile?${q.toString()}${hash}`;
+  const item = tabId === 'agents' && q.get('agent') ? q.get('agent') : (OPEN_ITEM_TABS.has(tabId) ? q.get('open') : null);
+  const names = [...q.keys()].some((k) => k !== 'tab') || !!hash;
+  const here = new URLSearchParams(window.location.search);
+  const onProfile = window.location.pathname === '/v1/profile';
+  const sameTab = onProfile && here.get('tab') === tabId;
+  try {
+    sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
+    if (tabId === 'messages' && rest) sessionStorage.setItem('aimeat.inbox.open', rest);
+  // eslint-disable-next-line aimeat/no-silent-catch -- noop
+  } catch { /* noop */ }
+  if (sameTab) {
+    // The page is open: an item it takes while open goes there, the inbox hears aimeat-open-tab, and
+    // a page that reads its item only on mount is loaded again with the link.
+    if (item) openItem(tabId, item);
+    else if (tabId === 'messages') window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+    else if (names) window.location.assign(target);
+    return;
+  }
+  if (onProfile) {
+    // Another tab of the profile: the address takes the link, then the tab opens and reads it on mount
+    // (landing-page.helpers.js openTabAt does the same for a link inside the profile).
+    history.pushState({ aimeatTab: tabId }, '', target);
+    window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+  } else if (onNavigate) {
+    onNavigate(target);
+    setTimeout(() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } })), 60);
+  }
+  if (item) setTimeout(() => openItem(tabId, item), 60);
 }
 
 export function NotificationBell({ t, onNavigate }) {
@@ -200,9 +253,19 @@ export function NotificationBell({ t, onNavigate }) {
       await api('/v1/notifications/read', { method: 'POST', body: JSON.stringify({ all: true }) });
     }
   };
+  // A notice without a link stays where it is, and the list stays open: closing it looked like a
+  // press that went somewhere and landed nowhere.
   const clickNotif = (n) => {
+    if (!n.link) return;
     setOpen(false);
     openNotificationLink(n.link, onNavigate);
+  };
+  // A press on the notice's text opens its link, unless the person was selecting text to copy: the
+  // text is not inside a button, because a browser lets no one select text inside a button.
+  const clickNotifText = (n) => {
+    const sel = typeof window.getSelection === 'function' ? window.getSelection() : null;
+    if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+    clickNotif(n);
   };
 
   const actionLabel = (a) => actionTextOf(a) || tr(ACTION_I18N[a.id], a.label || a.id);
@@ -274,11 +337,13 @@ export function NotificationBell({ t, onNavigate }) {
     const help = helpTermOf(n);
     return html`
       <div class="notif-item ${n.read ? '' : 'unread'}" key=${n.id}>
-        <button class="notif-item-main" onClick=${() => clickNotif(n)}>
-          <div class="notif-item-title">${titleOf(n)}</div>
+        <div class="notif-item-main ${n.link ? 'notif-item-main--link' : ''}" onClick=${() => clickNotifText(n)}>
+          ${n.link
+            ? html`<button type="button" class="notif-item-title" onClick=${(e) => { e.stopPropagation(); clickNotif(n); }}>${titleOf(n)}</button>`
+            : html`<div class="notif-item-title">${titleOf(n)}</div>`}
           ${bodyOf(n) ? html`<div class="notif-item-body">${bodyOf(n)}</div>` : null}
           <div class="notif-item-time">${sourceName(n)} · ${relTime(n.createdAt)}</div>
-        </button>
+        </div>
         ${help ? html`<div class="notif-actions"><${HelpTip} term=${help} label=${titleOf(n)} /></div>` : null}
         ${decided ? html`<div class="notif-result ok">${decided}</div>` : null}
         ${change ? html`<div class="notif-actions"><button class="notif-action-btn poster-menu-row" onClick=${(e) => { e.stopPropagation(); setOpen(false); openNotificationLink(change.link, onNavigate); }}>${change.label}</button></div>` : null}

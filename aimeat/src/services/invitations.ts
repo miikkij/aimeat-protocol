@@ -21,6 +21,7 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-11-15 — The accepted and member-added notices open the shared place (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
  *     (notiftext.organism_invitation, organism_invitation_cancelled, organism_invitation_accepted,
  *     organism_member_added_<role>); the invitation email names a team in the email's language.
@@ -89,6 +90,7 @@ import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../stora
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../storage/repositories/invitation.repository.js';
 import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
+import { organismLink } from './notifications/links.js';
 import { nodeContext } from './node-context.js';
 import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace/roles.js';
@@ -694,7 +696,7 @@ export async function acceptNameInvitation(
     await notify(storage, `${membership.invitedBy}@${config.nodeId}`, {
       type: 'organism_invitation_accepted',
       title: `${invitee} accepted your invitation to "${organism.name}"`,
-      link: '/v1/profile#organisms',
+      link: organismLink(organism.id),
       i18n: { key: 'organism_invitation_accepted', vars: { who: invitee }, orgVars: { org: organism.id } },
     });
     emitChange('notifications');
@@ -784,7 +786,7 @@ export async function addOrganismMember(
   await notify(storage, `${invitee}@${config.nodeId}`, {
     type: 'organism_member_added',
     title: `${input.inviterGhii} added you to "${input.organism.name}" as ${role}`,
-    link: '/v1/profile#organisms',
+    link: organismLink(input.organism.id),
     i18n: { key: `organism_member_added_${role}`, vars: { who: input.inviterGhii }, orgVars: { org: input.organism.id } },
   });
   emitChange('notifications', `${invitee}@${config.nodeId}`);

@@ -6,6 +6,7 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 — 2026-11-15 — The workflow notices and pushes open that workflow (openItemLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.16.0 — 2026-11-10 — One push per event: askHumanInput and maybeAlertAgentOffline no longer push
  *     beside notify(), which already pushes in the owner's language and under their push settings. The
  *     failed-step push reads 'Workflow "<name>" stopped at step <id>' / 'Open the workflow to see why.'
@@ -113,6 +114,7 @@ import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/wo
 import { runReader, hiddenStepInputError } from './run-reader.js';
 import { memoryTarget } from '../classification/labels.js';
 import { shownMemoryValue } from '../secret-records.js';
+import { openItemLink } from '../notifications/links.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -553,7 +555,7 @@ export async function askHumanInput(
   logger.info(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" waiting for human input`);
   // notify() stores it and pushes it, in the owner's language and under the owner's push settings.
   // A second, direct push here sent the same question twice in English and past quiet hours.
-  try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: '/v1/profile?tab=workflows', i18n: { key: 'workflow_input_needed', vars: { name, step: step.id, question: question.prompt, options: optionsSummary } } }); }
+  try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: openItemLink('workflows', run.workflowId), i18n: { key: 'workflow_input_needed', vars: { name, step: step.id, question: question.prompt, options: optionsSummary } } }); }
   catch (err) { logger.warn('askHumanInput: in-app notify best-effort', { error: String(err) }); }
   return { question, askedAt: now };
 }
@@ -574,7 +576,7 @@ export async function onStepFail(deps: StepDeps, ownerGhii: string, run: Workflo
     deps.pushService.sendNotification(ownerName, {
       title: `Workflow "${name}" stopped at step ${stepId}`,
       body: 'Open the workflow to see why.',
-      url: '/v1/profile?tab=workflows',
+      url: openItemLink('workflows', run.workflowId),
       tag: `workflow:${run.workflowId}`,
       i18n: {
         title: { key: 'workflow_step_failed.title', vars: { name, step: stepId } },
@@ -605,7 +607,7 @@ export async function maybeAlertAgentOffline(deps: StepDeps, ownerGhii: string, 
   const body = `${name}: step "${step.id}" was dispatched but its agent (${agents}) looks offline — it will fail in ~${graceMin} min unless the agent connects.`;
   logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" dispatched to offline agent(s) ${agents}`);
   // notify() stores it and pushes it once; a direct push here sent it a second time (see askHumanInput).
-  try { await notify(deps.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: '/v1/profile?tab=workflows', i18n: { key: 'workflow_agent_offline', vars: { name, step: step.id, agents, minutes: graceMin } } }); }
+  try { await notify(deps.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: openItemLink('workflows', run.workflowId), i18n: { key: 'workflow_agent_offline', vars: { name, step: step.id, agents, minutes: graceMin } } }); }
   catch (err) { logger.warn('agents: in-app notify best-effort', { error: String(err) }); }
 }
 
@@ -654,7 +656,8 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
     failedSteps.length ? `Failed steps: ${failedSteps.join(', ')}.` : null,
   ].filter(Boolean).join(' ');
   const body = `${header}\n\nRun log:\n${stepLog}`;
-  const link = '/v1/profile?tab=workflows';
+  // The workflow itself (useOpenItem on the Workflows page), not its list.
+  const link = openItemLink('workflows', run.workflowId);
 
   // 1. In-app inbox (the notification system) — always, best-effort (never throws).
   await notify(deps.storage, ownerGhii, {

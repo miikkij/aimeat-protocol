@@ -7,6 +7,9 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.10.0 — 2026-11-10 — A bell notice is no longer a button, so its text can be selected; it shows
+ *     the pointer and the hover only when it has a link, its title is a plain-looking button, and its
+ *     text keeps its line breaks.
  *   v1.9.0 — 2026-11-07 — The name stays in the folded bar (Jouni: the name is always visible somewhere,
  *     and it leads home). It is the item that gives way: it shrinks to the width left and ends in an
  *     ellipsis, at most 9rem. Before this the folded bar hid it with the "logged in" label.
@@ -134,10 +137,14 @@
 .notif-empty { padding: 1rem 0.85rem; color: var(--muted); font-size: var(--text-note); }
 .notif-item { display: block; border-bottom: 1px solid var(--border-subtle); }
 .notif-item.unread { background: var(--accent-subtle); }
-.notif-item-main { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.55rem 0.85rem; cursor: pointer; }
-.notif-item-main:hover { background: var(--bg-dim); }
-.notif-item-title { font-size: var(--text-note); font-weight: var(--weight-semibold); color: var(--text); }
-.notif-item-body { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+/* The notice is not a button, so its text can be selected and copied; with a link, a press on it
+   opens the link (NotificationBell.js) and the title is the button a keyboard reaches. */
+.notif-item-main { display: block; text-align: left; padding: 0.55rem 0.85rem; }
+.notif-item-main--link { cursor: pointer; }
+.notif-item-main--link:hover { background: var(--bg-dim); }
+.notif-item-title { display: block; width: 100%; text-align: left; font: inherit; font-size: var(--text-note); font-weight: var(--weight-semibold); color: var(--text); background: none; border: none; padding: 0; }
+button.notif-item-title { cursor: pointer; }
+.notif-item-body { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; user-select: text; cursor: text; white-space: pre-line; }
 .notif-item-time { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
 /* A notification's actions (reply / approve / deny …) are menu rows in a column (poster.css
    .poster-menu-row, Jouni's decision "Menu row"). */

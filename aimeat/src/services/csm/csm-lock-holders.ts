@@ -48,6 +48,7 @@
  * @structure CSM_LOCK_HOLDERS_KEY · moveCsmLockHoldersOnce()
  * @usage await moveCsmLockHoldersOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   2026-11-10 — The notice opens Incoming webhooks, the one page that lists data descriptions (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08b round 15, D1).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -95,6 +96,9 @@ async function tellRegistrant(storage: Storage, nodeId: string, account: string,
         + 'Every write under that key is still checked against the shape the lock holds. If that shape is not yours, '
         + `save your description again (PUT /v1/csm/${csm}), or remove the lock (DELETE /v1/memory/${pattern}/schema).`,
       i18n: { key: 'csm_lock_yours', vars: { csm, pattern } },
+      // The nearest page: Incoming webhooks is the only screen that lists data descriptions. No page
+      // shows a key's lock; without a link a press did nothing.
+      link: '/v1/profile?tab=receivers',
     });
   } catch (err) {
     logger.warn('csm-lock-holders: the notice to the registering account failed', { pattern, error: String(err) });

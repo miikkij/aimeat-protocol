@@ -30,6 +30,7 @@
  *   if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
  *
  * @version-history
+ *   v2.1.0 — 2026-11-15 — The ownership notices open the shared place (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v2.0.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
  *     language (notiftext.organism_owner_added*, organism_owner_removed_you*).
  *   v2.0.0 — 2026-08-15 — Ownership is plural: owners[] + createdBy, add/remove as first-class
@@ -40,6 +41,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { notify } from './notify.js';
+import { organismLink } from './notifications/links.js';
 
 /**
  * Everyone who holds this organism. Falls back to the deprecated single field for a record written
@@ -144,7 +146,7 @@ export async function addOrganismOwner(
   await notify(storage, `${name}@${config.nodeId}`, {
     type: 'organism_ownership_transferred',
     title: `You are now an owner of "${organism.name}"`,
-    link: '/v1/profile#organisms',
+    link: organismLink(organism.id),
     i18n: { key: 'organism_owner_added_you', orgVars: { org: organism.id } },
   });
   // Everyone who already held it is told, because gaining a co-owner is not a private event.
@@ -152,7 +154,7 @@ export async function addOrganismOwner(
     await notify(storage, `${existing}@${config.nodeId}`, {
       type: 'organism_ownership_transferred',
       title: `${name} is now an owner of "${organism.name}"${opts.performedBy ? ` (${opts.performedBy})` : ''}`,
-      link: '/v1/profile#organisms',
+      link: organismLink(organism.id),
       i18n: { key: opts.performedBy ? 'organism_owner_added_by' : 'organism_owner_added', vars: { who: name, by: opts.performedBy ?? '' }, orgVars: { org: organism.id } },
     });
   }
@@ -199,7 +201,8 @@ export async function removeOrganismOwner(
   await notify(storage, `${name}@${config.nodeId}`, {
     type: 'organism_ownership_transferred',
     title: `You are no longer an owner of "${organism.name}"${opts.performedBy ? ` (${opts.performedBy})` : ''}`,
-    link: '/v1/profile#organisms',
+    // The departing owner keeps an admin seat, so the place still opens for them.
+    link: organismLink(organism.id),
     i18n: { key: opts.performedBy ? 'organism_owner_removed_you_by' : 'organism_owner_removed_you', vars: { by: opts.performedBy ?? '' }, orgVars: { org: organism.id } },
   });
 

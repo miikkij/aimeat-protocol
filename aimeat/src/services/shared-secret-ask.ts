@@ -27,6 +27,7 @@
  * @usage
  *   await askOperatorsAboutSharedHost({ storage, config }, { extName, installer, secret, host, requestedBy, allowHostsField });
  * @version-history
+ *   2026-11-10 — The notice opens the Extensions page where the config is changed: the admin's for an operator, the installer's own at this extension (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22; Jouni, 2026-10-24).
  */
 import type { AimeatConfig } from '../config.js';
@@ -96,10 +97,16 @@ export async function askOperatorsAboutSharedHost(
             requestedAt: new Date().toISOString(), requestedBy: req.requestedBy,
         };
         if (!(await addAsk(deps.storage, owner, `${req.secret}#asks`, entry))) return;
-        const recipients = new Set(await listOperatorGhiis(deps.storage, deps.config));
+        const operators = new Set(await listOperatorGhiis(deps.storage, deps.config));
+        const recipients = new Set(operators);
         if (req.installer && req.installer !== NODE_INSTALLER) {
             recipients.add(req.installer.includes('@') ? req.installer : `${req.installer}@${deps.config.nodeId}`);
         }
+        // Where the extension's config is changed: the admin's Extensions page for an operator, the
+        // account's own Extensions page, at this extension, for the account that installed it.
+        const linkFor = (to: string) => operators.has(to)
+            ? '/v1/admin?tab=extensions'
+            : `/v1/profile?tab=extensions&open=${encodeURIComponent(`ext:${req.extName}`)}`;
         const hostname = hostnameOf(req.host);
         const vars = { requester: req.requestedBy, extension: req.extName, secret: req.secret, host: req.host, hostname };
         const body = req.allowHostsField
@@ -113,6 +120,7 @@ export async function askOperatorsAboutSharedHost(
                 type: SHARED_SECRET_ASK_TYPE,
                 title: `${req.requestedBy} asks to use the shared secret ${req.secret} with ${req.host}`,
                 body,
+                link: linkFor(to),
                 i18n: { key: req.allowHostsField ? SHARED_SECRET_ASK_TYPE : SHARED_SECRET_DECLARE_TYPE, vars },
             });
         }

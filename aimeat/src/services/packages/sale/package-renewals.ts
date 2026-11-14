@@ -31,6 +31,7 @@
  *   follow through Stripe's events; the node decides when to charge.
  * @structure AUTO_RENEW_DAYS_BEFORE · runAutoRenewals()
  * @version-history
+ *   2026-11-10 — The renewal notices open the package (packageLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.1.0 — 2026-10-06 — A renewal an agent turned on is held to that agent's daily purchase limit
  *     (secaudit 2026-10 follow-up, A6).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
@@ -43,6 +44,7 @@ import { bookSessionlessSale } from '../../../commerce/session-service.js';
 import { allSubscriptions, catalogueEntry, putSubscription, type Subscription } from './package-sale-catalogue.js';
 import { readOfferAsSeller, carryOutSale } from './package-sale-checkout.js';
 import { notify } from '../../notify.js';
+import { packageLink } from '../../notifications/links.js';
 import { reserveAgentPurchase, releaseAgentPurchase } from '../../../commerce/agent-purchase-limit.js';
 import { agentSessionCaller } from '../../caller-context.js';
 import { CommerceError } from '../../../commerce/errors.js';
@@ -121,7 +123,7 @@ async function renewOne(deps: Deps, sub: Subscription, reference: string): Promi
                 body: overLimit
                     ? `The agent that turned automatic renewal on may not spend this today (${reason}). The card was not charged. The updates end on ${date} unless you renew by hand or raise the agent's limit; this node tries again each day until then.`
                     : `The card could not be charged (${reason}). The updates end on ${date} unless you renew by hand; this node tries again each day until then.`,
-                link: '/v1/profile?tab=packages',
+                link: packageLink(sub.group_id),
                 i18n: { key: overLimit ? 'package_renewal_agent_limit' : 'package_renewal_failed', vars: { name: entry.title ?? sub.group_id, date } },
             });
             emitChange('notifications', buyerGhii);
@@ -149,7 +151,7 @@ async function renewOne(deps: Deps, sub: Subscription, reference: string): Promi
         type: 'package_renewed',
         title: `${entry.title ?? sub.group_id} was renewed`,
         body: `Your card was charged ${(amount / 1_000_000).toFixed(2)} ${currency}, and the updates go on for another ${sub.renewal!.period_days} days.`,
-        link: '/v1/profile?tab=packages',
+        link: packageLink(sub.group_id),
         i18n: { key: 'package_renewed', vars: { name: entry.title ?? sub.group_id, amount: `${(amount / 1_000_000).toFixed(2)} ${currency}`, days: String(sub.renewal!.period_days) } },
     });
     emitChange('notifications', buyerGhii);

@@ -25,6 +25,7 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.8.0 — 2026-11-15 — The unread-PDF notice links `?tab=dataWallet`, the tab's id; `datawallet` opened an empty page (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.7.0 — 2026-11-13 — mayAsk admits an agent on its owner's memory record, which service.ts
  *     sourceFor has checked against the owner-scope read rule.
  *   v1.6.0 — 2026-11-09 — memoryValueText reads a person's context (aimeat.context/v1) as its name,
@@ -199,7 +200,7 @@ async function tellTextNotRead(deps: Deps, ownerGhii: string, source: ContentSou
     title: `The text of your PDF ${source.key} was not read`,
     body: `The file is stored as it was. Reading its text reached this node's ${why.reason === 'time' ? 'time' : 'memory'} limit of ${limit}, `
       + 'which applies to a PDF whose size the node cannot check before it reads it. Its details on your Data Wallet page say the same.',
-    link: '/v1/profile?tab=datawallet',
+    link: '/v1/profile?tab=dataWallet',
     i18n: { key: why.reason === 'time' ? 'content_pdf_text_not_read_time' : 'content_pdf_text_not_read_memory', vars },
   }).catch((err: unknown) => logger.warn('contentclass: the notice about an unread PDF text was not sent', { key: source.key, error: String(err) }));
 }

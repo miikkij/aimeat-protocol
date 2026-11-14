@@ -25,6 +25,7 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-11-15 — The inviter's notice opens the shared place the invitation was for (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
  *     (notiftext.organism_invitation_accepted).
  *   2026-11-14 — An accepted invitation that was sent to make a team lead makes the accepter an owner
@@ -86,6 +87,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { notify } from '../services/notify.js';
+import { organismLink } from '../services/notifications/links.js';
 import { hashPassword } from '../services/password.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
 import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, registrationRefusal, createdAccountIsOperator } from '../services/owner-provisioning.js';
@@ -447,7 +449,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     await notify(storage, `${inv.invitedBy}@${config.nodeId}`, {
       type: 'organism_invitation_accepted',
       title: `${ownerName} accepted your invitation to "${organism.name}"`,
-      link: '/v1/profile#organisms',
+      link: organismLink(organismId),
       i18n: { key: 'organism_invitation_accepted', vars: { who: ownerName }, orgVars: { org: organism.id } },
     });
     emitChange('notifications');

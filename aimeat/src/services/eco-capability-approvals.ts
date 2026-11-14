@@ -33,6 +33,7 @@
  *   const refusal = await ecosystemCallRefusal({ storage, config }, { capability, app, action, callerGhii, input });
  *   if (refusal) throw Object.assign(new Error(refusal.message), refusal);
  * @version-history
+ *   2026-11-10 — The asker's answer notice opens its Capabilities page (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-04 — No guard for a storage without swapEcosystemAppCapabilityApprovals: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.3.0 — 2026-10-25 — The account holder's notice carries its question's ref, and Allow and Don't
@@ -285,6 +286,9 @@ async function tellEcoAsker(
       : `The account holder did not allow "${name}" to ask their outside app ${app} to run ${entry.action}. Nothing was sent. A later call asks again.`,
     data: { app, capability: entry.capability, action: entry.action },
     messageKind: 'eco-capability-approval',
+    // The asker registered the capability, so its own Capabilities page lists it. The allow page is
+    // the account holder's, not the asker's. Without a link a press on the answer did nothing.
+    link: '/v1/profile?tab=capabilities',
   });
 }
 

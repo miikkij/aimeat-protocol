@@ -27,6 +27,7 @@
  * @structure packageSellableResolver() · carryOutSale() · parsePackageLine() · readOfferAsSeller() ·
  *   decideSaleRequest() · reviewSale()
  * @version-history
+ *   2026-11-10 — The decision notices open the package (packageLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.3.2 — 2026-10-18 — A sale naming a node claims its holder before the grant, and a decision
  *     claims its request before anything is granted, both on the record's version; two at the same
  *     moment grant once (wish-rahapolkujen-kilpatilanteet).
@@ -55,6 +56,7 @@ import {
     type CatalogueEntry, type Subscription, type SaleRequest,
 } from './package-sale-catalogue.js';
 import { notify } from '../../notify.js';
+import { packageLink } from '../../notifications/links.js';
 import { isValidGAII } from '../../../utils/gaii.js';
 
 type Deps = { storage: Storage; config: AimeatConfig; peers: Map<string, PeerInfo> };
@@ -314,7 +316,7 @@ export async function decideSaleRequest(
         await notify(deps.storage, buyerGhii, {
             type: 'package_sale_request_decided', title: `Your request for ${req.group_id} was not approved`,
             body: 'The seller did not approve this request. Nothing was installed or charged.',
-            link: '/v1/profile?tab=packages', i18n: { key: 'package_sale_request_refused', vars: { name: req.group_id } },
+            link: packageLink(req.group_id), i18n: { key: 'package_sale_request_refused', vars: { name: req.group_id } },
         });
         return { ok: true, request: claimed };
     }
@@ -339,7 +341,7 @@ export async function decideSaleRequest(
     await notify(deps.storage, buyerGhii, {
         type: 'package_sale_request_decided', title: `Your request for ${req.group_id} was approved`,
         body: outcome.claim_code ? 'The seller approved it. Your claim code is in the request: redeem it on the node that is to receive the package.' : 'The seller approved it, and your node can now take the package.',
-        link: '/v1/profile?tab=packages', i18n: { key: 'package_sale_request_approved', vars: { name: req.group_id } },
+        link: packageLink(req.group_id), i18n: { key: 'package_sale_request_approved', vars: { name: req.group_id } },
     });
     return { ok: true, request: done };
 }

@@ -24,6 +24,7 @@
  *   if (refund.outcome === 'failed' || refund.outcome === 'not_possible') await recordUndeliveredPayment(ctx, {...});
  *   throw new CommerceError('FULFILLMENT_FAILED', 502, `... ${refundSentence(refund, session.id)}`);
  * @version-history
+ *   2026-11-10 — The seller's notice opens the wallet (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F5-01, F7e-01, S8-05).
  */
 import type { CheckoutSessionRecord, PaymentContext, PaymentHandler, RefundOutcome } from './types.js';
@@ -164,5 +165,7 @@ export async function recordUndeliveredPayment(ctx: PaymentContext, input: Undel
     title: `A payment of ${money} was taken and the order was not delivered`,
     body: `The order could not be delivered and the payment did not go back to the buyer, so you hold it. Return the payment to the buyer or deliver the order. Checkout reference: ${session.id}.`,
     i18n: { key: 'payment_not_delivered', vars: { amount: money, session: session.id } },
+    // The wallet lists the purchases and sales; without a link a press did nothing.
+    link: '/v1/profile?tab=wallet',
   });
 }

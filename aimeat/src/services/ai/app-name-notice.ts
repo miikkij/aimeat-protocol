@@ -16,6 +16,7 @@
  * @structure noticeBareNameMatch
  * @usage void noticeBareNameMatch(storage, ownerGhii, prefs, appId);
  * @version-history
+ *   2026-11-10 -- The notice opens the AI page (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -60,6 +61,8 @@ export async function noticeBareNameMatch(
       body: `Your list of apps that may use AI names "${entry}". The app ${app} belongs to another author but has that file name, `
         + `so it may use AI too. If you meant a different app, write its full name (author/app) in the list in place of "${entry}".`,
       i18n: { key: APP_NAME_NOTICE_TYPE, vars: { app, entry } },
+      // The AI page holds the person's AI settings; without a link a press did nothing.
+      link: '/v1/profile?tab=ai',
     });
   } catch (err) {
     logger.warn(`[ai] could not tell ${ownerGhii} about an allowlist name match: ${(err as Error).message}`);

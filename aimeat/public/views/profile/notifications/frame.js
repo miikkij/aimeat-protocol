@@ -6,9 +6,11 @@
  *   family, the switch), the rows of the inbox table with their doors and actions, the sender rows
  *   with their decisions, the crumb and the rail. Every machine word (a group, a kind, an action id)
  *   is turned into the reader's language here.
- * @structure c · rel · Switch · inboxRows · inboxHead · hasOwnPush · senderRows · crumb · pageLinks
+ * @structure c · rel · firstLine · bodyLines · Switch · inboxRows · inboxHead · hasOwnPush · senderRows · crumb · pageLinks
  * @usage import { c, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.14.0 -- 2026-11-10 -- A notice shows its whole text, a paragraph a line (bodyLines), not its first
+ *     line: an agent's notice that asked the person to say a sentence to a session hid the sentence.
  *   v1.13.0 -- 2026-11-08 -- The "AIMEAT itself" row draws no push switch (hasOwnPush). The switch
  *     always showed on and pressing it saved nothing, because the node's own notifications are
  *     pushed or not per group, and the row has no group; its words and its By group door say so.
@@ -52,6 +54,9 @@ export const day = (iso) => (iso ? fmtDate(iso) : '');
 export const clock = (iso) => (iso ? fmtTime(iso, { hour: '2-digit', minute: '2-digit' }) : '');
 export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); return Date.now() - d.getTime() > 30 * 864e5 ? day(iso) : formatRelativeTime(iso); };
 export const firstLine = (s) => String(s || '').split(/\r?\n/).map(l => l.trim()).find(Boolean) || '';
+/** A notice's whole text, one paragraph a line: the first line alone hid what the notice asked the
+ *  person to do (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida). */
+export const bodyLines = (s) => String(s || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
 /** The switch is the library's: the word on the left, the box on the right, so a column of switches lines up on its boxes. */
 export { Switch };
@@ -84,7 +89,7 @@ export function inboxRows(ctx, rows) {
       <${Row} key=${n.id}>
         <${When} at=${clock(n.createdAt)}>${rel(n.createdAt)}<//>
         <${Who} sub=${n.source?.kind === 'aimeat' ? groupWord(n.group) : kindWord(n.source?.kind)}>${sourceName(n)}<//>
-        <${Name} unread=${!n.read} meta=${firstLine(bodyOf(n))} note=${decided || (res ? res.msg : null)} noteTone=${(decided ? n.answered.outcome === 'allowed' : res?.ok) ? 'fine' : undefined}>${titleOf(n)}<//>
+        <${Name} unread=${!n.read} desc=${bodyLines(bodyOf(n))} note=${decided || (res ? res.msg : null)} noteTone=${(decided ? n.answered.outcome === 'allowed' : res?.ok) ? 'fine' : undefined}>${titleOf(n)}<//>
         <${Doors}>
           ${help ? html`<${HelpTip} term=${help} label=${titleOf(n)} />` : null}
           ${acts.slice(0, 2).map(a => answer(ctx, n, a, busy))}

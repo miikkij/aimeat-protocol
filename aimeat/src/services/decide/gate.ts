@@ -29,6 +29,7 @@
  * @usage
  *   const on = gateApplies(await gateSettingOf(storage, ownerGhii, agent), rule);
  * @version-history
+ *   v1.3.0 — 2026-11-15 — The stopped-action notice opens the home, where the open item waits (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.2.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
  *     language (notiftext.decision_gate_stopped).
  *   v1.2.0 — 2026-10-18 — writeAgentGate writes `decide.agents` on its version (record-cas.ts
@@ -123,7 +124,9 @@ export async function openGateItem(
         type: 'decision_gate_stopped',
         title: `${agentName} is waiting for you`,
         body: `${what.rule.decides} (${read}). It has not acted.`,
-        link: '/v1/profile',
+        // The home, whose open-items list carries this decision with its answer (OpenItemsList). A bare
+        // `/v1/profile` reopened whatever Settings page the browser tab had open last.
+        link: '/v1/home',
         i18n: { key: 'decision_gate_stopped', vars: { agent: agentName, decides: what.rule.decides, read } },
       }).catch(err => logger.warn('[decide] the gate stopped an action and could not say so', {
         owner: ownerGhii, decision: what.decisionId, error: String(err),

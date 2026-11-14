@@ -38,6 +38,7 @@
  *   closePayoutHoldNotArrived · listOpenPayoutHoldsOnNode · markPayoutHoldArrived
  * @usage const holds = await openPayoutHolds(storage, provider, beneficiary, currency);
  * @version-history
+ *   2026-11-10 -- The three payout notices open the wallet; they had no link, so a press did nothing (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.1.1 -- 2026-10-31 -- markPayoutHoldArrived closes a record the provider closed as not arrived
  *     between its check and its write as 'arrived', because the entries were already marked paid: the
  *     operator was answered CONFLICT, the record said not arrived, the book said paid, and nobody was
@@ -54,6 +55,9 @@ import { notify } from '../services/notify.js';
 import { updateRecord, UNCHANGED } from '../services/record-cas.js';
 import { listAllMemoryPages } from '../storage/memory-pages.js';
 import { listBeneficiaryEntries, markEntriesPaid } from './beneficiary-book.js';
+
+/** Where a payout notice leads: the wallet, with the shares owed, the purchases and sales and the payout rails. */
+const WALLET_LINK = '/v1/profile?tab=wallet';
 
 /** Key prefix of the possible-payout record under the provider's GHII. */
 export const PAYOUT_HOLD_PREFIX = 'commerce.possible.payout.';
@@ -124,6 +128,8 @@ export async function keepPayoutHold(
     title: `A payout of ${money} may have arrived`,
     body: `The payment service did not answer when ${hold.provider} paid you, so it is not known whether the money arrived. Check your payout address for a transfer from ${hold.payer}. Reference: ${hold.nonce}.`,
     i18n: { key: 'payout_possible', vars: { amount: money, provider: hold.provider, payer: hold.payer, reference: hold.nonce } },
+    // The wallet lists the shares owed, the purchases and sales, and the payout rails.
+    link: WALLET_LINK,
   });
 }
 
@@ -231,12 +237,14 @@ export async function markPayoutHoldArrived(
     title: `The payment of ${money} arrived`,
     body: `The people who run this server checked that the payment of ${money} from ${done.provider} arrived. It is now recorded as paid. Reference: ${reference}.`,
     i18n: { key: 'payout_arrived', vars: { amount: money, provider: done.provider, reference } },
+    link: WALLET_LINK,
   });
   await notify(storage, done.provider, {
     type: 'payout_arrived_provider',
     title: `Your payment of ${money} arrived`,
     body: `The people who run this server checked that your payment of ${money} to ${done.beneficiary} arrived. It is now recorded as paid, and you do not need to pay it again. Reference: ${reference}.`,
     i18n: { key: 'payout_arrived_provider', vars: { amount: money, beneficiary: done.beneficiary, reference } },
+    link: WALLET_LINK,
   });
   return { ok: true, hold: done, entries: paid };
 }

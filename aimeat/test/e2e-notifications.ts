@@ -6,6 +6,7 @@
  *   without notifications:send gets 403), mark-read, the inline-actions security invariant (a
  *   client-supplied actions field is rejected), and the DM reply action end-to-end.
  * @version-history
+ *   2026-11-10 — 35: an agent's notice without a link opens that agent, not the list of agents.
  *   2026-10-16 — 31–34: DELETE /v1/notifications from an agent puts the rows in the bin and the owner
  *     restores one; an agent without memory:delete is refused; the owner in person still clears for
  *     good (invariant 8 as ruled by the developer on 2026-10-16).
@@ -617,6 +618,23 @@ await test('34. The owner in person still clears for good: nothing of it waits i
     assert(r.status === 200 && r.body.data.cleared === 1 && r.body.data.in_bin === undefined, `owner clear ${r.status}: ${JSON.stringify(r.body.data)}`);
     assert(!(await listedIds()).includes(id), 'cleared');
     assert(!(await binKeyOf(id)), 'an owner\'s own clear does not fill the bin');
+});
+
+// An agent's notice without a link opened the list of agents, which is the page a person is often
+// already on, so the press changed nothing on the screen (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
+await test('35. An agent\'s notice without a link opens that agent; a link of its own is kept', async () => {
+    const name = `notiflink${Date.now() % 100000}`;
+    const ag = await json('/v1/agents', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name, owner: A.name, capabilities: ['memory'], scopes: ['notifications:send'] }) });
+    assert(ag.status === 201, `register ${name} ${ag.status}: ${JSON.stringify(ag.body.error)}`);
+    const gaii = ag.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(ag.body.data.private_key, gaii + ts) }) });
+    assert(tok.body.ok === true, `${name} token: ${JSON.stringify(tok.body.error)}`);
+    const plain = await json('/v1/notifications', { method: 'POST', headers: auth(tok.body.data.token), body: JSON.stringify({ title: 'Rules changed' }) });
+    assert(plain.status === 201, `notify without link ${plain.status}: ${JSON.stringify(plain.body.error)}`);
+    assert(plain.body.data.link === `/v1/profile?tab=agents&agent=${name}`, `the default link names the agent: ${plain.body.data.link}`);
+    const own = await json('/v1/notifications', { method: 'POST', headers: auth(tok.body.data.token), body: JSON.stringify({ title: 'Report ready', link: '/v1/profile?tab=memory' }) });
+    assert(own.status === 201 && own.body.data.link === '/v1/profile?tab=memory', `an agent's own link is kept: ${own.status} ${own.body.data?.link}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

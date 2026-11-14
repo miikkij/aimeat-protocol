@@ -6,6 +6,7 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — The access request and the grant notices open the workspace (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-13 — GET /:id/invitations/email asks services/organism-read/manager.ts
  *     pendingEmailInvitationsFor, the rule and the read aimeat_organism_invitations_email asks; the
  *     answers are unchanged (structure programme 2026-11, unit 2b). GET /:id/workspaces asks
@@ -103,6 +104,7 @@ import { resolveIdentity, isSameOwner, validateOwnerName, localAccountName } fro
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
+import { organismLink } from '../../services/notifications/links.js';
 import { hashPassword } from '../../services/password.js';
 import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner-provisioning.js';
 import { nodeContext } from '../../services/node-context.js';
@@ -306,7 +308,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       type: 'workspace_access_request',
       title: `${ownerName} requested access to "${entry.name ?? ws}"`,
       body: typeof message === 'string' ? message : '',
-      link: '/v1/profile#organisms',
+      link: organismLink(id, ws),
       i18n: { key: 'workspace_access_request', vars: { who: ownerName, ws: entry.name ?? ws, message: typeof message === 'string' ? message : '' } },
       actions: [
         { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: wsDecision, body: { ws, requester: ownerName, decision: 'approve' }, style: 'primary' },
@@ -428,7 +430,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     if (granteeOwnerName === createdBy) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The creator already has full access to their workspace')); return; }
     await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee, role, 'grant', req.auth!.owner as string);
     await notify(storage, `${granteeOwnerName}@${config.nodeId}`, {
-      type: 'workspace_access_granted', title: `You were added to "${ws}" as ${role}`, link: '/v1/profile#organisms',
+      type: 'workspace_access_granted', title: `You were added to "${ws}" as ${role}`, link: organismLink(id, ws as string),
       i18n: { key: 'workspace_access_granted', vars: { ws: String(ws), role } },
     });
     emitChange('notifications');

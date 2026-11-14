@@ -29,6 +29,7 @@
  *   deliveringSchedule(storage, task) · deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
+ *   2026-11-10 — The bell entry opens the task on the home (/v1/home?agent=&work=), not the list of agents (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.1.1 — 2026-11-03 — When the agent has used today's mail limit, the bell entry says the result was
@@ -244,7 +245,9 @@ export async function deliverTaskResult(
     const told = await notify(storage, ownerGhii, {
       type: 'agent_result', title: heading,
       body: note ? `${excerpt}\n\n${note}` : excerpt,
-      link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
+      // The task itself on the home (views/home/agent-work.js reads agent and work); `?tab=agents&task=`
+      // was read by no page, so the press opened the list of agents.
+      link: `/v1/home?agent=${encodeURIComponent(agentName)}&work=${encodeURIComponent(task.id)}`,
       source,
     });
     if (told.muted) {

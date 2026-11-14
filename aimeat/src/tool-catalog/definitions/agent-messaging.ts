@@ -12,6 +12,8 @@
  *     the owner's OK, and that exchange:invoke and work:request do not (services/agent-proposals.ts
  *     heldTaskWarnings).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
+ *   2026-11-10 — aimeat_notify's `link` says to give one for a place to open, and that the default is the
+ *     agent's own card on the Agents page.
  *   2026-11-03 — aimeat_dm_send, _send_as_owner, _ask and _broadcast say what the node part of an address is
  *     (the node id, never its web address) and where to read it; an agent had sent to heidileskinen@aimeat.io.
  *   2026-11-02 — aimeat_home_feed: what the person's home lists as having happened (GET /v1/home/feed), on all three surfaces.
@@ -515,7 +517,7 @@ export const agentMessagingTools = [
         input: {
             title: { type: 'string', required: true, description: 'What happened, in one line (max 200).', zod: z.string().max(200) },
             body: { type: 'string', description: 'The detail, a few lines at most.', zod: z.string().max(10_000) },
-            link: { type: 'string', description: 'Where a click leads: a path on this AIMEAT starting with "/". Default: the Agents page.', zod: z.string().max(500) },
+            link: { type: 'string', description: 'Where a click leads: a path on this AIMEAT starting with "/". Give one whenever the notice is about a place the owner should open (a report, a document, a decision). Default: your own card on the Agents page.', zod: z.string().max(500) },
             type: { type: 'string', description: 'A short machine word for the kind of event, e.g. report_ready.', zod: z.string().max(64) },
             email: { type: 'boolean', description: 'Also email it to your owner at the address they verified, for a report they asked to get by mail. At most 10 a day from you; never when they muted you. The answer\'s `emailed` says what happened (sent, no_address, mail_off, limit, failed, muted).' },
         },

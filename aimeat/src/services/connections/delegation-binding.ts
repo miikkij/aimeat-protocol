@@ -29,6 +29,7 @@
  *   noteAsked · noteDeclined · ownAppOf · bindOnSave · delegationView · tellBoundToOwnApp
  * @usage const bound = await readDelegationApp(storage, nodeId, delegation.id);
  * @version-history
+ *   2026-11-10 — The binding notice opens the app it names, not the Notifications page it is listed on (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-10-29 — Initial (secaudit2026oct26 round 8c, delegated-publish/app-id-not-bound-to-caller).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -153,13 +154,16 @@ export async function delegationView(storage: Storage, nodeId: string, d: Delega
 export async function tellBoundToOwnApp(
   storage: Storage, channelOwnerGhii: string, d: { label: string; action: string; app: string },
 ): Promise<void> {
+  const owner = d.app.slice(0, d.app.indexOf('/'));
   const file = d.app.slice(d.app.indexOf('/') + 1);
   try {
     await notify(storage, channelOwnerGhii, {
       type: 'delegation_bound',
       title: `Only your own app ${file} may now publish as "${d.label}" on your channel`,
       body: `You let the app "${d.label}" publish "${d.action}" on your channel and named it only by its file name, so an app of the same name by someone else could have used the permission. From now on only your own app ${file} may use it. Its users publish through it as before.`,
-      link: '/v1/profile?tab=notifications',
+      // The app the notice names. `?tab=notifications` was the page the notice is listed on, and no
+      // page lists a social channel's delegations (the Email page lists a mailbox's only).
+      link: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(file)}?mode=inline`,
       i18n: { key: 'delegation_bound', vars: { label: d.label, action: d.action, app: file } },
     });
     emitChange('notifications', channelOwnerGhii);

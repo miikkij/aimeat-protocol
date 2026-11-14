@@ -19,6 +19,7 @@
  * @usage
  *   await decideAccessRequest({ storage, config }, { orgId, ws, wsName, creator, requester, decision: 'approve', role, decidedBy });
  * @version-history
+ *   2026-11-10 — An approval opens the workspace it is for (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-09-25 — Moved from routes/organisms/workspace-access.ts, and the MCP decide path
  *     calls it.
  */
@@ -27,6 +28,7 @@ import type { Storage } from '../../storage/interface.js';
 import { grantWorkspaceRole, revokeWorkspaceRole, type WsRole } from './roles.js';
 import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
+import { organismLink } from '../notifications/links.js';
 
 /**
  * What a request record says about itself, with the pre-2026-08-15 fallback.
@@ -86,7 +88,7 @@ export async function decideAccessRequest(
         await notify(storage, `${requester}@${config.nodeId}`, {
             type: 'workspace_access_approved',
             title: `Your access to "${wsName}" was approved (${role})`,
-            link: '/v1/profile#organisms',
+            link: organismLink(orgId, ws),
             i18n: { key: 'workspace_access_approved', vars: { ws: wsName, role } },
         });
         emitChange('notifications');

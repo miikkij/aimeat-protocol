@@ -24,6 +24,7 @@
  *   await noticeDeciders(storage, nodeId, deciders, facts);
  *   await noticeRequester(storage, approval, 'approved');
  * @version-history
+ *   2026-11-10 — The notices open the workspace the suggestion is for (organismLink), not the list of shared places (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  *   v1.0.1 — 2026-09-26 — ownerNameOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
@@ -31,6 +32,7 @@ import type { Storage, PendingApprovalRecord } from '../../storage/interface.js'
 import { localAccountName } from '../../utils/gaii.js';
 import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
+import { organismLink } from '../notifications/links.js';
 
 /**
  * The two approval actions a member's suggested change files (services/workspace/suggestions.ts).
@@ -50,6 +52,8 @@ export interface SuggestionNoticeFacts {
     kind: 'space' | 'sections';
     /** The workspace's name as the registry had it when the suggestion was made. */
     wsName: string;
+    /** The workspace's id, so the notice opens that workspace. */
+    ws?: string;
     /** space: the names of the spaces; sections: the document space's name. */
     label: string;
     /** The member's name, as a person reads it. */
@@ -69,6 +73,7 @@ export function noticeFactsOf(approval: PendingApprovalRecord): SuggestionNotice
         suggestionId: approval.id,
         kind,
         wsName: typeof a.ws_name === 'string' && a.ws_name ? a.ws_name : String(a.ws ?? ''),
+        ws: typeof a.ws === 'string' && a.ws ? a.ws : undefined,
         label: typeof a.label === 'string' ? a.label : '',
         who: ownerNameOf(approval.actor),
         count: Array.isArray(a.ops) ? a.ops.length : undefined,
@@ -104,7 +109,7 @@ export async function noticeDeciders(
         await notify(storage, `${decider}@${nodeId}`, {
             type: space ? 'workspace_space_suggested' : 'workspace_sections_suggested',
             title, body,
-            link: '/v1/profile#organisms',
+            link: organismLink(facts.organismId, facts.ws),
             i18n: {
                 key: space ? 'workspace_space_suggested' : 'workspace_sections_suggested',
                 vars: { who: facts.who, ws: facts.wsName, space: facts.label, count: facts.count ?? 0 },
@@ -141,7 +146,7 @@ export async function noticeRequester(
         type: key,
         title: english[outcome],
         body: note ?? '',
-        link: '/v1/profile#organisms',
+        link: organismLink(facts.organismId, facts.ws),
         i18n: { key, vars: { ws: facts.wsName, space: facts.label, note: note ?? '' } },
     });
     emitChange('notifications');

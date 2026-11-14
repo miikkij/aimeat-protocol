@@ -33,6 +33,7 @@
  *   const filed = await fileInstallRequest({ storage, config }, ownerGhii, draft);
  *   await settleInstallRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-11-10 — The request notices open the package (packageLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.3.0 — 2026-10-04 — `options.grantApps`, shown as `grant_apps`: whether approving the install
  *     also approves the package's apps.
  *   v1.2.0 — 2026-10-02 — A request carries `capabilities` (what the package version can do). A request
@@ -50,6 +51,7 @@ import type { Storage, PackageRecord } from '../../../storage/interface.js';
 import type { MigrationRequest } from './package-migrate.js';
 import { addItem, closeItem, getItem } from '../../open-items.js';
 import { notify } from '../../notify.js';
+import { packageLink } from '../../notifications/links.js';
 import { sendAgentV2Message } from '../../agent/v2-messaging.js';
 import { emitChange } from '../../event-bus.js';
 import { stableStringify } from '../../../utils/stable-json.js';
@@ -321,7 +323,8 @@ export async function fileInstallRequest(
                 : draft.act === 'install'
                     ? `The package writes entries into your memory, and ${who} may not do that on its own. If you approve, it is installed as yours.`
                     : `The new version writes entries into your memory, and ${who} may not do that on its own. If you approve, your copy is updated.`,
-            link: '/v1/profile#packages',
+            // The package itself on the Packages page, whose sheet says what it can do.
+            link: packageLink(draft.package.group_id),
             i18n: { key: i18nKey, vars: { who, name: draft.package.name } },
             actions: [
                 { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve' }, style: 'primary' },
@@ -398,7 +401,7 @@ export async function settleInstallRequest(
             body: state === 'approved'
                 ? `${asker} asked for it, and ${agentName} approved it in your name.`
                 : `${asker} asked for it. Nothing was installed or changed.`,
-            link: '/v1/profile#packages',
+            link: packageLink(request.package.group_id),
             i18n: {
                 key: state === 'approved' ? 'package_request_approved_by_agent' : 'package_request_declined_by_agent',
                 vars: { by: agentName, who: asker, name: request.package.name },

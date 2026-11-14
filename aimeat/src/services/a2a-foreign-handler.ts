@@ -34,6 +34,7 @@
  * @structure ForeignA2AHandler
  * @usage new ForeignA2AHandler(storage, config, agent, peer, card, payment)
  * @version-history
+ *   2026-11-15 -- The paid-work notice opens the selling agent's card, not the missing `#exchange` tab (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-14 -- notify() passes i18n so the notification is written in its recipient's language
  *     (notiftext.a2a_foreign_work_paid, a2a_foreign_work_paid_key).
  *   2026-11-08 -- A paid turn claims the work before it collects, so two turns for one quote collect
@@ -400,7 +401,9 @@ export class ForeignA2AHandler implements A2ARequestHandler {
         // the provider sees where the key is published (secaudit2026oct26, jwks-origin-unbound-to-claimed-node).
         body: `${this.peer.displayName} paid for "${work.taskType}" from your agent ${this.agent.name}. It is waiting in your work inbox.`
           + (this.peer.keyHost && !this.peer.hostIsNode ? ` Its key is published at ${this.peer.keyHost}.` : ''),
-        link: '/v1/profile#exchange',
+        // The agent that sold the work: no profile tab is called `exchange`, so `#exchange` opened an
+        // empty page. The agent's own card holds its services and its tasks.
+        link: `/v1/profile?tab=agents&agent=${encodeURIComponent(this.agent.name)}`,
         i18n: {
           key: this.peer.keyHost && !this.peer.hostIsNode ? 'a2a_foreign_work_paid_key' : 'a2a_foreign_work_paid',
           vars: { peer: this.peer.displayName, task: work.taskType, agent: this.agent.name, host: this.peer.keyHost ?? '' },

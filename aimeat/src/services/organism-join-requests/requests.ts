@@ -32,6 +32,8 @@
  *   const r = await requestAccess({ storage, config }, req.auth, { access, ownerName, via }, message);
  *   const d = await reviewJoinRequest({ storage, config }, organism, requestId, 'approved', { owner, principal });
  * @version-history
+ *   v1.1.0 — 2026-11-15 — The approvers' notice opens the organism, whose home lists the requests, and
+ *     an approved join opens the organism the person joined; both linked the list of organisms.
  *   v1.0.0 — 2026-11-12 — Initial. The approval branch of joinOrganism and the review route's body
  *     move here; new: the access request, the organism's switch, one open request per person, the
  *     wait after a declined request, and answered notices.
@@ -43,6 +45,7 @@ import type {
 } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
+import { organismLink } from '../notifications/links.js';
 import { answerNotifications } from '../notification-answers.js';
 import { organismOwners, isOrganismOwner } from '../organism-ownership.js';
 import { isNodeAccount, type AudienceAuth } from '../audience.js';
@@ -206,7 +209,9 @@ export async function fileJoinRequest(
       body: via
         ? `Approving adds ${who} to "${organism.name}" as a member.${message ? ` Their message: ${message}` : ''}`
         : message,
-      link: '/v1/profile#organisms',
+      // The place itself, whose home lists the open join requests (organisms/home.js); the list of
+      // places made the approver look for it.
+      link: organismLink(organism.id),
       ref: noticeRef(joinRequest.id),
       ...(via ? {
         i18n: {
@@ -304,7 +309,8 @@ export async function reviewJoinRequest(
   } : {
     type: approved ? 'organism_join_approved' : 'organism_join_rejected',
     title: approved ? `You were approved to join "${organism.name}"` : `Your request to join "${organism.name}" was declined`,
-    link: '/v1/profile#organisms',
+    // Approved: the place the person now belongs to. Declined: the list, which is all they can open.
+    link: approved ? organismLink(organism.id) : '/v1/profile#organisms',
   });
   await closeNotices(deps, organism, request, approved ? 'allowed' : 'declined', reviewer.principal, now);
   emitChange('notifications');

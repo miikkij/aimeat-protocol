@@ -33,6 +33,7 @@
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   2026-11-10 — The three renewal notices open the wallet; they had no link (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-08 — The claim on a period reads the stored auto_renew and kept card, so a cancel stored
  *     after the daily run read its list is not charged; a renewal charged whose period write failed is
  *     refunded, or kept as an undelivered payment for the seller and the operator and marked so no
@@ -74,6 +75,9 @@ import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../services/record-cas.js';
 import { priceRose, askBuyerForPrice, type SubscriptionPriceQuestion } from './subscription-price-ask.js';
+
+/** Where a renewal notice leads: the wallet, with the purchases. No page lists subscriptions on their own. */
+const SUBSCRIPTION_LINK = '/v1/profile?tab=wallet';
 
 /** Where an extension keeps its plans, in its own namespace. */
 export const PLANS_KEY = 'subscription.plans';
@@ -407,6 +411,7 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
           ? `The agent that bought this subscription may not spend this today (${reason}). The card was not charged. The subscription ends on ${date} unless you renew it yourself or raise the agent's limit; this node tries again each day until then.`
           : `The card could not be charged (${reason}). The subscription ends on ${date} unless the payment goes through; this node tries again each day until then.`,
         i18n: { key: overLimit ? 'subscription_renewal_agent_limit' : 'subscription_renewal_failed', vars: { name: plan.title, date } },
+        link: SUBSCRIPTION_LINK,
       });
       emitChange('notifications', sub.buyer_ghii);
     }
@@ -497,6 +502,7 @@ async function chargedNotRecorded(
     title: `The renewal of ${plan.title} did not go through`,
     body: `Your card was charged, and the renewal could not be saved, so the charge was refunded. The subscription ends on ${date} unless a renewal goes through. The renewal is tried again each day until then.`,
     i18n: { key: 'subscription_renewal_refunded', vars: { name: plan.title, date } },
+    link: SUBSCRIPTION_LINK,
   } : {
     type: 'subscription_renewal_not_recorded',
     title: `The renewal of ${plan.title} was charged and not saved`,
@@ -504,6 +510,7 @@ async function chargedNotRecorded(
       + `Contact the seller, or the people who run this node, and give them the reference ${reference}: the seller has a record of this payment. `
       + 'This period is not charged again.',
     i18n: { key: 'subscription_renewal_not_recorded', vars: { name: plan.title, reference } },
+    link: SUBSCRIPTION_LINK,
   });
   emitChange('notifications', sub.buyer_ghii);
   return { result: 'failed', detail: `${reason}; ${said}` };

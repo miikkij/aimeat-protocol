@@ -34,6 +34,7 @@
  *   const refused = await refuseTriggerStart({ storage, config }, ownerGhii, def);
  *   if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
  * @version-history
+ *   2026-11-10 -- The refusal notices open that workflow (openItemLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.5.0 -- 2026-10-25 -- refuseTriggerStart skips the start for a deactivated account, whoever saved
  *     the workflow, with a log sentence and no refusal record (secaudit2026oct22,
  *     owner-deactivation:background-work-keeps-acting).
@@ -65,6 +66,7 @@ import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { loc } from './engine-util.js';
 import { missingStepScopes } from './step-authority.js';
 import { deactivatedAccountSkip } from '../account-deactivated.js';
+import { openItemLink } from '../notifications/links.js';
 import type { WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowSaver } from '../../models/workflow-schemas.js';
 
 export interface TriggerAuthorityDeps { storage: Storage; config: AimeatConfig }
@@ -287,7 +289,7 @@ async function tellOwner(storage: Storage, ownerGhii: string, def: WorkflowDef, 
       body: now.gone
         ? `The run acts for ${now.name}, which is no longer connected to your account. Run it once as yourself, or save the workflow again yourself.`
         : `The run acts for ${now.name}, which no longer holds every permission the step needs: ${words}. Run it once as yourself, or approve the permissions again.`,
-      link: '/v1/profile?tab=workflows',
+      link: openItemLink('workflows', def.id),
       actions: refusalActions(def, runId, now),
       i18n: { key: now.gone ? 'workflow_run_stopped_gone' : 'workflow_run_stopped', vars: { name, saver: now.name, missing: words, step: stoppedBefore } },
     });
@@ -300,7 +302,7 @@ async function tellOwner(storage: Storage, ownerGhii: string, def: WorkflowDef, 
     body: now.gone
       ? `${now.name} saved it and is no longer connected to your account. Run it once as yourself, or save the workflow again yourself.`
       : `${now.name} saved it and no longer holds every permission its steps need: ${words}. Run it once as yourself, or approve the permissions again.`,
-    link: '/v1/profile?tab=workflows',
+    link: openItemLink('workflows', def.id),
     actions,
     i18n: { key: now.gone ? 'workflow_run_refused_gone' : 'workflow_run_refused', vars: { name, saver: now.name, missing: words } },
   });

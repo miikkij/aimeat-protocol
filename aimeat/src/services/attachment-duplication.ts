@@ -12,6 +12,7 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.7.0 -- 2026-11-15 -- The storage-full notice opens the conversation the file came in (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.6.1 -- 2026-11-14 -- notify() passes i18n so the notification is written in its recipient's
  *     language (notiftext.direct_message_attachment_quota, _changed, _expired).
  *   v1.6.0 -- 2026-10-22 -- A copy is made only of the file version the message sent (isSentVersion:
@@ -311,7 +312,8 @@ export async function duplicateMessageAttachments(
           type: 'direct_message_attachment_quota',
           title: 'Attachment held — storage full',
           body: `Free up space to receive: ${att.name ?? att.storageKey}`,
-          link: '/v1/profile#inbox',
+          // The conversation the held file came in, as the other attachment notices below.
+          link: message.conversationId ? `/v1/profile#inbox/${message.conversationId}` : '/v1/profile#inbox',
           i18n: { key: 'direct_message_attachment_quota', vars: { file: att.name ?? att.storageKey } },
         });
       }

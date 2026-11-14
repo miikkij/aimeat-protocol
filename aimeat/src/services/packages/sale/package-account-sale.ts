@@ -35,6 +35,7 @@
  *   const out = await setAccountPrice({ storage, config }, { owner }, groupId, { price, state, preview });
  *   const rows = await listForSale(storage, { category: 'paneeli' });
  * @version-history
+ *   2026-11-10 — The refund notice opens the package (packageLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-10-31 — Initial (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  */
 import type { Storage, PackageRecord } from '../../../storage/interface.js';
@@ -46,6 +47,7 @@ import { refundCollected } from '../../../commerce/undelivered-payment.js';
 import { updateRecord, UNCHANGED } from '../../record-cas.js';
 import { notify } from '../../notify.js';
 import { emitChange } from '../../event-bus.js';
+import { packageLink } from '../../notifications/links.js';
 import {
     NS_PACKAGE_ACCOUNT_SALES, saleKey, parseSale, readAccountSale, currentPrice, activePurchase,
     type AccountSale, type AccountSaleState, type AccountPurchase,
@@ -303,7 +305,7 @@ async function tellBuyerRefunded(storage: Storage, config: AimeatConfig, sale: A
     await notify(storage, `${p.buyer}@${config.nodeId}`, {
         type: 'package_purchase_refunded', title: `Your purchase of ${sale.groupId.split('::')[0]} was refunded`,
         body: 'The author refunded the payment. The package can no longer be installed or updated from this account; copies you installed stay as they are.',
-        link: '/v1/profile?tab=packages', i18n: { key: 'package_purchase_refunded', vars: { name: sale.groupId.split('::')[0] } },
+        link: packageLink(sale.groupId), i18n: { key: 'package_purchase_refunded', vars: { name: sale.groupId.split('::')[0] } },
     });
 }
 

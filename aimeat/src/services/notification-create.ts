@@ -12,6 +12,8 @@
  *   ownerMailLimitReached
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.7.0 — 2026-11-10 — An agent's notice without a link opens that agent (`?tab=agents&agent=<name>`),
+ *     not the list of agents (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.6.0 — 2026-11-08 — An outside app (role `ecosystem`) is its own sender: source kind `ecosystem`
  *     with its GEAI, its name before the title, type `ecosystem`, so its notice and mail are told
  *     apart from the owner's own and the owner can mute it (secaudit2026nov08 round 14,
@@ -140,7 +142,9 @@ export async function createPrincipalNotification(
   } else if (auth.roles.includes('agent') && !auth.roles.includes('owner')) {
     const agentName = auth.sub.includes('#') ? auth.sub.split('#')[0] : auth.sub;
     finalTitle = `${agentName}: ${finalTitle}`;
-    finalLink = finalLink ?? '/v1/profile?tab=agents';
+    // Without a link of its own the notice opens the agent that sent it, not the list of agents:
+    // pressed from the Agents page, the list was the page the person was already on.
+    finalLink = finalLink ?? `/v1/profile?tab=agents&agent=${encodeURIComponent(agentName)}`;
     finalType = finalType ?? 'agent';
     source = { kind: 'agent', name: agentName, id: auth.sub };
   } else if (auth.roles.includes('ecosystem')) {

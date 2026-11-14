@@ -20,6 +20,7 @@
  *   managed copy then receives as an ordinary update.
  * @structure NS_PACKAGE_WITHDRAWALS · withdrawnVersions() · withdrawVersion() · actOnWithdrawn()
  * @version-history
+ *   2026-11-10 — The notice opens the package (packageLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 5).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -29,6 +30,7 @@ import { deactivateExtension } from '../../extension/lifecycle.js';
 import { firstNoticeFor } from './package-notices.js';
 import { notify } from '../../notify.js';
 import { emitChange } from '../../event-bus.js';
+import { packageLink } from '../../notifications/links.js';
 import { resolveGhii } from '../../../utils/ghii-resolver.js';
 import { logger } from '../../../utils/logger.js';
 
@@ -102,7 +104,7 @@ export async function actOnWithdrawn(deps: Deps, inst: PackageInstanceRecord, w:
             type: 'package_version_withdrawn',
             title: `The version of ${inst.label} you have was withdrawn`,
             body: `Its author withdrew version ${w.version}: ${w.reason}${off.length ? ` Its extensions were switched off: ${off.join(', ')}.` : ''} Your apps and records stay as they are.`,
-            link: '/v1/profile?tab=packages',
+            link: packageLink(inst.packageGroupId),
             i18n: { key: 'package_version_withdrawn', vars: { label: inst.label, version: w.version, reason: w.reason } },
         });
         emitChange('notifications', ownerGhii);

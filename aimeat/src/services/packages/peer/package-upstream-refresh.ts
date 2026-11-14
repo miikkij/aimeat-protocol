@@ -25,6 +25,7 @@
  * @usage
  *   const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner }, { notify: false });
  * @version-history
+ *   2026-11-10 — The update notices open the package they are about (packageLink); a renewal sold elsewhere still opens the seller (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   v1.5.0 — 2026-10-05 — The renewal notice links to the seller at the address this node's peer record
@@ -50,6 +51,7 @@ import { packageCapabilities, widenedItems } from '../install/package-capabiliti
 import { approvedItems } from '../install/package-approvals.js';
 import { notify } from '../../notify.js';
 import { emitChange } from '../../event-bus.js';
+import { packageLink } from '../../notifications/links.js';
 import { resolveGhii } from '../../../utils/ghii-resolver.js';
 import { logger } from '../../../utils/logger.js';
 import { stripTrailingSlashes } from '../../../utils/url-validator.js';
@@ -147,7 +149,7 @@ async function repositoryNotices(deps: RefreshDeps, instances: PackageInstanceRe
                 // a repository named any address as `sold_by_url`, and it became a link in the
                 // owner's notifications (secaudit 2026-10, PKG-12).
                 const sellerUrl = row.sold_by ? deps.peers.get(row.sold_by)?.url : undefined;
-                const where = sellerUrl ? `${stripTrailingSlashes(sellerUrl)}/v1/profile?tab=packages` : '/v1/profile?tab=packages';
+                const where = sellerUrl ? `${stripTrailingSlashes(sellerUrl)}/v1/profile?tab=packages` : packageLink(inst.packageGroupId);
                 await notify(storage, ownerGhii, {
                     type: 'package_renewal_due',
                     title: `The updates of ${inst.label} end on ${row.updates_until!.slice(0, 10)}`,
@@ -177,7 +179,7 @@ async function refreshOne(
                 type: 'package_updates_ended',
                 title: `The update service for ${inst.label} has ended`,
                 body: `${inst.label} keeps working as it is. New versions come again when you renew the update service.`,
-                link: '/v1/profile?tab=packages',
+                link: packageLink(inst.packageGroupId),
                 i18n: { key: 'package_updates_ended', vars: { label: inst.label } },
             });
             emitChange('notifications', ownerGhii);
@@ -206,7 +208,7 @@ async function refreshOne(
                     type: 'package_update_needs_approval',
                     title: `The update of ${inst.label} waits for you`,
                     body: `Version ${latest.version} of ${latest.name} can do more than you approved before. It is not installed until you update it yourself.`,
-                    link: '/v1/profile?tab=packages',
+                    link: packageLink(inst.packageGroupId),
                     i18n: { key: 'package_update_needs_approval', vars: { label: inst.label, version: latest.version, name: latest.name } },
                     actions: [{ id: 'update', label: 'Update', kind: 'api', method: 'POST', endpoint: `/v1/instances/${inst.id}/update`, body: {}, style: 'primary' }],
                 });
@@ -235,7 +237,7 @@ async function refreshOne(
             type: 'package_update_available',
             title: `An update is ready for ${inst.label}`,
             body: `Version ${latest.version} of ${latest.name} is here. Your install is on ${inst.packageVersion}. Updating keeps every part you edited as it is.`,
-            link: '/v1/profile?tab=packages',
+            link: packageLink(inst.packageGroupId),
             i18n: { key: 'package_update_available', vars: { label: inst.label, version: latest.version, name: latest.name, current: inst.packageVersion } },
             actions: [{ id: 'update', label: 'Update', kind: 'api', method: 'POST', endpoint: `/v1/instances/${inst.id}/update`, body: {}, style: 'primary' }],
         });

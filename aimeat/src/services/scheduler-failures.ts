@@ -30,6 +30,7 @@
  *   isOneShot(job) · oneShotFailedReason(error) · noteSuccess(streaks, jobId) · tellScheduleOwner(storage, job, what, detail)
  * @usage const { pauseReason } = await onFailedRun({ storage, config }, job, errorMessage, this.failureStreaks);
  * @version-history
+ *   2026-11-10 — The failed and paused notices open that schedule (openItemLink) (wish-ilmoitus-vie-jonnekin-ja-sen-tekstin-voi-kopioida).
  *   2026-10-19 — isOneShot() and oneShotFailedReason(): a failed one-shot user schedule is turned off
  *     at once, with no retry (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E4-03).
@@ -39,6 +40,7 @@ import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import { notify } from './notify.js';
 import { reportJobFault } from './system-fault-report.js';
 import { logger } from '../utils/logger.js';
+import { openItemLink } from './notifications/links.js';
 
 /** Failures in a row after which a user schedule is paused. */
 export const MAX_CONSECUTIVE_FAILURES = 5;
@@ -115,7 +117,8 @@ export async function tellScheduleOwner(
     type: what === 'failed' ? 'schedule_failed' : 'schedule_paused',
     title: what === 'failed' ? `Schedule "${name}" failed` : `Schedule "${name}" was paused`,
     body: detail,
-    link: '/v1/profile?tab=scheduler',
+    // The schedule itself: the Scheduler opens one by id (useOpenItem), not only its list.
+    link: openItemLink('scheduler', job.id),
     i18n: { key: what === 'failed' ? 'schedule_failed' : 'schedule_paused', vars: { name, detail } },
   });
 }
