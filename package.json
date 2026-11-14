@@ -44,6 +44,7 @@
     "rules:for": "cd aimeat && pnpm rules:for",
     "sandbox:stop": "cd aimeat && pnpm sandbox:stop",
     "gate:full": "cd aimeat && pnpm gate:full",
+    "nightly:preflight": "cd aimeat && pnpm nightly:preflight",
     "check:ai-disclosure": "cd aimeat && pnpm check:ai-disclosure",
     "check:locales": "cd aimeat && pnpm check:locales",
     "locale:extract": "cd aimeat && pnpm locale:extract",

@@ -111,6 +111,7 @@
     "gate": "tsx scripts/gate.ts",
     "ai:catalog:refresh": "tsx scripts/ai-catalog-refresh.ts",
     "gate:full": "tsx scripts/gate.ts --full",
+    "nightly:preflight": "tsx scripts/nightly-preflight.ts",
     "sandbox": "tsx scripts/sandbox.ts",
     "agent:start": "node scripts/agent-session.mjs start",
     "agent:worktree": "node scripts/agent-session.mjs worktree",
