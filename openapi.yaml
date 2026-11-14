@@ -36615,9 +36615,9 @@ paths:
                         type: string
                         format: date-time
                 since_timestamp:
-                  type: string
+                  type: [string, 'null']
                   format: date-time
-                  description: Only sync actions newer than this timestamp
+                  description: When the sender last synced to this node; null on the first sync, which sends the whole federable catalogue. The receiver reads it only to answer `incremental`, and it is part of the signed payload.
                 catalogue_hash:
                   type: string
                   description: Hash of the sender's full catalogue for consistency checks

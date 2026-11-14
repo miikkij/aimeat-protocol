@@ -8,6 +8,7 @@
  *   be neither looser nor stricter than the route.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-contract-class-b.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-14 — POST /v1/federation/catalogue-sync.
  *   v1.0.0 — 2026-11-14 — Initial: POST /v1/agents/{name}/tasks/{id}/event.
  */
 import { describe, it } from 'vitest';
@@ -67,5 +68,31 @@ describe('POST /v1/agents/{name}/tasks/{id}/event', () => {
             assert.equal(AgentTaskEventSchema.safeParse(b).success, false, `route schema takes ${JSON.stringify(b)}`);
             refuses(v, b);
         }
+    });
+});
+
+/** The delivery proof a sending node adds to its signed federation bodies. */
+const PROOF = { signature: 'sig', audience: 'node-b', sent_at: '2026-11-14T06:21:07.000Z', audience_signature: 'asig' };
+
+describe('POST /v1/federation/catalogue-sync', () => {
+    const v = validatorFor('POST', '/v1/federation/catalogue-sync');
+    // The body services/catalogue-sync.ts sends: since_timestamp is the sender's lastSyncAt, null
+    // until the first sync to that peer has succeeded.
+    const actions = [{
+        id: 'a1', provider_gaii: 'bot#alice@node-a', display_name: 'Summarise', description: 'd', category: 'text',
+        input_schema: {}, output_schema: {}, pricing: { toll_morsels: 1, base_morsels: 1 }, tags: ['federate:x'],
+        created_at: '2026-11-01T10:00:00.000Z', updated_at: '2026-11-02T10:00:00.000Z',
+    }];
+
+    it('matches a first sync (since_timestamp null) and an incremental one', () => {
+        accepts(v, { source_node: 'node-a', actions, since_timestamp: null, catalogue_hash: 'h', ...PROOF });
+        accepts(v, { source_node: 'node-a', actions: [], since_timestamp: '2026-11-13T06:21:07.000Z', catalogue_hash: 'h', ...PROOF });
+    });
+
+    it('refuses the bodies the route answers 400', () => {
+        // routes/federation-sync/catalogue-trust.ts: "source_node and actions array required".
+        refuses(v, { actions, ...PROOF });
+        refuses(v, { source_node: 'node-a', ...PROOF });
+        refuses(v, { source_node: 'node-a', actions: {}, ...PROOF });
     });
 });
