@@ -60089,10 +60089,11 @@ paths:
                     node's own origin and app-origin subdomains (apps.<apex> / *.apps.<apex>); any other
                     target is silently dropped (stored as null → default profile redirect). Open-redirect guard.
                 locale:
-                  type: string
-                  enum: [en, fi, es]
+                  type: [string, 'null']
+                  pattern: '^(\s*([Ee][Nn]|[Ff][Ii]|[Ee][Ss]).*)?$'
                   description: >-
-                    Language of the invitation email. A region tag such as fi-FI is read as its
+                    Language of the invitation email: en, fi or es, in either case. Null or an
+                    empty string leaves the choice to the node. A region tag such as fi-FI is read as its
                     language; any other value is refused with 400 INVALID_INPUT before anything is
                     stored. Without it the email uses the recipient's account language when the
                     address already has an account on this node, else the inviter's own language,
