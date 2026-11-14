@@ -117,6 +117,8 @@ const canonicalTab = (id) => TAB_ALIASES[id] || id;
 const TABS = [
   { id: 'messages',      key: 'profile.tabs.inbox',          load: () => import('./profile/inbox-tab.js').then(byDefault),          minTier: 'new' },
   { id: 'contacts',      key: 'contacts.tabLabel',           load: () => import('./profile/contacts-tab.js').then(byDefault),       minTier: 'new' },
+  // Ask someone who knows: questions asked of the person, their own, the shared list, their choices.
+  { id: 'help',          key: 'profile.tabs.help',           load: () => import('./profile/help-tab.js').then(byDefault),           minTier: 'new' },
   { id: 'discover',      key: 'discover.tabLabel',           load: () => import('./profile/discover-tab.js').then(byDefault),       minTier: 'new' },
   { id: 'portfolio',     key: 'portfolio.tabLabel',          load: () => import('./profile/portfolio-tab.js').then(byDefault),      minTier: 'active' },
   { id: 'fleet',         key: 'profile.tabs.fleet',          load: () => import('./profile/fleet-tab.js').then(byDefault),          minTier: 'active' },

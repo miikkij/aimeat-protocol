@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-14 — helpRouter and helpAdminRouter mounted (Ask someone who knows).
  *   2026-11-14 — secretSharesRouter mounted beside the vault (secret shares and requests).
  *   2026-11-04 — createEmailService gets storage, so mail retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — buildWithYouRouter (routes/build-with-you.ts): "Rakennamme kanssasi", the place's trail and the operator's relay.
@@ -181,6 +182,8 @@ import { totpRouter } from '../routes/totp.js';
 import { passkeysRouter } from '../routes/passkeys.js';
 import { secretsRouter } from '../routes/secrets.js';
 import { secretSharesRouter } from '../routes/vault/secret-shares.js';
+import { helpRouter } from '../routes/help/help.js';
+import { helpAdminRouter } from '../routes/help/admin.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
 import { appUiRouter } from '../routes/app-ui.js';
@@ -400,6 +403,8 @@ export async function mountRoutes(
   app.use(accessTokensRouter(config, storage));
   app.use(secretsRouter(config, storage));     // the owner's write-only credential vault (/v1/secrets)
   app.use(secretSharesRouter(config, storage)); // secret shares and requests (/v1/secret-shares, /v1/vault/device-keys)
+  app.use(helpRouter(config, storage)); // Ask someone who knows (/v1/help/*)
+  app.use(helpAdminRouter(config, storage)); // its reports for operators (/v1/admin/help/*)
   app.use(appGrantsRouter(config, storage));   // H-2: explicit scoped app grants (OAuth-like)
   app.use(appGrantsManageRouter(config, storage));   // the owner's list / narrow / cap / revoke of those grants
   app.use(sseRouter(config, storage));

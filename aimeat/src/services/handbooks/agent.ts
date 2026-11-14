@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.67.0 -- 2026-11-14 -- Ask someone who knows: the aimeat_help_* tools, the draft rule and the skill.
  *   v1.66.0 -- 2026-11-14 -- Secret shares and requests: the aimeat_secret_share_* tools, the three
  *     protections, and the code and deposit address that come back once.
  *   v1.65.2 -- 2026-11-08 -- A receiver is an incoming webhook and its key an API key in what an agent
@@ -196,6 +197,17 @@ and withdraw one. The pickup code and the deposit address come back once: tell y
 outside the node, and keep them out of memory. When a secret is very sensitive and your owner would rather
 handle it themselves, give them the share's pickup page and tell them where to paste it. These need
 secrets:share, which your owner ticks for you on its own.
+
+**Asking someone here who knows, or answering when they ask.** When your owner is stuck on how something
+is done in this place, \`aimeat_help_find\` first looks for an answer someone kept and for the members who
+chose to be asked about it; \`aimeat_help_ask\` sends a question in your owner's name, after you showed it
+to them, as a message thread in the helper's inbox. \`aimeat_help_inbox\` shows the questions asked of your
+owner and the ones they asked; \`aimeat_help_respond\` answers, passes or refers one, and the node keeps your
+answer as a draft for your owner unless they let you answer on your own in that topic.
+\`aimeat_help_close\` marks one solved with thanks, and the helper may get morsels. The skill
+\`aimeat-ask-someone-who-knows\` has the whole way of working. These need help:ask and help:answer, which
+your owner ticks for you on their own; on a node whose operator switched the feature off they answer
+HELP_DISABLED.
 
 **Making something public may wait for your owner.** When this node asks the owner first and you do
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is

@@ -28,6 +28,7 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   v1.5.0 — 2026-11-14 — Both default homes have home.ask ("Who knows?") under the door to the chat.
  *   v1.4.0 — 2026-10-10 — The default home has home.agents under the fleet line.
  *   v1.3.0 — 2026-09-14 — The built-in portal is the message frame's page (TARGET-075): seven
  *     portal.frame-* blocks and a new default order; the showroom blocks stay in the catalogue.
@@ -188,6 +189,9 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
     home: [
         b('home.nameplate'),
         b('home.chat-door'),
+        // Who knows? (Ask someone who knows): under the door to the chat, because asking a colleague
+        // is the other way in to an answer. Filtered out on a node with the feature off.
+        b('home.ask'),
         // Directly under the nameplate, because on the days it appears at all it is the most
         // important thing on the page: nothing else here works over chat until it is done. On every
         // other day it renders nothing and the mat line moves up into its place.
@@ -229,6 +233,9 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         // Right under the steps, where the chat used to be the whole landing page for a new account.
         // Filtered out with the rest on a node that has no chat, so it never renders empty.
         b('home.chat-door'),
+        // A newcomer asks the people who know from the first day (design canvas "Home", 2026-11-14,
+        // shows it beside "Käyttöönottosi 3/7"). Filtered out on a node with the feature off.
+        b('home.ask'),
         b('home.install-cta'),
         b('home.feed'),
         b('home.trust'),

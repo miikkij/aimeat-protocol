@@ -11,6 +11,8 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.14.0 — 2026-11-14 — `kind` takes the help kinds, and a reply into a question's thread is the
+ *     helper's answer (services/help/thread-reply.ts noteThreadReply); `helpHandled` skips that check.
  *   v1.13.0 — 2026-11-03 — An address whose node part is not a node id is refused RECIPIENT_NOT_FOUND
  *     before anything is counted, read or written (local-identity.ts nodePartRefusal). A DM to
  *     `heidileskinen@aimeat.io` was answered `queued` for a node that cannot exist; the reason now
@@ -81,6 +83,7 @@ import { duplicateMessageAttachments } from './attachment-duplication.js';
 import { localIdentityExists, missingIdentityReason, nodePartRefusal } from './local-identity.js';
 import { checkSendLimit, type SendLimitMark } from './message-send-limit.js';
 import { boundConversationId } from './message-thread-binding.js';
+import { logger } from '../utils/logger.js';
 
 export interface SendMessageInput {
   senderGhii: string;
@@ -100,7 +103,7 @@ export interface SendMessageInput {
   /** false = an announcement (recipient cannot reply). Omitted/true = normal. Travels with the message. */
   respondable?: boolean;
   /** What kind of message this is when it is not a person writing to a person. See DirectMessageRecord.kind. */
-  kind?: 'system-fault';
+  kind?: DirectMessageRecord['kind'];
   /** Auto-accept the first-contact gate (operator announcements → land in inbox, not requests). */
   skipContactGate?: boolean;
   /**
@@ -143,6 +146,9 @@ export interface SendMessageInput {
    * one copy of a broadcast counted as a whole, or a door with a limit of its own.
    */
   sendLimit?: SendLimitMark;
+  /** Set by services/help/ on the answers it sends itself, so the thread-reply check does not record
+   *  the same answer twice. */
+  helpHandled?: boolean;
 }
 
 /**
@@ -435,6 +441,15 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     }
     await logDelivery(ctx, { messageId: id, origin: 'local', targetNodeId: config.nodeId, status: 'delivered', latencyMs: 0 });
     emitChange('messages');
+
+    // Ask someone who knows: a helper who simply replies in the thread a question opened has answered
+    // it. Only a reply into a named thread can be one, and the help service's own sends say so and
+    // are skipped. Loaded on use: services/help/ sends through this file.
+    if (!kind && !input.helpHandled && input.conversationId) {
+      const { noteThreadReply } = await import('./help/thread-reply.js');
+      await noteThreadReply({ storage, config }, conversationId, senderGhii, body, input.sentByAgent)
+        .catch((err: unknown) => logger.warn('help: a reply in a question thread was not recorded', { conversationId, error: String(err) }));
+    }
 
     // Event-based push: if the actual recipient is an agent/eco (delivery routed to its owner), wake it
     // over the connect tunnel (mirrors task_assigned / workspace.record) so it acts on the DM without

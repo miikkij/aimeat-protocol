@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-14 — help-sweep and help-report: the hourly round and the report job of Ask someone who knows.
  *   2026-11-08 — tidyStoredFiles, once a minute after start and before the daily file store sweep: the
  *     content class fingerprint loop's leftovers are removed, then every file a store does not take is
  *     moved to the database (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
@@ -197,6 +198,18 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('compliance-report-monthly', async () => {
     const { runComplianceMonthlyReport } = await import('./compliance/monthly-job.js');
     await runComplianceMonthlyReport(config, storage);
+  });
+
+  // Ask someone who knows: the hourly round (a helper who did not answer is skipped, deadlines,
+  // expiry, kept answers going stale, closed questions leaving) and the daily check for a report
+  // whose period ended. Both stop at once on a node with the feature off.
+  scheduler.registerCoreHandler('help-sweep', async () => {
+    const { runHelpSweep } = await import('./help/sweep.js');
+    await runHelpSweep({ storage, config });
+  });
+  scheduler.registerCoreHandler('help-report', async () => {
+    const { runHelpReportJob } = await import('./help/report.js');
+    await runHelpReportJob({ storage, config });
   });
 
   // Data packages whose producer missed three promised runs: each owner is told once per stale spell

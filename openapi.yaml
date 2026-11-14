@@ -125,6 +125,13 @@ tags:
     description: Human (GHII) presence/availability — manual/auto status, who-can-see visibility, federated cache
   - name: Secrets
     description: The owner's write-only credential vault — named keys the node uses on their behalf and nothing reads back
+  - name: Ask someone who knows
+    description: >-
+      Members of one node ask each other. A helper chooses the topics others may ask them about, how
+      often, and what their AI may do (nothing, write drafts, or answer on its own in chosen topics).
+      A question travels as a direct message thread marked as a question; when it is solved the helper
+      is thanked, may get morsels, and the answer may be kept for the next person. The operator gets a
+      report without names about what was asked, written by their own AI.
   - name: Secret shares
     description: >-
       A secret share holds one secret (a key, a password, NAME=value lines or a file) that its maker
@@ -47137,6 +47144,285 @@ paths:
               schema: { $ref: '#/components/schemas/VaultDeviceKeysOfEnvelope' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: 'SCOPE_DENIED: an agent without secrets:share' }
+
+  /v1/help/me:
+    get:
+      operationId: helpMe
+      summary: My choices in Ask someone who knows
+      description: |
+        The caller's choices (may others ask them, their topics, audience, weekly limit, status, what
+        their AI may do, may they ask), with the node's defaults filled in where they never chose, the
+        topics their published business card suggests, and the node's settings that bound the choices.
+        HELP_DISABLED when the operator switched the feature off.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: 'participant, chosen, suggestedTopics, node', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: HELP_DISABLED or MEMBERS_ONLY }
+    put:
+      operationId: helpMeSet
+      summary: Change my choices
+      description: |
+        Only the fields given change. An agent needs help:answer and may lower what it is allowed but
+        never raise it (a higher ai_mode, more auto_topics, ai_may_send or agents_may_ask): that is
+        PERSON_REQUIRED. AI_AUTO_OFF when the operator does not allow an AI to answer on its own.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                helper: { type: boolean }
+                asker: { type: boolean }
+                topics: { type: array, items: { type: string }, maxItems: 40 }
+                audience: { type: string, enum: [node, organisms] }
+                cap_per_week: { type: integer, minimum: 1, maximum: 50 }
+                status: { type: string, enum: [available, busy, away] }
+                status_until: { type: string, nullable: true }
+                ai_mode: { type: string, enum: ['off', draft, auto] }
+                auto_topics: { type: array, items: { type: string } }
+                ai_may_send: { type: boolean }
+                agents_may_ask: { type: boolean }
+      responses:
+        '200': { description: The whole set after the change, content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED, PERSON_REQUIRED or HELP_DISABLED }
+        '409': { description: AI_AUTO_OFF }
+
+  /v1/help/find:
+    post:
+      operationId: helpFind
+      summary: Kept answers and the helpers who could answer
+      description: |
+        Answers kept by helpers for the next person (confirmed first; `stale` when not confirmed in
+        the operator's review period) and the members who chose to be asked about these topics, with
+        the topics that matched. It never shows how busy anyone is. An agent needs help:ask.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                question: { type: string, maxLength: 8000 }
+                query: { type: string, maxLength: 2000 }
+                topics: { type: array, items: { type: string } }
+      responses:
+        '200': { description: 'kept, helpers, board_enabled', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED or HELP_DISABLED }
+
+  /v1/help/questions:
+    post:
+      operationId: helpAsk
+      summary: Ask a member who knows
+      description: |
+        Sends the question in the caller's name to the best matching helper (or two, or the people
+        named) as a direct message thread marked `kind: help-question`, or puts it on the shared list
+        (`to_board`). When nobody matches, `nobody_found` is true and nothing is stored or sent. An
+        agent needs help:ask and its owner's leave (ai_may_send, or agents_may_ask for an agent running
+        on its own): AI_MAY_NOT_ASK otherwise.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question: { type: string, maxLength: 8000 }
+                subject: { type: string, maxLength: 200 }
+                tried: { type: string, maxLength: 4000 }
+                topics: { type: array, items: { type: string } }
+                people: { type: array, items: { type: string }, maxItems: 2 }
+                helpers: { type: integer, minimum: 1, maximum: 2 }
+                to_board: { type: boolean }
+                attachments: { type: array, maxItems: 10, items: { type: object } }
+      responses:
+        '201': { description: 'question, sent_to, nobody_found', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '400': { description: INVALID_INPUT or ATTACHMENT_NOT_FOUND }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED, ASKING_OFF, AI_MAY_NOT_ASK or HELP_DISABLED }
+        '404': { description: NOT_FOUND (a named member) }
+        '409': { description: NOT_A_HELPER or BOARD_OFF }
+
+  /v1/help/inbox:
+    get:
+      operationId: helpInbox
+      summary: Questions asked of me, my own questions, and the shared list
+      description: |
+        `me` (the caller's choices), `asked_of_me` (with any draft their AI wrote), `mine` (with the
+        answers; who passed is never shown) and `board` (the shared list, for a helper). Closed
+        questions only with include_closed=true.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: include_closed, in: query, required: false, schema: { type: boolean } }
+      responses:
+        '200': { description: 'me, asked_of_me, mine, board', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED or HELP_DISABLED }
+
+  /v1/help/threads/{conversationId}:
+    get:
+      operationId: helpThread
+      summary: The question behind a message thread, as the caller may see it
+      description: |
+        For the helper: the question, why it came to them, their AI's draft and what they may do. For
+        the asker: their question's state and answers. Anyone else gets NOT_FOUND.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The view, with role helper or asker, content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: NOT_FOUND }
+
+  /v1/help/questions/{id}/respond:
+    post:
+      operationId: helpRespond
+      summary: Answer, approve a draft, pass, refer, take from the shared list, or confirm a kept answer
+      description: |
+        An agent needs help:answer. Its answer is sent only when the helper's ai_mode is auto and the
+        question is in their auto topics; otherwise it is stored as a draft (`outcome: drafted`), and
+        with ai_mode off it is refused AI_OFF. A pass is shown to nobody.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string, enum: [answer, approve, pass, refer, take, confirm_kept] }
+                answer: { type: string, maxLength: 16000 }
+                to: { type: string }
+                keep_allowed: { type: boolean }
+      responses:
+        '200': { description: 'outcome, question_id, conversation_id', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED, AI_OFF, PERSON_REQUIRED or NOT_A_HELPER }
+        '404': { description: NOT_FOUND }
+        '409': { description: ALREADY_DONE, CLOSED, NO_DRAFT, TAKEN or NOT_A_HELPER }
+
+  /v1/help/questions/{id}/close:
+    post:
+      operationId: helpClose
+      summary: Mark my question solved, withdraw it, or give it more time
+      description: |
+        solved names whose answer solved it (default: the first who answered) and carries the thanks;
+        the helper gets the operator's morsels once, and `keep` keeps the answer for the next person
+        when the helper allowed it. An agent needs help:ask.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string, enum: [solved, cancel, extend] }
+                helper: { type: string }
+                thanks: { type: string, maxLength: 1000 }
+                keep: { type: boolean }
+                days: { type: integer, minimum: 1, maximum: 30 }
+      responses:
+        '200': { description: 'question_id, state, reward_morsels, kept, deadline', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED or HELP_DISABLED }
+        '404': { description: NOT_FOUND }
+        '409': { description: CLOSED, CHANGED or NOT_ANSWERED }
+
+  /v1/admin/help/reports:
+    get:
+      operationId: helpReportData
+      summary: A report's figures and its writer's instructions (operator)
+      description: |
+        Without id, the newest report. With make (monthly or weekly), the figures of the period that
+        ended are made now when the scheduled job has not made them. Never names.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: query, required: false, schema: { type: string } }
+        - { name: make, in: query, required: false, schema: { type: string, enum: [monthly, weekly] } }
+      responses:
+        '200': { description: 'report, prompt, reports', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: OPERATOR_ONLY or HELP_DISABLED }
+        '404': { description: NOT_FOUND }
+
+  /v1/admin/help/reports/{id}:
+    post:
+      operationId: helpReportWrite
+      summary: Store the written report, or decide its suggestions (operator)
+      description: |
+        `text` and `suggestions` store what the operator's AI (or the node's model) wrote; `dry_run`
+        shows what would be stored. `decisions` queue a suggestion into the development queue named in
+        the settings, or reject it.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string, maxLength: 40000 }
+                suggestions: { type: array, maxItems: 8, items: { type: object, properties: { title: { type: string }, why: { type: string } } } }
+                decisions: { type: array, maxItems: 8, items: { type: object, properties: { n: { type: integer }, decision: { type: string, enum: [queue, reject] } } } }
+                dry_run: { type: boolean }
+      responses:
+        '200': { description: 'report, stored', content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: OPERATOR_ONLY }
+        '404': { description: NOT_FOUND }
+        '409': { description: DECIDED or NO_QUEUE }
+
+  /v1/admin/help/status:
+    get:
+      operationId: helpStatus
+      summary: The month so far (operator)
+      description: The same figures as a monthly report, for the current month, not stored.
+      tags: [Ask someone who knows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: report, content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: OPERATOR_ONLY }
 
   /v1/ghii/login/passkey/options:
     post:

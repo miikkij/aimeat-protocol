@@ -11,6 +11,8 @@
  * @structure MessageBubble({ msg, mine, who, … })
  * @usage import { MessageBubble } from './message-turn.js'; (components.js re-exports it)
  * @version-history
+ *   2026-11-14 — A message of kind help-question carries the question card (help-card.js), and one of
+ *     kind help-status a mark that says it closes a question (Ask someone who knows).
  *   2026-11-07 — "Reply with AI" also in the line under the other side's message, before ⋯, with a
  *     tooltip (Jouni: people did not find it behind ⋯). It stays in the ⋯ menu too.
  *   2026-10-26 — `reactions` (./reactions.js): the marks on the message and "React", drawn by the Message component.
@@ -34,6 +36,7 @@ import { Message } from '/components/Message.js';
 import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, trackStatusTone, attachKind } from './helpers.js';
 import { reactionItems } from './reactions.js';
+import { HelpQuestionCard } from './help-card.js';
 
 /**
  * One message. `mine` is the person's own side (the sun); the other side is a person or their agent
@@ -81,6 +84,8 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
     // Which model wrote this, when an AI wrote it and named one. The name is the agent's own claim
     // (the node cannot verify it), so the tooltip says so rather than the mark implying a measurement.
     msg.ai?.model ? { text: msg.ai.model, title: t('inbox.modelClaimed', { model: msg.ai.model }), tone: 'model' } : null,
+    // The line that closes a question of Ask someone who knows (solved, withdrawn, ended).
+    msg.kind === 'help-status' ? { text: t('help.card.statusMark'), title: t('help.card.statusMarkTitle') } : null,
   ].filter(Boolean);
 
   return html`<${Message} id=${domId} mine=${mine} who=${who}
@@ -104,5 +109,7 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
       submitting, onSubmit: (answers) => onAnswer?.(msg, answers),
     } : null}>
     ${showLinkPreviews ? html`<${MessageLinkPreviews} msg=${msg} />` : null}
+    ${msg.kind === 'help-question' ? html`<${HelpQuestionCard} msg=${msg}
+      onReply=${onQuote ? () => onQuote(msg) : null} onReplyAi=${onReplyAi ? () => onReplyAi(msg) : null} />` : null}
   <//>`;
 }

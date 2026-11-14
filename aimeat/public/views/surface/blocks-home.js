@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-14: AskBlock, "Who knows?" of Ask someone who knows (views/home/ask-band.js, GET /v1/help/inbox);
+ *     YourTurnBlock marks a thread a question opened and lists those first (prop helpFirst).
  *   2026-11-14: AgentsBlock and YourTurnBlock give the home's contents rail their count (agents at
  *     work, threads waiting) on a marker with no box of its own (components/ContentsRail.js).
  *   2026-11-10: YourTurnBlock asks for the waiting threads of its window only, the first `max` and
@@ -88,6 +90,7 @@ import { HomeHeader } from '/views/home/header.js';
 import { HomeJourney } from '../home/journey.js';
 import { HomeFeed } from '/views/home/feed.js';
 import { AgentsBand } from '/views/home/agents-band.js';
+import { AskBand } from '/views/home/ask-band.js';
 import { OverviewBand } from '/views/home/overview-band.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { InstallCta } from '/components/InstallCta.js';
@@ -210,17 +213,31 @@ export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any
           who: c.groupAlias || handleOf(c.peerGhii),
           said: String(c.lastMessage ?? '').trim(),
           at: c.updatedAt,
+          // A thread a question of Ask someone who knows opened (services/help/), marked as one.
+          question: c.openedKind === 'help-question',
         })),
     }));
   if (!data) return null;
+  // Questions first when the operator kept helpFirst on (the default); the order within each group stays.
+  const threads = props.helpFirst === false ? data.threads
+    : [...data.threads.filter((r) => r.question), ...data.threads.filter((r) => !r.question)];
   // How far back the band looks is the person's choice, kept in home.prefs so it follows them to
   // every device and an AI can read or set it with the memory tools.
   // The count the home's contents rail shows beside this band: every thread waiting in the window.
   const waiting = data.total ?? data.threads.length;
   return html`<div class="rail-mark" data-rail-count=${waiting ? String(waiting) : ''}>
-    <${YourTurn} threads=${data.threads} total=${data.total} anyTime=${data.anyTime} max=${max}
+    <${YourTurn} threads=${threads} total=${data.total} anyTime=${data.anyTime} max=${max}
       days=${prefs?.turnDays} onDays=${(d) => writePrefs({ turnDays: d })} />
   </div>`;
+}
+
+/**
+ * Who knows? (Ask someone who knows): the field, the kept answers and helpers it finds, and where the
+ * person's questions stand. One read of GET /v1/help/inbox, re-read when a question changes.
+ */
+export function AskBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
+  const { data } = useShared('home-ask', '/v1/help/inbox', ['help']);
+  return html`<${AskBand} data=${data} props=${props} />`;
 }
 
 export function FleetBlock() {

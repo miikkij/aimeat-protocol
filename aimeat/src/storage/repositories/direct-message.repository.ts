@@ -11,6 +11,8 @@
  *     agent in one read (81 round trips at 79 agents on PostgreSQL).
  *   2026-11-04 -- getDirectMessagesByIds and listConversationsForOwners are required: both providers
  *     implement them (codebase analysis 2026-11-03, item D-e).
+ *   v1.8.0 -- 2026-11-14 -- ConversationSummary carries openedKind, the opener's server-set kind: a
+ *     thread a question from Ask someone who knows opened is marked whoever wrote last.
  *   v1.7.0 -- 2026-10-26 -- Reactions on a single message (addMessageReaction, removeMessageReaction,
  *     listMessageReactions) and listDirectMessageCopies, which a reaction from another node checks against.
  *   v1.6.0 -- 2026-10-21 -- Group chat: updateConversation takes `invited` and `createdBy` (ConversationUpdate),
@@ -83,6 +85,9 @@ export type ConversationSummary = {
   openedBy?: string;
   openedTo?: string;
   openedAt?: string;
+  /** The opener's server-set kind (DirectMessageRecord.kind), when it has one: a thread that opened
+   *  with a question from Ask someone who knows says so for its whole life, whoever wrote last. */
+  openedKind?: DirectMessageRecord['kind'];
 };
 
 /** The fields of a group thread that change after it is opened. */

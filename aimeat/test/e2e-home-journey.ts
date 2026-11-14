@@ -19,6 +19,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-home-journey
  * @version-history
+ *   2026-11-14 — Test 5 expects share next: sharing with someone is the fourth stage (Ask someone who knows).
  *   v1.2.0 — 2026-10-12 — The connector's upload (5c) and the agent refusal (6) use the agent's own
  *     token, as `aimeat connect` does; the MCP OAuth token stays on the MCP endpoint, where node 4.0.0
  *     keeps it. Test 6 had passed on 4.0.0 only because the MCP token was refused on REST at all.
@@ -216,7 +217,8 @@ await test('5. the published card is the first result: it is served, and next sk
     assert(JSON.parse(toolText(body)).served === true, `served: ${toolText(body)}`);
     const j = await journeyOf(me.ownerToken);
     assert(stage(j, 'first-result').done === true, 'first-result done');
-    assert(j.next === 'apps', `organise is declined, so next is apps, got ${j.next}`);
+    // Sharing with someone is the fourth stage (2026-11-14), before the declined shared place.
+    assert(j.next === 'share', `share comes after the connection and before the declined organise, got ${j.next}`);
     // The address the person is told to open has to show the card, JSON-LD included.
     const pub = await json(`/v1/portfolio/data/${me.ownerName}`);
     assert(pub.status === 200, `the published card is served, got ${pub.status}: ${JSON.stringify(pub.body.error)}`);

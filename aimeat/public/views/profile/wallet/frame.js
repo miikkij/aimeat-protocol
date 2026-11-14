@@ -10,6 +10,8 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, rowWords, sourcesOf } from './frame.js';
  * @version-history
+ *   v1.2.2 — 2026-11-14 — `help-reward` is a grant: morsels for a question the person's answer solved
+ *     (Ask someone who knows), worded by walpage.kind.help-reward.
  *   v1.2.1 — 2026-10-12 — A pacing row names its use in words (pacingWhat; a checkout is "a use", never
  *     its session id), and "your agent …" shows only for an agent of this wallet's own owner.
  *   v1.2.0 — 2026-10-11 — Pacing rows in words (pacing_charge, pacing_burn, pacing_earn, pacing_refund,
@@ -26,7 +28,7 @@ import { date as fmtDate, time as fmtTime, money as fmtMoney } from '/js/format.
 export const x = (key, vars) => t('walpage.' + key, vars);
 
 /** Row kinds that are the pace or a gift, not something earned from somebody. */
-export const GRANTED = new Set(['allowance', 'daily_allowance', 'welcome_bonus', 'mint']);
+export const GRANTED = new Set(['allowance', 'daily_allowance', 'welcome_bonus', 'mint', 'help-reward']);
 
 /**
  * The pacing rows one use writes (src/services/metered-settlement.ts chargePacing): what left the

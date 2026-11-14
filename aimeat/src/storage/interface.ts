@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-14 — HelpRepository: Ask someone who knows, its participants, questions and routes
+ *     (types/help.ts).
  *   2026-11-14 — SecretShareRepository: secret shares and requests, their events, named people and
  *     the browsers' end-to-end device keys (types/secret-shares.ts).
  *   2026-11-05 — SealedColumnRepository: the data key's re-encrypt job reads every sealed column a
@@ -166,6 +168,7 @@ import type { HeldAccountNameRepository } from './repositories/held-names.reposi
 import type { EphemeralClaimRepository } from './repositories/ephemeral-claim.repository.js';
 import type { SealedColumnRepository } from './repositories/sealed-column.repository.js';
 import type { SecretShareRepository } from './repositories/secret-share.repository.js';
+import type { HelpRepository } from './repositories/help.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository,
@@ -214,6 +217,7 @@ export interface Storage extends
   EphemeralClaimRepository,
   SealedColumnRepository,
   SecretShareRepository,
+  HelpRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

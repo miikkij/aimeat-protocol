@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-11-14 — help:ask and help:answer (HELP_ASK_SCOPE, HELP_ANSWER_SCOPE), outside the wildcard: an
+ *     agent asks or answers other members in its owner's name (Ask someone who knows).
  *   2026-11-14 — secrets:share (SECRETS_SHARE_SCOPE), outside the wildcard: secret shares hand content out.
  *   2026-11-14 — consent:read-as-owner (CONSENT_READ_AS_OWNER_SCOPE) joins the own-tick family: an agent
  *     seeing the account's consents, the owner's and its siblings', as the owner does.
@@ -262,6 +264,16 @@ export const SECRETS_MANAGE_SCOPE = 'secrets:manage';
 export const SECRETS_SHARE_SCOPE = 'secrets:share';
 
 /**
+ * Ask someone who knows (services/help/): an agent asks another member a question in its owner's
+ * name (help:ask), or answers a question sent to its owner, writes a draft, passes or refers one
+ * (help:answer). Both act toward OTHER people in the owner's name, as send-as-owner does, so neither
+ * rides along with "Full access": the owner ticks each. The member's own choices (may their AI send,
+ * may it answer on its own and in which topics) still decide on top of the word (2026-11-14).
+ */
+export const HELP_ASK_SCOPE = 'help:ask';
+export const HELP_ANSWER_SCOPE = 'help:answer';
+
+/**
  * Attaching another MCP server to this account, or removing one.
  *
  * THREE WORDS, AND ONLY THIS ONE IS OUT. `mcp:read` (what is attached) and `mcp:use` (call a tool
@@ -404,7 +416,7 @@ const OWN_TICK_SCOPES = [
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
     WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, OPERATOR_ADMIN_SCOPE,
     COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
-    SECRETS_SHARE_SCOPE, MCP_MANAGE_SCOPE,
+    SECRETS_SHARE_SCOPE, MCP_MANAGE_SCOPE, HELP_ASK_SCOPE, HELP_ANSWER_SCOPE,
     ...OWN_TICK_SCOPES,
 ];
 

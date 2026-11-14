@@ -4,6 +4,29 @@
     {
       "date": "2026-11-14",
       "kind": "feature",
+      "id": "2026-11-14-ask-someone-who-knows",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Ask someone who knows",
+        "fi": "Kysy osaajalta"
+      },
+      "summary": {
+        "en": "Ask the people on your node who know, and their AIs; helpers get thanks and morsels.",
+        "fi": "Kysy saman AIMEATin osaajilta ja heidän tekoälyiltään; auttaja saa kiitoksen ja muruja."
+      },
+      "body": {
+        "en": "Ask the people on your node who know, and their AIs. Helpers choose their topics and what their AI may do; a solved question thanks the helper with morsels and can be kept for the next person. Operators get a report on what was asked, written by their own AI.",
+        "fi": "Kysy saman AIMEATin osaajilta ja heidän tekoälyiltään. Auttaja valitsee aiheensa ja sen, mitä hänen tekoälynsä saa tehdä. Ratkennut kysymys tuo auttajalle kiitoksen ja muruja, ja vastaus voi jäädä seuraavalle kysyjälle. Ylläpito saa oman tekoälynsä kirjoittaman raportin siitä, mitä kysyttiin."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "feature",
       "id": "2026-11-14-your-home-shows-what-it-holds-beside-the-page",
       "highlight": false,
       "audience": [

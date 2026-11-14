@@ -74,6 +74,8 @@ function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
       post_settlement: [],
       pre_board_post: [],
       pre_federation_peer: [],
+      post_help_question: [],
+      post_help_solved: [],
     },
     federationRole: 'standalone',
     genesisUrl: null,

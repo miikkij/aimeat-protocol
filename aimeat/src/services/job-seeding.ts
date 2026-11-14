@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-11-14 — Seed core:help-sweep (hourly at :23) and core:help-report (daily 04:30): Ask someone who knows.
  *   2026-11-04 — Seed core:outbox-sweep (every minute): stored webhook and mail retries resumed (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — Seed core:datapackage-freshness (hourly at :47): owners of stale data packages are told once (plan D6.2).
  *   2026-10-28 — Seed core:compliance-ask-makers (daily 08:15): the makers of AI apps with EU AI Act questions open are asked.
@@ -96,6 +97,10 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     // The compliance report for the month that just ended. 04:00 on the first, after the nightly
     // usage rollup and archive at 03:xx, so the month it reports on is fully folded before it reads.
     { id: 'core:compliance-report-monthly', name: 'Monthly Compliance Report', coreHandler: 'compliance-report-monthly', cron: '0 4 1 * *' },
+    // Ask someone who knows: the hourly round at :23 (reroute, deadlines, expiry, stale kept answers),
+    // and the report job daily at 04:30, which makes the figures when a week or a month has ended.
+    { id: 'core:help-sweep', name: 'Ask Someone Who Knows: Hourly Round', coreHandler: 'help-sweep', cron: '23 * * * *' },
+    { id: 'core:help-report', name: 'Ask Someone Who Knows: Report', coreHandler: 'help-report', cron: '30 4 * * *' },
     // The makers of apps that use AI with EU AI Act questions open get one message with a ready prompt.
     // Daily at 08:15, in working hours; the same app is asked again only after a fortnight.
     { id: 'core:compliance-ask-makers', name: 'Ask App Makers for AI Act Answers', coreHandler: 'compliance-ask-makers', cron: '15 8 * * *' },

@@ -30,12 +30,14 @@
  * @usage
  *   const section = await skillsBySituation(storage, config, ownerName);
  * @version-history
+ *   v1.2.0 — 2026-11-14 — A skill whose `metadata.requires_config` switch is off on this node is left out.
  *   v1.1.0 — 2026-11-08 — `metadata.entry_point` exempts a skill from the part-of-another rule.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { listSkills } from './skills.js';
+import { skillFeatureOff } from './skill-types.js';
 
 const LINE_MAX = 190;
 
@@ -59,7 +61,8 @@ export function isEntryPoint(metadata: Record<string, unknown> | undefined): boo
  */
 export async function skillsBySituation(storage: Storage, config: AimeatConfig, ownerName: string | null): Promise<string> {
     const all = await listSkills(storage, config, 'node', { ownerName });
-    const entries = all.filter(s => !s.binding && !s.supersededBy);
+    // A skill that teaches a feature the operator switched off is not offered (skill-types.ts skillFeatureOff).
+    const entries = all.filter(s => !s.binding && !s.supersededBy && !skillFeatureOff(config, s.metadata));
     const names = new Set(entries.map(s => s.name));
     const isPartOfAnother = (name: string) => [...names].some(other => other !== name && name.startsWith(`${other}-`));
     const listed = entries.filter(s => isEntryPoint(s.metadata) || !isPartOfAnother(s.name)).sort((a, b) => a.name.localeCompare(b.name));

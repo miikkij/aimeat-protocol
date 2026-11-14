@@ -16,6 +16,9 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   v2.1.0 — 2026-11-14 — Sharing with someone is stage 4 (journey-state.ts JOURNEY_STAGES), and it
+ *     offers Ask someone who knows when the node has it on (Jouni, 2026-11-14). The organism, apps and
+ *     agents are stages 5 to 7.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v2.0.4 — 2026-11-01 — Stage 3 stays open for the node's own chat and the basic agents until an AI
  *     of the person's from outside connects (journey-state.ts isOutsideMcpAgent).
@@ -49,7 +52,7 @@ export const GUIDED_JOURNEY_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-guided-journey
-description: How to walk a person along their path on an AIMEAT node, one stage per conversation. First their profile (a short interview made into a business card that people and AIs can read), then a good AI of their own, that AI connected, an organism where their work lives, apps, agents that work while they are away, and sharing. At each stage, say what they get and where it leads. Use when the handbook says the person has not walked the path, when they are new, when they ask what this place is for, what to do next or how something here works, and when a piece of work has just finished.
+description: How to walk a person along their path on an AIMEAT node, one stage per conversation. First their profile (a short interview made into a business card that people and AIs can read), then a good AI of their own, that AI connected, sharing with someone, an organism where their work lives, apps, and agents that work while they are away. At each stage, say what they get and where it leads. Use when the handbook says the person has not walked the path, when they are new, when they ask what this place is for, what to do next or how something here works, and when a piece of work has just finished.
 license: MIT
 metadata:
   audience: agent
@@ -188,7 +191,19 @@ with the account, this stage stays open until an AI of theirs from outside conne
 the connection steps are on the Connect page, /v1/profile?tab=mcp . If they use a second AI, the
 steps are on the same page. Experience Center: layer L0, Basics.
 
-### 4. An organism, where their work lives between conversations
+### 4. Shared with someone
+
+What they get: other people, and other people's AIs, use what they know and what they built, and
+they can ask the people here who know. Send someone the card, invite someone to work with them, or
+publish a document. When this node has Ask someone who knows on (the skill
+\`aimeat-ask-someone-who-knows\` is in your handbook's list), offer it in one sentence: other members
+may ask them about the topics on their card, and they may ask others; ask whether they want either,
+and set it with \`aimeat_help_profile_set\` on their yes. Each of these is their decision; offer the
+one that fits. The stage is done when someone else is in a shared place with them, or a question
+they asked or answered is solved. Experience Center: layer L5, Agents + apps together, and B6,
+EXCHANGE, for selling.
+
+### 5. An organism, where their work lives between conversations
 
 What they get: one place where they, the people they invite and all their AIs read and write the
 same notes, documents and decisions, and nothing goes out without a person. They need one when more
@@ -201,7 +216,7 @@ starts with a readme that says what it is for and what is current. That readme i
 well: when something stops mattering, it says so there, or the material is archived. Experience
 Center: layer L2, Organisms & workspaces.
 
-### 5. Apps
+### 6. Apps
 
 What they get: ready tools for a job, which you can also use for them from the chat. Look at what
 they have (\`aimeat_app_list\`) and what can be installed (\`aimeat_package_list\`, and a repository's
@@ -213,7 +228,7 @@ Read an app's bound skills (\`aimeat_skill_list\` with \`binding\`) before you d
 their own is the skill \`aimeat-app-builder-atelier\`. Buying happens on the page. The stage is done when
 they have used one app once. Experience Center: layer L4, Apps in depth.
 
-### 6. Agents that work while they are away
+### 7. Agents that work while they are away
 
 What they get: work that continues without them in the conversation. The work they said they repeat
 is the first candidate. First ask what the agent should do, because that decides what it is:
@@ -229,14 +244,8 @@ its permissions on their page. The skill \`manage-my-agents\` has the picture of
 who pays. The stage is done when an agent they made has finished a piece of work (a task other than
 the test task of its onboarding); an agent that exists but has not run yet does not count, and nor do
 the basic agents created with the account. Experience Center: layer L3,
-Agents in depth.
-
-### 7. Shared with someone
-
-What they get: other people, and other people's AIs, use what they built. Send someone the card,
-invite someone to the organism, publish a document or a knowledge package, or put a price on an
-app's tool. Each of these is their decision; offer the one that fits what they built. Experience
-Center: layer L5, Agents + apps together, and B6, EXCHANGE, for selling.
+Agents in depth. Later, when they have built something, sharing it is the same decision as in stage
+4: a knowledge package, or a price on an app's tool.
 
 ## Words
 

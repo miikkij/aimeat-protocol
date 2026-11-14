@@ -2,12 +2,12 @@
  * @file src/services/hooks.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The eleven moments in this node's life where it stops and calls an address somebody
+ * @description The thirteen moments in this node's life where it stops and calls an address somebody
  *   named, and what it does with the answer.
  *
  *   FOUR OF THEM DECIDE. A hook whose name starts with `pre_` runs BEFORE the thing happens and its
  *   answer settles it: a registration, a work request, a board post or a new federation peer can be
- *   refused outright. The other seven are told once the thing has happened and cannot stop
+ *   refused outright. The other nine are told once the thing has happened and cannot stop
  *   anything. That difference is the whole of this file's risk, and it is why `hookKind` exists:
  *   every surface that shows a hook to a person has to say which of the two it is.
  *
@@ -44,6 +44,8 @@
  *   const r = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
+ *   2026-11-14 — post_help_question and post_help_solved: told after a question of Ask someone who
+ *     knows went to a helper and after one was solved. Thirteen moments.
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.2 — 2026-10-15 — owner_recovery stays listed with nothing firing it, since its route was removed (feature-list audit 171).
  *   v1.3.1 — 2026-10-05 — A hook action's answer is read under a ceiling (secaudit 2026-10, C6).
@@ -75,7 +77,7 @@ import { recordHookRun, type HookAnswer } from './hook-log.js';
 
 /**
  * Every moment, in the order a person meets them. THE canonical list: config.ts seeds the same
- * eleven keys and the admin route used to carry a third copy, which is one list too many to keep
+ * thirteen keys and the admin route used to carry a third copy, which is one list too many to keep
  * in step by hand.
  */
 export const HOOK_NAMES: HookName[] = [
@@ -86,6 +88,9 @@ export const HOOK_NAMES: HookName[] = [
   'owner_recovery', 'agent_rekey',
   'pre_work_request', 'post_work_delivery', 'post_settlement',
   'pre_board_post', 'pre_federation_peer',
+  // Ask someone who knows (services/help/): told after a question went to a helper and after one was
+  // solved. They carry ids, states and topics, never the question's text.
+  'post_help_question', 'post_help_solved',
 ];
 
 /** A gate decides whether the thing happens; a notify hook is told once it has. */

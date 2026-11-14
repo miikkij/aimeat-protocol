@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-14 — registerHelpTools (aimeat_help_*: Ask someone who knows, mcp/help.ts).
  *   2026-11-14 — registerSecretShareTools (aimeat_secret_share_*: secret shares and requests, mcp/secret-shares.ts).
  *   2026-11-13 — registerAgentOnboardingTools, registerAgentCapabilityTools and registerAgentMessageTools receive the session's caller
  *     (structure programme 2026-11, unit 2b).
@@ -204,6 +205,7 @@ import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
 import { registerSecretShareTools } from './secret-shares.js';
+import { registerHelpTools } from './help.js';
 import { registerCsmTool } from './csm.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
@@ -280,6 +282,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAccessTools(mcp, storage, config, agentGaii);
     registerSecretTools(mcp, storage, config, agentGaii);
     registerSecretShareTools(mcp, storage, config, caller);
+    registerHelpTools(mcp, storage, config, caller);
     registerCommerceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerExchangeTools(mcp, storage, config, agentGaii);
     registerExchangeRunTools(mcp, storage, config, agentGaii, getToken, scopes);

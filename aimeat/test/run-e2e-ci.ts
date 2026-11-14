@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-14 -- e2e-help.ts joins the list (not the guard tier): Ask someone who knows.
  *   2026-11-14 -- e2e-secret-shares.ts joins the list (not the guard tier): secret shares and secret requests (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   2026-11-14 -- e2e-consent-read-as-owner.ts joins the list (not the guard tier): an agent sees its own consents, and the account's with consent:read-as-owner, on the route, the tool and the resource.
  *   2026-11-14 -- e2e-generic-approval-publish.ts joins the list (not the guard tier): action "publish" on POST /v1/organisms/:id/approvals beside the checks POST /v1/organisms/:id/publish asks.
@@ -1358,6 +1359,10 @@ const ALL_SUITES = [
     // Secret shares and secret requests: deposit, pickup by person, organism, code or allowed agent,
     // sealed and vault, retention, revoke, the code lockout, device keys.
     'test/e2e-secret-shares.ts',
+    // Ask someone who knows: a question to the helper whose topics match, the AI's draft and its own
+    // answer, solved with thanks and morsels once, the kept answer found, a pass, the shared list,
+    // the operator's report, and the feature switched off.
+    'test/e2e-help.ts',
     'test/e2e-organism-member-visibility.ts',
     // A board and a skill at organism:<id>: the members read, an outsider and anonymous do not.
     'test/e2e-audience-boards-skills.ts',

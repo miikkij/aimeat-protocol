@@ -32,6 +32,7 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   2026-11-14 — A node skill whose `metadata.requires_config` switch is off reads as FEATURE_OFF.
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.14.0 -- 2026-10-26 -- Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss):
@@ -125,7 +126,7 @@ import {
 export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type SkillScope, type SkillRef } from './skill-refs.js';
 
 // The stored and returned shapes and SkillAccessError live in skill-types.ts (max-file-lines).
-import { SkillAccessError, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill-types.js';
+import { SkillAccessError, skillFeatureOff, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill-types.js';
 export { SkillAccessError, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill-types.js';
 
 // ── Internals ──
@@ -658,6 +659,9 @@ export async function resolveSkillRef(
   }
 
   const summary = toSummary(record, ref.scope, skillOwner);
+  if (ref.scope === 'node' && skillFeatureOff(config, summary.metadata)) {
+    throw new SkillAccessError('FEATURE_OFF', `The feature this skill teaches is switched off on this node by its operator: ${refStr}`);
+  }
   if (ref.version) summary.ref = formatSkillRef(ref);
   const fileContents = await readFileBodies(storage, config, accessor,
     ownerGaii, filesToRead(summary.files, opts, refStr).map(f => [f.path, fileKey(ref.name, f.path)]));

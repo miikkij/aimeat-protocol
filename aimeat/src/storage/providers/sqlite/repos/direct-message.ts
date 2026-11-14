@@ -306,8 +306,8 @@ export function listConversations(
       'SELECT subject FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND subject IS NOT NULL ORDER BY createdAt ASC LIMIT 1',
     ).get(ownerGhii, row.conversationId) as { subject: string } | undefined;
     const open = db.prepare(
-      'SELECT senderGhii, recipientGhii, createdAt FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt ASC, id ASC LIMIT 1',
-    ).get(ownerGhii, row.conversationId) as { senderGhii: string; recipientGhii: string; createdAt: string } | undefined;
+      'SELECT senderGhii, recipientGhii, createdAt, kind FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt ASC, id ASC LIMIT 1',
+    ).get(ownerGhii, row.conversationId) as { senderGhii: string; recipientGhii: string; createdAt: string; kind: string | null } | undefined;
 
     // The peer is the other party relative to this mailbox owner.
     const peerGhii = last
@@ -331,6 +331,7 @@ export function listConversations(
       openedBy: open?.senderGhii,
       openedTo: open?.recipientGhii,
       openedAt: open?.createdAt,
+      ...(open?.kind ? { openedKind: open.kind as ConversationSummary['openedKind'] } : {}),
     };
   });
 }
@@ -372,12 +373,12 @@ export function listConversationsForOwners(
   ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; subject: string }>;
   // The opener: the first row this mailbox holds in the thread.
   const opens = db.prepare(
-    `SELECT ownerGhii, conversationId, senderGhii, recipientGhii, createdAt FROM (
-        SELECT ownerGhii, conversationId, senderGhii, recipientGhii, createdAt,
+    `SELECT ownerGhii, conversationId, senderGhii, recipientGhii, createdAt, kind FROM (
+        SELECT ownerGhii, conversationId, senderGhii, recipientGhii, createdAt, kind,
                ROW_NUMBER() OVER (PARTITION BY ownerGhii, conversationId ORDER BY createdAt ASC, id ASC) rn
         FROM direct_messages WHERE ownerGhii IN (${ph})
      ) WHERE rn = 1`,
-  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; senderGhii: string; recipientGhii: string; createdAt: string }>;
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; senderGhii: string; recipientGhii: string; createdAt: string; kind: string | null }>;
 
   const ck = (o: string, c: string) => `${o} ${c}`;
   const lastBy = new Map(lasts.map(l => [ck(l.ownerGhii, l.conversationId), l]));
@@ -406,6 +407,7 @@ export function listConversationsForOwners(
       openedBy: open?.senderGhii,
       openedTo: open?.recipientGhii,
       openedAt: open?.createdAt,
+      ...(open?.kind ? { openedKind: open.kind as ConversationSummary['openedKind'] } : {}),
     });
   }
   for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

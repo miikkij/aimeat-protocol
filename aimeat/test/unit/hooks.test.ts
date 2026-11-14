@@ -1,6 +1,6 @@
 /**
  * @file hooks.test.ts
- * @description The eleven moments: which of them decide, what a gate does when the address will not
+ * @description The thirteen moments: which of them decide, what a gate does when the address will not
  *   answer, and the record every call leaves behind.
  *
  *   THREE HOLES THIS FILE IS THE MEMORY OF.
@@ -36,6 +36,7 @@
  *      left, so no later publication or deletion decides what a stored binding names.
  *
  * @version-history
+ *   2026-11-14 — Thirteen moments: post_help_question and post_help_solved (Ask someone who knows).
  *   v1.5.1 — 2026-10-05 — The fake safeFetch answers a real Response: the hook reads the body under
  *     a ceiling now (secaudit 2026-10, C6).
  *   v1.5.0 — 2026-09-26 — A binding stored as `id#<account name>` follows its action to the
@@ -117,15 +118,15 @@ beforeEach(() => {
   fetched.length = 0;
 });
 
-describe('the eleven moments, and which of them decide', () => {
+describe('the thirteen moments, and which of them decide', () => {
   it('HOOK_NAMES is the whole list and every name has a kind', () => {
-    expect(HOOK_NAMES).toHaveLength(11);
+    expect(HOOK_NAMES).toHaveLength(13);
     expect(HOOK_NAMES.filter((n) => hookKind(n) === 'gate')).toEqual([
       'pre_owner_registration', 'pre_agent_registration', 'pre_work_request',
       'pre_board_post', 'pre_federation_peer',
     ]);
-    // Five names start with pre_, and all five decide. The other six are told afterwards.
-    expect(HOOK_NAMES.filter((n) => hookKind(n) === 'notify')).toHaveLength(6);
+    // Five names start with pre_, and all five decide. The other eight are told afterwards.
+    expect(HOOK_NAMES.filter((n) => hookKind(n) === 'notify')).toHaveLength(8);
   });
 
   it('nothing bound is allowed without a call', async () => {

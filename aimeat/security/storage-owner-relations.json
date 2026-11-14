@@ -93,6 +93,32 @@
       "verification": "behavior-tested",
       "decision": "existing-contract"
     },
+    "HelpParticipant.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteHelpDataByOwner (step help_questions): the person's participant row goes, with their questions, the routes of those questions and the routes that sent questions to them.",
+      "reason": "A participant row holds one person's choices (topics, status, what their AI may do); it cannot pass to a new registrant of the same name.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/help.ts",
+        "src/storage/providers/sqlite/methods/help.ts"
+      ],
+      "test": "test/unit/help-storage.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
+    "HelpQuestion.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteHelpDataByOwner (step help_questions): every question the person asked goes with its routes.",
+      "reason": "A question is the asker's own text; it cannot pass to a new registrant of the same name.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/help.ts",
+        "src/storage/providers/sqlite/methods/help.ts"
+      ],
+      "test": "test/unit/help-storage.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
     "SecretShare.ownerGhii": {
       "role": "ownership",
       "current": "eraseOwner calls deleteSecretSharesByOwner (step secret_shares): the person's shares and requests go with their content, events and member rows, and the person's member rows on others' shares go too.",

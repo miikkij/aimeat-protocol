@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.24.0 -- 2026-11-14 -- helpCliTools: aimeat_help_* (Ask someone who knows).
  *   v1.23.0 -- 2026-11-14 -- secretShareCliTools: aimeat_secret_share_create, _list, _get, _deposit, _pickup and _revoke.
  *   v1.22.0 -- 2026-11-07 -- csmCliTools: aimeat_csm, the account's data descriptions (CSM).
  *   v1.22.0 -- 2026-11-07 -- receiverCliTools: aimeat_receiver and aimeat_admin_receivers.
@@ -49,6 +50,7 @@ import { boardTools } from './tool-call-defs-boards.js';
 import { skillTools } from './tool-call-defs-skills.js';
 import { secretTools } from './tool-call-defs-secrets.js';
 import { secretShareCliTools } from './tool-call-defs-secret-shares.js';
+import { helpCliTools } from './tool-call-defs-help.js';
 import { organismTools } from './tool-call-defs-organism.js';
 import { appTools } from './tool-call-defs-apps.js';
 import { extensionTools } from './tool-call-defs-extensions.js';
@@ -111,6 +113,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...skillTools,
     ...secretTools,
     ...secretShareCliTools,
+    ...helpCliTools,
     ...organismTools,
     ...appTools,
     ...extensionTools,

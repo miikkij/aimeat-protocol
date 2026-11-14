@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   2026-11-14 — helpDefaults(): the settings of Ask someone who knows (config/help.ts, AIMEAT_HELP_*).
  *   2026-11-08 — memoryMaxArchivedKeysPerAgent (AIMEAT_MEMORY_MAX_ARCHIVED_KEYS, default 10000): archived memory keys get a ceiling of their own (secaudit2026nov08b round 15b).
  *   v1.40.0 — 2026-11-07 — microservicesCentralUrl (AIMEAT_MSC_CENTRAL_URL, default none): a Microservices Central the app-building guidance names (services/appdev/microservices.ts).
  *   v1.39.0 — 2026-11-06 — extensionZipMaxFiles (AIMEAT_EXT_ZIP_MAX_FILES, default 1000): files one extension or cortex ZIP may hold (was a fixed 50 in upload-zip.ts).
@@ -112,6 +113,7 @@ import { decideDefaults } from './config/decide.js';
 import { visibilityDefaults } from './config/visibility.js';
 import { turnDefaults } from './config/turn.js';
 import { pagesDefaults } from './config/pages.js';
+import { helpDefaults } from './config/help.js';
 import { nodeLimitsDefaults } from './config/node-limits.js';
 import { fileStoreDefaults } from './config/file-store.js';
 import { x402Defaults } from './config/x402.js';
@@ -303,6 +305,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     coHost: (process.env.AIMEAT_CO_HOST ?? deriveCoHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
     ...pagesDefaults(),
+    ...helpDefaults(),
     ...runtimeConfigFromEnv(),
     ...nodeLimitsDefaults(),
     ...fileStoreDefaults(),
@@ -422,6 +425,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
       post_settlement: [],
       pre_board_post: [],
       pre_federation_peer: [],
+      post_help_question: [],
+      post_help_solved: [],
     },
     federationRole: (process.env.AIMEAT_FEDERATION_ROLE ?? 'standalone') as FederationRole,
     federationAuthPolicy: (process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'disabled') as 'disabled' | 'all_peers' | 'specific_peers',

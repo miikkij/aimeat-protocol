@@ -113,14 +113,26 @@
       "digest": "sha256:151344e28d26294c42633854",
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
+    "node:aimeat-ask-someone-who-knows": {
+      "reviewedOn": "2026-11-14",
+      "watches": [
+        "aimeat/src/services/help/questions.ts",
+        "aimeat/src/services/help/respond.ts",
+        "aimeat/src/services/help/close.ts",
+        "aimeat/src/services/help/participants.ts",
+        "aimeat/src/services/help/report.ts"
+      ],
+      "digest": "sha256:b4aeaa5d413b038375e685f1",
+      "note": "The order an AI follows (find, show, ask), the AI level the node enforces on an answer, the close with thanks and keep, the owner's choices an AI may only lower, and the operator's report tools are decided in these five files."
+    },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-11-09",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:425d6db75d64499fad41609f",
+      "digest": "sha256:302f8ad69a8652a0eb22f827",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -439,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:23aa69d0edc99a389ddda163",
+      "digest": "sha256:565f55743540f8f6054a63a8",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -795,7 +807,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "c386fed71e81bdf0",
+      "aimeat/src/services/journey-state.ts": "a21f63cc05139963",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "24765a8656779b80"
     },
@@ -827,7 +839,7 @@
       "aimeat/src/services/memory-bin.ts": "af03c3dad61b242b",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
-      "aimeat/src/services/owner-erasure.ts": "f6f9da0ee3c44048",
+      "aimeat/src/services/owner-erasure.ts": "dd1af74cc96ea366",
       "aimeat/src/services/archive.ts": "8a08d72e2732e5ed",
       "aimeat/src/mcp/organisms.ts": "ffcf31f00d0cc0f0"
     },
@@ -920,6 +932,13 @@
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "9aaa1c75a9accaea",
       "aimeat/src/services/usage/usage-read.ts": "5d85342c8a5aeebd",
       "aimeat/public/views/appcat.js": "325750f08208eb54"
+    },
+    "node:aimeat-ask-someone-who-knows": {
+      "aimeat/src/services/help/questions.ts": "b50cbe9a38572b55",
+      "aimeat/src/services/help/respond.ts": "a54811359113e017",
+      "aimeat/src/services/help/close.ts": "eceaefeba42cea8c",
+      "aimeat/src/services/help/participants.ts": "99fe63c994a9813a",
+      "aimeat/src/services/help/report.ts": "6f23f8121715ce27"
     }
   }
 }

@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-14 -- +ask-someone-who-knows (builtin-skills.ask-someone.ts): asking and answering the people
+ *     on this node who know, and the operator's report; shown only while the feature is on.
  *   2026-11-13 -- +balancing-test (builtin-skills.balancing-test.ts): how an AI writes the balancing
  *     test of an app (legitimate interests) with its owner, and what it leaves to the person.
  *   2026-11-11 -- +aimeat-app-agents (builtin-skills.app-agents.ts): how an app brings an agent of
@@ -275,6 +277,7 @@ import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.
 import { AGENT_AVATAR_SKILL_ENTRY } from './builtin-skills.agent-avatar.js';
 import { APP_AGENTS_SKILL_ENTRY } from './builtin-skills.app-agents.js';
 import { FIND_MY_APP_SKILL_ENTRY } from './builtin-skills.find-my-app.js';
+import { ASK_SOMEONE_SKILL_ENTRY } from './builtin-skills.ask-someone.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -291,6 +294,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   ...RECURRING_WORK_SKILL_ENTRIES,
   ...CONVERSATION_SKILL_ENTRIES,
   GUIDED_JOURNEY_SKILL_ENTRY,
+  ASK_SOMEONE_SKILL_ENTRY,
   ORGANISMS_SKILL_ENTRY,
   HTML_PAGE_SKILL_ENTRY,
   WORKSTATION_SKILL_ENTRY,

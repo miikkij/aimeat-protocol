@@ -34,6 +34,8 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.6.0 — 2026-11-14 — `share` is the fourth stage, and a solved question of Ask someone who knows
+ *     (asked or answered) counts as having shared with someone (Jouni, 2026-11-14).
  *   v1.5.2 — 2026-11-09 — countWorkersRun counts a worker with two or more finished tasks without
  *     reading them (one of two is always not the test task), and reads the onboarding records once
  *     (loadOwnerOnboardings): two reads per worker, 158 at 79 workers, before. Same count.
@@ -75,9 +77,11 @@ const MERGE_ATTEMPTS = 10;
 
 /**
  * In the order a newcomer meets them. The profile comes first: the interview runs in any AI through
- * a copied prompt, so it needs no connection, and connecting is offered right after it.
+ * a copied prompt, so it needs no connection, and connecting is offered right after it. Sharing with
+ * someone is fourth, before the shared place, apps and agents: working with other people is what
+ * makes the rest worth having (Jouni, 2026-11-14: "Siirretäänkö polkusi-vaihe ...? <- siirretään").
  */
-export const JOURNEY_STAGES = ['first-result', 'ai', 'connect', 'organise', 'apps', 'agents', 'share'] as const;
+export const JOURNEY_STAGES = ['first-result', 'ai', 'connect', 'share', 'organise', 'apps', 'agents'] as const;
 export type JourneyStageId = typeof JOURNEY_STAGES[number];
 
 /**
@@ -255,6 +259,14 @@ function markedBeforeAgentMcpMark(marker: { value?: unknown } | null | undefined
     return typeof at === 'string' && at < AGENT_MCP_MARK_SINCE;
 }
 
+/** A question this person asked was solved, or they answered someone's question. */
+async function helpedOrWasHelped(storage: Storage, ghii: string): Promise<boolean> {
+    const answered = await storage.listHelpRoutesForHelper(ghii, { limit: 50 });
+    if (answered.some(r => r.outcome === 'answered')) return true;
+    const asked = await storage.listHelpQuestionsByOwner(ghii, { limit: 50 });
+    return asked.some(q => q.state === 'solved');
+}
+
 /** The account's facts. `home` is passed when the caller already read it. */
 export async function readJourneySignals(
     storage: Storage, config: AimeatConfig, owner: string, home?: HomeState,
@@ -268,8 +280,11 @@ export async function readJourneySignals(
         storage.getMemory(ghii, FIRST_MCP_CALL_KEY),
     ]);
     const isMe = (who: string) => who === owner || who === ghii;
+    // Shared with someone: a shared place with another person in it, or a question of Ask someone who
+    // knows that the person asked and saw solved, or answered for someone else.
     const sharedWithSomeone = organisms.some(o =>
-        [...(o.owners ?? []), ...(o.admins ?? []), ...(o.members ?? [])].some(who => !isMe(who)));
+        [...(o.owners ?? []), ...(o.admins ?? []), ...(o.members ?? [])].some(who => !isMe(who)))
+        || (config.helpEnabled && await helpedOrWasHelped(storage, ghii));
     const apps = usage.counts.apps.used + usage.counts.extensions.used + usage.counts.cortexes;
     const own = agents.filter(isOwnWorker);
     return {

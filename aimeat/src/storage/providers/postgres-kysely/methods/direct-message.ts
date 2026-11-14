@@ -273,7 +273,7 @@ export const directMessageMethods = {
       // Thread subject = the one set on the message that opened it (earliest non-null subject).
       const subj = await this.db.selectFrom('DirectMessage').select('subject')
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).where('subject', 'is not', null).orderBy('createdAt', 'asc').limit(1).executeTakeFirst();
-      const open = await this.db.selectFrom('DirectMessage').select(['senderGhii', 'recipientGhii', 'createdAt'])
+      const open = await this.db.selectFrom('DirectMessage').select(['senderGhii', 'recipientGhii', 'createdAt', 'kind'])
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).orderBy('createdAt', 'asc').orderBy('id', 'asc').limit(1).executeTakeFirst();
       const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
       results.push({
@@ -293,6 +293,7 @@ export const directMessageMethods = {
         openedBy: open?.senderGhii,
         openedTo: open?.recipientGhii,
         openedAt: open?.createdAt ? iso(open.createdAt) : undefined,
+        ...(open?.kind ? { openedKind: open.kind as ConversationSummary['openedKind'] } : {}),
       });
     }
     results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -330,9 +331,9 @@ export const directMessageMethods = {
       ) t WHERE rn = 1
     `.execute(this.db);
     // The opener: the first row this mailbox holds in the thread.
-    const opens = await sql<{ ownerGhii: string; conversationId: string; senderGhii: string; recipientGhii: string; createdAt: Date | string }>`
-      SELECT "ownerGhii", "conversationId", "senderGhii", "recipientGhii", "createdAt" FROM (
-        SELECT "ownerGhii", "conversationId", "senderGhii", "recipientGhii", "createdAt",
+    const opens = await sql<{ ownerGhii: string; conversationId: string; senderGhii: string; recipientGhii: string; createdAt: Date | string; kind: string | null }>`
+      SELECT "ownerGhii", "conversationId", "senderGhii", "recipientGhii", "createdAt", "kind" FROM (
+        SELECT "ownerGhii", "conversationId", "senderGhii", "recipientGhii", "createdAt", "kind",
                ROW_NUMBER() OVER (PARTITION BY "ownerGhii", "conversationId" ORDER BY "createdAt" ASC, "id" ASC) AS rn
         FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
       ) t WHERE rn = 1
@@ -365,6 +366,7 @@ export const directMessageMethods = {
         openedBy: open?.senderGhii,
         openedTo: open?.recipientGhii,
         openedAt: open?.createdAt ? iso(open.createdAt) : undefined,
+        ...(open?.kind ? { openedKind: open.kind as ConversationSummary['openedKind'] } : {}),
       });
     }
     for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

@@ -154,8 +154,13 @@ export interface DirectMessageRecord {
    *
    * Omitted means an ordinary message. The field is the extension point, not a taxonomy: add a value
    * only when an operator would triage it differently.
+   *
+   * 'help-question' is a question from Ask someone who knows (services/help/): the helper's inbox
+   * shows it as a question card with its own actions (answer, pass, refer), and the list marks the
+   * thread. 'help-status' is the line that closes one (solved, the thanks, the morsels). Both are set
+   * by services/help/ alone; a person writing "can you help" is still an ordinary message.
    */
-  kind?: 'system-fault';
+  kind?: 'system-fault' | 'help-question' | 'help-status';
   /** false = an announcement (recipients cannot reply); omitted/true = a normal message. Travels with the
    *  message (incl. cross-node) so the recipient's node can enforce/hide replies. */
   respondable?: boolean;

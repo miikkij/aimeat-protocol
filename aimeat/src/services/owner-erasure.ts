@@ -76,6 +76,8 @@
  *     it does not act on the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-04 — The service_records step erases the person's service namespace (services/service-records.ts),
  *     and the log names it only when it held records (codebase analysis 2026-11-03, item B6).
+ *   2026-11-14 — The help_questions step: the person's questions, the routes that sent questions to
+ *     them and their participant row (Ask someone who knows).
  *   2026-11-14 — The secret_shares and vault_device_keys steps: the person's secret shares and requests,
  *     their place on others', and their browsers' end-to-end keys.
  *   2026-11-02 — The mcp_user_credentials step erases the person's own sign-ins on shared MCP servers.
@@ -429,6 +431,14 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     await step('secret_shares', async () => {
       const n = await storage.deleteSecretSharesByOwner(ghii);
       return n ? `secret_shares:${n}` : null;
+    }, deletionLog, storage);
+
+    // Ask someone who knows: the questions this person asked and where they were sent, the questions
+    // sent to this person, and their choices (topics, status, what their AI may do). The direct
+    // messages those questions travelled in are erased with the rest of the person's messages.
+    await step('help_questions', async () => {
+      const n = await storage.deleteHelpDataByOwner(ghii);
+      return n ? `help_questions:${n}` : null;
     }, deletionLog, storage);
 
     // The public keys of this person's browsers for end-to-end shares.

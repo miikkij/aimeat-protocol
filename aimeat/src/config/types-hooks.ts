@@ -8,6 +8,7 @@
  * @structure ExtensionHooks · HookName
  * @usage import type { ExtensionHooks, HookName } from '../config-types.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — post_help_question and post_help_solved (Ask someone who knows).
  *   v1.0.0 — 2026-10-09 — Moved from config-types.ts unchanged.
  */
 
@@ -23,6 +24,10 @@ export interface ExtensionHooks {
   post_settlement: string[];
   pre_board_post: string[];
   pre_federation_peer: string[];
+  /** A member's question was sent to a helper (Ask someone who knows). Told after, decides nothing. */
+  post_help_question: string[];
+  /** A question was marked solved (Ask someone who knows). Told after, decides nothing. */
+  post_help_solved: string[];
 }
 
 export type HookName = keyof ExtensionHooks;

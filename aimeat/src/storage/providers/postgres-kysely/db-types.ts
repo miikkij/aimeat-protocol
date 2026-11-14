@@ -476,6 +476,68 @@ export interface EphemeralClaim {
   expiresAt: string;
 }
 
+/** One member's choices in Ask someone who knows (migration 0131). JSON columns are TEXT. */
+export interface HelpParticipant {
+  ownerGhii: string;
+  helper: Generated<boolean>;
+  asker: boolean | null;
+  topics: Generated<string>;
+  audience: Generated<string>;
+  capPerWeek: Generated<number>;
+  status: Generated<string>;
+  statusUntil: string | null;
+  aiMode: Generated<string>;
+  autoTopics: Generated<string>;
+  aiMaySend: Generated<boolean>;
+  agentsMayAsk: Generated<boolean>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One question in Ask someone who knows (migration 0131). JSON columns are TEXT; times are ISO strings. */
+export interface HelpQuestion {
+  id: string;
+  ownerGhii: string;
+  askedBy: string;
+  subject: string;
+  question: string;
+  tried: Generated<string>;
+  topics: Generated<string>;
+  attachments: Generated<string>;
+  audience: string;
+  state: string;
+  answeredBy: string | null;
+  answeredByAi: Generated<boolean>;
+  answer: Generated<string>;
+  thanks: Generated<string>;
+  rewardMorsels: Generated<number>;
+  saved: Generated<boolean>;
+  savedConfirmedAt: string | null;
+  stale: Generated<boolean>;
+  deadline: string;
+  remindedAt: string | null;
+  version: Generated<number>;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+}
+
+/** One helper a question was sent to (migration 0131). `draft` is JSON or NULL. */
+export interface HelpRoute {
+  id: string;
+  questionId: string;
+  helperGhii: string;
+  conversationId: string;
+  routedAt: string;
+  outcome: string;
+  outcomeAt: string | null;
+  referredTo: string | null;
+  draft: string | null;
+  answer: Generated<string>;
+  answeredByAi: Generated<boolean>;
+  keepAllowed: Generated<boolean>;
+}
+
 /** A secret share or request (migration 0130). JSON columns are TEXT; times are ISO strings. */
 export interface SecretShare {
   id: string;
@@ -2587,6 +2649,9 @@ export interface DB {
   GenesisPeer: GenesisPeer;
   Ghii: Ghii;
   GroupShare: GroupShare;
+  HelpParticipant: HelpParticipant;
+  HelpQuestion: HelpQuestion;
+  HelpRoute: HelpRoute;
   Invitation: Invitation;
   JoinRequest: JoinRequest;
   KnowledgeLink: KnowledgeLink;

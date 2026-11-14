@@ -30,6 +30,7 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.8.4 — 2026-11-14 — aimeat_help_report_write joins AI_PROVENANCE_REVIEWED_WITHOUT (the operator's internal report, its writer recorded on it).
  *   v1.8.3 — 2026-11-14 — aimeat_secret_share_create joins AI_PROVENANCE_REVIEWED_WITHOUT (a credential and its note).
  *   v1.8.2 — 2026-11-02 — aimeat_files_write joins AI_PROVENANCE_REVIEWED_WITHOUT (the person's own SharePoint).
  *   v1.8.1 — 2026-10-21 — aimeat_dm_group_create joins AI_PROVENANCE_REQUIRED (group chat).
@@ -375,6 +376,13 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // names the principal, an agent's GAII when an agent made it, and the share's events name every
   // actor. A separate provenance record would be a second, durable row about a credential.
   'aimeat_secret_share_create',
+  // DECIDED, 2026-11-14 (the session that built Ask someone who knows; the developer reviews it with
+  // the build). The free text is the operator's report about what members asked: an internal
+  // document for the operator, never published, and written by an AI by design (the operator's own,
+  // or the node's model). The report record itself names its writer (`written_by`, the principal
+  // that stored it, and the node's own system@<node> for the node's model) and when, which is the provenance it
+  // needs; the page that shows it says an AI wrote it.
+  'aimeat_help_report_write',
   // DECIDED, Phase 8b. A draft is inline-only staging that nobody but its author can see, and its
   // content is stamped at PUBLISH by the one publish path. A record minted at save time would
   // describe bytes that were never shown to anyone and that the next save replaces — and it would

@@ -6,6 +6,8 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.18.0 — 2026-11-14 — The `help` page (views/admin/help-tab.js): Ask someone who knows, its
+ *     settings, report and status.
  *   v1.17.0 — 2026-11-09 — Every admin page starts with PageStart (`pageStart.admin.<id>.*`: what the
  *     page is for, a prompt for the operator's own AI, what follows, and "Explain this page to me"),
  *     and a head paragraph (`admin.pageHead.<id>`) where the page had no sentence of its own
@@ -70,6 +72,7 @@ import SecurityTab     from './admin/security-tab.js';
 import InternetOpeningsTab from './admin/internet-openings-tab.js';
 import ReceiversAdminTab from './admin/receivers-tab.js';
 import ComplianceTab   from './admin/compliance-tab.js';
+import HelpAdminTab    from './admin/help-tab.js';
 import CorsTab         from './admin/cors-tab.js';
 import MaintenanceTab  from './admin/maintenance-tab.js';
 import HooksTab        from './admin/hooks-tab.js';
@@ -130,6 +133,7 @@ const NAV_GROUPS = [
     { id: 'internet-openings', key: 'admin.internetOpenings.title', component: InternetOpeningsTab },
     { id: 'receivers',    key: 'receivers.admin.title', component: ReceiversAdminTab },
     { id: 'compliance',   key: 'admin.compliance.title', component: ComplianceTab },
+    { id: 'help',         key: 'admin.help.title',      component: HelpAdminTab },
     { id: 'cors',         key: 'dashboard.cors',       component: CorsTab },
     { id: 'maintenance',  key: 'dashboard.maintenance',component: MaintenanceTab },
     { id: 'hooks',        key: 'dashboard.hooks',      component: HooksTab },

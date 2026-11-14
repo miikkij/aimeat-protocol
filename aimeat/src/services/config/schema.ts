@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-11-14 — help.* (schema-help.ts): the settings of Ask someone who knows.
  *   2026-11-08 — quota.memory_max_archived_keys_per_agent (AIMEAT_MEMORY_MAX_ARCHIVED_KEYS), mutable,
  *     default 10000, 0 = no limit: archived memory keys get a ceiling of their own (secaudit2026nov08b
  *     round 15b, storage/memory-totals:postgres-archived-rows-count-no-bytes).
@@ -149,6 +150,7 @@ import { VISIBILITY_CONFIG_FIELDS } from './schema-visibility.js';
 import { DOCSIGN_CONFIG_FIELDS } from './schema-docsign.js';
 import { OPERATOR_CONFIG_FIELDS } from './schema-operator.js';
 import { PAGES_CONFIG_FIELDS } from './schema-pages.js';
+import { HELP_CONFIG_FIELDS } from './schema-help.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './schema-morsels.js';
@@ -381,6 +383,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Node (immutable, additional) ──
   { key: 'baseUrl', dotPath: 'node.base_url', envVar: 'AIMEAT_BASE_URL', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Public base URL of this node' },
   ...PAGES_CONFIG_FIELDS,
+  // ── Ask someone who knows (config/help.ts) ──
+  ...HELP_CONFIG_FIELDS,
   { key: 'devMode', dotPath: 'node.dev_mode', envVar: 'AIMEAT_DEV_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Development mode (localhost webhooks, credential reset preserves data)', adminDisplay: 'visible' },
   { key: 'testMode', dotPath: 'node.test_mode', envVar: 'AIMEAT_TEST_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test mode (re-registration wipes account for E2E test isolation)', adminDisplay: 'visible' },
   { key: 'updateCheck', dotPath: 'node.update_check', envVar: 'AIMEAT_UPDATE_CHECK', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Ask npm for a newer AIMEAT (at most every six hours, when an operator opens a page) and show operators a notice in the header when there is one. Off: no request leaves this node and no notice appears' },

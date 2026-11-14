@@ -17,6 +17,8 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-11-14: YourTurn marks a thread a question of Ask someone who knows opened, and links it
+ *     straight to that thread.
  *   2026-11-10: YourTurn takes `total` and `anyTime` from a server-filtered read (the waiting threads
  *     of the window and how many wait at any time); without them it filters as before.
  *   2026-10-25: YourTurn shows the threads of the window the person chose (1 to 90 days or any time,
@@ -144,7 +146,8 @@ export function YourTurn({ threads, total, anyTime, max, days, onDays }) {
       <//>
       ${rows.length > 0
         ? html`<${LineList}
-            rows=${rows.map((r) => ({ id: r.id, name: r.who, text: r.said, href: '/v1/profile?tab=messages' }))}
+            rows=${rows.map((r) => ({ id: r.id, name: r.who, text: r.said, href: r.question ? `/v1/profile#inbox/${r.id}` : '/v1/profile?tab=messages',
+              ...(r.question ? { mark: tr('home.turn.question', 'Question') } : {}) }))}
             more=${hidden > 0 ? bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden) : null} />`
         : html`<${QuietNote}>${tr('home.turn.noneFresh', 'Nobody is waiting for your answer in this time.')}<//>`}
     <//>`;

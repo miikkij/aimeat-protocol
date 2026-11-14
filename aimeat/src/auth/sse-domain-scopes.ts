@@ -22,6 +22,7 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.16.0 — 2026-11-14 — `help` → help:answer (Ask someone who knows).
  *   v1.15.0 — 2026-11-14 — `secret-shares` → secrets:share.
  *   v1.14.0 — 2026-11-09 — An extension's own domain (`ext:<installer>/<name>`, sent by its ctx.changed())
  *     passes for a principal holding ext:invoke, the word a page needs to call the extension at all.
@@ -157,6 +158,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // Secret shares made by, waiting for, or asked of this account (services/secret-shares/). The same
   // fence as the vault: only a principal the owner ticked for shares hears that one changed.
   'secret-shares': 'secrets:share',
+  // Ask someone who knows (services/help/): a question asked of this account, or one it asked,
+  // changed. A principal that may answer for the owner hears it; the owner in person always does.
+  help: 'help:answer',
 
   // Remote MCP servers. Gated on the READ word rather than the manage word, because the event says
   // "the set of attached servers changed" and that is what a reader of the list needs to hear —

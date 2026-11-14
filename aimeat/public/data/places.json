@@ -92,6 +92,12 @@
           { "id": "ct-agents", "num": "03", "labelKey": "contacts.cover.secAgents" },
           { "id": "ct-add", "num": "04", "labelKey": "contacts.cover.add" }
         ] },
+        { "id": "help", "labelKey": "profile.tabs.help", "sections": [
+          { "id": "hp-asked", "num": "01", "labelKey": "help.page.secAsked" },
+          { "id": "hp-mine", "num": "02", "labelKey": "help.page.secMine" },
+          { "id": "hp-board", "num": "03", "labelKey": "help.page.secBoard" },
+          { "id": "hp-me", "num": "04", "labelKey": "help.page.secMe" }
+        ] },
         { "id": "notifications", "labelKey": "profile.tabs.notifications", "sections": [
           { "id": "nt-inbox", "num": "01", "labelKey": "notifpage.secInbox" },
           { "id": "nt-senders", "num": "02", "labelKey": "notifpage.secSenders" },
@@ -258,6 +264,7 @@
         { "id": "internet-openings", "labelKey": "admin.internetOpenings.title" },
         { "id": "receivers", "labelKey": "receivers.admin.title" },
         { "id": "compliance", "labelKey": "admin.compliance.title" },
+        { "id": "help", "labelKey": "admin.help.title" },
         { "id": "cors", "labelKey": "dashboard.cors" },
         { "id": "maintenance", "labelKey": "dashboard.maintenance" },
         { "id": "hooks", "labelKey": "dashboard.hooks" },

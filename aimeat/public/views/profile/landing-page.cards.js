@@ -656,6 +656,9 @@ export const SIDEBAR_GROUPS = [
   ] },
   { titleKey: 'profile.landing.menuActivity', items: [      // communication + events
     { id: 'contacts', labelKey: 'contacts.tabLabel' },
+    /* Ask someone who knows: questions between members of this node (design canvas "Apu-sivu",
+     * 2026-11-14). */
+    { id: 'help', labelKey: 'profile.tabs.help' },
     { id: 'notifications', labelKey: 'profile.tabs.notifications' },
     { id: 'email', labelKey: 'profile.tabs.email' },
     { id: 'chatsessions', labelKey: 'profile.tabs.chatSessions' },

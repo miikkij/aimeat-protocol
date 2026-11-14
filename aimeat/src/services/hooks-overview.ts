@@ -82,6 +82,8 @@ export const HOOK_GUARDS: Record<HookName, 'accounts' | 'work' | 'social'> = {
   post_settlement: 'work',
   pre_board_post: 'social',
   pre_federation_peer: 'social',
+  post_help_question: 'social',
+  post_help_solved: 'social',
 };
 
 /** One thing bound to a moment, and whether it can actually do anything. */
@@ -247,7 +249,7 @@ export async function setHookActions(
   actions: unknown,
 ): Promise<SetHookOutcome> {
   if (!HOOK_NAMES.includes(hookName as HookName)) {
-    return { ok: false, code: 'INVALID_INPUT', message: `Unknown hook "${hookName}". The eleven are: ${HOOK_NAMES.join(', ')}` };
+    return { ok: false, code: 'INVALID_INPUT', message: `Unknown hook "${hookName}". The moments are: ${HOOK_NAMES.join(', ')}` };
   }
   if (!Array.isArray(actions) || !actions.every((a: unknown) => typeof a === 'string' && a.trim())) {
     return { ok: false, code: 'INVALID_INPUT', message: 'actions must be an array of action reference strings' };

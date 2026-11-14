@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-14 -- definitions/help.ts: aimeat_help_find, _ask, _inbox, _respond, _close,
+ *     _profile_set, _report_data and _report_write (Ask someone who knows).
  *   v1.x -- 2026-11-14 -- definitions/secret-shares.ts: aimeat_secret_share_create, _list, _get,
  *     _deposit, _pickup and _revoke.
  *   v1.x -- 2026-11-12 -- definitions/organism-join-requests.ts: aimeat_access_request,
@@ -127,6 +129,7 @@ import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
 import { secretShareTools } from './definitions/secret-shares.js';
+import { helpTools } from './definitions/help.js';
 import { dataProductTools } from './definitions/dataproduct.js';
 import { partyTools } from './definitions/party.js';
 import { receiverTools } from './definitions/receivers.js';
@@ -187,6 +190,7 @@ const CATALOG = [
     ...accountRightsTools,
     ...secretAddressTools,
     ...secretShareTools,
+    ...helpTools,
     ...dataProductTools,
     ...partyTools,
     ...receiverTools,

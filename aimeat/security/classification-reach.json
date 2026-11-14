@@ -1287,6 +1287,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
     },
+    "src/services/help/report.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listAllMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-11-14 (Ask someone who knows), the node's own read: the reports and the unmatched-topic counts under system@<node> (help.report.*, help.unmatched.*), which the node itself wrote; no person's content is read here."
+    },
     "src/services/component-content.ts": {
       "reads": {
         "getMemory": 3

@@ -9,6 +9,7 @@
  *   SkillAccessor · SkillAccessError
  * @usage import { type SkillSummary, SkillAccessError } from './skills.js';   // through the re-export
  * @version-history
+ *   v1.3.0 — 2026-11-14 — skillFeatureOff(): a skill names the switch of the feature it teaches; FEATURE_OFF.
  *   v1.2.0 — 2026-10-26 — A file index entry may say `encoding: "base64"` (skill-files.ts);
  *     SkillSummary.standardIssues on a publish that breaks a rule of the Agent Skills standard; the
  *     FILE_NOT_FOUND access code for a `path` the skill does not hold.
@@ -138,8 +139,20 @@ export interface SkillAccessor {
   caller?: CallerContext;
 }
 
+/**
+ * A built-in skill that teaches a feature the operator can switch off names the switch in its
+ * frontmatter (`metadata.requires_config: helpEnabled`). True when that switch is off on this node:
+ * the handbook leaves the skill out and a read of it is refused with FEATURE_OFF, so an AI is not
+ * taught a feature that answers every call with a refusal.
+ */
+export function skillFeatureOff(config: object, metadata: Record<string, unknown> | undefined): boolean {
+  const key = metadata?.requires_config;
+  if (typeof key !== 'string' || !key) return false;
+  return (config as Record<string, unknown>)[key] === false;
+}
+
 export class SkillAccessError extends Error {
-  constructor(public readonly code: 'NOT_FOUND' | 'FILE_NOT_FOUND' | 'FORBIDDEN' | 'BAD_REF' | 'BAD_VISIBILITY' | 'NOT_ORGANISM_MEMBER', message: string) {
+  constructor(public readonly code: 'NOT_FOUND' | 'FILE_NOT_FOUND' | 'FORBIDDEN' | 'BAD_REF' | 'BAD_VISIBILITY' | 'NOT_ORGANISM_MEMBER' | 'FEATURE_OFF', message: string) {
     super(message);
     this.name = 'SkillAccessError';
   }

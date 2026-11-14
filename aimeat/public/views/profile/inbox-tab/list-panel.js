@@ -13,6 +13,8 @@
  * @structure ListPanel · rowIds · isUnread
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.14.0 — 2026-11-14 — A thread a question of Ask someone who knows opened carries the Question
+ *     chip (openedKind help-question).
  *   v1.13.0 — 2026-11-10 — "Unread" is the top section: a row with a message the owner has not opened
  *     leaves its own section for it and goes back once opened (Jouni: "sinulla on huomaamatta vielä
  *     tämä").
@@ -130,6 +132,8 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
       mark=${nested ? { word } : { picture: labelPeer ? foldedWho(c) : whoOf(c), avatar: avatarFor(labelPeer ? foldedWho(c) : whoOf(c)) }}
       date=${c.updatedAt ? stampShort(c.updatedAt) : ''} dateTitle=${c.updatedAt ? stampFull(c.updatedAt) : ''}
       chips=${[
+        // A thread a question of Ask someone who knows opened (services/help/).
+        c.openedKind === 'help-question' ? t('inbox.questionChip') : null,
         !nested && via ? `${t('inbox.viaAgent')} ${via}` : null,
         c.broadcastCount ? t('inbox.broadcastRecipients', { count: String(c.broadcastCount) }) : null,
         c.fold ? t('inbox.org.foldCount', { count: String(c.fold.count) }) : null,

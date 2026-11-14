@@ -24,6 +24,7 @@
  * @usage
  *   import type { SurfaceBlockDef } from './registry-types.js';
  * @version-history
+ *   v1.3.0 — 2026-11-14 — helpEnabled joins the boolean keys a block may gate on (Ask someone who knows).
  *   v1.2.0 — 2026-09-29 — signageEnabled joins the boolean keys a block may gate on.
  *   v1.1.0 — 2026-08-28 — storeEnabled joins the boolean keys a block may gate on.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -75,7 +76,8 @@ export type BooleanConfigKey =
     | 'portfolioEnabled'
     | 'siteEnabled'
     | 'storeEnabled'
-    | 'signageEnabled';
+    | 'signageEnabled'
+    | 'helpEnabled';
 
 /** Named predicates a block may gate on, resolved in registry.ts against the real function. */
 export type CapabilityName = 'chat';

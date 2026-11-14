@@ -16,6 +16,7 @@
  * @structure BLOCKS · blockFor
  * @usage const load = BLOCKS['home.feed']; const Component = await load();
  * @version-history
+ *   v1.5.0 — 2026-11-14 — home.ask (Who knows?, Ask someone who knows).
  *   v1.4.0 — 2026-09-15 — home.own-aimeat.
  *   v1.3.0 — 2026-09-14 — The seven blocks of the message frame's front page (TARGET-075).
  *   v1.2.0 — 2026-08-28 — The six showroom blocks of the front page.
@@ -37,6 +38,7 @@ export const BLOCKS = {
   'home.mat': () => import('/views/surface/blocks-home.js').then(m => m.MatBlock),
   'home.mailbox': () => import('/views/surface/blocks-home.js').then(m => m.MailboxBlock),
   'home.your-turn': () => import('/views/surface/blocks-home.js').then(m => m.YourTurnBlock),
+  'home.ask': () => import('/views/surface/blocks-home.js').then(m => m.AskBlock),
   'home.chat-door': () => import('/views/surface/blocks-home.js').then(m => m.ChatDoorBlock),
   'home.fleet': () => import('/views/surface/blocks-home.js').then(m => m.FleetBlock),
   'home.agents': () => import('/views/surface/blocks-home.js').then(m => m.AgentsBlock),

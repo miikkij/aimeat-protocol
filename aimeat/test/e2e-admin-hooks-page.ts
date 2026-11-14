@@ -1,7 +1,7 @@
 /**
  * @file e2e-admin-hooks-page.ts
  * @description E2E for the Hooks page's one read and the binding behind it. The read says which of
- *   the eleven moments decide rather than notify, what is bound to each and whether that action is
+ *   the thirteen moments decide rather than notify, what is bound to each and whether that action is
  *   still published and still carries an address, what could be bound, and every call made. The
  *   write binds a moment, refuses a reference nothing is published under, and clears one. Every
  *   door refuses a stranger and a non-operator.
@@ -10,6 +10,7 @@
  *   ones where the binding looks right: an action with no address is bound and does nothing, and a
  *   reference nothing is published under is refused until the action is published.
  * @version-history
+ *   2026-11-14 -- Thirteen moments: post_help_question and post_help_solved (Ask someone who knows).
  *   v1.3.1 -- 2026-10-12 -- The hook actions are published with pricing.toll_morsels: node 4.0.0
  *            refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), so no action was published and the
  *            binding tests failed with it. toll_morsels 0 means the same free action on 3.x.
@@ -100,14 +101,14 @@ await test('The three doors refuse a stranger (401) and a non-operator (403)', a
 
 await test('The read says which moments decide, and carries the whole page', async () => {
     const d = await hooks(opToken);
-    assert(Array.isArray(d.hooks) && d.hooks.length === 11, `eleven moments, got ${d.hooks?.length}`);
+    assert(Array.isArray(d.hooks) && d.hooks.length === 13, `thirteen moments, got ${d.hooks?.length}`);
     const gates = d.hooks.filter((h: any) => h.kind === 'gate').map((h: any) => h.name);
     assert(JSON.stringify(gates) === JSON.stringify([
         'pre_owner_registration', 'pre_agent_registration', 'pre_work_request', 'pre_board_post', 'pre_federation_peer',
     ]), `the five gates are the pre_ ones, got ${JSON.stringify(gates)}`);
     assert(d.hooks.every((h: any) => (h.kind === 'gate') === h.name.startsWith('pre_')), 'kind follows the name, every row');
     assert(d.hooks.every((h: any) => ['accounts', 'work', 'social'].includes(h.guards)), 'every moment belongs to a group');
-    assert(d.summary.total === 11 && d.summary.gates === 5, `the summary counts them, got ${JSON.stringify(d.summary)}`);
+    assert(d.summary.total === 13 && d.summary.gates === 5, `the summary counts them, got ${JSON.stringify(d.summary)}`);
     assert(d.summary.timeout_ms === 10000, `the page says how long an address gets, got ${d.summary.timeout_ms}`);
     assert(typeof d.extension_hooks === 'object' && 'pre_board_post' in d.extension_hooks, 'the old shape is still there');
     assert(Array.isArray(d.runs) && d.runs.length === 0, `nothing has run on a fresh node, got ${d.runs?.length}`);

@@ -18,6 +18,7 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-11-14 — help:ask and help:answer, outside every wildcard: asking and answering other members.
  *   2026-11-14 — secrets:share, outside every wildcard: making, filling and picking up secret shares.
  *   2026-11-14 — consent:read-as-owner, outside every wildcard: seeing the account's consents, the
  *     owner's and the other agents', as the owner does.
@@ -164,6 +165,11 @@ export const NOT_IN_WILDCARD = [
   // Secret shares: making, filling and picking up shares in the owner's name. Unlike the vault, a
   // share hands content out, and a key someone gave the owner is not for an agent to take by default.
   'secrets:share',
+  // ── Added 2026-11-14 ─────────────────────────────────────────────────────────────────────────
+  // Ask someone who knows: asking another member, or answering one, in the owner's name. Both speak
+  // to other people for the owner, as send-as-owner does, so each costs its own tick.
+  'help:ask',
+  'help:answer',
   // ── Added 2026-09-07 ─────────────────────────────────────────────────────────────────────────
   // Removing a message from the owner's own mailbox, as the owner. A separate word from
   // send-as-owner and not a widening of it: replying for someone is additive and they can read what
@@ -355,6 +361,10 @@ export const SCOPE_DOMAINS = [
   //   share whose maker allowed agents (services/secret-shares/). Outside every wildcard: a share hands
   //   content out, so "Full access" must not mean an agent may take a key someone gave its owner.
   { key: 'secrets',  permissions: ['manage', 'share'] },
+  // help:ask — ask another member of this node a question in the owner's name (Ask someone who knows).
+  // help:answer — answer a question sent to the owner, write a draft, pass or refer one. Both outside
+  //   every wildcard (NOT_IN_WILDCARD above); the owner's own choices on the page still apply on top.
+  { key: 'help',     permissions: ['ask', 'answer'] },
   // publish:public — make something public without a request to the owner (plan doc-mvcn6c7e4e5q,
   //   V4.1). Outside every wildcard (NOT_IN_WILDCARD above).
   { key: 'publish',  permissions: ['public'] },

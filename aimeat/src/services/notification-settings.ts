@@ -17,6 +17,7 @@
  * @usage const s = await readNotificationSettings(storage, ghii); const p = prefsFor(s, source, type);
  *   await updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }));
  * @version-history
+ *   v1.6.0 — 2026-11-14 — `help_*` notifications (Ask someone who knows) are in the messages group.
  *   v1.5.0 — 2026-11-08 — Sender kind `ecosystem`: an outside app's notification is its own sender,
  *     keyed by its GEAI, so the owner can tell it apart and mute it (secaudit2026nov08 round 14,
  *     notification-create:ecosystem-sender-labelled-as-owner).
@@ -206,7 +207,8 @@ export function updateNotificationSettings(
 export function groupOfType(type: string): NotifGroup {
   const t = (type || '').toLowerCase();
   if (t.startsWith('workflow')) return 'workflows';
-  if (t.startsWith('direct_message') || t.startsWith('message') || t.startsWith('mailbox') || t.startsWith('conversation')) return 'messages';
+  // Ask someone who knows: a question, a draft, a thanks and its deadlines travel with the messages they live in.
+  if (t.startsWith('direct_message') || t.startsWith('message') || t.startsWith('mailbox') || t.startsWith('conversation') || t.startsWith('help_')) return 'messages';
   if (t.startsWith('workspace') || t.startsWith('organism') || t.startsWith('invitation') || t.startsWith('membership') || t.startsWith('member_') || t.startsWith('join')) return 'organisms';
   if (t.startsWith('app_') || t === 'app' || t.startsWith('exchange') || t.startsWith('contract')) return 'apps';
   if (t.startsWith('budget') || t.startsWith('quota') || t.startsWith('ledger') || t.startsWith('compliance') || t.startsWith('disclosure') || t.startsWith('security') || t.startsWith('account') || t.startsWith('tracked')) return 'account';

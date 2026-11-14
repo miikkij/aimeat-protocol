@@ -5,6 +5,7 @@
  *   path is walked. The profile comes first, and the interview's answers reach the handbook.
  * @usage cd aimeat && pnpm exec vitest run test/unit/journey-state.test.ts
  * @version-history
+ *   2026-11-14 — Sharing with someone is the fourth stage: next after the connection is share.
  *   v1.4.0 — 2026-11-01 — The place's own chat agent does not count as a connected AI (isOutsideMcpAgent).
  *   v1.3.0 — 2026-10-31 — "Agents at work" needs an agent that has done work (workersRun, v31 K27).
  *   v1.2.0 — 2026-10-31 — The basic agents do not count as the person's workers (isOwnWorker).
@@ -34,7 +35,7 @@ describe('the journey', () => {
         const card = { ...nothing, firstResult: true };
         expect(deriveJourney(card, {}).next).toBe('ai');
         expect(deriveJourney(card, { road: 'free' }).next).toBe('connect');
-        expect(deriveJourney({ ...card, connected: true }, {}).next).toBe('organise');
+        expect(deriveJourney({ ...card, connected: true }, {}).next).toBe('share');
     });
 
     it('a connected AI without a card is still offered the profile first', () => {
@@ -49,13 +50,13 @@ describe('the journey', () => {
 
     it('on the prompt road the connection is not the next step', () => {
         const j = deriveJourney({ ...nothing, firstResult: true }, { road: 'prompt' });
-        expect(j.next).toBe('organise');
+        expect(j.next).toBe('share');
         expect(j.stages.find(s => s.id === 'connect')!.declined).toBe(true);
     });
 
     it('a declined stage is skipped by next, and a done stage is never shown as declined', () => {
         const signals = { ...nothing, connected: true, firstResult: true, apps: 1 };
-        const j = deriveJourney(signals, { declined: [{ stage: 'organise', at: '2026-10-01' }, { stage: 'apps', at: '2026-10-01' }] });
+        const j = deriveJourney(signals, { declined: [{ stage: 'share', at: '2026-10-01' }, { stage: 'organise', at: '2026-10-01' }, { stage: 'apps', at: '2026-10-01' }] });
         expect(j.next).toBe('agents');
         expect(j.stages.find(s => s.id === 'organise')!.declined).toBe(true);
         expect(j.stages.find(s => s.id === 'apps')).toMatchObject({ done: true, declined: false });

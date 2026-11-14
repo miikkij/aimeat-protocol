@@ -28,6 +28,8 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   2026-11-14 — home.ask ("Who knows?", Ask someone who knows; shown when help.enabled is on), and
+ *     home.your-turn's helpFirst: questions first among the waiting threads.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.4.0 — 2026-10-10 — home.agents: a new agent from one sentence, the proposals that wait, the
  *     agents at work and their machines.
@@ -103,9 +105,46 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
                 max: 20,
                 description: 'How many waiting threads to name before the rest are counted.',
             },
+            helpFirst: {
+                type: 'boolean',
+                default: true,
+                description: 'Questions from Ask someone who knows come first among the waiting threads.',
+            },
         },
         maxPerSurface: 1,
         summary: 'Which conversations are waiting on an answer from them.',
+    },
+    {
+        // Ask someone who knows (services/help/): only where the operator has it on.
+        id: 'home.ask',
+        surfaces: ['home', 'home-onboarding'],
+        presence: { kind: 'config', configKey: 'helpEnabled' },
+        localeStem: 'home.ask',
+        liveDomains: ['help'],
+        props: {
+            placeholder: {
+                type: 'string',
+                maxLength: 200,
+                description: 'The example in the question field, in the members\' language. Empty uses the built-in one.',
+            },
+            showMine: {
+                type: 'boolean',
+                default: true,
+                description: 'Show where the member\'s own questions stand, and how many wait for their answer.',
+            },
+            showHelper: {
+                type: 'boolean',
+                default: true,
+                description: 'Show the member\'s helper topics and weekly limit, or that they do not take questions.',
+            },
+            copyPrompt: {
+                type: 'boolean',
+                default: true,
+                description: 'Offer a prompt to copy, for an AI that is not connected to this node.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'Who knows? A field where a member asks a question; the node shows a kept answer and who could answer before anything is sent. Shown when Ask someone who knows is on.',
     },
     {
         id: 'home.chat-door',
