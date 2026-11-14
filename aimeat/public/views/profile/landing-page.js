@@ -17,7 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
- *   v3.25.0 — 2026-11-14 — The overview has a contents rail beside it, as every Settings page does:
+ *   v3.26.0 — 2026-11-15 — A plain link inside the profile opens its tab: the shell's aimeat-navigated is read as Back is. A team page's rows changed the address and nothing else.
+ *   v3.25.0 —2026-11-14 — The overview has a contents rail beside it, as every Settings page does:
  *     its panels as numbered links (Agents with its count), then Home and, for an operator, Admin
  *     (components/ContentsRail.js; Jouni's design review, 2026-11-14).
  *   v3.24.0 — 2026-11-09 — The app strip asks for the owner's own apps (listApps({ own: true })) instead
@@ -449,8 +450,16 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
         fromPopRef.current = false;
       }
     };
+    // A plain link inside the profile (<a href="/v1/profile?tab=agents">, a LineList row) is routed by
+    // the SPA shell, which pushes the address and dispatches aimeat-navigated while this view stays
+    // mounted. Read the tab from it as Back does; a link to another page leaves this view alone.
+    const onNavigated = () => { if (window.location.pathname === '/v1/profile') onPop(); };
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    window.addEventListener('aimeat-navigated', onNavigated);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.removeEventListener('aimeat-navigated', onNavigated);
+    };
   }, [isOperator]);
 
   /* On first mount, reflect a sessionStorage/?tab=-restored tab in the URL via

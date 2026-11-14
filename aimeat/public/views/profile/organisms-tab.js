@@ -19,7 +19,8 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
- *   v2.40.0 -- 2026-11-14 -- The team map above My Organisms, for someone in two teams or more (organisms/team-map.js, team setup T21).
+ *   v2.41.0 -- 2026-11-15 -- ?org=&ws= is read again when a link inside the profile changes the address (aimeat-navigated), so a team page's rows open their workspace.
+ *   v2.40.0 -- 2026-11-14 --The team map above My Organisms, for someone in two teams or more (organisms/team-map.js, team setup T21).
  *   v2.39.1 -- 2026-11-14 -- A team's row and the joined banner name the team in the reader's language (orgName, team setup T24).
  *   v2.39.0 -- 2026-11-14 -- The joined banner asks which AI the newcomer uses and opens the connect page on that AI's instruction (rememberTool), so the step after joining is one press (team setup T3).
  *   v2.38.0 -- 2026-11-08 -- The create form's shape, join policy and visibility drop-downs each have their question mark beside them: organism.shape, organism.joinPolicy, organism.visibility (components/HelpTip.js); the notes under them stay, because they follow the current choice.
@@ -337,17 +338,30 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   }, []);
 
   // Deep link from another view (e.g. the Secretary's "Open" links open in a new tab):
-  // ?org=…&ws=… opens that organism (+ workspace) on a cold navigation. Runs once on mount.
+  // ?org=…&ws=… opens that organism (+ workspace) on a cold navigation, and again when a link inside
+  // the profile (a team page's rows) changes the address while this tab stays mounted.
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const org = params.get('org');
-      if (org) { setOpenId(org); setOpenWs(params.get('ws') || null); setOpenSpace(null); setOpenSettings(false); }
-      // ?joined=1 arrives from the invitation-accept redirect: the person just became a member
-      // of THIS organism. The welcome banner says whose team they joined and points at the chat
-      // connection, because that is their actual next step (UX-remake v3, P8).
-      if (org && params.get('joined') === '1') setJustJoinedOrg(org);
-    } catch (err) { swallowed('organisms-tab: onOpen', err); }
+    const follow = (first) => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (!first && params.get('tab') !== 'organisms') return;
+        const org = params.get('org');
+        if (org) { setOpenId(org); setOpenWs(params.get('ws') || null); setOpenSpace(null); setOpenSettings(false); }
+        // ?joined=1 arrives from the invitation-accept redirect: the person just became a member
+        // of THIS organism. The welcome banner says whose team they joined and points at the chat
+        // connection, because that is their actual next step (UX-remake v3, P8).
+        if (first && org && params.get('joined') === '1') setJustJoinedOrg(org);
+      } catch (err) { swallowed('organisms-tab: onOpen', err); }
+    };
+    follow(true);
+    const onNavigated = () => follow(false);
+    // Back from such a link returns to the address before it, so the workspace it opened closes.
+    window.addEventListener('aimeat-navigated', onNavigated);
+    window.addEventListener('popstate', onNavigated);
+    return () => {
+      window.removeEventListener('aimeat-navigated', onNavigated);
+      window.removeEventListener('popstate', onNavigated);
+    };
   }, []);
 
   // Cross-organism content search (debounced) — librarian FTS across all my own content.
