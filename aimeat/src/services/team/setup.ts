@@ -257,7 +257,7 @@ async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOut
     };
     const descriptions = t.description ? { ...t.descriptions, [t.language]: t.description } : t.descriptions;
     const team: TeamRecord = {
-        type: TEAM_RECORD_TYPE, names: t.names, language: t.language, kind: t.kind, workspaces: ws, workspaceNames, descriptions, skill,
+        type: TEAM_RECORD_TYPE, names: t.names, language: t.language, kind: t.kind, workspaces: ws, workspaceNames, descriptionByLang: descriptions, skill,
         leadsPending: [], createdBy: caller.owner, createdAt: now, updatedAt: now,
     };
     if (!(await writeTeamRecord(storage, config, orgId, team, null, caller.owner))) {
@@ -317,7 +317,7 @@ export async function planOrApplyTeams(deps: Deps, caller: Caller, teams: TeamIn
             read = { team: made.team, version: made.version, ownerGaii: made.ownerGaii };
             org = await storage.getOrganism(made.orgId);
         } else if (read && (Object.keys(t.names).length || Object.keys(t.descriptions).length)) {
-            const team = { ...read.team, names: out.names, descriptions: { ...(read.team.descriptions ?? {}), ...t.descriptions } };
+            const team = { ...read.team, names: out.names, descriptionByLang: { ...(read.team.descriptionByLang ?? {}), ...t.descriptions } };
             if (await writeTeamRecord(storage, config, org.id, team, read, read.team.createdBy)) read = await readTeamRecordWithVersion(storage, org.id);
         }
         if (!org || !read) continue;

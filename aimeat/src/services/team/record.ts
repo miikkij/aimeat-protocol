@@ -19,7 +19,7 @@
  *   const name = team ? teamDisplayName(team, 'en', organism.name) : organism.name;
  * @version-history
  *   v1.1.0 — 2026-11-14 — The record keeps each workspace's name and the description in every
- *     language (workspaceNames, descriptions); teamNamesFor serves them, so a page shows the whole
+ *     language (workspaceNames, descriptionByLang); teamNamesFor serves them, so a page shows the whole
  *     team in its reader's language. A team made before has its workspace names from the kit.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
@@ -41,7 +41,7 @@ export interface TeamRecord {
     /** Each workspace's name in every language, by workspace id (data/team-kit.ts). */
     workspaceNames?: Record<string, Partial<Record<TeamLang, string>>>;
     /** The team's description in every language the AI wrote it in; the working language's is the organism's own. */
-    descriptions?: Partial<Record<TeamLang, string>>;
+    descriptionByLang?: Partial<Record<TeamLang, string>>;
     skill: { name: string; ref: string } | null;
     leadsPending: PendingLead[];
     createdBy: string;
@@ -137,7 +137,7 @@ export async function teamNamesFor(storage: Storage, organisms: readonly { id: s
     for (const o of organisms) {
         if (!TEAM_ORGANISM_TYPES.has(String(o.type ?? ''))) continue;
         const team = await readTeamRecord(storage, o.id);
-        if (team) out.set(o.id, { names: team.names, language: team.language, workspaces: teamWorkspaceNames(team), descriptions: team.descriptions ?? {} });
+        if (team) out.set(o.id, { names: team.names, language: team.language, workspaces: teamWorkspaceNames(team), descriptions: team.descriptionByLang ?? {} });
     }
     return out;
 }

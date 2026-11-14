@@ -107,6 +107,9 @@ await test('t03 the same call for real makes the team, its three workspaces, con
     assert(newLeadAcceptUrl.includes('/v1/invite?token='), 'an emailed invitation answers its address to the inviter');
     const ws = await json(`/v1/organisms/${salesId}/workspace?ws=${t.workspaces[0]}`, { headers: auth(lead.token) });
     assert(ws.status === 200 && ws.body.data.manifest?.name === 'Yhteinen tieto', `shared workspace: ${ws.status} ${ws.body.data?.manifest?.name}`);
+    // The spaces and fields carry their labels in every language, which the page reads per reader.
+    const i18n = ws.body.data.manifest?.i18n;
+    assert(i18n?.en?.['type.item'] === 'Open matters' && i18n?.fi?.['type.item'] === 'Avoimet asiat' && i18n?.es?.['shared.items.title'] === 'Título', `manifest i18n: ${JSON.stringify(i18n?.en ?? null).slice(0, 200)}`);
     const st = await json(`/v1/teams/status?organism_id=${salesId}`, { headers: auth(lead.token) });
     const team = st.body.data.teams[0];
     assert(team.context?.core.includes('Tarjoukset julkisen sektorin asiakkaille.'), 'the context starts from the description');

@@ -18,10 +18,14 @@
  * @structure ORGANISM_SHAPES · shapeById · shapeWorkspaceInput(shape, index, lang) · publicShapes(lang)
  * @usage const input = shapeWorkspaceInput(shapeById('team')!, 0, 'fi');
  * @version-history
+ *   2026-11-14 — A shaped workspace's manifest carries `i18n`: its spaces' and fields' labels in en, fi
+ *     and es (data/shape-labels.ts), so every reader sees them in their own language, not as raw names.
  *   2026-11-14 — ShapeId names 'team-kit', the team setup's shape (data/team-kit.ts), which the
  *     starting-shape list does not carry.
  *   v1.0.0 — 2026-10-01 — Initial. The project shape moved here from organisms.workspace-gen.js.
  */
+
+import { manifestI18n } from './shape-labels.js';
 
 export type ShapeLang = 'en' | 'fi' | 'es';
 type L = Record<ShapeLang, string>;
@@ -198,6 +202,8 @@ export function shapeWorkspaceInput(shape: OrganismShape, index: number, lang: s
     const purpose = pick(ws.purpose, lang);
     const manifest = {
         manifestVersion: '1.0', id: '', name, kind: shape.id, language: lang, summary: purpose, status: 'active',
+        // The space and field labels in every language, which the workspace page reads for its reader.
+        i18n: manifestI18n(ws.spaces),
         ...(shape.manifestExtra ?? {}),
         objectTypes: ws.spaces.map(s => ({
             name: s.name, schemaRef: `schema:${shape.id}/${s.name}@1`, namespace: s.namespace, mode: s.mode,
