@@ -5696,11 +5696,18 @@ components:
 
     TaskEvent:
       type: object
-      required: [type, timestamp]
+      description: One entry in a task's history, as the node stores it (AgentTaskEventRecord).
+      required: [id, taskId, type, message, timestamp]
       properties:
+        id:
+          type: string
+          format: uuid
+        taskId:
+          type: string
         type:
           type: string
-          enum: [created, started, progress, log, completed, failed, declined, stalled]
+          enum: [started, progress, todo_completed, todo_failed, memory_write, extension_install, app_publish, verification, completed, failed, message, revision_requested, rating, scope_denied, declined]
+          description: rating, scope_denied and declined are written by the node; an agent's POST …/event takes the other twelve.
         message:
           type: string
         details:
@@ -67161,7 +67168,7 @@ paths:
                   type: object
                   description: Free-form event details. A `telemetry` object (ai_calls, tokens_in, tokens_out, duration_seconds) is added to the task's totals.
       responses:
-        '200':
+        '201':
           description: Event added
           content:
             application/json:
@@ -67171,7 +67178,11 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/AgentTask'
+                        type: object
+                        required: [event]
+                        properties:
+                          event:
+                            $ref: '#/components/schemas/TaskEvent'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
