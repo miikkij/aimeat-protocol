@@ -2262,6 +2262,12 @@
       },
       "why": "Reviewed 2026-11-02 (WP11), passes the reader at the point of use: the cached node-wide scan of knowledge package manifests shared with members or an organism; sharedKnowledgeFor admits each by knowledgeAudienceAllows and then runs presentMemories with the caller's classification reader before the library answers, as GET /v1/knowledge/:id does."
     },
+    "src/services/knowledge/package-links.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Written 2026-11-14 (structure programme 2026-11, unit 2b, B15), passes the reader at the point of use: packageLinksFor reads the copies of one package manifest key by that key, chooses the one the caller may read (its own account, a public copy, or an audience that admits it) and returns it only through presentMemory with the caller's classification reader, as GET /v1/knowledge/:id/links and aimeat_knowledge_links answer it."
+    },
     "src/services/ledger-billing.ts": {
       "reads": {
         "getMemory": 1

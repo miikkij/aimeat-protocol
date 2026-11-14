@@ -17,9 +17,17 @@
  *   caller that audience admits. Then what the classification reader shows. The outgoing rows are
  *   those of the namespace that holds the manifest found, never another account's at the same key
  *   (secaudit 2026-10, v78).
+ *
+ *   ONE READ. Every copy of the package's manifest key on this node is read once, by that key
+ *   (getMemoryByKeysAnyOwner), so the cost is the number of copies of this one key and never the
+ *   number of accounts or agents. The copy chosen leaves this file only through presentMemory with the
+ *   caller's classification reader.
  * @structure PackageLinks · packageLinksFor(storage, config, reader, packageId, opts)
  * @usage const out = await packageLinksFor(storage, config, { caller, auth: req.auth }, id, { direction: 'both' });
  * @version-history
+ *   v1.1.0 — 2026-11-14 — One keyed read of the manifest's copies replaces the whole-table owner and
+ *     agent lists and the three listMemoryForOwners reads (repairs a153b56dc; check:unbounded-lists,
+ *     check:classification-reach). The rule and its answers are unchanged.
  *   v1.0.0 — 2026-11-14 — Initial (structure programme 2026-11, unit 2b part 2, B15).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -31,16 +39,15 @@ import { isNodeAccount, type AudienceAuth } from '../audience.js';
 import { packageAudienceOf, knowledgeAudienceAllows } from '../knowledge-audience.js';
 import { readerFor, type ReaderAuth } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { isGEAI, localAccountName } from '../../utils/gaii.js';
 
 type Link = Awaited<ReturnType<Storage['listLinks']>>[number];
 /** `omitted`: the account holds the package, and the visibility rule left it out for this caller. */
 export type PackageLinks = { found: false; omitted: boolean } | { found: true; manifest: MemoryRecord; links: Link[] };
 
-/** The copy of a manifest that names the package: of the records at `key`, the one written first (secaudit2026oct26). */
-function firstCopy(rows: MemoryRecord[], key: string): MemoryRecord | undefined {
-    return rows.filter(r => r.key === key)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.ownerGaii.localeCompare(b.ownerGaii))[0];
+/** Oldest first: the copy the package's import wrote, which any other copy at the key is younger than (secaudit2026oct26). */
+function oldestFirst(rows: MemoryRecord[]): MemoryRecord[] {
+    return [...rows].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.ownerGaii.localeCompare(b.ownerGaii));
 }
 
 /**
@@ -55,29 +62,30 @@ export async function packageLinksFor(
 ): Promise<PackageLinks> {
     const key = `packages/${packageId}/manifest`;
     const { caller } = reader;
+    // Every live copy of this one key, oldest first, held by an account or an agent of this node (the
+    // identities a package import writes under; an ecosystem app or a visitor's namespace is no account).
+    const suffix = `@${config.nodeId}`;
+    const copies = oldestFirst((await storage.getMemoryByKeysAnyOwner([key]))
+        .filter(r => r.key === key && !isGEAI(r.ownerGaii) && r.ownerGaii.endsWith(suffix)));
     let record: MemoryRecord | undefined;
     let omitted = false;
 
     // The caller's own account: the principal's own copy, or the account's for the owner in person and
     // for an agent holding memory:read-as-owner.
     if (caller && !caller.visitor && caller.owner) {
-        const agents = await loadOwnerAgents(storage, caller.owner);
-        const own = (await storage.listMemoryForOwners([caller.ownerGhii, ...agents.map(a => a.gaii)], { prefix: key }))
-            .filter(r => r.key === key);
+        const identities = new Set([caller.ownerGhii, ...(await loadOwnerAgents(storage, caller.owner)).map(a => a.gaii)]);
+        const own = copies.filter(r => identities.has(r.ownerGaii));
         record = own.find(r => r.ownerGaii === caller.principal)
-            ?? (caller.inPerson || readsAsOwner(caller) ? firstCopy(own, key) : undefined);
+            ?? (caller.inPerson || readsAsOwner(caller) ? own[0] : undefined);
         omitted = !record && own.length > 0;
     }
     // A public manifest of any account, the one its importer wrote.
     if (!record) {
-        const owners = (await storage.listOwners()).map(o => `${o.name}@${config.nodeId}`);
-        const agents = (await storage.listAgents()).map(a => a.gaii);
-        record = firstCopy(await storage.listMemoryForOwners([...owners, ...agents], { prefix: key, visibility: 'public' }), key);
+        record = copies.find(r => r.visibility === 'public');
         // A package shared with this node's accounts or one organism, for a caller that audience admits.
         if (!record && isNodeAccount(reader.auth)) {
-            const rows = (await storage.listMemoryForOwners([...owners, ...agents], { prefix: key }))
-                .filter(r => r.key === key && r.visibility !== 'public');
-            for (const r of rows) {
+            for (const r of copies) {
+                if (r.visibility === 'public') continue;
                 const audience = packageAudienceOf(r.value);
                 if (audience !== 'members' && !audience.startsWith('organism:')) continue;
                 if (await knowledgeAudienceAllows(storage, audience, reader.auth, localAccountName(r.ownerGaii))) { record = r; break; }
