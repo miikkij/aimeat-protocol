@@ -14,7 +14,6 @@
     "CompanyRepository": "DEBT: none of its 10 methods is called by a two-provider unit file",
     "DeviceAuthRepository": "DEBT: none of its 8 methods is called by a two-provider unit file",
     "FinanceRepository": "DEBT: none of its 22 methods is called by a two-provider unit file",
-    "MemoryTallyRepository": "DEBT: none of its 3 methods is called by a two-provider unit file",
     "ModerationRepository": "DEBT: none of its 12 methods is called by a two-provider unit file",
     "NotificationRepository": "DEBT: none of its 10 methods is called by a two-provider unit file",
     "OtkRepository": "DEBT: none of its 2 methods is called by a two-provider unit file",

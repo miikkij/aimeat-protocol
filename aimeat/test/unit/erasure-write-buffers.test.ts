@@ -21,6 +21,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-write-buffers.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-write-buffers.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-14 — The memory write tally.
  *   v1.1.0 — 2026-11-14 — The usage call stream.
  *   v1.0.0 — 2026-11-14 — Initial: the consent audit.
  */
@@ -32,6 +33,7 @@ import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent-audit-buffer.js';
 import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';
+import { initWriteTallyBuffer, recordMemoryTouch, flushWriteTallyBuffer, resetWriteTallyBuffer } from '../../src/services/data-map/write-tally-buffer.js';
 
 requirePostgresWhenAsked('erasure-write-buffers');
 
@@ -115,11 +117,17 @@ async function eraseDuring(s: Storage, p: People, held: { began: Promise<void>; 
   await Promise.all([write, erased]);
 }
 
+async function until(cond: () => Promise<boolean>, what: string): Promise<void> {
+  for (let i = 0; i < 100; i++) { if (await cond()) return; await new Promise(r => setTimeout(r, 20)); }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
 describe.each(names)('%s: a write buffer and an account erasure', provider => {
   const st = () => providers.get(provider)!;
   afterEach(async () => {
     await shutdownConsentAuditBuffer();
     resetUsageBuffer();
+    resetWriteTallyBuffer();
   });
 
   // ── The consent audit (services/consent-audit-buffer.ts) ──
@@ -189,5 +197,67 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
       await eraseDuring(s, p, held, flushUsageBuffer());
     } finally { held.restore(); }
     expect(await s.listUsageCalls({ ownerGhii: p.aliceGhii })).toEqual([]);
+  });
+
+  // ── The memory write tally (services/data-map/write-tally-buffer.ts) ──
+  const tally = (s: Storage, ownerGaii: string, key?: string) => s.listMemoryWriteTally({ ownerGaii, ...(key ? { key } : {}) });
+  /**
+   * The first sighting writes the key's row and the family's row, and only then counts the pair as
+   * written; a touch made between the two would be lost to the count (a property of the buffer, not
+   * of the erasure). So the test waits for the key's row and then for the family's write to end.
+   */
+  const firstSightingsWritten = async (cond: () => Promise<boolean>) => {
+    await until(cond, 'the first sightings');
+    await new Promise(r => setTimeout(r, 200));
+  };
+
+  it('write tally, WAITING: no count of the erased account\'s keys is stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    initWriteTallyBuffer(s, NEVER);
+    // The first touch of a pair is written at once; the second waits for the flush.
+    recordMemoryTouch({ ownerGaii: p.aliceGhii, key: 'notes.a', writerPrincipal: p.star, kind: 'write' });
+    recordMemoryTouch({ ownerGaii: p.bobGhii, key: 'notes.b', writerPrincipal: p.bobGhii, kind: 'write' });
+    await firstSightingsWritten(async () => (await tally(s, p.aliceGhii)).length === 1 && (await tally(s, p.bobGhii)).length === 1);
+    recordMemoryTouch({ ownerGaii: p.aliceGhii, key: 'notes.a', writerPrincipal: p.star, kind: 'write' });
+    recordMemoryTouch({ ownerGaii: p.bobGhii, key: 'notes.b', writerPrincipal: p.bobGhii, kind: 'write' });
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushWriteTallyBuffer();
+
+    expect(await tally(s, p.aliceGhii)).toEqual([]);
+    // POSITIVE CONTROL: bob's two touches are counted.
+    expect((await tally(s, p.bobGhii)).map(r => r.writeCount)).toEqual([2]);
+  });
+
+  it('write tally, WAITING: alice\'s touch of bob\'s key is stored under the erasure\'s pseudonym, not her name, and bob\'s count stays whole', async () => {
+    const s = st();
+    const p = await people(s);
+    initWriteTallyBuffer(s, NEVER);
+    recordMemoryTouch({ ownerGaii: p.bobGhii, key: 'shared.c', writerPrincipal: p.aliceGhii, kind: 'write' });
+    await firstSightingsWritten(async () => (await tally(s, p.bobGhii, 'shared.c')).length === 1);
+    recordMemoryTouch({ ownerGaii: p.bobGhii, key: 'shared.c', writerPrincipal: p.aliceGhii, kind: 'write' });
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushWriteTallyBuffer();
+
+    const rows = await tally(s, p.bobGhii, 'shared.c');
+    expect(rows.filter(r => r.writerPrincipal.includes(p.alice))).toEqual([]);
+    expect(rows.reduce((n, r) => n + r.writeCount, 0)).toBe(2);
+  });
+
+  it('write tally, BEING WRITTEN: a first sighting whose write is in progress is not stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    initWriteTallyBuffer(s, NEVER);
+    const held = holdFirst(s, 'upsertMemoryWriteTally');
+    try {
+      recordMemoryTouch({ ownerGaii: p.aliceGhii, key: 'notes.held', writerPrincipal: p.aliceGhii, kind: 'write' });
+      await eraseDuring(s, p, held, Promise.resolve());
+      // The held write-through is a floating promise inside the buffer: give it its turn.
+      await new Promise(r => setTimeout(r, 100));
+      await flushWriteTallyBuffer();
+    } finally { held.restore(); }
+    expect(await tally(s, p.aliceGhii)).toEqual([]);
   });
 });
