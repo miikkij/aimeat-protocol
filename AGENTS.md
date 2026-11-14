@@ -1,14 +1,44 @@
 # AGENTS.md
 
 For coding agents that do not read `CLAUDE.md`: Codex, Cursor, Copilot, Gemini CLI and the rest.
-Claude Code reads `CLAUDE.md`. That file is the source, and this one exists so that you arrive with
-the same rules. It was written on 2026-09-19, after a model working in this repository without any
-of them built the wrong thing three times in a row.
+Claude Code reads `CLAUDE.md`, and that file is the source of every rule here. This file is a
+pointer, not a copy: it tells you what to read, and it names the rules that bite before you would
+find them there. Where the two differ, `CLAUDE.md` wins. It was first written on 2026-09-19, after a
+model working in this repository without these rules built the wrong thing three times in a row.
+
+## This repository is public
+
+Nothing in it names an organisation node or the company behind one: not its address or node id,
+its members, its apps, organisms, customers or projects, a data map copied from it, or the state of
+its compliance register. Write a fix found on such a node in general words in code, tests and
+commit messages ("an organisation node", "an app that keeps colleagues' ratings"). Fixtures use
+invented names (alice, bob, carol). The `commit-msg` and `pre-push` hooks refuse a term from that
+node's lists, and refuse your commit outright when the list is missing on the machine
+(`node aimeat/scripts/check-private-terms.mjs --where` says where it is). Push `main` only.
+
+## The rules that bite first
+
+- **Ask first** before release tags, CI builds and the full E2E sweep (about two hours; it runs only
+  when Jouni asks or has approved the work). When he asks for a release, the full run its check
+  needs is part of that request (`pnpm nightly:preflight --dispatch`); the tag and the publish stay
+  his. Ask also before a new entry in `docs/known_gaps.md`, before publishing a roadmap item or a
+  ruling, and at the end of every feature with the proposed `aimeat/public/changelog.json` entry.
+- **A fix covers the whole defect**, not the reported symptom: a delete that leaves data behind is
+  checked in every table and store that carries the id.
+- **Never claim anything about production without probing it**: `curl <node>/v1/build` gives the
+  commit that runs. Test at the size production has, not with two fixtures.
+- **Every place you mention comes with its URL**: production, or your sandbox with the account and
+  what to press.
+- **The wish bucket stays true**: close the wish in the session that shipped it, before you say it
+  is done (skill `user:happydude500001/aimeat-wish-bucket` on the node).
+- **Replies to Jouni** use ASD-STE100 Simplified Technical English, or selkeä kieli in Finnish. No
+  em-dashes, and none of the words and patterns `CLAUDE.md` bans ("delve", "robust", "it's not X,
+  it's Y").
 
 ## Read these first, in this order
 
 1. **`CLAUDE.md`, in full.** What the project is for, how Jouni works, the gates, where knowledge
-   lives. Everything below is a pointer into it or a rule that bites before you would find it.
+   lives. Everything in this file is a pointer into it or a rule that bites before you would find it.
 2. **`.claude/rules/*.md`.** Rules for one kind of code. The `paths` list at the top of each file
    says which files it covers. Claude Code loads them by itself when it opens a matching file; you
    run `pnpm rules:for <the files you will edit>` and read every file it names before the edit. It
@@ -90,16 +120,22 @@ of them built the wrong thing three times in a row.
   hooks on. Then work from that folder. Never copy `.env.test.*` by hand: the
   examples name one port and one database for everybody, and the test runner empties that
   database between suites, so two sessions testing at once wipe each other.
-- Coordination lives on aimeat.io, not in chat. Name the session and the project
-  (`AIMEAT_SESSION=cc-<owner>-<tag>`, `AIMEAT_PROJECT=aimeat-protocol`), read the Lifecycle
-  Central board, and claim the paths and the E2E port before you edit. Skill
-  `aimeat-dev-session` on the node has the ritual.
+- Coordination lives on aimeat.io, not in chat. Export the session and the project in the shell
+  that commits (`AIMEAT_SESSION=<tool>-<owner>-<tag>`, `AIMEAT_PROJECT=aimeat-protocol`), read the
+  Lifecycle Central board with your project (`board_read { project }`), and claim the paths and the
+  E2E port before you edit (a free port in 40251-40499 that no active claim names). Skill
+  `aimeat-dev-session` on the node has the ritual. With `AIMEAT_SESSION` set, the git hooks treat
+  you as a session: they stamp the `Session:` and `Project:` trailers and hold your commits and
+  pushes to the session rules below.
 - Look at a change on your own node: `pnpm sandbox` from `aimeat/`. Run the E2E suites the change
   can reach, one at a time with `--test=<suite>`. Never start the full sweep on your own: it takes
   about two hours and runs only when Jouni asks for it.
 - Never `git add -A`. Stage files by name. No `Co-Authored-By` trailer.
 - A multi-line commit message goes in a file: `bash scripts/git-commit.sh <file>`. On Windows that
   `bash` is Git Bash (`"C:\Program Files\Git\bin\bash.exe"` from PowerShell), never the WSL one.
+  The subject is at most 72 characters and the body at most 600, and the body says why the change
+  exists. It never says who approved or asked for it. It uses industry terms (endpoint, route, MCP
+  tool), not metaphors, and its paragraphs are not hard-wrapped.
 - Edit files with your editing tool, never with `sed`, a heredoc or an inline script.
 - Reuse what exists. A new MCP tool, route, table or page type needs a reason that a memory record
   and a prompt could not cover.
@@ -110,4 +146,4 @@ of them built the wrong thing three times in a row.
   first, the evidence after it: a status question is answered in the first sentence as "done",
   "done, except X, which needs your decision" or "not done, it is at X". No em-dashes.
 - Ask before spending money, changing AI settings, touching infrastructure, deleting anything, or
-  building something that was not agreed.
+  building something that was not agreed, and before everything in "The rules that bite first".

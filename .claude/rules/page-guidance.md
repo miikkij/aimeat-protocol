@@ -68,5 +68,7 @@ These exist on older pages and are migration debt, not examples:
 Lead with what the person gets, then how. A use case names a real situation and the question the
 person then asks their own AI. Facts come from the code, never from the page's old text. Terms come
 from the language context (skill `aimeat-writing`, `references/language-context.md`); a new term gets
-its row in the same change. English, Finnish and Spanish in the same change, Finnish composed in
+its row in the same change. Read it before writing any language but English, so one concept does not
+get two words; it is for the writer, never for a cold reader, whose value is having no context
+(`locales.md` has the rule and its measurement). English, Finnish and Spanish in the same change, Finnish composed in
 Finnish. A new concept needs no code: a `explain.concept.<thing>` entry and `help="concept.<thing>"`.

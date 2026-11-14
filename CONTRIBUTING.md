@@ -88,16 +88,25 @@ before it runs. If your fork's `origin/main` is behind the upstream repository, 
 `pnpm install` at the root points git at `.githooks/`:
 
 - **pre-commit** runs lint and the three type checks (`pnpm lint`, `pnpm typecheck`,
-  `pnpm typecheck:frontend`, `pnpm typecheck:sdk`), about twenty seconds.
+  `pnpm typecheck:frontend`, `pnpm typecheck:sdk`), about twenty seconds. It also refuses a new
+  silent exception handler in a staged file (`check:silent-catch --staged`), and checks
+  `THIRD-PARTY-NOTICES.md` (`check:notices`) when your commit changes it, since that file is generated.
 - **commit-msg** refuses a `Co-Authored-By` trailer and a message that a shell mangled. Write a
   multi-line message to a file and commit with `bash scripts/git-commit.sh <file>`. See
-  [Shell and Git](docs/coding-guidelines/shell-and-git.md).
-- **pre-push** refuses a push when your branch is behind the remote's `main`, and a tree whose
-  boot path does not load.
+  [Shell and Git](docs/coding-guidelines/shell-and-git.md). It also checks the message and the
+  added lines against a list of private names the maintainers keep outside the repository; on
+  your machine there is no such list, and the hook says so and goes on.
+- **pre-push** refuses a push when your branch is behind the remote's `main`, a tree whose boot
+  path does not load, and a commit that descends from a history the maintainers rewrote (merge
+  from a fresh clone instead). When the newest CI run on `main` is red, it prints a warning and
+  goes on.
 
-If you work with Claude Code, set `AIMEAT_SESSION` to a name of your choice in the shell that
-commits (for example `export AIMEAT_SESSION=cc-yourname-fix`). The hook adds it to each commit as a
-`Session:` trailer and refuses a Claude Code commit without it.
+If you work with an AI coding agent, set `AIMEAT_SESSION` to a name of your choice in the shell
+that commits (for example `export AIMEAT_SESSION=cc-yourname-fix`). The hook adds it to each commit
+as a `Session:` trailer and then treats your commits as a session's: the subject is at most 72
+characters, the body at most 600, a push on a red CI needs a reason, and a missing private-name
+list refuses the commit (point `AIMEAT_PRIVATE_TERMS` at an empty file of your own: you hold no
+such names). Leave it unset when you commit by hand. A Claude Code commit without it is refused.
 
 ## Code standards
 

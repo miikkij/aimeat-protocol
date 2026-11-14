@@ -53,7 +53,8 @@ own, `https://aimeat.io`, or someone else's.
 
 > If the person wants to *develop* the node, point them at **`CONTRIBUTING.md`** (setup, a node of
 > their own with `pnpm sandbox`, one test suite, `pnpm gate`) and **`CLAUDE.md`** with the rules in
-> `.claude/rules/`. Do not repeat those rules here; read them.
+> `.claude/rules/` (**`AGENTS.md`** first if you are not Claude Code). Do not repeat those rules
+> here; read them.
 
 ---
 
@@ -197,7 +198,7 @@ in there too.
 
 Three routes. Pick by what the tool can do; use more than one if they use several tools.
 
-**a) A remote connector, for AI apps that take one** (claude.ai, Claude Desktop, ChatGPT, Grok
+**a) A remote connector, for AI apps that take one** (claude.ai, Claude Desktop, ChatGPT with Developer mode, Grok
 and others). The person adds `<NODE_URL>/v1/mcp` as a connector (custom connector, MCP server) in
 the tool's settings, signs in to the node in the browser, and picks what the AI may do: read only,
 standard, full, or exactly the permissions they tick. Nothing to install. The steps for each tool,
@@ -248,7 +249,7 @@ command ran in (or `AIMEAT_HOME`), which keeps itself out of git. You never hand
   [aimeat/tools/dify-bridge/README.md](aimeat/tools/dify-bridge/README.md).
 
 **An AI that cannot connect at all** (a consumer Gemini app outside the United States, Copilot
-without Copilot Studio) still
+without Copilot Studio, ChatGPT without Developer mode) still
 works through prompts: the node's pages compose a ready prompt, the person runs it in their own chat
 and pastes the answer back.
 

@@ -24,6 +24,7 @@ paths:
 - **A migration that can destroy or hide data acts only on positive evidence, and anything ambiguous goes to the operator's page, never to a script someone must remember.** Operators who installed a node run no scripts: every deploy step happens by itself at start, and the node always boots. What a migration cannot decide on evidence stays exactly as it is and becomes one incident on the Security page (`services/security-incident.ts`), with a decision per case on REST, MCP and the page; nothing in it throws on data. A migration file on main never changes: one that must not run any more is superseded (`SUPERSEDED` in `migrate.ts`), and `pnpm check:migration-hashes` holds the files to `security/migration-hashes.json`. Ruled by Jouni on 2026-09-27, for the move to the full identity (0086).
 - **ESM imports keep the `.js` extension:** `import { foo } from '../services/foo.js'`.
 - **Express 5:** `req.params` returns `string | string[]`, cast with `as string`.
+- **Starting the node on one backend:** `pnpm start -- --db postgres-kysely --db-url postgresql://localhost:5432/aimeat` or `pnpm start -- --db sqlite --db-path ./data/aimeat.db`. There is no Prisma and no MongoDB in this codebase (both removed on 2026-07-16); do not re-add either. (Moved from CLAUDE.md on 2026-11-15.)
 
 ## Gates for this area
 

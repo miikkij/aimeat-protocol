@@ -1,8 +1,9 @@
 # Identity model: GHII, GAII and GEAI
 
-> The identity table is in `CLAUDE.md`. The rules for code (ask the caller object, `resolveIdentity()`,
-> visitors from another node, key files) are in `.claude/rules/security.md`, which Claude Code loads when
-> a file under `aimeat/src/` is read. This doc holds the worked patterns and the morsel-pacing detail.
+> This doc is the identity reference: the principal types, how each one arrives, the worked patterns
+> and the morsel-pacing detail. `CLAUDE.md` keeps two sentences of it. The rules for code (ask the
+> caller object, `resolveIdentity()`, visitors from another node, key files) are in
+> `.claude/rules/security.md`, which Claude Code loads when a file under `aimeat/src/` is read.
 
 ## The principal types
 
@@ -14,6 +15,20 @@
 | **Party** | `party:owner/name@node-id` | `party:alice/matti@aimeat-fi-001-genesis` | An outside party: a person or a program with NO account here (a Power BI, an ETL job, a partner). Not a principal: no namespace, no scopes, no balance. Reads only the data packages its owner shared with it by name (Core §3.8). |
 
 There is also a bare **Owner** name (`alice`) which is the account layer. It appears in `req.auth!.sub` for owner JWTs. `req.auth!.owner` carries it on every principal that acts for this person: the owner, an agent, an app grant and an ecosystem app alike, so comparing it answers "same person", never "which principal" ([invariant 11](security-development-dna.md#11-the-owner-name-is-not-a-principal)). A visitor from another node is the exception: its `sub` and `owner` are both its home GHII (`alice@home-node`), never a bare name.
+
+## How a principal arrives
+
+- **A person** signs in (password and TOTP, an organisation's single sign-on, an invitation) and
+  owns everything that acts in their name.
+- **An agent** connects by device authorization (RFC 8628): the owner approves it and picks its
+  scopes. Or the system creates it for a purpose the owner set up (fleet management, a paid
+  service). An agent may approve another agent of the same owner. The owner sees and can remove
+  every agent.
+- **An ecosystem app** is onboarded hello, approve, token, with TOFU key pinning plus a scope and
+  data-area allowlist; it writes into its own `eco:` namespace and is consented like an agent
+  ([Building an ecosystem app](../building-an-aimeat-compatible-ecosystem-app.md)).
+- **A hosted app** carries identity through a scoped app grant, which resolves `role:'app'` to the
+  owner but fences the app to the scopes the owner approved.
 
 ## Authentication paths
 

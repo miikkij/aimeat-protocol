@@ -21,7 +21,7 @@ of these and no single page said so.
 | 4 | A served library's registry entry (`src/data/library-packs/`), its `aiDoc` and `promptLine` | the app-building prompt, `GET /v1/libs`, bootstrap, llms.txt | `check:sdk` (bundle only) |
 | 5 | `docs/AIMEAT-Feature-List.md`, then `pnpm build:everything` | anyone reading `/v1/everything` | `check:everything` (freshness only) |
 | 6 | `aimeat/public/changelog.json`, newest first | people on the landing page | `check:changelog` (shape only). **At the end of every feature, ask Jouni whether it goes in, with the proposed entry**; write it only on his yes; platform work only |
-| 7 | Settings: `src/services/config-schema.ts` row, `.env.example`, a Config-tab group in `public/views/admin/config-tab.js` `DOMAINS` | the operator | `check:config-coverage` |
+| 7 | Settings: `src/services/config/schema.ts` row, `.env.example`, a Config-tab group in `public/views/admin/config-tab.js` `DOMAINS` | the operator | `check:config-coverage` |
 | 8 | Locales `en`, `fi`, `es`, and a row in the language context for any new term (skill `aimeat-writing`); a new setting a person cannot read from its label gets `help` and `explain.<term>.*` (`.claude/rules/frontend.md`) | people in their language, and an AI through `aimeat_handbook_get { tier: "settings/<term>" }` | `check:locales` |
 | 9 | A skill: node-wide (`src/data/builtin-skills*.ts`) or the owner's registry (`aimeat_skill_publish`) | an AI using the feature | `check:skill-reviews` (for skills that already watch the code) |
 | 10 | The appdev pitfalls (`aimeat_appdev_pitfall_report`) when app builders can get it wrong | an AI building an app | none |
@@ -33,6 +33,8 @@ of these and no single page said so.
 
 Rows 10, 12, 13 and 14 have no gate, so they are the ones that get skipped. Row 5 is never skipped: every new feature gets its feature list row. Row 6 is a question, never a silence: the report that says a feature is done ends with the proposed changelog entry (title and summary in en and fi) and the question whether it goes in. Read "ask first" as a duty to ask, not only as a limit on writing: read as a limit, it let 17 features from 2026-10-22 to 25 reach main with no entry and no question (Jouni, 2026-10-25). The `note-writer` agent
 does 12 to 14 from a commit hash and a list of what was decided.
+
+**Row 15 holds for every change, not only a new feature.** The IT adoption package (`docs/it-adoption/`) stays true to the code: an organisation's IT signs off against it, and one false line costs the whole package its trust. A change to a setting, a default, a sign-in method, an outbound connection, a security control or a limit corrects the page that states it in the same commit; `pnpm check:it-adoption` names the page when the code it watches changes (Jouni, 2026-11-01: "tämä on tärkeä"; moved from CLAUDE.md on 2026-11-15).
 
 ## The feature guide itself (row 5)
 

@@ -24,6 +24,14 @@ coordination their own sessions follow.
 | Write prompts | [Prompt writing](prompt-writing.md) |
 | Commit from this environment | [Shell and Git](shell-and-git.md) |
 | Group agents | [Agent tags and modes](agent-tags.md) |
+| Build an agent that offers work | [Building an agent](../building-an-aimeat-compatible-agent.md): the offer descriptor, pricing, workflow signals |
+| Build an ecosystem app (GEAI) | [Building an ecosystem app](../building-an-aimeat-compatible-ecosystem-app.md): the hello, approve, token flow |
+| Let an app use the person's AI key | [App developer AI guide](../app-developer-ai-guide.md): `AIMEAT.ai.complete()` with the user's OpenRouter key |
+| Publish or pin a skill | [Skills registry](../skills-registry.md): SKILL.md packs, scopes, semver pins, app-bound skills |
+| Connect a mailbox | [Connecting an outside account](../connecting-an-outside-account.md): Gmail and Outlook read and send, bring-your-own app, the AI-disclosure header |
+| Run a node for one company and its partners | [Organisation node sign-in](../organisation-node-sign-in.md): the Entra tenant allowlist and the registration mode |
+| Look up a trap someone already hit | [Pitfalls](../pitfalls.md), by kind of problem; add to it only a trap that can recur and no gate can prevent |
+| See what is deferred | [Known gaps](../known_gaps.md), developer-approved entries only |
 
 ## Verification
 
