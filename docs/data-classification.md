@@ -48,6 +48,34 @@ not `local:` is refused (`CLASSIFIED`), and no exception opens it. Only an agent
 says `llm: "local"` (`aimeat_agent_runtime_report`) reads it; the node records that claim and cannot
 check it. New content gets the policy's default label (Internal).
 
+### Audience caps
+
+A label can carry an audience cap (`maxAudience`): the widest audience its content may be given.
+The levels, narrowest first, are `private`, `organism`, `signed-in`, `link` and `public`. A change that
+makes content wider than its effective label's cap is refused with 409 `LABEL_CAPS_AUDIENCE`, and the
+message names the label and the cap; a change that keeps or narrows the audience is never refused.
+The effective label of a workspace or an organism caps everything in it. The owner in person can make
+an `audience` exception with a written reason for one item; an agent or an app cannot
+(`aimeat/src/services/classification/audience-cap.ts`). On a node closed to visitors, `public` and
+`link` count as `signed-in`.
+
+The shipped levels have default caps: Public none, Internal `signed-in`, Confidential and Highly
+confidential `organism` (`DEFAULT_LABEL_CAPS` in `aimeat/src/services/classification/defaults.ts`). A
+new node takes them at its first start. A node that ran before keeps what it has: when classification
+is on, the operator's Security page offers each cap as one incident, and the operator applies or keeps
+each one (`aimeat/src/services/classification/default-caps.ts`).
+
+### Agent clearance
+
+An agent of this node can have a clearance: the highest label it may read
+(`PATCH /v1/agents/:name/clearance`, or `aimeat_operator_agent_configure`). Content whose effective
+label ranks above it is hidden from that agent and counted. No clearance means no limit. The owner,
+or the owner's agent with `agent:permissions`, sets it; the agent never sets its own, and raising or
+removing it needs the owner in person (`PERSON_REQUIRED`). A clearance whose label was deleted hides
+everything that has a label. Only agents have one: a personal access token, an ecosystem app and a
+visitor from another node are not limited this way
+(`aimeat/src/services/classification/clearance.ts`).
+
 ### Security class packs (TL and NATO)
 
 The operator switches two packs on from the admin Security page, or with `PUT /v1/classification/packs`

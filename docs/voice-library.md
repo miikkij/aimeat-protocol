@@ -2,12 +2,16 @@
 
 Load `/v1/libs/aimeat-auth.js` and `/v1/libs/aimeat-voice.js`. Declare `ai:use` in the app's scopes.
 The signed-in owner's provider credentials remain on the node. The built-in stages use the owner's
-configured OpenRouter or compatible endpoint. Each stage has its own model and parameters. Nothing
+AI providers in the owner's order, under the owner's model policy: OpenRouter, another OpenAI-compatible
+endpoint, an Anthropic provider (reply only, through the node's converter) or an extension provider
+whose `ai.speak` action speaks. The reply tries the next provider when one fails before its first byte;
+the speech uses the owner's speech fallback (`aimeat/src/services/ai/voice.ts`). Each stage has its
+own model and parameters, and without a model the stage's AI role decides. Nothing
 records, calls a provider or persists a transcript until the app starts a session and submits a turn.
 
 ```js
 const voice = AIMEAT.voice.createSession({
-  appId: 'owner/companion.html', // Must equal the signed app grant's full app identity.
+  appId: 'companion.html',     // The signed app's own file name, with or without .html, or its full owner/filename.
   preset: 'balanced',          // balanced | responsive | patient
   language: 'fi-FI',
   input: { mode: 'vad' },      // vad | manual | text
@@ -135,13 +139,24 @@ to integrate a different recorder, streaming recognizer or turn detector.
 ## Server API
 
 `POST /v1/ai/transcribe` remains the shared STT endpoint, with optional temperature and disconnect
-cancellation. App tokens are attributed from their signed app identity; a conflicting app_id is 403.
+cancellation. App tokens are attributed from their signed app identity. `app_id` may be the app's own
+file name, with or without `.html`, or its full `owner/filename`; another app's id, the same file name
+under another owner included, is 403 `APP_ID_MISMATCH`, and the details give both ids.
 
 `POST /v1/ai/stream` accepts app_id, messages, optional model, temperature, top_p, max_tokens and
 reasoning. `POST /v1/ai/speak` accepts app_id, input (1..4000 characters), model, voice,
 response_format (pcm/mp3), speed and instructions. Both require ai:use and return newline-delimited
 JSON: start, text/audio, done. After headers, failures are error frames; a stream without done is
 not a successful turn. Audio frames contain base64 bytes. Abort the HTTP request to cancel.
+
+The speech `start` and `done` frames carry `audio` { `mime`, `sample_rate`, `channels`,
+`sample_format` }: the provider's real format, which `AIMEAT.ai.speak()` and the voice library's node
+adapter use to type and play the bytes. Refusals before the first byte: a voice the model catalogue
+says the model does not have is 400 `INVALID_VOICE`, before any paid call; a provider's permanent
+refusal is 422 `PROVIDER_REJECTED` with the provider's reason (an mp3 the model does not make says to
+ask for pcm); a provider's 429 is `RATE_LIMITED` with its `Retry-After`. After the first byte, an
+error frame carries `TOO_LARGE` (413) at a size limit or `PROVIDER_ERROR` (502) for a broken stream,
+with the refusal's details.
 
 The built-in adapters use the authenticated session and refresh once on 401. Every stage shares
 the existing daily and application budgets. OpenRouter TTS uses its catalogue's per-character price

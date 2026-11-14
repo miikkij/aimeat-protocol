@@ -41,8 +41,10 @@ Options:
 - `--agent <name>` names the agent.
 - `--workdir <path>` sets where the program starts. An agent writes files where it is launched,
   so this keeps it out of your source repositories. The default is `~/aimeat-work`.
-- `--surface <appdev|agent|service|admin>` narrows the tools to one job. The full set at
-  `/v1/mcp` costs a client many more input tokens per turn than one surface.
+- `--surface <appdev|agent|service|admin>` narrows the tools to one job, for `claude-desktop`
+  only. The full set at `/v1/mcp` costs a client many more input tokens per turn than one surface.
+  Every other client connects to the full set, and the command's summary says that it did not use
+  the flag.
 - `--home <path>` puts the credential somewhere other than the default `~/.aimeat-<client>`.
 - `--name <server>` lets a second node sit beside the first in the same client.
 

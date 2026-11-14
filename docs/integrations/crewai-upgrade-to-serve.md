@@ -9,8 +9,8 @@
 > itself is `aimeat connect serve`, from the same `aimeat` package as the node, and
 > from aimeat 3.20.0 on it refuses a call without the secret in its `serve.json`
 > (401). The Python package sends that secret from **0.29.0** on, so with aimeat
-> 3.20.0 or later the floor is 0.29.0. The current package is 0.34.0
-> (`python/aimeat-crewai/pyproject.toml`).
+> 3.20.0 or later the floor is 0.29.0. The version of the package in this
+> repository is in `python/aimeat-crewai/pyproject.toml`.
 
 ---
 

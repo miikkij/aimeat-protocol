@@ -24,7 +24,7 @@ Upgrade the account in OpenRouter's settings before you choose `eu` or `us`.
 
 ## The four settings
 
-All four are on the admin Config tab (`/admin.html`, section AI) and take effect without a
+All four are on the admin Config tab (`/v1/admin?tab=config`, section AI) and take effect without a
 restart, except the shared chat key below. The same names work in `.env`.
 
 | Setting | Environment variable | Values | Default |
@@ -76,7 +76,7 @@ reads their own setting with `GET /v1/ai/routing` (`openrouter_region`) or `aime
 
 - **The privacy page** (`/v1/privacy`, section 5.1) states the region, the fallback, whether people
   choose, and the transfer to the United States. You write nothing for it.
-- **The records of processing** (`/admin.html`, the Compliance tab) list one processor per region your key can
+- **The records of processing** (`/v1/admin?tab=compliance`, the Compliance tab) list one processor per region your key can
   reach: `ai-node-openrouter-eu`, `ai-node-openrouter-us` and `ai-node-openrouter` (any). Record
   OpenRouter's data processing agreement (openrouter.ai/data-processing-agreement, binding on its
   terms of service) on each, and the transfer basis:

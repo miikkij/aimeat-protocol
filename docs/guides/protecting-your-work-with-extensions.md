@@ -120,8 +120,10 @@ method.
 
 - **Action code is never shipped.** An extension action's source lives only on the server,
   runs in a QuickJS WASM sandbox with a controlled `ctx` (no Node globals), and is reachable
-  only via authenticated `POST /v1/ext/{name}/{action}` — and only if the extension is
-  installed and active on that node. No endpoint returns the source to someone who calls the
+  only via `POST /v1/ext/{name}/{action}` — and only if the extension is installed and active
+  on that node. The call needs an account unless the manifest marks the action
+  `public: true`; a public action answers a caller without an account, so it takes no price and
+  no `tollMorsels` (the manifest is refused otherwise). The source stays on the server either way. No endpoint returns the source to someone who calls the
   action. Those who manage the extension can read it: the installer and the operator with
   `GET /v1/extensions/{name}?full=true` (an agent of the installer needs `ext:write`), the
   operator for the bundled extensions, and a package that ships the extension carries its

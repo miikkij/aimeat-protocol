@@ -93,7 +93,8 @@ The allowlist is the gate. Leaving it empty falls back to `AIMEAT_ENTRA_OAUTH_TE
 there admits that one tenant (single-tenant app registration, the older setup), and
 `common` / `organizations` / `consumers` admit anyone.
 
-Restart the node after changing any of these. The allowlist is deliberately environment-only: the
+Restart the node after changing any of the Entra settings: the Config tab saves them, and they take
+effect at the next start. The registration mode takes effect at once. The allowlist is deliberately environment-only: the
 admin Config tab shows the value and marks it as not editable, and a PUT naming its path is refused,
 because widening who may sign in should take a deploy rather than one call from an operator session.
 
@@ -202,7 +203,9 @@ community or unlisted) and `AIMEAT_APP_DEFAULT_ACCESS` (anyone or signed-in), wi
 ## 6b. A company node, step by step
 
 The whole recipe for a node that one company and its approved partners use, and nobody else. Every
-setting below is also on the admin Config tab, so an operator can change it without a restart.
+setting below is shown on the admin Config tab. Most change there without a restart; the tenant
+allowlist (`AIMEAT_ENTRA_ALLOWED_TENANTS`) cannot be changed there and takes effect only after a
+restart (section 4).
 
 **1. Run a version that has all of it.** The content gate, the publish gate and the starting levels
 arrived on 2026-10-17 and 2026-10-18 (plan doc-mvcn6c7e4e5q). `curl https://<node>/v1/build` gives

@@ -16,6 +16,8 @@ Every setting below is in Admin › Config, domain Identity, group **docsign**, 
 | `docsign.lotl_signer_sha256` | `AIMEAT_DOCSIGN_LOTL_SIGNER_SHA256` | empty | live | Pins the certificates allowed to sign the EU list (comma-separated SHA-256). |
 | `docsign.trust_anchors` | `AIMEAT_DOCSIGN_TRUST_ANCHORS` | empty | start | A PEM file of extra root certificates (a company CA, a non-EU scheme). |
 | `docsign.max_mb` | `AIMEAT_DOCSIGN_MAX_MB` | 25 | live | The largest file a check reads, 1 to 100 MB. Also the largest PDF a wallet signs. |
+| `docsign.max_signatures` | `AIMEAT_DOCSIGN_MAX_SIGNATURES` | 50 | live | The most signatures one checked PDF may have, 0 to 10000. A file with more is not checked. 0 is no limit. |
+| `docsign.max_fetches` | `AIMEAT_DOCSIGN_MAX_FETCHES` | 200 | live | The most requests one check sends to the addresses in the file's certificates, 0 to 100000. When they are used up, the check says so and leaves revocation open. 0 is no limit. |
 | `docsign.app_url` | `AIMEAT_DOCSIGN_APP_URL` | empty | live | The signing app. A signing request's notification and the AI's answers link to it (`?request=<id>`). |
 | `docsign.eudi_enabled` | `AIMEAT_DOCSIGN_EUDI_ENABLED` | false | live | Signing a PDF with an EU Digital Identity Wallet. |
 | `docsign.eudi_rp_credential` | `AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL` | empty | start | The PEM file with the wallet access certificate (below). A secret: the file holds a private key. |

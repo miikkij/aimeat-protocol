@@ -239,10 +239,14 @@ what the extension does.
 
 ### Who may install
 
-`POST /v1/extensions` needs the role in `AIMEAT_EXT_INSTALL_ROLE` (default `owner`; set `operator`
-to keep installs to operators), or a principal holding `ext:write`. An app under an app grant can
-never hold `ext:write`. The installing owner, their agents with `ext:write`, and the operator may
-then manage the extension.
+`AIMEAT_EXT_INSTALL_ROLE` decides who may call `POST /v1/extensions`. With the default `owner`,
+every account holder in person, and an agent holding `ext:write`. With `operator`, only the
+operator's account writes extension code: the operator in person and the operator's agents holding
+`ext:write`. An agent of another account is refused an install, a redeploy and a script change,
+even with `ext:write`, and the refusal names the setting and the operator
+(`aimeat/src/services/extension/install-role.ts`). An app under an app grant can never hold
+`ext:write`. The installing owner, their agents with `ext:write`, and the operator may then manage
+the extension; under `operator`, a code change still needs the operator's account.
 
 ### Installing an Extension
 

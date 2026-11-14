@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Phase:** 0.6
-**Status:** Describes node 3.26 (checked against the code on 2026-10-11). Its normative content moved to AIMEAT Core 2026-11, normative since node 4.0.0. Where this page and the code disagree, the code wins.
+**Status:** Describes node 3.26 (checked against the code on 2026-10-11). On 2026-11-15 the visibility words and the consent reach were brought up to node 4.3.1; the rest still describes 3.26. Its normative content moved to AIMEAT Core 2026-11, normative since node 4.0.0. Where this page and the code disagree, the code wins.
 
 ---
 
@@ -27,10 +27,10 @@ AIMEAT uses a three-zone data model inspired by the network security DMZ. Data f
 +--------------------+     +--------------------+     +--------------------+
          |                          |                          |
          |   Consent grants control boundary crossing          |
-         +---- ConsentRecord (scope: private | dmz | federation | auth) ----+
+         +---- ConsentRecord (scope: local | federation | auth) ----+
 ```
 
-`MemoryRecord.visibility` has six values (`src/storage/types/commerce.ts`). `visibilityToZone()` in `src/routes/memory/shared.ts` maps each one to a zone:
+`MemoryRecord.visibility` has six plain values and `organism:<organism id>` (`src/utils/visibility-words.ts`). `visibilityToZone()` in the same file (re-exported by `src/routes/memory/shared.ts`) maps each one to a zone:
 
 | `visibility` value | Zone | Who can read it |
 |-------------------|------|-----------------|
@@ -39,6 +39,7 @@ AIMEAT uses a three-zone data model inspired by the network security DMZ. Data f
 | `'group'` | DMZ | The owner and the members of the sharing group named in `groupId`, with read permission |
 | `'workspace'` | DMZ | Members of the organism workspaces named in `workspaceRef` |
 | `'members'` | DMZ | Any signed-in user of this node (not the shared anonymous identity) |
+| `'organism:<id>'` | DMZ | The active members of that one organism (since 2026-10-17; never sent to federation) |
 | `'public'` | Federation | Anyone, including a caller with no token (`GET /v1/memory/{gaii}/{key}`) |
 
 The order of reach, from low to high, is `private < owner < group < workspace < members < public`. Data moves between zones when the data owner changes the visibility or grants consent.
@@ -110,7 +111,7 @@ interface ConsentRecord {
   dataPattern: string;        // Glob pattern: "profile.*.interests", "iot.*"
   recipient: string;          // see "Recipient matching" below
   purpose: string;            // Free-form: "discovery", "marketplace", "research"
-  scope: 'private' | 'dmz' | 'federation' | 'auth';
+  scope: 'local' | 'federation' | 'auth';   // ConsentReach; 'private' and 'dmz' are read as 'local'
   expires: string | null;     // ISO 8601 timestamp or null (indefinite)
   status: 'active' | 'revoked' | 'expired';
   grantedAt: string;          // ISO timestamp
@@ -119,7 +120,7 @@ interface ConsentRecord {
 }
 ```
 
-**Required fields for creation:** `data_pattern`, `recipient`, `purpose` (`ConsentCreateSchema` in `src/models/schemas.ts`). The `scope` defaults to `'federation'` if omitted. The `status` is always `'active'` on creation.
+**Required fields for creation:** `data_pattern`, `recipient`, `purpose` (`ConsentCreateSchema` in `src/models/schemas.ts`). When `scope` is omitted it is `'local'` from node 4.0.0 (`'federation'` before it; `src/utils/consent-reach.ts`). The `status` is always `'active'` on creation.
 
 **Quota:** at most 100 consent records per owner.
 
@@ -228,15 +229,14 @@ Note: the CSM `visibility_default` is a policy for the service template, and its
 
 ### 5.1 Consent Scopes
 
-A `ConsentRecord` with `scope: 'federation'` authorizes cross-node data access. When `scope` is omitted in `POST /v1/consent`, it defaults to `'federation'`.
+A `ConsentRecord` with `scope: 'federation'` authorizes cross-node data access. When `scope` is omitted in `POST /v1/consent`, it is `'local'` from node 4.0.0 (`'federation'` before it).
 
-The four consent scopes:
+The three consent reaches (`ConsentReach` in `src/utils/consent-reach.ts`; `'private'` and `'dmz'` are accepted as older names for `'local'`):
 
 | `ConsentRecord.scope` | Zone | Meaning |
 |----------------------|------|---------|
-| `'private'` | Private | Consent to read private data on this node only |
-| `'dmz'` | DMZ | Consent to read node-local shared data |
-| `'federation'` | Federation | Consent that applies across node boundaries |
+| `'local'` | Private and DMZ | Consent to read on this node only |
+| `'federation'` | Federation | As `local`, and matching public records may go to peers |
 | `'auth'` | Federation | Lets another node sign this person in with their password here. The recipient is `node:<requesting-node-id>`, `*` or `domain:*` (`src/routes/federation-auth.ts`). |
 
 ### 5.2 CsmRecord.federate
@@ -280,7 +280,8 @@ When `federate` is `true`:
 |------|---------|
 | `src/services/consent.ts` | Consent logic: `checkConsentForRead()`, `auditDataAccess()`, `expireConsents()` |
 | `src/routes/consent.ts` | REST API: `POST/GET /v1/consent`, `GET/DELETE /v1/consent/:id`, `GET /v1/consent/audit`, `GET /v1/data-wallet` |
-| `src/routes/memory/shared.ts` | `visibilityToZone()`: memory visibility to zone |
+| `src/utils/visibility-words.ts` | The visibility words, and `visibilityToZone()`: memory visibility to zone (re-exported by `src/routes/memory/shared.ts`) |
+| `src/utils/consent-reach.ts` | `ConsentReach` and the default reach by node version |
 | `src/storage/types/commerce.ts` | Type definition: `MemoryRecord` |
 | `src/storage/types/auth.ts` | Type definitions: `ConsentRecord`, `ConsentAuditEntry` |
 | `src/storage/types/apps.ts` | Type definition: `CsmRecord` |

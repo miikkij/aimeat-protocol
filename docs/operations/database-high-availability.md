@@ -90,7 +90,8 @@ guide for them.
    (`failed_count` stays 0).
 5. Keep backing up `.env` and the node key file as [Backup and restore](backup-and-restore.md)
    says. A database restored without the same `AIMEAT_ENCRYPTION_KEY` and `AIMEAT_KEY_PASSPHRASE`
-   opens no stored secret.
+   opens no stored secret, and on a node with a second data key the same holds for
+   `AIMEAT_ENCRYPTION_KEY_1` and `AIMEAT_ENCRYPTION_KEY_CURRENT`.
 
 To recover to a moment, for example just before a mistaken bulk delete: stop every node process,
 restore the base backup with the tool and give it the target time (`recovery_target_time`), let

@@ -95,7 +95,10 @@ Rules the repository applies:
   the node's `/.well-known/aimeat` and registers it as a packages-only peer when the card names the
   same node id and key (`peer_registered: true`). When the node does not answer, the grant stands and
   the registration waits for the node's first signed request (`peer_pending: true`). A grant to the
-  repository's own id is refused.
+  repository's own id is refused (400 `SELF_NODE_ID`). A repository on the public internet takes
+  only an `https://` address for a new node: a plain `http://` one answers 400
+  `PEER_HTTPS_REQUIRED`, and nothing is written. A repository with the local security profile also
+  takes `http://`.
 
 ## 4. A customer node redeems a claim code
 

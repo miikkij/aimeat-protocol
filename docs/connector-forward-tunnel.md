@@ -36,7 +36,7 @@ flowchart LR
 
   crew -- "HOP 1: loopback HTTP<br/>/v1/mcp, /v1/*, /local/tasks/next<br/>(keep-alive, ~free)" --> serve
   serve == "HOP 2: ONE persistent WebSocket per agent<br/>(multiplexed request/response + push)" ==> mgr
-  mgr -- "forward dispatch (loopback self-fetch,<br/>pinned agent JWT)" --> api
+  mgr -- "forward dispatch (in-process request to the node's own HTTP server,<br/>pinned agent JWT)" --> api
   bus -- "task_assigned (target = agent GAII)" --> mgr
 ```
 
@@ -81,7 +81,16 @@ flowchart TB
 
 ## Frame protocol
 
-The tunnel is full-duplex JSON frames, id-correlated where applicable.
+The tunnel is full-duplex JSON frames, id-correlated where applicable. The frame
+shape is `ConnectFrame` in `aimeat/src/services/connect-tunnel-wire.ts`, which
+lists all 19 types.
+
+One socket can carry several identities of the same owner. The first is the one
+the upgrade authenticated; each further one is proved with an `attach` frame. A
+frame names its identity in `agent` (the full GAII or GEAI); a frame without it
+belongs to the upgrade identity, which is how a client from before 2026-09-03,
+with one socket per agent, still works. A frame that names an identity the socket
+has not proved is refused.
 
 | type | dir | payload |
 |------|-----|---------|
@@ -91,7 +100,16 @@ The tunnel is full-duplex JSON frames, id-correlated where applicable.
 | `response` | S→C | `{ id, status, body }` (AIMEAT envelope) |
 | `deliver` | S→C | `{ id, kind, payload }` — **full** task object, realtime |
 | `ack` | C→S | `{ id }` — in-session dedup (does **not** suppress backlog) |
-| `backlog` | S→C | on-connect snapshot `{ tasks, messages }` from storage |
+| `backlog` | S→C | on-connect snapshot `{ tasks, messages }` from storage, sent at connect and at attach |
+| `invoke` | S→C | `{ id, capability, input, caller, timeout_ms }`: the node runs a capability on the connected principal (an ecosystem app) |
+| `invoke_result` | C→S | `{ id, ok, result }`: the principal's answer to an `invoke` |
+| `subscribe` | C→S | `{ id, spaces }`: workspace record spaces (`organism_id`, `ws`, `space`) to get record-write pushes for |
+| `subscribed` | S→C | `{ id, payload: { accepted, rejected } }`: which space references were accepted and which refused |
+| `attach` | C→S | `{ id, agent, token }`: carry one more identity on this socket; the token is verified as at the upgrade |
+| `attached` | S→C | `{ id, agent }`: the attach was accepted |
+| `detach` | C→S | `{ agent }`: this socket stops carrying that identity |
+| `auth_revoked` | S→C | `{ agent, message, reason? }`: that identity's credential was revoked; stop it. `reason` is `moved` (sent to another connector) or `deleted` |
+| `scopes_changed` | S→C | that identity's permissions changed: mint a fresh token, keep running |
 | `disconnect` | both | graceful close |
 | `error` | S→C | `{ code, message }` — malformed/forbidden frame |
 
@@ -153,12 +171,19 @@ sequenceDiagram
   Crew->>Serve: GET /v1/memory (loopback)
   Serve->>Tun: forward("GET","/v1/memory")
   Tun->>Node: request{id, method, path}
-  Node->>App: loopback self-fetch (pinned agent JWT)
+  Node->>App: in-process request (pinned agent JWT)
   App-->>Node: 200 envelope (requireScope enforced)
   Node-->>Tun: response{id, status, body}
   Tun-->>Serve: {status, body}
   Serve-->>Crew: 200 envelope
 ```
+
+Since 2026-11-04 the forward makes no network connection: the node hands the
+request to its own HTTP server in the same process
+(`aimeat/src/services/request-injector.ts`, called from
+`aimeat/src/services/connect-tunnel-forward.ts`). The request still passes the
+server's HTTP parser, every route gate and the envelope, as a request over a
+socket does.
 
 Path safety: the server pins the resolved request origin to loopback, so a
 protocol-relative path (`//evil/…`) can never make the node fetch an off-host
@@ -242,8 +267,9 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
 - **Endpoint:** `GET /v1/connect/tunnel` (WS upgrade). The agent JWT goes in the
   `Authorization` header, which the connector sends. A client that cannot set a
   header (a browser) asks `POST /v1/ws/ticket` for a single-use ticket for this
-  socket kind and connects with `?ticket=`. The old `?token=<agentJWT>` still works
-  in 3.x behind `AIMEAT_WS_QUERY_TOKEN` and is removed in 4.0.0. Opt-in via
+  socket kind and connects with `?ticket=`. The old `?token=<agentJWT>` was
+  removed in node 4.0.0 (`WS_QUERY_TOKEN_REMOVED_IN`); `AIMEAT_WS_QUERY_TOKEN`
+  no longer turns it on. Opt-in via
   `AIMEAT_CONNECT_TUNNEL_ENABLED=true`.
 - **Discovery file:** `<AIMEAT_HOME or ~/.aimeat>/serve.json` —
   `{ schema_version, port, pid, secret, agents:[{agent, gaii, owner, node_url,

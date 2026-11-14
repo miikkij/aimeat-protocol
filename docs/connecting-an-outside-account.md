@@ -1,10 +1,13 @@
 <!--
 @file connecting-an-outside-account.md
 @description Outbound connections: how a person attaches their own Gmail, Outlook, SharePoint and
-  OneDrive, LinkedIn, X, Mastodon, Bluesky or YouTube account to this node, what the node can then do
-  with it, and what it deliberately cannot. Covers the read direction, the send direction, the write
-  direction, bring-your-own application, the Google alias path, and Microsoft's three differences.
+  OneDrive, LinkedIn, X, Mastodon, Bluesky, YouTube, Facebook Page, Instagram or Reddit account to
+  this node, what the node can then do with it, and what it deliberately cannot. Covers the read
+  direction, the send direction, the write direction, bring-your-own application, the Google alias
+  path, and Microsoft's three differences.
 @version-history
+  2026-11-15 — facebook, instagram and reddit in the provider list and the configuration, and the
+    history and replies tools; which settings change without a restart.
   2026-11-02 — SharePoint and OneDrive: the microsoft-files read/write pair, the token-free download,
     the write route and Sites.Selected.
   2026-09-26 — The agents' button is the owner's one tap, POST /v1/agents/{name}/read-through.
@@ -52,6 +55,7 @@ The full list, from `GET /v1/connections/providers`:
 | `microsoft-files` | reads SharePoint and OneDrive: sites, libraries, files, lists | `read-files` |
 | `microsoft-files-write` | writes there too: files, folders, list rows | `read-files`, `write-files` |
 | `linkedin`, `x`, `mastodon`, `bluesky`, `youtube` | publishing | `publish` |
+| `facebook` (a Facebook Page), `instagram`, `reddit` | publishing, metrics and the replies to a post | `publish-post` or `publish-image`, `publish-video`, `read-metrics`, `read-replies` |
 
 Every entry says whether **this node** holds an application for it. When it does not, somebody who
 brings their own application can still use it, so a missing registration removes an option from
@@ -276,10 +280,18 @@ decides what it signs.
 
 ## From chat
 
-Seven tools, on all three MCP surfaces:
+Nine tools, on all three MCP surfaces:
 
 `aimeat_connection_providers` · `aimeat_connection_list` · `aimeat_connection_start` ·
+`aimeat_connection_history` · `aimeat_connection_replies` ·
 `aimeat_mail_search` · `aimeat_mail_read` · `aimeat_mail_aliases` · `aimeat_mail_send`
+
+`aimeat_connection_history` lists what the owner published through their connections.
+`aimeat_connection_replies` reads, from the provider at that moment, the replies to one published
+post (`POST /v1/connections/attempts/{id}/replies`); the node stores none of them. It needs
+`connections:use` or `connections:read-through`. It answers 409 `NOT_READABLE` when the provider
+will never give them (LinkedIn, comments turned off, a deleted post) and 502 `REPLIES_UNAVAILABLE`
+when it cannot answer now.
 
 `aimeat_mail_send` is registered only when the agent holds **both** `outbound:send` and
 `connections:use`. An agent without them does not see a tool that would refuse; it sees no tool.
@@ -326,13 +338,22 @@ AIMEAT_CONNECT_MICROSOFT_CLIENT_SECRET=
 AIMEAT_CONNECT_MICROSOFT_TENANT=common
 AIMEAT_CONNECT_LINKEDIN_CLIENT_ID=
 AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET=
+AIMEAT_CONNECT_MICROSOFT_FILES_SITES=
 AIMEAT_CONNECT_X_CLIENT_ID=
 AIMEAT_CONNECT_X_CLIENT_SECRET=
+AIMEAT_CONNECT_FACEBOOK_CLIENT_ID=          # Meta app id, for a Facebook Page
+AIMEAT_CONNECT_FACEBOOK_CLIENT_SECRET=
+AIMEAT_CONNECT_FACEBOOK_CONFIG_ID=          # Facebook Login for Business configuration id; empty: scopes only
+AIMEAT_CONNECT_INSTAGRAM_CLIENT_ID=         # Instagram Login app id, not the Meta app id
+AIMEAT_CONNECT_INSTAGRAM_CLIENT_SECRET=
+AIMEAT_CONNECT_REDDIT_CLIENT_ID=
+AIMEAT_CONNECT_REDDIT_CLIENT_SECRET=
 AIMEAT_CONNECT_REDIRECT_URI=                # default: <baseUrl>/v1/connections/callback
 ```
 
-Every one of these is also visible and adjustable in the admin dashboard's Config tab, so an
-operator sets them in one place rather than two.
+Every one of these is shown in the admin dashboard's Config tab (`aimeat/src/services/config/schema-connections.ts`).
+The client ids and the redirect address change there without a restart. The client secrets show
+only whether they are set, and a new value takes effect after a restart.
 
 **One thing to check at Google before promising the send button in production.** `gmail.send` is a
 restricted scope, which means the application is either verified or in testing mode with a user cap.

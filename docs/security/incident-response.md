@@ -21,10 +21,10 @@
 
 ### 2. Containment
 - **Compromised owner account:** The owner key signs no one in since 4.0.0. The operator disables the account (`aimeat_admin_owner_*`), resets its two-step sign-in, and revokes its sessions (`DELETE /v1/auth/sessions` as the owner, or the admin routes)
-- **Compromised node key:** Rotate node keys, re-establish federation peer connections
+- **Compromised node key:** There is no rotation procedure. A new node key is a new identity: every token the node issued stops working, so people sign in again and agents connect again, and every federation peer that pinned the old public key refuses the node until it peers again. Read [Key rotation](../operations/key-rotation.md) before you replace the key file
 - **Compromised JWT:** Revoke via `POST /v1/auth/revoke`, the authenticated owner's human sessions via `DELETE /v1/auth/sessions`. Revoke agent and ecosystem credentials through their own management routes
 - **Malicious federation peer:** Emergency de-peer via `DELETE /v1/federation/peers/:nodeId?emergency=true`
-- **Malicious extension:** Disable the extension via admin API
+- **Malicious extension:** Deactivate it with `POST /v1/extensions/:name/deactivate` (scope `ext:write`; the installer or the operator). No route under `/v1/admin` disables an extension
 
 ### 3. Eradication
 - Identify root cause (logs, audit trail)

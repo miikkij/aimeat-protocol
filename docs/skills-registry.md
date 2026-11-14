@@ -101,6 +101,12 @@ its visibility to `owner`.
 (a ref or a bare name); the registry mirrors it to `supersededBy`, and the Skills page lists
 the skill as replaced instead of leaving the fact in the description.
 
+**A skill for a feature that can be switched off:** a node skill names the switch in its
+frontmatter, `metadata.requires_config: <config key>` (for example `helpEnabled`). While that switch
+is off on the node, the handbook leaves the skill out and a read of it is refused with
+`FEATURE_OFF`, so an AI is not taught a feature that would refuse every call
+(`aimeat/src/services/skill-types.ts`, `skillFeatureOff`).
+
 ## App-bound skills (`binding`) — how and why
 
 **Why:** an AI-boosted app (an app calling `AIMEAT.ai.complete()`, or any app an agent is

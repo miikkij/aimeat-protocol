@@ -2,7 +2,7 @@
 
 *Anchor your own personal node to an operator node and keep it reachable through a tunnel.*
 
-**Checked against:** node 3.26.1, 2026-10-11
+**Checked against:** the code of node 4.3.1, 2026-11-15 (routes, frames, settings and error codes; the commands were last run against node 3.26.1 on 2026-10-11)
 **License:** MIT
 
 ---
@@ -163,7 +163,7 @@ curl -s -X POST "$OPERATOR/v1/personal/anchor" \
 }
 ```
 
-The node shows `status: "offline"` until the tunnel connects. One account anchors one personal node: the tunnel finds the node by the account that opens it.
+The node shows `status: "offline"` until the tunnel connects. An account may anchor up to `AIMEAT_PERSONAL_NODE_MAX_PER_OWNER` nodes (3 by default; one more answers 409 `PERSONAL_NODE_LIMIT`). The tunnel and `GET /v1/personal/status` find the node by the account that opens them and take one of that account's anchors, so anchor one personal node per account.
 
 ### 3.4 Open the tunnel
 
@@ -172,7 +172,7 @@ The tunnel is a WebSocket at `/v1/personal/tunnel`, and only the account that an
 - **A single-use ticket.** `POST /v1/ws/ticket` with `{"socket": "personal-tunnel"}` returns a ticket that is valid for 60 seconds. Open the socket with `?ticket=<ticket>`. A browser must use this way, because a browser WebSocket cannot send headers.
 - **An `Authorization: Bearer` header** on the upgrade request, from a client that can set headers.
 
-`?token=<jwt>` in the URL is deprecated and is removed in node 4.0.0, because reverse proxies write URLs to their access logs.
+`?token=<jwt>` in the URL was removed in node 4.0.0, because reverse proxies write URLs to their access logs.
 
 This client asks for a ticket, opens the tunnel, sends heartbeats, acknowledges mailbox items, and disconnects when you press Enter. Save it as `tunnel.mjs`:
 
@@ -268,8 +268,8 @@ Every frame is a JSON object:
 | `heartbeat` | Node to operator | Keeps the tunnel alive |
 | `heartbeat_ack` | Operator to node | The answer to a heartbeat, with the same `id` |
 | `disconnect` | Node to operator | Closes the tunnel and marks the node `offline` at once |
-| `request`, `response` | Both | Reserved for requests the operator forwards to the node. Node 3.26.1 does not forward requests yet. |
-| `delivery_receipt` | Not used | Defined in the frame type, with no handler in node 3.26.1 |
+| `request`, `response` | Both | Reserved for requests the operator forwards to the node. The operator reads a `response`, but no code of the node sends a `request` yet. |
+| `delivery_receipt` | Not used | Defined in the frame type, with no handler |
 
 ### 4.1 Acknowledge mailbox items
 
@@ -405,7 +405,7 @@ curl -s "$OPERATOR/v1/personal/mailbox/personal-myowner-001" -H "Authorization: 
 | `online` | The tunnel is open and heartbeats arrive on time |
 | `degraded` | The tunnel is open, but no heartbeat has arrived for more than 60% of the offline threshold |
 | `offline` | No tunnel is open |
-| `detached` | Defined in the record type; node 3.26.1 does not set it |
+| `detached` | Defined in the record type; no code of the node sets it |
 
 ---
 
@@ -415,11 +415,11 @@ curl -s "$OPERATOR/v1/personal/mailbox/personal-myowner-001" -H "Authorization: 
 |----------|---------|-------------|
 | `AIMEAT_PERSONAL_NODES_ENABLED` | `true` | Turns personal node support on or off |
 | `AIMEAT_PERSONAL_NODE_MAX_SLOTS` | `100` | The most personal nodes this operator anchors |
+| `AIMEAT_PERSONAL_NODE_MAX_PER_OWNER` | `3` | The most personal nodes one account anchors; `0` sets no limit |
 | `AIMEAT_PERSONAL_MAILBOX_QUOTA_MB` | `50` | Mailbox size per personal node, in MB |
 | `AIMEAT_PERSONAL_HEARTBEAT_MS` | `30000` | Heartbeat interval sent to the node in `welcome`, in ms |
 | `AIMEAT_PERSONAL_OFFLINE_MS` | `300000` | Time without a heartbeat before the node is marked offline, in ms |
 | `AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS` | `60000` | Time the operator waits for a `response` frame, in ms |
-| `AIMEAT_WS_QUERY_TOKEN` | `true` | Accepts the deprecated `?token=` on WebSocket upgrades. Removed in 4.0.0. |
 
 ### 7.1 Admin dashboard
 
@@ -518,6 +518,10 @@ The full contract is in `openapi.yaml` and at `$OPERATOR/v1/docs`. It also lists
 ### `CAPACITY_FULL` on registration
 
 - The operator anchors as many personal nodes as `AIMEAT_PERSONAL_NODE_MAX_SLOTS` allows. Use another operator, or ask this one to free a slot.
+
+### `PERSONAL_NODE_LIMIT` on registration
+
+- Your account already anchors as many nodes as `AIMEAT_PERSONAL_NODE_MAX_PER_OWNER` allows. Deregister one you no longer use (section 8).
 
 ### The node shows `degraded`
 

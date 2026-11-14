@@ -77,9 +77,14 @@ its agents, or an operator.
 
 The response is in `data.receipt`. It contains the receipt id, consent timestamp,
 principal, controller, purpose, data categories and termination condition.
-The implementation emits `version: "KI-CR-v1.1.0"`, jurisdiction `FI`,
-language `fi` and the node id as controller. These are implementation constants;
-the receipt is not an operator-specific legal assessment.
+The implementation emits `version: "KI-CR-v1.1.0"` and the node id as controller. Since
+2026-10-15 three fields come from the node and the consent
+([mydata-receipt.ts](../aimeat/src/services/mydata-receipt.ts)): the jurisdiction is the
+node's `operator.country` setting (an ISO 3166-1 alpha-2 code when it names a country,
+`unspecified` when it is empty), the language is the consenting person's account language
+(else the node's default), and the collection method is how the consent was given, stamped
+when it was granted (`not recorded` for an older consent). The receipt is not an
+operator-specific legal assessment.
 
 ## Limits
 

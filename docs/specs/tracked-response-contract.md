@@ -4,12 +4,16 @@
   state machine, and the rules any human/AI system must honor when reading or advancing one. A
   Tracked Response's `spec` field points here so external agents know how to handle the structure.
 @version-history
+  v1.1.0 - 2026-11-15 - Rules 2 and 5 match the node since 2026-10-14: the watched key is read only
+    from the owner's own account (the owner's records and their agents' records), and the account,
+    sender, recipient and conversation come from storage, not from the record's own fields. A
+    classified result can be left out of the reply.
   v1.0.1 - 2026-10-12 - The example uses made-up identities (example-node, helper#bob) instead of a
     real peer node and a real bug title. No change to the contract.
   v1.0.0 — 2026-06-21 — Initial spec (Tracked Response = first Memory Contract instance).
 -->
 
-# Tracked Response — contract spec (v1)
+# Tracked Response — contract spec (v1, revision 1.1.0)
 
 **One line:** *an important inbox message that is owed a response once a linked follow-up has been completed.*
 
@@ -81,10 +85,11 @@ cancelled         — owner cancelled; deregistered
 
 ## Rules any system MUST honor
 1. **Never delete the `source` message** — it is the reply target. A Tracked Response without its source can never fulfil.
-2. **Only `watch.key` + `watch.condition` drive firing.** To make a Tracked Response fulfil, an external system simply advances the watched record so the condition becomes true (e.g. publishes the bug with `status: "done"`). It does **not** need to know this contract exists.
+2. **Only `watch.key` + `watch.condition` drive firing, and only in the owner's own account.** The node reads the watched key from the account that stores the contract: the owner's own record first, then a record with that key stored by one of the owner's agents. A record with the same key in any other account never fires the contract. To make a Tracked Response fulfil, the owner or one of the owner's agents advances that record so the condition becomes true (for example, writes the bug with `status: "done"`). The writer does **not** need to know this contract exists.
 3. **Inject the result, don't fabricate it.** The reply carries `response.inject.field` from the watched value verbatim. If you want a richer reply, write a richer field (e.g. `resolution`) on the watched record before it goes `done`.
 4. **Idempotency is sacred.** A contract with `delivery.sentMessageId` set has already replied — never re-send. The system guards on this before every send.
-5. **Editing is allowed; the shape is the contract.** Any field may be edited by an authorized human/AI as long as the shape above is preserved and `type` stays `tracked-response`. Add data under `references` freely.
+5. **Editing is allowed; the shape is the contract.** Any field may be edited by an authorized human/AI as long as the shape above is preserved and `type` stays `tracked-response`. Add data under `references` freely. Four fields are not taken from the record when the node evaluates it: `ownerGaii` and `source.ownerGhii` become the account that stores the record (it must be a person, not an agent or an app), and `source.peerGhii` and `source.conversationId` come from that account's own copy of the message `source.messageId` names. A record that names no message of that account is skipped.
+6. **A classified result stays home.** When the watched record's classification label may not leave its organism, `{{result}}` is empty, the reply still goes, and the ledger records a `result-withheld` event with the key and the reason.
 
 ## How an external AI advances the work (the common case)
 > Read the bug at `watch.key`, do the work, then write it back with `status: "done"` and a `resolution` field, and publish. That's all — the reply to the original reporter is sent automatically.

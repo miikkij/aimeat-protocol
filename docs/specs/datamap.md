@@ -50,6 +50,8 @@ in two lines, without anyone opening the source.
 | `machinery` | list | What the app relies on (values below; an unknown name is kept as written). |
 | `leaves` | list of `{ what, to, recallable }` | What the app sends out: `what` it sends, `to` where, and `recallable`, whether it can be recalled. Sent mail cannot. |
 | `invites` | `{ does, into }`, optional | The app invites people into organisms, and an invitation can create a new account. `does` lists what it does (values below; an unknown one is kept as written), `into` names which organisms in the app's own words. |
+| `registers` | `{ who, keeps }`, optional | The app lets people with no account here register to it with an e-mail address, and they become outside parties of the app's owner. `who` says who registers, in the app's own words ("buyers and sellers of the market"); `keeps` lists what the app keeps of each ("e-mail address", "listings"). The owner is the controller of that data, so the records of processing list it. |
+| `aiAct` | `{ answers, notes? }`, optional | For an app that uses AI: the maker's answers to the node's EU AI Act questions. `answers` maps a question id to `true`, `false` or an option value; `notes` maps a question id to one or two sentences saying why. `GET /v1/datamap/apps/{owner}/{filename}` (and `aimeat_datamap_get`) lists the questions under `ai_act`. The node's administrator approves the answers in the register, where they are marked as the maker's. |
 | `held` | list of rows | The key families the app keeps (section below). |
 | `elsewhere` | list of `{ what, status, where, controlledBy, deletion }` | What is not ours or not resolved: `status` is `work-in-progress`, `copy-of-anothers-record`, `already-left` or `account-in-a-foreign-system`; `where` names the real one, `controlledBy` who decides about it, `deletion` what deleting our side does. |
 | `source` | `"declared"` or `"none"` | Who wrote it. The node writes `declared` for every stated map; `none` means there is no map. |
@@ -145,10 +147,22 @@ belong in the row store.
 The node never invents a map; it reads the stated one, folds it into one line for a list, and names
 what is missing. The findings, worst first: `DATAMAP_MISSING`, `DATAMAP_NO_PURPOSE`,
 `DATAMAP_NO_ARRANGEMENT`, `DATAMAP_FORM_UNSTATED`, `DATAMAP_FORM_CONTRADICTED`,
-`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`, `DATAMAP_ROW_BAD_PUBLISHABLE`,
-`DATAMAP_ROW_BAD_CLASSIFICATION`, `DATAMAP_ROW_BAD_DOMAIN`, `DATAMAP_PERSONAL_NO_DOMAIN`. The node reads the app's declared scopes for the invites finding,
+`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_REGISTERS_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`, `DATAMAP_ROW_BAD_PUBLISHABLE`,
+`DATAMAP_ROW_BAD_CLASSIFICATION`, `DATAMAP_ROW_BAD_DOMAIN`, `DATAMAP_PERSONAL_NO_DOMAIN`, `DATAMAP_AI_ACT_UNANSWERED`. The node reads the app's declared scopes for the invites finding,
 and an app with no map that asks for `organism:invite` has it beside `DATAMAP_MISSING`.
+`DATAMAP_AI_ACT_UNANSWERED` means that the map says the app uses AI (a model in its machinery, or
+something sent to an AI service) and `aiAct.answers` is empty.
 A finding never refuses a map. The owner sees it; everyone else reads the map without it.
+
+`PUT /v1/datamap/apps/{owner}/{filename}` answers with the stored map, its stamp and the findings.
+When the node requires a balancing test (`AIMEAT_COMPLIANCE_BALANCING_TEST=required`) and the app now
+needs one that is not approved, the answer also carries `balancing_test`: its state, the registers
+that need it, what to tell the person, and the address where it is written.
+
+`PUT /v1/datamap/apps/{owner}/{filename}/agents/{agent}` (body `{ made_for?, holds? }`) states, as
+one row of the map, that the app shows that agent's work; `DELETE` on the same path takes the tie
+away and leaves the agent, its work and the app as they are. Both need `memory:write`, and the
+agent's page and the app's page list the tie from the map.
 
 The app's own list entry carries a summary (`spec`, `form`, `summary`, `heldRows`,
 `rowsWithoutWhy`, `missing`, `docKey`, `at`), so a list of apps shows where each one's data is

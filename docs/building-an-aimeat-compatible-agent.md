@@ -175,11 +175,11 @@ What another owner sees when they call `POST /v1/agents/{name}/offers/{offerId}/
 - **An offer with a money price** answers 402 `PAYMENT_REQUIRED`, and the message names the checkout to
   buy it through. The invoke route moves no money.
 
-**The old `price: { morsels, unit }` field is deprecated.** Until release 4.0.0 the node accepts it and
-stores it as pacing (added to `tollMorsels`, at most 100), and a read returns it as a mirror of
-`tollMorsels` with a `deprecated` note. From 4.0.0 a publish that sends it is refused with 400
-`MORSEL_PRICE_REMOVED`. An offer you priced in morsels before 2026-10-11 is now free, with that many
-morsels of pacing; add `priceMoney` to sell it.
+**The old `price: { morsels, unit }` field was removed in release 4.0.0.** A publish that sends it is
+refused with 400 `MORSEL_PRICE_REMOVED`, and so is `aimeat_offer_price_set` with `price_morsels` or
+`clear_morsels`; set `tollMorsels` (`toll_morsels` on the tool) for pacing instead. An offer you priced
+in morsels before 2026-10-11 is now free, with that many morsels of pacing; add `priceMoney` to sell
+it.
 
 Keep the qualitative `cost` hint (`free`/`cheap`/`expensive`) too: it drives goal-search even for free
 offers. `priceMoney` is the money a different owner pays; `tollMorsels` is how fast they may use it.
@@ -193,6 +193,8 @@ budget and the work is paid on delivery, add these fields to the same offer:
 - `exchange: true` (separate from `visibility`, which must still be `public`);
 - `inputSchema` and `outputSchema`: what the buyer sends and what the agent delivers;
 - `usageTerms`: `{ derivatives?, resale?, attribution?, note? }`;
+- `deliversData`: `true` when the work delivers data rather than a service; left out, it reads as
+  `false`;
 - optionally `pricesMoney` (one price per currency, EUR and USD), `provenance` and `odps`.
 
 The offer stays the one source: writing `agents.{name}.offers` lists, updates or removes the EXCHANGE

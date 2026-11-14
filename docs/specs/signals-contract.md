@@ -4,6 +4,9 @@
   is shaped, and what each number is worth. Named by `spec` inside every month record, so an agent
   or another system can read and honour the shape without our code.
 @version-history
+  v1.1.0 - 2026-11-15 - The place a person came from (the stream's `geo` precision, the daily
+    `countries` and `places` counts, the month's `places` map) and the report's day window, as the
+    node keeps them since 2026-09-18.
   v1.0.0 — 2026-08-24 — Initial, with the collector.
 -->
 
@@ -46,9 +49,15 @@ reads its own saved link map. The node counts; it does not forward.
       "events":   { "open": 120, "click": 23 },
       "channels": { "email": 143 },
       "classes":  { "human": 118, "ai": 4, "bot": 21 },
-      "aiAgents": { "chatgpt:asked": 3, "claude": 1 }
+      "aiAgents": { "chatgpt:asked": 3, "claude": 1 },
+      "countries": { "FI": 90, "SE": 20, "ZZ": 8 },          // people only; only when the stream's geo is not "off"
+      "places":    { "FI|Uusimaa|Espoo": 41 }                // keys into "places" below
     }
   },
+  "places": {
+    "FI|Uusimaa|Espoo": { "country": "FI", "region": "Uusimaa", "city": "Espoo", "lat": 60.2, "lon": 24.7 }
+  },
+  "placesTruncated": false,
   "subjects": {
     "r-8fc21": { "firstAt": "…", "lastAt": "…", "events": { "open": 2, "click": 1 },
                  "lastRef": "hero-link", "machine": false }
@@ -58,6 +67,21 @@ reads its own saved link map. The node counts; it does not forward.
   "updatedAt": "…"
 }
 ```
+
+## Where people came from
+
+A stream sets `geo`, the precision it keeps a place at: `off` (the default), `country`, `region` or
+`city`. Only hits from people count; an AI fetcher's place is a data centre. The place comes from
+headers the reverse proxy sets, and the node keeps no address. Each day gets `countries` (an ISO
+3166 two-letter code, or `ZZ` when the place could not be told) and, at `region` or `city`,
+`places`, whose keys (`country|region|city`) point into the month's `places` map. A city place
+carries `lat` and `lon` rounded to one decimal. A month keeps at most 300 places; a new place after
+that is not counted as a place, and `placesTruncated` turns true.
+
+The report (`GET /v1/signals/streams/{streamId}/report`) takes a month window (`from`, `to`) or a
+day window (`from_day`, `to_day`), and answers `totals.countries`, `totals.places`, the `places` they
+refer to, `placesTruncated`, and `geo`, the precision the stream keeps NOW: earlier days may hold
+less.
 
 ## Why one key per month
 
@@ -108,7 +132,7 @@ load no images.
 | `POST /v1/signals/streams` | `signals:write` | define what is measured |
 | `GET /v1/signals/streams` | `signals:read` | list streams and their public addresses |
 | `DELETE /v1/signals/streams/{id}` | `signals:write` | delete a stream and its months |
-| `GET /v1/signals/streams/{id}/report` | `signals:read` | totals, days, AI names, per-subject roll-up |
+| `GET /v1/signals/streams/{id}/report` | `signals:read` | totals, days, AI names, countries and places, per-subject roll-up |
 | `GET /v1/signals/{owner}/{id}/px.svg` | none | the tracking image |
 | `POST /v1/signals/{owner}/{id}/hit` | none | everything a script can send |
 

@@ -79,7 +79,7 @@ You need Node.js 24 or later. SQLite needs no database server; PostgreSQL is the
 
 ## For a company
 
-One node can serve a company, its staff and the partner companies it approves, and nobody else. Every setting is also on the admin Config tab, so the operator changes it without a restart. The whole recipe: [a company node, step by step](https://github.com/miikkij/aimeat-protocol/blob/main/docs/organisation-node-sign-in.md#6b-a-company-node-step-by-step).
+One node can serve a company, its staff and the partner companies it approves, and nobody else. Every setting is shown on the admin Config tab, and most change there without a restart; a few, such as the list of partner tenants, take effect only after a restart. The whole recipe: [a company node, step by step](https://github.com/miikkij/aimeat-protocol/blob/main/docs/organisation-node-sign-in.md#6b-a-company-node-step-by-step).
 
 - **Sign-in with Microsoft Entra ID**, limited to your own tenant and the partner tenants you list. A new account comes only through Entra or an invitation.
 - **Closed to the internet.** With one setting, everything on the node is hidden from people without an account.

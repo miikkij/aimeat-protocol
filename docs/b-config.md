@@ -157,7 +157,8 @@ Defaults as shipped in `.env.example`.
 | `node.anonymous_mode` | `AIMEAT_ANONYMOUS` | `false` | Read and limited writes with no account, alongside normal auth |
 | `node.dev_mode` | `AIMEAT_DEV_MODE` | `false` | Allows localhost webhooks; re-registration resets the password only |
 | `storage.type` | `AIMEAT_STORAGE` | `memory` | `sqlite` or `postgres-kysely` for anything that must survive a restart |
-| `auth.jwt_ttl_seconds` | `AIMEAT_JWT_TTL` | `3600` | Session token lifetime |
+| `auth.access_ttl_seconds` | `AIMEAT_ACCESS_TTL` | `900` | A person's access token after sign-in; the refresh cookie renews it (`AIMEAT_REFRESH_IDLE_DAYS`, `AIMEAT_REFRESH_ABSOLUTE_DAYS`) |
+| `auth.jwt_ttl_seconds` | `AIMEAT_JWT_TTL` | `3600` | Tokens minted by a signed `POST /v1/auth/token`, MCP OAuth access tokens and the setup token; not a person's browser session |
 | `morsel_policy.welcome_bonus` | `AIMEAT_WELCOME_BONUS` | `100` | Morsels a new owner starts with |
 | `morsel_policy.daily_allowance` | `AIMEAT_DAILY_ALLOWANCE` | `50` | Accrued per day |
 | `morsel_policy.daily_allowance_cap` | `AIMEAT_DAILY_ALLOWANCE_CAP` | `500` | Where accrual stops |
@@ -178,7 +179,7 @@ Defaults as shipped in `.env.example`.
 | `rate_limits.auth` | `AIMEAT_RL_AUTH` | `20` | Requests per second on auth |
 | `rate_limits.memory` | `AIMEAT_RL_MEMORY` | `120` | Requests per second on memory |
 | `security.login_rate_limit_max` | `AIMEAT_LOGIN_RATE_LIMIT_MAX` | `15` | Login attempts per window |
-| `security.password_lockout_attempts` | `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` | `5` | Failures before an account locks |
+| `security.password_lockout_attempts` | `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` | `5` | Failures before an account locks; read only when `auth.sign_in_lockout` (`AIMEAT_SIGN_IN_LOCKOUT`) is `on`, and it is `off` by default |
 | `security.json_body_limit_mb` | `AIMEAT_JSON_BODY_LIMIT_MB` | `5` | Request body ceiling |
 | `features.extended_features_enabled` | `AIMEAT_EXTENDED_FEATURES` | `true` | The platform layer on top of the Core |
 | `registration.mode` | `AIMEAT_REGISTRATION_MODE` | `open` | Who may create an account: `open`, `oauth`, `invite` or `closed`. → `docs/organisation-node-sign-in.md` |
@@ -186,7 +187,9 @@ Defaults as shipped in `.env.example`.
 
 **The security posture is environment-only.** `AIMEAT_SECURITY_PROFILE` takes `local` or `public`.
 When unset, `config.ts` selects `local` for a private base URL or a personal node, and `public`
-otherwise. Its schema row (`security.profile`) is immutable, so the dashboard shows it and cannot
+otherwise. A node whose `AIMEAT_BIND_HOST` is beyond this computer (not `localhost`, `127.x` or
+`::1`) always gets `public` when the profile is unset, whatever its base URL says
+(`config/private-host.ts`). Its schema row (`security.profile`) is immutable, so the dashboard shows it and cannot
 change it. It decides the settings whose safe value differs between localhost and the open internet:
 private-network egress and whether app origin isolation is on when nothing has said. On a public node
 it also makes the start log warn about an empty AI provider allowlist; the allowlist itself is empty
@@ -200,7 +203,7 @@ answers 503 on `/v1/privacy` rather than naming somebody else as the data contro
 
 Since 11 October 2026 every offer, app, tool, action and EXCHANGE offering has two values: an
 optional money price (EUR or USD; none means free) and a pacing amount in morsels per use
-(`toll_morsels`, at most `AIMEAT_EXT_MAX_DEBIT`, 100 by default, which has no dot path). Each use takes the pacing
+(`toll_morsels`, at most `extensions.max_debit_per_call` (`AIMEAT_EXT_MAX_DEBIT`), 100 by default). Each use takes the pacing
 amount from the user's owner. `morsel_policy.burn_rate` decides the share that burns. A flow that
 had an operator share before (`commerce.fee_percent`, `marketplace.tx_fee_percent`) keeps it, and
 the provider gets the rest. An older morsel price (`price.morsels`, `priceMorsels`, `base_morsels`

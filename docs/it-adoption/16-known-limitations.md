@@ -1,6 +1,6 @@
 # 16 Known limitations
 
-> Checked against AIMEAT node 4.2.0 (commit 2d94bf903) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 667811fb8) on 2026-11-14. Maintained with the code: see the README for how.
 
 Every known limitation of AIMEAT in one place, for the IT, security and data protection staff deciding whether to run it. Each row says what the limitation is, what follows from it, what the organisation can do about it, and where it is recorded. A limitation that has a setting is listed with that setting; "off by default" means the protection exists and the organisation must turn it on. The pages of this package carry their own `## Limits`; those the tables do not already carry are in the section "From the other pages" below.
 

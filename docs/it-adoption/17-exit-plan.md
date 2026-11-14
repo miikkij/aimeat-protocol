@@ -1,6 +1,6 @@
 # 17 Exit plan
 
-> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 667811fb8) on 2026-11-14. Maintained with the code: see the README for how.
 
 This page is for the system owner and the DPO of the adopting organisation. It answers three exit questions before you go live: how people and the organisation get their data out and in which formats, how a node is shut down and its data destroyed, and how you keep running and developing AIMEAT yourselves if the project or its maintainer stops. Every route and tool named here was checked in the code.
 
@@ -70,7 +70,7 @@ Once the node key and the process are gone, every token the node issued to peopl
 | File store objects | The S3 bucket or Azure container prefix | Delete the prefix, and the bucket if the node had it alone | `aimeat/.env.example` |
 | People's own storage | Buckets that people connected themselves (`AIMEAT_OWNER_FILE_STORES`) | They belong to those people; tell them | `aimeat/src/services/file-store/owner-file-store.ts` |
 | Node key | `~/.aimeat/nodes/<node id>/node-key.json`, or `AIMEAT_NODE_KEY_PATH`; a sealed copy is in the database | Delete the file; the database copy goes with the database | [Backup and restore](../operations/backup-and-restore.md#what-a-node-is) |
-| Secrets | `.env` or the process manager's environment: `AIMEAT_ENCRYPTION_KEY`, `AIMEAT_TOTP_ENCRYPTION_KEY`, `AIMEAT_KEY_PASSPHRASE`, provider keys | Delete. Without the data key (`AIMEAT_ENCRYPTION_KEY`, or `AIMEAT_TOTP_ENCRYPTION_KEY` where the first was never set), nobody can read the encrypted secrets in any remaining copy | [Backup and restore](../operations/backup-and-restore.md#what-a-node-is) |
+| Secrets | `.env` or the process manager's environment: `AIMEAT_ENCRYPTION_KEY`, `AIMEAT_ENCRYPTION_KEY_1` and `AIMEAT_ENCRYPTION_KEY_CURRENT` where a second data key was set, `AIMEAT_TOTP_ENCRYPTION_KEY`, `AIMEAT_KEY_PASSPHRASE`, provider keys | Delete. Without the data keys (`AIMEAT_ENCRYPTION_KEY` and `AIMEAT_ENCRYPTION_KEY_1`, or `AIMEAT_TOTP_ENCRYPTION_KEY` where the first was never set), nobody can read the encrypted secrets in any remaining copy | [Backup and restore](../operations/backup-and-restore.md#what-a-node-is) |
 | Backups | Wherever your backups go | Delete each copy when its retention ends. A backup holds what people deleted or erased after it was taken | [Data ownership](../data-ownership.md#8-the-operator-is-accountable) |
 | Logs | The node log (journald with the systemd unit, the container log with Docker) and the proxy's access log | Delete by your log retention policy | `aimeat/deploy/aimeat.service`, [10 Logging and monitoring](10-logging-monitoring.md) |
 | Federation peers | Records replicated to peers under a federation consent | The node sends a signed retraction (`POST /v1/federation/retract`) for a record that is deleted, made non-public, loses its federation consent or belongs to an erased account. The node keeps the record of what it sent in memory only, so it can miss a retraction that falls across a restart. A receiving AIMEAT node then drops the copy after its 168-hour cache lifetime. A peer run by another operator decides itself whether it deletes, and a node that is already gone sends nothing | `aimeat/src/services/memory-replication.ts` |

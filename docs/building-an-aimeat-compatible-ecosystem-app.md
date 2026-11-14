@@ -148,6 +148,13 @@ the request with its `user_code` on the **Outside apps** tab of Settings & Contr
   them as `own_tick_scopes`, the Outside apps tab shows them unticked, and an approval that names no
   scopes leaves them out unless your app already held them (`held_back_scopes` in the answer). Ask
   for such a scope only when your app needs it, and say why in your setup guide.
+- A hello from an app the owner already connected is a **reconnect**. The pending row says so
+  (`reconnect: true`) and whether the key differs from the pinned one (`key_changed`; a change also
+  carries `pinned_key_fingerprint` and `key_fingerprint`, and a same-key reconnect carries
+  `key_proven`). Approving a key change ends every session of the GEAI issued before it, as a
+  delete does, so the old credential answers 401 and your app picks up the new one. A reconnect with
+  the same key (the yearly re-approval) keeps its sessions. Send a hello with a new key only when the
+  old one is lost.
 
 ### 3.3 `POST /v1/ecosystem-apps/token`: the connector polls for the credential
 

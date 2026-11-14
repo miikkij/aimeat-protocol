@@ -2,7 +2,10 @@
 
 A node can exchange catalogues and consented memory with approved genesis peers.
 The implemented routes and authorization are in
-[federation-genesis.ts](../aimeat/src/routes/federation-genesis.ts); request and
+[federation-genesis.ts](../aimeat/src/routes/federation-genesis.ts), and the answering half of the
+memory read (`GET /v1/federation/genesis-memory-read`, which answers only an approved peer on a
+request signed for this node) in
+[federation-genesis-memory-read.ts](../aimeat/src/routes/federation-genesis-memory-read.ts); request and
 response schemas belong in [openapi.yaml](../openapi.yaml).
 
 ## Routes

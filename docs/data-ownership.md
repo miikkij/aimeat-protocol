@@ -102,9 +102,11 @@ for ever with knowledge that no longer applies.
 
 **How.**
 
-- **Expiry on a record:** `ttl_hours` on a write. Reads hide an expired record, a read by key moves it
-  to the bin, and the `memory-ttl-cleanup` job moves expired records to the bin every few minutes. From
-  there the bin's window applies.
+- **Expiry on a record:** `ttl_hours` on a write. Reads hide an expired record. Every five minutes the
+  `memory-ttl-cleanup` job deletes every expired record of every owner for good, in one statement
+  (`storage.deleteExpiredMemory`, called from `aimeat/src/services/core-jobs.ts`); the bin's window does
+  not apply, because the writer set the expiry. A read by key that meets an expired record before the
+  job does moves it to the bin, and the next run of the job removes it from there too.
 - **Archive:** `POST /v1/organisms/{id}/archive` and `/unarchive` (`aimeat_organism_archive`) at four
   levels (organism, workspace, space, record). Archived content is read-only and leaves overviews,
   lists and search, and stays readable by key (`aimeat/src/services/archive.ts`).
@@ -114,9 +116,8 @@ for ever with knowledge that no longer applies.
   execution log (`AIMEAT_EXECUTION_LOG_RETENTION_DAYS`), decision records (`AIMEAT_DECIDE_RETENTION_DAYS`),
   the classification audit, and visit statistics are pruned by scheduled jobs. Board posts expire.
 
-**Limits today.** The expiry job walks agents' records only, so an expired record under a person's own
-identity is hidden from every read but reaches the bin only when someone reads it by key. Nothing marks
-a record as stale short of expiring it; that judgement is left to the person and their AI.
+**Limits today.** Nothing marks a record as stale short of expiring it; that judgement is left to the
+person and their AI.
 
 ## 6. A person can leave
 

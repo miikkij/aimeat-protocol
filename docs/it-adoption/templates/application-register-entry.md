@@ -1,6 +1,6 @@
 # Template: application register entry
 
-> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 667811fb8) on 2026-11-14. Maintained with the code: see the README for how.
 
 ## How to use
 

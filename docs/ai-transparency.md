@@ -172,9 +172,9 @@ Every knob has a safe public default. All are documented in `.env.example`.
 
 | Variable | Values | What it governs |
 |---|---|---|
-| `AIMEAT_AI_PROVENANCE` | `true` (default) · `false` | Whether records are minted at all. `false` is a local-dev convenience, **not** a compliance option — a node that generates and publishes owes the marking whether or not it kept a record. |
+| `AIMEAT_AI_PROVENANCE` | `true` (default) · `false` | Whether records are minted at all. `false` is a local-dev convenience, **not** a compliance option — a node that generates and publishes owes the marking whether or not it kept a record. Since 4.0.0 a node on the `public` security profile records provenance whatever this says; only a local node can switch it off (`aimeat/src/config/ai-label.ts`, Core 2026-11 PROV-07). |
 | `AIMEAT_AI_PROVENANCE_DETAIL` | `full` (default) · `minimal` | What a **public** surface *serves*. It never reduces what is stored, and the owner always sees the whole record. `minimal` serves the four required fields plus the disclosure block — for when a pipeline name or a source list would reveal something commercial. |
-| `AIMEAT_AI_LABEL_PUBLIC` | `strict` (default) · `light` · `off` | How eagerly a **visible** label is shown. Presentation only: the record, the headers and the machine planes are unaffected. |
+| `AIMEAT_AI_LABEL_PUBLIC` | `strict` (default) · `light` · `off` | How eagerly a **visible** label is shown. Presentation only: the record, the headers and the machine planes are unaffected. `off` is refused on a node on the `public` security profile and becomes `strict`; an unknown value is `strict` too. |
 | `AIMEAT_AI_COP_SECTIONS` | empty (default) · `2` · `1,2` | Which sections of the Code of Practice **your organisation** signed. Empty means the statement reports you as not a signatory. Set it only once the AI Office has confirmed your signature: it is a public compliance claim, not a feature flag. |
 | `AIMEAT_AI_COP_SIGNED_ON` | ISO date | When it was signed. A signature without a date is the part a reader cannot check, so `aimeat validate` warns when sections are set without one. |
 
@@ -214,7 +214,8 @@ If you deliberately run without them, say so on your own node. Silence reads as 
 
 ## 7. If someone reports unlabelled AI content
 
-Anyone can report content that should carry a label and does not. A visible label links to its own
+Anyone with an account on the node can report content that should carry a label and does not (the
+report needs a sign-in and the `social:write` permission). A visible label links to its own
 provenance record, and that record id is what to report.
 
 ```
