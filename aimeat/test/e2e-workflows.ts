@@ -6,6 +6,8 @@
  *   steps via simulated task completion (the onTaskTerminal hook). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows
  * @version-history
+ *   2026-11-14 — The finish notifications are read in the recipient's own words (notiftext), which
+ *     notify() now stores: the setup no longer matched production, where the bell showed those words.
  *   2026-10-20 — Three cases from the October security audit. "Run as me" on a refusal whose
  *     definition was saved again by another principal answers 409 DEFINITION_CHANGED and starts
  *     nothing, while an untouched refused run still runs as the owner. GET /:id/preflight by
@@ -886,7 +888,9 @@ async function run() {
     assert(r.body.data.status === 'done', `expected done, got ${r.body.data.status}`);
 
     const fn = await finishNotifs();
-    const ok = fn.find(n => n.type === 'workflow_finished' && n.title.includes('succeeded'));
+    // The stored title is the recipient's own words since 2026-11-14 (notiftext.workflow_finished, in
+    // English for this account): what the bell always showed, where the code's fallback said "succeeded".
+    const ok = fn.find(n => n.type === 'workflow_finished' && n.title.includes('finished'));
     assert(!!ok, `expected a workflow_finished 'succeeded' notification, got ${JSON.stringify(fn)}`);
     assert(ok!.body.includes('fetch:') && ok!.body.includes('write:'), `notification body should carry the per-step log, got: ${ok!.body}`);
   });
@@ -908,9 +912,10 @@ async function run() {
     assert(r.body.data.status === 'partial', `expected partial, got ${r.body.data.status}`);
 
     const fn = await finishNotifs();
-    const failed = fn.find(n => n.type === 'workflow_failed' && n.title.includes('failed'));
+    // The recipient's own words (notiftext.workflow_failed), as the bell always showed them.
+    const failed = fn.find(n => n.type === 'workflow_failed' && n.title.includes('stopped short'));
     assert(!!failed, `expected a workflow_failed notification, got ${JSON.stringify(fn)}`);
-    assert(failed!.body.includes('Failed steps: gen'), `notification body should name the failed step, got: ${failed!.body}`);
+    assert(failed!.body.includes('Did not produce: gen'), `notification body should name the failed step, got: ${failed!.body}`);
   });
 
   // ── health ──
