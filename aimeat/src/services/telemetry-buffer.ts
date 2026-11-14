@@ -24,15 +24,21 @@
  *   - listTelemetryBuffered(...)     -- read the ring for GET /telemetry
  *   - bufferedTelemetryCount(gaii)   -- existence check for onboarding validation
  *   - flushTelemetryBuffer()         -- write accumulated deltas to storage
+ *   - holdTelemetryForErasure(a)     -- an account erasure: drop its agents' signals, keep none until released
  * @usage
  *   import { pushTelemetry, recordTelemetryActivity } from './telemetry-buffer.js';
  * @version-history
+ *   v1.1.0 -- 2026-11-14 -- holdTelemetryForErasure: before the erasure cascade, the account's agents'
+ *     waiting signals are dropped and a flush in progress answers, and none of their signals is kept
+ *     until it ends. A flush that had taken an agent's counts before the cascade stored its activity
+ *     rows after it (register finding f-2026-11-13-write-buffers-and-erasure).
  *   v1.0.0 -- 2026-06-21 -- Initial: move per-request telemetry + heartbeat writes to a
  *                            60s batched flush; stop persisting raw telemetry_events rows.
  */
 import type { Storage, TelemetryEvent, AgentActivityStats } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
+import { ErasureHolds, type ErasedAccount } from './erasure/holds.js';
 
 /** Flush cadence. Dashboards reading agent_activity / lastSeen are at most this stale. */
 const FLUSH_INTERVAL_MS = 60_000;
@@ -53,9 +59,13 @@ let activityDeltas = new Map<string, number>();
 let statsDeltas = new Map<string, StatsDelta>();
 /** Latest heartbeat timestamp per agent (overwrite — only the newest matters). */
 let lastSeen = new Map<string, string>();
+/** The accounts whose erasure runs now, whose agents' signals are not kept, and the flush in
+ *  progress an erasure waits for (holdTelemetryForErasure). */
+const erasing = new ErasureHolds();
 
 /** Push a raw telemetry event into the bounded per-agent ring. No DB write. */
 export function pushTelemetry(event: TelemetryEvent): void {
+  if (erasing.covers(event.agentGaii)) return;
   let events = ring.get(event.agentGaii);
   if (!events) {
     events = [];
@@ -81,6 +91,8 @@ function addActivityDelta(gaii: string, date: string, hour: number, metric: stri
  * Tolerant about field names: agents send { tokens_in, tokens_out } or { tokens_used }.
  */
 export function recordTelemetryActivity(gaii: string, event: { type: string; data: Record<string, unknown> }): void {
+  // An agent of an account being erased: the cascade deletes its activity, so none is started again.
+  if (erasing.covers(gaii)) return;
   const now = new Date();
   const date = now.toISOString().split('T')[0];
   const hour = now.getUTCHours();
@@ -108,6 +120,7 @@ export function recordTelemetryActivity(gaii: string, event: { type: string; dat
 
 /** Record a heartbeat. Only the newest timestamp per agent is kept. No DB write. */
 export function markAgentSeen(gaii: string, iso: string): void {
+  if (erasing.covers(gaii)) return;
   lastSeen.set(gaii, iso);
 }
 
@@ -165,8 +178,10 @@ export async function flushTelemetryBuffer(): Promise<void> {
     // 1. Refined activity time series (upsert-increment per agent/date/hour/metric).
     for (const [key, value] of deltas) {
       const [agentGaii, date, hourStr, metric] = key.split('\0');
+      // Taken before an erasure began and reached after it: the erased account's agent gets no row back.
+      if (erasing.covers(agentGaii)) continue;
       try {
-        await storage.recordActivity({ agentGaii, date, hour: Number(hourStr), metric, value });
+        await erasing.track(storage.recordActivity({ agentGaii, date, hour: Number(hourStr), metric, value }));
         wrote = true;
       } catch (err) {
         logger.warn('telemetry flush: recordActivity failed', { key, error: String(err) });
@@ -177,6 +192,7 @@ export async function flushTelemetryBuffer(): Promise<void> {
     //    One getAgent (only when stats need merging) + one updateAgent per agent.
     const agents = new Set<string>([...seen.keys(), ...stats.keys()]);
     for (const gaii of agents) {
+      if (erasing.covers(gaii)) continue;
       try {
         const patch: { lastSeen?: string; activityStats?: AgentActivityStats } = {};
         if (seen.has(gaii)) patch.lastSeen = seen.get(gaii);
@@ -199,7 +215,7 @@ export async function flushTelemetryBuffer(): Promise<void> {
         }
 
         if (patch.lastSeen !== undefined || patch.activityStats !== undefined) {
-          await storage.updateAgent(gaii, patch);
+          await erasing.track(storage.updateAgent(gaii, patch));
           wrote = true;
         }
       } catch (err) {
@@ -212,6 +228,25 @@ export async function flushTelemetryBuffer(): Promise<void> {
 
   // One coalesced SSE nudge per flush instead of one per request.
   if (wrote) emitChange('agents');
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no signal of the account's
+ * agents is kept from now on, a write of the flush in progress answers first so the cascade deletes
+ * what it stored, the rest of that flush skips them, and their waiting signals are dropped.
+ * evictAgentTelemetry does the last part for one agent; this does it for every agent of the
+ * account, the ones the cascade removes too. The returned function ends the hold, after the cascade.
+ */
+export async function holdTelemetryForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  await erasing.writesSettled();
+  for (const gaii of [...ring.keys(), ...statsDeltas.keys(), ...lastSeen.keys()]) {
+    if (ErasureHolds.isOf(gaii, account)) evictAgentTelemetry(gaii);
+  }
+  for (const key of [...activityDeltas.keys()]) {
+    if (ErasureHolds.isOf(key.split('\0')[0], account)) activityDeltas.delete(key);
+  }
+  return release;
 }
 
 /** Wire storage and start the flush interval. Idempotent. */

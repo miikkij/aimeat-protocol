@@ -23,6 +23,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-queues.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-queues.test.ts
  * @version-history
+ *   v1.5.0 — 2026-11-14 — The agent telemetry buffer.
  *   v1.4.0 — 2026-11-14 — The content intake queue.
  *   v1.3.0 — 2026-11-14 — The write-time classification queue.
  *   v1.2.0 — 2026-11-14 — The receiver delivery log.
@@ -45,6 +46,7 @@ import { memoryTarget } from '../../src/services/classification/labels.js';
 import { contentAfterStore, flushContentIntake } from '../../src/services/content/intake.js';
 import { getFacts, sourceIdOf } from '../../src/services/content/facts-store.js';
 import { writeStorageFile } from '../../src/services/storage-file-write.js';
+import { initTelemetryBuffer, recordTelemetryActivity, flushTelemetryBuffer } from '../../src/services/telemetry-buffer.js';
 
 // The model path is not what these cases test; an IBAN meets the detection rules alone.
 vi.mock('../../src/services/decide/service.js', () => ({
@@ -246,5 +248,36 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
       expect(await facts(p.aliceGhii, 'docs/held.txt')).toBeNull();
       expect(await ownRecords(p.aliceGhii)).toEqual([]);
     });
+  });
+
+  // ── The agent telemetry buffer (services/telemetry-buffer.ts) ──
+  const llmCall = { type: 'llm_call', data: { tokens_used: 5 } };
+
+  it('agent telemetry, WAITING: no activity of the erased account\'s agent is stored after the erasure (green before the fix too: the erasure dropped the agent\'s waiting counts)', async () => {
+    const s = st();
+    const p = await people(s);
+    initTelemetryBuffer(s);
+    const bobAgent = `helper#${p.bobGhii}`;
+    recordTelemetryActivity(p.star, llmCall);
+    recordTelemetryActivity(bobAgent, llmCall);
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushTelemetryBuffer();
+
+    expect(await s.getActivityHistory(p.star)).toEqual([]);
+    // POSITIVE CONTROL: the other account's agent's activity is stored.
+    expect((await s.getActivityHistory(bobAgent)).length).toBeGreaterThan(0);
+  });
+
+  it('agent telemetry, BEING WRITTEN: activity whose write is in progress is not stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    initTelemetryBuffer(s);
+    const held = holdFirst(s, 'recordActivity', 'before', args => (args[0] as { agentGaii?: string }).agentGaii === p.star);
+    try {
+      recordTelemetryActivity(p.star, llmCall);
+      await eraseDuring(s, p, held, flushTelemetryBuffer());
+    } finally { held.restore(); }
+    expect(await s.getActivityHistory(p.star)).toEqual([]);
   });
 });

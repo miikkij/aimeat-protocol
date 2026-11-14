@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-14 — The agent telemetry buffer holds the account for the length of the erasure
+ *     (holdTelemetryForErasure): a flush in progress stored an agent's activity rows after the cascade
+ *     (register finding f-2026-11-13-write-buffers-and-erasure).
  *   2026-11-14 — The content intake queue holds the account for the length of the erasure
  *     (holdContentIntakeForErasure): an inspection in progress stored the facts of the erased person's
  *     file after the cascade (register finding f-2026-11-13-write-buffers-and-erasure).
@@ -131,7 +134,7 @@ import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { ERASED_PARTY_PREFIX, erasedPartyPseudonym } from '../storage/erased-party.js';
 import { inSavepoint } from './tolerant-step.js';
-import { evictAgentTelemetry } from './telemetry-buffer.js';
+import { evictAgentTelemetry, holdTelemetryForErasure } from './telemetry-buffer.js';
 import { removeWithClassificationAudit, flushClassificationAudit } from './classification/audit.js';
 import { holdConsentAuditForErasure } from './consent-audit-buffer.js';
 import { holdUsageForErasure } from './usage/usage-buffer.js';
@@ -568,6 +571,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     releases.push(await holdReceiverLogsForErasure(account));
     releases.push(await holdWriteClassificationForErasure(account));
     releases.push(await holdContentIntakeForErasure(account));
+    releases.push(await holdTelemetryForErasure(account));
     // The cascade deletes the classification audit rows of the person's content and renames the person
     // where they were the reader of someone else's. A row that waits in memory, or is being written
     // while the cascade runs, would be stored after it and bring the erased person back into the log
