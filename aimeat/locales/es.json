@@ -19786,6 +19786,19 @@
     "figAgents": "agentes",
     "figLast": "último cambio",
     "noAgentsYet": "Ninguno todavía",
+    "teamMap": {
+      "title": "Mapa de equipos",
+      "lead": "Tus equipos, quién los dirige, de quién está conectada la propia IA y qué necesita cada uno de otro. Se dibuja a partir de los propios equipos; no hace falta un organigrama. Solo muestra los equipos en los que estás, y nada de su contenido.",
+      "team": "equipo",
+      "virtual": "equipo virtual",
+      "leads": "dirigido por {names}",
+      "members": "miembros: {n}",
+      "ai": "IA propia conectada: {n}/{of}",
+      "until": "hasta el {date}",
+      "otherTeam": "un equipo en el que no estás",
+      "open": "Abrir el equipo",
+      "chat": "Una línea entre equipos sale del chat: \"Ventas necesita los datos técnicos de software.\" Las personas bajo las fichas están en más de uno de tus equipos."
+    },
     "team": {
       "waitingTitle": "Pendiente de ti",
       "waitingNone": "Nada te espera en este equipo.",

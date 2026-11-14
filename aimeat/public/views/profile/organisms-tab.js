@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.40.0 -- 2026-11-14 -- The team map above My Organisms, for someone in two teams or more (organisms/team-map.js, team setup T21).
  *   v2.39.1 -- 2026-11-14 -- A team's row and the joined banner name the team in the reader's language (orgName, team setup T24).
  *   v2.39.0 -- 2026-11-14 -- The joined banner asks which AI the newcomer uses and opens the connect page on that AI's instruction (rememberTool), so the step after joining is one press (team setup T3).
  *   v2.38.0 -- 2026-11-08 -- The create form's shape, join policy and visibility drop-downs each have their question mark beside them: organism.shape, organism.joinPolicy, organism.visibility (components/HelpTip.js); the notes under them stay, because they follow the current choice.
@@ -122,6 +123,7 @@ import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import { fmtDate, orgInitials, orgName, exportOrganismZip } from '/views/profile/organisms/helpers.js';
 import { IncomingInvitations } from '/views/profile/organisms/panels.js';
+import { TeamMap } from '/views/profile/organisms/team-map.js';
 import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
 import { swallowed } from '/js/swallowed.js';
@@ -733,6 +735,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     ` : html`
     ${/* Incoming invitations */ ''}
     <${IncomingInvitations} showToast=${showToast} onChanged=${loadData} />
+
+    ${/* The team map: drawn only for someone in two teams or more (team-map.js). */ ''}
+    <${TeamMap} onOpen=${(id) => { setOpenId(id); setOpenWs(null); setOpenSpace(null); setOpenSettings(false); }} />
 
     ${/* My Organisms */ ''}
     <${FileDrop} hidden accept=".zip,application/zip" inputRef=${orgFileRef} onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />

@@ -21729,6 +21729,19 @@
     "figAgents": "agenttia",
     "figLast": "viimeksi",
     "noAgentsYet": "Ei vielä yhtään",
+    "teamMap": {
+      "title": "Tiimikartta",
+      "lead": "Tiimisi, niiden vetäjät, kenen oma tekoäly on kytketty ja mitä kukin tiimi tarvitsee toiselta. Kartta syntyy tiimeistä itsestään, eikä organisaatiokaaviota tarvita. Siinä näkyvät vain tiimit, joissa olet, eikä niiden sisältöä.",
+      "team": "tiimi",
+      "virtual": "virtuaalitiimi",
+      "leads": "vetäjä: {names}",
+      "members": "jäseniä: {n}",
+      "ai": "oma tekoäly kytketty: {n}/{of}",
+      "until": "{date} asti",
+      "otherTeam": "tiimi, jossa et ole",
+      "open": "Avaa tiimi",
+      "chat": "Viiva tiimien välille syntyy chatissa: \"Myynti tarvitsee ohjelmistokehitykseltä tekniset tiedot.\" Korttien alla ovat ihmiset, jotka ovat useammassa tiimissäsi."
+    },
     "team": {
       "waitingTitle": "Odottaa sinua",
       "waitingNone": "Tässä tiimissä mikään ei odota sinua.",

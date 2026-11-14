@@ -20962,6 +20962,19 @@
     "figAgents": "agents",
     "figLast": "last change",
     "noAgentsYet": "None yet",
+    "teamMap": {
+      "title": "Team map",
+      "lead": "Your teams, who leads them, whose own AI is connected, and what each needs from another. Drawn from the teams themselves; no org chart is needed. It shows only teams you are in, and none of their content.",
+      "team": "team",
+      "virtual": "virtual team",
+      "leads": "led by {names}",
+      "members": "members: {n}",
+      "ai": "own AI connected: {n}/{of}",
+      "until": "until {date}",
+      "otherTeam": "a team you are not in",
+      "open": "Open the team",
+      "chat": "A line between teams comes from chat: \"Sales needs the technical details from software.\" The people listed under the tiles are in more than one of your teams."
+    },
     "team": {
       "waitingTitle": "Waiting for you",
       "waitingNone": "Nothing waits for you in this team.",
