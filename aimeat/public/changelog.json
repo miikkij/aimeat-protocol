@@ -4,6 +4,28 @@
     {
       "date": "2026-11-14",
       "kind": "feature",
+      "id": "2026-11-14-your-ai-reads-the-node-s-usage-reports",
+      "highlight": false,
+      "audience": [
+        "operator",
+        "agent"
+      ],
+      "title": {
+        "en": "Your AI reads the node's usage reports",
+        "fi": "Tekoälysi lukee noden käyttöraportit"
+      },
+      "summary": {
+        "en": "Your AI can read every usage report of the node: which tools are used and fail, by day, model, app and person.",
+        "fi": "Tekoälysi lukee kaikki noden käyttöraportit."
+      },
+      "body": {
+        "en": "Your AI can read every usage report of the node: which tools are used and fail, by day, model, app and person.",
+        "fi": "Tekoälysi lukee kaikki noden käyttöraportit: mitkä työkalut ovat käytössä ja mitkä epäonnistuvat, päivittäin, malleittain, sovelluksittain ja henkilöittäin."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "feature",
       "id": "2026-11-14-teams-for-you-and-your-colleagues-ais",
       "highlight": true,
       "audience": [
