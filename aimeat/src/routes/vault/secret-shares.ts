@@ -1,9 +1,10 @@
 /**
- * @file src/routes/secret-shares.ts
+ * @file src/routes/vault/secret-shares.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Secret shares over REST. Every handler calls services/secret-shares/, the same functions
- *   the MCP tools call, so the rules and refusals are written once.
+ *   the MCP tools call, so the rules and refusals are written once. Bodies are checked for type and
+ *   bounds by models/secret-share-schemas.ts; what a value means is the service's to decide.
  *
  *   - POST   /v1/secret-shares                     — make a share (with content) or a request (kind: request)
  *   - GET    /v1/secret-shares                     — what I made, what waits for me, what I am asked to fill, my organisms'
@@ -19,29 +20,41 @@
  *   - POST   /v1/vault/device-keys                  — register this browser's public key (in person)
  *   - DELETE /v1/vault/device-keys/:keyId           — remove one (in person)
  *   - GET    /v1/vault/device-keys/of/:who          — a person's public keys, to encrypt a share to
+ *
+ *   The two doors a person with no account uses (deposit-with-token, pickup-with-code) take no session:
+ *   the link's token and the pickup code are their credentials (auth/credential-kinds.ts), verified
+ *   before the handler runs.
  * @usage app.use(secretSharesRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-11-14 — Moved under routes/vault/ (check:services-flat); bodies checked with
+ *     validateBody; the device-key doors take secrets:share as the others do.
  *   v1.0.0 — 2026-11-14 — Initial (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  */
 import { Router, type Request, type Response } from 'express';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { optionalAuth, requireAuth, requireScope, hasSession } from '../auth/middleware.js';
-import { acceptCredential } from '../auth/credential-strategies.js';
-import { success, error } from '../middleware/envelope.js';
-import { callerOf } from '../middleware/caller.js';
-import { SECRETS_SHARE_SCOPE } from '../utils/scope-coverage.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { optionalAuth, requireAuth, requireScope, hasSession } from '../../auth/middleware.js';
+import { acceptCredential } from '../../auth/credential-strategies.js';
+import { success, error } from '../../middleware/envelope.js';
+import { callerOf } from '../../middleware/caller.js';
+import { validateBody } from '../../models/schemas.js';
+import {
+  SecretShareCreateBody, SecretShareDepositBody, SecretShareDepositTokenBody, SecretSharePickupBody,
+  SecretSharePickupCodeBody, SecretShareRevokeBody, VaultDeviceKeyBody,
+} from '../../models/secret-share-schemas.js';
+import { SECRETS_SHARE_SCOPE } from '../../utils/scope-coverage.js';
 import {
   createShare, depositShare, listShares, getShare, revokeShare, shareCard, depositCard,
-} from '../services/secret-shares/service.js';
-import { pickupShare } from '../services/secret-shares/pickup.js';
-import { registerDeviceKey, listOwnDeviceKeys, removeDeviceKey, deviceKeysOf } from '../services/secret-shares/device-keys.js';
-import type { ShareResult } from '../services/secret-shares/rules.js';
+} from '../../services/secret-shares/service.js';
+import { pickupShare } from '../../services/secret-shares/pickup.js';
+import { registerDeviceKey, listOwnDeviceKeys, removeDeviceKey, deviceKeysOf } from '../../services/secret-shares/device-keys.js';
+import type { ShareResult } from '../../services/secret-shares/rules.js';
 
 export function secretSharesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const deps = { storage, config };
   const gate = [requireAuth(), requireScope(SECRETS_SHARE_SCOPE)];
+  const v = config.nodeId;
   // Each handler hands its own req.body to its own service function: one shared body helper made a
   // static reading of the routes take every route's fields as every other route's (check:field-reach).
   const send = <T>(res: Response, r: ShareResult<T>, status = 200): void => {
@@ -50,7 +63,7 @@ export function secretSharesRouter(config: AimeatConfig, storage: Storage): Rout
   };
   const id = (req: Request): string => String(req.params.id ?? '');
 
-  router.post('/v1/secret-shares', ...gate, async (req, res) => {
+  router.post('/v1/secret-shares', ...gate, validateBody(SecretShareCreateBody, v), async (req, res) => {
     send(res, await createShare(deps, callerOf(req, config.nodeId, storage), req.body ?? {}), 201);
   });
 
@@ -71,27 +84,27 @@ export function secretSharesRouter(config: AimeatConfig, storage: Storage): Rout
     send(res, await getShare(deps, callerOf(req, config.nodeId, storage), id(req)));
   });
 
-  router.post('/v1/secret-shares/:id/deposit', ...gate, async (req, res) => {
+  router.post('/v1/secret-shares/:id/deposit', ...gate, validateBody(SecretShareDepositBody, v), async (req, res) => {
     send(res, await depositShare(deps, callerOf(req, config.nodeId, storage), id(req), req.body ?? {}));
   });
 
   // The link's token is the credential; a session, when there is one, is recorded as the depositor.
-  router.post('/v1/secret-shares/:id/deposit-with-token', acceptCredential('secret-share-deposit', deps), optionalAuth(), async (req, res) => {
+  router.post('/v1/secret-shares/:id/deposit-with-token', validateBody(SecretShareDepositTokenBody, v), acceptCredential('secret-share-deposit', deps), optionalAuth(), async (req, res) => {
     const caller = hasSession(req) ? callerOf(req, config.nodeId, storage) : null;
     send(res, await depositShare(deps, caller, id(req), req.body ?? {}));
   });
 
-  router.post('/v1/secret-shares/:id/pickup', ...gate, async (req, res) => {
+  router.post('/v1/secret-shares/:id/pickup', ...gate, validateBody(SecretSharePickupBody, v), async (req, res) => {
     send(res, await pickupShare(deps, callerOf(req, config.nodeId, storage), id(req), req.body ?? {}, req.ip ?? ''));
   });
 
   // The code is the credential; the service asks for a session too when the maker chose that.
-  router.post('/v1/secret-shares/:id/pickup-with-code', acceptCredential('secret-share-code', deps), optionalAuth(), async (req, res) => {
+  router.post('/v1/secret-shares/:id/pickup-with-code', validateBody(SecretSharePickupCodeBody, v), acceptCredential('secret-share-code', deps), optionalAuth(), async (req, res) => {
     const caller = hasSession(req) ? callerOf(req, config.nodeId, storage) : null;
     send(res, await pickupShare(deps, caller, id(req), req.body ?? {}, req.ip ?? ''));
   });
 
-  router.post('/v1/secret-shares/:id/revoke', ...gate, async (req, res) => {
+  router.post('/v1/secret-shares/:id/revoke', ...gate, validateBody(SecretShareRevokeBody, v), async (req, res) => {
     send(res, await revokeShare(deps, callerOf(req, config.nodeId, storage), id(req)));
   });
 
@@ -99,11 +112,11 @@ export function secretSharesRouter(config: AimeatConfig, storage: Storage): Rout
     send(res, await listOwnDeviceKeys(deps, callerOf(req, config.nodeId, storage)));
   });
 
-  router.post('/v1/vault/device-keys', requireAuth(), async (req, res) => {
+  router.post('/v1/vault/device-keys', ...gate, validateBody(VaultDeviceKeyBody, v), async (req, res) => {
     send(res, await registerDeviceKey(deps, callerOf(req, config.nodeId, storage), req.body ?? {}), 201);
   });
 
-  router.delete('/v1/vault/device-keys/:keyId', requireAuth(), async (req, res) => {
+  router.delete('/v1/vault/device-keys/:keyId', ...gate, async (req, res) => {
     send(res, await removeDeviceKey(deps, callerOf(req, config.nodeId, storage), String(req.params.keyId ?? '')));
   });
 

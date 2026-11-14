@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-14 — /v1/secret-shares is parsed at the large JSON limit: a secret share carries a file inline.
  *   2026-11-13 — openapiBodyGuard() is given hasSession (auth/middleware.ts): on an enforced route a
  *     caller without a session is passed on to the route's sign-in check. No route is enforced yet.
  *   2026-11-04 — createServer registers the app for its port with services/request-injector.ts, so the
@@ -234,7 +235,8 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     // /v1/ai/image takes reference pictures as data: URLs, which the small limit answered with 413 after
     // two or three pages; stored pictures by key are read on the node and count only against
     // IMAGE_INPUT_LIMITS (services/ai/call-files.ts).
-    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp') || req.path === '/v1/ai/image';
+    // /v1/secret-shares carries a secret file inline (up to security.secret_share_max_bytes, 25 MB at most).
+    const needsLargeBody = req.path.startsWith('/v1/secret-shares') || req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp') || req.path === '/v1/ai/image';
     // POST /v1/mcp/register (open client registration) carries a name and a few addresses, and needs
     // no credential: it is parsed at 64 kB, not at the /v1/mcp file-call size (secaudit2026oct22).
     const limit = req.path === '/v1/mcp/register' ? '64kb'

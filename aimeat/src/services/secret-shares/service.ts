@@ -25,7 +25,7 @@ import { emitChange } from '../event-bus.js';
 import {
   newDepositToken, newPickupCode, newShareId, normalizeCode, normalizeContent, normalizeTerms, refuse,
   requestDeadline, secretHmac, hmacMatches, DEFAULT_SHARE_MAX_BYTES, SHARE_MAX_BYTES_CEILING, MAX_E2E_KEYS,
-  SHARE_ID_RE, type ShareRefusal, type ShareContent, type ShareDeps, type ShareResult,
+  SHARE_ID_RE, MAX_PEOPLE, type ShareRefusal, type ShareContent, type ShareDeps, type ShareResult,
 } from './rules.js';
 import { scopeRefusal, shareRolesOf } from './access.js';
 import { recipeFor, runCheck } from './check.js';
@@ -120,6 +120,7 @@ export async function createShare(deps: ShareDeps, caller: CallerContext, body: 
     }
   }
   const depositorsIn = kind === 'request' && Array.isArray(body.depositors) ? body.depositors.filter((d): d is string => typeof d === 'string') : [];
+  if (depositorsIn.length > MAX_PEOPLE) return refuse(400, 'TOO_MANY_PEOPLE', `A request asks at most ${MAX_PEOPLE} people to fill it.`);
   const depositors = await resolvePeople(deps, depositorsIn); if (!depositors.ok) return depositors;
   if (terms.organismId) {
     const m = await deps.storage.getMembership(terms.organismId, caller.owner);
@@ -271,6 +272,7 @@ export async function depositShare(deps: ShareDeps, caller: CallerContext | null
 
 export interface ShareLists { made: ShareView[]; for_me: ShareView[]; to_fill: ShareView[]; organisms: ShareView[] }
 
+// process-local: a second process sweeps on its own clock; each share is ended once by one conditional UPDATE.
 let lastSweep = 0;
 /** End the shares and requests whose time ran out, at most once a minute per process. */
 export async function sweepExpired(deps: ShareDeps, force = false): Promise<void> {
@@ -279,7 +281,12 @@ export async function sweepExpired(deps: ShareDeps, force = false): Promise<void
   lastSweep = now;
   const ids = await deps.storage.endExpiredSecretShares(new Date(now).toISOString());
   for (const id of ids) await record(deps.storage, id, 'ended', null, { reason: 'time' });
+  // A closed share holds no content, only its terms and events; after CLOSED_KEEP_DAYS it ages out.
+  await deps.storage.purgeClosedSecretShares(new Date(now - CLOSED_KEEP_DAYS * 24 * 60 * 60 * 1000).toISOString());
 }
+
+/** How long an ended or revoked share stays listed with its events before it is deleted. */
+export const CLOSED_KEEP_DAYS = 180;
 
 /** Everything the caller made, may pick up, is asked to fill, or manages in an organism's vault. */
 export async function listShares(deps: ShareDeps, caller: CallerContext): Promise<ShareResult<ShareLists>> {

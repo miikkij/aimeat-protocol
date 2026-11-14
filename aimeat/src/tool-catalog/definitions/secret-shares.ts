@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Secret shares on MCP: make a share or a request, list them, read one, fill a request,
- *   pick one up, revoke one. Each tool is the REST route of the same name in routes/secret-shares.ts
+ *   pick one up, revoke one. Each tool is the REST route of the same name in routes/vault/secret-shares.ts
  *   and calls the same function in services/secret-shares/, so the maker's terms, the protection rule
  *   and every refusal are decided there.
  *

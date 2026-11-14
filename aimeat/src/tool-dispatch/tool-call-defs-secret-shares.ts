@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The secret-share slice of the CLI dispatch table (CONNECT_CLI_TOOLS): what
  *   `/local/call/<tool>` and the connector MCP run for aimeat_secret_share_*. Thin calls on
- *   /v1/secret-shares (routes/secret-shares.ts), so the node decides everything: the scope
+ *   /v1/secret-shares (routes/vault/secret-shares.ts), so the node decides everything: the scope
  *   (secrets:share), the maker's terms, the protection rule and the pickup count.
  *
  *   The body is built from the catalog's field lists (tool-catalog/definitions/secret-shares.ts), the

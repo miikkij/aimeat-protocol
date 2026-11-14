@@ -9,9 +9,10 @@
  * @structure SecretShareRepository: createSecretShare · getSecretShare · listSecretSharesByOwner ·
  *   listSecretSharesByOrganisms · listSecretSharesForMember · listSecretShareMembers ·
  *   depositSecretShare · claimSecretSharePickup · closeSecretShare · endExpiredSecretShares ·
- *   addSecretShareEvent · listSecretShareEvents · deleteSecretSharesByOwner · putVaultDeviceKey ·
- *   listVaultDeviceKeys · deleteVaultDeviceKey · deleteVaultDeviceKeysByOwner
+ *   addSecretShareEvent · listSecretShareEvents · deleteSecretSharesByOwner · purgeClosedSecretShares ·
+ *   putVaultDeviceKey · listVaultDeviceKeys · deleteVaultDeviceKey · deleteVaultDeviceKeysByOwner
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial
+ *   2026-11-14 — purgeClosedSecretShares; share lists take opts.limit.
  */
 export type { SecretShareRepository } from '../types/secret-shares.js';

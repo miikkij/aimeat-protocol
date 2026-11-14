@@ -15923,6 +15923,8 @@
     "cfg_security_owner_key_login": "Sign-in with the account's signing key (being removed)",
     "cfg_security_ws_query_token": "Sign-in token in live connection addresses (being removed)",
     "cfg_security_secret_host_ask_default": "Ask owners before a secret goes to a new address (default)",
+    "cfg_security_secret_share_max_bytes": "Largest shared secret (bytes)",
+    "cfg_security_secret_share_check": "Check a shared key with its service",
     "cfg_security_admin_setup_open_after_first_operator": "Setup creates operators after the first (test servers only)",
     "cfg_security_password_lockout_attempts": "Password lockout after N failures",
     "cfg_security_password_lockout_minutes": "Password lockout duration (minutes)",

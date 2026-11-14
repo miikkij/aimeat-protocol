@@ -16690,6 +16690,8 @@
     "cfg_security_owner_key_login": "Kirjautuminen tilin allekirjoitusavaimella (poistumassa)",
     "cfg_security_ws_query_token": "Token jatkuvan yhteyden osoitteessa (poistumassa)",
     "cfg_security_secret_host_ask_default": "Kysy omistajalta, ennen kuin salaisuus menee uuteen osoitteeseen (oletus)",
+    "cfg_security_secret_share_max_bytes": "Jaetun salaisuuden enimmäiskoko (tavua)",
+    "cfg_security_secret_share_check": "Tarkista jaettu avain sen palvelusta",
     "cfg_security_admin_setup_open_after_first_operator": "Käyttöönotto luo operaattoreita ensimmäisen jälkeen (vain testi)",
     "cfg_security_password_lockout_attempts": "Salasanalukitus N epaonnistumisen jalkeen",
     "cfg_security_password_lockout_minutes": "Salasanalukituksen kesto (minuuttia)",

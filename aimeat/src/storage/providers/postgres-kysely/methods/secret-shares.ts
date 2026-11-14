@@ -9,18 +9,19 @@
  *   condition is tested against that: two pickers racing for the last pickup get one row between
  *   them. JSON fields are TEXT, read and written whole, so both backends store the same bytes. Times
  *   are ISO strings from the caller's clock and compare as TEXT.
- * @structure secretShareMethods · toShare · toEvent · parse helpers
+ * @structure secretShareMethods · toShare · toEvent · listLimit · parse helpers
  * @usage Object.assign(PostgresKyselyStorage.prototype, secretShareMethods) in ../index.ts
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial
  *   2026-11-14 — record properties secretFormat, protectionLevel, fileType (field-reach vocabulary); columns unchanged.
+ *   2026-11-14 — share lists take opts.limit (500, at most 1000); purgeClosedSecretShares.
  */
 import { sql, type Kysely } from 'kysely';
 import { logger } from '../../../../utils/logger.js';
 import type { DB } from '../db-types.js';
 import type {
   SecretShareRecord, SecretShareEvent, SecretShareMember, VaultDeviceKey, SecretShareRecipients,
-  SecretShareCheck, SecretShareFormat,
+  SecretShareCheck, SecretShareFormat, SecretShareListOptions,
 } from '../../../types/secret-shares.js';
 
 /**
@@ -131,6 +132,12 @@ function toEvent(r: Row): SecretShareEvent {
 
 const jsonOrNull = (v: unknown): string | null => (v === null || v === undefined ? null : JSON.stringify(v));
 
+/** The row count a share list answers: opts.limit, 500 by default, between 1 and 1000. */
+function listLimit(opts?: SecretShareListOptions): number {
+  const n = Number(opts?.limit ?? 500);
+  return Number.isFinite(n) ? Math.min(1000, Math.max(1, Math.floor(n))) : 500;
+}
+
 export const secretShareMethods = {
   async createSecretShare(this: Db, record: SecretShareRecord, members: SecretShareMember[]): Promise<void> {
     await this.transaction(async () => {
@@ -160,25 +167,26 @@ export const secretShareMethods = {
     return row ? toShare(row as unknown as Row) : null;
   },
 
-  async listSecretSharesByOwner(this: Db, ownerGhii: string): Promise<SecretShareRecord[]> {
+  async listSecretSharesByOwner(this: Db, ownerGhii: string, opts?: SecretShareListOptions): Promise<SecretShareRecord[]> {
     const rows = await this.db.selectFrom('SecretShare').selectAll().where('ownerGhii', '=', ownerGhii)
-      .orderBy('createdAt', 'desc').orderBy('id', 'desc').execute();
+      .orderBy('createdAt', 'desc').orderBy('id', 'desc').limit(listLimit(opts)).execute();
     return rows.map(r => toShare(r as unknown as Row));
   },
 
-  async listSecretSharesByOrganisms(this: Db, organismIds: string[]): Promise<SecretShareRecord[]> {
+  async listSecretSharesByOrganisms(this: Db, organismIds: string[], opts?: SecretShareListOptions): Promise<SecretShareRecord[]> {
     if (organismIds.length === 0) return [];
     const rows = await this.db.selectFrom('SecretShare').selectAll().where('organismId', 'in', organismIds)
-      .orderBy('createdAt', 'desc').orderBy('id', 'desc').execute();
+      .orderBy('createdAt', 'desc').orderBy('id', 'desc').limit(listLimit(opts)).execute();
     return rows.map(r => toShare(r as unknown as Row));
   },
 
-  async listSecretSharesForMember(this: Db, ghii: string, role: SecretShareMember['role']): Promise<SecretShareRecord[]> {
+  async listSecretSharesForMember(this: Db, ghii: string, role: SecretShareMember['role'], opts?: SecretShareListOptions): Promise<SecretShareRecord[]> {
     const rows = await this.db.selectFrom('SecretShare as s')
       .innerJoin('SecretShareMember as m', 'm.shareId', 's.id')
       .selectAll('s')
       .where('m.ghii', '=', ghii).where('m.role', '=', role)
       .orderBy('s.createdAt', 'desc').orderBy('s.id', 'desc')
+      .limit(listLimit(opts))
       .execute();
     return rows.map(r => toShare(r as unknown as Row));
   },
@@ -260,6 +268,22 @@ export const secretShareMethods = {
         .where(eb => eb.or([eb('shareId', 'in', own), eb('ghii', '=', ownerGhii)]))
         .execute();
       const r = await db.deleteFrom('SecretShare').where('ownerGhii', '=', ownerGhii).executeTakeFirst();
+      return Number(r.numDeletedRows ?? 0);
+    });
+  },
+
+  async purgeClosedSecretShares(this: Db, before: string): Promise<number> {
+    // ended and revoked are final states, and no statement changes updatedAt on them, so the three
+    // deletes see the same set of shares.
+    return this.transaction(async () => {
+      const db = this.db;
+      const closed = db.selectFrom('SecretShare').select('id')
+        .where('status', 'in', ['ended', 'revoked']).where('updatedAt', '<', before);
+      await db.deleteFrom('SecretShareEvent').where('shareId', 'in', closed).execute();
+      await db.deleteFrom('SecretShareMember').where('shareId', 'in', closed).execute();
+      const r = await db.deleteFrom('SecretShare')
+        .where('status', 'in', ['ended', 'revoked']).where('updatedAt', '<', before)
+        .executeTakeFirst();
       return Number(r.numDeletedRows ?? 0);
     });
   },

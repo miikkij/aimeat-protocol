@@ -15054,6 +15054,8 @@
     "cfg_security_owner_key_login": "Inicio de sesión con la clave de firma de la cuenta (en retirada)",
     "cfg_security_ws_query_token": "Token de sesión en la dirección de conexiones en vivo (en retirada)",
     "cfg_security_secret_host_ask_default": "Preguntar antes de que un secreto vaya a una dirección nueva (por defecto)",
+    "cfg_security_secret_share_max_bytes": "Tamaño máximo de un secreto compartido (bytes)",
+    "cfg_security_secret_share_check": "Comprobar una clave compartida con su servicio",
     "cfg_security_admin_setup_open_after_first_operator": "La puesta en marcha crea operadores tras el primero (solo pruebas)",
     "cfg_security_password_lockout_attempts": "Bloquear la contraseña tras N fallos",
     "cfg_security_password_lockout_minutes": "Duración del bloqueo (minutos)",

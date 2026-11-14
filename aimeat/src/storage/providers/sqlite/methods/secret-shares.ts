@@ -8,17 +8,18 @@
  *   conditional UPDATE, so the condition and the change cannot be separated by another writer.
  *   Times are ISO strings from the caller's clock and compare as TEXT. "check" is a reserved word in
  *   SQL and is quoted wherever a statement names it.
- * @structure secretShareMethods · toShare · toEvent · parse helpers
+ * @structure secretShareMethods · toShare · toEvent · listLimit · parse helpers
  * @usage Object.assign(SqliteStorage.prototype, secretShareMethods) in ../index.ts
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial
  *   2026-11-14 — record properties secretFormat, protectionLevel, fileType (field-reach vocabulary); columns unchanged.
+ *   2026-11-14 — share lists take opts.limit (500, at most 1000); purgeClosedSecretShares.
  */
 import type Database from 'better-sqlite3';
 import { logger } from '../../../../utils/logger.js';
 import type {
   SecretShareRecord, SecretShareEvent, SecretShareMember, VaultDeviceKey, SecretShareRecipients,
-  SecretShareCheck, SecretShareFormat,
+  SecretShareCheck, SecretShareFormat, SecretShareListOptions,
 } from '../../../types/secret-shares.js';
 
 /**
@@ -129,6 +130,12 @@ function toEvent(r: Row): SecretShareEvent {
 
 const jsonOrNull = (v: unknown): string | null => (v === null || v === undefined ? null : JSON.stringify(v));
 
+/** The row count a share list answers: opts.limit, 500 by default, between 1 and 1000. */
+function listLimit(opts?: SecretShareListOptions): number {
+  const n = Number(opts?.limit ?? 500);
+  return Number.isFinite(n) ? Math.min(1000, Math.max(1, Math.floor(n))) : 500;
+}
+
 export const secretShareMethods = {
   async createSecretShare(this: Db, record: SecretShareRecord, members: SecretShareMember[]): Promise<void> {
     const insertShare = this.db.prepare(
@@ -162,28 +169,29 @@ export const secretShareMethods = {
     return row ? toShare(row) : null;
   },
 
-  async listSecretSharesByOwner(this: Db, ownerGhii: string): Promise<SecretShareRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM secret_shares WHERE ownerGhii = ? ORDER BY createdAt DESC, id DESC')
-      .all(ownerGhii) as Row[];
+  async listSecretSharesByOwner(this: Db, ownerGhii: string, opts?: SecretShareListOptions): Promise<SecretShareRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM secret_shares WHERE ownerGhii = ? ORDER BY createdAt DESC, id DESC LIMIT ?')
+      .all(ownerGhii, listLimit(opts)) as Row[];
     return rows.map(toShare);
   },
 
-  async listSecretSharesByOrganisms(this: Db, organismIds: string[]): Promise<SecretShareRecord[]> {
+  async listSecretSharesByOrganisms(this: Db, organismIds: string[], opts?: SecretShareListOptions): Promise<SecretShareRecord[]> {
     if (organismIds.length === 0) return [];
     const marks = organismIds.map(() => '?').join(', ');
     const rows = this.db.prepare(
-      `SELECT * FROM secret_shares WHERE organismId IN (${marks}) ORDER BY createdAt DESC, id DESC`,
-    ).all(...organismIds) as Row[];
+      `SELECT * FROM secret_shares WHERE organismId IN (${marks}) ORDER BY createdAt DESC, id DESC LIMIT ?`,
+    ).all(...organismIds, listLimit(opts)) as Row[];
     return rows.map(toShare);
   },
 
-  async listSecretSharesForMember(this: Db, ghii: string, role: SecretShareMember['role']): Promise<SecretShareRecord[]> {
+  async listSecretSharesForMember(this: Db, ghii: string, role: SecretShareMember['role'], opts?: SecretShareListOptions): Promise<SecretShareRecord[]> {
     const rows = this.db.prepare(
       `SELECT s.* FROM secret_shares s
        JOIN secret_share_members m ON m.shareId = s.id
        WHERE m.ghii = ? AND m.role = ?
-       ORDER BY s.createdAt DESC, s.id DESC`,
-    ).all(ghii, role) as Row[];
+       ORDER BY s.createdAt DESC, s.id DESC
+       LIMIT ?`,
+    ).all(ghii, role, listLimit(opts)) as Row[];
     return rows.map(toShare);
   },
 
@@ -258,6 +266,18 @@ export const secretShareMethods = {
       this.db.prepare(`DELETE FROM secret_share_events WHERE shareId IN (${own})`).run(ownerGhii);
       this.db.prepare(`DELETE FROM secret_share_members WHERE shareId IN (${own}) OR ghii = ?`).run(ownerGhii, ownerGhii);
       return this.db.prepare('DELETE FROM secret_shares WHERE ownerGhii = ?').run(ownerGhii).changes;
+    })();
+  },
+
+  async purgeClosedSecretShares(this: Db, before: string): Promise<number> {
+    // ended and revoked are final states, and no statement changes updatedAt on them, so the three
+    // deletes see the same set of shares.
+    return this.db.transaction(() => {
+      const closed = `SELECT id FROM secret_shares WHERE status IN ('ended', 'revoked') AND updatedAt < ?`;
+      this.db.prepare(`DELETE FROM secret_share_events WHERE shareId IN (${closed})`).run(before);
+      this.db.prepare(`DELETE FROM secret_share_members WHERE shareId IN (${closed})`).run(before);
+      return this.db.prepare(`DELETE FROM secret_shares WHERE status IN ('ended', 'revoked') AND updatedAt < ?`)
+        .run(before).changes;
     })();
   },
 

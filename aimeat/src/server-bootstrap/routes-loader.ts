@@ -180,7 +180,7 @@ import { chatInstancesRouter } from '../routes/chat-instances.js';
 import { totpRouter } from '../routes/totp.js';
 import { passkeysRouter } from '../routes/passkeys.js';
 import { secretsRouter } from '../routes/secrets.js';
-import { secretSharesRouter } from '../routes/secret-shares.js';
+import { secretSharesRouter } from '../routes/vault/secret-shares.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
 import { appUiRouter } from '../routes/app-ui.js';

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Secret shares on the node MCP: aimeat_secret_share_create, _list, _get, _deposit,
  *   _pickup and _revoke. Each tool calls the same services/secret-shares/ function the REST route in
- *   routes/secret-shares.ts calls, with the session's caller, so the scope check (secrets:share), the
+ *   routes/vault/secret-shares.ts calls, with the session's caller, so the scope check (secrets:share), the
  *   maker's terms, the protection rule, the pickup count and the change events happen there once.
  *   Nothing is decided in this file.
  *

@@ -2,7 +2,7 @@
  * @file test/e2e-secret-shares.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Secret shares and secret requests over REST (src/routes/secret-shares.ts, services in
+ * @description Secret shares and secret requests over REST (src/routes/vault/secret-shares.ts, services in
  *   src/services/secret-shares/): a request filled by a named depositor or by the link's token, a share
  *   picked up by a named person, an organism's member, a code holder or an agent the maker allowed, the
  *   protections (sealed refuses an agent the content and lets it copy into the owner's vault), the
@@ -367,6 +367,36 @@ await h.test('3b. ten wrong codes on one share lock it: the next try is 429 TOO_
     const free = await codeCall(HOST_A, other.body.data.share.id, { code: other.body.data.code });
     const expected = twoAddresses ? 200 : 429;
     assert(free.status === expected, `another share from ${HOST_A}: expected ${expected}, got ${err(free)}`);
+});
+
+// ── 11 ───────────────────────────────────────────────────────────────────────────────────────────
+await h.test('11. every signed-in route refuses an agent without secrets:share (403), and a second owner cannot revoke (403)', async () => {
+    const made = await post(alice.token, S, { name: `SS_DENY_${STAMP}`, content: 'deny', recipients: { people: [bob.name] }, protection: 'open', retention: 'keep' });
+    assert(made.status === 201, `create ${err(made)}`);
+    const id = made.body.data.share.id;
+    const w = auth(wildcard.token);
+    const list = await json('/v1/secret-shares', { headers: w });
+    assert(list.status === 403, `GET list ${err(list)}`);
+    const one = await json(`/v1/secret-shares/${id}`, { headers: w });
+    assert(one.status === 403, `GET one ${err(one)}`);
+    const create = await json('/v1/secret-shares', { method: 'POST', headers: w, body: JSON.stringify({ name: 'X', content: 'y', recipients: { people: [bob.name] } }) });
+    assert(create.status === 403, `POST create ${err(create)}`);
+    const deposit = await json(`/v1/secret-shares/${id}/deposit`, { method: 'POST', headers: w, body: JSON.stringify({ content: 'y' }) });
+    assert(deposit.status === 403, `POST deposit ${err(deposit)}`);
+    const pickup = await json(`/v1/secret-shares/${id}/pickup`, { method: 'POST', headers: w, body: JSON.stringify({ to: 'reveal' }) });
+    assert(pickup.status === 403, `POST pickup ${err(pickup)}`);
+    const revoke = await json(`/v1/secret-shares/${id}/revoke`, { method: 'POST', headers: w, body: '{}' });
+    assert(revoke.status === 403, `POST revoke by the agent ${err(revoke)}`);
+    const byBob = await json(`/v1/secret-shares/${id}/revoke`, { method: 'POST', headers: auth(bob.token), body: '{}' });
+    assert(byBob.status === 403 && byBob.body.error?.code === 'NOT_MAKER', `POST revoke by bob ${err(byBob)}`);
+    const keyAdd = await json('/v1/vault/device-keys', { method: 'POST', headers: w, body: JSON.stringify({ public_key: { kty: 'EC', crv: 'P-256', x: 'a'.repeat(43), y: 'b'.repeat(43) } }) });
+    assert(keyAdd.status === 403, `POST device key ${err(keyAdd)}`);
+    const keyDel = await json('/v1/vault/device-keys/abc', { method: 'DELETE', headers: w });
+    assert(keyDel.status === 403, `DELETE device key ${err(keyDel)}`);
+    const keysOf = await json(`/v1/vault/device-keys/of/${bob.name}`, { headers: w });
+    assert(keysOf.status === 403, `GET device keys of ${err(keysOf)}`);
+    const ownKeys = await json('/v1/vault/device-keys', { headers: w });
+    assert(ownKeys.status === 403, `GET own device keys ${err(ownKeys)}`);
 });
 
 h.finish();

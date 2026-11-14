@@ -5,7 +5,8 @@
  * @description SecretShareRepository behaves the same on both storage providers: the create and
  *   read round trip with its JSON columns, the one-statement pickup count (a `once` share is picked
  *   up once; past its end it is refused), a request filled only once, a close that removes the
- *   content and refuses a second close, the expiry sweep, the member list and the owner delete.
+ *   content and refuses a second close, the expiry sweep, the member list, the owner delete, the
+ *   share lists' limit and the purge of closed shares past a cutoff.
  *
  *   Runs SQLite always and PostgreSQL when DATABASE_URL is set (AIMEAT_CONFORMANCE_REQUIRE_POSTGRES=true
  *   makes a missing DATABASE_URL a failure). Every id carries a run tag, and the owner delete at the
@@ -13,6 +14,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/secret-shares-storage.test.ts
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial
+ *   2026-11-14 — share lists' opts.limit; purgeClosedSecretShares.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
@@ -254,6 +256,60 @@ describe('secret shares storage', () => {
       expect((await storage.listSecretShareEvents(theirs.id, 10)).length, name).toBe(1);
       expect(await storage.deleteSecretSharesByOwner(owner), name).toBe(0);
       await storage.deleteSecretSharesByOwner(other);
+    }
+  });
+
+  it('the share lists answer at most opts.limit, newest first; 0 and junk fall back to the bounds', async () => {
+    for (const { name, storage } of provs) {
+      const owner = `fran-${RUN}-${name}@${NODE}`;
+      const org = `org-lim-${RUN}-${name}`;
+      const times = [T0, T1, T2, T3];
+      const recs = times.map(t => share({ ownerGhii: owner, createdBy: owner, organismId: org, createdAt: t }));
+      for (const r of recs) await storage.createSecretShare(r, [pickup(r.id, CAROL), { shareId: r.id, ghii: CAROL, role: 'deposit' }]);
+      const newestTwo = [recs[3].id, recs[2].id];
+      expect((await storage.listSecretSharesByOwner(owner, { limit: 2 })).map(s => s.id), name).toEqual(newestTwo);
+      expect((await storage.listSecretSharesByOrganisms([org], { limit: 2 })).map(s => s.id), name).toEqual(newestTwo);
+      const forCarol = await storage.listSecretSharesForMember(CAROL, 'pickup', { limit: 2 });
+      expect(forCarol.length, name).toBe(2);
+      // Without opts the default (500) answers all four; a limit under 1 still answers one row.
+      expect((await storage.listSecretSharesByOwner(owner)).length, name).toBe(4);
+      expect((await storage.listSecretSharesByOwner(owner, { limit: 0 })).map(s => s.id), name).toEqual([recs[3].id]);
+      expect((await storage.listSecretSharesByOwner(owner, { limit: Number.NaN })).length, name).toBe(4);
+      await storage.deleteSecretSharesByOwner(owner);
+    }
+  });
+
+  it('purgeClosedSecretShares removes closed shares older than the cutoff with their events and members', async () => {
+    for (const { name, storage } of provs) {
+      const owner = `gus-${RUN}-${name}@${NODE}`;
+      const mk = (over: Partial<SecretShareRecord>) => share({ ownerGhii: owner, createdBy: owner, ...over });
+      const oldEnded = mk({ status: 'ended', ciphertext: null, updatedAt: T0 });
+      const oldRevoked = mk({ status: 'revoked', ciphertext: null, updatedAt: T0, revokedAt: T0, revokedBy: owner });
+      const recentEnded = mk({ status: 'ended', ciphertext: null, updatedAt: T3 });
+      const oldReady = mk({ status: 'ready', updatedAt: T0 });
+      const oldWaiting = mk({ kind: 'request', status: 'waiting', ciphertext: null, updatedAt: T0 });
+      const all = [oldEnded, oldRevoked, recentEnded, oldReady, oldWaiting];
+      for (const r of all) {
+        await storage.createSecretShare(r, [pickup(r.id, BOB)]);
+        await storage.addSecretShareEvent({ id: `ev-${r.id}`, shareId: r.id, at: T0, kind: 'created', actor: owner, onBehalfOf: owner, detail: {} });
+      }
+
+      // Other runs' closed shares may also be past T2 in a shared database, so count only ours.
+      const purged = await storage.purgeClosedSecretShares(T2);
+      expect(purged, name).toBeGreaterThanOrEqual(2);
+      for (const gone of [oldEnded, oldRevoked]) {
+        expect(await storage.getSecretShare(gone.id), name).toBeNull();
+        expect(await storage.listSecretShareEvents(gone.id, 10), name).toEqual([]);
+        expect(await storage.listSecretShareMembers(gone.id), name).toEqual([]);
+      }
+      for (const kept of [recentEnded, oldReady, oldWaiting]) {
+        expect((await storage.getSecretShare(kept.id))?.id, name).toBe(kept.id);
+        expect((await storage.listSecretShareEvents(kept.id, 10)).length, name).toBe(1);
+        expect(await storage.listSecretShareMembers(kept.id), name).toEqual([pickup(kept.id, BOB)]);
+      }
+      expect((await storage.listSecretSharesByOwner(owner)).map(s => s.id).sort(), name)
+        .toEqual([recentEnded.id, oldReady.id, oldWaiting.id].sort());
+      await storage.deleteSecretSharesByOwner(owner);
     }
   });
 

@@ -13,6 +13,10 @@
       "count": 1,
       "reason": "Each process counts a sender's mails on its own (moved from notification-create.ts emailsSent), so N active processes allow N times the daily limit; one active process plus a standby keeps it."
     },
+    "src/services/secret-shares/service.ts :: let :: lastSweep": {
+      "count": 1,
+      "reason": "When this process last ended expired secret shares, so a list does not run the sweep more than once a minute. A second process sweeps on its own clock; the sweep is one conditional UPDATE that ends each share once, so two sweeps end nothing twice."
+    },
     "src/services/openapi-body-contract.ts :: let :: shared": {
       "count": 1,
       "reason": "openapi.yaml read once per process; every process reads the same file."

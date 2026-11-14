@@ -23,10 +23,11 @@
  *   RECIPIENT ROWS. Named people and named depositors are rows in SecretShareMember, so "what waits
  *   for me" is one indexed query instead of a scan of every share's JSON.
  * @structure SecretShareRecord · SecretShareRecipients · SecretShareEvent · SecretShareMember ·
- *   VaultDeviceKey · SecretShareRepository
+ *   VaultDeviceKey · SecretShareListOptions · SecretShareRepository
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   2026-11-14 — record properties secretFormat, protectionLevel, fileType (field-reach vocabulary); columns unchanged.
+ *   2026-11-14 — share lists take opts.limit (500, at most 1000); purgeClosedSecretShares.
  */
 
 export type SecretShareKind = 'share' | 'request';
@@ -150,16 +151,22 @@ export interface VaultDeviceKey {
   lastUsedAt: string | null;
 }
 
+/** How many shares a list answers: `limit` defaults to 500 and is capped at 1000. */
+export interface SecretShareListOptions {
+  limit?: number;
+}
+
 export interface SecretShareRepository {
   /** Insert the share and its member rows. */
   createSecretShare(record: SecretShareRecord, members: SecretShareMember[]): Promise<void>;
   getSecretShare(id: string): Promise<SecretShareRecord | null>;
-  /** Shares this person made, newest first. */
-  listSecretSharesByOwner(ownerGhii: string): Promise<SecretShareRecord[]>;
-  /** Shares in these organisms' vaults, newest first. */
-  listSecretSharesByOrganisms(organismIds: string[]): Promise<SecretShareRecord[]>;
-  /** Shares naming this person in a role, newest first. */
-  listSecretSharesForMember(ghii: string, role: SecretShareMember['role']): Promise<SecretShareRecord[]>;
+  /** Shares this person made, newest first, at most `opts.limit` (500 by default, 1000 at most). */
+  listSecretSharesByOwner(ownerGhii: string, opts?: SecretShareListOptions): Promise<SecretShareRecord[]>;
+  /** Shares in these organisms' vaults, newest first, at most `opts.limit` (500 by default, 1000 at most). */
+  listSecretSharesByOrganisms(organismIds: string[], opts?: SecretShareListOptions): Promise<SecretShareRecord[]>;
+  /** Shares naming this person in a role, newest first, at most `opts.limit` (500 by default, 1000 at most). */
+  listSecretSharesForMember(ghii: string, role: SecretShareMember['role'], opts?: SecretShareListOptions): Promise<SecretShareRecord[]>;
+  /** One share's named people. Bounded by the service: at most MAX_PEOPLE (50) per role (rules.ts). */
   listSecretShareMembers(shareId: string): Promise<SecretShareMember[]>;
   /**
    * Fill a waiting request, in one statement conditional on `status = 'waiting'`. False when it was
@@ -188,8 +195,15 @@ export interface SecretShareRepository {
   listSecretShareEvents(shareId: string, limit: number): Promise<SecretShareEvent[]>;
   /** Every share this person made, their events and member rows, and their member rows on others'. */
   deleteSecretSharesByOwner(ownerGhii: string): Promise<number>;
+  /**
+   * Delete every share whose status is `ended` or `revoked` and whose `updatedAt` is before `before`
+   * (ISO), with its events and member rows, in one transaction. Answers the number of shares deleted.
+   * A closed share holds no content, only its terms and events, so it ages out.
+   */
+  purgeClosedSecretShares(before: string): Promise<number>;
 
   putVaultDeviceKey(key: VaultDeviceKey): Promise<void>;
+  /** One account's device keys. Bounded by the service: at most MAX_DEVICE_KEYS (20) (device-keys.ts). */
   listVaultDeviceKeys(ownerGhii: string): Promise<VaultDeviceKey[]>;
   deleteVaultDeviceKey(ownerGhii: string, keyId: string): Promise<boolean>;
   deleteVaultDeviceKeysByOwner(ownerGhii: string): Promise<number>;
