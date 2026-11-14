@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.12.0 -- 2026-11-14 -- A team's page opens with what waits for you, the team context and skill, and you in this team (team-sections.js, team setup T14, T15); the organism's sections follow, numbered on.
  *   v3.11.1 -- 2026-11-14 -- A team's title, crumb and description are in the reader's language (orgName, orgDescription, team setup T24).
  *   v3.11.0 -- 2026-10-31 -- "Show in the overview" under the map: the Overview page opened on this organism (views/home/overview.js).
  *   v3.10.0 -- 2026-10-03 -- The question mark that explains a workspace, concept.workspace, after the line under the workspace list (components/HelpTip.js; guidance part B).
@@ -61,6 +62,7 @@ import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
 import { BoardPreview } from '/views/profile/organisms/panels.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
+import { useTeam, TeamSections } from '/views/profile/organisms/team-sections.js';
 import { swallowed } from '/js/swallowed.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
@@ -83,6 +85,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [openAi, setOpenAi] = useState(false);
   const [fullTimeline, setFullTimeline] = useState(false);
   const [timeline, setTimeline] = useState(null);
+  const team = useTeam(org);
 
   // Ownership is plural. `owners` is the truth; `creatorGhii` is the deprecated mirror of owners[0]
   // and is only read for an organism served by a node that predates the split.
@@ -167,23 +170,32 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const agentCount = (org.agentGaiis || []).length;
   const openAiSection = () => { setOpenAi(true); setTimeout(() => scrollToSection('og-ai'), 30); };
   const readmeTitle = (readme.match(/^#\s+(.+)$/m) || [])[1] || '';
+  // A team's page opens with its three sections (team-sections.js), and the organism's own follow.
+  const shift = team ? 3 : 0;
+  const num = (i) => String(i + shift).padStart(2, '0');
+  const teamRail = team ? [
+    { id: 'og-team-waiting', num: num(-2), label: t('organisms.team.waitingTitle'), count: team.items.length + team.approvals.length },
+    { id: 'og-team-brain', num: num(-1), label: t('organisms.team.brainTitle'), count: '·' },
+    { id: 'og-team-you', num: num(0), label: t('organisms.team.youTitle'), count: '·' },
+  ] : [];
   // The rail: every section scrolls into view (the three folds open first), then Settings, a page of its own.
   const sections = [
-    { id: 'og-workspaces', num: '01', label: tr('organisms.tabWorkspaces', 'Workspaces'), count: wsCount ?? '' },
-    { id: 'og-members', num: '02', label: tr('organisms.tabMembers', 'Members'), count: memberCount },
-    { id: 'og-agents', num: '03', label: tr('organisms.tabAgents', 'Agents'), count: agentCount },
-    { id: 'og-board', num: '04', label: tr('organisms.tabBoard', 'Board'), count: '·' },
-    { id: 'og-history', num: '05', label: tr('organisms.happened', 'What has happened'), count: timeline ? timeline.length : '' },
-    { id: 'og-readme', num: '06', label: tr('organisms.readmeFold', 'README'), count: '→', open: () => setOpenReadme(true) },
-    { id: 'og-map', num: '07', label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→', open: () => setOpenMap(true) },
-    { id: 'og-ai', num: '08', label: tr('organisms.forAi', 'For your AI'), count: '→', open: () => setOpenAi(true) },
+    ...teamRail,
+    { id: 'og-workspaces', num: num(1), label: tr('organisms.tabWorkspaces', 'Workspaces'), count: wsCount ?? '' },
+    { id: 'og-members', num: num(2), label: tr('organisms.tabMembers', 'Members'), count: memberCount },
+    { id: 'og-agents', num: num(3), label: tr('organisms.tabAgents', 'Agents'), count: agentCount },
+    { id: 'og-board', num: num(4), label: tr('organisms.tabBoard', 'Board'), count: '·' },
+    { id: 'og-history', num: num(5), label: tr('organisms.happened', 'What has happened'), count: timeline ? timeline.length : '' },
+    { id: 'og-readme', num: num(6), label: tr('organisms.readmeFold', 'README'), count: '→', open: () => setOpenReadme(true) },
+    { id: 'og-map', num: num(7), label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→', open: () => setOpenMap(true) },
+    { id: 'og-ai', num: num(8), label: tr('organisms.forAi', 'For your AI'), count: '→', open: () => setOpenAi(true) },
   ].map((s) => ({ ...s, href: '#' + s.id }));
   const railTitle = tr('organisms.railTitle', 'In this organism');
   const rail = {
     title: railTitle,
     groups: [
       { label: railTitle, items: sections.map(railSection) },
-      { items: [{ key: 'settings', mark: '09', label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
+      { items: [{ key: 'settings', mark: num(9), label: tr('organisms.settings', 'Settings'), count: '→', onClick: () => setView('settings') }] },
     ],
   };
   const visWord = t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility;
@@ -215,7 +227,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       ]} />`}
       rail=${rail}
       after=${html`<${ConfirmUI} />`}>
-      <${Section} id="og-workspaces" num="01" first=${true} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
+      ${team ? html`<${TeamSections} team=${team} me=${ghii} num=${(i) => num(i - 3)} />` : null}
+      <${Section} id="og-workspaces" num=${num(1)} first=${!team} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
         <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
         <${Row} align="end">
           <${Note}>${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}<//>
@@ -223,33 +236,33 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         <//>
       <//>
 
-      <${Section} id="og-members" num="02" title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>
+      <${Section} id="og-members" num=${num(2)} title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>
         <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
           showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />
       <//>
 
-      <${Section} id="og-agents" num="03" title=${tr('organisms.tabAgents', 'Agents')} count=${agentCount}>
+      <${Section} id="og-agents" num=${num(3)} title=${tr('organisms.tabAgents', 'Agents')} count=${agentCount}>
         <${OrgAgentsPanel} org=${org} ghii=${ghii} canManage=${canEdit} showToast=${showToast} onChanged=${onChanged} />
       <//>
 
-      <${Section} id="og-board" num="04" title=${tr('organisms.tabBoard', 'Board')}>
+      <${Section} id="og-board" num=${num(4)} title=${tr('organisms.tabBoard', 'Board')}>
         ${org.boardId
           ? html`<${BoardPreview} boardId=${org.boardId} showToast=${showToast} />`
           : html`<${Note}>${tr('organisms.noBoard', 'This organism has no board.')}<//>`}
       <//>
 
-      <${Section} id="og-history" num="05" title=${tr('organisms.happened', 'What has happened')} count=${timeline ? timeline.length : null}
+      <${Section} id="og-history" num=${num(5)} title=${tr('organisms.happened', 'What has happened')} count=${timeline ? timeline.length : null}
         doors=${fullTimeline ? null : html`<${Action} small soft onClick=${() => setFullTimeline(true)}>${tr('organisms.fullTimeline', 'Full timeline →')}<//>`}>
         ${fullTimeline ? html`<${TimelinePanel} orgId=${org.id} defaultOpen=${true} />` : html`<${TimelineRecent} rows=${timeline} limit=${5} />`}
       <//>
 
-      <${Section} fold id="og-readme" num="06" title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
+      <${Section} fold id="og-readme" num=${num(6)} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
         ${readme || canEdit
           ? html`<${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name} aiPromptSeed=${tocSeed} onSave=${saveReadme} />`
           : html`<${Note}>${tr('organisms.readmeEmpty', 'No README yet.')}<//>`}
       <//>
 
-      <${Section} fold id="og-map" num="07" title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
+      <${Section} fold id="og-map" num=${num(7)} title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
         <${Note}>${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
         <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} defaultOpen />
         <${Actions}><${Action} href=${`/v1/home?overview=1&focus=${encodeURIComponent(`organism:${org.id}`)}`}>${tr('home.overview.showIn', 'Show in the overview')}<//><//>
@@ -257,7 +270,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
           load=${() => orgService.getOrganismOverview(org.id)} defaultOpen />
       <//>
 
-      <${Section} fold id="og-ai" num="08" title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
+      <${Section} fold id="og-ai" num=${num(8)} title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
         <${Note} kind="lead">${tr('organisms.instrBlockLead', 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure.')}<//>
         <${InstructionBlock} orgId=${org.id} />
       <//>
