@@ -4,6 +4,28 @@
     {
       "date": "2026-11-14",
       "kind": "feature",
+      "id": "2026-11-14-find-one-app-among-hundreds",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Find one app among hundreds",
+        "fi": "Löydä yksi sovellus sadoista"
+      },
+      "summary": {
+        "en": "My Apps shows the apps you opened last at the top and folds away the ones you have not opened in six months.",
+        "fi": "Omat sovellukset näyttää viimeksi avaamasi sovellukset ylimpänä ja taittaa pois ne, joita et ole avannut puoleen vuoteen."
+      },
+      "body": {
+        "en": "My Apps shows the six apps you opened last in one row at the top, each with the day you opened it, so an app from yesterday is one press away. Your own apps that you have not opened or changed in six months move into their own folded section under the list; when you open one, it moves back. A search still finds every app. Your AI finds an app from what you remember of it, for example \"the app I made in the autumn that counted…\", and gives you its address.",
+        "fi": "Omat sovellukset näyttää ylimpänä yhdellä rivillä kuusi viimeksi avaamaasi sovellusta ja päivän, jolloin avasit ne. Eilen avattu sovellus on siis yhden painalluksen päässä. Omat sovelluksesi, joita et ole avannut etkä muuttanut puoleen vuoteen, siirtyvät listan alle omaan osioonsa, joka on taitettu kiinni. Kun avaat sellaisen sovelluksen, se palaa listaan. Haku löytää edelleen kaikki sovellukset. Tekoälysi löytää sovelluksen siitä, mitä muistat, esimerkiksi \"se sovellus, jonka tein syksyllä ja joka laski…\", ja antaa sinulle sen osoitteen."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "feature",
       "id": "2026-11-14-balancing-test-for-apps",
       "highlight": false,
       "audience": [
