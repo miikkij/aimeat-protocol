@@ -21,10 +21,15 @@
  *   - pendingUsageCalls(filter)    -- the unflushed tail, so a just-made call is not invisible
  *   - flushUsageBuffer()           -- write the buffer out
  *   - shutdownUsageBuffer()        -- stop the interval + final flush
+ *   - holdUsageForErasure(account) -- an account erasure: drop its calls, keep none until released
  * @usage
  *   import { recordUsageCall } from '../services/usage/usage-buffer.js';
  *   recordUsageCall({ ownerGhii, surface: 'mcp', coordinate: toolName, outcome: 'ok', durationMs });
  * @version-history
+ *   v1.3.0 — 2026-11-14 — holdUsageForErasure: the erasure drops the account's waiting calls and waits
+ *     for a write in progress before its cascade, and no call of the account is kept until it ends. A
+ *     call that waited was stored after the cascade had deleted the account's calls (register finding
+ *     f-2026-11-13-write-buffers-and-erasure).
  *   v1.2.0 — 2026-10-25 — The flush interval is the caller's (usage.buffer_ms from the config), not
  *     AIMEAT_USAGE_BUFFER_MS read at import.
  *   v1.1.0 — 2026-10-08 — onUsageRecorded(): a listener told of every call as it is recorded.
@@ -33,6 +38,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, UsageCallRecord, UsageCallInput, UsageCallFilter } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 /**
  * Flush cadence when the caller names none. A dashboard reading raw calls is at most this stale, plus
@@ -52,6 +58,9 @@ let flushTimer: ReturnType<typeof setInterval> | null = null;
 let flushing = false;
 let buffer: UsageCallRecord[] = [];
 let droppedSinceLastWarning = 0;
+/** The accounts whose erasure runs now, whose calls are not kept, and the write in progress an
+ *  erasure waits for (holdUsageForErasure). */
+const erasing = new ErasureHolds();
 const listeners: Array<(call: UsageCallRecord) => void> = [];
 
 /**
@@ -73,6 +82,8 @@ export function onUsageRecorded(listener: (call: UsageCallRecord) => void): () =
  */
 export function recordUsageCall(input: UsageCallInput): void {
   try {
+    // A call of an account being erased: the cascade deletes its calls, so none is started again.
+    if (erasing.covers(input.ownerGhii)) return;
     const record: UsageCallRecord = {
       id: randomUUID(),
       ts: input.ts ?? new Date().toISOString(),
@@ -148,7 +159,7 @@ export async function flushUsageBuffer(): Promise<void> {
   }
 
   try {
-    await storageRef.appendUsageCall(batch);
+    await erasing.track(storageRef.appendUsageCall(batch));
   } catch (err) {
     logger.warn('usage-buffer: flush failed, this window is lost', {
       count: batch.length, error: String(err),
@@ -156,6 +167,20 @@ export async function flushUsageBuffer(): Promise<void> {
   } finally {
     flushing = false;
   }
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no call of the account is kept
+ * from now on, a write in progress answers first so the cascade reaches what it stored, and the
+ * account's waiting calls are dropped. The returned function ends the hold, after the cascade. The
+ * calls are matched on their owner, the column the cascade deletes by; another owner's call made by
+ * the erased person's agent stays, as the cascade keeps that stored row.
+ */
+export async function holdUsageForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  await erasing.writesSettled();
+  buffer = buffer.filter(r => !ErasureHolds.isOf(r.ownerGhii, account));
+  return release;
 }
 
 /** Wire storage and start the flush interval. Idempotent: the interval is the first call's. */

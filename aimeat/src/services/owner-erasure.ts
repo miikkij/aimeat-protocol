@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-14 — The usage call buffer holds the account for the length of the erasure
+ *     (holdUsageForErasure): a call that waited was stored after the cascade had deleted the
+ *     account's calls (register finding f-2026-11-13-write-buffers-and-erasure).
  *   2026-11-14 — The consent audit buffer holds the account for the length of the erasure
  *     (holdConsentAuditForErasure): an entry that waited was stored after the cascade had deleted the
  *     account's audit rows (register finding f-2026-11-13-write-buffers-and-erasure).
@@ -107,6 +110,7 @@ import { inSavepoint } from './tolerant-step.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
 import { removeWithClassificationAudit, flushClassificationAudit } from './classification/audit.js';
 import { holdConsentAuditForErasure } from './consent-audit-buffer.js';
+import { holdUsageForErasure } from './usage/usage-buffer.js';
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app/member-erasure.js';
 import { eraseAppDesignSpecsOf } from './app/design-spec.js';
@@ -523,6 +527,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
   const releases: Array<() => void> = [];
   try {
     releases.push(await holdConsentAuditForErasure(account));
+    releases.push(await holdUsageForErasure(account));
     // The cascade deletes the classification audit rows of the person's content and renames the person
     // where they were the reader of someone else's. A row that waits in memory, or is being written
     // while the cascade runs, would be stored after it and bring the erased person back into the log

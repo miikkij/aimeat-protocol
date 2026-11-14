@@ -21,6 +21,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-write-buffers.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-write-buffers.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The usage call stream.
  *   v1.0.0 — 2026-11-14 — Initial: the consent audit.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -30,12 +31,15 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent-audit-buffer.js';
+import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';
 
 requirePostgresWhenAsked('erasure-write-buffers');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])];
 const providers = new Map<string, TestStorage>();
+/** One interval for the whole file, longer than any run: a flush happens only when a test asks. */
+const NEVER = 3_600_000;
 beforeAll(async () => {
   for (const name of names) providers.set(name, await createStorage({
     provider: name === 'sqlite' ? 'sqlite' : 'postgres-kysely',
@@ -115,6 +119,7 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
   const st = () => providers.get(provider)!;
   afterEach(async () => {
     await shutdownConsentAuditBuffer();
+    resetUsageBuffer();
   });
 
   // ── The consent audit (services/consent-audit-buffer.ts) ──
@@ -154,5 +159,35 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
       await eraseDuring(s, p, held, flushConsentAudit());
     } finally { held.restore(); }
     expect(await s.listConsentAudit(p.aliceGhii)).toEqual([]);
+  });
+
+  // ── The usage call stream (services/usage/usage-buffer.ts) ──
+  it('usage calls, WAITING: no call of the erased account is stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    initUsageBuffer(s, NEVER);
+    recordUsageCall({ ownerGhii: p.aliceGhii, surface: 'mcp', coordinate: 'aimeat_memory_read' });
+    recordUsageCall({ ownerGhii: p.aliceGhii, actorGaii: p.star, actorKind: 'agent', surface: 'mcp', coordinate: 'aimeat_memory_write' });
+    recordUsageCall({ ownerGhii: p.bobGhii, surface: 'mcp', coordinate: 'aimeat_memory_read' });
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushUsageBuffer();
+
+    expect(await s.listUsageCalls({ ownerGhii: p.aliceGhii })).toEqual([]);
+    expect(await s.listUsageCalls({ actorGaii: p.star })).toEqual([]);
+    // POSITIVE CONTROL: bob's call in the same buffer is stored.
+    expect((await s.listUsageCalls({ ownerGhii: p.bobGhii })).length).toBe(1);
+  });
+
+  it('usage calls, BEING WRITTEN: a batch whose write is in progress is not stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    initUsageBuffer(s, NEVER);
+    const held = holdFirst(s, 'appendUsageCall');
+    try {
+      recordUsageCall({ ownerGhii: p.aliceGhii, surface: 'rest', coordinate: 'GET /v1/memory' });
+      await eraseDuring(s, p, held, flushUsageBuffer());
+    } finally { held.restore(); }
+    expect(await s.listUsageCalls({ ownerGhii: p.aliceGhii })).toEqual([]);
   });
 });
