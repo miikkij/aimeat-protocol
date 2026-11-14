@@ -21973,7 +21973,7 @@ paths:
             schema:
               type: object
               properties:
-                capability: { type: string, enum: [text, vision, files, transcription, image] }
+                capability: { type: string, enum: [text, vision, files, image, speech, transcription, embed], description: 'An AiCapability (services/ai/types.ts); speech and embed make one small call each.' }
                 accept_cost: { type: boolean }
       responses:
         '200':
