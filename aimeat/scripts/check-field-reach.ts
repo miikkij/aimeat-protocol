@@ -26,6 +26,13 @@
  *   - `unnamed:<file>#<n>` and `unrouted:<file>#<n>`: reads the measurement cannot place (a key
  *     CodeQL cannot name; a request no route registration names). A file gaining one fails too,
  *     because a field read that way is a field this gate cannot see.
+ *   A ROUTE CAPABILITY HAS AN AGENT PATH (2026-11-14). Every route of openapi.yaml that a caller with a
+ *   session can run is a capability `aimeat_invoke` runs with the agent's own credential through the
+ *   same route (src/services/route-capabilities.ts). A `rest-only`, `no-twin` or `no-twin-write`
+ *   finding on such a route is therefore reached and needs no entry. An entry the file keeps for one
+ *   stays held: it says why the route itself refuses an agent (requireRole('owner'), an operator word
+ *   or account:security that no wildcard carries). A finding on a route the catalogue leaves out (a
+ *   non-JSON body, a stream, an outside credential) is measured as before.
  *   An entry is either an ANSWER or the seeding's placeholder, `NOT YET REVIEWED`. Re-seeding
  *   forgives the whole backlog, so it is a decision. It keeps every entry already in the file as
  *   written, writes the placeholder only for a key the file does not hold, and drops entries no
@@ -43,6 +50,8 @@
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts          # report only, never fails
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts --seed   # rewrite the exemption file
  * @version-history
+ *   v2.3.0 — 2026-11-14 — A finding on a route capability is reached through aimeat_invoke and needs
+ *     no entry; an entry kept for one is held, and both counts have a report line.
  *   v2.2.0 — 2026-11-12 — `no-twin-write:` joins the ratchet, with its own report line. --seed keeps
  *     every entry already in the file instead of rewriting all of them to the placeholder, which
  *     would have erased the answered entries; a new key's placeholder carries the day it was seeded.
@@ -59,6 +68,8 @@ import { recordFields, doorReach, type AgentSurface, type Finding } from './inve
 import { srcProgram, AIMEAT } from './inventory/program.js';
 import { loadFacts } from './inventory/field-reach-facts.js';
 import { captureServer, captureConnector, captureCliDispatch, type CapturedTool } from './inventory/mcp-capture.js';
+import { listRouteCapabilities } from '../src/services/route-capabilities.js';
+import { routeKey } from '../src/services/openapi-body-contract.js';
 
 const EXEMPTIONS = join(AIMEAT, 'security', 'field-reach-exemptions.json');
 const PLACEHOLDER = 'NOT YET REVIEWED';
@@ -81,6 +92,20 @@ function describe(f: Finding): string {
     return f.kind === 'no-twin'
         ? `the door reads record fields (${f.fields!.join(', ')}) and no agent tool does the same job`
         : 'the writing route reads no record field and no agent tool does the same job';
+}
+
+/** `GET /v1/agents/:name/telemetry` → the key the route capabilities are known by. */
+function routeKeyOf(route: string): string {
+    const [method, ...path] = route.split(' ');
+    return routeKey(method, path.join(' '));
+}
+
+/**
+ * The routes `aimeat_invoke` reaches as route capabilities: the catalogue's own list
+ * (src/services/route-capabilities.ts), read from openapi.yaml, so this gate and the catalogue agree.
+ */
+function invokableRouteKeys(): Set<string> {
+    return new Set(listRouteCapabilities().map(c => routeKey(c.method, c.path)));
 }
 
 function readExemptions(): Record<string, string> {
@@ -132,8 +157,16 @@ function main(): void {
         .flatMap(s => [...declared[s].keys()].map(t => `${s}:${t}`)).filter(t => !found.has(t));
 
     const m = doorReach(recordFields(srcProgram().files), facts, declared);
+    // A route an agent reaches as a route capability through aimeat_invoke has an agent path: the
+    // finding needs no entry. One the file still holds stays held, because the route itself refuses
+    // an agent (or an agent without a word no wildcard carries), and the entry says so.
+    const exemptNow = readExemptions();
+    const invokable = invokableRouteKeys();
+    const viaInvoke = m.findings.filter(f => invokable.has(routeKeyOf(f.route)));
+    const heldViaInvoke = viaInvoke.filter(f => exemptNow[f.key]);
+    const reached = new Set(viaInvoke.filter(f => !exemptNow[f.key]).map(f => f.key));
     const current: [string, string][] = [
-        ...m.findings.map((f): [string, string] => [f.key, describe(f)]),
+        ...m.findings.filter(f => !reached.has(f.key)).map((f): [string, string] => [f.key, describe(f)]),
         ...blindKeys('unnamed', m.blind.unnamed).map(([k, w]): [string, string] => [k, `a read CodeQL could not name, so the field it reads is invisible to this gate: ${w}`]),
         ...blindKeys('unrouted', m.blind.unrouted).map(([k, w]): [string, string] => [k, `a read of a request no route registration names, so its door is unknown: ${w}`]),
     ];
@@ -159,7 +192,9 @@ function main(): void {
                 + 'and no agent tool does the same job. '
                 + '`unnamed:` and `unrouted:` hold, per file, the reads the measurement cannot place. Seeded so '
                 + `the gate fails only on a NEW entry. "${PLACEHOLDER}" is a question nobody has answered, `
-                + 'not a clearance; an answered entry says why only a person with a browser is meant to reach it.',
+                + 'not a clearance; an answered entry says why only a person with a browser is meant to reach it. '
+                + 'A finding on a route aimeat_invoke reaches as a route capability needs no entry; '
+                + '"ROUTE REFUSES AN AGENT" marks one kept because the route itself refuses an agent.',
             exempt,
         } satisfies ExemptionFile, null, 2) + '\n');
         const added = current.filter(([k]) => !before[k]).length;
@@ -182,6 +217,8 @@ function main(): void {
     console.log(`  fields a door takes and no twin does    ${String(count('rest-only:')).padStart(4)}`);
     console.log(`  doors with no agent twin                ${String(count('no-twin:')).padStart(4)}`);
     console.log(`  writing routes with no agent tool       ${String(count('no-twin-write:')).padStart(4)}   (of ${m.writes.length} that read no record field)`);
+    console.log(`  reached through aimeat_invoke           ${String(reached.size).padStart(4)}   (a route capability; no entry needed)`);
+    console.log(`  of those routes, still held by an entry ${String(heldViaInvoke.length).padStart(4)}   (an answer, e.g. "ROUTE REFUSES AN AGENT")`);
     console.log(`  reads CodeQL could not name             ${String(count('unnamed:')).padStart(4)}`);
     console.log(`  reads on no known route                 ${String(count('unrouted:')).padStart(4)}`);
     console.log(`  exempt, not yet reviewed                ${String(unreviewed).padStart(4)}`);
