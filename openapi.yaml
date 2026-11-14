@@ -49562,7 +49562,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, type]
+              required: [name]
               properties:
                 name:
                   type: string
@@ -49571,13 +49571,15 @@ paths:
                   description: Organism display name. No control character, and not only white space (400 VALIDATION_ERROR naming the field).
                   example: Helsinki Photography Club
                 description:
-                  type: string
+                  type: [string, 'null']
                   maxLength: 10000
                   description: No control character other than tab and line breaks.
                 type:
-                  type: string
+                  type: [string, 'null']
                   maxLength: 256
-                  description: Free text; the presets are community, team, club, cooperative, project.
+                  description: >-
+                    Free text; the presets are community, team, club, cooperative, project. Omitted,
+                    empty or null: the shape's type, or community. Kept to its first 40 characters.
                 location:
                   type: object
                   properties:
@@ -49588,26 +49590,31 @@ paths:
                     country:
                       type: string
                 interests:
-                  type: array
+                  type: [array, 'null']
                   items:
                     type: string
                     maxLength: 200
                   example: [photography, urban-exploration]
-                joinPolicy:
-                  type: string
-                  enum: [open, approval, invite]
+                join_policy:
+                  type: [string, 'null']
+                  maxLength: 256
                   default: open
+                  description: >-
+                    open, approval_required or invite_only. Omitted, or any other value: the
+                    shape's join policy, or open.
+                max_members:
+                  description: A positive number (a numeric string is read as one); omitted or not positive is 500.
                 visibility:
-                  type: string
-                  enum: [public, listed, private]
+                  type: [string, 'null']
+                  enum: [public, listed, private, null]
                   default: public
                   description: >-
                     Omitted (and not set by the shape): the node's starting level,
                     `visibility.organism_default` (AIMEAT_DEFAULT_ORGANISM_VISIBILITY, public unless the
                     operator chose otherwise). A default of public asks the publish gate as an explicit one does.
                 member_visibility:
-                  type: string
-                  enum: [public, authenticated, members, admins]
+                  type: [string, 'null']
+                  enum: [public, authenticated, members, admins, null]
                   default: authenticated
                   description: >-
                     Who may see the member ROSTER (the members/agentGaiis fields and the /members
@@ -49615,8 +49622,8 @@ paths:
                     never sees rosters. 'public' is a deliberate opt-in. Creator + admins stay
                     visible at every tier (accountability); admins/operator always see the roster.
                 shape:
-                  type: string
-                  enum: [own-work, team, company, family, club, project]
+                  type: [string, 'null']
+                  enum: [own-work, team, company, family, club, project, '', null]
                   description: >-
                     A starting shape (GET /v1/organisms/shapes): the organism takes the shape's
                     type, join policy and visibility unless they are given, and gets the shape's
@@ -49625,8 +49632,8 @@ paths:
                     (the ones made) and `workspaces_not_created` (the ones that failed, each with
                     its reason); the organism and the workspaces made stay either way.
                 lang:
-                  type: string
-                  enum: [en, fi, es]
+                  type: [string, 'null']
+                  enum: [en, fi, es, null]
                   description: Language of the shape's workspace names and readme.
       responses:
         '201':
@@ -49866,12 +49873,14 @@ paths:
                   type: array
                   items:
                     type: string
-                joinPolicy:
+                join_policy:
                   type: string
-                  enum: [open, approval, invite]
+                  enum: [open, approval_required, invite_only]
+                max_members:
+                  description: A positive number (a numeric string is read as one); kept as a whole number.
                 visibility:
                   type: string
-                  enum: [public, unlisted, private]
+                  enum: [public, listed, private]
                 member_visibility:
                   type: string
                   enum: [public, authenticated, members, admins]
