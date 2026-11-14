@@ -30,6 +30,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { readCiState, describeState, NIGHTLY_WORKFLOW } from './lib/ci-runs.mjs';
 import { redFromLog, planSteps, type Step, type JobReds } from './lib/nightly-preflight-plan.js';
+import { manifestChangedBeyondScripts } from './lib/package-manifest-change.js';
 
 const args = process.argv.slice(2);
 const full = args.includes('--full');
@@ -69,12 +70,8 @@ if (base) {
         changed = [...new Set([...tracked, ...untracked].map(s => s.trim()).filter(Boolean))];
         // A package.json change that touches only `scripts` changes nothing the package ships, and the
         // pack start costs about ten minutes here; drop it from what the plan reads.
-        if (changed.includes('aimeat/package.json')) {
-            const withoutScripts = (text: string): string => { const p = JSON.parse(text); delete p.scripts; return JSON.stringify(p); };
-            try {
-                const before = execFileSync('git', ['show', `${base}:aimeat/package.json`], { encoding: 'utf8', cwd: repoRoot });
-                if (withoutScripts(before) === withoutScripts(readFileSync('package.json', 'utf8'))) changed = changed.filter(f => f !== 'aimeat/package.json');
-            } catch { /* unreadable: keep it, so the pack start runs */ }
+        if (changed.includes('aimeat/package.json') && !manifestChangedBeyondScripts(base, repoRoot)) {
+            changed = changed.filter(f => f !== 'aimeat/package.json');
         }
     } catch {
         console.log(`  Commit ${base.slice(0, 9)} is not in this clone; run \`git fetch\` to compare with it.`);

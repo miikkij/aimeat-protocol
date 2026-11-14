@@ -53,6 +53,11 @@ export default defineConfig({
         },
     },
     test: {
+        // vitest's default also reruns every file when package.json changes, so `pnpm gate` after a
+        // one-line script change ran all 1 391 files for twenty minutes (2026-11-14). package.json is
+        // left out here; the gate runs the whole suite itself when the manifest changed beyond
+        // `scripts` (scripts/lib/package-manifest-change.ts), and CI runs it on every push.
+        forceRerunTriggers: ['**/vitest.config.*/**', '**/vite.config.*/**'],
         coverage: {
             provider: 'v8',
             include: ['src/**/*.ts'],

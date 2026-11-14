@@ -40,6 +40,9 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-11-14 -- Unit files that fail in the parallel run are run again alone before the gate refuses,
+ *     and the closing lines name the ones that passed alone (machine load); a package.json change
+ *     that touches only `scripts` reaches no unit test, one beyond it runs the whole suite.
  *   2026-10-26 -- The Agent Skills validator (pnpm check:skills-standard, skills-ref through uv) runs when
  *     a built-in skill, the SKILL.md parser or the check changed (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
  *   2026-10-21 -- The purpose tier runs wherever the guard tier runs (pnpm test:e2e:purpose:*), so a fix
@@ -67,6 +70,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describeState, readCiState } from './lib/ci-runs.mjs';
+import { manifestChangedBeyondScripts } from './lib/package-manifest-change.js';
 
 const args = process.argv.slice(2);
 const FULL = args.includes('--full');
@@ -165,7 +169,8 @@ function changedSince(base: string): { files: string[]; mergeBase: string } {
     return { files, mergeBase };
 }
 
-interface Step { name: string; cmd: string[]; why: string }
+/** `unit`: a vitest run whose failed files are run again alone before the gate refuses (runUnit). */
+interface Step { name: string; cmd: string[]; why: string; unit?: boolean }
 
 function plan(files: string[], mergeBase: string): Step[] {
     const steps: Step[] = [];
@@ -182,10 +187,14 @@ function plan(files: string[], mergeBase: string): Step[] {
     steps.push({ name: 'check:fast', cmd: ['pnpm', '-s', 'check:fast'], why: 'always: thirty seconds, and half of it reads documents' });
     steps.push({ name: 'check:invariants', cmd: ['pnpm', '-s', 'check:invariants'], why: 'always: one compiler program, five gates' });
 
-    if (FULL) {
-        steps.push({ name: 'unit suite, whole', cmd: ['pnpm', '-s', 'test'], why: '--full' });
-    } else if (unitReach.length > 0) {
-        steps.push({ name: `unit tests reaching ${unitReach.length} changed file(s)`, cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', '--changed', mergeBase, '--passWithNoTests'], why: unitReach.slice(0, 4).join(', ') + (unitReach.length > 4 ? ', …' : '') });
+    // vitest.config.ts leaves package.json out of forceRerunTriggers, so the manifest is decided here:
+    // a change beyond `scripts` runs the whole suite, a script line alone reaches no test.
+    const manifestChanged = unitReach.includes('aimeat/package.json') && manifestChangedBeyondScripts(mergeBase, ROOT);
+    const unitFiles = unitReach.filter(f => f !== 'aimeat/package.json');
+    if (FULL || manifestChanged) {
+        steps.push({ name: 'unit suite, whole', cmd: ['pnpm', '-s', 'exec', 'vitest', 'run'], why: FULL ? '--full' : 'package.json changed beyond its scripts', unit: true });
+    } else if (unitFiles.length > 0) {
+        steps.push({ name: `unit tests reaching ${unitFiles.length} changed file(s)`, cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', '--changed', mergeBase, '--passWithNoTests'], why: unitFiles.slice(0, 4).join(', ') + (unitFiles.length > 4 ? ', …' : ''), unit: true });
     }
     // test/unit/version-aware-suites.test.ts reads the suites' TEXT, so `vitest --changed` (an import
     // graph) never selects it for a changed suite. A suite that started to name a *_REMOVED_IN constant
@@ -279,7 +288,7 @@ async function main(): Promise<void> {
     console.log('  ' + '─'.repeat(62));
     for (const s of steps) console.log(`  • ${s.name.padEnd(44)} ${s.why}`);
     const skipped: string[] = [];
-    if (!FULL && !files.some(f => UNIT_REACH.test(f))) skipped.push('unit tests (nothing a test can reach changed)');
+    if (!steps.some(s => s.unit)) skipped.push('unit tests (nothing a test can reach changed)');
     if (!FULL && !files.some(f => PYTHON_PARITY.test(f))) skipped.push('Python parity tests (no aimeat-crewai, offer schema or shape-allowlist change)');
     if (!FULL && !files.some(f => SKILLS_STANDARD.test(f))) skipped.push('Agent Skills validator (no built-in skill, SKILL.md parser or check change)');
     if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard and purpose tiers (no server source, dependency or E2E machinery changed)');
@@ -291,18 +300,52 @@ async function main(): Promise<void> {
     if (PLAN_ONLY) return;
 
     const t0 = Date.now();
+    const loadNotes: string[] = [];
     for (const s of steps) {
         const t = Date.now();
         console.log(`\n[gate] ${s.name}…`);
-        const r = spawnSync(s.cmd[0], s.cmd.slice(1), { cwd: AIMEAT, stdio: 'inherit', shell: process.platform === 'win32' });
+        const ok = s.unit ? runUnit(s, loadNotes) : spawnSync(s.cmd[0], s.cmd.slice(1), { cwd: AIMEAT, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0;
         const secs = ((Date.now() - t) / 1000).toFixed(0);
-        if (r.status !== 0) {
+        if (!ok) {
             console.error(`\n✖ gate: ${s.name} refused after ${secs}s. Fix it, then run pnpm gate again.`);
             process.exit(1);
         }
         console.log(`[gate] ✓ ${s.name} (${secs}s)`);
     }
-    console.log(`\n  ✓ gate passed in ${((Date.now() - t0) / 1000).toFixed(0)}s: ${steps.length} step(s)${skipped.length ? `, ${skipped.length} skipped for cause` : ''}\n`);
+    console.log(`\n  ✓ gate passed in ${((Date.now() - t0) / 1000).toFixed(0)}s: ${steps.length} step(s)${skipped.length ? `, ${skipped.length} skipped for cause` : ''}`);
+    for (const note of loadNotes) console.log(`  ⚠ ${note}`);
+    console.log('');
+}
+
+/**
+ * A vitest step whose failed files are run again alone, one at a time, before the gate refuses.
+ *
+ * WHY. Run whole on a machine where other sessions run their own suites, 10 to 15 of the 14 700 unit
+ * tests ran past their 5 s limit, a different set each run, and every one passed alone (2026-11-14):
+ * the gate refused for the machine's load and said nothing about the change. A file that fails again
+ * alone refuses; one that passes alone is named in the closing lines, so the load is visible and is
+ * never read as the change.
+ */
+function runUnit(s: Step, notes: string[]): boolean {
+    const report = join(mkdtempSync(join(tmpdir(), 'aimeat-gate-unit-')), 'report.json');
+    const shell = process.platform === 'win32';
+    const first = spawnSync(s.cmd[0], [...s.cmd.slice(1), '--reporter=default', '--reporter=json', `--outputFile.json=${report}`], { cwd: AIMEAT, stdio: 'inherit', shell });
+    if (first.status === 0) return true;
+    let failed: string[] = [];
+    try {
+        const body = JSON.parse(readFileSync(report, 'utf8')) as { testResults?: Array<{ name: string; status: string }> };
+        failed = (body.testResults ?? []).filter(r => r.status === 'failed').map(r => r.name);
+    } catch {
+        console.error('[gate] the unit report could not be read, so the failed files cannot be run again alone');
+        return false;
+    }
+    if (failed.length === 0) return false;
+    console.log(`\n[gate] ${failed.length} unit file(s) failed; running them again alone, one at a time…`);
+    const again = spawnSync('pnpm', ['-s', 'exec', 'vitest', 'run', '--no-file-parallelism', ...failed], { cwd: AIMEAT, stdio: 'inherit', shell });
+    if (again.status !== 0) return false;
+    const names = failed.map(f => f.replace(/\\/g, '/').replace(/^.*?\/aimeat\//, ''));
+    notes.push(`${names.length} unit file(s) failed in the parallel run and passed alone: the machine's load, not the change. ${names.join(', ')}`);
+    return true;
 }
 
 void main();
