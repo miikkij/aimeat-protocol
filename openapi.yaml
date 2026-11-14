@@ -52948,6 +52948,9 @@ paths:
         The two actions of a member's suggested workspace change (`workspace.space.add`,
         `workspace.sections.change`) are refused here with 400: they are filed by
         POST .../workspace/spaces and PUT .../workspace/sections/{space}, because approving one runs it.
+        Action `publish` is refused here with 400 INVALID_INPUT for the same reason: approving it
+        publishes a draft, so a publish approval is filed only by POST /v1/organisms/{id}/publish, which
+        asks the publish checks first and takes the approver from the organism's publish gate.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -52961,7 +52964,7 @@ paths:
               type: object
               required: [action]
               properties:
-                action: { type: string, description: "e.g. flow:advance, data-model-change, external-release, publish" }
+                action: { type: string, description: "e.g. flow:advance, data-model-change, external-release. Not publish, workspace.space.add or workspace.sections.change, which are filed by their own routes." }
                 arguments: { type: object, description: The proposed change payload }
                 risk: { type: string, enum: [low, medium, high] }
                 rule: { type: string, enum: [approve, auto], description: "What the CALLER asks for. `approve` always gates, even where the organism's autonomy level would have auto-run it. `auto` asks to skip review and is honoured only where the organism's own `policy.agentAutonomy` already allows it — an owner's setting the caller could opt out of would not be a setting. It is recorded in the decision's reason either way." }

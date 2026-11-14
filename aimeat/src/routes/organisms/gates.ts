@@ -6,6 +6,10 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-11-14 — POST /approvals refuses action "publish" with 400 INVALID_INPUT and names
+ *     POST /v1/organisms/:id/publish, as it refuses the member-change actions: resolving one published
+ *     the draft without the publish route's checks or its gate's approver (register finding
+ *     f-2026-11-13-generic-approval-action-publish-runs-a-publish).
  *   v1.7.3 — 2026-11-13 — POST /revert asks requireMember (services/organism-read/member.ts), the
  *     organism read and the role aimeat_workspace_revert_to_draft asks; the answers are unchanged
  *     (structure programme 2026-11, unit 2b).
@@ -158,6 +162,16 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     // choosing would be a change nobody's rule allowed.
     if (isMemberChangeAction(action)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `${action} is filed by the workspace's member change doors: POST /v1/organisms/${id}/workspace/spaces or PUT /v1/organisms/${id}/workspace/sections/{space}.`));
+      return;
+    }
+    // The same for a publish: approving one publishes the draft its arguments name, and the publish
+    // route asks first whether the caller may write that draft, the space fence and the namespace
+    // rule, and takes the approver from the organism's publish gate. Filed here, with arguments and
+    // an approver of the caller's choosing, it skipped all of that (register finding
+    // f-2026-11-13-generic-approval-action-publish-runs-a-publish). The resolve step below keeps its
+    // publish branch for the approvals that route files.
+    if (action === 'publish') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `A publish approval is filed by POST /v1/organisms/${id}/publish, which asks the publish checks and the organism's publish gate first.`));
       return;
     }
     const riskVal: Risk = ['low', 'medium', 'high'].includes(risk) ? risk : 'medium';

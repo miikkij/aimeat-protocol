@@ -4,19 +4,19 @@
  * SPDX-License-Identifier: MIT
  * @description E2E for the action "publish" on the generic approval route, POST /v1/organisms/:id/approvals.
  *   That route refuses the two member-change actions, because approving one runs the change it
- *   carries. It takes action "publish" with arguments the caller chooses, and resolving it
- *   (POST /v1/organisms/:id/approvals/:aid) runs the same publish of the draft that
- *   POST /v1/organisms/:id/publish runs, without the checks that route asks first: the write test of
- *   the draft's key and the organism's configured publish gate with its approver role. A member in
- *   person names approverRole 'member' and resolves the request himself.
- *   Each section holds the refused case on the publish route, the same publish through the generic
- *   route, and the designed use of the publish route and of a publish approval filed through it.
- *   Register finding f-2026-11-13-generic-approval-action-publish-runs-a-publish: the designed rule
- *   (the draft is not published) was measured red on both backends on 2026-11-14. The fix changes
- *   what a caller gets and waits for the developer's decision, so the two generic-route sections
- *   assert today's answer under a title that names the question.
+ *   carries, and it refuses action "publish" for the same reason: resolving one
+ *   (POST /v1/organisms/:id/approvals/:aid) publishes the draft, and a publish approval filed there
+ *   skipped the checks POST /v1/organisms/:id/publish asks first (the write test of the draft's key)
+ *   and the approver role of the organism's configured publish gate.
+ *   Each section holds the refused case on the publish route, the same publish on the generic route
+ *   (refused with 400, the draft not published), and the designed use of the publish route and of
+ *   a publish approval filed through it.
+ *   Register finding f-2026-11-13-generic-approval-action-publish-runs-a-publish. FAIL FIRST,
+ *   2026-11-14, on both backends: before the refusal, both generic-route sections published the draft.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-generic-approval-publish
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The generic route refuses action "publish": the two sections assert the
+ *     designed answer instead of today's (developer's decision of 2026-11-14, option A).
  *   v1.0.0 — 2026-11-14 — Initial.
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
@@ -72,16 +72,14 @@ async function published(id: string): Promise<boolean> {
     for (const who of [alice, bob, carol]) if (await holds(who, id, 'latest')) return true;
     return false;
 }
-/** File action "publish" on the generic route, naming member approvers, and resolve it as the same person. */
-async function fileAndResolve(who: RegisteredOwner, id: string): Promise<{ filed: Answer; resolved: Answer }> {
+/** File action "publish" on the generic route, naming member approvers; it is refused with 400 and names the publish route. */
+async function fileOnGenericRoute(who: RegisteredOwner, id: string): Promise<void> {
     const filed = await call('POST', `/v1/organisms/${orgId}/approvals`, who.token, {
         action: 'publish', rule: 'approve', approverRole: 'member',
         arguments: { ws: WS, namespace: NS, instance: id },
     });
-    assert(filed.status === 201, `file: ${show(filed)}`);
-    const aid = filed.body.data.approval.id as string;
-    const resolved = await call('POST', `/v1/organisms/${orgId}/approvals/${aid}`, who.token, { decision: 'approve' });
-    return { filed, resolved };
+    assert(filed.status === 400 && filed.body.error?.code === 'INVALID_INPUT', `file: ${show(filed)}`);
+    assert(String(filed.body.error?.message ?? '').includes(`/v1/organisms/${orgId}/publish`), `the refusal names the publish route: ${show(filed)}`);
 }
 
 console.log('\n=== Action "publish" on the generic approval route ===\n');
@@ -121,15 +119,10 @@ await test('REFUSED: bob, a member with no grant, cannot publish carol\'s draft 
     assert(!(await published('c1')), 'nothing may be published');
 });
 
-// QUESTION for the developer (register finding f-2026-11-13-generic-approval-action-publish-runs-a-publish).
-// The designed rule is that this draft is not published; measured red on both backends on 2026-11-14.
-// Until the decision, this section asserts today's answer, so the suite says when it changes.
-await test('publish through the generic approval route: bob, who may not write the draft, files and resolves his own publish of carol\'s draft; TODAY it is published', async () => {
-    const { filed, resolved } = await fileAndResolve(bob, 'c1');
-    assert(filed.body.data.approval.approverRole === 'member', `stored approverRole: ${filed.body.data.approval.approverRole}`);
-    assert(resolved.status === 200, `resolve: ${show(resolved)}`);
-    assert(await published('c1'), 'today the draft is published');
-    assert(!(await holds(carol, 'c1', 'draft')), 'today carol\'s draft is consumed');
+await test('REFUSED: bob files action "publish" of carol\'s draft on the generic approval route: 400 naming the publish route, and the draft is not published', async () => {
+    await fileOnGenericRoute(bob, 'c1');
+    assert(!(await published('c1')), 'the draft must not be published');
+    assert(await holds(carol, 'c1', 'draft'), 'carol\'s draft must still be there');
 });
 
 await test('USE KEPT: carol, the contributor, publishes her own draft through POST /publish', async () => {
@@ -158,12 +151,10 @@ await test('REFUSED: carol\'s publish through POST /publish files an approval fo
     assert(!(await published('g1')), 'g1 is not published yet');
 });
 
-// QUESTION for the developer, the same finding: the designed rule is that the gate's approver decides.
-await test('publish through the generic approval route: carol names member approvers for the draft the gate sends to the owner and resolves it herself; TODAY it is published', async () => {
-    const { filed, resolved } = await fileAndResolve(carol, 'g1');
-    assert(filed.body.data.approval.approverRole === 'member', `stored approverRole: ${filed.body.data.approval.approverRole}`);
-    assert(resolved.status === 200, `resolve: ${show(resolved)}`);
-    assert(await published('g1'), 'today the draft is published past the gate');
+await test('REFUSED: carol files action "publish" with member approvers for the draft the gate sends to the owner: 400 naming the publish route, and the draft is not published', async () => {
+    await fileOnGenericRoute(carol, 'g1');
+    assert(!(await published('g1')), 'the draft must not be published past the gate');
+    assert(await holds(carol, 'g1', 'draft'), 'carol\'s draft must still be there');
 });
 
 await test('USE KEPT: alice, the owner, resolves the approval the publish route filed, and the draft is published', async () => {
