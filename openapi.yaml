@@ -4208,12 +4208,12 @@ components:
           example: [photography, urban-exploration]
         joinPolicy:
           type: string
-          enum: [open, approval, invite]
+          enum: [open, approval_required, invite_only]
           default: open
-          description: How new members can join
+          description: How new members can join. Written as `join_policy` on create and update.
         visibility:
           type: string
-          enum: [public, unlisted, private]
+          enum: [public, listed, private]
           default: public
         memberCount:
           type: integer
@@ -49947,11 +49947,13 @@ paths:
                 join_policy:
                   type: string
                   enum: [open, approval_required, invite_only]
+                  description: Any other value is refused with 400 INVALID_INPUT.
                 max_members:
                   description: A positive number (a numeric string is read as one); kept as a whole number.
                 visibility:
                   type: string
                   enum: [public, listed, private]
+                  description: Any other value is refused with 400 INVALID_INPUT.
                 member_visibility:
                   type: string
                   enum: [public, authenticated, members, admins]
