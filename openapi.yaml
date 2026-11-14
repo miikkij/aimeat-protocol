@@ -15309,11 +15309,12 @@ paths:
                 text: { type: string, description: What to say. Must not be empty. }
                 attachments:
                   type: array
-                  items: { type: string }
+                  items: {}
                   description: >-
                     Storage keys of files the person attached, uploaded beforehand through the
-                    presigned path. Keys, never bytes. The legacy field name `images` is still
-                    accepted.
+                    presigned path. Keys, never bytes. An item that is not a string of 1 to 511
+                    characters is dropped and the turn goes on. The legacy field name `images` is
+                    still accepted.
                 starter:
                   type: string
                   description: >-
