@@ -72,7 +72,7 @@ beforeAll(async () => {
     const share = await import('../../src/services/share-token.js');
     const draft = await import('../../src/services/draft-token.js');
     const confirm = await import('../../src/services/operator-confirm.js');
-    const appAccess = await import('../../src/services/app-access-token.js');
+    const appAccess = await import('../../src/services/app/access-token.js');
     const external = await import('../../src/services/external-login.js');
     download.initDownloadTokenKeys(privateKey, publicKey);
     share.initShareTokenKeys(privateKey, publicKey);

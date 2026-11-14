@@ -39,7 +39,7 @@ import { logger } from '../../utils/logger.js';
 import { AiCompletionError } from './errors.js';
 import type { AiCapability } from './types.js';
 import type { AiProvider } from './providers.js';
-import type { AppAiRole } from '../app-ai-roles.js';
+import type { AppAiRole } from '../app/ai-roles.js';
 import { appAiMetaOf } from './policy-store.js';
 
 export const ROLES_KEY = 'ai.roles.owner';

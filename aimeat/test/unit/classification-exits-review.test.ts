@@ -31,7 +31,7 @@ import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { memoryTarget, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { readerFor, systemReader } from '../../src/services/classification/reader.js';
 import { resetClassificationAudit } from '../../src/services/classification/audit.js';
-import { collectWorkspace } from '../../src/services/workspace-export.js';
+import { collectWorkspace } from '../../src/services/workspace/export.js';
 import { leaveMemoriesToPeer, WITHHELD_REASON } from '../../src/services/classification-exits.js';
 import { safeUnzip, BACKUP_ZIP_LIMITS } from '../../src/services/safe-zip.js';
 import { memoryRouter } from '../../src/routes/memory.js';

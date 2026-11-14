@@ -540,7 +540,7 @@ await test('EXTENSION: for the agent, hidden reads as absent and allowed is plai
 await test('EXTENSION: for the agent, the warning-classified value arrives with its warning', async () => {
   const w = await peek(bot.token, OWN.warning);
   assert(w.status === 200 && w.body.data.found === true, `warning value: ${JSON.stringify(w.body).slice(0, 200)}`);
-  // ctx.memory.getPublic hands a script the value alone (services/extension-ctx.ts), so the warning
+  // ctx.memory.getPublic hands a script the value alone (services/extension/ctx.ts), so the warning
   // reaches the script only when it is on what getPublic returns, which the script hands back as
   // `value`.
   assert(!!warningOf(w.body.data.value), `the warning did not reach the extension: ${JSON.stringify(w.body.data).slice(0, 300)}`);

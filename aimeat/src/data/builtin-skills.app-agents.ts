@@ -12,9 +12,9 @@
  *   permission.
  *
  *   The facts come from models/crew-def-schemas.ts (the fields and the limits),
- *   services/app-bundled-crews.ts (the block, what a publish reads and the two hints),
- *   services/app-agent-propose.ts (which permissions a proposal asks for) and
- *   services/app-agent-deploy.ts (the four actions and the states). The curated pitfalls
+ *   services/app/bundled-crews.ts (the block, what a publish reads and the two hints),
+ *   services/app/agent-propose.ts (which permissions a proposal asks for) and
+ *   services/app/agent-deploy.ts (the four actions and the states). The curated pitfalls
  *   bundled-agent-block and bundled-agent-permissions point here.
  * @structure APP_AGENTS_SKILL_ENTRY
  * @usage import { APP_AGENTS_SKILL_ENTRY } from './builtin-skills.app-agents.js';

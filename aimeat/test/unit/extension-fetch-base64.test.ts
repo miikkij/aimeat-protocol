@@ -32,9 +32,9 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     return { ...actual, safeFetch: vi.fn(async () => answer()) };
 });
 
-const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
-const { executeExtensionAction } = await import('../../src/services/extension-runtime.js');
-const { scrubBytes, scrubFormsOf, SCRUB_PLACEHOLDER } = await import('../../src/services/extension-fetch-scrub.js');
+const { buildExtensionCtx } = await import('../../src/services/extension/ctx.js');
+const { executeExtensionAction } = await import('../../src/services/extension/runtime.js');
+const { scrubBytes, scrubFormsOf, SCRUB_PLACEHOLDER } = await import('../../src/services/extension/fetch-scrub.js');
 
 const config = {
     nodeId: 'node-1', encryptionKey: null, totpSecretEncryptionKey: null,

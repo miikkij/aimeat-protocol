@@ -27,7 +27,7 @@ import {
     splitComponentAddress, findExtension, findCortex, installNameFor, placeExtensionInstall, extensionCallTarget,
     cortexLibPath, idStemOf, settleReclaimed, ownExtensionFileKey, ownExtensionMemoryOwner, withOwnerFields,
 } from '../../src/services/component-address.js';
-import { uninstallExtension } from '../../src/services/extension-lifecycle.js';
+import { uninstallExtension } from '../../src/services/extension/lifecycle.js';
 
 requirePostgresWhenAsked('component-address');
 

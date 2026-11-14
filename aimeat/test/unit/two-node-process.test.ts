@@ -293,7 +293,7 @@ vi.mock('../../src/services/cache-cleanup.js', async (importOriginal) => ({
 vi.mock('../../src/services/sync-scheduler.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), startSyncScheduler: () => {},
 }));
-vi.mock('../../src/services/extension-schedules.js', async (importOriginal) => ({
+vi.mock('../../src/services/extension/schedules.js', async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()), backfillExtensionJobOwnerScope: async () => {},
 }));
 vi.mock('../../src/services/dependency-map.js', async (importOriginal) => ({

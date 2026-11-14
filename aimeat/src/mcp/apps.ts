@@ -11,6 +11,8 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-13 — aimeat_app_draft_publish reads the draft and asks the roadmap question through
+ *     services/app/draft-to-publish.ts, which POST .../publish-draft calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_app_draft_save hands mime_type to stageAppDraft, as the PUT draft route does (unit 3b).
  *   2026-11-13 — aimeat_app_publish takes toll_morsels and license_type on an inline publish, refused
  *     to a delegated builder as on POST /v1/apps (structure programme 2026-11, unit 3b).
@@ -135,34 +137,35 @@ import { appListingOf } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
-import { mintDraftPreview } from '../services/app-draft-preview.js';
+import { mintDraftPreview } from '../services/app/draft-preview.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { requirementsOf, appRef as depAppRef } from '../services/dependency-map.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { publishApp } from '../services/app-publish.js';
-import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
+import { publishApp } from '../services/app/publish.js';
+import { servedMarksResponse } from '../services/app/serve-marks-strip.js';
 import {
     appFilenameRefusal, resolveAppOwnerScope, resolveAppTargetScope, stageAppDraft, discardAppDraft,
     publishAppDraft, deleteOwnedApp,
-} from '../services/app-lifecycle.js';
-import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app-dev-grant.js';
-import { roadmapGate } from '../services/app-roadmap.js';
-import { draftNoticeFrom, appViewerStanding, readAppNews } from '../services/app-news.js';
-import { publicAppManifest } from '../services/app-public-manifest.js';
-import { resolveAppUrls } from '../services/app-urls.js';
+} from '../services/app/lifecycle.js';
+import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app/dev-grant.js';
+import { roadmapGate } from '../services/app/roadmap.js';
+import { draftToPublish } from '../services/app/draft-to-publish.js';
+import { draftNoticeFrom, appViewerStanding, readAppNews } from '../services/app/news.js';
+import { publicAppManifest } from '../services/app/public-manifest.js';
+import { resolveAppUrls } from '../services/app/urls.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { loadServedProvenance } from '../services/ai/provenance-marks.js';
 import { registerAppForkTool } from './apps-fork.js';
-import { presentAppManifest, readAppTollInput } from '../services/app-pacing.js';
+import { presentAppManifest, readAppTollInput } from '../services/app/pacing.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { mayViewApp } from '../services/app-visibility.js';
+import { mayViewApp } from '../services/app/visibility.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { publishAskOf } from '../services/publish-requests/ask.js';
-import { publishAskedFields } from '../services/app-publish-gate.js';
+import { publishAskedFields } from '../services/app/publish-gate.js';
 
 /** The address a person opens a just-published app at: the one aimeat_app_list gives, read-only. */
 async function publishedAppUrl(config: AimeatConfig, storage: Storage, ownerName: string, filename: string): Promise<string | null> {
@@ -179,7 +182,7 @@ export function registerAppsTools(
     emitResourceListChanged: (agentGaii: string) => void,
     /** The session's caller (register-all.ts): who asks, for the app visibility rule of aimeat_app_get and the publish gate. */
     caller: () => CallerContext,
-    /** The app whose grant the session's token carries, when it is a role-'app' token (services/app-published-by-app.ts). */
+    /** The app whose grant the session's token carries, when it is a role-'app' token (services/app/published-by-app.ts). */
     publishingApp: () => string | undefined = () => undefined,
 ): void {
 
@@ -199,7 +202,7 @@ export function registerAppsTools(
     /**
      * Whether the session is a member of this node, for an app listed to members. The minted anonymous
      * token is an agent session here (kind 'agent') and is nobody's membership, as on the REST reads
-     * (services/app-visibility.ts; secaudit2026oct26).
+     * (services/app/visibility.ts; secaudit2026oct26).
      */
     function sessionIsMember(session: CallerContext): boolean {
         return session.kind !== 'anonymous' && !session.visitor
@@ -287,7 +290,7 @@ export function registerAppsTools(
                             cortex_agents: cortexAgents,
                         }),
                         // The publish gate's answer for this session; the PUT has none to ask
-                        // (services/app-publish-gate.ts). Server-side, never from the input.
+                        // (services/app/publish-gate.ts). Server-side, never from the input.
                         publish_ask: publishAskOf({ storage, config }, caller()),
                         ...(publishingApp() ? { publishing_app: publishingApp() } : {}),
                     },
@@ -323,7 +326,7 @@ export function registerAppsTools(
                 };
             }
 
-            // From here it is services/app-publish.ts — the same function POST /v1/apps, the
+            // From here it is services/app/publish.ts — the same function POST /v1/apps, the
             // presigned upload and publish-draft call. This tool was a FOURTH partial copy of the
             // publish: no transparency lint, no protection-cache invalidation, no quota, no
             // change-log entry, no announcement, no public feed, no subdomain provisioning, and a
@@ -416,7 +419,7 @@ export function registerAppsTools(
             if ('refusal' in scope) return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
             const data = Buffer.from(content_base64, 'base64');
             try {
-                // The draft slot is written in services/app-lifecycle.ts, the same function
+                // The draft slot is written in services/app/lifecycle.ts, the same function
                 // PUT /v1/apps/:owner/:filename/draft calls. The two used to build the manifest
                 // separately and disagreed on the default category.
                 const staged = await stageAppDraft(storage, config, {
@@ -429,7 +432,7 @@ export function registerAppsTools(
                 if ('refusal' in staged) {
                     return { content: [{ type: 'text' as const, text: refusalText(staged.refusal) }], isError: true };
                 }
-                // The preview link is services/app-draft-preview.ts, the same function
+                // The preview link is services/app/draft-preview.ts, the same function
                 // POST .../draft/preview-token calls, so both return the app-origin URL when it is on.
                 const preview = await mintDraftPreview(storage, config,
                     { owner: scope.ownerName, ownerGhii: scope.ownerGhii, filename });
@@ -475,18 +478,17 @@ export function registerAppsTools(
             if ('refusal' in scope) return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
             // Loaded here rather than in the service so this door can name ITS remedy; the HTTP door
             // points at `PUT .../draft` for the same condition.
-            const draft = await storage.getAppDraft(scope.ownerGhii, filename);
-            if (!draft) {
-                return { content: [{ type: 'text' as const, text: `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.` }], isError: true };
+            // The draft read and the roadmap question (the draft's own notice answers it when no line is
+            // given) are services/app/draft-to-publish.ts, which POST .../publish-draft calls too.
+            const checked = await draftToPublish(storage, { ownerName: scope.ownerName, ownerGhii: scope.ownerGhii, filename }, roadmap);
+            if (!checked.ok) {
+                return { content: [{ type: 'text' as const, text: checked.code === 'NO_DRAFT'
+                    ? `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.`
+                    : checked.message }], isError: true };
             }
-            // The draft's own notice answers the roadmap question when no line is given (publishAppDraft).
-            const road = roadmapGate({
-                line: roadmap?.trim() ? roadmap : draft.manifest.draftNotice?.text,
-                shared: await isSharedApp(storage, scope.ownerName, filename),
-            });
-            if (!road.ok) return { content: [{ type: 'text' as const, text: road.message }], isError: true };
+            const draft = checked.draft;
             try {
-                // The promotion, including the draft-slot clear, is services/app-lifecycle.ts — the
+                // The promotion, including the draft-slot clear, is services/app/lifecycle.ts — the
                 // same function POST .../publish-draft calls. Both doors used to map the draft
                 // manifest onto the publish input by hand, nine fields each.
                 const out = await publishAppDraft(storage, config, {
@@ -685,7 +687,7 @@ export function registerAppsTools(
             const app = await storage.getAppByOwnerName(owner, filename);
             // An app the caller may not see (hidden, behind an access code, unlisted, or listed to this
             // node's members for a caller who is not one) is answered as absent, as the app read routes
-            // answer it (services/app-visibility.ts; QA audit W15).
+            // answer it (services/app/visibility.ts; QA audit W15).
             const session = caller();
             const viewer = { ownerName: session.owner, member: sessionIsMember(session), auth: session.auth };
             if (!app || !(await mayViewApp(storage, config, viewer, app, 'detail'))) {
@@ -706,7 +708,7 @@ export function registerAppsTools(
             const isOwn = localAccountName(getAgentGaii()) === app.ownerName;
             const manifest = presentAppManifest(isOwn ? app.manifest : publicAppManifest(app.manifest));
             // What changed lately and, for the people who build it, the draft under way: the same
-            // answer as GET /v1/apps/:owner/:filename/news (services/app-news.ts).
+            // answer as GET /v1/apps/:owner/:filename/news (services/app/news.ts).
             const standing = await appViewerStanding(storage, config, session?.auth ?? null, app);
             const news = await readAppNews(storage, app, standing.builder);
 
@@ -759,7 +761,7 @@ export function registerAppsTools(
             }
 
             try {
-                // The delete is services/app-lifecycle.ts, the same function DELETE /v1/apps/:filename
+                // The delete is services/app/lifecycle.ts, the same function DELETE /v1/apps/:filename
                 // calls. This tool used to delete one bucket and stop: the ghost rows an old publish
                 // path left behind stayed listed, and the app's screenshot stayed in storage forever.
                 const out = await deleteOwnedApp(storage, {

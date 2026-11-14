@@ -13,8 +13,8 @@
  *   marks take (utils/app-chrome-reserve.ts), so those never cover it either.
  *
  *   Same mechanics as the other marks: pure static markup with a scoped `<style>`, idempotent via
- *   INTERNET_OPEN_MARK, put in the page by the one pass in services/app-serve-marks.ts, and taken out
- *   again on a republish by services/app-serve-marks-strip.ts. One `<div>` with no nested `<div>`.
+ *   INTERNET_OPEN_MARK, put in the page by the one pass in services/app/serve-marks.ts, and taken out
+ *   again on a republish by services/app/serve-marks-strip.ts. One `<div>` with no nested `<div>`.
  * @structure INTERNET_OPEN_MARK · internetOpenSnippet()
  * @usage via applyServeMarks({ internetOpen: { text, who } })
  * @version-history

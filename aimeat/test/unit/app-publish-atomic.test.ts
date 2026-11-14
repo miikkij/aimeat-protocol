@@ -12,9 +12,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { publishApp, type PublishAppInput } from '../../src/services/app-publish.js';
-import { readAppRoadmap } from '../../src/services/app-roadmap.js';
-import { putDevGrant } from '../../src/services/app-dev-grant.js';
+import { publishApp, type PublishAppInput } from '../../src/services/app/publish.js';
+import { readAppRoadmap } from '../../src/services/app/roadmap.js';
+import { putDevGrant } from '../../src/services/app/dev-grant.js';
 
 const stores: SqliteStorage[] = [];
 const config = { nodeId: 'node-test', baseUrl: 'http://localhost:40319', aiProvenance: false, maxAppsPerAgent: 0 } as AimeatConfig;

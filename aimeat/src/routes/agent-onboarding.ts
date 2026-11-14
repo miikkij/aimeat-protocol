@@ -12,6 +12,8 @@
  *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
+ *   2026-11-13 — GET /v1/agents/:name/onboarding reads through services/agent/onboarding-read.ts, the
+ *     gate and reads aimeat_onboarding_status calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — buildPostOnboardingChecklist moved unchanged to services/onboarding/post-checklist.ts,
  *     so the agent integration overview service no longer imports this route file (structure
  *     programme 2026-11, unit 4).
@@ -60,7 +62,8 @@
  */
 
 import { Router, type Request } from 'express';
-import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding-progress.js';
+import { confirmOnboardingStep } from '../services/onboarding-progress.js';
+import { readOnboardingFor } from '../services/agent/onboarding-read.js';
 import { createOnboardingTestTask } from '../services/onboarding-test-task.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -102,48 +105,35 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   /* -- GET /v1/agents/:name/onboarding -- */
   router.get('/v1/agents/:name/onboarding', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-    if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
-      return;
-    }
-
     const agentGaii = resolveAgentGaii(req, agentName);
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
+    // Who may read (canAccessAgent's rule), the agent, the refreshed record and the test task are
+    // services/agent/onboarding-read.ts, which aimeat_onboarding_status calls too.
+    const read = await readOnboardingFor({ storage, config }, req.auth, agentGaii);
+    if (!read.ok) {
+      if (read.code === 'NOT_YOURS') {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
+        return;
+      }
       const notFound = agentNotFoundResponse(req, agentName, agentGaii, { nodeId: config.nodeId, baseUrl: config.baseUrl });
       res.status(notFound.status).json(error(config.nodeId, notFound.code, notFound.message));
       return;
     }
-
-    let onboarding = await storage.getOnboarding(agentGaii);
-    if (!onboarding) {
+    if (!read.onboarding) {
       res.json(success(config.nodeId, { onboarding: null, status: 'not_started' }));
       return;
     }
-
-    // services/onboarding-progress.ts — aimeat_onboarding_status does the same re-evaluation.
-    const refreshed = await refreshOnboarding(storage, agentGaii, onboarding);
-    onboarding = refreshed.onboarding;
-    if (!onboarding) {
-      res.json(success(config.nodeId, { onboarding: null, status: 'not_started' }));
-      return;
-    }
-    if (refreshed.completed) {
+    const onboarding = read.onboarding;
+    if (read.completed) {
       try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('GET /v1/agents/:name/onboarding: MCP not connected', { error: String(err) }); }
     }
 
     const pendingSteps = onboarding.steps.filter(s => s.status === 'pending');
     const testTaskStep = onboarding.steps.find(s => s.id === 'accept_test_task');
-    const testTaskId = (testTaskStep?.details as Record<string, unknown> | undefined)?.testTaskId as string | undefined;
-    let testTaskStatus: string | undefined;
-    let testTaskFound = false;
-    let testTaskHasPlan = false;
-    if (testTaskId) {
-      const task = await storage.getAgentTask(testTaskId);
-      testTaskStatus = task?.status;
-      testTaskFound = !!task;
-      testTaskHasPlan = (task?.todos?.length ?? 0) > 0;
-    }
+    const testTaskId = read.testTaskId;
+    const task = read.testTask;
+    const testTaskStatus: string | undefined = task?.status;
+    const testTaskFound = !!task;
+    const testTaskHasPlan = (task?.todos?.length ?? 0) > 0;
     const hints: Record<string, unknown> = {};
     // Driver contract: hints.test_task_id is ALWAYS present when a test task exists -- connectors
     // (aimeat-crewai onboarding driver) fill the {test_task_id} placeholder from it, so gating it

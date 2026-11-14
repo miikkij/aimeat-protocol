@@ -26,7 +26,7 @@
  *     - a hosted app's grant (role `app`): it acts as its person, in the person's browser.
  *   Every other caller is fenced: an agent (every MCP session), an ecosystem app, a session from
  *   another node. The extension is named by the workspace capability of an extension action
- *   (services/extension-workspace.ts), which marks its caller with `installer/name`; no request
+ *   (services/extension/workspace.ts), which marks its caller with `installer/name`; no request
  *   field sets the marker.
  *
  *   WHAT IS A FENCE. A list with at least one entry. The valid entries (`installer/name`, trimmed
@@ -38,7 +38,7 @@
  *   MATCHED BY NAMESPACE PREFIX of the key (`organism.<org>.w.<ws>.<namespace>.`), never by a parser
  *   that expects a `.draft` or `.latest` suffix: a bare key is a live record too.
  *
- *   THE MANIFEST is the copy that counts (services/workspace-meta.ts), the one the row service
+ *   THE MANIFEST is the copy that counts (services/workspace/meta.ts), the one the row service
  *   reads, and it is not read at all for a caller the rule allows directly: a person's write costs
  *   nothing more than before.
  *
@@ -65,7 +65,7 @@
  *        and an identity with no session is decided by its shape as before, whatever list is
  *        beside it.
  *     2. A hosted app names its own extension on a space of an existing workspace through its own
- *        add-only route (services/workspace-space-extensions.ts), which asks callerIsFenced() for
+ *        add-only route (services/workspace/space-extensions.ts), which asks callerIsFenced() for
  *        who may call it.
  *     3. THE LIST IS PROTECTED. A change to the manifest is protected when it touches the fence of
  *        a memory-backed object type that has one BEFORE the change: its `extensions` value differs
@@ -118,7 +118,7 @@
 import type { Storage } from '../storage/interface.js';
 import { isOwnerInPerson, isGEAI } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isMemoryBackedSpace, readWorkspaceMetaRecord, type WorkspaceManifest } from './workspace-meta-read.js';
+import { isMemoryBackedSpace, readWorkspaceMetaRecord, type WorkspaceManifest } from './workspace/meta-read.js';
 
 export interface FenceDeps { storage: Storage; config: { nodeId: string } }
 
@@ -146,7 +146,7 @@ export interface FenceCaller {
      */
     scopes?: readonly string[];
     /** `installer/name` of the extension whose action makes the call. Set by
-     *  services/extension-workspace.ts and by nothing else. */
+     *  services/extension/workspace.ts and by nothing else. */
     extension?: string;
 }
 
@@ -261,7 +261,7 @@ function isHostedAppGrant(roles: readonly string[]): boolean {
  * May this caller change the list of a fenced space? The account holder in person, or a session
  * whose scopes cover `organism:direct`. A hosted app's grant may not, whatever words it holds: it
  * writes records directly because it acts as its person, and its way to a list is the add-only
- * route (services/workspace-space-extensions.ts). A caller with no session may not either: no code
+ * route (services/workspace/space-extensions.ts). A caller with no session may not either: no code
  * path changes a manifest without one.
  */
 export function mayChangeFence(caller: FenceCaller): boolean {

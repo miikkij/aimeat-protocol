@@ -19,7 +19,7 @@
  *   v1.0.0 — 2026-09-25 — Initial (workspace actions for plain members).
  */
 import type { AimeatClient } from './api-client.js';
-import { applySectionOps, readStoredSections, type Section } from '../services/workspace-sections.js';
+import { applySectionOps, readStoredSections, type Section } from '../services/workspace/sections.js';
 
 /** Each document space's section index as the workspace read gave it, updated as filings land. */
 export type SectionsCache = Record<string, unknown[]>;

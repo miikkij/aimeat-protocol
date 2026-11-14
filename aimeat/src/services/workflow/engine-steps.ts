@@ -97,7 +97,7 @@ import { collectSignalKeys, type ResolvedStep } from './store.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { nodeContext } from '../node-context.js';
 import { emitDelivery } from '../event-bus.js';
-import { runExtensionActionAsSystem } from '../extension-system-run.js';
+import { runExtensionActionAsSystem } from '../extension/system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { datapackageGateOf, fileDatapackageAsk } from '../datapackage/publish-ask.js';
 import { askActors, runActor, type PublishActor } from '../publish-actors.js';

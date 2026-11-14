@@ -70,7 +70,7 @@ import {
     putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid, acceptBid,
     offeringStats, offeringConsumers, enrichNeeds, presentOffering, presentContractTerms, budgetFloorText,
 } from '../services/exchange-market.js';
-import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config/pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { offeringExtAction } from '../services/exchange/offering-action.js';

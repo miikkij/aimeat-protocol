@@ -55,7 +55,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { appSeoState } from '../../services/app-seo.js';
+import { appSeoState } from '../../services/app/seo.js';
 import { planAnnouncement, announceEverything, type AnnounceScope } from '../../services/indexnow-site.js';
 import { localAccountName } from '../../utils/gaii.js';
 import type { CanonicalOwner } from '../apps/helpers.js';

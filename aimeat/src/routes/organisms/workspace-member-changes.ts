@@ -7,7 +7,7 @@
  *
  *   THESE HANDLERS DECIDE NOTHING. Who may change a workspace, whether the change lands at once or
  *   waits for an approval under the workspace's rule, who may decide a suggestion and what approving
- *   one runs all live in services/workspace-member-changes.ts and services/workspace-suggestions.ts,
+ *   one runs all live in services/workspace/member-changes.ts and services/workspace/suggestions.ts,
  *   which the MCP tools and the CLI dispatch call too. The answer's status says what happened: 200
  *   with `status: 'applied'` (or 'unchanged'), 202 with `status: 'pending_approval'` and the
  *   suggestion, or the refusal with its reason.
@@ -30,8 +30,8 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import {
     addWorkspaceSpaces, setWorkspaceSections, isRefusal, type ChangeCaller, type ChangeRefusal,
-} from '../../services/workspace-member-changes.js';
-import { listSuggestions, decideSuggestion, type SuggestionStatusFilter } from '../../services/workspace-suggestions.js';
+} from '../../services/workspace/member-changes.js';
+import { listSuggestions, decideSuggestion, type SuggestionStatusFilter } from '../../services/workspace/suggestions.js';
 
 const STATUSES: SuggestionStatusFilter[] = ['pending', 'approved', 'declined', 'expired', 'all'];
 

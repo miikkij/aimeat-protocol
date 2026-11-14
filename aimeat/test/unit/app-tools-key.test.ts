@@ -1,6 +1,6 @@
 /**
  * @file test/unit/app-tools-key.test.ts
- * @description An app's tool manifest lives under the app's filename (services/app-tools-key.ts):
+ * @description An app's tool manifest lives under the app's filename (services/app/tools-key.ts):
  *   the rule, and the once-per-node carry-over of manifests written under another name, against a
  *   real SQLite store. The shapes are the two found on aimeat.io on 2026-09-27: kkk wrote
  *   `apps.ai-slop-detector.tools` for the app `ai-slop-detector.html`, and happydude500001 wrote
@@ -14,7 +14,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import {
     canonicalAppToolsId, canonicalAppToolsKey, migrateAppToolsKeysOnce, APP_TOOLS_KEY_MIGRATION_KEY,
-} from '../../src/services/app-tools-key.js';
+} from '../../src/services/app/tools-key.js';
 import { putOffering, type Offering } from '../../src/services/exchange-market.js';
 
 const NODE = 'node-test';

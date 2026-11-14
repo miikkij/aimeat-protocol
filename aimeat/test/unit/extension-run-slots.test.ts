@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node-wide pool of request-driven extension runs and one account's share
- *   (services/extension-run-slots.ts; secaudit2026oct22, lead 817):
+ *   (services/extension/run-slots.ts; secaudit2026oct22, lead 817):
  *     - past the account's share the next run is refused with a retryable answer naming
  *       extensions.run_slots_per_account, while another account still gets a slot;
  *     - past the node's pool every account is refused, naming extensions.run_slots;
@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { takeExtensionRunSlot, runSlotsInUse, visitorRunShareKey, waitExtensionRunSlot } from '../../src/services/extension-run-slots.js';
+import { takeExtensionRunSlot, runSlotsInUse, visitorRunShareKey, waitExtensionRunSlot } from '../../src/services/extension/run-slots.js';
 
 const cfg = (node: number, perAccount: number) => ({ extensionRunSlots: node, extensionRunSlotsPerAccount: perAccount }) as unknown as AimeatConfig;
 type Held = { ok: true; release: () => void };

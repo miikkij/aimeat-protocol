@@ -33,7 +33,7 @@
  *   v1.0.0 — 2026-10-28 — Initial.
  */
 import type { DataMap, DataMapRow } from '../data-map/data-map-types.js';
-import type { AppAiPosture } from '../app-ai-posture.js';
+import type { AppAiPosture } from '../app/ai-posture.js';
 
 /**
  * One domain's vocabulary as a pattern. A term ending in `*` is a stem and takes any letters after

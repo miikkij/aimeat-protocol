@@ -3,14 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An extension running as an AI provider (System 2 plan V6), on the extension side:
- *   - ctx.fetch with `providerCall` (services/extension-ctx.ts): a listed host gets the owner's key
+ *   - ctx.fetch with `providerCall` (services/extension/ctx.ts): a listed host gets the owner's key
  *     header, the script's own copy of that header name is replaced, and the name is passed to
  *     safeFetch as sensitive; an unlisted host (a suffix, a longer name, a userinfo trick) is refused
  *     with `Fetch blocked:` before anything is sent; the key never reaches the script.
- *   - executeExtensionAction's `opts.signal` (services/extension-runtime.ts): a script awaiting a
+ *   - executeExtensionAction's `opts.signal` (services/extension/runtime.ts): a script awaiting a
  *     slow ctx.fetch rejects with `Extension run aborted` soon after the abort, and the fetch's own
  *     signal is aborted.
- *   - runExtensionActionAsSystem (services/extension-system-run.ts) passes both through, and still
+ *   - runExtensionActionAsSystem (services/extension/system-run.ts) passes both through, and still
  *     refuses another owner's extension.
  *   safeFetch is replaced by a recorder, the way outbound-read-cap.test.ts does it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-ai-provider-ctx.test.ts
@@ -40,9 +40,9 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     };
 });
 
-const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
-const { executeExtensionAction, EXTENSION_RUN_ABORTED } = await import('../../src/services/extension-runtime.js');
-const { runExtensionActionAsSystem } = await import('../../src/services/extension-system-run.js');
+const { buildExtensionCtx } = await import('../../src/services/extension/ctx.js');
+const { executeExtensionAction, EXTENSION_RUN_ABORTED } = await import('../../src/services/extension/runtime.js');
+const { runExtensionActionAsSystem } = await import('../../src/services/extension/system-run.js');
 
 const config = {
     nodeId: 'node-1', encryptionKey: null, totpSecretEncryptionKey: null,

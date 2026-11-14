@@ -7,7 +7,7 @@
  *   people who registered with an e-mail link (WP9d). Two endpoints take the app party token for this:
  *
  *   GET /v1/apps/{owner}/{filename}/members/me answers the party's standing in the shape it answers an
- *   account holder (rosterMe in services/app-roster-ops.ts), with `kind: 'party'`: the roster row
+ *   account holder (rosterMe in services/app/roster-ops.ts), with `kind: 'party'`: the roster row
  *   without the owner's note, the role, never isOwner and never canManage. This is the read
  *   AIMEAT.iam.init, can() and guard() make on an app with no extension.
  *
@@ -21,7 +21,7 @@
  *   - appPartyForExtensionCall reads the app from the token's own signed claim, never from the request,
  *     and then runs appPartyFromRequest for that app: the token's epoch, the party's status, the node's
  *     setting and the Origin. A token of the owner's own parties (no `app` claim) is refused 401.
- *   - services/extension-invoke.ts then refuses, before the extension's status or its actions are
+ *   - services/extension/invoke.ts then refuses, before the extension's status or its actions are
  *     read, every extension whose gated app (`config.app`, resolveGatedApp) is not the token's app:
  *     403 PARTY_NOT_FOR_EXTENSION, the same answer for an extension that does not exist, so a party
  *     learns nothing about the owner's other extensions. A priced action is refused 403
@@ -38,8 +38,8 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { getMember } from '../app-members.js';
-import { done, type AppOpOutcome } from '../app-op-outcome.js';
+import { getMember } from '../app/members.js';
+import { done, type AppOpOutcome } from '../app/op-outcome.js';
 import { PARTY_TOKEN_PREFIX } from '../parties/contract.js';
 import { verifyPartyToken } from '../parties/token.js';
 import { appPartyView } from './contract.js';
@@ -85,7 +85,7 @@ export async function partyRosterMe(deps: Deps, ctx: AppPartyCtx): Promise<AppOp
 /**
  * The app party behind POST /v1/ext/{extension}/{action}, or the refusal. The app is the one the
  * token's signed claim names; appPartyFromRequest then checks the party for that app. Which extension
- * the party may run is decided in services/extension-invoke.ts, from this context's appId.
+ * the party may run is decided in services/extension/invoke.ts, from this context's appId.
  */
 export async function appPartyForExtensionCall(deps: Deps, req: Headers): Promise<{ ok: true; ctx: AppPartyCtx } | Refusal> {
     const ref = await appOfPartyToken(req);

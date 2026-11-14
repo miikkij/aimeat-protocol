@@ -2,7 +2,7 @@
  * @file test/unit/app-grant-scopes.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description What an app grant keeps when the node rewrites its words (services/app-grant-scopes.ts):
+ * @description What an app grant keeps when the node rewrites its words (services/app/grant-scopes.ts):
  *   a word the owner added by hand stays through a narrowing to the app's declaration and through an
  *   approval that did not list it, and goes when the owner leaves it unticked on a consent screen
  *   that listed it. The HTTP doors are asserted in test/e2e-mail-read-consent.ts and
@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { READ_THROUGH_SCOPE, heldOwnerAdded, narrowToDeclared, afterApproval } from '../../src/services/app-grant-scopes.js';
+import { READ_THROUGH_SCOPE, heldOwnerAdded, narrowToDeclared, afterApproval } from '../../src/services/app/grant-scopes.js';
 
 const USE = 'connections:use';
 const grant = { scopes: ['memory:read', USE, READ_THROUGH_SCOPE], ownerAddedScopes: [READ_THROUGH_SCOPE] };

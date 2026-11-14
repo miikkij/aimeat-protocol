@@ -2,7 +2,7 @@
  * @file test/unit/app-scope-needs.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The reading of an app's code for the scope words 4.0.0 checks (services/app-scope-needs.ts):
+ * @description The reading of an app's code for the scope words 4.0.0 checks (services/app/scope-needs.ts):
  *   one fixture per call shape found in the 218 apps on aimeat.io on 2026-10-13, and the shapes that
  *   look alike and are not calls (a prompt sentence, a help-text placeholder, a lib being loaded, a GET
  *   that 4.0.0 does not gate, an app that never signs in).
@@ -14,8 +14,8 @@
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { scanScopeNeeds, cortexLibRefs, undeclaredScopeNeeds, undeclaredScopeFindings, SCOPE_NEED_WORDS } from '../../src/services/app-scope-needs.js';
-import { APP_GRANTABLE_SCOPES } from '../../src/services/app-grant-vocabulary.js';
+import { scanScopeNeeds, cortexLibRefs, undeclaredScopeNeeds, undeclaredScopeFindings, SCOPE_NEED_WORDS } from '../../src/services/app/scope-needs.js';
+import { APP_GRANTABLE_SCOPES } from '../../src/services/app/grant-vocabulary.js';
 
 describe('the words a finding names', () => {
     it('are all words an app grant can hold, so the sign-in can ask for each', () => {

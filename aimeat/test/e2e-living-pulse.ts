@@ -72,7 +72,7 @@ await test('Setup: first owner (auto-operator) + organism + a DUE living-config'
     orgId = o.body.data.organism.id;
 
     // The workspace declares the space first: a workspace record in a space its manifest does not
-    // declare is refused with 422 UNDECLARED_SPACE (services/workspace-write-items.ts), and production's
+    // declare is refused with 422 UNDECLARED_SPACE (services/workspace/write-items.ts), and production's
     // living deploy writes the manifest before the config (public/js/services/living.js). The manifest
     // key contains `.meta.`, so the pulse does not count it as workspace activity.
     const m = await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({

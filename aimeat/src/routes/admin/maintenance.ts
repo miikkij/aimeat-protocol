@@ -99,7 +99,7 @@ export function adminMaintenanceRouter(
     router.post('/v1/admin/maintenance/compact-workspace-versions', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const organismId = typeof req.body?.organism_id === 'string' && req.body.organism_id.trim() ? req.body.organism_id.trim() : undefined;
-            const { compactWorkspaceVersions } = await import('../../services/workspace-versions.js');
+            const { compactWorkspaceVersions } = await import('../../services/workspace/versions.js');
             const result = await compactWorkspaceVersions(storage, config, organismId ? { organismId } : undefined);
             res.json(success(config.nodeId, result));
         } catch (err) {

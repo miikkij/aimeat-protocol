@@ -47,11 +47,11 @@ import type { Storage } from '../../storage/interface.js';
 import { fenceOf } from '../fenced-space.js';
 import type { MemoryRecord } from '../../storage/types/commerce.js';
 import { isValidAgentName } from '../../utils/gaii.js';
-import { resolveAppUrls } from '../app-urls.js';
+import { resolveAppUrls } from '../app/urls.js';
 import { listWorkspaces } from '../structure-overview.js';
 import { listOwnerAppToolNames, type OwnerAppToolName } from '../../commerce/app-tool-catalog.js';
-import { decideWorkspaceRead } from '../workspace-access.js';
-import { isMemoryBackedSpace, type WorkspaceManifest } from '../workspace-meta.js';
+import { decideWorkspaceRead } from '../workspace/access.js';
+import { isMemoryBackedSpace, type WorkspaceManifest } from '../workspace/meta.js';
 import { DATA_MAP_SPEC, type DataMap } from '../data-map/data-map-types.js';
 
 /** One app that shows an agent's work. */

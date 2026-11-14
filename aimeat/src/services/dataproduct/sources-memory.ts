@@ -6,7 +6,7 @@
  *   one memory key (plan doc-mvwxcas3dom3, D9.1). Each reads through the check its direct read uses, as
  *   the caller, so a product reaches nothing its definer could not read.
  *
- *   records    The workspace read aimeat_workspace_read runs (services/workspace-tool-ops.ts
+ *   records    The workspace read aimeat_workspace_read runs (services/workspace/tool-ops.ts
  *              readWorkspaceOp): membership, the organism's agent rule and the classification reader.
  *              Each PUBLISHED record of the space is a row; a draft is not data yet. The space's locked
  *              JSON Schema gives the column types. The product's audience is at most the organism, and
@@ -37,9 +37,9 @@
  */
 import type { MemoryRecord, ContentLabelTarget } from '../../storage/interface.js';
 import type { FieldType } from '../datapackage/contract.js';
-import { readWorkspaceOp } from '../workspace-tool-ops.js';
-import { workspaceCallerOf, type WorkspaceOpsCaller } from '../workspace-ops-caller.js';
-import { readWorkspaceMetaRecord } from '../workspace-meta.js';
+import { readWorkspaceOp } from '../workspace/tool-ops.js';
+import { workspaceCallerOf, type WorkspaceOpsCaller } from '../workspace/ops-caller.js';
+import { readWorkspaceMetaRecord } from '../workspace/meta.js';
 import { isSameOwner } from '../../utils/gaii.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';

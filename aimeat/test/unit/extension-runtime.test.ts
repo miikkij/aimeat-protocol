@@ -6,8 +6,8 @@
  *     calls, end at the wall-clock deadline (QA audit S7-02).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { executeExtensionAction, isEngineAbort, extensionWallClockMs } from '../../src/services/extension-runtime.js';
-import type { ExtensionCtx, ExtensionLimits } from '../../src/services/extension-runtime.js';
+import { executeExtensionAction, isEngineAbort, extensionWallClockMs } from '../../src/services/extension/runtime.js';
+import type { ExtensionCtx, ExtensionLimits } from '../../src/services/extension/runtime.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 

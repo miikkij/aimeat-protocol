@@ -55,7 +55,7 @@ import { readRecentAuthFailures, authLogStatus, type AuthFailureLine } from './a
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { listSecurityIncidents, type SecurityIncidentValue } from './security-incident.js';
 import { getStats } from './stats.js';
-import { appIsolationStatus, type AppIsolationStatus } from './app-isolation-status.js';
+import { appIsolationStatus, type AppIsolationStatus } from './app/isolation-status.js';
 import { testMoneyHandlerActive, testMoneyHandlerOnPublicNode } from '../utils/test-money-guard.js';
 import { testSwitchesOnPublicNode } from '../utils/test-switches.js';
 import { partySecurityCounts } from './parties/admin.js';

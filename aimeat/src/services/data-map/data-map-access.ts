@@ -212,7 +212,7 @@ async function aiActQuestions(
 /**
  * Whether somebody other than the app's owner may read this app's map. The gates are the app's own,
  * as the app read routes apply them (routes/apps/read.ts, routes/apps/legal.ts,
- * services/app-config.ts): an app an operator hid, an app behind an access code and an unlisted app
+ * services/app/config.ts): an app an operator hid, an app behind an access code and an unlisted app
  * are the owner's and an operator's; an app listed to the community is also every signed-in member's
  * of this node; a listed app is everyone's. The operator's read of another person's private map
  * writes the operator trail, as the app read does.

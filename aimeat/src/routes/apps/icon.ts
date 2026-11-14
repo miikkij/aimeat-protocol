@@ -38,7 +38,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
-import { appIconKey } from '../../services/app-seo.js';
+import { appIconKey } from '../../services/app/seo.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
 import { operatorOverride } from '../../services/operator-override.js';

@@ -47,7 +47,7 @@ import {
 import { toDeclaredProvenance, type AiProvenanceToolInput } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { setCompanyFrontPageGated, publishCompanyPortfolioGated } from '../services/company/company-publish-gate.js';
-import { publishAskedFields } from '../services/app-publish-gate.js';
+import { publishAskedFields } from '../services/app/publish-gate.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { IDENTITY_FIELDS } from '../tool-catalog/definitions/companies.js';

@@ -6,7 +6,7 @@
  *   with its whole history, and the list of owners an operator trusts to open on their own. A node
  *   with `contentAccess: 'signed-in'` serves nothing to strangers (middleware/content-access-gate.ts);
  *   an opening is the watched exception for one app and the intake forms it declares
- *   (services/app-intake-forms.ts). Who opened it, why, when, who approved it and until when are
+ *   (services/app/intake-forms.ts). Who opened it, why, when, who approved it and until when are
  *   fields; every change is an event in `history`.
  *
  *   Both records live under the node's own principal `system@<node>`, a reserved account name

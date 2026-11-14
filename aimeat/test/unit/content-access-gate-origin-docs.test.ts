@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { isOpenedOriginDocument } from '../../src/middleware/content-access-gate.js';
-import { LEGAL_KIND_INFO } from '../../src/services/app-legal.js';
+import { LEGAL_KIND_INFO } from '../../src/services/app/legal.js';
 import { APP_LEGAL_KINDS } from '../../src/storage/types/apps.js';
 
 describe('the opened app origin', () => {

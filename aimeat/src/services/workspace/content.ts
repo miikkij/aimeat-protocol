@@ -1,0 +1,215 @@
+/**
+ * @file src/services/workspace/content.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The one loader of an organism workspace's content (TARGET-082, spec §13.2 group 2).
+ *   It loads the records under the workspace, decides the read with decideWorkspaceRead (membership,
+ *   the manifest, the ecosystem allowlist: services/workspace/access.ts) and passes what may be read
+ *   through the classification reader. The surfaces keep their own answer shapes: the REST read
+ *   builds its object map, readWorkspaceOp its index and its batch-open, from the same records.
+ *
+ *   Before this file, GET /v1/organisms/:id/workspace and readWorkspaceOp (node MCP, ctx.workspace)
+ *   each loaded and decided on their own, and they had drifted: the MCP path admitted an agent the
+ *   organism does not list (agentAccess 'listed') and did not give an organism manager the automatic
+ *   read the REST path gives. One loader, one decision.
+ *
+ *   `accessorGaii` is the identity each surface has always decided with: the resolved identity on
+ *   REST, the owner GHII on readWorkspaceOp. Keeping it is what keeps a grant that names the owner
+ *   working for the owner's agent; the reader carries who is really asking, for classification.
+ * @structure WorkspaceContentArgs · WorkspaceContent · loadWorkspaceContent()
+ * @usage
+ *   const got = await loadWorkspaceContent({ storage, config }, reader, { sub, ownerName, accessorGaii }, { organismId, ws });
+ *   if (!got.ok) return refuse(got.status, got.code, got.message);
+ * @version-history
+ *   2026-11-11 — An agent the organism does not admit hears the organism's own refusal
+ *     (agentBarredMessage), not "Not an active member of this organism": the admin's own agent was
+ *     refused an extension action's workspace read that way, and the owner is a member.
+ *   2026-11-08 — Every value it hands out (`items` and `hydrate`) passes the credential mask
+ *     (shownMemoryValue), as presentMemories does: the share record's password and calendar key hashes
+ *     read as has_password and has_ics_key (secaudit2026nov08 round 14,
+ *     workspace-content:reserved-workspace-records-served-through-declared-namespace-unmasked).
+ *   2026-11-04 — No per-key getMemory for a storage without getMemoryByKeys: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
+ *   v1.2.0 — 2026-11-04 — `truncated`: the workspace holds more rows than one read loads (5 000), which
+ *     the read used to leave out with nothing to say so. `valuesOnDemand`: the rows without their
+ *     values, decided and passed through the reader the same way, and `hydrate` reads the values a
+ *     caller opens, so opening one record no longer loads every value of the workspace (codebase
+ *     analysis 2026-11-03, item C7).
+ *   v1.1.0 — 2026-09-29 — TARGET-082 review: `manRec` and the descriptor's manifest and readme pass
+ *     reader.show. They came from the unfiltered load, so a structure overview handed an AI the
+ *     readme's first line and the workspace name whatever their label.
+ *   v1.0.0 — 2026-09-29 — TARGET-082 V1. The REST workspace read and readWorkspaceOp load here.
+ */
+import type { Storage, MemoryRecord, OrganismRecord } from '../../storage/interface.js';
+import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
+import type { AimeatConfig } from '../../config.js';
+import { decideWorkspaceRead } from './access.js';
+import { agentBarred, agentBarredMessage } from '../organism-agent-access.js';
+import { workspaceMetaReader, type WorkspaceMetaReader } from './meta.js';
+import { memoryTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
+import { shownMemoryValue } from '../secret-records.js';
+
+export interface WorkspaceContentArgs {
+  organismId: string;
+  /** Null or absent: the organism's legacy root (`organism.{id}.`), kept for un-scoped callers. */
+  ws?: string | null;
+  /** include: active and archived content. only: archived content plus the manifest and readme. */
+  archived?: 'include' | 'only';
+  /**
+   * Load the rows without their values (a named workspace only): `items` are the same rows, decided
+   * and passed through the reader the same way, with `value` undefined, and the caller reads the
+   * values it needs with `hydrate`. The manifest and the readme come whole. For a read that opens a
+   * few records of a large workspace.
+   */
+  valuesOnDemand?: boolean;
+}
+
+/** The most rows one read loads. Past it, `truncated` says so. */
+export const WORKSPACE_READ_ROWS = 5000;
+
+export interface WorkspaceCaller {
+  /** The session principal (token `sub`): an organism agent is admitted by it. */
+  sub: string | undefined;
+  /** The bare account name. Memberships are keyed by it. */
+  ownerName: string | undefined;
+  /** The identity the manifest decision is made with (see the header). */
+  accessorGaii: string;
+}
+
+export type WorkspaceContent =
+  | { ok: false; status: number; code: string; message: string }
+  | {
+      ok: true;
+      organism: OrganismRecord;
+      /** `organism.{id}.w.{ws}.` or `organism.{id}.`, with the trailing dot. */
+      root: string;
+      manager: boolean;
+      canRead: boolean;
+      /** The manifest the read was decided on; null when there is none or it may not be read. */
+      manRec: MemoryRecord | null;
+      /** What this reader may see. Empty when the workspace may not be read. */
+      items: MemoryRecord[];
+      /** The meta-record picker for a named workspace; null on the legacy root. */
+      meta: WorkspaceMetaReader | null;
+      /**
+       * What a member sees of a workspace they may not read: its manifest and readme (the name and
+       * the one-line description an overview lists). Null when there are none.
+       */
+      descriptor: { manifest: MemoryRecord | null; readme: MemoryRecord | null };
+      /**
+       * The workspace holds more rows than one read loads (WORKSPACE_READ_ROWS, in key order), so
+       * `items` is not all of it. The rows past the window used to be left out with nothing to say so.
+       */
+      truncated: boolean;
+      /**
+       * `items` rows with their values read from the store, in the order given; a row gone since the
+       * load is left out. With `valuesOnDemand` this is how a value is read; otherwise it answers the
+       * rows as they are.
+       */
+      hydrate: (rows: MemoryRecord[]) => Promise<MemoryRecord[]>;
+    };
+
+export async function loadWorkspaceContent(
+  deps: { storage: Storage; config: AimeatConfig },
+  reader: ContentReader,
+  who: WorkspaceCaller,
+  args: WorkspaceContentArgs,
+): Promise<WorkspaceContent> {
+  const { storage, config } = deps;
+  const organism = await storage.getOrganism(args.organismId);
+  if (!organism) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Organism not found' };
+  const ws = args.ws ?? null;
+  const root = ws ? `organism.${organism.id}.w.${ws}.` : `organism.${organism.id}.`;
+
+  // excludeVersionRows: a read collapses each instance to `.latest`/`.draft`/bare and never surfaces
+  // `.version.N` history, so those rows are dropped in SQL rather than loaded to be skipped.
+  const lazy = !!args.valuesOnDemand && !!ws;
+  const listOpts = { prefix: root, limit: WORKSPACE_READ_ROWS, excludeVersionRows: true, ...(args.archived ? { archived: 'include' as const } : {}) };
+  const window = lazy
+    ? await storage.listAllMemoryMeta(listOpts).then(r => ({ items: r.items.map(metaAsRecord), total: r.total }))
+    : await storage.listAllMemory(listOpts);
+  const all = window.items;
+  const truncated = window.total > all.length;
+  // Archived-only keeps the manifest and the readme so the workspace shell renders. EXACT keys, not
+  // a `meta.` prefix: an objectType namespace can itself start with `meta.`.
+  const loaded = args.archived === 'only'
+    ? all.filter(r => r.archived || r.key === `${root}meta.manifest` || r.key === `${root}meta.readme`)
+    : all;
+  // Every value handed out passes the credential mask (services/secret-records.ts), the half of
+  // presentMemories the reader does not do: the share record shows has_password, never its hash.
+  const hydrate = lazy ? async (rows: MemoryRecord[]) => (await hydrateRows(storage, rows)).map(masked) : async (rows: MemoryRecord[]) => rows;
+  /** One picked meta record, whole. */
+  const whole = async (r: MemoryRecord | null): Promise<MemoryRecord | null> => (r ? (await hydrate([r]))[0] ?? null : null);
+
+  // The copy of the manifest that counts (services/workspace/meta.ts); the legacy root keeps its own.
+  const meta = ws ? workspaceMetaReader(storage, organism.id, config.nodeId) : null;
+  const manifest = meta ? await whole(await meta.pick(ws!, 'meta.manifest', loaded)) : (loaded.find(r => r.key === `${root}meta.manifest`) ?? null);
+  const decision = await decideWorkspaceRead(storage, config, organism, who.sub, who.ownerName, who.accessorGaii, ws, { manRec: manifest });
+  if (!decision.member) {
+    // An agent the organism does not admit (agentAccess 'listed', not on its list) is refused here as
+    // a non-member, and it hears why: its owner can be an active member, admin included, and "Not an
+    // active member" sent that owner looking at the wrong setting (2026-11-11).
+    const message = who.sub && agentBarred(organism, who.sub) ? agentBarredMessage(organism, who.sub) : 'Not an active member of this organism';
+    return { ok: false, status: 403, code: 'ACCESS_DENIED', message };
+  }
+
+  const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
+  const items = decision.canRead ? (await reader.show(loaded, target)).map(masked) : [];
+  const readme = meta ? await whole(await meta.pick(ws!, 'meta.readme', loaded)) : (loaded.find(r => r.key === `${root}meta.readme`) ?? null);
+  // The read is DECIDED on the stored manifest, but what is HANDED OUT (the manifest, the readme a
+  // member sees of a workspace they may not read, and the name an overview takes from them) passes
+  // the reader like every other record (TARGET-082 review): a label that hides the manifest or the
+  // readme from this reader hides it here too.
+  const shownOne = async (r: MemoryRecord | null): Promise<MemoryRecord | null> => (r ? (await reader.show([r], target))[0] ?? null : null);
+  const shownManifest = await shownOne(manifest);
+  const manRec = !decision.canRead ? null : decision.manRec === manifest ? shownManifest : await shownOne(decision.manRec);
+  return {
+    ok: true, organism, root, manager: decision.manager, canRead: decision.canRead,
+    manRec, items, meta,
+    descriptor: { manifest: shownManifest, readme: await shownOne(readme) },
+    truncated, hydrate,
+  };
+}
+
+/** The row with its value as a generic door may show it; the same object when the mask changes nothing. */
+function masked(r: MemoryRecord): MemoryRecord {
+  const value = shownMemoryValue(r.key, r.value);
+  return value === r.value ? r : { ...r, value };
+}
+
+/** A META row as a record without its value: the fields the decision and the reader use. */
+function metaAsRecord(m: MemoryMetaRow): MemoryRecord {
+  return {
+    key: m.key, ownerGaii: m.ownerGaii, value: undefined, visibility: m.visibility, tags: m.tags,
+    ttlHours: m.ttlHours ?? null, version: m.version, createdAt: m.createdAt, updatedAt: m.updatedAt,
+    flagCount: m.flagCount, archived: m.archived,
+    ...(m.groupId ? { groupId: m.groupId } : {}), ...(m.workspaceRef ? { workspaceRef: m.workspaceRef } : {}),
+    ...(m.allowedOrigins?.length ? { allowedOrigins: m.allowedOrigins } : {}),
+    ...(m.aiProvenanceId ? { aiProvenanceId: m.aiProvenanceId } : {}),
+  };
+}
+
+/**
+ * The rows with their values, one read per owner (getMemoryByKeys), in the order given. A row the
+ * reader marked with a classification warning keeps the mark. A row gone since the load is left out.
+ */
+async function hydrateRows(storage: Storage, rows: MemoryRecord[]): Promise<MemoryRecord[]> {
+  const keysByOwner = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const keys = keysByOwner.get(r.ownerGaii) ?? new Set<string>();
+    keys.add(r.key);
+    keysByOwner.set(r.ownerGaii, keys);
+  }
+  const full = new Map<string, MemoryRecord>();
+  for (const [owner, keys] of keysByOwner) {
+    const got = await storage.getMemoryByKeys(owner, [...keys]);
+    for (const r of got) full.set(`${r.ownerGaii}\u0000${r.key}`, r);
+  }
+  return rows.flatMap(r => {
+    const f = full.get(`${r.ownerGaii}\u0000${r.key}`);
+    if (!f) return [];
+    const warned = (r as { classificationWarning?: unknown }).classificationWarning;
+    return [warned ? { ...f, classificationWarning: warned } as MemoryRecord : f];
+  });
+}

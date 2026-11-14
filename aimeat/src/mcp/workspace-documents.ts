@@ -5,7 +5,7 @@
  * @description The two MCP tools that edit a workspace DOCUMENT in place: append markdown, and
  *   replace one section. Registered from mcp/workspaces.ts, which is at the max-file-lines boundary.
  *
- *   THESE HOLD NO LOGIC OF THEIR OWN. services/workspace-doc-edit.ts is what the REST routes call
+ *   THESE HOLD NO LOGIC OF THEIR OWN. services/workspace/doc-edit.ts is what the REST routes call
  *   too, so the manifest gate, the access rule, the archive guard, the schema check, the ceilings
  *   and the compare-and-swap retry cannot answer differently on one door than on the other.
  * @structure registerWorkspaceDocumentTools(mcp, deps, caller)
@@ -25,7 +25,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import {
     appendToDocument, replaceDocumentSection, WorkspaceDocError,
     type DocEditCaller, type DocEditResult,
-} from '../services/workspace-doc-edit.js';
+} from '../services/workspace/doc-edit.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 

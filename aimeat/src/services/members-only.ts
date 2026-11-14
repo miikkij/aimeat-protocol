@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The members-only stance of an app, asked by every route that charges for a call before
  *   it charges. An app whose carry plan says `access: members-only` serves its members and nobody
- *   else, money or no money (services/app-members.ts AppCarryPlan). The raw extension paywall asked
+ *   else, money or no money (services/app/members.ts AppCarryPlan). The raw extension paywall asked
  *   this before its till opened, but the routes that charge UPSTREAM of it did not: the checkout,
  *   the MCP app-tool route, the REST app-tool route and an extension buying from another extension
  *   settled first, then reached the paywall with an internal pass that skipped the question. A paying
@@ -29,7 +29,7 @@
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isSameAccount } from '../utils/same-account.js';
-import { getCarryPlan, getMember } from './app-members.js';
+import { getCarryPlan, getMember } from './app/members.js';
 import { findBackingCapability } from './component-address.js';
 
 /** What the caller is told, on every route. Nothing has been charged when it is said. */

@@ -260,7 +260,7 @@ The rules for secrets (never returned, never logged, destination allowlisted) ar
 
 ## Extension Security
 
-Extensions run in a QuickJS sandbox compiled to WASM (`quickjs-emscripten`, `src/services/extension-runtime.ts`). The script has no file system and no Node.js APIs. Each limit is read in `src/config.ts`:
+Extensions run in a QuickJS sandbox compiled to WASM (`quickjs-emscripten`, `src/services/extension/runtime.ts`). The script has no file system and no Node.js APIs. Each limit is read in `src/config.ts`:
 
 | Env var | What it controls | Field |
 |---|---|---|
@@ -275,7 +275,7 @@ Extensions run in a QuickJS sandbox compiled to WASM (`quickjs-emscripten`, `src
 | `AIMEAT_MAX_EXTENSIONS_PER_OWNER` | Extensions one owner may install | `maxExtensionsPerOwner` |
 | `AIMEAT_EXT_INSTALL_ROLE` | Who may install: `owner` or the stricter `operator` (only the operator's account, its agents included) | `extInstallRole` |
 
-Network access goes through `ctx.fetch` only (`src/services/extension-ctx.ts`). It refuses unless the manifest declares the `network` capability, reaches only the hosts the manifest lists when it lists any, and sends every request through `safeFetch`, so the SSRF rules above apply.
+Network access goes through `ctx.fetch` only (`src/services/extension/ctx.ts`). It refuses unless the manifest declares the `network` capability, reaches only the hosts the manifest lists when it lists any, and sends every request through `safeFetch`, so the SSRF rules above apply.
 
 ---
 

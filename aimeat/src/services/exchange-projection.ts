@@ -80,7 +80,7 @@
 import type { Storage } from '../storage/interface.js';
 import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { OffersDocSchema, normalizeOfferPacing, type Offer } from '../models/offer-schemas.js';
-import { ensureInterfaceVersion, getLatestInterface } from './app-tool-interfaces.js';
+import { ensureInterfaceVersion, getLatestInterface } from './app/tool-interfaces.js';
 import {
   appToolCoordinate, agentWorkCoordinate, listAllOfferings, newOfferingId, putOffering,
   type Offering, type OfferingPlan,

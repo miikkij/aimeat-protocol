@@ -7,8 +7,8 @@
  *   suggestion: aimeat_workspace_space_add, aimeat_workspace_sections_set, aimeat_workspace_suggestions.
  *   Registered from mcp/workspaces.ts, which is at the max-file-lines boundary.
  *
- *   THESE HOLD NO LOGIC OF THEIR OWN. services/workspace-member-changes.ts and
- *   services/workspace-suggestions.ts are what the REST routes call too, so who may change a
+ *   THESE HOLD NO LOGIC OF THEIR OWN. services/workspace/member-changes.ts and
+ *   services/workspace/suggestions.ts are what the REST routes call too, so who may change a
  *   workspace, whether the change lands at once or waits for an approval, and who may decide one
  *   cannot answer differently here than on the web page. An MCP session is always an agent, so a
  *   person deciding from their own chat decides through the agent their chat is, and the service
@@ -28,8 +28,8 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { addWorkspaceSpaces, setWorkspaceSections, isRefusal, type ChangeCaller } from '../services/workspace-member-changes.js';
-import { listSuggestions, decideSuggestion } from '../services/workspace-suggestions.js';
+import { addWorkspaceSpaces, setWorkspaceSections, isRefusal, type ChangeCaller } from '../services/workspace/member-changes.js';
+import { listSuggestions, decideSuggestion } from '../services/workspace/suggestions.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 

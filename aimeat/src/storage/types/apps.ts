@@ -66,7 +66,7 @@
  *     omitted rather than emptied so a caller needing content fails to compile.
  */
 import type { SemanticAnnotation, SemanticContext } from './common.js';
-import type { AppAiPosture } from '../../services/app-ai-posture.js';
+import type { AppAiPosture } from '../../services/app/ai-posture.js';
 import type { DataMapStamp } from '../../services/data-map/data-map-types.js';
 
 /**
@@ -100,7 +100,7 @@ export interface AppMarks {
 
 /**
  * What the app's draft is changing, in one sentence, with who wrote it and when. Kept on the DRAFT's
- * manifest only (services/app-news.ts): the owner and the people holding a development right see it
+ * manifest only (services/app/news.ts): the owner and the people holding a development right see it
  * on the app page, a visitor never does (Jouni, 2026-10-18), and promoting the draft makes it the
  * version's roadmap line when the publisher gives none.
  */
@@ -136,7 +136,7 @@ export const AUTHORSHIP_LOG_MAX = 50;
  * The legal pages an app can publish about ITSELF, because the app and not the platform answers
  * for what it does: a shop needs its own terms, an app that handles personal data its own privacy
  * notice. Each kind is a page on the app's own origin (`/terms`, `/privacy`, …) and on the apex.
- * The set is what the law and the app stores ask for (services/app-legal.ts names the source of
+ * The set is what the law and the app stores ask for (services/app/legal.ts names the source of
  * each): terms of use, privacy notice, imprint (who is behind this, DSA Art. 30(7) and the
  * e-commerce directive), refunds and withdrawal (consumer rights), accessibility statement (EAA),
  * cookies (ePrivacy) and support (the contact the app stores require).
@@ -154,7 +154,7 @@ export interface AppLegalDoc {
   /** GHII of the principal that set it. */
   updatedBy: string;
   /**
-   * The AI-provenance record minted for this text at the time it was set (services/app-legal.ts,
+   * The AI-provenance record minted for this text at the time it was set (services/app/legal.ts,
    * through the same provenanceForWrite() every published app goes through). The served page
    * carries the record's marks and, when the law asks for it, the visible label. Absent on a page
    * set before 2026-08-29 or on a node with provenance switched off.
@@ -194,7 +194,7 @@ export interface AppManifest {
   /** A draft's manifest only: what the draft is changing (AppDraftNotice). Never on a live version. */
   draftNotice?: AppDraftNotice;
   /**
-   * The design spec's stamp (services/app-design-spec.ts): when it was last written, by whom, against
+   * The design spec's stamp (services/app/design-spec.ts): when it was last written, by whom, against
    * which app version, at which revision, and how big it is. Never the prose. Refreshed by every
    * write of the spec and copied forward by every publish.
    */
@@ -242,13 +242,13 @@ export interface AppManifest {
   usesCortex: string[];         // cortex extension names used
   cortex?: AppManifestCortex;   // agent-bundled apps: declarative crew-defs (see above)
   /**
-   * The config the app declares it needs (services/app-config.ts), parsed from its
+   * The config the app declares it needs (services/app/config.ts), parsed from its
    * `<script type="application/json" id="aimeat-config">` block at every publish. The bytes are the
    * source, so it is never carried forward: a version without the block has no config.
    */
   configSchema?: Record<string, unknown>;
   /**
-   * The workspaces the app declares it needs (services/app-workspaces.ts), parsed from its
+   * The workspaces the app declares it needs (services/app/workspaces.ts), parsed from its
    * `<script type="application/json" id="aimeat-workspace">` block at every publish, never carried
    * forward. The contract is what the set composer matches on.
    */
@@ -256,7 +256,7 @@ export interface AppManifest {
   /**
    * The public intake forms this version submits to, read from its
    * `<meta name="aimeat-intake" content="org/ws/formId ...">` at every publish and never carried
-   * forward (services/app-intake-forms.ts). An app opened to the internet on a closed node opens
+   * forward (services/app/intake-forms.ts). An app opened to the internet on a closed node opens
    * these forms with it (services/internet-opening/).
    */
   intake?: Array<{ org: string; ws: string; formId: string }>;
@@ -265,7 +265,7 @@ export interface AppManifest {
    * 0 or absent = unpaced. A morsel is pacing, never a price, and an app has no money price yet. A
    * manifest stored before 2026-10-11 under the old key `priceMorsels` is read as this field by both
    * storage providers (storage/app-manifest-pacing.ts); responses mirror it as the deprecated
-   * `priceMorsels` until 4.0.0 (services/app-pacing.ts).
+   * `priceMorsels` until 4.0.0 (services/app/pacing.ts).
    */
   tollMorsels?: number;
   licenseType?: 'single' | 'lifetime';
@@ -288,12 +288,12 @@ export interface AppManifest {
    * copies a manifest — an update, a FORK (a fork of a generative app is still a generative app), a
    * backup, a purchase snapshot. Optional everywhere: an app that declares nothing is `undefined`,
    * never a validation failure, because one bad manifest field silently delists every offering an
-   * app has. See services/app-ai-posture.ts.
+   * app has. See services/app/ai-posture.ts.
    */
   aiPosture?: AppAiPosture;
   /**
    * The app's own answer to `?format=md`: an action of the owner's own extension that returns the
-   * markdown (services/app-format-md.ts). Read from `<meta name="aimeat-format-md">` on every
+   * markdown (services/app/format-md.ts). Read from `<meta name="aimeat-format-md">` on every
    * publish and never carried forward; a fork drops it, because the extension stays its owner's.
    */
   formatMd?: { extension: string; action: string };
@@ -354,7 +354,7 @@ export interface AppManifest {
   dataMap?: DataMapStamp;
   /**
    * Present only when the LAST publish did not carry the build spec that was in force at the time
-   * (services/app-spec-gate.ts). A clean publish stores nothing and clears whatever was here, so
+   * (services/app/spec-gate.ts). A clean publish stores nothing and clears whatever was here, so
    * this reads as "the state right now" rather than an accusation an app can never shed.
    *
    * OWNER-ONLY, like `aiPosture.gap`: the catalogue strips it for anybody else. It exists so a skip

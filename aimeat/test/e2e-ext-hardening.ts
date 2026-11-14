@@ -237,7 +237,7 @@ async function run() {
     });
     assert(first.status === 201, `install ${first.status}: ${JSON.stringify(first.body?.error)}`);
     // A manifest's schedules are registered when the extension is turned ON, not when it is
-    // installed (services/extension-lifecycle.ts), so an inactive extension has no clock to keep.
+    // installed (services/extension/lifecycle.ts), so an inactive extension has no clock to keep.
     const on = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(ownerA.token) });
     assert(on.status === 200 || on.status === 201, `activate ${on.status}: ${JSON.stringify(on.body?.error)}`);
 

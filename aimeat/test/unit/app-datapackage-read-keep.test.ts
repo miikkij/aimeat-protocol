@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The storage:read step for published apps that read data packages
- *   (services/app-datapackage-read-keep-migration.ts, secaudit 2026-10 v41), and the publish warning
- *   that names the word for a new app (services/app-scope-needs.ts rule 'datapackage-read').
+ *   (services/app/datapackage-read-keep-migration.ts, secaudit 2026-10 v41), and the publish warning
+ *   that names the word for a new app (services/app/scope-needs.ts rule 'datapackage-read').
  *
  *   - An app published before the step that declares its own aimeat-scopes without storage:read and
  *     reads data packages gets the word: through AIMEAT.datapackage.rows, and through a
@@ -24,10 +24,10 @@ import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
-import { keepDatapackageReadForAppsOnce, APP_DATAPACKAGE_READ_KEEP_KEY } from '../../src/services/app-datapackage-read-keep-migration.js';
-import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app-scope-allowance-store.js';
+import { keepDatapackageReadForAppsOnce, APP_DATAPACKAGE_READ_KEEP_KEY } from '../../src/services/app/datapackage-read-keep-migration.js';
+import { readAppScopeAllowance, writeAppScopeAllowance, APP_SCOPE_ALLOWANCE_SPEC } from '../../src/services/app/scope-allowance-store.js';
 import { readAccountEvents } from '../../src/services/account-events.js';
-import { undeclaredScopeFindings } from '../../src/services/app-scope-needs.js';
+import { undeclaredScopeFindings } from '../../src/services/app/scope-needs.js';
 
 const NODE_ID = 'aimeat-app-datapackage-read-keep';
 const OWNER = 'dpowner';

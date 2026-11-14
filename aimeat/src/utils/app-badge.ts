@@ -12,7 +12,7 @@
  *   apps.ts and the isolated app origin in subdomains.ts) so the behaviour is identical.
  * @structure BADGE_MARK — the idempotency marker; badgeSnippet() — the markup, with no opinion about
  *   where it goes. The document detection, the idempotency check and the `</body>`-inside-app-JS
- *   trap all live ONCE in services/app-serve-marks.ts, which is what actually puts it in the page.
+ *   trap all live ONCE in services/app/serve-marks.ts, which is what actually puts it in the page.
  * @usage import { badgeSnippet } from '../utils/app-badge.js';  // via applyServeMarks({ badge: true })
  * @version-history
  *   v2.3.0 — 2026-11-01 — The words come from the caller in the visitor's language (BadgeWords): the
@@ -66,7 +66,7 @@ const AIMEAT_HOME = 'https://aimeat.io/';
 const AIMEAT_LABEL = 'aimeat.io';
 
 /**
- * The badge's words in the visitor's language, from the caller (services/app-serve-marks.ts reads
+ * The badge's words in the visitor's language, from the caller (services/app/serve-marks.ts reads
  * them from locales/, as it does for the app-info mark): `label` names the bolt and the link for a
  * screen reader, `free` is the pill's second line. English when the caller gives none, which is the
  * text every app carried before 2026-11-01.

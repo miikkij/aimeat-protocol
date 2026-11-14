@@ -17,8 +17,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildExtensionPrompt } from '../../src/services/build-extension-prompt.js';
-import { executeExtensionAction } from '../../src/services/extension-runtime.js';
-import type { ExtensionCtx } from '../../src/services/extension-runtime.js';
+import { executeExtensionAction } from '../../src/services/extension/runtime.js';
+import type { ExtensionCtx } from '../../src/services/extension/runtime.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const config = { nodeId: 'test-node', baseUrl: 'https://example.test' } as unknown as AimeatConfig;

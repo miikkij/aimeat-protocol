@@ -30,7 +30,7 @@
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4; lead decisions L1 to L3).
  */
 import { createHash } from 'node:crypto';
-import { appKeySegment } from '../app-record-keys.js';
+import { appKeySegment } from '../app/record-keys.js';
 import type { PartyRecord } from '../parties/contract.js';
 
 /** The service-owned record of one app's parties (utils/reserved-keys.ts). */
@@ -66,7 +66,7 @@ export interface AppPartyRecord extends Omit<PartyRecord, 'status'> {
 export interface AppPartyRegistration {
     /** closed: no signup. requested: the owner asked and the operator decides (apps-ask). open. refused. */
     state: 'closed' | 'requested' | 'open' | 'refused';
-    /** The roster role a registered party is given (services/app-members.ts). */
+    /** The roster role a registered party is given (services/app/members.ts). */
     role: string;
     requestedAt?: string;
     decidedAt?: string;

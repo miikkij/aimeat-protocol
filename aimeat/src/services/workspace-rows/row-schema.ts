@@ -13,7 +13,7 @@
  *   pattern and set by the same code paths as a records space's: `organism.{id}.w.{ws}.{namespace}`,
  *   applyTo 'prefix', written by aimeat_workspace_update / PUT /v1/organisms/:id/workspace
  *   (`schemas`, creator or organism admin), by a workspace create and by add_spaces, and read back
- *   in the `schemas` map of the workspace read (services/workspace-meta.ts readWorkspaceSchemas).
+ *   in the `schemas` map of the workspace read (services/workspace/meta.ts readWorkspaceSchemas).
  *   The lock is compiled with effectiveSchemaOf (services/schema-validator.ts), so a 'strict' lock
  *   refuses an undeclared field on a row as it does on a record.
  *

@@ -26,10 +26,10 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { writeMemoryRecord } from '../../src/services/memory-write.js';
-import { workspaceCallerOf, writeWorkspaceDraftsOp } from '../../src/services/workspace-tool-ops.js';
-import { appendToDocument, WorkspaceDocError } from '../../src/services/workspace-doc-edit.js';
+import { workspaceCallerOf, writeWorkspaceDraftsOp } from '../../src/services/workspace/tool-ops.js';
+import { appendToDocument, WorkspaceDocError } from '../../src/services/workspace/doc-edit.js';
 import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
-import { undeclaredSpaceRefusal, undeclaredSpaceForKey, isPlatformWorkspaceNamespace } from '../../src/services/workspace-write-items.js';
+import { undeclaredSpaceRefusal, undeclaredSpaceForKey, isPlatformWorkspaceNamespace } from '../../src/services/workspace/write-items.js';
 
 const ORG = '5e1f0c2a-7b3d-4e8f-9a10-2b3c4d5e6f70';
 const WS = 'ws-undeclared1';

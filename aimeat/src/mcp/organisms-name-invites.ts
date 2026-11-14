@@ -12,6 +12,9 @@
  *   aimeat_organism_agent_detach.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-11-13 — The invite-admin gate, the two owner tools, aimeat_organism_invitations and
+ *     aimeat_organism_invitation_respond read through services/organism-read/manager.ts and
+ *     name-invitations.ts, as their REST routes do (structure programme 2026-11, unit 2b).
  *   2026-11-11 — aimeat_organism_agent_attach and aimeat_organism_agent_detach: the organism's agent
  *     list reached the page and REST only, so an owner's AI could not add an admin's agent to an
  *     organism that admits only listed agents. Same service as the route.
@@ -33,7 +36,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { isOrganismOwner, addOrganismOwner, removeOrganismOwner } from '../services/organism-ownership.js';
+import { addOrganismOwner, removeOrganismOwner } from '../services/organism-ownership.js';
+import { organismForManager, organismForOwner } from '../services/organism-read/manager.js';
+import { nameInvitationsOf, nameInvitationTo } from '../services/organism-read/name-invitations.js';
 import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
     acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
@@ -58,13 +63,12 @@ export function registerOrganismNameInviteTools(
     /** Creator/admin gate shared by the invite/add/edit tools. Returns the organism or an error string. */
     type InviteGate = { err: string; organism?: never; ownerName?: never } | { err?: never; organism: OrganismRecord; ownerName: string };
     const inviteAdminGate = async (organism_id: string): Promise<InviteGate> => {
-        const organism = await storage.getOrganism(organism_id);
-        if (!organism) return { err: 'Organism not found' };
+        // The read and the owner-or-admin rule are services/organism-read/manager.ts, which the REST
+        // invitation and member routes ask too (requireInviteAdmin).
         const ownerName = getOwnerName();
-        if (!isOrganismOwner(organism, ownerName) && !organism.admins.includes(ownerName)) {
-            return { err: 'Only the creator or an admin can manage members and invitations' };
-        }
-        return { organism, ownerName };
+        const gate = await organismForManager(storage, organism_id, { owner: ownerName });
+        if (gate.ok) return { organism: gate.organism, ownerName };
+        return { err: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'Only the creator or an admin can manage members and invitations' };
     };
     const invitationErrText = (e: unknown): string =>
         e instanceof InvitationError ? e.message : ((e as Error)?.message || 'Invitation operation failed');
@@ -195,13 +199,13 @@ export function registerOrganismNameInviteTools(
             annotations: annotationsFor('aimeat_organism_owner_add'),
         },
         async ({ organism_id, ghii }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
+            // The read and the owner rule are services/organism-read/manager.ts, which POST /v1/organisms/:id/owners asks too.
             const ownerName = getOwnerName();
-            if (!isOrganismOwner(organism, ownerName)) {
-                return { content: [{ type: 'text' as const, text: 'Only an owner can add an owner' }], isError: true };
+            const gate = await organismForOwner(storage, organism_id, { owner: ownerName });
+            if (!gate.ok) {
+                return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? `Organism not found: ${organism_id}` : 'Only an owner can add an owner' }], isError: true };
             }
-            const out = await addOrganismOwner(storage, config, organism, ghii, { performedBy: ownerName });
+            const out = await addOrganismOwner(storage, config, gate.organism, ghii, { performedBy: ownerName });
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, added: out.added, owners: out.owners }, null, 2) }] };
         },
@@ -218,13 +222,13 @@ export function registerOrganismNameInviteTools(
             annotations: annotationsFor('aimeat_organism_owner_remove'),
         },
         async ({ organism_id, ghii }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
+            // The read and the owner rule are services/organism-read/manager.ts, which DELETE /v1/organisms/:id/owners/:ghii asks too.
             const ownerName = getOwnerName();
-            if (!isOrganismOwner(organism, ownerName)) {
-                return { content: [{ type: 'text' as const, text: 'Only an owner can remove an owner' }], isError: true };
+            const gate = await organismForOwner(storage, organism_id, { owner: ownerName });
+            if (!gate.ok) {
+                return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? `Organism not found: ${organism_id}` : 'Only an owner can remove an owner' }], isError: true };
             }
-            const out = await removeOrganismOwner(storage, config, organism, ghii, { performedBy: ownerName });
+            const out = await removeOrganismOwner(storage, config, gate.organism, ghii, { performedBy: ownerName });
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
             return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, removed: out.removed, owners: out.owners }, null, 2) }] };
         },
@@ -288,13 +292,9 @@ export function registerOrganismNameInviteTools(
             annotations: annotationsFor('aimeat_organism_invitations'),
         },
         async () => {
-            const ownerName = getOwnerName();
-            const memberships = (await storage.listMembershipsByGhii(ownerName)).filter(m => m.status === 'invited');
-            const out = [];
-            for (const m of memberships) {
-                const org = await storage.getOrganism(m.organismId);
-                if (org) out.push({ organism_id: org.id, name: org.name, type: org.type, invited_by: m.invitedBy, role: m.role, workspaces: m.invitedWorkspaces ?? [] });
-            }
+            // services/organism-read/name-invitations.ts, which GET /v1/organisms/invitations/mine asks too.
+            const out = (await nameInvitationsOf(storage, { owner: getOwnerName() })).map(({ membership: m, organism: org }) =>
+                ({ organism_id: org.id, name: org.name, type: org.type, invited_by: m.invitedBy, role: m.role, workspaces: m.invitedWorkspaces ?? [] }));
             return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
         },
     );
@@ -308,13 +308,14 @@ export function registerOrganismNameInviteTools(
             annotations: annotationsFor('aimeat_organism_invitation_respond'),
         },
         async ({ organism_id, decision }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            // The organism and the pending invitation: services/organism-read/name-invitations.ts,
+            // which POST /v1/organisms/:id/invitations/accept asks too.
             const ownerName = getOwnerName();
-            const membership = await storage.getMembership(organism_id, ownerName);
-            if (!membership || membership.status !== 'invited') {
-                return { content: [{ type: 'text' as const, text: 'You have no pending invitation to this organism' }], isError: true };
+            const inv = await nameInvitationTo(storage, organism_id, { owner: ownerName });
+            if (!inv.ok) {
+                return { content: [{ type: 'text' as const, text: inv.code === 'NOT_FOUND' ? 'Organism not found' : 'You have no pending invitation to this organism' }], isError: true };
             }
+            const { organism, membership } = inv;
             if (decision === 'decline') {
                 // Shared with POST /:id/invitations/decline (services/invitations.ts).
                 try {

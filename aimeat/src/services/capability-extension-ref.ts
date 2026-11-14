@@ -16,7 +16,7 @@
  *   THE GRAMMAR. `ext:<name>[@<version>][:<action>]`. The name follows EXT_ADDRESS_PATTERN, the rule
  *   every installed extension's name follows (`<owner>/<name>` since 2026-10-25); the version is a pinnable version
  *   (services/component-versions.ts), the same pin `/v1/ext/<name>@<version>/…` accepts; the action
- *   follows EXT_ACTION_ID_PATTERN, the action id rule services/app-format-md.ts already declares.
+ *   follows EXT_ACTION_ID_PATTERN, the action id rule services/app/format-md.ts already declares.
  *   The action segment is optional at registration because a capability may be registered before
  *   its action exists (test/e2e-capability-webhook-update.ts stores `ext:demo`); invoke requires it
  *   and resolves both the extension and the action before it sends a request.
@@ -39,14 +39,14 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { EXT_ADDRESS_PATTERN } from './extension-manifest.js';
+import { EXT_ADDRESS_PATTERN } from './extension/manifest.js';
 import { findExtension } from './component-address.js';
 import { splitPinnedName } from './component-versions.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
 import { recordSecurityIncident, securityOwner } from './security-incident.js';
 import { logger } from '../utils/logger.js';
 
-/** An extension action id: the pattern services/app-format-md.ts declares for an action it names. */
+/** An extension action id: the pattern services/app/format-md.ts declares for an action it names. */
 export const EXT_ACTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
 
 /** The record under `system@<nodeId>` that says the boot step has run. */

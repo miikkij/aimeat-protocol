@@ -22,7 +22,7 @@
 
 import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
-import { parseBundledCrews, decideBundledCrews, crewPermissionFindings } from '../../src/services/app-bundled-crews.js';
+import { parseBundledCrews, decideBundledCrews, crewPermissionFindings } from '../../src/services/app/bundled-crews.js';
 import { crewDefHash, deployedAgentName, proposedAgentName } from '../../src/models/crew-def-schemas.js';
 
 const CREW = {

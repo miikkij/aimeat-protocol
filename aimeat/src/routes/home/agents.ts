@@ -35,7 +35,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { readHomeAgents } from '../../services/home-agents.js';
 import { setWorkplace, clearWorkplace, workplaceView, type WorkplaceCaller } from '../../services/agent/workplace.js';
 import { readTieChoices, readWatchableSpaces } from '../../services/agent/ties.js';
-import { readWorkspaceOp, workspaceCallerOf } from '../../services/workspace-tool-ops.js';
+import { readWorkspaceOp, workspaceCallerOf } from '../../services/workspace/tool-ops.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 

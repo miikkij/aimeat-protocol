@@ -76,27 +76,27 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isSameAccount } from '../utils/same-account.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveAppTargetScope } from '../services/app-lifecycle.js';
+import { resolveAppTargetScope } from '../services/app/lifecycle.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
-import { ownerAppSeo } from '../services/app-seo.js';
-import { ownerAppMarks } from '../services/app-marks.js';
-import { ownerAppLegal } from '../services/app-legal.js';
-import { ownerAppAudit } from '../services/app-audit.js';
-import { ownerAppSettings, SETTINGS_FIELDS, SETTINGS_OFFERING_FIELDS } from '../services/app-settings.js';
-import { listAppVersionsView } from '../services/app-versions.js';
-import { callerAppReader } from '../services/app-read-gate.js';
-import { collectAppLineage } from '../services/app-lineage.js';
+import { ownerAppSeo } from '../services/app/seo.js';
+import { ownerAppMarks } from '../services/app/marks.js';
+import { ownerAppLegal } from '../services/app/legal.js';
+import { ownerAppAudit } from '../services/app/audit.js';
+import { ownerAppSettings, SETTINGS_FIELDS, SETTINGS_OFFERING_FIELDS } from '../services/app/settings.js';
+import { listAppVersionsView } from '../services/app/versions.js';
+import { callerAppReader } from '../services/app/read-gate.js';
+import { collectAppLineage } from '../services/app/lineage.js';
 import { captureAppScreenshot } from '../services/screenshot-capture.js';
-import { storeAppScreenshot, clearAppScreenshot } from '../services/app-screenshot-store.js';
-import { mintDraftPreview } from '../services/app-draft-preview.js';
-import { AppVisitorsError, clampDays, readAppVisitors, setAppMeasurement } from '../services/app-visitors.js';
+import { storeAppScreenshot, clearAppScreenshot } from '../services/app/screenshot-store.js';
+import { mintDraftPreview } from '../services/app/draft-preview.js';
+import { AppVisitorsError, clampDays, readAppVisitors, setAppMeasurement } from '../services/app/visitors.js';
 import { buildUiCatalogueView } from '../services/app-ui/catalogue-index.js';
 import { AppUiService } from '../services/app-ui/service.js';
 import { AppUiError } from '../services/app-ui/validate.js';
-import { appCostView } from '../services/app-cost.js';
-import { getAppConfig, setAppConfig } from '../services/app-config.js';
-import { deployAppAgent, appAgentInstances, appAgentStatus } from '../services/app-agent-deploy.js';
-import { listActiveAppGrants } from '../services/app-grant-list.js';
+import { appCostView } from '../services/app/cost.js';
+import { getAppConfig, setAppConfig } from '../services/app/config.js';
+import { deployAppAgent, appAgentInstances, appAgentStatus } from '../services/app/agent-deploy.js';
+import { listActiveAppGrants } from '../services/app/grant-list.js';
 import { exportAppsBackupToStorage } from '../services/apps-backup-export.js';
 import {
     listSubdomainSites, createSubdomainSite, updateSubdomainSite, deleteSubdomainSite,
@@ -104,8 +104,8 @@ import {
 import { appManageMemberAction } from './app-manage-members.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
-import { publishAskedFields } from '../services/app-publish-gate.js';
-import { applyOwnerSettingsGated } from '../services/app-settings-gate.js';
+import { publishAskedFields } from '../services/app/publish-gate.js';
+import { applyOwnerSettingsGated } from '../services/app/settings-gate.js';
 
 type Args = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
@@ -180,7 +180,7 @@ export function registerAppManageTool(
                 const scope = await target(touchesOffering ? 'operate' : 'presentation');
                 if ('refusal' in scope) return toolError('FORBIDDEN', scope.refusal);
                 const appTarget = { ownerGaii: scope.ownerGhii, ownerName: scope.ownerName, filename };
-                // Through the publish gate, as PATCH /v1/apps/:filename asks it (services/app-publish-gate.ts):
+                // Through the publish gate, as PATCH /v1/apps/:filename asks it (services/app/publish-gate.ts):
                 // a change that makes the app public is applied without that one field, which the
                 // owner is asked about.
                 const out = await applyOwnerSettingsGated({ storage, config }, caller(), undefined, { ...appTarget, callerGaii }, fields);
@@ -338,7 +338,7 @@ export function registerAppManageTool(
                 const out = await deployAppAgent(storage, config, {
                     callerOwner, appOwner, filename, agentName: String(args.bundled_agent),
                     runnerAgent: str(args.runner_agent), organismId: str(args.organism_id), undeploy: action === 'agent_undeploy',
-                    // A deploy with no runner becomes a proposal for the owner (services/app-agent-propose.ts).
+                    // A deploy with no runner becomes a proposal for the owner (services/app/agent-propose.ts).
                     principal: { sub: callerGaii, owner: callerOwner, roles: callerGaii.includes('#') ? ['agent'] : ['owner'], scopes },
                 });
                 return out.ok ? answer(out.view) : refusalText(out);

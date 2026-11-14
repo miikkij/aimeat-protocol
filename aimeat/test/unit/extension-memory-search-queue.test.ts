@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
+import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
 import { loadConfig } from '../../src/config.js';
 
 describe('one run\'s ctx.memory.search calls', () => {

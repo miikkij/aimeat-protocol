@@ -207,7 +207,7 @@ The node has one account role above a person, `operator`. There is no separate `
 | Publish an app | yes | yes | yes | yes | with `app:write` | within its scopes | not with `app:write`, which an app cannot ask |
 | Approve an agent | own agents | own agents | own agents | own agents | a sibling, never with more scopes than its own | no | no |
 
-Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin/monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/services/workspace-roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/app-grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
+Sources: `aimeat/src/auth/middleware.ts` (role order operator, owner, agent or ecosystem), `aimeat/src/routes/admin/monitoring.ts` (operator grant and revoke), `aimeat/src/auth/account-security.ts` (account security doors), `aimeat/src/services/workspace/roles.ts` (workspace roles go to the person and their agents), `aimeat/src/services/app/grant-vocabulary.ts` (what an app may ask), `aimeat/src/utils/scope-coverage.ts` (words outside every wildcard).
 
 ## Agent identities
 

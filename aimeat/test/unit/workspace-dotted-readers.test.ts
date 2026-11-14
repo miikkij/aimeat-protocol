@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description The readers of a workspace key that have no route of their own to test through read a
  *   record whose id holds a dot under its whole id, as the workspace index does
- *   (services/workspace-record-key.ts; secaudit2026oct31w2 round 10b, dotted record ids): the KPI
+ *   (services/workspace/record-key.ts; secaudit2026oct31w2 round 10b, dotted record ids): the KPI
  *   roll-up (services/kpi-rollup.ts), the section index's "does this page still exist"
- *   (services/workspace-change-core.ts existingDocIds), the version history compaction
- *   (services/workspace-versions.ts compactWorkspaceVersions) and the connector's record wake
+ *   (services/workspace/change-core.ts existingDocIds), the version history compaction
+ *   (services/workspace/versions.ts compactWorkspaceVersions) and the connector's record wake
  *   (services/connect-tunnel-push.ts onMemoryWrite). The helpers themselves are tested first. The E2E
  *   half is test/e2e-workspace-dotted-id.ts.
  *
@@ -21,10 +21,10 @@ import { describe, it, expect } from 'vitest';
 import { WebSocket } from 'ws';
 import type { MemoryRecord } from '../../src/storage/interface.js';
 import { evaluateRecordsKpi } from '../../src/services/kpi-rollup.js';
-import { existingDocIds, type ChangeDeps } from '../../src/services/workspace-change-core.js';
-import { compactWorkspaceVersions } from '../../src/services/workspace-versions.js';
+import { existingDocIds, type ChangeDeps } from '../../src/services/workspace/change-core.js';
+import { compactWorkspaceVersions } from '../../src/services/workspace/versions.js';
 import { onMemoryWrite, type RecordPushContext, type PushConn } from '../../src/services/connect-tunnel-push.js';
-import { recordRowAt, spaceRowAt, declaredNamespaceOf } from '../../src/services/workspace-record-key.js';
+import { recordRowAt, spaceRowAt, declaredNamespaceOf } from '../../src/services/workspace/record-key.js';
 
 const ORG = '00000000-0000-4000-8000-000000000001';
 const WS = 'wsdot';

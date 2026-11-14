@@ -9,8 +9,10 @@
  *   - registerAgentTelemetryTools() -- the telemetry append tool + the usage report read
  * @usage
  *   import { registerAgentTelemetryTools } from './agent-telemetry.js';
- *   registerAgentTelemetryTools(mcp, storage, config, getAgentGaii);
+ *   registerAgentTelemetryTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, caller);
  * @version-history
+ *   2026-11-13 — aimeat_agent_telemetry_report calls services/agent/telemetry-append.ts, the gate, the
+ *     agent read and the append POST /v1/agents/:name/telemetry runs (structure programme 2026-11, unit 2b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -29,12 +31,11 @@
  *                            priced, append-only usage event via services/usage-metering.js.
  */
 
-import { randomUUID } from 'node:crypto';
-import { recordTelemetryUsage } from '../services/usage-metering.js';
 import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
-import { pushTelemetry, recordTelemetryActivity } from '../services/telemetry-buffer.js';
-import type { Storage, TelemetryEvent } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
+import type { CallerContext } from '../services/caller-context.js';
+import { telemetryTarget, appendAgentTelemetry } from '../services/agent/telemetry-append.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { readUsageReport, UnknownReportError } from '../services/usage/usage-read.js';
@@ -48,39 +49,20 @@ export function registerAgentTelemetryTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's caller (services/caller-context.ts): the agent itself, for the telemetry gate. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
     mcp.registerTool('aimeat_agent_telemetry_report', { description: descriptionFor('aimeat_agent_telemetry_report'), inputSchema: zodShapeFor('aimeat_agent_telemetry_report'), annotations: annotationsFor('aimeat_agent_telemetry_report') }, async ({ type, data, session_id, task_id }) => {
-        const agent = await storage.getAgent(agentGaii);
-        if (!agent) {
+        // The gate, the agent read and the append are services/agent/telemetry-append.ts, which
+        // POST /v1/agents/:name/telemetry calls too. The session is the agent itself.
+        const target = await telemetryTarget({ storage, config }, caller().auth, agentGaii);
+        if (!target.ok) {
             return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
         }
-
-        const event: TelemetryEvent = {
-            id: randomUUID(),
-            agentGaii,
-            type,
-            data: data ?? {},
-            sessionId: session_id,
-            taskId: task_id,
-            createdAt: new Date().toISOString(),
-        };
-
-        // Buffered in-memory + batched flush (see telemetry-buffer.ts). Unlike the prior
-        // append-only path this also feeds the activity counters, so MCP-reported telemetry
-        // now shows up in the Activity tab consistently with the REST path.
-        pushTelemetry(event);
-        recordTelemetryActivity(agentGaii, { type, data: data ?? {} });
-
-        // LEDGER (TARGET-016): an llm_call carrying a model becomes a priced, append-only usage
-        // event. services/usage-metering.ts decides that, because the ledger is what an owner is
-        // billed from and two copies of "does this count" is two answers to what something cost.
-        await recordTelemetryUsage(storage,
-            { agentGaii, ownerGhii: `${agent.owner}@${config.nodeId}`, taskId: task_id },
-            type, data ?? {});
-
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ id: event.id }, null, 2) }] };
+        const id = await appendAgentTelemetry({ storage, config }, target.agent, { type, data, session_id, task_id });
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ id }, null, 2) }] };
     });
 
     // ── aimeat_usage_report ──

@@ -41,10 +41,10 @@ import type { Storage, MemoryRecord, OrganismRecord } from '../storage/interface
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
-import { workspaceMetaReader } from './workspace-meta.js';
+import { workspaceMetaReader } from './workspace/meta.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
-import { recordRowAt } from './workspace-record-key.js';
+import { recordRowAt } from './workspace/record-key.js';
 
 export interface DanglingRefFinding {
   ws: string;
@@ -169,7 +169,7 @@ async function scanWorkspace(
   // Live rows (archived excluded by default) + archived-only rows, in two bounded scans.
   // excludeVersionRows: the scan skips `.version.N` rows in SQL (they were loaded then discarded).
   const live = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, excludeVersionRows: true })).items;
-  // The copy of the manifest that counts (services/workspace-meta.ts), not the first the scan returned.
+  // The copy of the manifest that counts (services/workspace/meta.ts), not the first the scan returned.
   const manRec = await workspaceMetaReader(storage, orgId, config.nodeId).pick(ws, 'meta.manifest', live);
   if (!manRec) return { readable: false, findings: [] };
 

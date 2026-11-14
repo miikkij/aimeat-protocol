@@ -32,11 +32,11 @@ import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../st
 import { withoutFlagHiddenMemory } from './moderation-flags.js';
 import type { AimeatConfig } from '../config.js';
 import { localAccountOf } from '../utils/gaii.js';
-import { workspaceMetaReader } from './workspace-meta.js';
-import { decideWorkspaceRead } from './workspace-access.js';
+import { workspaceMetaReader } from './workspace/meta.js';
+import { decideWorkspaceRead } from './workspace/access.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
-import { recordRowAt, isNodeReservedPart } from './workspace-record-key.js';
+import { recordRowAt, isNodeReservedPart } from './workspace/record-key.js';
 
 export interface OrganismSearchHit {
   ws: string;
@@ -96,7 +96,7 @@ export async function searchOrganismContent(
     h => memoryTarget(h.record.ownerGaii, h.record.key));
 
   // Per-workspace manifest + read-permission cache (resolved once per workspace). The manifest is the
-  // copy that counts (services/workspace-meta.ts), not the first one the store returns, and the read
+  // copy that counts (services/workspace/meta.ts), not the first one the store returns, and the read
   // is decided where every workspace read is decided (decideWorkspaceRead).
   const wsMeta = new Map<string, { canRead: boolean; types: Array<{ name: string; ns: string }> } | null>();
   const metaReader = workspaceMetaReader(storage, id, config.nodeId);

@@ -104,7 +104,7 @@ export const CUTS: UsageCut[] = [
   // `surface` is in the key because an app id also rides on metered tool calls, and an author
   // asking who OPENED the app must not be answered with who called its paid tool. `ownerGhii` is
   // '' for an open nobody was signed in for, which is the whole split the author asks about; the
-  // reader (services/app-visitors.ts) answers counts and never hands the identities out. After
+  // reader (services/app/visitors.ts) answers counts and never hands the identities out. After
   // thirteen months the identity itself goes (services/usage/visit-retention.ts): this cut, the two
   // owner cuts keyed by the surface and the opens inside call.owner.app are folded into rows that
   // name nobody. A new cut keyed by a person is decided there, and a test fails until it is.

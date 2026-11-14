@@ -11,7 +11,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (wish-corp-moodissa-julkaistu-app-ulosp-in-vahdittuna-ja-listattun).
  */
-import { resolveAppUrls } from '../app-urls.js';
+import { resolveAppUrls } from '../app/urls.js';
 import { logger } from '../../utils/logger.js';
 import { listOpenings, readOpening, readOpeners, activeOpeners, type OpeningCtx } from './opening-store.js';
 import { openingMode, directOpening } from './opening-policy.js';

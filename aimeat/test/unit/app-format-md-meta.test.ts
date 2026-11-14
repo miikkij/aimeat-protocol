@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-10-03 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { parseFormatMdMeta, formatMdLang } from '../../src/services/app-format-md.js';
+import { parseFormatMdMeta, formatMdLang } from '../../src/services/app/format-md.js';
 
 describe('formatMdLang', () => {
     it('takes a language tag with at most one subtag, primary subtag lowercased', () => {

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A published app that worked on a 3.x node keeps working when the same node starts as
- *   4.0.x, with no change to its code (services/app-scope-allowance.ts; ruling
+ *   4.0.x, with no change to its code (services/app/scope-allowance.ts; ruling
  *   decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san, apps too). Proven across three
  *   real boots of one database, as e2e-rest-scope-keep-working does for agents.
  *

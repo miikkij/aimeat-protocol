@@ -9,8 +9,8 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { lintAppDecideUse as lintWithScopes, appUsesDecide } from '../../src/services/app-decide-posture.js';
-import { lintAppAiDisclosure } from '../../src/services/app-ai-posture.js';
+import { lintAppDecideUse as lintWithScopes, appUsesDecide } from '../../src/services/app/decide-posture.js';
+import { lintAppAiDisclosure } from '../../src/services/app/ai-posture.js';
 import { parseAppScopes } from '../../src/services/protected-resource.js';
 
 /** As the publish path calls it: the scopes read from the same source. */

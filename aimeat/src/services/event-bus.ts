@@ -419,7 +419,7 @@ export function offRowsAppendedEvent(handler: (evt: RowsAppendedEvent) => void):
 // draft is seen by the owner and the people holding a development right (Jouni, 2026-10-18).
 
 export interface AppChangeEvent {
-  /** `owner/filename` with the bare owner name (services/app-record-keys.ts canonicalAppId form). */
+  /** `owner/filename` with the bare owner name (services/app/record-keys.ts canonicalAppId form). */
   appId: string;
   /** `version`: a new version is live. `draft`: the draft slot was written, discarded or promoted. */
   kind: 'version' | 'draft';

@@ -33,7 +33,7 @@
  *   services/core-jobs.ts registerCoreHandlers() sets it through classification-queue-job.ts. A
  *   process that never sets it (a CLI tool) classifies nothing on write and says so once.
  *
- *   The callers: services/memory-write.ts writeMemoryRecord, services/workspace-write.ts
+ *   The callers: services/memory-write.ts writeMemoryRecord, services/workspace/write.ts
  *   writeWorkspaceRecord, services/memory-batch-write.ts writeMemoryBatch, PUT and PATCH
  *   /v1/memory/:key, POST /v1/memory/copy, and the organism publish paths in services/organism-gate.ts.
  *

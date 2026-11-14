@@ -33,7 +33,7 @@
  *   `packages:*`) is left alone, and nothing is ever removed.
  *
  *   NOT APP GRANTS. A grant follows its app's own declaration (`<meta name="aimeat-scopes">`): every
- *   refresh and silent sign-in trims a word the app does not declare (services/app-grant-scopes.ts), so
+ *   refresh and silent sign-in trims a word the app does not declare (services/app/grant-scopes.ts), so
  *   a word written here would be gone at the app's next refresh. An app that reads installs declares
  *   packages:read (routes/app-grant-vocabulary.ts lists it), and its owner sees it on the consent screen;
  *   until 4.0.0 the call still works and carries the Deprecation header that says so.

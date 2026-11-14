@@ -51,7 +51,7 @@ import { restScopeKind } from '../../src/auth/rest-scope-gate.js';
 import { agentsRouter } from '../../src/routes/agents.js';
 import { agentsV2Router } from '../../src/routes/agents-v2.js';
 import { deferredScopesForTool, enforcedScopesForTool, scopeAllowsTool } from '../../src/tool-catalog/scopes.js';
-import { APP_GRANTABLE_SCOPES } from '../../src/services/app-grant-vocabulary.js';
+import { APP_GRANTABLE_SCOPES } from '../../src/services/app/grant-vocabulary.js';
 import { SCOPE_DOMAINS } from '../../public/views/profile/agents/scope-model.js';
 import * as migration from '../../src/services/rest-scope-gates-migration.js';
 

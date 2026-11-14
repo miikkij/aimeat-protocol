@@ -10,7 +10,7 @@
  *   rule written out three times.
  *
  *   What this checks NOW is the shape that fixed it: a file that runs extension code takes its
- *   context from `buildExtensionCtx` (services/extension-ctx.ts), which carries the memory quota,
+ *   context from `buildExtensionCtx` (services/extension/ctx.ts), which carries the memory quota,
  *   safeFetch and the email rule inside it, and calls `enforcePaywall` unless it is a road with
  *   nobody to charge. The companion rule is `aimeat/no-adhoc-extension-ctx`, which forbids building
  *   the context anywhere else; this script is the other half, catching a NEW entry point that skips
@@ -44,7 +44,7 @@ const BUILDER = 'buildExtensionCtx';
  * paywall there, because "no payer" is a reason to skip a CHARGE, never a reason to skip a check.
  */
 const PAYWALL_EXEMPT: Record<string, string> = {
-    'src/services/extension-system-run.ts':
+    'src/services/extension/system-run.ts':
         'the two unattended roads (a schedule firing, a workflow step reaching its turn) have no caller '
         + 'and no payer, and the owner is not charged for their own clock. What replaces the paywall is '
         + 'the owner fence enforced in this file: an unattended run may only call an extension the '
@@ -54,7 +54,7 @@ const PAYWALL_EXEMPT: Record<string, string> = {
 
 /** Files that mention the engine but do not run it. */
 const NOT_A_CALLER: Record<string, string> = {
-    'src/services/extension-runtime.ts': 'the engine itself, not a caller',
+    'src/services/extension/runtime.ts': 'the engine itself, not a caller',
     'src/generated/api-types.ts': 'generated OpenAPI types; the name appears as a schema string',
 };
 
@@ -91,7 +91,7 @@ function main(): void {
         const problems: string[] = [];
         if (!new RegExp(`\\b${BUILDER}\\s*\\(`).test(source)) {
             problems.push(
-                `builds its own sandbox context — call ${BUILDER}() from services/extension-ctx.js, which `
+                `builds its own sandbox context — call ${BUILDER}() from services/extension/ctx.js, which `
                 + 'carries the memory quota, safeFetch and the email authorization rule');
         }
         if (!/\benforcePaywall\s*\(/.test(source)) {

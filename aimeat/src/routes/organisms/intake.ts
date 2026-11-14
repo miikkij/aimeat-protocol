@@ -76,8 +76,8 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
-import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
-import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
+import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspace/write-items.js';
+import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace/meta.js';
 import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';
 import { callerOf } from '../../middleware/caller.js';
 import { takeDailySlot, releaseDailySlot, forgetDailyCount } from '../../services/intake-daily-count.js';
@@ -135,7 +135,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
   const cfgKey = (org: string, ws: string, formId: string) => `organism.${org}.w.${ws}.meta.intake.${formId}`;
   const cfgPrefix = (org: string, ws: string) => `organism.${org}.w.${ws}.meta.intake.`;
 
-  /** A form's config: the copy that counts (services/workspace-meta.ts), because it is what a public
+  /** A form's config: the copy that counts (services/workspace/meta.ts), because it is what a public
    *  submission obeys, and only the workspace's creator or an organism admin writes it. */
   const readFormRecord = (org: string, ws: string, formId: string) =>
     readWorkspaceMetaRecord(storage, org, ws, `meta.intake.${formId}`, config.nodeId);

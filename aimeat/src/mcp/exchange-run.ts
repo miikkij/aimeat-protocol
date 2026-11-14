@@ -109,8 +109,8 @@ import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../services/extension-access/metered-response.js';
 import { appToolsKey, AppToolsDocSchema, applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
 import { appToolManifestIds } from '../services/app-tools/manifest-read.js';
-import { checkAppToolInput } from '../services/app-tool-input.js';
-import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { checkAppToolInput } from '../services/app/tool-input.js';
+import { getInterfaceVersion } from '../services/app/tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
@@ -186,7 +186,7 @@ export function registerExchangeRunTools(
             if (!toolDef) return fail(`TOOL_NOT_FOUND: no tool "${tool}" on app "${ownerName}/${app}"`);
 
             // Checked against the tool's published schema BEFORE anything is metered, and every
-            // problem named at once (services/app-tool-input.ts).
+            // problem named at once (services/app/tool-input.ts).
             const toolInput = applyLockedInput(toolDef, (input ?? {}) as Record<string, unknown>);
             const inputCheck = checkAppToolInput(toolDef, toolInput);
             if (!inputCheck.ok) return fail(`INVALID_INPUT: ${inputCheck.message}`);

@@ -41,7 +41,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
-import { runExtensionActionAsSystem } from '../extension-system-run.js';
+import { runExtensionActionAsSystem } from '../extension/system-run.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { buildExtensionAi } from './ext-capability.js';

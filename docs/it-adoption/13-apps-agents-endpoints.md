@@ -12,7 +12,7 @@ An app is a single-file web app that a person publishes on the node.
 
 | Question | Answer | Source |
 |---|---|---|
-| Who may publish | Any account. An agent needs `app:write`. An app gets it only when it declares the word and the owner approves it on the app's consent screen. There is no operator approval before publishing. | `aimeat/src/routes/apps/publish.ts`, `aimeat/src/services/app-grant-vocabulary.ts` |
+| Who may publish | Any account. An agent needs `app:write`. An app gets it only when it declares the word and the owner approves it on the app's consent screen. There is no operator approval before publishing. | `aimeat/src/routes/apps/publish.ts`, `aimeat/src/services/app/grant-vocabulary.ts` |
 | Who sees it in lists | `listed`, `community` (signed-in accounts) or `unlisted`; new apps start at `AIMEAT_APP_DEFAULT_LISTING` (default `listed`) | `aimeat/.env.example` |
 | Who may open it | `anyone` or `signed-in`, or one organism's members (`open_to`), optionally with an access code; new apps start at `AIMEAT_APP_DEFAULT_ACCESS` (default `anyone`) and `AIMEAT_APP_DEFAULT_ACCESS_CODE` | [Organisation node sign-in](../organisation-node-sign-in.md), section 6a |
 | Asking for access to an app opened to one organism | An account of this node that is not a member can ask from the app's refusal page, or through its AI (`aimeat_access_request`). The request goes to the organism's owners and admins as a join request (`aimeat_organism_join_requests`, `aimeat_organism_join_request_review`); only they approve, and approving makes the person a member of that organism. The requester is not told which organism it is. One open request per person; after a rejection a new one is taken after 30 days. Each organism's owner turns it off (`access_requests` on `aimeat_organism_update`); it is on by default. A welcome page and a company front page work the same way. | `aimeat/src/services/organism-join-requests/requests.ts` |
@@ -29,7 +29,7 @@ For an organisation node, set `AIMEAT_APP_DEFAULT_ACCESS=signed-in`, `AIMEAT_APP
 - `AIMEAT_APP_HOST` names the app host; `AIMEAT_APP_ORIGIN_ENABLED` turns isolation on or off (`aimeat/.env.example`).
 - An app reaches the person's data only through an app grant: the owner approves named scopes on a consent screen, and the app gets a short access token with role `app` and a rotating refresh token. The scopes are enforced on every request, and the owner can narrow or revoke the grant (`aimeat/src/routes/app-grants.ts`).
 - An AI job waits in a queue, so its starter is asked again when the job runs. A job that an app, an ecosystem app or an agent queued ends before the provider is called, and nothing is paid, when the owner has revoked that app's grant, disconnected that ecosystem app, deleted that agent, or taken `ai:use` from it since. The job's error names the page where the owner gives the permission back (`aimeat/src/services/ai-jobs/run-gate.ts`).
-- An app can never hold `account:security` (`aimeat/src/auth/account-security.ts`). It holds `app:write` only when the owner approved that word on the app's consent screen (`aimeat/src/services/app-grant-vocabulary.ts`, `APP_GRANTABLE_SCOPES`).
+- An app can never hold `account:security` (`aimeat/src/auth/account-security.ts`). It holds `app:write` only when the owner approved that word on the app's consent screen (`aimeat/src/services/app/grant-vocabulary.ts`, `APP_GRANTABLE_SCOPES`).
 - When an app goes away, its address stays held for its owner for `AIMEAT_APP_HELD_LABEL_DAYS` (90), because its visitors' browser data lives on that origin (`aimeat/.env.example`).
 
 ### What an app keeps in the browser, and apps that work with no connection
@@ -89,11 +89,11 @@ An extension is server-side JavaScript that runs inside the node, in a QuickJS s
 | Control | Default | Source |
 |---|---|---|
 | Extensions on or off | `AIMEAT_EXTENSIONS_ENABLED=true` | `aimeat/.env.example` |
-| Who installs and changes extension code | `AIMEAT_EXT_INSTALL_ROLE=owner`; set `operator` so that only the operator's account (and its agents) can. The start-up self-check warns about `owner` on a public node. | `aimeat/src/services/extension-install-role.ts`, `aimeat/.env.example` |
+| Who installs and changes extension code | `AIMEAT_EXT_INSTALL_ROLE=owner`; set `operator` so that only the operator's account (and its agents) can. The start-up self-check warns about `owner` on a public node. | `aimeat/src/services/extension/install-role.ts`, `aimeat/.env.example` |
 | Memory and CPU per action | 64 MB, 5000 ms | `AIMEAT_EXT_MAX_MEMORY_MB`, `AIMEAT_EXT_TIMEOUT_MS` |
 | Installed on the node, per owner | 20, 10 | `AIMEAT_EXT_MAX_INSTALLED`, `AIMEAT_MAX_EXTENSIONS_PER_OWNER` |
-| Capabilities | An extension reaches the internet, starts AI jobs, sends email or buys only when its manifest declares `network`, `ai`, `email` or `payments`. The approval shows that list and the sandbox enforces the same list. | `aimeat/src/services/extension-capability-declaration.ts` |
-| Network | `ctx.fetch` reaches only the hosts the manifest names, through the SSRF guard, checked again on every redirect | `aimeat/src/services/extension-ctx.ts`, `aimeat/src/services/extension-network-hosts.ts` |
+| Capabilities | An extension reaches the internet, starts AI jobs, sends email or buys only when its manifest declares `network`, `ai`, `email` or `payments`. The approval shows that list and the sandbox enforces the same list. | `aimeat/src/services/extension/capability-declaration.ts` |
+| Network | `ctx.fetch` reaches only the hosts the manifest names, through the SSRF guard, checked again on every redirect | `aimeat/src/services/extension/ctx.ts`, `aimeat/src/services/extension/network-hosts.ts` |
 | Secrets | The extension never reads the owner's vault; `ctx.fetch` puts a secret into an outbound header on the way out | [Extension memory architecture](../coding-guidelines/extension-memory-architecture.md) |
 | Email | `AIMEAT_EXT_EMAIL_PER_HOUR` (200) per account | `aimeat/.env.example` |
 | Its own data | Writes only its own namespace `ext:<name>`, readable by anyone without sign-in | `.claude/rules/namespaces-memory.md` |

@@ -21,7 +21,7 @@
  */
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { intakeFormKey, type IntakeFormRef } from '../app-intake-forms.js';
+import { intakeFormKey, type IntakeFormRef } from '../app/intake-forms.js';
 import { listOpenings, updateOpening, updateOpeners, withEvent, UNCHANGED, type OpeningCtx } from './opening-store.js';
 import { refreshOpenings } from './opening-registry.js';
 import { tellOperators, tellOwner } from './opening-notify.js';

@@ -223,7 +223,7 @@ describe('the secret resolver is NOT in this script any more', () => {
   // change: a script that resolves its own secret HOLDS it, in a variable, inside the VM, for the
   // length of the call. Nothing in the shipped source may name a stored value again — ctx.fetch
   // fills the placeholder after this script has handed the request over
-  // (services/extension-ctx.ts → services/owner-secrets.ts).
+  // (services/extension/ctx.ts → services/owner-secrets.ts).
   it('defines neither helper, so nothing here can read a stored value', () => {
     expect(lib.livingSecrets).toBeUndefined();
     expect(lib.livingResolveSecret).toBeUndefined();

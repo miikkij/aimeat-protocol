@@ -1,6 +1,6 @@
 /**
  * @file e2e-app-format-md.ts
- * @description E2E for an app that answers ?format=md itself (services/app-format-md.ts): the app
+ * @description E2E for an app that answers ?format=md itself (services/app/format-md.ts): the app
  *   declares <meta name="aimeat-format-md" content="/v1/ext/<extension>/<action>">, the publish checks
  *   the extension is the owner's own and has the action, and GET ?format=md returns the action's
  *   markdown with the node's affordances footer.

@@ -358,7 +358,7 @@ export async function validateWorkflow(
         // (services/schedule-write.ts); the same rule, at the same moment, for the same reason.
         //
         // Refused at SAVE so the author is told while they are writing it rather than at 06:00 in a
-        // run log. It is checked again at run time (services/extension-system-run.ts): `installedBy`
+        // run log. It is checked again at run time (services/extension/system-run.ts): `installedBy`
         // is decided at install, and a delete-and-reinstall by a different owner outlives this gate.
         // The owner's own first (services/component-address.ts), as the run reads it.
         const ext = await findExtension(storage, a.extension, ownerName, 'manage');

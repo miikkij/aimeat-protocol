@@ -44,19 +44,19 @@
 import type { Router, Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
-import { appToolNames } from '../services/app-tool-names.js';
+import { appToolNames } from '../services/app/tool-names.js';
 import { MCP_PROTOCOL_VERSION, MCP_SERVED_REVISIONS } from '../mcp/protocol-version.js';
 import { buildAppAgentFace } from '../services/agent/face.js';
-import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
+import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app/agent-surfaces.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
-import { appSeoIndexable, appSeoListable, appHasIconImage, appIconKey } from '../services/app-seo.js';
-import { legalLinksFor, renderLegalPage, LEGAL_KIND_INFO } from '../services/app-legal.js';
+import { appSeoIndexable, appSeoListable, appHasIconImage, appIconKey } from '../services/app/seo.js';
+import { legalLinksFor, renderLegalPage, LEGAL_KIND_INFO } from '../services/app/legal.js';
 import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
 import { detectLocale } from '../i18n.js';
 import { appCsp } from '../utils/app-csp.js';
-import { applyServeMarks } from '../services/app-serve-marks.js';
+import { applyServeMarks } from '../services/app/serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
-import { appReviewedBy } from '../services/app-marks.js';
+import { appReviewedBy } from '../services/app/marks.js';
 import { escapeHtml } from '../utils/html-escape.js';
 import { countVisit } from '../services/visibility/visibility-counter.js';
 import { visitSignals } from '../utils/visit-signals.js';
@@ -331,7 +331,7 @@ export function registerAppOriginDocs(
   // One SOURCE, three shapes. Pointing all of these at the Agent Face was one document too few:
   // llms.txt is asked for a blockquote summary and link lists, sitemap.md for links, AGENTS.md for
   // installation/configuration/usage sections, and the face is prose with none of those shapes.
-  // The face is still the substance inside each — src/services/app-agent-surfaces.ts wraps it.
+  // The face is still the substance inside each — src/services/app/agent-surfaces.ts wraps it.
   router.get(['/AGENTS.md', '/agents.md'], async (req: Request, res: Response, next) => {
     const app = await appForOrigin(req);
     if (!app) return next();

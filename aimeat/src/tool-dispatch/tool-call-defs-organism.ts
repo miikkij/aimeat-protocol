@@ -47,7 +47,7 @@ import { randomUUID } from 'node:crypto';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalBoolean, optionalRecord, requiredArray, coerceObject, wsRoot } from './tool-call-helpers.js';
 import { unfileThroughDoor, sectionsFromRead } from './workspace-section-filing.js';
-import { shareBodyFromToolInput } from '../services/workspace-share-input.js';
+import { shareBodyFromToolInput } from '../services/workspace/share-input.js';
 
 /** location, max_members and member_visibility, under the names POST and PUT /v1/organisms read. */
 function copyOrganismPlaceAndRoster(input: JsonObject, body: JsonObject): void {

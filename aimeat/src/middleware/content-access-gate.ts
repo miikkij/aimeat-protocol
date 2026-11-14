@@ -224,7 +224,7 @@ const APP_ORIGIN_PAGE = /^\/([^/]+\/[^/]+\.html?)?$/i;
  * The documents an app origin publishes about itself (routes/subdomain-origin-docs.ts and
  * routes/subdomain-webmcp.ts): llms.txt, robots.txt, the sitemaps, the markdown mirrors, AGENTS.md,
  * the web-app manifest and icons, the MCP server card, WebMCP, and the app's own legal pages
- * (services/app-legal.ts LEGAL_KIND_INFO; test/unit/content-access-gate-origin-docs.test.ts holds the
+ * (services/app/legal.ts LEGAL_KIND_INFO; test/unit/content-access-gate-origin-docs.test.ts holds the
  * two lists equal). Spelled here because the gate does not load the app services.
  */
 const APP_ORIGIN_DOCUMENT = new RegExp('^/(?:'

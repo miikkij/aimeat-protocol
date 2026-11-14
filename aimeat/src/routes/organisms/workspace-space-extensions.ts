@@ -10,7 +10,7 @@
  *   nothing is removed.
  *
  *   THIS HANDLER DECIDES NOTHING. Who may call it, which entries it takes and the write itself are
- *   services/workspace-space-extensions.ts. The route asks `organism:write` of the session and
+ *   services/workspace/space-extensions.ts. The route asks `organism:write` of the session and
  *   turns the answer into a response. It carries no requireRole('agent'): a hosted app's grant is
  *   one of the callers the service admits, and that gate refuses the role `app`.
  *
@@ -34,8 +34,8 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { callerOf } from '../../middleware/caller.js';
-import { nameSpaceExtensions } from '../../services/workspace-space-extensions.js';
-import { isRefusal } from '../../services/workspace-change-core.js';
+import { nameSpaceExtensions } from '../../services/workspace/space-extensions.js';
+import { isRefusal } from '../../services/workspace/change-core.js';
 
 export function registerOrganismWorkspaceSpaceExtensionRoutes(
     router: Router, config: AimeatConfig, storage: Storage,

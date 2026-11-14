@@ -17,7 +17,7 @@
 import type { AiAdapterType, AiCapability, AiOp, AiTarget } from './types.js';
 import type { RoutingRules } from './routing.js';
 import type { AiCandidate, ChosenBy, RejectedCandidate } from './route-plan.js';
-import type { AppAiRoleParams } from '../app-ai-roles.js';
+import type { AppAiRoleParams } from '../app/ai-roles.js';
 import type { UsageRecord } from './usage-record.js';
 
 /**

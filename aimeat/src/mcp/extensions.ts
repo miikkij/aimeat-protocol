@@ -100,24 +100,24 @@
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
-import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
-import { getExtSecretKeys, maskSecretFields } from '../services/extension-secrets.js';
-import { usesSecretsOf } from '../services/extension-secret-uses.js';
+import { buildExtensionRecordFromManifest } from '../services/extension/manifest.js';
+import { getExtSecretKeys, maskSecretFields } from '../services/extension/secrets.js';
+import { usesSecretsOf } from '../services/extension/secret-uses.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { enforcePaywall } from '../services/extension-access/paywall.js';
 import { createRefusalRecorder, refusalText } from '../services/extension-access/metered-response.js';
 import { localAccountName } from '../utils/gaii.js';
-import { invokeExtensionAction } from '../services/extension-invoke.js';
-import { capabilitiesOfRecord } from '../services/extension-capability-declaration.js';
+import { invokeExtensionAction } from '../services/extension/invoke.js';
+import { capabilitiesOfRecord } from '../services/extension/capability-declaration.js';
 import { canManageExtensionAs, type ExtensionCaller } from '../services/extension-access/manage.js';
-import { installRoleRefusal } from '../services/extension-install-role.js';
+import { installRoleRefusal } from '../services/extension/install-role.js';
 import { findExtension, placeExtensionInstall } from '../services/component-address.js';
 import { isOperatorCaller } from '../services/operator-override.js';
-import { codeHoldRefusal, takeHoldOff } from '../services/extension-code-hold.js';
+import { codeHoldRefusal, takeHoldOff } from '../services/extension/code-hold.js';
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
-} from '../services/extension-lifecycle.js';
+} from '../services/extension/lifecycle.js';
 import { nodeContext } from '../services/node-context.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
@@ -127,12 +127,12 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
-import { setExtensionConfig, mayChooseSecretHost } from '../services/extension-config-set.js';
+import { setExtensionConfig, mayChooseSecretHost } from '../services/extension/config-set.js';
 import { requesterOf } from '../services/publish-requests/ask.js';
 import {
     askOperatorsForEmailPolicy, manifestAsksUnrestrictedEmail, grantsUnrestrictedEmail, type EmailPolicyAsk,
-} from '../services/extension-email-policy-ask.js';
-import { readAuthorityOf, readAuthorityPayload } from '../services/extension-read-authority.js';
+} from '../services/extension/email-policy-ask.js';
+import { readAuthorityOf, readAuthorityPayload } from '../services/extension/read-authority.js';
 import { toolError } from './tool-error.js';
 
 export function registerExtensionsTools(
@@ -281,7 +281,7 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 2: aimeat_extension_invoke ──
-    // The sequence is services/extension-invoke.ts, the one POST /v1/ext/:extName/:actionId runs:
+    // The sequence is services/extension/invoke.ts, the one POST /v1/ext/:extName/:actionId runs:
     // the version pin, the app membership, the paywall, the sandbox context with ctx.buy, the refund,
     // the call duration and count, the accrual and the redacted failure text. This tool renders the
     // answer as text. Cross-owner invocation is intended (an extension is a sellable capability), and
@@ -435,7 +435,7 @@ export function registerExtensionsTools(
             }
 
             try {
-                // The whole write is services/extension-lifecycle.ts: the node-wide and per-owner
+                // The whole write is services/extension/lifecycle.ts: the node-wide and per-owner
                 // install ceilings, the secret encryption (this path once wrote config straight to
                 // storage, so a `type: secret` value was persisted in the clear), the no-op shortcut
                 // for an identical manifest, the in-place swap with its schedule re-registration, and
@@ -455,7 +455,7 @@ export function registerExtensionsTools(
                     version: result.version, by: record.installedBy, reinitialized: written.reinitialized,
                 });
                 // A manifest asking for emailPolicy 'unrestricted' from a caller that is not an
-                // operator caller: the grant was left out, and the operators are asked (services/extension-email-policy-ask.ts).
+                // operator caller: the grant was left out, and the operators are asked (services/extension/email-policy-ask.ts).
                 const emailAsk: EmailPolicyAsk | null = !isOperator && manifestAsksUnrestrictedEmail(manifestYaml) && !grantsUnrestrictedEmail(result.config)
                     ? await askOperatorsForEmailPolicy({ storage, config }, result, requesterOf({ storage, config }, sessionCaller()),
                         grantsUnrestrictedEmail(existingExt?.config) ? 'code-changed' : 'asked')
@@ -526,7 +526,7 @@ export function registerExtensionsTools(
             }
 
             // Code a package brought in under install role operator waits for an operator, as on REST
-            // (services/extension-code-hold.ts); an operator's activate is that approval.
+            // (services/extension/code-hold.ts); an operator's activate is that approval.
             const isOperator = await isOperatorCaller(storage, resolveCaller());
             const held = codeHoldRefusal(ext, isOperator);
             if (held) return { content: [{ type: 'text' as const, text: held.message }], isError: true };
@@ -536,7 +536,7 @@ export function registerExtensionsTools(
                 // the @activate jobs that do the extension's first run. This tool wrote the status
                 // and stopped, so an extension switched on by an agent never started its clock —
                 // it looked installed, active and idle. One implementation, in
-                // services/extension-lifecycle.ts.
+                // services/extension/lifecycle.ts.
                 const updated = await activateExtension(
                     { storage, config, scheduler: nodeContext().scheduler }, isOperator ? await takeHoldOff(storage, ext) : ext, getAgentGaii(),
                 );
@@ -590,7 +590,7 @@ export function registerExtensionsTools(
                 name, changed: out.changed,
                 config: maskSecretFields(out.record.config, getExtSecretKeys(out.record)),
                 ...(hosts ? { network_hosts: hosts } : {}),
-                // The emailPolicy grant asked of the operators, pending until one answers (services/extension-email-policy-ask.ts).
+                // The emailPolicy grant asked of the operators, pending until one answers (services/extension/email-policy-ask.ts).
                 ...(out.approval_request ? { approval_request: out.approval_request } : {}),
                 ...(out.warnings ? { warnings: out.warnings } : {}),
             }, null, 2) }] };
@@ -766,7 +766,7 @@ export function registerExtensionsTools(
                         // Which principal wrote the code (the person, or which of their agents): public
                         // provenance, as GET /v1/extensions/:name answers it (Jouni, 2026-10-25).
                         installed_by_principal: ext.installedByPrincipal ?? null,
-                        // Which vault secrets the scripts send where, and why (services/extension-secret-uses.ts).
+                        // Which vault secrets the scripts send where, and why (services/extension/secret-uses.ts).
                         uses_secrets: usesSecretsOf(ext.config),
                         installed_at: ext.installedAt,
                         activated_at: ext.activatedAt,

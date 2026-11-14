@@ -184,7 +184,7 @@ async function main() {
     await test('ctx.hash matches the PUBLISHED reference implementation byte for byte', async () => {
         // The whole point of shipping ctx.hash: a browser app must be able to compute the SAME
         // value. Recompute it here with the exported reference source and compare.
-        const { EXT_HASH_REFERENCE_JS } = await import('../src/services/extension-runtime.js');
+        const { EXT_HASH_REFERENCE_JS } = await import('../src/services/extension/runtime.js');
         const aimeatHash = new Function(`${EXT_HASH_REFERENCE_JS}; return aimeatHash;`)() as (s: string) => string;
         const r = await json(`/v1/ext/${EXT}/ping`, {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },

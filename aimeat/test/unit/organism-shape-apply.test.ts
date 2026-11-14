@@ -13,8 +13,8 @@ const calls: string[] = [];
 let failAt = new Set<number>();
 let failWith: () => Error = () => new Error('disk full');
 
-vi.mock('../../src/services/workspace-provision.js', async (orig) => {
-    const real = await orig<typeof import('../../src/services/workspace-provision.js')>();
+vi.mock('../../src/services/workspace/provision.js', async (orig) => {
+    const real = await orig<typeof import('../../src/services/workspace/provision.js')>();
     return {
         ...real,
         provisionWorkspace: async (_s: unknown, _c: unknown, input: { name: string }) => {
@@ -28,7 +28,7 @@ vi.mock('../../src/services/workspace-provision.js', async (orig) => {
 
 import { applyOrganismShape } from '../../src/services/organism-shape-apply.js';
 import { shapeById } from '../../src/data/organism-shapes.js';
-import { WorkspaceProvisionError } from '../../src/services/workspace-provision.js';
+import { WorkspaceProvisionError } from '../../src/services/workspace/provision.js';
 
 const deps = { storage: {} as never, config: { nodeId: 'test-node' } as never };
 

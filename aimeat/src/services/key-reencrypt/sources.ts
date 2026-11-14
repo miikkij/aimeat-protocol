@@ -36,7 +36,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { SealedColumn, SealedColumnRow } from '../../storage/repositories/sealed-column.repository.js';
 import { decryptBound, keyRingOf } from '../encryption.js';
-import { secretContext, isEncryptedValue } from '../extension-secrets.js';
+import { secretContext, isEncryptedValue } from '../extension/secrets.js';
 import { contextFor as transportContext } from '../mcp-client/transport-secrets.js';
 import { credentialContext as nodeStoreContext, NODE_STORES_KEY } from '../file-store/node-file-stores.js';
 import { credentialContext as ownerStoreContext, OWNER_STORE_PREFIX } from '../file-store/owner-file-store.js';
@@ -285,7 +285,7 @@ export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/services/owner-secrets.ts': 'secrets vault',
   'src/services/totp.ts': 'two-step sign-in secrets',
   'src/services/config/at-rest.ts': 'secret Config settings',
-  'src/services/extension-secrets.ts': 'extension settings, extension instance settings',
+  'src/services/extension/secrets.ts': 'extension settings, extension instance settings',
   'src/services/oauth-round-secrets.ts': 'none: a sign-in round lives 10 to 15 minutes and opens with either key while it lives',
   'src/utils/app-protect.ts': 'none: the watermark is sealed into the copy a person downloads, not stored here',
 };

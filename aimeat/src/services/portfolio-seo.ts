@@ -5,7 +5,7 @@
  * @description Whether one person's published portfolio may be found in a search engine, and what
  *   its page says about them when it is.
  *
- *   The same shape as services/app-seo.ts and for the same reason: several surfaces ask the
+ *   The same shape as services/app/seo.ts and for the same reason: several surfaces ask the
  *   question — the portfolio sitemap, the X-Robots-Tag on both serve paths, and the per-person head
  *   metadata — and a rule written out three times drifts.
  *

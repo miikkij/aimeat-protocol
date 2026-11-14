@@ -12,10 +12,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { appCsp, APP_FRAME_SANDBOX } from '../../src/utils/app-csp.js';
-import { appIsolationMode, resetAppIsolationCache } from '../../src/services/app-isolation.js';
+import { appIsolationMode, resetAppIsolationCache } from '../../src/services/app/isolation.js';
 import { FRAME_HOST_CSP } from '../../src/routes/apps/inline-frame.js';
 import { appFrameShimSource, withFrameShim } from '../../src/utils/app-frame-assets.js';
-import { stripServedMarks } from '../../src/services/app-serve-marks-strip.js';
+import { stripServedMarks } from '../../src/services/app/serve-marks-strip.js';
 
 const STATIC = join(process.cwd(), 'src', 'static');
 const owners = (...names: string[]) => ({ listOwners: async () => names.map(name => ({ name })) }) as any;

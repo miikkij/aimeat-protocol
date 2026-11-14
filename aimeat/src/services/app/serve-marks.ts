@@ -1,0 +1,379 @@
+/**
+ * @file src/services/app/serve-marks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE one pass that adds the node's marks to a published app document on its way out.
+ *
+ *   WHY IT EXISTS. Four separate injectors used to run in sequence — the aimeat.io attribution
+ *   badge, the AI-disclosure marks, the agent-discovery block, the head metadata. Each decoded the
+ *   same buffer, each re-tested whether the payload was a document, each carried its own idempotency
+ *   check, and three of them carried their own copy of the one rule that has actually broken an app:
+ *   inject before the LAST `</body>`, never the first, because app JavaScript routinely contains the
+ *   literal string (the fatalii drum-slicer incident, 2026-07-16). Four copies of a rule is four
+ *   chances to add a fifth that forgets it — and the app-platform SDK work in TARGET-058 Phase 5 is
+ *   exactly the kind of change that would have.
+ *
+ *   So the modules under utils/ (and ai-provenance-marks.ts) now supply MARKUP, and this file owns
+ *   the three decisions they were each making separately:
+ *     1. is this payload a document we may touch at all
+ *     2. has it already been marked (a served copy can be re-served)
+ *     3. where the markup goes
+ *
+ *   BYTE-IDENTICAL, AND HELD THAT WAY. The order below is the order the four injectors ran in, and
+ *   test/unit/app-serve-marks.test.ts replays a corpus of trap-shaped documents against goldens
+ *   captured from the pre-consolidation code (test/fixtures/serve-marks-golden.json). Two orderings
+ *   in here are load-bearing rather than incidental, and both are the previous behaviour:
+ *     - the document-element `ai-disclosure` attribute is applied BEFORE the head metadata can
+ *       create an `<html>` element, so a head-less app document keeps ending up with an unmarked
+ *       `<html lang="en">` exactly as it did before;
+ *     - the head-gap detection runs against the text WITH the body marks already in it, so an
+ *       AI-disclosure JSON-LD block legitimately suppresses the SoftwareApplication one.
+ *
+ *   SERVE TIME ONLY. Nothing here is ever written back to storage. `app.data` is what the author
+ *   uploaded, which is what keeps the content hash in a provenance record meaningful, and this
+ *   codebase has published from a served copy before.
+ *
+ *   AND TAKEN BACK OUT ON THE WAY IN. A publish that receives a served copy removes every block
+ *   this pass writes before it stores the bytes (services/app/serve-marks-strip.ts, the developer's
+ *   decision of 2026-09-13), recognising each by the exact opening tag written below. A new mark
+ *   added here needs its rule there: the round trip in test/unit/app-serve-marks-strip.test.ts
+ *   serves a document, strips it and expects the author's bytes back, and goes red until it has one.
+ *   The head metadata is the exception, because applyAppHeadMeta writes its tags with no marker.
+ * @structure
+ *   - ServeMarksSpec — which marks the calling route wants
+ *   - applyServeMarks(bytes, spec) — the single pass, returns a Buffer
+ * @usage
+ *   const body = applyServeMarks(app.data, {
+ *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
+ * @version-history
+ *   v1.10.0 — 2026-11-06 — `appBody`: the app's name and description as a visible block at the start
+ *     of the body (utils/app-page-body.ts), for an app a search engine may index (TARGET-089). A spec
+ *     without it produces the same bytes, so the goldens are unchanged.
+ *   v1.9.0 — 2026-11-01 — The attribution badge speaks the visitor's language (appBadge.*), the one the
+ *     AI label and the other marks speak; it was English on every page.
+ *   v1.8.1 — 2026-10-25 — aiDisclosureParts reads the author's document, so an app that declares its
+ *     own `ai-disclosure` meta gets no second meta and no `<html>` attribute from the node.
+ *   v1.8.0 — 2026-10-25 — `internetOpen`: the line at the end of an app a closed node opened to the
+ *     internet (utils/app-internet-open-badge.ts), in the same one splice as the other body marks.
+ *   v1.7.0 — 2026-10-18 — `info`: the app-info mark (utils/app-info-badge.ts), after the "Use with your
+ *     AI" mark, in the visitor's language; it counts as visible chrome for the reserve strip and its
+ *     block loads public/js/app-news.js. A spec without it produces the same bytes.
+ *   v1.6.0 — 2026-10-09 — `aiUse`: the "Use with your AI" mark (utils/app-ai-use-badge.ts), after the
+ *     badge, in the visitor's language; it counts as visible chrome for the reserve strip. A spec
+ *     without it produces the same bytes, so the goldens are unchanged.
+ *   v1.5.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
+ *   v1.5.0 — 2026-09-26 — `visibleLabel.publiclyReadable`: the app as served now, for the
+ *     reviewer's re-decision of the visible label. Absent means public, so the goldens are unchanged.
+ *   v1.4.1 — 2026-09-13 — Comment only: the publish now strips what this pass writes
+ *     (services/app-serve-marks-strip.ts), and a new mark here needs its rule there. Output unchanged.
+ *   v1.4.0 — 2026-09-13 — The `#aimeat-app-ref` identity block is written at the start of the head
+ *     (headStart(): past the doctype and the `<html>` and `<head>` opening tags, never into
+ *     content) instead of at the end of the body, so an app's inline script can read it at parse
+ *     time; the rest of the discovery block stays in the body. Its JSON is script-safe rather than
+ *     HTML-escaped. The nine goldens that carry a discovery block were re-captured.
+ *   v1.3.0 — 2026-09-11 — `spec.isDocument`: a caller that has already checked the media type may
+ *     say so, instead of this pass sniffing for a closing tag the author never had to write.
+ *     Three live apps open with a comment or a `<meta charset>` and close nothing, so they were
+ *     served with no badge, no AI-disclosure mark and no discovery block at all. Default is the
+ *     sniff, unchanged, and every golden case leaves the flag unset.
+ *   v1.2.1 — 2026-08-31 — The head injection finds `<body …>` with utils/html-inject's findOpenTag
+ *     instead of `/<body[^>]*>/i`, which cost quadratic time on a document made of `<body` repeats
+ *     (CodeQL js/polynomial-redos 1579/1580). Same insertion point, so the goldens are unchanged.
+ *   v1.2.0 — 2026-08-29 — `reviewedBy`: the named reviewer goes into the head as two meta tags
+ *     and re-decides the visible label with editorial responsibility declared; `badge` is now
+ *     the owner's switch at every call site (services/app-marks.ts). Existing goldens unchanged:
+ *     a spec without the new member produces the same bytes.
+ *   v1.1.0 — 2026-08-02 — The reserved-strip contract: whenever visible chrome is served (badge or
+ *     AI label), also declare `--aimeat-chrome-bottom` (utils/app-chrome-reserve.ts) so apps can
+ *     lift their own fixed bottom UI clear of the marks instead of being covered by them. Goldens
+ *     re-captured — this is the first INTENTIONAL output change since the consolidation.
+ *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: the four serve-time injectors become one pass.
+ */
+import type { AimeatConfig } from '../../config.js';
+import { createT, type Locale } from '../../i18n.js';
+import { findOpenTag, injectBeforeClosingTag } from '../../utils/html-inject.js';
+import { BADGE_MARK, BADGE_WORDS_EN, badgeSnippet, type BadgeWords } from '../../utils/app-badge.js';
+import { AI_USE_MARK, aiUseBadgeSnippet, type AppAiUse } from '../../utils/app-ai-use-badge.js';
+import { APP_INFO_MARK, appInfoBadgeSnippet } from '../../utils/app-info-badge.js';
+import { INTERNET_OPEN_MARK, internetOpenSnippet, type InternetOpenBadgeSpec } from '../../utils/app-internet-open-badge.js';
+import { formatForPerson } from '../display-prefs.js';
+import type { AppNews } from './news.js';
+import { RESERVE_MARK, reserveSnippet } from '../../utils/app-chrome-reserve.js';
+import {
+  APP_REF_MARK, DISCOVERY_MARK, agentDiscoverySnippet, appRefSnippet, type AppDiscoverySpec,
+} from '../../utils/app-agent-discovery.js';
+import { applyAppHeadMeta, type AppHeadSpec } from '../../utils/app-head-meta.js';
+import { APP_BODY_MARK, appPageBodySnippet, type AppPageBodySpec } from '../../utils/app-page-body.js';
+import { escapeHtml } from '../../utils/html-escape.js';
+import {
+  PROVENANCE_HTML_MARK, aiDisclosureParts, markDocumentElement, type ServedProvenance,
+} from '../ai/provenance-marks.js';
+
+/** The attribute that names the reviewer tag, and the idempotency marker for it. */
+export const REVIEWED_MARK = 'name="aimeat-reviewed-by"';
+
+/** The "Use with your AI" mark in the visitor's language. */
+/** The attribution badge's words in the visitor's language; English, the badge's own default, without one. */
+function badgeWords(locale: Locale | undefined): BadgeWords {
+  if (!locale) return BADGE_WORDS_EN;
+  const t = createT(locale);
+  return { label: t('appBadge.label', { site: 'aimeat.io' }), free: t('appBadge.free') };
+}
+
+function aiUseMarkup(use: AppAiUse, locale: Locale): string {
+  const t = createT(locale);
+  return aiUseBadgeSnippet({
+    guideUrl: use.guideUrl,
+    title: t('aiUseBadge.title'),
+    counts: t('aiUseBadge.counts', { tools: use.tools, skills: use.skills }),
+    link: t('aiUseBadge.link'),
+    open: t('aiUseBadge.open'),
+  });
+}
+
+/** A served date in the visitor's language: "18 Oct 2026", "18.10.2026", "18 oct 2026". */
+function servedDate(iso: string, locale: Locale): string {
+  return formatForPerson({ locale, region: locale, timezone: null }, iso, { dateStyle: 'medium' });
+}
+
+/** The app-info mark in the visitor's language, from the app's news (services/app/news.ts). */
+function infoMarkup(info: NonNullable<ServeMarksSpec['info']>): string {
+  const { news, locale } = info;
+  const t = createT(locale);
+  const version = news.label
+    ? t('appInfoBadge.versionLabel', { label: news.label, v: news.version })
+    : t('appInfoBadge.version', { v: news.version });
+  const updated = servedDate(news.updatedAt, locale);
+  return appInfoBadgeSnippet({
+    appId: news.app,
+    version: news.version,
+    tucked: info.tucked,
+    moreUrl: info.moreUrl,
+    open: t('appInfoBadge.open'),
+    title: t('appInfoBadge.title'),
+    versionLine: updated ? `${version} · ${t('appInfoBadge.updated', { date: updated })}` : version,
+    changesTitle: t('appInfoBadge.changes'),
+    changes: news.changes.map((c) => (c.version ? `${c.what} (${c.version})` : c.what)),
+    more: t('appInfoBadge.more'),
+    words: {
+      draft: t('appInfoBadge.draft'),
+      draftBy: t('appInfoBadge.draftBy'),
+      draftSaved: t('appInfoBadge.draftSaved'),
+      draftStale: t('appInfoBadge.draftStale'),
+      draftOpen: t('appInfoBadge.draftOpen'),
+      tuck: t('appInfoBadge.tuck'),
+      untuck: t('appInfoBadge.untuck'),
+      reloaded: t('appInfoBadge.reloaded'),
+    },
+  });
+}
+
+/**
+ * One past the `<body …>` tag that directly follows the head, or -1. "Directly" is the guard: only a
+ * `<body>` with nothing but whitespace and comments between it and the first `</head>` is taken for
+ * the real one, so a `<body>` written inside an app's script or template is never a place to write.
+ * A document without that shape gets -1, and its caller writes at the end of the body instead.
+ */
+function bodyOpenEnd(html: string): number {
+  const head = /<\/head\s*>/i.exec(html);
+  if (!head) return -1;
+  let at = head.index + head[0].length;
+  for (;;) {
+    while (at < html.length && /\s/.test(html[at])) at++;
+    if (!html.startsWith('<!--', at)) break;
+    const end = html.indexOf('-->', at + 4);
+    if (end < 0) return -1;
+    at = end + 3;
+  }
+  const tag = findOpenTag(html.slice(at, at + 2048), 'body');
+  return tag && tag.start === 0 ? at + tag.end : -1;
+}
+
+/** Before `</head>` when there is one; else before the body opens; else at the front. */
+function injectIntoHead(html: string, snippet: string): string {
+  if (/<\/head\s*>/i.test(html)) return html.replace(/<\/head\s*>/i, (m) => snippet + m);
+  const body = findOpenTag(html, 'body');
+  if (body) return html.slice(0, body.end) + snippet + html.slice(body.end);
+  return snippet + html;
+}
+
+/**
+ * Where the head's first child goes: past the document's prolog and nothing else. That is leading
+ * whitespace and comments, then a doctype, then the `<html>` and `<head>` opening tags, each only
+ * when it is the next thing in the text. Every element the author wrote comes after this point, a
+ * script in the head included, and the scan never reads into content, so a `<head>` written inside
+ * an app's JavaScript cannot be taken for the real one. A document with none of the prolog gets
+ * the snippet at its front, where the parser opens the head for it.
+ */
+function headStart(html: string): number {
+  const lower = html.toLowerCase();
+  let at = 0;
+  const skipBlankAndComments = (): void => {
+    for (;;) {
+      while (at < html.length && /\s/.test(html[at])) at++;
+      if (!lower.startsWith('<!--', at)) return;
+      const end = lower.indexOf('-->', at + 4);
+      if (end < 0) return;
+      at = end + 3;
+    }
+  };
+  /** One past the `>` of a `<name …>` opening tag starting exactly at `at`, or -1. */
+  const openTagEnd = (name: string): number => {
+    const needle = `<${name}`;
+    if (!lower.startsWith(needle, at)) return -1;
+    const after = lower[at + needle.length];
+    if (after === undefined || (after !== '>' && after !== '/' && !/\s/.test(after))) return -1;
+    const gt = lower.indexOf('>', at);
+    return gt < 0 ? -1 : gt + 1;
+  };
+  skipBlankAndComments();
+  const doctype = openTagEnd('!doctype');
+  if (doctype > 0) { at = doctype; skipBlankAndComments(); }
+  const htmlTag = openTagEnd('html');
+  if (htmlTag > 0) { at = htmlTag; skipBlankAndComments(); }
+  const headTag = openTagEnd('head');
+  if (headTag > 0) at = headTag;
+  return at;
+}
+
+/** Which marks this response carries. Every member is optional; omitting one leaves it off. */
+export interface ServeMarksSpec {
+  /** The permanent aimeat.io attribution pill. */
+  badge?: boolean;
+  /** The provenance record attached to these bytes, when one exists. */
+  provenance?: ServedProvenance;
+  /**
+   * Also render the VISIBLE AI label. Opt-in per caller: the machine-readable marks belong on every
+   * HTML face, the chip belongs only where a person is looking at a running app.
+   */
+  visibleLabel?: {
+    config: AimeatConfig; locale: Locale;
+    /**
+     * Whether anyone can read this app right now. Only the reviewer's re-decision reads it (the
+     * strict policy labels only what anyone can read); absent means yes, which is what every
+     * caller assumed before 2026-09-26 and what a legal page served without the access code is.
+     */
+    publiclyReadable?: boolean;
+  };
+  /**
+   * The natural person who declared they reviewed this app and answer for it
+   * (manifest.authorship, services/app/marks.ts). Served as `<meta name="author">` and
+   * `<meta name="aimeat-reviewed-by">` in the head, and it re-decides the VISIBLE label with
+   * editorial responsibility declared — which lifts the Art. 50(4) content label and nothing
+   * else. The machine-readable marks (the attribute, the JSON-LD, the record link) are untouched:
+   * synthesis may have happened, and the record keeps saying so.
+   */
+  reviewedBy?: string;
+  /** The static agent-discovery block, for an app served on its own origin. */
+  discovery?: AppDiscoverySpec;
+  /**
+   * The "Use with your AI" mark (utils/app-ai-use-badge.ts): what services/app/ai-use.ts counted,
+   * and the visitor's language for its words. Absent when there is nothing to use, when the owner
+   * switched it off, or when the caller serves no visible chrome.
+   */
+  aiUse?: { use: AppAiUse; locale: Locale };
+  /**
+   * The app-info mark (utils/app-info-badge.ts): the app's public news, the owner's starting state for
+   * the row, the catalogue link and the visitor's language. Absent when the owner switched it off or
+   * the caller serves no visible chrome.
+   */
+  info?: { news: AppNews; tucked: boolean; moreUrl: string; locale: Locale };
+  /**
+   * The line that says the app is open to everyone on the internet, for an app a closed node opened
+   * (utils/app-internet-open-badge.ts, services/internet-opening/opening-mark.ts). Absent otherwise.
+   */
+  internetOpen?: InternetOpenBadgeSpec;
+  /** The `<head>` metadata the app almost certainly has none of. */
+  headMeta?: AppHeadSpec;
+  /**
+   * The app's name and description as a visible block at the start of the body
+   * (utils/app-page-body.ts), for a reader that does not run JavaScript. Only for an app a search
+   * engine may index; absent, the bytes are what they were before (TARGET-089).
+   */
+  appBody?: AppPageBodySpec;
+  /**
+   * The CALLER states that these bytes are an HTML document, overruling the sniff below.
+   *
+   * The sniff looks for a closing `</body>` or `</html>`, and three published apps on aimeat.io
+   * have neither: noste, taivas and laake open with a comment or a `<meta charset>` and simply
+   * stop, which every browser parses as a document and this pass declined as a fragment. They were
+   * served with no attribution badge, no AI-disclosure mark and no discovery block — 235 kB of
+   * application with eleven characters of text in it, on an origin a search engine had indexed.
+   *
+   * It stays a sniff by default, because the callers that hand this function JSON, SVG or a raw
+   * download cannot all vouch for their payload and a mark spliced into JSON corrupts it. The two
+   * that CAN vouch already tested the media type before calling, and say so here.
+   */
+  isDocument?: boolean;
+}
+
+/**
+ * Add the requested marks and return the bytes to send.
+ *
+ * A payload that is not an HTML document comes back unchanged apart from the head-metadata pass,
+ * which has its own (deliberately wider) notion of a document because a single-file app is often a
+ * bare fragment with no `<head>` at all.
+ */
+export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeMarksSpec): Buffer {
+  const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+
+  // Only touch real HTML documents; never corrupt JSON/SVG/other inline payloads. Tested ONCE.
+  // A caller that has already checked the media type may say so instead (spec.isDocument): the
+  // sniff reads closing tags, and a single-file app is under no obligation to write any.
+  const isDocument = spec.isDocument ?? (/<\/body\s*>/i.test(text) || /<\/html\s*>/i.test(text));
+
+  let out = text;
+  if (isDocument) {
+    // Idempotency is decided against the ORIGINAL text for every mark, which is what the four
+    // injectors did in effect: none of them emits another's marker, so a chain of `.includes`
+    // checks over progressively longer strings gave the same answers.
+    const parts: string[] = [];
+    // The reserved-strip contract rides along whenever VISIBLE chrome does (the badge or the AI
+    // label): it declares `--aimeat-chrome-bottom` so the app can lift its own bottom UI clear of
+    // the marks. Declaration only — an app that ignores it renders exactly as before.
+    const visibleChrome = spec.badge || (spec.provenance && spec.visibleLabel) || spec.aiUse || spec.info;
+    if (visibleChrome && !text.includes(RESERVE_MARK)) parts.push(reserveSnippet());
+    if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet(badgeWords(spec.visibleLabel?.locale ?? spec.aiUse?.locale)));
+    if (spec.aiUse && !text.includes(AI_USE_MARK)) parts.push(aiUseMarkup(spec.aiUse.use, spec.aiUse.locale));
+    if (spec.info && !text.includes(APP_INFO_MARK)) parts.push(infoMarkup(spec.info));
+    if (spec.internetOpen && !text.includes(INTERNET_OPEN_MARK)) parts.push(internetOpenSnippet(spec.internetOpen));
+    if (spec.provenance && !text.includes(PROVENANCE_HTML_MARK)) {
+      const { block, w3c } = aiDisclosureParts(spec.provenance,
+        spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined, text);
+      parts.push(block);
+      // Before the head pass — see the file comment; this is what keeps a head-less document's
+      // generated `<html>` element unmarked, as it has always been.
+      if (w3c) out = markDocumentElement(out, w3c);
+    }
+    if (spec.discovery && !text.includes(DISCOVERY_MARK)) parts.push(agentDiscoverySnippet(spec.discovery));
+    // ONE splice, through the one helper that knows about the last-`</body>` rule.
+    if (parts.length) out = injectBeforeClosingTag(out, parts.join(''));
+    // The app's name and description open the body, where a reader meets them first. A document
+    // whose body does not directly follow its head gets them at the end of the body instead, with
+    // the same one helper, because guessing where such a body starts could write into content.
+    if (spec.appBody && !text.includes(APP_BODY_MARK)) {
+      const block = appPageBodySnippet(spec.appBody);
+      const at = bodyOpenEnd(out);
+      out = at >= 0 ? out.slice(0, at) + block + out.slice(at) : injectBeforeClosingTag(out, block);
+    }
+    // The app's own identity block goes to the START of the head instead, because an app reads it
+    // from its first line of script (AIMEAT.atelier.appRef(), the mosaic's own boot). At the end of
+    // the body it arrived after every inline script and read as null at parse time.
+    if (spec.discovery && !text.includes(APP_REF_MARK)) {
+      const at = headStart(out);
+      out = out.slice(0, at) + appRefSnippet(spec.discovery) + out.slice(at);
+    }
+    // The reviewer's name, machine-readable, in the head. Before the head pass so a head-less
+    // document gets it inside the `<head>` that pass opens, and so that pass's own "already has
+    // an author" checks see it. Two tags: the standard one every crawler reads, and the one that
+    // says what it means here — a person reviewed this and answers for it.
+    if (spec.reviewedBy && !text.includes(REVIEWED_MARK)) {
+      const name = escapeHtml(spec.reviewedBy);
+      out = injectIntoHead(out,
+        `<meta name="author" content="${name}"><meta ${REVIEWED_MARK} content="${name}">`);
+    }
+  }
+
+  if (spec.headMeta) out = applyAppHeadMeta(out, spec.headMeta);
+  return Buffer.from(out, 'utf-8');
+}

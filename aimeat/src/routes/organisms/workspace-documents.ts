@@ -7,7 +7,7 @@
  *
  *   THESE HANDLERS DECIDE NOTHING. The manifest lookup, the access rule, the archive guard, the
  *   schema check, the memory ceilings and the compare-and-swap retry all live in
- *   services/workspace-doc-edit.ts, which the MCP tools and the CLI dispatch call too. That is not
+ *   services/workspace/doc-edit.ts, which the MCP tools and the CLI dispatch call too. That is not
  *   tidiness: the same defect has already been fixed three separate times inside one MCP tool
  *   because a rule lived in one door and not the other.
  *
@@ -32,7 +32,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import {
     appendToDocument, replaceDocumentSection, WorkspaceDocError, type DocEditCaller, type DocEditResult,
-} from '../../services/workspace-doc-edit.js';
+} from '../../services/workspace/doc-edit.js';
 
 export function registerOrganismWorkspaceDocumentRoutes(
     router: Router, config: AimeatConfig, storage: Storage,

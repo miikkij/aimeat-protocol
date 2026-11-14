@@ -43,9 +43,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkOrganismNamespaceAccess } from '../../src/services/organism-namespace-access.js';
-import { readWorkspaceManifest, updateWorkspaceMeta } from '../../src/services/workspace-meta.js';
-import { canReadWorkspace } from '../../src/services/workspace-access.js';
-import { readPublishSpace } from '../../src/services/workspace-write-items.js';
+import { readWorkspaceManifest, updateWorkspaceMeta } from '../../src/services/workspace/meta.js';
+import { canReadWorkspace } from '../../src/services/workspace/access.js';
+import { readPublishSpace } from '../../src/services/workspace/write-items.js';
 import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord, ConsentRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';

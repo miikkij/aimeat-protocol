@@ -13,7 +13,7 @@
  *   and never the source.
  *
  *   Registered separately from apps.ts because that file is already near the 800-line ceiling. The
- *   work itself lives in services/app-draft-edit.ts, which every write funnels through
+ *   work itself lives in services/app/draft-edit.ts, which every write funnels through
  *   stageAppDraft() — the same function the HTTP draft route and aimeat_app_draft_save call.
  * @structure
  *   - registerAppDraftEditTools() — registers the four tools on an McpServer instance
@@ -38,10 +38,10 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { resolveAppTargetScope } from '../services/app-lifecycle.js';
-import { writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft } from '../services/app-draft-edit.js';
-import { draftNoticeFrom } from '../services/app-news.js';
-import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
+import { resolveAppTargetScope } from '../services/app/lifecycle.js';
+import { writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft } from '../services/app/draft-edit.js';
+import { draftNoticeFrom } from '../services/app/news.js';
+import { servedMarksResponse } from '../services/app/serve-marks-strip.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** MCP has one error channel, plain text, so the refusal code travels in the sentence. */

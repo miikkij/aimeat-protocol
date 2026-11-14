@@ -73,7 +73,7 @@ beforeAll(async () => {
   const party = await import('../../src/services/parties/token.js');
   const pageFrame = await import('../../src/services/page-frame-token.js');
   const preview = await import('../../src/services/design-book/preview-token.js');
-  const appAccess = await import('../../src/services/app-access-token.js');
+  const appAccess = await import('../../src/services/app/access-token.js');
   const external = await import('../../src/services/external-login.js');
   PARTY_PREFIX = (await import('../../src/services/parties/contract.js')).PARTY_TOKEN_PREFIX;
   download.initDownloadTokenKeys(privateKey, publicKey);

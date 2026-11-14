@@ -11,17 +11,17 @@
  *   aimeat.io (1.0.0, 2026-07-27), so every other node had none, and its selling section still
  *   priced an action in morsels. The AI-facing half of docs/manuals/service-extensions-manual.md
  *   (writing scripts, the ctx rules, instances, schedules, best practice) moved here in the same
- *   change, corrected: top-level helpers are kept (services/extension-runtime.ts transformScript,
+ *   change, corrected: top-level helpers are kept (services/extension/runtime.ts transformScript,
  *   since 2026-07-18), an update is PUT /v1/extensions/{name} in place, `instance_scope` on a
  *   manifest schedule does not exist, there is no /v1/federation/capabilities route, and a morsel
  *   is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). A
  *   skill ships with every installation and seeds by hash (services/skill-seeds.ts).
  *
  *   WHAT IT MUST AGREE WITH. services/build-extension-prompt.ts (the canonical table it points
- *   to), services/extension-ctx-contract.ts (ctx members), services/extension-manifest.ts (manifest
+ *   to), services/extension/ctx-contract.ts (ctx members), services/extension/manifest.ts (manifest
  *   validation, tollMorsels, commercial, the 4.0.0 refusal of payMorsels), routes/extensions/
  *   paywall.ts and pacing.ts (who pays what per call), routes/extensions/crud.ts and instances.ts
- *   (install, PUT redeploy, instances), services/extension-schedules.ts (schedule fields),
+ *   (install, PUT redeploy, instances), services/extension/schedules.ts (schedule fields),
  *   services/schedule-write.ts (instance_id on POST /v1/schedules), config.ts (the limits and
  *   AIMEAT_EXT_INSTALL_ROLE).
  * @structure EXTENSION_BUILDER_SKILL_ENTRY

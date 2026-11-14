@@ -33,7 +33,7 @@
  *   v1.0.0 — 2026-08-01 — Written after the mojibake was seen in a real browser.
  */
 import { describe, it, expect } from 'vitest';
-import { applyServeMarks } from '../../src/services/app-serve-marks.js';
+import { applyServeMarks } from '../../src/services/app/serve-marks.js';
 import type { ServedProvenance } from '../../src/services/ai/provenance-marks.js';
 import { AI_PROVENANCE_SPEC_V1, type AiProvenance } from '../../src/models/ai-provenance-schemas.js';
 import type { AimeatConfig } from '../../src/config.js';

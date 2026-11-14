@@ -86,12 +86,12 @@ import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { nodeContext } from './node-context.js';
 import { formatForPerson } from './display-prefs.js';
-import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
+import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace/roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
 import { isOrganismOwner } from './organism-ownership.js';
 import { closeJoinRequestsOnMembership } from './organism-join-requests/requests.js';
 import { localAccountName } from '../utils/gaii.js';
-import { findWorkspaceRegistration, workspaceRegistrations } from './workspace-meta-read.js';
+import { findWorkspaceRegistration, workspaceRegistrations } from './workspace/meta-read.js';
 import { isValidEmail } from '../utils/email-validator.js';
 import { LOCALES } from '../i18n.js';
 import { emailTemplateLang } from './email-templates.js';
@@ -506,7 +506,7 @@ export async function revokeDepartedMemberAccess(
   // Which consent list to look in is decided by who CREATED each workspace, and the registry is what
   // says so — one registry record per creator, each listing the workspaces they made. revokeWorkspaceRole
   // is the same call the deny and revoke routes make, so what counts as a workspace-role grant stays
-  // defined in exactly one place (services/workspace-roles.ts).
+  // defined in exactly one place (services/workspace/roles.ts).
   // Each workspace once, under the registry copy that counts (workspace-meta-read.ts), the same copy
   // the grant was made under (secaudit2026oct26).
   const revokedWorkspaces: string[] = [];
@@ -793,7 +793,7 @@ export interface GrantMembership {
 
 /**
  * What a direct workspace-role grant does about the grantee's ORGANISM membership. A workspace role
- * is read only for an active member of the organism (services/workspace-access.ts, gate 1), so a
+ * is read only for an active member of the organism (services/workspace/access.ts, gate 1), so a
  * role granted to an account outside it opened nothing: the grant answered 200, the person was told
  * they were added, and every read answered "Not an active member of this organism". Both grant
  * endpoints (POST /v1/organisms/:id/workspace-access/grant and the MCP tool

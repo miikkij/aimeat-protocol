@@ -10,7 +10,7 @@
  *   the owner's grant lacks go to the owner's one-press consent, listed, instead (secaudit2026oct22,
  *   app-grants/own-app-silent-ignores-publisher-and-owner-narrowing; developer decision 2026-10-25):
  *   - THE LIVE VERSION WAS PUBLISHED BY ANOTHER ACCOUNT, one the owner gave a publisher or full
- *     development right (services/app-publish.ts stamps `manifest.publishedBy` on every version).
+ *     development right (services/app/publish.ts stamps `manifest.publishedBy` on every version).
  *     The owner's own agent is the owner (purpose rule 2) and counts as the owner here.
  *   - THE OWNER NARROWED THE GRANT BY HAND (PATCH /v1/app-grants/:id stamps scopesFixedAt). A word
  *     the owner took away does not come back without the owner saying yes again.
@@ -28,9 +28,9 @@
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import type { Storage, AppGrantRecord } from '../storage/interface.js';
-import { accountOf } from './app-members.js';
-import { authorAccountOf } from './app-grant-author.js';
-import { byAnotherAuthorsApp } from './app-published-by-app.js';
+import { accountOf } from './app/members.js';
+import { authorAccountOf } from './app/grant-author.js';
+import { byAnotherAuthorsApp } from './app/published-by-app.js';
 
 /** Why the owner's own app asks the owner, and the words it asks for that the owner's grant lacks. */
 export interface OwnAppConsent {
@@ -68,7 +68,7 @@ export async function ownAppConsentNeed(
       return { reason: 'publisher_version', added, publisher };
     }
     // Published through the grant of another author's app: that app is the publisher, though the
-    // token acts for the owner (services/app-published-by-app.ts; secaudit2026oct26).
+    // token acts for the owner (services/app/published-by-app.ts; secaudit2026oct26).
     const byApp = app?.manifest?.publishedByApp;
     if (byAnotherAuthorsApp(byApp, owner)) {
       return { reason: 'publisher_version', added, publisher: byApp, publisherApp: byApp };

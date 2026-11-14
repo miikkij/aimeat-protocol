@@ -319,7 +319,7 @@ await test('Saving a draft requires content (400)', async () => {
 
 // ── Phase 6: ONE publish path (TARGET-058 Phase 8 step 0a) ──
 // The three publish doors — POST /v1/apps, the presigned upload, and publish-draft — now share
-// services/app-publish.ts. These tests pin the two things that were different before they did:
+// services/app/publish.ts. These tests pin the two things that were different before they did:
 // a draft manifest cannot express pricing or per-locale descriptions, and this route used to
 // publish the draft manifest VERBATIM, so promoting a draft turned a paid app free and dropped
 // its translations. Nothing in the response said so.

@@ -24,7 +24,7 @@
  *     way to learn that an agent or a colleague changed them.
  */
 import type { AimeatConfig } from '../../config.js';
-import type { ExtensionCtx } from '../extension-ctx-contract.js';
+import type { ExtensionCtx } from '../extension/ctx-contract.js';
 import { emitChange, extensionDomain } from '../event-bus.js';
 import { localAccountOf } from '../../utils/gaii.js';
 

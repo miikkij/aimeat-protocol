@@ -20,7 +20,7 @@ import type { AppRecord, GHIIRecord, Storage } from '../../src/storage/interface
 import type { AimeatConfig } from '../../src/config.js';
 import {
   writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
-} from '../../src/services/app-draft-edit.js';
+} from '../../src/services/app/draft-edit.js';
 
 const NODE = 'node-test';
 const OWNER = 'alice';

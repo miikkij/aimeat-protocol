@@ -6,6 +6,8 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.11.2 -- 2026-11-13 -- POST .../publish-draft reads the draft and asks the roadmap question through
+ *     services/app/draft-to-publish.ts, which aimeat_app_draft_publish calls too (structure programme 2026-11, unit 2b).
  *   v2.11.1 -- 2026-10-27 -- POST .../publish-draft through an app's grant names that app on the version (secaudit2026oct26).
  *   v2.11.0 -- 2026-10-19 -- PUT .../draft and POST .../publish-draft take `version`, the display version
  *     the promotion publishes with (services/app-display-version.ts judges it); PUT .../draft answers with
@@ -72,27 +74,26 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { generateFrameToken } from '../../services/draft-token.js';
-import { mintDraftPreview } from '../../services/app-draft-preview.js';
+import { mintDraftPreview } from '../../services/app/draft-preview.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
-import { stageAppDraft, discardAppDraft, publishAppDraft } from '../../services/app-lifecycle.js';
-import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';
+import { stageAppDraft, discardAppDraft, publishAppDraft } from '../../services/app/lifecycle.js';
+import { servedMarksResponse } from '../../services/app/serve-marks-strip.js';
 import {
     writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
-} from '../../services/app-draft-edit.js';
+} from '../../services/app/draft-edit.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
-import { isSharedApp } from '../../services/app-dev-grant.js';
-import { roadmapGate } from '../../services/app-roadmap.js';
-import { presentAppManifest } from '../../services/app-pacing.js';
+import { draftToPublish } from '../../services/app/draft-to-publish.js';
+import { presentAppManifest } from '../../services/app/pacing.js';
 import { callerOf } from '../../middleware/caller.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
-import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
-import { draftNoticeFrom } from '../../services/app-news.js';
+import { publishAskedFields, askedStatus } from '../../services/app/publish-gate.js';
+import { draftNoticeFrom } from '../../services/app/news.js';
 import type { AppDraftNotice } from '../../storage/interface.js';
-import { appDisplayVersionRefusal } from '../../services/app-display-version.js';
-import { publishingAppOf } from '../../services/app-published-by-app.js';
+import { appDisplayVersionRefusal } from '../../services/app/display-version.js';
+import { publishingAppOf } from '../../services/app/published-by-app.js';
 
 /**
  * The body's `notice` (what the draft changes) as the record the slot keeps: undefined when not sent,
@@ -162,7 +163,7 @@ export function registerDraftRoutes(
         if (version === false) return;
 
         // The filename rule, the size cap and the manifest that inherits from the live app are
-        // services/app-lifecycle.ts — the same function aimeat_app_draft_save calls. This route maps
+        // services/app/lifecycle.ts — the same function aimeat_app_draft_save calls. This route maps
         // its JSON body onto that one shape and nothing more.
         const staged = await stageAppDraft(storage, config, {
             ownerName: owner,
@@ -410,7 +411,7 @@ export function registerDraftRoutes(
         const t = await appTargetOr(appTarget, config, req, res, 'draft');
         if (!t) return;
         const { owner, ownerGhii } = t;
-        // The token and the URL are services/app-draft-preview.ts, shared with aimeat_app_draft_save.
+        // The token and the URL are services/app/draft-preview.ts, shared with aimeat_app_draft_save.
         const out = await mintDraftPreview(storage, config, { owner, ownerGhii, filename });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
@@ -505,23 +506,21 @@ export function registerDraftRoutes(
         if (!t) return;
         const { owner, ownerGhii } = t;
 
-        const draft = await storage.getAppDraft(ownerGhii, filename);
-        if (!draft) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish for "${filename}". Save one with PUT .../draft first.`));
+        // The draft read and the same question POST /v1/apps asks (what did this change? A warning on
+        // your own app, a refusal on one somebody else helps build) are services/app/draft-to-publish.ts,
+        // which aimeat_app_draft_publish calls too. Asked before the promotion, so a refusal never
+        // arrives after the bytes are live. The draft's own notice answers it when the publisher gives
+        // no line (publishAppDraft).
+        const checked = await draftToPublish(storage, { ownerName: owner, ownerGhii, filename }, req.body?.roadmap);
+        if (!checked.ok) {
+            if (checked.code === 'NO_DRAFT') {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish for "${filename}". Save one with PUT .../draft first.`));
+            } else {
+                res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', checked.message));
+            }
             return;
         }
-
-        // The same question POST /v1/apps asks: what did this change? A warning on your own app, a
-        // refusal on one somebody else helps build. Asked before the promotion, so a refusal never
-        // arrives after the bytes are live.
-        // The draft's own notice answers it when the publisher gives no line (publishAppDraft).
-        const shared = await isSharedApp(storage, owner, filename);
-        const givenLine = typeof req.body?.roadmap === 'string' && req.body.roadmap.trim() ? req.body.roadmap : undefined;
-        const road = roadmapGate({ line: givenLine ?? draft.manifest.draftNotice?.text, shared });
-        if (!road.ok) {
-            res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', road.message));
-            return;
-        }
+        const draft = checked.draft;
 
         // The declaration belongs to the PUBLISH, not to the draft save: promoting a draft is the act
         // that puts bytes in front of readers, and it is the moment the publisher is answering for how
@@ -539,7 +538,7 @@ export function registerDraftRoutes(
         if (version === false) return;
 
         // The promotion — the draft manifest mapped onto the publish input, publishApp, and the slot
-        // cleared afterwards — is services/app-lifecycle.ts, shared with aimeat_app_draft_publish.
+        // cleared afterwards — is services/app/lifecycle.ts, shared with aimeat_app_draft_publish.
         // The draft manifest IS the caller's statement, so every field it can express is passed as
         // stated; what it CANNOT express (the pacing amount, licence, per-locale descriptions) is left
         // unmentioned and carried from the live app.

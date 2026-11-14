@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { handRolledFindings } from '../../src/services/app-hand-rolled.js';
+import { handRolledFindings } from '../../src/services/app/hand-rolled.js';
 
 const page = (libs: string[], script: string) => `<!DOCTYPE html><html><head></head><body>
 ${libs.map(l => `<script src="/v1/libs/${l}.js"></` + 'script>').join('\n')}

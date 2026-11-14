@@ -20,7 +20,7 @@ anywhere in the table above.
 
 An extension's `ctx.memory.set(key, value)` writes to `ext:{extensionName}`, with `visibility: 'public'` unless the call passes `{ visibility: 'private' }`. Nobody else can write to this namespace: not the cortex, not the app, not the user directly. Pass `private` on every write that holds somebody's personal data, because an `ext:` namespace is world-readable.
 
-**Code reference:** `extMemoryOwner` in `src/routes/extensions/actions.ts` (`ext:${ext.name}`, or `ext:${ext.name}.${instanceId}` on the instance route) and in `src/mcp/extensions.ts` (`aimeat_extension_invoke`). The memory calls themselves are `buildExtensionCtx` in `src/services/extension-ctx.ts`.
+**Code reference:** `extMemoryOwner` in `src/routes/extensions/actions.ts` (`ext:${ext.name}`, or `ext:${ext.name}.${instanceId}` on the instance route) and in `src/mcp/extensions.ts` (`aimeat_extension_invoke`). The memory calls themselves are `buildExtensionCtx` in `src/services/extension/ctx.ts`.
 
 ---
 
@@ -28,7 +28,7 @@ An extension's `ctx.memory.set(key, value)` writes to `ext:{extensionName}`, wit
 
 ### Extension (QuickJS WASM sandbox, server-side)
 
-An action script has one `export default async function (ctx, input) { ... }`. Helper functions and constants may sit above it: `transformScript` in `src/services/extension-runtime.ts` rewrites the export in place and keeps them. There is no module loader, so a script cannot `import`.
+An action script has one `export default async function (ctx, input) { ... }`. Helper functions and constants may sit above it: `transformScript` in `src/services/extension/runtime.ts` rewrites the export in place and keeps them. There is no module loader, so a script cannot `import`.
 
 ```
 ctx.memory.get(key)             → reads from ext:{name} namespace (own data)
@@ -51,7 +51,7 @@ ctx.workspace.{publishRecords,deleteRecords}
                                   operations the batch publish and delete routes run
 ```
 
-The full contract is `ExtensionCtx` in `src/services/extension-ctx-contract.ts`.
+The full contract is `ExtensionCtx` in `src/services/extension/ctx-contract.ts`.
 
 `ctx.workspace` is the one road from the sandbox into a namespace that is not `ext:`, and it does not
 open the fence above: nothing is read or written under the extension's own authority. The caller's
@@ -59,7 +59,7 @@ membership, the creator's contributor grant, the caller's scopes (`memory:write`
 `memory:purge` to remove records with `deleteRecords`, `organism:read` to read; an owner session
 needs none of them), the space's locked schema and the publish gate all apply exactly as they do on
 the MCP tools and the REST routes, and every refusal reaches the script as a thrown `CODE: message`.
-The service is `src/services/workspace-tool-ops.ts`, the batch included; the sandbox binding is `src/services/extension-workspace.ts`. A batch of records goes through
+The service is `src/services/workspace/tool-ops.ts`, the batch included; the sandbox binding is `src/services/extension/workspace.ts`. A batch of records goes through
 `publishRecords` in one call: 500 records as `write` + `publish` would be 1000 calls, past the
 default ceiling of 500.
 
@@ -221,19 +221,19 @@ Six rules, and each one closes a way the value could leak back:
   never bound through an extension another account installed, whoever calls: the script that chose
   the address is someone else's, so the call is refused with `SECRET_HOST`, naming the extension, its
   installer and the host, and the owner allows it by setting the secret's address (secaudit 2026-10,
-  v58 as Jouni amended it on 2026-10-21; `src/services/extension-secret-authority.ts`).
+  v58 as Jouni amended it on 2026-10-21; `src/services/extension/secret-authority.ts`).
 - **Through the caller's own account's extension, a secret with no host is bound on first use.** A
   first use to a host the manifest declares for that secret in `uses_secrets: [{ name, hosts, why }]`
   binds whoever calls (the owner's app, their chat agent, a schedule) when the code's writer is
   trusted: the owner, an app grant of theirs, an agent holding `secrets:manage`, or a record from
-  before writers were recorded (`src/services/extension-secret-uses.ts`). Otherwise only a principal
+  before writers were recorded (`src/services/extension/secret-uses.ts`). Otherwise only a principal
   that may create the secret makes that use: the owner in person or a `secrets:manage` holder; in
   an unattended run, the principal that wrote the extension's code (ruling 6, 2026-10-20).
   living-hooks counts as the caller's own here: a host on the operator's node-wide allowlist binds
   by itself, and a host only on the caller's own list (which an app granted memory:write can change)
   asks once per secret and host. An own-account extension whose code was installed before these
   rules keeps the old first use, binding to the host its script names whoever calls, until its code
-  is written again (`src/services/extension-first-use-keep.ts`; Jouni, 2026-10-21).
+  is written again (`src/services/extension/first-use-keep.ts`; Jouni, 2026-10-21).
 - **A value from the shared `secrets` field gets its first host from whoever set it.** Its first
   host then serves every account, so the first use binds by itself only toward a host on the
   extension's `allow_hosts`, a host the extension declares for that secret, or when the map's setter
@@ -260,7 +260,7 @@ inside a document, a config or a workflow and the vault can see none of those. I
 this node has to "what breaks if I delete this".
 
 Full reference: `src/services/owner-secrets.ts` (the one implementation), `src/routes/secrets.ts`
-(the three routes), `src/services/extension-ctx.ts` (the resolution point).
+(the three routes), `src/services/extension/ctx.ts` (the resolution point).
 
 ---
 
@@ -383,9 +383,9 @@ an active cortex (`upsertCortex` in `src/services/cortex/upsert.ts`). Over MCP, 
 | `src/routes/extensions/actions.ts` (`extMemoryOwner`) | Sets the extension's namespace, `ext:${ext.name}` or `ext:${ext.name}.${instanceId}`, on `POST /v1/ext/...` |
 | `src/mcp/extensions.ts` (`extMemoryOwner`) | The same for `aimeat_extension_invoke` |
 | `src/routes/extensions/actions.ts` (`callerGaii`) | `resolveIdentity(req.auth!, config.nodeId)`, the value the script sees as `ctx.caller.gaii` |
-| `src/services/extension-ctx.ts` (`buildExtensionCtx`) | `ctx.memory.get/set/search/delete/getPublic` and `ctx.fetch` |
-| `src/services/extension-ctx-contract.ts` (`ExtensionCtx`) | The context contract a script is written against |
-| `src/services/extension-runtime.ts` (`transformScript`) | How an action script's `export default` is loaded |
+| `src/services/extension/ctx.ts` (`buildExtensionCtx`) | `ctx.memory.get/set/search/delete/getPublic` and `ctx.fetch` |
+| `src/services/extension/ctx-contract.ts` (`ExtensionCtx`) | The context contract a script is written against |
+| `src/services/extension/runtime.ts` (`transformScript`) | How an action script's `export default` is loaded |
 | `src/routes/memory/public-read.ts` (`registerPublicReadRoute`) | Public memory read route `GET /v1/memory/:gaii/:key` (no auth) |
 | `src/static/sdk-libs/data/index.js` (`get`, `getPublic`) | `AIMEAT.data.get()` with its creator fallback, and `AIMEAT.data.getPublic()` |
 | `src/services/cortex-lifecycle.ts` (`installCortex`, `activateCortex`) | Cortex install (expects the `libs` dict) and activate (no-op when already active) |

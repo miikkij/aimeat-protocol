@@ -10,6 +10,10 @@
  * @structure createOrganismHelpers(config, storage) → createOrganismGate(config, storage) + the Express forms
  * @usage const H = createOrganismHelpers(config, storage); const role = await H.memberRole(req, organism, id);
  * @version-history
+ *   2026-11-13 — requireOrgAdmin asks services/organism-read/manager.ts organismForManager, the read
+ *     and the rule the email invitation tools ask; refuseOrgAdmin is its refusal (structure programme
+ *     2026-11, unit 2b). The answers are unchanged. requireMember asks services/organism-read/member.ts,
+ *     the read and the membership rule the workspace MCP tools ask.
  *   2026-11-04 — The helpers that take no Express request or response moved unchanged to
  *     services/organism-gate.ts (createOrganismGate), which the MCP tools and the services import; this
  *     file keeps the Express forms and returns the same object as before (codebase analysis 2026-11-03,
@@ -23,7 +27,8 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { resolveIdentity } from '../../utils/gaii.js';
 import { organismArchiveOp } from '../../services/organism-archive-op.js';
 import { callerOf } from '../../middleware/caller.js';
-import { isOrganismOwner } from '../../services/organism-ownership.js';
+import { organismForManager } from '../../services/organism-read/manager.js';
+import { organismMemberGate } from '../../services/organism-read/member.js';
 import { createOrganismGate } from '../../services/organism-gate.js';
 
 // The pure rules every importer of ./shared.js reached, from where they live now.
@@ -57,14 +62,25 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
   /** Creator/admin gate shared by the email-invite management routes. */
   const requireOrgAdmin = async (req: Request, res: Response, id: string): Promise<OrganismRecord | null> => {
-    const callerGhii = req.auth!.owner as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
-    if (!isOrganismOwner(organism, callerGhii) && !organism.admins.includes(callerGhii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage invitations'));
-      return null;
-    }
-    return organism;
+    // The read and the owner-or-admin rule are services/organism-read/manager.ts, which the email
+    // invitation tools ask too.
+    const gate = await organismForManager(storage, id, { owner: req.auth!.owner as string });
+    if (!gate.ok) { refuseOrgAdmin(res, gate.code); return null; }
+    return gate.organism;
+  };
+  /** The organism and the caller's role in it, or the refusal sent: services/organism-read/member.ts,
+   *  which the workspace MCP tools ask too (denyReason). */
+  const requireMember = async (req: Request, res: Response, id: string): Promise<{ organism: OrganismRecord; role: string } | null> => {
+    const gate = await organismMemberGate(storage, id, req.auth!);
+    if (gate.ok) return { organism: gate.organism, role: gate.role };
+    if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+    return null;
+  };
+  /** requireOrgAdmin's refusal, for a route that asks a manager-gated service function itself. */
+  const refuseOrgAdmin = (res: Response, code: 'NOT_FOUND' | 'ACCESS_DENIED'): void => {
+    if (code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage invitations'));
   };
 
   const codeInviteGuards = [requireAuth(), requireExternalPrincipal(), requireScope('organism:invite')];
@@ -96,7 +112,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
   return {
     ...gate,
-    requireWsManager, requireOrgAdmin, codeInviteGuards, requireOrgMember,
+    requireWsManager, requireOrgAdmin, refuseOrgAdmin, requireMember, codeInviteGuards, requireOrgMember,
     archiveHandler,
   };
 }

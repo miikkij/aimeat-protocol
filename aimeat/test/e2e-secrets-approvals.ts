@@ -19,7 +19,7 @@
  *   the approval stops it. The address itself: PATCH /v1/secrets/:name (13, 14).
  *
  *   FIRST FAIL, measured 2026-10-21 on both backends: with the declared-host test in
- *   services/extension-secret-authority.ts accepting any host, 5 fails (delivered to the undeclared
+ *   services/extension/secret-authority.ts accepting any host, 5 fails (delivered to the undeclared
  *   host); with the foreign-extension check removed, 7 fails; with the approval lookup in
  *   services/owner-secrets.ts removed, 10 fails (the approved call is refused).
  *
@@ -40,7 +40,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
-import { keepExtensionFirstUseOnce, FIRST_USE_KEEP_KEY, FIRST_USE_KEEP_STEP_KEY } from '../src/services/extension-first-use-keep.js';
+import { keepExtensionFirstUseOnce, FIRST_USE_KEEP_KEY, FIRST_USE_KEEP_STEP_KEY } from '../src/services/extension/first-use-keep.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';

@@ -31,7 +31,7 @@ import { CompanyError, requireOwnCompany, resolveFrontPage, setFrontPage } from 
 import { pageAccessOf } from '../page-access.js';
 import { publishAskOf, fileAsk } from '../publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
-import { askedOf, type AppPublishAsked, type PageGate } from '../app-publish-gate.js';
+import { askedOf, type AppPublishAsked, type PageGate } from '../app/publish-gate.js';
 
 /** The one change a request about a company's front page makes. */
 export type CompanyChange =

@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-13 — aimeat_board_post takes ttl_hours, as POST /v1/boards/:boardId/posts does (unit 3b).
+ *   2026-11-13 — aimeat_storage_upload takes federate, as POST /v1/storage does (unit 3b).
  *   2026-11-13 — aimeat_action_execute takes callback_url, as POST /v1/work/request does (unit 3b).
  *   2026-11-13 — aimeat_admin_knowledge takes author, as GET /v1/admin/knowledge does (unit 3b).
  *   2026-11-09 — aimeat_admin_hooks says five gates and six moments that are only told, as HOOK_NAMES
@@ -270,6 +272,8 @@ export const discoveryWorkBoardsTools = [
             title: { type: 'string', required: true, description: 'Post title.' },
             body: { type: 'string', required: true, description: 'Post body.' },
             category: { type: 'string', description: 'Optional post category.' },
+            // As POST /v1/boards/:boardId/posts takes it on social:write (unit 3b).
+            ttl_hours: { type: 'number', description: "How many hours the post lives before it is removed. Without it the board's own default applies (168 hours, seven days, unless the board's rules say otherwise).", zod: z.number().positive() },
         },
     },
     {
@@ -358,6 +362,8 @@ export const discoveryWorkBoardsTools = [
             workspace_refs: { type: 'array', description: 'The workspaces the file is shared with, each "<organismId>/<workspaceId>" (required when visibility=workspace).', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             store: { type: 'string', description: 'Where the bytes are kept: "own:<name>" for one of your owner\'s own stores, "node:<name>" for one of the node\'s. aimeat_file_store_get lists the stores you may choose (`choices`). Omit for the default: your owner\'s default own store, else the node\'s.', zod: z.string().max(100) },
             direct: { type: 'boolean', description: 'For a large file (up to several GB): without data_base64, answer an upload_url in the file store itself (Azure Blob or S3), so the bytes never pass through the node. PUT the file there with the answered upload_headers, then POST complete_url; the file exists only after that. When the file would go to the node\'s database, the answer says direct: false and gives an ordinary upload_url.' },
+            // As POST /v1/storage takes it on storage:write (structure programme 2026-11, unit 3b).
+            federate: { type: 'boolean', description: 'Marks the file as one you would share with the nodes this node federates with. Today it is only a mark on the file record, shown in the answer to the upload: this node sends no file to another node. An inline upload (with data_base64) only, as on POST /v1/storage.' },
             ...aiProvenanceCatalogInput,
         },
     },

@@ -9,7 +9,7 @@
  *   the 800-line ceiling with these in it.
  *
  *   Each is a thin proxy to the REST route its MCP twin calls, which is the point: the draft edit
- *   exists once, in services/app-draft-edit.ts, and all three doors reach it the same way. Note that
+ *   exists once, in services/app/draft-edit.ts, and all three doors reach it the same way. Note that
  *   `content` here is PLAIN TEXT while aimeat_app_draft_save takes base64 — a caller composing HTML
  *   is not moving a file, and base64 would inflate every chunk by a third.
  * @structure appDraftEditTools — ConnectCliToolDefinition[]
@@ -26,7 +26,7 @@ import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.j
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
 import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
 
-/** What the draft changes (services/app-news.ts). Forwarded as given: an empty string clears it. */
+/** What the draft changes (services/app/news.ts). Forwarded as given: an empty string clears it. */
 export const DRAFT_NOTICE_PARAM = {
     type: 'string',
     description: 'One sentence, at most 280 characters, on what this draft changes. The app\'s builders see it on the app page; an empty string clears it.',

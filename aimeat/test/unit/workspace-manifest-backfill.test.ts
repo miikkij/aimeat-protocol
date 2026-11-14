@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-11-08 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { backfillManifestEnvelope } from '../../src/services/workspace-meta.js';
+import { backfillManifestEnvelope } from '../../src/services/workspace/meta.js';
 
 describe('backfillManifestEnvelope', () => {
     it('fills each space\'s defaults the way add_spaces does', () => {

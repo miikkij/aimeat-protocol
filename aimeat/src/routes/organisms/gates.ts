@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.3 — 2026-11-13 — POST /revert asks requireMember (services/organism-read/member.ts), the
+ *     organism read and the role aimeat_workspace_revert_to_draft asks; the answers are unchanged
+ *     (structure programme 2026-11, unit 2b).
  *   v1.7.2 — 2026-11-13 — POST /approvals takes approverRole from a caller not in person only through a
  *     manifest flow gate it names, else the default, as risk is floored for it (services/gate-policy.ts
  *     approverRoleFor; structure programme 2026-11, unit 7).
@@ -56,17 +59,17 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { shouldGate, gatePolicyFromManifest, approverRoleFor, DEFAULT_ALWAYS_GATE, type GatePolicy, type Risk } from '../../services/gate-policy.js';
-import { readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
+import { readWorkspaceMetaRecord } from '../../services/workspace/meta.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
-import { canReadWorkspace } from '../../services/workspace-access.js';
-import { readPublishSpace, resolveSpaceNamespace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
+import { canReadWorkspace } from '../../services/workspace/access.js';
+import { readPublishSpace, resolveSpaceNamespace, type UndeclaredSpaceRefusal } from '../../services/workspace/write-items.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
-import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace-suggestions.js';
+import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace/suggestions.js';
 import { logger } from '../../utils/logger.js';
 import { callerOf } from '../../middleware/caller.js';
-import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace-tool-ops.js';
+import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace/tool-ops.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { fencedSpaceRefusal } from '../../services/fenced-space.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
@@ -87,14 +90,14 @@ function mergeWorkspaceGatePolicy(org: GatePolicy, ws: GatePolicy): GatePolicy {
 }
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
+  const { memberRole, requireMember, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
   /** The session as the suggestion service takes it: its full identity, owner and roles. */
   const suggestionCaller = (req: Request) => ({
     principal: resolveIdentity(req.auth!, config.nodeId), owner: (req.auth!.owner as string) ?? '', roles: req.auth!.roles ?? [],
     // The fenced-space rule reads the session's scopes when an approval writes the manifest.
     scopes: req.auth!.scopes ?? [],
   });
-  /** The shared UNDECLARED_SPACE refusal (services/workspace-write-items.ts), sent as it comes. */
+  /** The shared UNDECLARED_SPACE refusal (services/workspace/write-items.ts), sent as it comes. */
   const sendRefusal = (res: Response, r: UndeclaredSpaceRefusal): void => {
     res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details));
   };
@@ -232,7 +235,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     await expireOverdueApprovals(storage, new Date().toISOString());
     const status = req.query.status as string | undefined;
     // A member's suggestion carries the structure it would add to a workspace, so it is listed only
-    // to someone who may read that workspace, or who made it (services/workspace-suggestions.ts).
+    // to someone who may read that workspace, or who made it (services/workspace/suggestions.ts).
     const approvals = await visibleApprovals({ storage, config }, suggestionCaller(req), id,
       await storage.listPendingApprovals(id, status ? { status } : undefined));
     res.json(success(config.nodeId, { approvals, total: approvals.length }));
@@ -356,7 +359,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // so when it's enabled this batch path is refused (use POST /v1/organisms/:id/publish one at a time).
   // Body: { ws?, namespace, instances: [] | records: [], expected_versions?: { <instance>: <version> },
   // create_only?, dry_run? }. The body of the operation is publishRecordsBatchOp
-  // (services/workspace-tool-ops.ts), which ctx.workspace.publishRecords runs too.
+  // (services/workspace/tool-ops.ts), which ctx.workspace.publishRecords runs too.
   // A17 (E2E test-quality audit). `requireAuth()` alone here meant the batch door asked less than the
   // single-record door it amortises, and less than the memory door the records land in — so an app
   // grant carrying any one scope could publish a workspace's records in bulk. organism:write is the
@@ -395,16 +398,11 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // Same write access as publish; not gated (creating a private draft is not a publish).
   router.post('/v1/organisms/:id/revert', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
-    }
-    const role = await memberRole(req, organism, id);
-    if (!role) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
-      return;
-    }
+    // The organism and the caller's role: services/organism-read/member.ts, which
+    // aimeat_workspace_revert_to_draft asks too.
+    const member = await requireMember(req, res, id);
+    if (!member) return;
+    const { organism, role } = member;
     const { namespace: given, id: instance, ws } = req.body ?? {};
     const wsId = typeof ws === 'string' ? ws : undefined;
     if (!given || typeof given !== 'string' || !instance || typeof instance !== 'string') {

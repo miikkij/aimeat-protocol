@@ -43,7 +43,7 @@ import { readsAsOwner } from '../services/owner-scope-read.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate,
   type ProposeTemplateInput,
-} from '../services/app-template-proposals.js';
+} from '../services/app/template-proposals.js';
 import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 import { templateSourceApp } from '../services/appdev/template-source.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

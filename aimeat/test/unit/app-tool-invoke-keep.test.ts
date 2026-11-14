@@ -2,7 +2,7 @@
  * @file test/unit/app-tool-invoke-keep.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The once-only step services/app-tool-invoke-keep.ts and the gate routes/webmcp-invoke-gate.ts
+ * @description The once-only step services/app/tool-invoke-keep.ts and the gate routes/webmcp-invoke-gate.ts
  *   (secaudit 2026-10, v72), on a real store:
  *   - the step lists an agent or an approved ecosystem app that called app tools (the `apptool` usage
  *     surface) before it, without exchange:write; and leaves alone one that never called them, one that
@@ -24,7 +24,7 @@ import type { UsageCallRecord } from '../../src/storage/types/usage.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
-import { keepAppToolInvokeOnce, appToolInvokeKept, APP_TOOL_INVOKE_KEEP_KEY } from '../../src/services/app-tool-invoke-keep.js';
+import { keepAppToolInvokeOnce, appToolInvokeKept, APP_TOOL_INVOKE_KEEP_KEY } from '../../src/services/app/tool-invoke-keep.js';
 import { refuseAppToolInvokeWithoutWord } from '../../src/routes/webmcp-invoke-gate.js';
 
 const NODE_ID = 'keep-node';

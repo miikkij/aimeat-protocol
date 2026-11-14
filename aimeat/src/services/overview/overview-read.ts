@@ -37,7 +37,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AgentRecord } from '../../storage/types/identity.js';
 import { listConnectors, wantedInstalls } from '../connector-registry.js';
 import { readAgentTies, readTieChoices } from '../agent/ties.js';
-import { resolveAppUrls } from '../app-urls.js';
+import { resolveAppUrls } from '../app/urls.js';
 import { logger } from '../../utils/logger.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { loadOwnerAgents } from '../db/owner-identity.js';

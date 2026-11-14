@@ -39,7 +39,7 @@ import {
 import { encrypt, decrypt, getEncryptionKey } from '../../src/services/encryption.js';
 import type { SecretRecord } from '../../src/storage/types/secrets.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
+import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
 import { loadConfig } from '../../src/config.js';
 
 const KEY_HEX = '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20';

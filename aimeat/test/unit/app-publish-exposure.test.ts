@@ -2,14 +2,14 @@
  * @file app-publish-exposure.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description How exposed a published version is (services/app-publish-exposure.ts): an update
+ * @description How exposed a published version is (services/app/publish-exposure.ts): an update
  *   carries the live version's state whatever the node's defaults say; a first publish takes them.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-publish-exposure.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V2.4).
  */
 import { describe, it, expect } from 'vitest';
-import { publishExposure, generateAccessCode } from '../../src/services/app-publish-exposure.js';
+import { publishExposure, generateAccessCode } from '../../src/services/app/publish-exposure.js';
 import type { AppRecord } from '../../src/storage/interface.js';
 
 const strict = { appDefaultListing: 'unlisted' as const, appDefaultAccess: 'signed-in' as const, appDefaultAccessCode: true };

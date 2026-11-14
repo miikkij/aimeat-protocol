@@ -119,11 +119,11 @@ import { authorizeRead } from './access-guard.js';
 import { ecoMayReadKey } from './ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from './schema-validator.js';
 import { validateArchiveTarget } from './organism-archive-op.js';
-import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from './workspace-roles.js';
-import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from './workspace-versions.js';
-import { readPublishSpace, type UndeclaredSpaceRefusal } from './workspace-write-items.js';
-import { readWorkspaceMetaRecord, workspaceMetaReader, workspaceRegistrations } from './workspace-meta.js';
-import { createPublicCollectors } from './workspace-public-collectors.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from './workspace/roles.js';
+import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from './workspace/versions.js';
+import { readPublishSpace, type UndeclaredSpaceRefusal } from './workspace/write-items.js';
+import { readWorkspaceMetaRecord, workspaceMetaReader, workspaceRegistrations } from './workspace/meta.js';
+import { createPublicCollectors } from './workspace/public-collectors.js';
 import { logger } from '../utils/logger.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 
@@ -131,7 +131,7 @@ import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRe
 
 // The share shapes live in routes/organisms/share-types.ts (a type-only import).
 import type { ResolvedShare } from '../routes/organisms/share-types.js';
-import { readShareMetaOf, redactShareOf, memberRoleOf } from './workspace-share.js';
+import { readShareMetaOf, redactShareOf, memberRoleOf } from './workspace/share.js';
 import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { holderLivingStatus } from './living/config-publish.js';
@@ -152,7 +152,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
   // ── Gate primitive helpers ──
 
   // Active membership keyed by bare owner name (or org agent) — returns { role } or null. The rule is
-  // services/workspace-share.ts memberRoleOf, which the share MCP tool asks too.
+  // services/workspace/share.ts memberRoleOf, which the share MCP tool asks too.
   const memberRole = (req: { auth?: VerifiedToken }, organism: { agentGaiis: string[] }, id: string): Promise<string | null> =>
     memberRoleOf(storage, organism, id, { sub: req.auth!.sub, owner: req.auth!.owner });
 
@@ -345,7 +345,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
   // read for the whole batch) and the writes/deletes are committed together (ONE bulkSetMemory + ONE
   // bulkDeleteMemory), instead of the per-record scan + individual setMemory/deleteMemory pipeline that a
   // 520-record CADENCE import ran as ~11k separate operations. Auth (membership, meta.* role, archive,
-  // publish gate) is publishRecordsBatchOp's (services/workspace-tool-ops.ts), which the batch route
+  // publish gate) is publishRecordsBatchOp's (services/workspace/tool-ops.ts), which the batch route
   // and ctx.workspace.publishRecords both call; this is the data operation.
   const publishDraftsBatch = async (
     organismId: string, ws: string | undefined, namespace: string, instances: string[], publisher: string,
@@ -550,7 +550,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
   const bareOwner = (gaii: string) => localAccountName(gaii);
 
   /** Find a workspace's registry entry across every member's registry (one key per owner): the copy
-   *  that counts (services/workspace-meta-read.ts workspaceRegistrations), never the first in store
+   *  that counts (services/workspace/meta-read.ts workspaceRegistrations), never the first in store
    *  order, which let a since-demoted admin's copy name its writer the creator (secaudit2026oct26). */
   const findWsEntry = async (id: string, ws: string): Promise<{ id: string; name?: string; createdBy?: string; createdAt?: string; ownerGaii: string } | null> => {
     const reg = (await workspaceRegistrations(storage, id, { archived: 'exclude' })).get(ws);
@@ -650,7 +650,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     await storage.createConsent({ id: uuidv4(), ownerGaii, dataPattern, recipient, purpose, scope: 'local', expires: null, status: 'active', grantedAt: now, revokedAt: null });
   };
 
-  // Workspace member roles delegate to the ONE shared service (services/workspace-roles.ts) so the REST
+  // Workspace member roles delegate to the ONE shared service (services/workspace/roles.ts) so the REST
   // routes, the MCP tools, and the invitation-accept path share a single authority path (no parallel
   // ad-hoc mechanism). These thin wrappers keep the route-local call sites terse.
   /** Set a member's role, stamping provenance (source + grantedBy) for the members listing. */
@@ -664,8 +664,8 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
 
   // ── Document-space public sharing (meta.share) ──
 
-  // The copy that counts (services/workspace-meta.ts), so a member's own copy shares nothing. Read,
-  // shown and set in services/workspace-share.ts, which the share MCP tool runs too.
+  // The copy that counts (services/workspace/meta.ts), so a member's own copy shares nothing. Read,
+  // shown and set in services/workspace/share.ts, which the share MCP tool runs too.
   const readShareMeta = (id: string, ws: string): Promise<ResolvedShare> => readShareMetaOf(storage, config, id, ws);
 
   /** The share state as the API is allowed to show it — the password hash and the feed key's hash NEVER leave the server. */

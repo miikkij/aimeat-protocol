@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The attribute text of every `<script ...>` or `<link ...>` tag in an HTML document,
- *   read in one linear pass. The publish-time asset scan (services/app-artifact-lint.ts) runs on the
+ *   read in one linear pass. The publish-time asset scan (services/app/artifact-lint.ts) runs on the
  *   node's event loop before the write, on HTML an uploader chose. The patterns it used ran `[^>]*`
  *   from each opener, and an opener with no `>` after it cost a scan to the end of the text, so k such
  *   openers cost k times the size of the upload (secaudit2026oct26,

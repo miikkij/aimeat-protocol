@@ -24,7 +24,7 @@
  *     waiting on, and an expiry nobody hears of reads as an admin who never answered.
  */
 import type { Storage, PendingApprovalRecord } from '../storage/interface.js';
-import { isMemberChangeAction, noticeRequester } from './workspace-suggestion-notices.js';
+import { isMemberChangeAction, noticeRequester } from './workspace/suggestion-notices.js';
 
 export function isOverdue(a: PendingApprovalRecord, nowIso: string): boolean {
   return a.status === 'pending' && !!a.deadline && a.deadline < nowIso;

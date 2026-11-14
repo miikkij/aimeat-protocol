@@ -22,10 +22,10 @@ import { randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../../src/storage/interface.js';
 import { claimOnceOnlyStep, ruleSinceKey } from '../../src/services/once-only-step.js';
-import { keepExtensionFirstUseOnce, FIRST_USE_KEEP_STEP_KEY } from '../../src/services/extension-first-use-keep.js';
-import { keepExtensionPublishOnce, PUBLISH_KEEP_STEP_KEY } from '../../src/services/extension-publish-keep.js';
+import { keepExtensionFirstUseOnce, FIRST_USE_KEEP_STEP_KEY } from '../../src/services/extension/first-use-keep.js';
+import { keepExtensionPublishOnce, PUBLISH_KEEP_STEP_KEY } from '../../src/services/extension/publish-keep.js';
 import { keepAiScheduleReadsOnce, AI_SCHEDULE_READ_KEEP_KEY } from '../../src/services/schedule-ai-read.js';
-import { keepAppToolInvokeOnce, APP_TOOL_INVOKE_KEEP_KEY } from '../../src/services/app-tool-invoke-keep.js';
+import { keepAppToolInvokeOnce, APP_TOOL_INVOKE_KEEP_KEY } from '../../src/services/app/tool-invoke-keep.js';
 
 const NODE_ID = 'aimeat-late-rerun';
 const SYSTEM = `system@${NODE_ID}`;

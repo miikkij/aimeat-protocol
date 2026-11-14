@@ -2,7 +2,7 @@
  * @file app-marks.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Unit: the two request shapes of services/app-marks.ts, and what the serve-time
+ * @description Unit: the two request shapes of services/app/marks.ts, and what the serve-time
  *   pass does with a named reviewer — the head tags, the visible label re-decided under editorial
  *   responsibility, the two reasons the declaration must NOT reach, and the badge and install
  *   switches. The E2E suite (test/e2e-app-marks.ts) proves the route and the log; this file proves
@@ -13,11 +13,11 @@
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { applyServeMarks } from '../../src/services/app-serve-marks.js';
+import { applyServeMarks } from '../../src/services/app/serve-marks.js';
 import { applyAppHeadMeta } from '../../src/utils/app-head-meta.js';
 import {
   parseMarksInput, parseAuthorInput, appBadgeOn, appInstallChipOn, appReviewedBy, AUTHOR_NAME_MAX,
-} from '../../src/services/app-marks.js';
+} from '../../src/services/app/marks.js';
 import { buildDisclosure } from '../../src/services/ai/provenance.js';
 import { SERVE_MARK_CASES, FIXTURE_CONFIG, provFixture } from './serve-marks-fixtures.js';
 import type { AppManifest } from '../../src/storage/types/apps.js';

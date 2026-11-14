@@ -11,7 +11,7 @@
  *       grants the inviter chose;
  *     - a NODE invitation (organismId null — the agent door, 12-ai-rekisteroi.md) stops at the
  *       account and sends the person to their home;
- *     - an APP invitation (type 'app', services/app-invite-link.ts) makes the person a member of
+ *     - an APP invitation (type 'app', services/app/invite-link.ts) makes the person a member of
  *       the app in the invited role and sends them back to the app. It answers only while the app
  *       invitation it was sent for is open, checked before any account is made.
  *
@@ -88,8 +88,8 @@ import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, regi
 import { newPasswordRefusal } from '../services/sign-in-policy.js';
 import { establishOwnerSession } from '../services/owner-session.js';
 import { hashInviteToken, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget } from '../services/invitations.js';
-import { appInviteMeta, type AppInviteMeta } from '../services/app-invite-link.js';
-import { findInvite, applyAppInvitesForVerifiedEmail } from '../services/app-member-invites.js';
+import { appInviteMeta, type AppInviteMeta } from '../services/app/invite-link.js';
+import { findInvite, applyAppInvitesForVerifiedEmail } from '../services/app/member-invites.js';
 import { startRegistrationEmailVerification } from '../services/email-verification-start.js';
 import { createEmailService } from '../services/email.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';

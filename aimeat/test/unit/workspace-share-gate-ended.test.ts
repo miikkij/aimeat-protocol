@@ -11,8 +11,8 @@
  *   2026-11-01 — Initial (secaudit2026oct31w2 round 12, workspace-share-gate.ts openTargets ended-until).
  */
 import { describe, expect, it } from 'vitest';
-import { newlyOpened, openTargets, withholdOpening } from '../../src/services/workspace-share-gate.js';
-import { isDocPublicAt } from '../../src/services/workspace-share.js';
+import { newlyOpened, openTargets, withholdOpening } from '../../src/services/workspace/share-gate.js';
+import { isDocPublicAt } from '../../src/services/workspace/share.js';
 import type { ResolvedShare } from '../../src/routes/organisms/share-types.js';
 
 const NOW = Date.parse('2026-11-01T12:00:00Z');

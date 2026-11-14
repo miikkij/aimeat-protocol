@@ -71,7 +71,7 @@ describe('consent vocabulary over the real en.json', () => {
   it('has a localized sentence and a family name for EVERY app-grantable scope', () => {
     // The vocabulary moved out of the route when that file passed 800 lines, and to services/ on
     // 2026-11-04 (codebase analysis D-d); it is the same list.
-    const route = read('../../src/services/app-grant-vocabulary.ts');
+    const route = read('../../src/services/app/grant-vocabulary.ts');
     const block = route.match(/APP_GRANTABLE_SCOPES: Record<string, string> = \{([\s\S]*?)\n\};/);
     expect(block, 'APP_GRANTABLE_SCOPES not found — update this parser with the route').toBeTruthy();
     const scopes = [...block![1].matchAll(/'([a-z-]+:[a-z-]+)':/g)].map((m) => m[1]);

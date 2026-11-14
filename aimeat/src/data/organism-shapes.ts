@@ -10,7 +10,7 @@
  *   ONE SOURCE. The project shape is the "project" template the organism pages applied by writing
  *   the manifest and the schemas straight into memory (public/js/services/organisms.workspace-gen.js);
  *   it lives here now, and the page reads it from GET /v1/organisms/shapes and applies it through the
- *   workspace routes, which go through services/workspace-provision.ts and workspace-meta.ts.
+ *   workspace routes, which go through services/workspace/provision.ts and workspace-meta.ts.
  *
  *   The names are in the three languages the node ships, so a shape creates a workspace the person
  *   reads in their own language. A shape is a start, not a rule: every space can be renamed, added
@@ -188,7 +188,7 @@ function readmeFor(name: string, purpose: string, lang: string): string {
     return `# ${name}\n\n${purpose}\n\n## ${pick(current, lang)}\n\n${pick(note, lang)}\n`;
 }
 
-/** What services/workspace-provision.ts takes for one workspace of a shape. */
+/** What services/workspace/provision.ts takes for one workspace of a shape. */
 export function shapeWorkspaceInput(shape: OrganismShape, index: number, lang: string) {
     const ws = shape.workspaces[index];
     const name = pick(ws.name, lang);

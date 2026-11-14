@@ -10,6 +10,7 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-13 -- aimeat_knowledge_links forwards relation (unit 3b).
  *   2026-11-13 -- aimeat_group_create forwards default_permissions (unit 3b).
  *   2026-11-13 -- aimeat_memory_list forwards archived as ?archived=only or ?include_archived=true (unit 3b).
  *   2026-11-13 -- aimeat_consent_list forwards recipient (unit 3b).
@@ -817,6 +818,6 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_knowledge_links',
-        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'package_id'))}/links${query({ direction: optionalString(input, 'direction') })}`),
+        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'package_id'))}/links${query({ direction: optionalString(input, 'direction'), relation: optionalString(input, 'relation') })}`),
     },
 ];

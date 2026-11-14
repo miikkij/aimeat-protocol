@@ -58,7 +58,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord, MemoryRecord } from '../storage/interface.js';
 import { isFreedRelease } from '../storage/types/component-versions.js';
 import { dependentsOf } from './dependency-map.js';
-import { resolveAppOriginTarget } from './app-origin-target.js';
+import { resolveAppOriginTarget } from './app/origin-target.js';
 import { fileAsk, accountGhii } from './publish-requests/ask.js';
 import { readPublishRequest, effectiveState } from './publish-requests/store.js';
 import { askerKind } from './approval-standard.js';

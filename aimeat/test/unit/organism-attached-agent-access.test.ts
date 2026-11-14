@@ -33,8 +33,8 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { checkOrganismNamespaceAccess } from '../../src/services/organism-namespace-access.js';
 import { attachedAsParticipant, agentBarred } from '../../src/services/organism-agent-access.js';
-import { workspaceCallerOf, writeWorkspaceDraftsOp } from '../../src/services/workspace-tool-ops.js';
-import { buildExtensionWorkspace } from '../../src/services/extension-workspace.js';
+import { workspaceCallerOf, writeWorkspaceDraftsOp } from '../../src/services/workspace/tool-ops.js';
+import { buildExtensionWorkspace } from '../../src/services/extension/workspace.js';
 import { attachOrganismAgent, detachOrganismAgent, AgentListError } from '../../src/services/organism-agents/attach.js';
 
 const ORG = '7c2d9e41-3a5b-4c6d-8e7f-90a1b2c3d4e5';

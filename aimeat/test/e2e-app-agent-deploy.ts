@@ -295,7 +295,7 @@ async function main() {
 
     await test('owner2 deploying owner1\'s public app lands on owner2\'s OWN fleet (never the author\'s)', async () => {
         // owner2 has no crew-forge yet → since 2026-10-01 the deploy becomes an agent proposal on
-        // owner2's OWN open items (services/app-agent-propose.ts), never anything of owner1's. It
+        // owner2's OWN open items (services/app/agent-propose.ts), never anything of owner1's. It
         // answered 404 RUNNER_NOT_FOUND before, which is what every new account met: crew-forge left
         // the basic agents on 2026-09-02. The source changed on purpose; the cross-owner guard holds.
         const r1 = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/deploy`, {

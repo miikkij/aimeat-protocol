@@ -64,7 +64,7 @@
  */
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, MemoryRecord, OrganismRecord } from '../../../storage/interface.js';
-import { canReadWorkspace } from '../../workspace-access.js';
+import { canReadWorkspace } from '../../workspace/access.js';
 import { memoryTarget } from '../../classification/labels.js';
 import { organismKeysCarried } from '../../group-shares-classification.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
@@ -73,7 +73,7 @@ import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullO
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 import { ownerScopeView, readsAsOwner } from '../../owner-scope-read.js';
 import { organismReadableRecords } from '../../organism-namespace-access.js';
-import { readWorkspaceManifest } from '../../workspace-meta.js';
+import { readWorkspaceManifest } from '../../workspace/meta.js';
 import { shownMemoryValue } from '../../secret-records.js';
 import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';
 import type { DiscoveryPlace } from '../types.js';

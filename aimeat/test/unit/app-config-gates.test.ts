@@ -1,6 +1,6 @@
 /**
  * @file test/unit/app-config-gates.test.ts
- * @description An app's config read applies the app's own gates (services/app-config.ts, secaudit
+ * @description An app's config read applies the app's own gates (services/app/config.ts, secaudit
  *   2026-10, APP-6): an app an operator hid is not found except for its owner and operators, and an
  *   access-coded app's workspace ids need the code or the owner. The values stay readable.
  * @version-history
@@ -8,8 +8,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Storage } from '../../src/storage/interface.js';
-import { getAppConfig } from '../../src/services/app-config.js';
-import { appWorkspacesKey } from '../../src/services/app-workspaces.js';
+import { getAppConfig } from '../../src/services/app/config.js';
+import { appWorkspacesKey } from '../../src/services/app/workspaces.js';
 
 const OWNER_GHII = 'alice@test-node';
 const LINK = { organism_id: 'org-1', workspace_id: 'ws-secret' };

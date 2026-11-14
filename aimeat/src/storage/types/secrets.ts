@@ -11,7 +11,7 @@
  *   in it is readable by whoever holds the right to read that namespace: `memory:read` on an agent,
  *   an app grant, a key-space share, an export. A credential must be readable by NOBODY, including
  *   its owner, and a namespace whose whole contract is "the owner can read this back" cannot
- *   express that. The extension config already stored secrets this way (services/extension-secrets.ts)
+ *   express that. The extension config already stored secrets this way (services/extension/secrets.ts)
  *   and proved the shape; what it could not express is a secret belonging to the PERSON rather than
  *   to one installed extension, which is what makes the same vault work across every extension,
  *   every instance, and whatever comes next.

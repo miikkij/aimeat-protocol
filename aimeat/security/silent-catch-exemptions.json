@@ -177,7 +177,7 @@
       "count": 2,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/app-frame-redirect.ts": {
+    "src/services/app/frame-redirect.ts": {
       "count": 2,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
@@ -213,7 +213,7 @@
       "count": 2,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/extension-secrets.ts": {
+    "src/services/extension/secrets.ts": {
       "count": 2,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
@@ -573,15 +573,15 @@
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/app-artifact-lint.ts": {
+    "src/services/app/artifact-lint.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/app-config.ts": {
+    "src/services/app/config.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/app-urls.ts": {
+    "src/services/app/urls.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
@@ -649,11 +649,11 @@
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/extension-fetch-decode.ts": {
+    "src/services/extension/fetch-decode.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/extension-notify.ts": {
+    "src/services/extension/notify.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
@@ -749,7 +749,7 @@
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/workspace-tool-ops.ts": {
+    "src/services/workspace/tool-ops.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },

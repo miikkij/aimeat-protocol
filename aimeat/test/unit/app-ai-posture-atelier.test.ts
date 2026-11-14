@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { lintAppAiDisclosure } from '../../src/services/app-ai-posture.js';
+import { lintAppAiDisclosure } from '../../src/services/app/ai-posture.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REAL_SOURCE = join(HERE, '..', 'fixtures', 'apps', 'design-book.happydude500001.html');

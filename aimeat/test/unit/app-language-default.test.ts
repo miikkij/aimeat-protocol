@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { oneLanguageFindings } from '../../src/services/app-language-default.js';
+import { oneLanguageFindings } from '../../src/services/app/language-default.js';
 
 const head = (locales: string | null) => `<html><head>${locales === null ? '' : `<meta name="aimeat-locales" content="${locales}" />`}</head><body></body></html>`;
 

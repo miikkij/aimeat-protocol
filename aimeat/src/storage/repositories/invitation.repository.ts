@@ -49,7 +49,7 @@ export interface InvitationRecord {
    * 'link' = magic-link self-register (default); 'code' = account provisioned at mint, code is its
    * password; 'registration' = the agent door (12-ai-rekisteroi.md) — no organism, no inviter, and
    * the "inviter" is an AI that supplied only an email address; 'app' = the sign-up link of an app
-   * invitation (services/app-invite-link.ts), no organism, the app named in `meta`.
+   * invitation (services/app/invite-link.ts), no organism, the app named in `meta`.
    */
   type: 'link' | 'code' | 'registration' | 'app';
   workspaces: InvitationWorkspaceGrant[]; // per-workspace roles to grant on accept

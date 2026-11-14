@@ -8,9 +8,9 @@
  * @structure
  *   - CanonicalOwner — authenticated-caller → owner resolver closure type
  *   - AppTargetFor / appTargetOr — whose bucket this act lands in, or the refusal to send
- *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL; re-exported from services/app-urls.ts
+ *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL; re-exported from services/app/urls.ts
  *   - withForwardedQuery() — the request's query on the redirect target, minus the apex-only parameters
- *   - resolveAppUrls() — READ-ONLY, re-exported from services/app-urls.ts
+ *   - resolveAppUrls() — READ-ONLY, re-exported from services/app/urls.ts
  * @version-history
  *   2026-11-13 — appOriginUrl moved unchanged to services/app-urls.ts and is re-exported here, so the
  *     draft preview service no longer imports a route file (structure programme 2026-11, unit 4).
@@ -35,12 +35,12 @@
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { AppDevAct, DelegatedDev } from '../../services/app-dev-grant.js';
+import type { AppDevAct, DelegatedDev } from '../../services/app/dev-grant.js';
 import { error } from '../../middleware/envelope.js';
 
-// appOriginUrl and its read-only sibling resolveAppUrls live in services/app-urls.ts, so a service
+// appOriginUrl and its read-only sibling resolveAppUrls live in services/app/urls.ts, so a service
 // can build or read an app's address; re-exported for every importer of this file.
-export { appOriginUrl, resolveAppUrls } from '../../services/app-urls.js';
+export { appOriginUrl, resolveAppUrls } from '../../services/app/urls.js';
 
 /**
  * The canonical-owner resolver closure built in appsRouter and passed to each route

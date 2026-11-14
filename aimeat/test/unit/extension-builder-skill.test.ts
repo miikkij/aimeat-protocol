@@ -8,7 +8,7 @@
  *   WHY. The skill existed only as an operator-published copy on aimeat.io, so no other node had it,
  *   and that copy priced an action with `commercial.payMorsels`. Three repository guides taught
  *   `ctx.api`, `ctx.task` and `ctx.log()` as a function, none of which the sandbox has. The ctx
- *   members are read from services/extension-ctx-contract.ts (the ExtensionCtx interface) plus the
+ *   members are read from services/extension/ctx-contract.ts (the ExtensionCtx interface) plus the
  *   two pure helpers the guest prelude adds, `hash` and `now`.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-builder-skill.test.ts
  * @version-history
@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BUILTIN_SKILLS } from '../../src/data/builtin-skills.js';
 
-const CONTRACT = readFileSync(join(import.meta.dirname, '../../src/services/extension-ctx-contract.ts'), 'utf-8');
+const CONTRACT = readFileSync(join(import.meta.dirname, '../../src/services/extension/ctx-contract.ts'), 'utf-8');
 
 /** The top-level members of ExtensionCtx, as declared at four-space indent inside the interface. */
 function ctxMembers(): Set<string> {

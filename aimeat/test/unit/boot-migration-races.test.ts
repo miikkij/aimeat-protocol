@@ -31,7 +31,7 @@ import { migrateToolScopeWordsOnce } from '../../src/services/tool-scope-words-m
 import { migrateOperatorAdminOnce } from '../../src/services/operator-admin-migration.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../../src/services/task-start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../../src/services/openrouter-settings-migration.js';
-import { migrateAppToolsKeysOnce } from '../../src/services/app-tools-key.js';
+import { migrateAppToolsKeysOnce } from '../../src/services/app/tools-key.js';
 import { noticeFailingComponents } from '../../src/services/design-book/component-notice.js';
 import { partKey } from '../../src/services/design-book/service.js';
 import { IMPLICIT_FREE_MODEL } from '../../src/services/ai/model-defaults.js';

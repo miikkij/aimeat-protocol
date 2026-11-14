@@ -14,7 +14,7 @@ import { renderMarkdownLite } from '../../src/utils/markdown-lite.js';
 import {
   parseLegalInput, appLegalState, legalReadiness, renderLegalPage, legalLinksFor, stripLegalContent,
   LEGAL_CONTENT_MAX,
-} from '../../src/services/app-legal.js';
+} from '../../src/services/app/legal.js';
 import { applyAppHeadMeta } from '../../src/utils/app-head-meta.js';
 import type { AppRecord, AppManifest } from '../../src/storage/types/apps.js';
 

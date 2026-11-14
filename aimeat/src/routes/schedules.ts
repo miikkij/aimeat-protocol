@@ -99,7 +99,7 @@ import { buildGAII, resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
-import { isManifestDeclaredJob } from '../services/extension-schedules.js';
+import { isManifestDeclaredJob } from '../services/extension/schedules.js';
 import { nodeTimeZone } from '../services/display-prefs.js';
 import { schedulePromptOf } from '../services/schedule-prompt.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';

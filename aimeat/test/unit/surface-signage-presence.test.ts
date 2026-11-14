@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { blockById, blocksForSurface, defaultLayout } from '../../src/services/surface-layout/registry.js';
-import { servedBadgeOn } from '../../src/services/app-marks.js';
+import { servedBadgeOn } from '../../src/services/app/marks.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 function configWith(signageEnabled: boolean): AimeatConfig {

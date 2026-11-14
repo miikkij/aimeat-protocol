@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
-import { workspaceRegistrations } from './workspace-meta-read.js';
+import { workspaceRegistrations } from './workspace/meta-read.js';
 
 /** The record under `system@<nodeId>` that says the step has run. */
 export const SHARE_SEARCH_REINDEX_KEY = 'migrations.secaudit2026oct22.share-search-reindex';

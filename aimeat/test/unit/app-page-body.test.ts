@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-11-06 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { applyServeMarks } from '../../src/services/app-serve-marks.js';
+import { applyServeMarks } from '../../src/services/app/serve-marks.js';
 import { appPageBodySnippet } from '../../src/utils/app-page-body.js';
 
 const BODY = { name: 'Noste', description: 'Laskee nostovoiman ja näyttää kuorman.', lang: 'fi' };

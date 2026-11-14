@@ -21,8 +21,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
-import type { ExtensionCtx } from '../../src/services/extension-runtime.js';
+import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
+import type { ExtensionCtx } from '../../src/services/extension/runtime.js';
 import { loadConfig } from '../../src/config.js';
 
 const EXT_OWNER = 'ext:shop';

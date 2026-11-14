@@ -283,7 +283,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
             `an undeclared track must stay absent, got ${JSON.stringify(row?.manifest?.track)}`);
     });
 
-    // ── A build that left the Atelier track (services/app-track-drift.ts, 2026-09-19) ──
+    // ── A build that left the Atelier track (services/app/track-drift.ts, 2026-09-19) ──
     const drift = (r: any) => ((r.body.data.app_hints ?? []) as any[]).filter(h => h.pitfall === 'track-drift');
     const driftName = `gatedrift${Date.now()}.html`;
 

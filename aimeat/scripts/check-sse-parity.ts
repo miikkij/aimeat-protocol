@@ -178,8 +178,8 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/appdev-proofs.ts': "services/contribution-proofs.ts, which writes through "
         + "services/memory-write.ts and emits 'memory' there. No REST twin exists for this one: the "
         + 'proof is attached from the appdev tool surface only.',
-    'src/mcp/apps.ts': "services/app-publish.ts and services/app-lifecycle.ts, both emitting 'apps'",
-    'src/mcp/seo.ts': "services/app-seo.ts, whose applyOwnerSeoUpdate() emits 'apps' right after "
+    'src/mcp/apps.ts': "services/app/publish.ts and services/app/lifecycle.ts, both emitting 'apps'",
+    'src/mcp/seo.ts': "services/app/seo.ts, whose applyOwnerSeoUpdate() emits 'apps' right after "
         + 'the write. The catalogue card carries the search-visibility state, so the views watching '
         + "that domain are the ones that change, and they change for everyone who can see the app "
         + 'rather than only for the caller. The REST twin (PATCH /v1/apps/:filename) reaches the '
@@ -197,7 +197,7 @@ const DELEGATES: Record<string, string> = {
         + 'that route is a door onto the same function. Verified by reading the emit out of the '
         + 'service rather than trusting the delegation.',
     'src/mcp/cortex.ts': "services/cortex-lifecycle.ts, which emits 'cortex'",
-    'src/mcp/extensions.ts': "services/extension-lifecycle.ts, which emits 'extensions'",
+    'src/mcp/extensions.ts': "services/extension/lifecycle.ts, which emits 'extensions'",
     'src/mcp/knowledge.ts': "services/knowledge-package-entry.ts, which emits 'knowledge'",
     'src/mcp/organisms-name-invites.ts': "services/invitations.ts, which emits 'organisms' and 'notifications'",
     'src/mcp/sharing-groups.ts': "services/sharing-group-members.ts, which emits 'groups'",

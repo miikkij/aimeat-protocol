@@ -10,7 +10,7 @@
  *   Attribution is by the entitlement's `appId`; the caller only ever sees entitlements whose consumer is
  *   their own owner (strictly cross-owner, per resolveIdentity).
  *
- *   The view is built by appCostView() in services/app-cost.ts, which the MCP tool calls too; this
+ *   The view is built by appCostView() in services/app/cost.ts, which the MCP tool calls too; this
  *   file holds the auth and the envelope.
  *
  *   LLM-usage attribution (ledger) is intentionally out of scope for slice-1: the usage ledger has no
@@ -34,7 +34,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { appCostView } from '../services/app-cost.js';
+import { appCostView } from '../services/app/cost.js';
 
 export function appsCostRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

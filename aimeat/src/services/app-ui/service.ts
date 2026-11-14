@@ -27,7 +27,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { resolveAppOwnerScope } from '../app-owner-scope.js';
+import { resolveAppOwnerScope } from '../app/owner-scope.js';
 import { managedChangeRefusal } from '../packages/install/package-managed.js';
 import { provenanceForWrite, type DeclaredProvenance } from '../ai/provenance.js';
 import { validateUiLayout, AppUiError, type AppUiLayout } from './validate.js';

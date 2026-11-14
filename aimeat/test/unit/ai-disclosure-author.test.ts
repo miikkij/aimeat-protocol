@@ -14,8 +14,8 @@
  *     node's draft-vocabulary `autonomous` meta.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { applyServeMarks } from '../../src/services/app-serve-marks.js';
-import { stripServedMarks } from '../../src/services/app-serve-marks-strip.js';
+import { applyServeMarks } from '../../src/services/app/serve-marks.js';
+import { stripServedMarks } from '../../src/services/app/serve-marks-strip.js';
 import { authorDisclosure, traceAuthorDisclosure } from '../../src/services/ai/disclosure-author.js';
 import { logger } from '../../src/utils/logger.js';
 import { provFixture } from './serve-marks-fixtures.js';

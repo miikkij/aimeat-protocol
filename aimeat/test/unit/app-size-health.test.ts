@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-08-25 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { appSizeHealth } from '../../src/services/app-size-health.js';
+import { appSizeHealth } from '../../src/services/app/size-health.js';
 import type { AppVersionSize } from '../../src/storage/interface.js';
 
 const MB = 1024 * 1024;

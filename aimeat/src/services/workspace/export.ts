@@ -1,0 +1,309 @@
+/**
+ * @file src/services/workspace/export.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Full-fidelity export of an organism workspace as a ZIP (a `workspace.json` with all
+ *   data + an `images/` folder of the real image binaries — no base64 inlining). The data captures
+ *   the manifest, locked schemas, document sections, sources, and every object record (draft /
+ *   latest / version.N), plus references to the embedded images. Owner/creator backup + portability.
+ *
+ *   Export is bounded by what the exporter can READ: their own records pass directly, others go
+ *   through the consent guard — so a personal backup captures your content + anything you're granted.
+ * @structure
+ *   - WS_EXPORT_VERSION, WorkspaceExportJson
+ *   - exportWorkspace(storage, config, { orgId, ws, exporterGaii, callerSub, exportedAt }) -> { buffer, filename }
+ * @usage import { exportWorkspace } from './export.js';
+ * @version-history
+ *   2026-11-03 -- The shared fingerprints (`meta.fingerprint.*`) and their setting (`meta.contentclass`)
+ *     are not exported: the node's own rows, derived from the documents.
+ *   2026-10-20 -- `callerSub`, the CALLER's resolved principal, which is not always the identity the
+ *     export reads as: the organism bundle exports as the member's owner GHII. An ecosystem app is
+ *     held to its owner-granted read data-areas on the workspace manifest, the gate the live read
+ *     makes (workspace-access.ts Gate 3) and the owner identity skipped, so a GEAI exported
+ *     workspaces its data areas did not cover (secaudit 2026-10,
+ *     organism-export:owner-identity-drops-geai-data-area-gate). The bundle's records also pass the
+ *     credential mask, so a workspace share leaves with `has_password` and not its scrypt hash
+ *     (secaudit 2026-10, collectWorkspace:share-password-hash-unmasked).
+ *   2026-10-16 -- The export reads every memory record of the workspace, page by page
+ *     (storage/memory-pages.ts), up to EXPORT_RECORD_LIMIT (200 000), which is named in `truncated`
+ *     when reached. It read one window of 10 000 in key order, so a larger workspace lost its tail,
+ *     and the tail can hold the workspace's own meta.manifest: a member who is not a manager was then
+ *     refused the workspace and the organism bundle skipped it (QA audit F06c-01).
+ *   2026-10-15 -- The row spaces (`backing: 'rows'`) are in the export as `rows`
+ *     (services/workspace-transfer-rows.ts), and a limit the export reached (10 000 memory records,
+ *     or the most rows a workspace may hold) is named in `truncated` and returned by
+ *     exportWorkspace. Both used to be missing without a word (feature-list audit #68).
+ *   v1.1.0 -- 2026-10-05 -- An image shared into the organism leaves the export only when its organism
+ *     classification lets it: its workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
+ *   v1.0.0 -- 2026-06-09 -- Initial: ZIP export (workspace.json + images/) reusing archiver.
+ *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
+ *   v1.1.0 -- 2026-07-10 -- An owner-level exporter with ACTIVE organism membership captures every
+ *     record (matching the live human-member read model); per-record consent bounding stays for
+ *     agent (GAII) exporters. Cross-member records used to vanish from every export silently.
+ *   v1.2.0 — 2026-08-10 — Security audit C-5: a WORKSPACE-level read gate in front of the record loop.
+ *     v1.1.0 matched the live read model for records inside a workspace and skipped the decision the
+ *     live path makes first, which is whether this exporter may read this workspace at all, so the
+ *     organism bundle handed every active member workspaces the workspace list reports to them as
+ *     `access: 'none'`. An org manager still reads all; everyone else gets the manifest's own gate.
+ *   v1.3.0 — 2026-09-24 — The gate, and the manifest, readme, sources and config the bundle carries,
+ *     come from the copies that count (services/workspace-meta.ts), not the first copy the scan
+ *     returned for the gate and the last one the loop met for the bundle.
+ *   v1.3.1 — 2026-09-26 — The exporter's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.4.0 — 2026-09-29 — The workspace gate is decideWorkspaceRead, the one read decision, and what
+ *     the export carries passes the exporter's classification reader: show, then leave with the
+ *     destination `export` (TARGET-082). The caller passes the reader.
+ *   v1.5.0 — 2026-09-29 — TARGET-082 review: what leave() keeps back is named in workspace.json
+ *     `leftOut` ({ key, label, reason }, records and images) and returned by exportWorkspace.
+ */
+import { ZipArchive } from 'archiver';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { authorizeRead } from '../access-guard.js';
+import { localAccountName, localAccountOf, isGEAI } from '../../utils/gaii.js';
+import { ecoMayReadKey } from '../ecosystem-access.js';
+import { shownMemoryValue } from '../secret-records.js';
+import { workspaceMetaReader } from './meta.js';
+import { decideWorkspaceRead } from './access.js';
+import { memoryTarget, fileTarget } from '../classification/labels.js';
+import type { ContentReader } from '../classification/reader.js';
+import { leaveMemories, leftOutOf, type LeftOut } from '../classification-exits.js';
+import { logger } from '../../utils/logger.js';
+import { collectRowSpaces, type ExportRow, type ExportTruncation } from './transfer-rows.js';
+import { listAllMemoryPages } from '../../storage/memory-pages.js';
+
+export type { ExportRow, ExportTruncation } from './transfer-rows.js';
+
+export const WS_EXPORT_VERSION = '1.0';
+
+/** The exporter may not read this workspace. Thrown rather than returned so the organism bundle,
+ *  which walks every workspace, keeps its existing "skip what the exporter cannot read" behaviour. */
+export class WorkspaceNotReadableError extends Error {
+  constructor(public readonly orgId: string, public readonly ws: string) {
+    super(`Workspace "${ws}" is not readable by this exporter`);
+    this.name = 'WorkspaceNotReadableError';
+  }
+}
+
+export interface ExportObject { namespace: string; id: string; role: string; value: unknown; visibility: string; createdAt: string; updatedAt: string; version: number }
+export interface ExportImage { key: string; file: string; mimeType: string; visibility: string }
+export interface WorkspaceExportJson {
+  aimeatWorkspaceExport: string;
+  exportedAt: string;
+  source: { organismId: string; ws: string; nodeId: string };
+  name: string;
+  manifest: unknown;
+  readme: unknown;
+  config: unknown;
+  schemas: Record<string, { schema: unknown; mode: string }>;
+  sections: Record<string, unknown>;
+  sources: unknown;
+  objects: ExportObject[];
+  images: ExportImage[];
+  /** What the classification kept out of the export, by key (records and images), with the label and why. */
+  leftOut: LeftOut[];
+  /** The rows of the workspace's row spaces (`backing: 'rows'`). Absent in a bundle made before 2026-10-15. */
+  rows?: ExportRow[];
+  /** What the export did not carry in full because a limit was reached. Empty when it carried everything. */
+  truncated?: ExportTruncation[];
+}
+
+/**
+ * The most memory records (records, documents, versions, meta) one workspace export reads. A ceiling
+ * against holding an unbounded set in memory, far above what the publish routes create in practice;
+ * reaching it is named in `truncated`. Until 2026-10-16 it was 10 000 and read as one window.
+ */
+export const EXPORT_RECORD_LIMIT = 200_000;
+/** Rows per page of that read. */
+export const EXPORT_PAGE_SIZE = 5000;
+
+/** Pull storage keys out of an image URL: /v1/storage/<key> or /v1/pub/<ghii>/<key>. */
+const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
+
+/** Collect a workspace's full data + image binaries WITHOUT zipping — the reusable core shared by
+ *  the single-workspace export and the organism bundle export. Image file names are relative
+ *  ("images/img-N.ext"), as referenced by each object's `img.file`. */
+export async function collectWorkspace(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: {
+    orgId: string; ws: string; exporterGaii: string;
+    /** The CALLER's resolved principal, which `exporterGaii` is not on the organism bundle path. */
+    callerSub: string;
+    exportedAt: string; isOrgManager?: boolean; reader: ContentReader;
+  },
+): Promise<{ json: WorkspaceExportJson; images: Map<string, Buffer> }> {
+  const { orgId, ws, exporterGaii, callerSub, exportedAt, reader } = opts;
+  const root = `organism.${orgId}.w.${ws}`;
+
+  // An owner-level exporter (GHII, no '#') who is an active member of the organism reads the whole
+  // workspace live (workspace-access middleware: a human owner session needs no consent), so the
+  // export includes the same — per-record consent bounding would silently drop records owned by
+  // OTHER members from every member's export, including the organism creator's. Agent exporters
+  // (GAII) keep the consent-bounded path, matching their live read rights.
+  let isActiveMemberOwner = false;
+  if (!exporterGaii.includes('#')) {
+    const m = await storage.getMembership(orgId, localAccountName(exporterGaii));
+    isActiveMemberOwner = !!m && m.status === 'active';
+  }
+
+  // EVERY record, page by page (QA audit F06c-01). One window of 10 000 in key order cut a larger
+  // workspace's tail, and meta.* sorts after most namespaces, so the manifest itself could fall out.
+  // `total` is the count past the ceiling too, so a workspace larger than the export reads is named
+  // in `truncated` instead of arriving as a smaller backup without a word (feature-list audit #68).
+  const { items, total: recordTotal } = await listAllMemoryPages(storage, { prefix: `${root}.` }, EXPORT_PAGE_SIZE, EXPORT_RECORD_LIMIT);
+
+  // SECURITY (C-5): membership of the organism is not access to every workspace in it. The live read
+  // decides per workspace, on its manifest record — an org manager reads all, the manifest's own
+  // owner reads theirs, anyone else needs authorizeRead to allow it (services/organism-gate.ts
+  // canReadWsManifest, and workspace-read.ts, which then serves the workspace all-or-nothing). The
+  // bundle export used to skip that decision entirely and hand every active member every workspace,
+  // including ones the organism's own workspace list reports to them as `access: 'none'`. Refusing
+  // here is what makes the route's promise true: the bundle carries what the member can read live.
+  // The workspace's own records are the copies that count (services/workspace/meta.ts), for the gate
+  // and for what the bundle carries, not the first copy the scan returned or the last one looped over.
+  // The decision is the one every workspace read makes (decideWorkspaceRead: membership, the
+  // manifest, managers, the ecosystem allowlist); a caller that already knows the exporter manages
+  // the organism still says so.
+  const metaReader = workspaceMetaReader(storage, orgId, config.nodeId);
+  const manifestRec = await metaReader.pick(ws, 'meta.manifest', items);
+  const organism = await storage.getOrganism(orgId);
+  // SECURITY (secaudit 2026-10): an ecosystem app rides its owner's organism membership, so the one
+  // thing that makes the owner-granted read data-area bite is this check — Gate 3 of the live read
+  // (services/workspace/access.ts). It is asked HERE, on the caller's own principal, because the
+  // organism bundle reads as the member's owner GHII and that identity never reaches Gate 3: a GEAI
+  // exported workspaces its data areas did not cover, while the live read of the same workspace with
+  // the same token returned nothing. Before the isOrgManager shortcut, which is about the OWNER.
+  if (isGEAI(callerSub) && !(manifestRec && await ecoMayReadKey(storage, callerSub, manifestRec.key))) {
+    throw new WorkspaceNotReadableError(orgId, ws);
+  }
+  const canReadWorkspace = opts.isOrgManager === true || (!!organism && (await decideWorkspaceRead(storage, config, organism,
+    exporterGaii, localAccountOf(exporterGaii) ?? undefined, exporterGaii, ws, { manRec: manifestRec })).canRead);
+  if (!canReadWorkspace) throw new WorkspaceNotReadableError(orgId, ws);
+
+  const permitted: MemoryRecord[] = [];
+  for (const r of items) {
+    if (isActiveMemberOwner || r.ownerGaii === exporterGaii) { permitted.push(r); continue; }
+    const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: exporterGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
+    if (d.allowed) permitted.push(r);
+  }
+  // An export takes content out of the organism: what the exporter may see, then what may leave
+  // (the classification component's show and leave, TARGET-082).
+  // What stays behind is named in the bundle's `leftOut` (TARGET-082 review): the exporter is a
+  // member who may see the keys, and a backup that is silently smaller than the workspace is wrong.
+  const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
+  const { kept, leftOut } = await leaveMemories(reader, await reader.show(permitted, target), { kind: 'export', organismId: orgId });
+  // A record that holds a credential leaves with the credential replaced, exactly as every other
+  // read door shows it (services/secret-records.ts). The workspace share record carries the scrypt
+  // hash of its password, and the bundle handed it to every member who could read the workspace
+  // (secaudit 2026-10, collectWorkspace:share-password-hash-unmasked). A restore of the masked
+  // record is a share no password opens, which is closed and not open.
+  const readable = kept.map(r => ({ ...r, value: shownMemoryValue(r.key, r.value) }));
+
+  const out: WorkspaceExportJson = {
+    aimeatWorkspaceExport: WS_EXPORT_VERSION, exportedAt,
+    source: { organismId: orgId, ws, nodeId: config.nodeId },
+    name: ws, manifest: null, readme: null, config: null,
+    schemas: {}, sections: {}, sources: null, objects: [], images: [], leftOut, rows: [], truncated: [],
+  };
+  if (recordTotal > items.length) out.truncated!.push({ what: 'records', exported: items.length, total: recordTotal });
+  const namespaces = new Set<string>();
+  const imageKeys = new Set<string>();
+
+  const countedValue = async (rel: string) => (await metaReader.pick(ws, rel, readable))?.value ?? null;
+  out.manifest = await countedValue('meta.manifest');
+  const manifestName = (out.manifest as { name?: string } | null)?.name;
+  if (manifestName) out.name = manifestName;
+  out.readme = await countedValue('meta.readme');
+  out.sources = await countedValue('meta.sources');
+  out.config = await countedValue('meta.config');
+  const single = new Set(['meta.manifest', 'meta.readme', 'meta.sources', 'meta.config']);
+
+  for (const r of readable) {
+    const rel = r.key.slice(root.length + 1);   // after "root."
+    if (single.has(rel)) continue;
+    if (rel.startsWith('meta.sections.')) { out.sections[rel.slice('meta.sections.'.length)] = r.value; continue; }
+    if (rel.startsWith('access.')) continue;   // access requests are not workspace content
+    // The shared fingerprints and their setting are the node's own, derived from the documents
+    // (services/content/shared-profile.ts); the node an export lands on makes its own.
+    if (rel.startsWith('meta.fingerprint.') || rel === 'meta.contentclass') continue;
+
+    // An object instance: <namespace…>.<id>[.draft|.latest|.version.N]
+    const parts = rel.split('.');
+    let role = '';
+    let core = parts;
+    const last = parts[parts.length - 1];
+    const secondLast = parts[parts.length - 2];
+    if (last === 'draft' || last === 'latest') { role = last; core = parts.slice(0, -1); }
+    else if (secondLast === 'version' && /^\d+$/.test(last)) { role = `version.${last}`; core = parts.slice(0, -2); }
+    const id = core[core.length - 1];
+    const namespace = core.slice(0, -1).join('.');
+    if (!namespace || !id) continue;
+    namespaces.add(namespace);
+    out.objects.push({ namespace, id, role, value: r.value, visibility: r.visibility, createdAt: r.createdAt, updatedAt: r.updatedAt, version: r.version });
+    const md = (r.value && typeof r.value === 'object') ? (r.value as { markdown?: unknown }).markdown : undefined;
+    if (typeof md === 'string') for (const m of md.matchAll(STORAGE_URL_RE)) imageKeys.add(decodeURIComponent(m[1]));
+  }
+
+  // The row spaces live in their own table, so the memory scan above never meets them: their rows
+  // are read here, through the same show and leave (feature-list audit #68).
+  const rowPart = await collectRowSpaces({ storage, config }, { orgId, ws, manifest: out.manifest, reader });
+  out.rows = rowPart.rows;
+  out.leftOut.push(...rowPart.leftOut);
+  out.truncated!.push(...rowPart.truncated);
+
+  // Locked schemas per namespace.
+  for (const ns of namespaces) {
+    const sc = await storage.getSchema(`${root}.${ns}`, 'prefix');
+    if (sc) out.schemas[ns] = { schema: sc.schemaJson, mode: sc.schemaMode };
+  }
+
+  // Storage files under the workspace prefix (images the exporter owns), in case some aren't
+  // referenced in markdown yet.
+  try {
+    const files = await storage.listStorageFiles(exporterGaii);
+    for (const f of files) if (f.key.startsWith(`${root}.`) || f.key.startsWith(`organism.${orgId}.img.`)) imageKeys.add(f.key);
+  } catch (err) { logger.warn('md: listing is best-effort', { error: String(err) }); }
+
+  const images = new Map<string, Buffer>();
+  let imgN = 0;
+  for (const key of imageKeys) {
+    const stored = await storage.getStorageFile(exporterGaii, key).catch(err => { logger.warn('md: continuing after a suppressed failure', { error: String(err) }); return null; });
+    // An image leaves with the export under the same two questions as a record.
+    // The image's own workspace binding decides its address: one shared into this organism takes the
+    // organism's labels and its "may not leave" (secaudit 2026-10, DATA-4).
+    const shown = stored ? await reader.show([stored], () => fileTarget(exporterGaii, key, stored.workspaceRef)) : [];
+    const { kept: [file], left } = await reader.leave(shown, () => fileTarget(exporterGaii, key, stored?.workspaceRef), { kind: 'export', organismId: orgId });
+    out.leftOut.push(...leftOutOf(left, () => key));
+    if (!file) continue;
+    const ext = (file.mimeType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
+    const fileName = `images/img-${imgN++}.${ext}`;
+    out.images.push({ key, file: fileName, mimeType: file.mimeType, visibility: file.visibility });
+    images.set(fileName, file.data);
+  }
+  return { json: out, images };
+}
+
+/** Export a single workspace as a standalone ZIP (workspace.json + images/). */
+export async function exportWorkspace(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: {
+    orgId: string; ws: string; exporterGaii: string; callerSub: string;
+    exportedAt: string; isOrgManager?: boolean; reader: ContentReader;
+  },
+): Promise<{ buffer: Buffer; filename: string; leftOut: LeftOut[]; truncated: ExportTruncation[] }> {
+  const { json, images } = await collectWorkspace(storage, config, opts);
+  const archive = new ZipArchive({ zlib: { level: 6 } });
+  const chunks: Buffer[] = [];
+  const done = new Promise<Buffer>((resolve, reject) => {
+    archive.on('data', (c: Buffer) => chunks.push(c));
+    archive.on('end', () => resolve(Buffer.concat(chunks)));
+    archive.on('error', reject);
+  });
+  for (const [name, data] of images) archive.append(data, { name });
+  archive.append(JSON.stringify(json, null, 2), { name: 'workspace.json' });
+  archive.finalize();
+  const buffer = await done;
+  const safe = String(json.name).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'workspace';
+  return { buffer, filename: `workspace-${safe}.zip`, leftOut: json.leftOut, truncated: json.truncated ?? [] };
+}

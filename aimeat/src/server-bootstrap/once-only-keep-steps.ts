@@ -92,14 +92,14 @@ import { logger } from '../utils/logger.js';
 import { migrateToolScopeWordsOnce } from '../services/tool-scope-words-migration.js';
 import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../services/rest-scope-gates-migration.js';
 import { migrateRestScopeKeepWorkingOnce } from '../services/rest-scope-keep-working-migration.js';
-import { keepStorageReadForAppsOnce } from '../services/app-storage-read-keep-migration.js';
-import { keepOnDoneForAppsOnce } from '../services/app-on-done-keep-migration.js';
-import { keepDatapackageReadForAppsOnce } from '../services/app-datapackage-read-keep-migration.js';
+import { keepStorageReadForAppsOnce } from '../services/app/storage-read-keep-migration.js';
+import { keepOnDoneForAppsOnce } from '../services/app/on-done-keep-migration.js';
+import { keepDatapackageReadForAppsOnce } from '../services/app/datapackage-read-keep-migration.js';
 import { keepAppExtensionSchedulesOnce } from '../services/schedule-extension-keep.js';
 import { keepAiScheduleReadsOnce } from '../services/schedule-ai-read.js';
-import { keepExtensionFirstUseOnce } from '../services/extension-first-use-keep.js';
-import { keepExtensionPublishOnce } from '../services/extension-publish-keep.js';
-import { keepAppToolInvokeOnce } from '../services/app-tool-invoke-keep.js';
+import { keepExtensionFirstUseOnce } from '../services/extension/first-use-keep.js';
+import { keepExtensionPublishOnce } from '../services/extension/publish-keep.js';
+import { keepAppToolInvokeOnce } from '../services/app/tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
 import { recordDatapackageAudiencesOnce } from '../services/datapackage/audience-record.js';
 import { recordPointerStateOnce } from '../services/datapackage/sale-terms-record.js';
@@ -155,11 +155,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await placeKnowledgeLinkOwnersOnce(storage, config)
     .catch(err => logger.error('Failed to place the older knowledge link rows; the next boot tries again', { error: String(err) }));
   // Every extension installed before the first-use rules of secaudit 2026-10 keeps the first use it
-  // had (services/extension-first-use-keep.ts). Awaited, so no call meets the new rule first.
+  // had (services/extension/first-use-keep.ts). Awaited, so no call meets the new rule first.
   await keepExtensionFirstUseOnce(storage, config)
     .catch(err => logger.error('Failed to keep the first use of the older extensions; the next boot tries again', { error: String(err) }));
   // An extension an agent or an app installed before its unattended runs asked the publish gate keeps
-  // publishing as before until its code changes (services/extension-publish-keep.ts). Awaited, so no
+  // publishing as before until its code changes (services/extension/publish-keep.ts). Awaited, so no
   // scheduled run meets the new rule first.
   await keepExtensionPublishOnce(storage, config)
     .catch(err => logger.error('Failed to keep the publishing of the older agent-installed extensions; the next boot tries again', { error: String(err) }));
@@ -184,13 +184,13 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
     // storage:read for published apps that read data packages, before the /v1/pub step (app-datapackage-read-keep-migration.ts).
     .then(() => keepDatapackageReadForAppsOnce(storage, config, { existedBefore: scopeStepsBegan }))
     // storage:read for the published apps that read /v1/pub, on a node that ran the third step before
-    // S3-03 gated that route (services/app-storage-read-keep-migration.ts).
+    // S3-03 gated that route (services/app/storage-read-keep-migration.ts).
     .then(() => keepStorageReadForAppsOnce(storage, config, { existedBefore: scopeStepsBegan }))
-    // ext:invoke for the published apps whose AI jobs bind on_done (services/app-on-done-keep-migration.ts).
+    // ext:invoke for the published apps whose AI jobs bind on_done (services/app/on-done-keep-migration.ts).
     .then(() => keepOnDoneForAppsOnce(storage, config, { existedBefore: scopeStepsBegan }))
     .catch(err => logger.error('Failed to give the REST scope gate words to existing principals; the next boot tries again', { error: String(err) }));
   // The agents and ecosystem apps that called app tools over HTTP before that route asked exchange:write
-  // keep calling them (services/app-tool-invoke-keep.ts). After the chain, which it reads and does not
+  // keep calling them (services/app/tool-invoke-keep.ts). After the chain, which it reads and does not
   // write; awaited, so no kept caller meets the refusal first.
   await keepAppToolInvokeOnce(storage, config, { existedBefore: scopeStepsBegan })
     .catch(err => logger.error('Failed to keep the earlier app-tool callers; the next boot tries again', { error: String(err) }));

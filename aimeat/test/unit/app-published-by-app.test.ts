@@ -2,7 +2,7 @@
  * @file test/unit/app-published-by-app.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Which publish names an app as its publisher (src/services/app-published-by-app.ts;
+ * @description Which publish names an app as its publisher (src/services/app/published-by-app.ts;
  *   secaudit2026oct26, own-app-consent:app-grant-publisher-reads-as-owner): only a role-'app' token,
  *   on REST and on MCP, and only another author's app counts as somebody else's.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-published-by-app.test.ts
@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
-import { publishingAppOf, publishingAppOfVerifiedToken, byAnotherAuthorsApp } from '../../src/services/app-published-by-app.js';
+import { publishingAppOf, publishingAppOfVerifiedToken, byAnotherAuthorsApp } from '../../src/services/app/published-by-app.js';
 
 const jwt = (claims: Record<string, unknown>) =>
   `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;

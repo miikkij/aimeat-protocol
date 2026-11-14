@@ -36,7 +36,7 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     };
 });
 
-const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
+const { buildExtensionCtx } = await import('../../src/services/extension/ctx.js');
 const { SqliteStorage } = await import('../../src/storage/providers/sqlite/index.js');
 
 const config = { nodeId: 'node-1', encryptionKey: null, totpSecretEncryptionKey: null } as unknown as AimeatConfig;

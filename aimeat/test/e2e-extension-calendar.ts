@@ -1,7 +1,7 @@
 /**
  * @file e2e-extension-calendar.ts
  * @description E2E for `ctx.calendar`, the calendar library's computation as host calls of an
- *   extension (services/extension-calendar.ts). An extension's sandbox has no Intl and no
+ *   extension (services/extension/calendar.ts). An extension's sandbox has no Intl and no
  *   time-zone data, so these are the only way it expands a recurrence or converts a zone.
  *
  *   What it holds: a weekly event at 09:00 in Europe/Helsinki keeps its wall clock across the

@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import { toolError } from './tool-error.js';
-import type { AppOpOutcome } from '../services/app-op-outcome.js';
+import type { AppOpOutcome } from '../services/app/op-outcome.js';
 
 export type ToolAnswer = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 

@@ -41,6 +41,12 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.3.1 — 2026-11-13 — Structure programme unit 2b, batch 3: agent-capabilities.ts, agent-onboarding.ts,
+ *     core-boards.ts, organisms-email-invites.ts and organisms-name-invites.ts leave EXEMPT; their reads
+ *     moved with the gate around them into service functions the REST routes call too.
+ *   v1.3.0 — 2026-11-13 — Structure programme unit 2b: a file leaves EXEMPT when its reads move, with
+ *     the gate around them, into a service function the REST route calls too (agent-telemetry.ts,
+ *     prompts.ts).
  *   v1.2.1 — 2026-11-13 — src/mcp/sharing-groups.ts leaves EXEMPT: its group reads call
  *     services/sharing-groups/reach.ts, as the REST routes do (structure programme unit 7).
  *   v1.2.0 — 2026-11-13 — Structure programme unit 2: a file leaves EXEMPT when its reads call the
@@ -69,12 +75,9 @@
  * it came out of, so the pair can be cleared together.
  */
 const EXEMPT = new Set([
-  'src/mcp/agent-capabilities.ts',
   'src/mcp/agent-messages.ts',
-  'src/mcp/agent-onboarding.ts',
   'src/mcp/agent-schedules.ts',
   'src/mcp/agent-tasks.ts',
-  'src/mcp/agent-telemetry.ts',
   'src/mcp/apps.ts',
   'src/mcp/apps-fork.ts',              // pure extraction out of apps.ts (max-file-lines), same backlog
   'src/mcp/boards.ts',
@@ -82,7 +85,6 @@ const EXEMPT = new Set([
   'src/mcp/chat-instances.ts',
   'src/mcp/commerce.ts',
   'src/mcp/consent.ts',
-  'src/mcp/core-boards.ts',            // pure extraction out of core.ts (max-file-lines), same backlog
   'src/mcp/core-admin.ts',
   'src/mcp/core-resources.ts',         // extraction out of core.ts (max-file-lines): the same four storage reads
   'src/mcp/core.ts',
@@ -92,10 +94,7 @@ const EXEMPT = new Set([
   'src/mcp/memory-extended.ts',
   'src/mcp/oauth.ts',
   'src/mcp/operator-config.ts',
-  'src/mcp/organisms-email-invites.ts',
-  'src/mcp/organisms-name-invites.ts',
   'src/mcp/organisms.ts',
-  'src/mcp/prompts.ts',
   'src/mcp/skills.ts',
   'src/mcp/wallet-extended.ts',
   'src/mcp/workspaces.ts',

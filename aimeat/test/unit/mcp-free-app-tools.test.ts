@@ -19,13 +19,13 @@ import { authoriseMeteredCall } from '../../src/services/metered-access.js';
 import { invokeCapability, appToolBindingRefusal } from '../../src/services/capability-invoke.js';
 import { consumeInternalPass } from '../../src/services/extension-access/internal-pass.js';
 import { membersOnlyRefusalForCapability } from '../../src/services/members-only.js';
-import { getInterfaceVersion } from '../../src/services/app-tool-interfaces.js';
+import { getInterfaceVersion } from '../../src/services/app/tool-interfaces.js';
 
 vi.mock('../../src/services/metered-access.js', () => ({ authoriseMeteredCall: vi.fn() }));
 vi.mock('../../src/services/capability-invoke.js', () => ({ invokeCapability: vi.fn(), appToolBindingRefusal: vi.fn() }));
 vi.mock('../../src/services/call-timing.js', () => ({ recordCallDuration: vi.fn() }));
 vi.mock('../../src/services/members-only.js', () => ({ membersOnlyRefusalForCapability: vi.fn(), MEMBERS_ONLY_MESSAGE: 'Members only.' }));
-vi.mock('../../src/services/app-tool-interfaces.js', () => ({ getInterfaceVersion: vi.fn() }));
+vi.mock('../../src/services/app/tool-interfaces.js', () => ({ getInterfaceVersion: vi.fn() }));
 
 const caller = 'helper#buyer@node.test', scopes = ['social:read'];
 const tool = { name: 'read', action_id: 'ext:sample:dispatch', lockedInput: { op: 'get' },

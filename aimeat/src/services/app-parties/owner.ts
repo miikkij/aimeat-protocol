@@ -30,14 +30,14 @@
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { UNCHANGED } from '../record-cas.js';
-import { rosterContext, rosterAudit, rosterBucketOf, type RosterCaller } from '../app-roster-context.js';
-import { done, refuse, type AppOpOutcome } from '../app-op-outcome.js';
-import { getMember, putMember, removeMember } from '../app-members.js';
-import { isManagerRole, roleShapeError } from '../app-member-rules.js';
+import { rosterContext, rosterAudit, rosterBucketOf, type RosterCaller } from '../app/roster-context.js';
+import { done, refuse, type AppOpOutcome } from '../app/op-outcome.js';
+import { getMember, putMember, removeMember } from '../app/members.js';
+import { isManagerRole, roleShapeError } from '../app/member-rules.js';
 import { parsePartyRef, partyRefOf } from '../parties/contract.js';
 import { findParty } from '../parties/store.js';
 import { APP_PARTIES_PREFIX, PARTY_DATA_PREFIX, appPartyView, parseAppPartiesValue, type AppPartyRegistration } from './contract.js';
-import { appKeySegment } from '../app-record-keys.js';
+import { appKeySegment } from '../app/record-keys.js';
 import { appIdOf, changeAppParties, readAppParties, registrationMode, signupOpen } from './store.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };

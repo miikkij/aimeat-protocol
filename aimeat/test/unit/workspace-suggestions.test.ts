@@ -2,8 +2,8 @@
  * @file workspace-suggestions.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A plain member's suggested change to a workspace (services/workspace-member-changes.ts
- *   and services/workspace-suggestions.ts), driven on SQLite with a clock the test moves: what the
+ * @description A plain member's suggested change to a workspace (services/workspace/member-changes.ts
+ *   and services/workspace/suggestions.ts), driven on SQLite with a clock the test moves: what the
  *   E2E suite cannot reach from outside. An expired suggestion does nothing and the member hears it;
  *   approving re-validates the stored change and runs nothing when it no longer holds; a sections
  *   suggestion approved after the creator reorganised keeps the creator's work; and a member's change
@@ -14,9 +14,9 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { addWorkspaceSpaces, setWorkspaceSections, isRefusal } from '../../src/services/workspace-member-changes.js';
-import { decideSuggestion, listSuggestions } from '../../src/services/workspace-suggestions.js';
-import { readWorkspaceManifest } from '../../src/services/workspace-meta.js';
+import { addWorkspaceSpaces, setWorkspaceSections, isRefusal } from '../../src/services/workspace/member-changes.js';
+import { decideSuggestion, listSuggestions } from '../../src/services/workspace/suggestions.js';
+import { readWorkspaceManifest } from '../../src/services/workspace/meta.js';
 import type { OrganismRecord, GHIIRecord, ConsentRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 

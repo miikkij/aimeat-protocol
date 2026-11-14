@@ -226,7 +226,7 @@ export interface AgentProposal {
    */
   warnings?: CrewDefWarning[];
   /**
-   * Set when the proposal was made from an agent an app bundles (services/app-agent-propose.ts).
+   * Set when the proposal was made from an agent an app bundles (services/app/agent-propose.ts).
    * The app's status, its list of running copies and its stop action find the approved agent by
    * this, never by the agent's name. Absent on any other proposal and on one stored before 2026-11-11.
    */
@@ -498,7 +498,7 @@ export async function readProposal(ctx: ProposalContext, owner: string, id: stri
 /**
  * Record that the agent made from an approved proposal now runs another definition of its app:
  * `source_app.definition_hash` becomes `definitionHash`. Called after a newer definition of the
- * app's bundled agent was published to the agent (services/app-agent-deploy.ts). A proposal with no
+ * app's bundled agent was published to the agent (services/app/agent-deploy.ts). A proposal with no
  * `source_app` is left as it is. Written on the record's version, so a concurrent settle is not lost.
  */
 export async function recordProposalDefinition(

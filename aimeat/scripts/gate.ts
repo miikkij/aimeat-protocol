@@ -110,7 +110,7 @@ const GUARDED = /^aimeat\/(?:src\/(?!static\/)|package\.json$|pnpm-lock\.yaml$|t
  * both backends are run. PostgreSQL is the production backend, and a change in these places is the
  * kind that differs between the two providers or decides who may do what (QA audit P2-04).
  */
-const POSTGRES_TRIGGER = /^aimeat\/(?:src\/(?:storage|auth|routes|mcp|tool-catalog)\/|src\/(?:services|utils)\/[^/]*(?:identity|gaii|ghii|owner|principal)[^/]*\.ts$|test\/run-e2e-[^/]+\.ts$|test\/helpers\/server-db\.ts$)/;
+const POSTGRES_TRIGGER = /^aimeat\/(?:src\/(?:storage|auth|routes|mcp|tool-catalog)\/|src\/(?:services|utils)\/[^/]*(?:identity|gaii|ghii|owner|principal)[^/]*\.ts$|src\/services\/app\/owner-scope\.ts$|test\/run-e2e-[^/]+\.ts$|test\/helpers\/server-db\.ts$)/;
 /**
  * Paths that move the Python half of the offer-shape comparison: the aimeat-crewai package, the zod
  * schemas its fixture is generated from (and the two modules they import), the shape allowlist the

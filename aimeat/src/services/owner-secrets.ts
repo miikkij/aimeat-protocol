@@ -11,7 +11,7 @@
  *
  *   THE SHAPE OF THE PROMISE. A value goes in and never comes out. `list` returns names and times;
  *   no route, tool or export returns a value or a ciphertext. The only reader on the node is
- *   `resolveSecretForHeaders` below, called from `ctx.fetch` in services/extension-ctx.ts AFTER the
+ *   `resolveSecretForHeaders` below, called from `ctx.fetch` in services/extension/ctx.ts AFTER the
  *   sandbox has handed over its request — so a script can SEND a credential and cannot LEARN one.
  *   That is what makes it safe for an AI to write the script and for a stranger to open the page it
  *   renders.
@@ -435,7 +435,7 @@ export type ForeignExtension = { extension: string; installer: string };
  * Whether the principal behind this call may choose the first host of a vault secret that has none
  * (ruling 6, 2026-10-20): the owner in person, or a principal holding `secrets:manage`. `by` is the
  * deciding principal, which the binding records. The caller of resolveSecretForHeaders answers it,
- * because only the caller knows whether the run is attended (services/extension-secret-authority.ts).
+ * because only the caller knows whether the run is attended (services/extension/secret-authority.ts).
  */
 export type FirstUseDecision = { allowed: boolean; by: string; foreign?: ForeignExtension };
 
@@ -507,7 +507,7 @@ export function secretUnknownMessage(headerName: string, secretName: string): st
  * see on the list whether the host was one they chose. The extension's shared map is bound to the
  * host of its first use too (sharedBindingName), as a vault secret is. The answer carries the values
  * it put into the headers, so ctx.fetch can remove them from whatever the far end sends back
- * (services/extension-fetch-scrub.ts; secrets audit 2026-10-09, item 10).
+ * (services/extension/fetch-scrub.ts; secrets audit 2026-10-09, item 10).
  */
 /**
  * Did the installer account an approval names exist when the owner gave it? The approval names the

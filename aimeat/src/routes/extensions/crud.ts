@@ -69,7 +69,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { requesterOf } from '../../services/publish-requests/ask.js';
 import {
   askOperatorsForEmailPolicy, grantsUnrestrictedEmail, manifestAsksUnrestrictedEmail, EMAIL_POLICY_KEY,
-} from '../../services/extension-email-policy-ask.js';
+} from '../../services/extension/email-policy-ask.js';
 import { requireAuth, requireScope, requireAnyScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
@@ -78,24 +78,24 @@ import type { Scheduler } from '../../services/scheduler.js';
 import { logger } from '../../utils/logger.js';
 import {
   writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
-} from '../../services/extension-lifecycle.js';
+} from '../../services/extension/lifecycle.js';
 import { ExtensionInstallSchema, validateBody } from '../../models/schemas.js';
-import { getExtSecretKeys, maskSecretFields } from '../../services/extension-secrets.js';
-import { usesSecretsOf } from '../../services/extension-secret-uses.js';
-import { withoutFirstUseKeep } from '../../services/extension-first-use-keep.js';
+import { getExtSecretKeys, maskSecretFields } from '../../services/extension/secrets.js';
+import { usesSecretsOf } from '../../services/extension/secret-uses.js';
+import { withoutFirstUseKeep } from '../../services/extension/first-use-keep.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../../services/dependency-map.js';
 import {
   listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
   snapshotExtensionVersion,
 } from '../../services/component-versions.js';
-import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
+import { buildExtensionRecordFromManifest } from '../../services/extension/manifest.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt, extWriteRefusalText, codeWriteRefusalText } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
-import { codeHoldRefusal, takeHoldOff } from '../../services/extension-code-hold.js';
+import { codeHoldRefusal, takeHoldOff } from '../../services/extension/code-hold.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { workspaceDeclarationOf } from '../../services/extension-workspace-declaration.js';
+import { workspaceDeclarationOf } from '../../services/extension/workspace-declaration.js';
 import {
   findExtension, ownComponent, placeExtensionInstall, installNameFor, splitComponentAddress, shortNameOf, addressSegment, withOwnerFields,
 } from '../../services/component-address.js';
@@ -246,7 +246,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // The install ceilings, the secret encryption and the EXCHANGE projection are one
-      // implementation (services/extension-lifecycle.ts) because aimeat_extension_install does the
+      // implementation (services/extension/lifecycle.ts) because aimeat_extension_install does the
       // same act and answers to the same numbers.
       const written = await writeExtensionRecord({ storage, config, scheduler }, record, {
         existing: null,
@@ -341,7 +341,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       // The whole write — the install ceilings on a create, the secret carry-forward, the no-op
       // shortcut, the in-place swap with its EXCHANGE re-projection and the re-initialisation of an
-      // active extension — is services/extension-lifecycle.ts, because aimeat_extension_install does
+      // active extension — is services/extension/lifecycle.ts, because aimeat_extension_install does
       // the same act. This handler decides who may write and how the answer reads.
       const written = await writeExtensionRecord({ storage, config, scheduler }, record, {
         existing: existing ?? null,
@@ -581,7 +581,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // Changed code falls under the first-use rules: the mark old code keeps goes with it
-      // (services/extension-first-use-keep.ts). The operator's grant to email any address was given
+      // (services/extension/first-use-keep.ts). The operator's grant to email any address was given
       // to the earlier code: for code a caller that is not an operator caller wrote, it is held back
       // and the operators are asked to confirm it (secaudit2026oct22; Jouni, 2026-10-25). Meanwhile
       // the extension emails under the normal recipient rules.
@@ -592,7 +592,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // upload do on every code write: the unattended secret first use and file reach read it
       // (secaudit2026oct22). The same value the install routes stamp.
       // Resolved, so an owner session stamps its GHII rather than the bare name; every reader of the
-      // field tells an account from an agent by the `#` alone (services/extension-system-run.ts), so
+      // field tells an account from an agent by the `#` alone (services/extension/system-run.ts), so
       // the two read alike (Semgrep owner-data-must-resolve-identity, code scanning 1765).
       const writer = resolveIdentity(req.auth!, config.nodeId);
       const updated = await storage.updateExtension(name, {
@@ -643,7 +643,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // The scheduled jobs, the ext:{name} namespace and each instance's namespace go with the row.
-      // One implementation (services/extension-lifecycle.ts): aimeat_extension_delete deleted only
+      // One implementation (services/extension/lifecycle.ts): aimeat_extension_delete deleted only
       // the row, so an extension uninstalled by an agent left its cron jobs and its data behind.
       await uninstallExtension({ storage, config, scheduler }, name);
       logger.info(`Extension uninstalled: ${name}`, { by: req.auth!.sub });
@@ -676,7 +676,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // Code a package brought in under install role operator waits for an operator; an operator
-      // switching it on is that approval (services/extension-code-hold.ts).
+      // switching it on is that approval (services/extension/code-hold.ts).
       const isOperator = await isOperatorCaller(storage, req.auth);
       const held = codeHoldRefusal(ext, isOperator);
       if (held) {
@@ -685,7 +685,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // Status, the schedules the manifest declares, and the @activate jobs — one implementation
-      // (services/extension-lifecycle.ts), because aimeat_extension_activate wrote only the status
+      // (services/extension/lifecycle.ts), because aimeat_extension_activate wrote only the status
       // and left the extension switched on with its clock never started.
       const updated = await activateExtension({ storage, config, scheduler }, isOperator ? await takeHoldOff(storage, ext) : ext, req.auth!.sub);
 

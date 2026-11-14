@@ -11,7 +11,7 @@
  *   address chosen by code one of the owner's agents wrote or by a host field such an agent set, asks
  *   the owner first under the approval standard (services/secret-approvals.ts files the question; an
  *   agent holding secrets:manage is not asked about). While it is off, that send goes through and
- *   the address is kept, as before the audit (services/extension-secret-authority.ts decideFirstUse).
+ *   the address is kept, as before the audit (services/extension/secret-authority.ts decideFirstUse).
  *
  *   WHERE IT IS KEPT. The profile settings record pattern (routes/ghii/profile.ts
  *   `profile.<username>.directory_listed`): one memory record, `profile.<username>.secret_host_ask`,

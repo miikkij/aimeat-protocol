@@ -28,7 +28,7 @@ import { portfolioSwitchState } from './portfolio-config.js';
 import { pageAccessOf } from './page-access.js';
 import { publishAskOf, fileAsk } from './publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
-import { askedOf, type AppPublishAsked, type PageGate } from './app-publish-gate.js';
+import { askedOf, type AppPublishAsked, type PageGate } from './app/publish-gate.js';
 
 /** The one change a request about the welcome page makes. */
 export type PortfolioChange =

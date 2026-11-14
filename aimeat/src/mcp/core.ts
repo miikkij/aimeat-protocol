@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-13 — aimeat_agents_list reads the roster through services/agent/owner-roster.ts, the gate,
+ *     the read and the run-mode filter GET /v1/agents calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — SECURITY: aimeat_discover decides with the session's permissions, built by
  *     services/discovery/caller.ts as GET /v1/discover builds them, not with the agent record's list
  *     (structure programme 2026-11, unit 7).
@@ -227,6 +229,7 @@ import { taskStartView, scopeUseLookup } from '../services/agent/task-start-writ
 import { stoppedView } from '../services/agent/stop-rules.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { ownerRoster } from '../services/agent/owner-roster.js';
 import { presentWorkCost } from '../services/morsel.js';
 import { presentActionPricing } from '../services/action-pacing.js';
 import { memoryVisibilityDefault } from '../services/content-defaults.js';
@@ -418,9 +421,12 @@ export function registerCoreTools(
             if (!parsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
-            const all = await storage.getAgentsByOwner(localAccountName(agentGaii));
-            // The roster filter GET /v1/agents applies: an unknown value lists nothing (unit 3b).
-            const agents = run_mode ? all.filter(a => (a.runMode ?? '') === run_mode) : all;
+            // Who may list, the read and the run-mode filter (an unknown value lists nothing) are
+            // services/agent/owner-roster.ts, which GET /v1/agents calls too. The session is an agent,
+            // so the app refusal there never applies here.
+            const roster = await ownerRoster(storage, caller().auth, run_mode);
+            if (!roster.ok) return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
+            const agents = roster.agents;
             // The same two fields GET /v1/agents gives the owner and the owner's agents.
             const access = await readOwnerAgentAccessOrMarker(storage, ownerGhiiOf(agentGaii), 'aimeat_agents_list');
             const useOf = await scopeUseLookup(storage, agents);

@@ -422,7 +422,7 @@ export const ConsentCreateSchema = z.object({
     scope: z.enum(CONSENT_REACH_INPUTS).optional(),
     expires: z.string().datetime().nullable().optional().default(null),
     metadata: z.record(z.string(), z.unknown()).optional(),
-    // What the recipient may do. Absent: read. Write is decided in services/workspace-roles.ts
+    // What the recipient may do. Absent: read. Write is decided in services/workspace/roles.ts
     // (consentWsRole), never from the purpose text.
     role: z.enum(['read', 'write']).optional(),
 });

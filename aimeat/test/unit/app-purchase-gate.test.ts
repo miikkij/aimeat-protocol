@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The app's own gates as POST /v1/app-store/purchase asks them
- *   (src/services/app-purchase-gate.ts; secaudit2026oct26,
+ *   (src/services/app/purchase-gate.ts; secaudit2026oct26,
  *   app-store:purchase-returns-content-past-app-gates): an app the operator hid is not found, an app
  *   open to the owner's chosen people refuses a buyer outside them, and an access code the buyer did
  *   not send keeps the copy out of the receipt. The usage half: an open app and a buyer who sends the
@@ -16,7 +16,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { AppRecord } from '../../src/storage/interface.js';
-import { appPurchaseGate } from '../../src/services/app-purchase-gate.js';
+import { appPurchaseGate } from '../../src/services/app/purchase-gate.js';
 
 const NODE_ID = 'aimeat-local-001-dev';
 const config = { nodeId: NODE_ID, accountEventWindow: 0, contentAccess: 'open' } as unknown as AimeatConfig;

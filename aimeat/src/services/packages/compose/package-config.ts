@@ -7,7 +7,7 @@
  *   WHAT IT IS FOR. A package that installs and then does not work until somebody finds the right
  *   screen is the thing install packages exist to end (wish-asennuspaketit-uusille-nodeille-ja-
  *   keskitetty-pakettireposit, phase 2). So an install takes `config: { <componentId>: { … } }`:
- *   an app component's values go into its config record (services/app-config.ts), and an extension
+ *   an app component's values go into its config record (services/app/config.ts), and an extension
  *   component's values go into the extension's own config, where a `type: secret` field is encrypted
  *   and only the sandbox sees it decrypted.
  *
@@ -30,11 +30,11 @@
  */
 import type { AimeatConfig } from '../../../config.js';
 import type { PackageComponent, InstalledComponent } from '../../../storage/interface.js';
-import { parseAppConfigSchema, checkAppConfigValues, configMissing, type AppConfigSchema, type AppConfigValues } from '../../app-config.js';
-import { buildExtensionRecordFromManifest } from '../../extension-manifest.js';
-import { getExtSecretKeys, prepareSecretConfigForWrite, stripClientEncryptedValues } from '../../extension-secrets.js';
+import { parseAppConfigSchema, checkAppConfigValues, configMissing, type AppConfigSchema, type AppConfigValues } from '../../app/config.js';
+import { buildExtensionRecordFromManifest } from '../../extension/manifest.js';
+import { getExtSecretKeys, prepareSecretConfigForWrite, stripClientEncryptedValues } from '../../extension/secrets.js';
 import { getEncryptionKey } from '../../encryption.js';
-import { hostFieldsOf, parseHostFieldValue, type NetworkHostField } from '../../extension-network-hosts.js';
+import { hostFieldsOf, parseHostFieldValue, type NetworkHostField } from '../../extension/network-hosts.js';
 
 /** Config keys the extension builder keeps beside the declared fields; never a caller's to set. */
 const EXTENSION_RESERVED_KEY = /^__|^\$/;

@@ -71,29 +71,29 @@ import { validateCortexAgents } from '../../models/crew-def-schemas.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
+import { forkApp, deleteOwnedApp } from '../../services/app/lifecycle.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import {
     applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput, appAccessMembershipRefusal,
     SETTINGS_PRESENTATION_FIELDS, SETTINGS_OFFERING_FIELDS, type AppSettingsField, type AppSettingsInput,
-} from '../../services/app-settings.js';
-import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput, appOwnWords, prospectiveApp, thinPageRefusal, APP_OWN_WORDS_MIN } from '../../services/app-seo.js';
+} from '../../services/app/settings.js';
+import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput, appOwnWords, prospectiveApp, thinPageRefusal, APP_OWN_WORDS_MIN } from '../../services/app/seo.js';
 import {
     applyOwnerMarksUpdate, appMarksState, parseMarksInput, parseAuthorInput, AUTHOR_NEEDS_OWNER_PRINCIPAL,
-} from '../../services/app-marks.js';
+} from '../../services/app/marks.js';
 import {
     applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney, parseLegalInput, legalUpdateRefusal,
-} from '../../services/app-legal.js';
-import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
+} from '../../services/app/legal.js';
+import { recordAppAudit, type AppAuditAction } from '../../services/app/audit.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { operatorOverride } from '../../services/operator-override.js';
-import { appIsPaced, appToll } from '../../services/app-pacing.js';
-import { currentAppRow } from '../../services/app-served-protection.js';
+import { appIsPaced, appToll } from '../../services/app/pacing.js';
+import { currentAppRow } from '../../services/app/served-protection.js';
 import { callerOf } from '../../middleware/caller.js';
-import { fileAppPublishAsk, appAskedNote, publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
-import { appSettingsGate, appSettingsCapRefusal } from '../../services/app-settings-gate.js';
+import { fileAppPublishAsk, appAskedNote, publishAskedFields, askedStatus } from '../../services/app/publish-gate.js';
+import { appSettingsGate, appSettingsCapRefusal } from '../../services/app/settings-gate.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
 
 /** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
@@ -135,7 +135,7 @@ function patchRefusal(body: Record<string, unknown>, auth: Parameters<typeof isO
     if ('author' in body) {
         // Never for a delegate, whatever rung they hold. Declaring the natural person who answers
         // for an app is the account holder's own act, and somebody signed in as the owner of THEIR
-        // account is not the owner of this one. The same test services/app-marks.ts applies.
+        // account is not the owner of this one. The same test services/app/marks.ts applies.
         const ownerPrincipal = delegated === null && isOwnerInPerson(auth);
         if (!ownerPrincipal) return { status: 403, code: 'ACCESS_DENIED', message: AUTHOR_NEEDS_OWNER_PRINCIPAL };
         const parsed = parseAuthorInput(body.author);
@@ -240,7 +240,7 @@ export function registerForkManageRoutes(
             }
         }
 
-        // Past the gates it is services/app-lifecycle.ts — the same copy aimeat_app_fork performs:
+        // Past the gates it is services/app/lifecycle.ts — the same copy aimeat_app_fork performs:
         // the target-name check, the shadowing check, the per-owner quota, the manifest with the
         // source's paid terms and private notes removed, the bytes, the screenshot, the lineage
         // event, the change log and the public feed.
@@ -401,14 +401,14 @@ export function registerForkManageRoutes(
         // Each field is independent and only touched when present in the body, so a
         // parked-only PATCH never clears the access code (and vice-versa).
         const notes: string[] = [];
-        // Every change to how this app is offered lands in its audit log (services/app-audit.ts),
+        // Every change to how this app is offered lands in its audit log (services/app/audit.ts),
         // under the principal that made it — the agent's GAII when an agent did, so the owner can
         // tell their own hand from their agents'.
         const audit = (action: AppAuditAction, detail?: Record<string, string | number | boolean | null>) =>
             recordAppAudit(storage, { ownerGhii: effectiveGaii, filename, by: callerGaii, action, detail });
 
         // The app's own settings (name, descriptions, access code, parked, forkable, protection)
-        // are services/app-settings.ts, which the MCP tool calls too. Called once per part, before
+        // are services/app/settings.ts, which the MCP tool calls too. Called once per part, before
         // and after `cortex`, so the writes and the notes keep the order they always had.
         const settingsTarget = { ownerGaii: effectiveGaii, ownerName: owner, filename, callerGaii };
         const applySettings = async (fields: readonly AppSettingsField[]): Promise<boolean> => {
@@ -567,7 +567,7 @@ export function registerForkManageRoutes(
         const version = versionParam ? parseInt(versionParam, 10) : undefined;
 
         // The bucket sweep, the screenshot removal and the change-log line are
-        // services/app-lifecycle.ts — the same function aimeat_app_delete calls. That tool used to
+        // services/app/lifecycle.ts — the same function aimeat_app_delete calls. That tool used to
         // delete a single bucket and nothing else, so a ghost row from an old publish path survived
         // an agent's delete and its screenshot stayed in storage.
         const out = await deleteOwnedApp(storage, {

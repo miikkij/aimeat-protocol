@@ -32,7 +32,7 @@ import { s3Target } from '../../storage/blob/s3-client.js';
 import { uriEncode } from '../../storage/blob/blob-http.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
-import { appOriginScheme } from '../app-urls.js';
+import { appOriginScheme } from '../app/urls.js';
 import { endpointOrigin } from './file-store-specs.js';
 
 /** One preflight costs one round trip; a store that does not answer in this time is reported as unknown. */

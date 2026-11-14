@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node MCP tool aimeat_extension_invoke runs the sequence POST /v1/ext/:extName/:actionId
- *   runs (services/extension-invoke.ts). Proven on the parts the tool used to skip and the E2E suite
+ *   runs (services/extension/invoke.ts). Proven on the parts the tool used to skip and the E2E suite
  *   cannot see: a delivered call records its duration under the provider, the failure text is redacted
  *   of credential-shaped text, and a version pin resolves.
  * @version-history

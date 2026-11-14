@@ -121,7 +121,7 @@ export interface AppNeed {
 }
 
 /**
- * What an app needs, from the AI roles it declares in its meta (services/app-ai-roles.ts), as the
+ * What an app needs, from the AI roles it declares in its meta (services/app/ai-roles.ts), as the
  * pill shows it beside the bolt: one entry per pill capability any role names. Empty for an app that
  * declares no roles, and for every caller that is not acting for an app.
  */

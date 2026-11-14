@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { GENRE_BODIES } from '../../src/data/app-templates/genres.js';
-import { genreForkFindings, genreKeptShare, genreClassNames, GENRE_KEPT_MIN } from '../../src/services/app-genre-fork.js';
+import { genreForkFindings, genreKeptShare, genreClassNames, GENRE_KEPT_MIN } from '../../src/services/app/genre-fork.js';
 
 const page = (register: string, body: string) => `<!DOCTYPE html><html><head><meta name="aimeat-track" content="atelier" />
 <meta name="aimeat-register" content="${register}" /><link href="/lib/aimeat-atelier.css" rel="stylesheet" /></head><body>${body}</body></html>`;

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Scheduled `extension` job executor: turns a ScheduledJobRecord into one unattended
  *   extension run. The run itself — resolving the extension and action, the owner fence, secrets,
- *   the instance, the sandbox context — is services/extension-system-run.ts, shared with the
+ *   the instance, the sandbox context — is services/extension/system-run.ts, shared with the
  *   workflow engine's `extension` step.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from scheduler.ts (max-file-lines)
@@ -42,7 +42,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { runExtensionActionAsSystem } from './extension-system-run.js';
+import { runExtensionActionAsSystem } from './extension/system-run.js';
 import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import type { EmailService } from './email.js';
 

@@ -7,7 +7,7 @@
  *   that file reached the 800-line ceiling; subdomains.ts re-exports the three exported functions, so
  *   no importer changed.
  * @structure unlockRedirect · resolveAppTarget, resolveServableApp and appIsRestricted re-exported from
- *   services/app-access.ts
+ *   services/app/access.ts
  * @usage import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain-app-gate.js';
  * @version-history
  *   2026-11-13 — resolveAppTarget, resolveServableApp and appIsRestricted moved unchanged to
@@ -23,12 +23,12 @@
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { AppRecord } from '../storage/interface.js';
-import { appNeedsSignIn } from '../services/app-access.js';
+import { appNeedsSignIn } from '../services/app/access.js';
 
 // resolveAppTarget, resolveServableApp and appIsRestricted read no request and live in
-// services/app-access.ts, so a service resolves an app origin's target without importing a route
+// services/app/access.ts, so a service resolves an app origin's target without importing a route
 // file; re-exported for every importer of this file.
-export { resolveAppTarget, resolveServableApp, appIsRestricted } from '../services/app-access.js';
+export { resolveAppTarget, resolveServableApp, appIsRestricted } from '../services/app/access.js';
 
 /**
  * A CODE-gated app met by a browser that holds no usable grant: send it to the apex, where the

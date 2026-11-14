@@ -130,7 +130,7 @@ import { mcpInstallLink } from '../services/mcp-install.js';
 // static-files.ts have imported them from here since before the split.
 import { PROCESS_BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
 import { localAccountName } from '../utils/gaii.js';
-import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
+import { appHiddenFromPublicSurfaces } from '../services/app/ai-use.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { livePageMarkdown } from '../services/page-body-live.js';
 import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio-seo.js';

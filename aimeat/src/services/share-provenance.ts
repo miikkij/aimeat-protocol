@@ -11,7 +11,7 @@
  *   URL got 404, as did a by-hash lookup of the text they were given.
  *
  *   WHY NOT A SQL CLAUSE. Whether a share opens a record depends on the copy of meta.share and of
- *   the manifest that counts (services/workspace-meta.ts pickWorkspaceMetaCopy: the creator's, else an
+ *   the manifest that counts (services/workspace/meta.ts pickWorkspaceMetaCopy: the creator's, else an
  *   organism manager's, never a plain member's), on the manifest mapping a namespace to a space, on
  *   the docs > spaces > public precedence of the share, and on the classification of each record
  *   (what may leave the organism). A clause re-deriving all that in SQL would be a second
@@ -51,11 +51,11 @@ import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import type { WorkspaceProvenanceLink } from '../storage/repositories/ai-provenance.repository.js';
 import { publiclyResolvable } from './ai/provenance.js';
 import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock, type ServeOptions } from './ai/provenance-marks.js';
-import { createPublicCollectors } from './workspace-public-collectors.js';
+import { createPublicCollectors } from './workspace/public-collectors.js';
 import { readerFor } from './classification/reader.js';
-import { shareIsOpen, isDocPublicAt, readShareMetaOf } from './workspace-share.js';
+import { shareIsOpen, isDocPublicAt, readShareMetaOf } from './workspace/share.js';
 import { servedPageProvenanceIds } from './served-page-provenance.js';
-import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace/record-key.js';
 import type { ResolvedShare } from '../routes/organisms/share-types.js';
 
 /** `organism.{org}.w.{ws}.` — the workspace a published record key belongs to. */

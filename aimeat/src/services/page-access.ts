@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may OPEN an owner's welcome page (the portfolio) and a company's front page (plan
- *   doc-mvcn6c7e4e5q, V3.10). The same three values an app's `open_to` takes (services/app-access.ts),
+ *   doc-mvcn6c7e4e5q, V3.10). The same three values an app's `open_to` takes (services/app/access.ts),
  *   and the same decision behind them (services/audience.ts):
  *
  *     anyone          the default, stored as no value: the address opens the page, as before.
@@ -16,7 +16,7 @@
  *   visibility gets).
  *
  *   The page origins hold no session, so a page that needs a sign-in is served there only with a
- *   page grant (services/app-access-token.ts pageAccessGranted), which POST /v1/portfolio/:user/open
+ *   page grant (services/app/access-token.ts pageAccessGranted), which POST /v1/portfolio/:user/open
  *   and POST /v1/companies/:id/open hand out (routes/page-open.ts).
  * @structure PageAccess · pageAccessOf · parsePageAccessInput · pageNeedsSignIn · mayOpenPage ·
  *   pageOpenPath · pageAccessLevel
@@ -29,10 +29,10 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { ContentAccess } from '../config/visibility.js';
-import { parseAppAccessInput, appAccessOf, appAudience, type AppAccess } from './app-access.js';
+import { parseAppAccessInput, appAccessOf, appAudience, type AppAccess } from './app/access.js';
 import { audienceAllows, type AudienceAuth } from './audience.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
-import type { PageRef } from './app-access-token.js';
+import type { PageRef } from './app/access-token.js';
 
 /** What an owner writes and what a read answers: the app's three words. */
 export type PageAccess = AppAccess;

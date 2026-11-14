@@ -20,7 +20,7 @@
  *     metadata is admitted by the contract and not charged.
  *
  *     THE INTERFACE. A package's Table Schemas are its interface. Each schema mints an interface version
- *     (services/app-tool-interfaces.ts, keyed `datapkg:{name}` / `read`), a listing names the current one
+ *     (services/app/tool-interfaces.ts, keyed `datapkg:{name}` / `read`), a listing names the current one
  *     and a contract pins the one it was signed on. THE PINNED VERSION RANGE of a contract is every
  *     stored version of the package whose schemas hash to that interface (contractVersionHashes): a read
  *     with no version reads the newest of them, and a version outside them is refused. A schema change
@@ -56,7 +56,7 @@ import {
 import { trustedPackageOf, type TrustedAudience } from './datapackage/audience-record.js';
 import { saleTermsOf, writeSaleTerms } from './datapackage/sale-terms-record.js';
 import { currentNodeId } from '../utils/gaii.js';
-import { hashDef, getInterfaceVersion, type InterfaceDef } from './app-tool-interfaces.js';
+import { hashDef, getInterfaceVersion, type InterfaceDef } from './app/tool-interfaces.js';
 import { resolveActionPricing, type OfferingPlan } from './exchange-action-pricing.js';
 import type { EntitlementUnit, PricingSpec, DatapackageSurface } from './metered-entitlements.js';
 import { dataListingRefusal } from './data-intermediation/gate.js';
@@ -82,7 +82,7 @@ export function parseDatapackageCoordinate(ext: string): { ownerName: string; na
     return m ? { ownerName: m[1]!, name: m[2]! } : null;
 }
 
-/** The interface key a package's schemas are versioned under (services/app-tool-interfaces.ts). */
+/** The interface key a package's schemas are versioned under (services/app/tool-interfaces.ts). */
 export const packageIfaceApp = (name: string): string => `datapkg:${name}`;
 
 /** Does a JSON Schema describe rows or records: an array of objects, or an object whose rows/records/items is one? */

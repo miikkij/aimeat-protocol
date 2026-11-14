@@ -13,7 +13,7 @@
 import type { RequestHandler } from 'express';
 import { denyScope403 } from '../auth/deny.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { READ_THROUGH_SCOPE } from '../services/app-grant-scopes.js';
+import { READ_THROUGH_SCOPE } from '../services/app/grant-scopes.js';
 
 /**
  * An APP or an AGENT that may not read through a connection is told what it lacks and how it gets

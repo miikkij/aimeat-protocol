@@ -144,7 +144,7 @@ export type WorkflowStepAction =
   // with no agent session and no model call. It is the deterministic half of a pipeline — fetch,
   // normalise, hash, write a file — next to the agent steps that do the interpreting.
   //
-  // Same input as the schedule kind, because it is the same run: services/extension-system-run.ts
+  // Same input as the schedule kind, because it is the same run: services/extension/system-run.ts
   // executes both. `input` is {var}-templated at dispatch, so a step can be parameterised by the
   // run's vars the way a key template is. The step completes through onPushTerminal, which means
   // its success_signal decides green or red exactly as it does for an ecosystem step — a script

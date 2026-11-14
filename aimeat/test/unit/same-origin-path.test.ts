@@ -20,7 +20,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { isSameOriginPath, safeRedirectPath, withQueryParam } from '../../src/utils/same-origin-path.js';
-import { safeNotificationLink } from '../../src/services/extension-notify.js';
+import { safeNotificationLink } from '../../src/services/extension/notify.js';
 import { isSafeNotifActionEndpoint } from '../../src/services/notify.js';
 import { createPrincipalNotification } from '../../src/services/notification-create.js';
 

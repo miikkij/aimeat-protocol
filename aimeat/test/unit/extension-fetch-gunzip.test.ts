@@ -34,10 +34,10 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
 });
 
 const { EXTENSION_FETCH_MAX_BYTES_CEILING, OUTBOUND_READ_MAX_BYTES, inflateCapped, isGzip } = await import('../../src/utils/read-capped.js');
-const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
-const { executeExtensionAction } = await import('../../src/services/extension-runtime.js');
-const { buildExtensionRecordFromManifest } = await import('../../src/services/extension-manifest.js');
-const { capabilitiesOfRecord } = await import('../../src/services/extension-capability-declaration.js');
+const { buildExtensionCtx } = await import('../../src/services/extension/ctx.js');
+const { executeExtensionAction } = await import('../../src/services/extension/runtime.js');
+const { buildExtensionRecordFromManifest } = await import('../../src/services/extension/manifest.js');
+const { capabilitiesOfRecord } = await import('../../src/services/extension/capability-declaration.js');
 
 const config = {
     nodeId: 'node-1', encryptionKey: null, totpSecretEncryptionKey: null,

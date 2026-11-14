@@ -3,18 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The manifest's `provides.ai_provider` declaration (System 2 plan V6), validated by
- *   buildExtensionRecordFromManifest (services/extension-manifest.ts) and read back by
- *   aiProviderDeclarationOf (services/extension-ai-provider-declaration.ts): the accepted shape and
+ *   buildExtensionRecordFromManifest (services/extension/manifest.ts) and read back by
+ *   aiProviderDeclarationOf (services/extension/ai-provider-declaration.ts): the accepted shape and
  *   how it is stored, and each refusal naming its field.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-ai-provider-manifest.test.ts
  * @version-history
  *   v1.0.0 — 2026-09-28 — System 2 plan, V6: initial.
  */
 import { describe, it, expect } from 'vitest';
-import { buildExtensionRecordFromManifest } from '../../src/services/extension-manifest.js';
+import { buildExtensionRecordFromManifest } from '../../src/services/extension/manifest.js';
 import {
     AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, aiProviderDeclarationOf,
-} from '../../src/services/extension-ai-provider-declaration.js';
+} from '../../src/services/extension/ai-provider-declaration.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const config = {

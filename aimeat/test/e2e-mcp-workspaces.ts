@@ -1035,7 +1035,7 @@ await test('43. workspace_create refuses a blank name, as the REST door always h
 
 // ── The routes the connector and the shell call (secaudit 2026-10 follow-up, Part B) ──
 // aimeat_workspace_read and _write run their CLI dispatch definition on the connector, which calls
-// these two routes; both run services/workspace-tool-ops.ts, the functions the MCP tools above run.
+// these two routes; both run services/workspace/tool-ops.ts, the functions the MCP tools above run.
 
 const restAs = (token: string, path: string, opts: RequestInit = {}) =>
     json(path, { ...opts, headers: { Authorization: `Bearer ${token}`, ...(opts.headers as Record<string, string> | undefined) } });

@@ -6,6 +6,10 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-13 — GET /:id/invitations/email asks services/organism-read/manager.ts
+ *     pendingEmailInvitationsFor, the rule and the read aimeat_organism_invitations_email asks; the
+ *     answers are unchanged (structure programme 2026-11, unit 2b). GET /:id/workspaces asks
+ *     requireMember (services/organism-read/member.ts), the gate aimeat_workspace_list asks.
  *   2026-11-09 — POST workspace-access/grant says where the grantee stands in the organism and, for
  *     an account outside it, sends the organism invitation when the granter may invite
  *     (services/invitations.ts membershipAfterGrant). The role opened nothing for a non-member before.
@@ -103,13 +107,14 @@ import { hashPassword } from '../../services/password.js';
 import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner-provisioning.js';
 import { nodeContext } from '../../services/node-context.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
-import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
-import { isOrgManager } from '../../services/workspace-access.js';
-import { workspaceMetaReader } from '../../services/workspace-meta.js';
+import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace/enrichment.js';
+import { isOrgManager } from '../../services/workspace/access.js';
+import { workspaceMetaReader } from '../../services/workspace/meta.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
-import { decideAccessRequest, requestStatus } from '../../services/workspace-access-decision.js';
+import { decideAccessRequest, requestStatus } from '../../services/workspace/access-decision.js';
 import { listWorkspaceAccessRequests } from '../../services/organism-read/workspace-access-requests.js';
+import { pendingEmailInvitationsFor } from '../../services/organism-read/manager.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, membershipAfterGrant, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
@@ -127,7 +132,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   const {
     memberRole, wsRegPrefix, bareOwner, canReadWsManifest, readWsManifests, findWsEntry, ensureConsent,
     memberRolesForWs, setWorkspaceRole, revokeWorkspaceRole,
-    requireWsManager, requireOrgAdmin, requireOrgMember, codeInviteGuards,
+    requireWsManager, requireOrgAdmin, refuseOrgAdmin, requireMember, requireOrgMember, codeInviteGuards,
   } = H;
 
   /**
@@ -155,9 +160,10 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
    * names + creator + your access status). Discovery is open to members; content stays gated. ── */
   router.get('/v1/organisms/:id/workspaces', requireAuth(), requireRestScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    // The organism and the membership rule: services/organism-read/member.ts, which aimeat_workspace_list asks too.
+    const member = await requireMember(req, res, id);
+    if (!member) return;
+    const { organism } = member;
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const ownerName = req.auth!.owner as string;
     // An org manager (creator/admin) reads every workspace under the organism → mark them 'granted'
@@ -312,7 +318,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   });
 
   // requestStatus (what a request record says about itself) and the decision itself live in
-  // services/workspace-access-decision.ts, which the MCP aimeat_workspace_access decide path calls too.
+  // services/workspace/access-decision.ts, which the MCP aimeat_workspace_access decide path calls too.
 
   /* ── GET /v1/organisms/:id/workspace-access?ws= — the workspace creator (or org admin) lists the
    * pending/decided access requests for a workspace they own. ── */
@@ -399,7 +405,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can decide access')); return;
     }
     // Grant or revoke, write the decision on the request record, tell the requester: the same
-    // function the MCP aimeat_workspace_access decide path calls (services/workspace-access-decision.ts).
+    // function the MCP aimeat_workspace_access decide path calls (services/workspace/access-decision.ts).
     const decided = await decideAccessRequest({ storage, config }, {
       orgId: id, ws, wsName: entry.name ?? ws, creator: createdBy, requester, decision,
       role: req.body?.role === 'viewer' ? 'viewer' : 'contributor', decidedBy: ownerName,
@@ -499,9 +505,11 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   /* GET /v1/organisms/:id/invitations/email — list pending email invitations (creator/admin) */
   router.get('/v1/organisms/:id/invitations/email', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
-    const organism = await requireOrgAdmin(req, res, id);
-    if (!organism) return;
-    const invitations = (await storage.listInvitationsByOrganism(id, { status: 'pending' })).map(invitePublic);
+    // The manager rule and the read are services/organism-read/manager.ts, which
+    // aimeat_organism_invitations_email asks too.
+    const out = await pendingEmailInvitationsFor(storage, id, { owner: req.auth!.owner as string });
+    if (!out.ok) { refuseOrgAdmin(res, out.code); return; }
+    const invitations = out.invitations;
     res.json(success(config.nodeId, { invitations, total: invitations.length }));
   });
 

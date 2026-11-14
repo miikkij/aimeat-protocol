@@ -18,7 +18,7 @@ import { catalogModel } from './catalog/store.js';
 import type { AiCapability } from './types.js';
 import type { AiProvider } from './providers.js';
 import type { OwnerRole } from './roles.js';
-import type { AppAiRole } from '../app-ai-roles.js';
+import type { AppAiRole } from '../app/ai-roles.js';
 
 /** The catalogue's context for a model of a provider type, or undefined when it does not say. */
 export function contextOf(type: string, model: string): number | undefined {

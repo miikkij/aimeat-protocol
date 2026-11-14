@@ -20,7 +20,7 @@
  *   again and writes from that. Without it the write replaces whatever is there, for the person
  *   editing in the page who just looked at it.
  *
- *   The handlers are the route's gate and one call of services/app-design-spec-ops.ts, which the
+ *   The handlers are the route's gate and one call of services/app/design-spec-ops.ts, which the
  *   aimeat_app_manage MCP tool (spec, spec_set, spec_clear) calls too.
  * @structure registerDesignSpecRoutes(router, config, storage) —
  *   GET /design-spec · PUT /design-spec · DELETE /design-spec
@@ -35,7 +35,7 @@ import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
-import { readDesignSpecFor, writeDesignSpecFor, clearDesignSpecFor } from '../../services/app-design-spec-ops.js';
+import { readDesignSpecFor, writeDesignSpecFor, clearDesignSpecFor } from '../../services/app/design-spec-ops.js';
 import { sendAppOp } from '../app-op-answer.js';
 
 /** The app this request names: `:owner` (`me` for the caller's own) and `:filename`. */

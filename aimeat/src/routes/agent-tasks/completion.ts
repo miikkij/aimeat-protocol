@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 — 2026-11-13 — event, complete, fail, decline and the todo PATCH read their task through
+ *     services/agent/task-access.ts taskToActOn, the read and the gate the task tools call
+ *     (structure programme 2026-11, unit 2b).
  *   v1.7.0 — 2026-10-08 — POST …/complete takes ai_provenance and ai_provenance_id, as
  *     aimeat_task_complete does, with the session's scopes: 400 INVALID_PROVENANCE for a malformed
  *     block, 403 SCOPE_DENIED for a declaration the caller may not make (the task stays where it
@@ -52,26 +55,25 @@ import { requireReadiness } from '../../middleware/readiness-gate.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { loadServedProvenance, provenanceItemBlock } from '../../services/ai/provenance-marks.js';
 import type { TaskRouteHelpers } from './helpers.js';
+import { refuseTaskAccess } from './helpers.js';
+import { taskToActOn } from '../../services/agent/task-access.js';
 
 export function registerTaskCompletionRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
 ): void {
-  const { resolve, canAccessTask, canReadTask } = helpers;
+  const { resolve, canReadTask } = helpers;
 
   /* ── POST /v1/agents/:name/tasks/:id/event -- Append event ── */
   router.post('/v1/agents/:name/tasks/:id/event', requireAuth(), requireReadiness('standard', config, storage), async (req, res) => {
     const id = req.params.id as string;
 
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    // The read and who may act on it are services/agent/task-access.ts, which the task tool asks too.
+    const found = await taskToActOn({ storage, config }, req.auth!, id);
+    if (!found.ok) {
+      refuseTaskAccess(res, config, found.code);
       return;
     }
-
-    if (!canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
+    const task = found.task;
 
     // The stalled auto-resume, the state gate, the event and the telemetry roll-up are
     // services/agent/task-write.ts, because they belong to APPENDING AN EVENT rather than to this
@@ -90,16 +92,13 @@ export function registerTaskCompletionRoutes(
   router.post('/v1/agents/:name/tasks/:id/complete', requireAuth(), requireReadiness('standard', config, storage), async (req, res) => {
     const id = req.params.id as string;
 
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    // The read and who may act on it are services/agent/task-access.ts, which the task tool asks too.
+    const found = await taskToActOn({ storage, config }, req.auth!, id);
+    if (!found.ok) {
+      refuseTaskAccess(res, config, found.code);
       return;
     }
-
-    if (!canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
+    const task = found.task;
 
     // The whole completion is services/agent/task-fanout.ts, because it belongs to COMPLETING rather
     // than to this door: which states may complete (active AND stalled, so an agent that came back
@@ -152,16 +151,13 @@ export function registerTaskCompletionRoutes(
   router.post('/v1/agents/:name/tasks/:id/fail', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
 
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    // The read and who may act on it are services/agent/task-access.ts, which the task tool asks too.
+    const found = await taskToActOn({ storage, config }, req.auth!, id);
+    if (!found.ok) {
+      refuseTaskAccess(res, config, found.code);
       return;
     }
-
-    if (!canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
+    const task = found.task;
 
     const message = typeof req.body?.message === 'string' ? req.body.message : 'Task failed';
     // services/agent/task-fanout.ts, which aimeat_task_fail calls for the same transition. The state
@@ -185,16 +181,13 @@ export function registerTaskCompletionRoutes(
   router.post('/v1/agents/:name/tasks/:id/decline', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
 
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    // The read and who may act on it are services/agent/task-access.ts, which the task tool asks too.
+    const found = await taskToActOn({ storage, config }, req.auth!, id);
+    if (!found.ok) {
+      refuseTaskAccess(res, config, found.code);
       return;
     }
-
-    if (!canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
+    const task = found.task;
 
     const reason = typeof req.body?.reason === 'string' ? req.body.reason : '';
     const declined = await declineTask({ storage, config }, task, reason, resolve(req));
@@ -355,16 +348,13 @@ export function registerTaskCompletionRoutes(
     const id = req.params.id as string;
     const todoId = req.params.todoId as string;
 
-    const task = await storage.getAgentTask(id);
-    if (!task) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+    // The read and who may act on it are services/agent/task-access.ts, which the task tool asks too.
+    const found = await taskToActOn({ storage, config }, req.auth!, id);
+    if (!found.ok) {
+      refuseTaskAccess(res, config, found.code);
       return;
     }
-
-    if (!canAccessTask(req, task)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
-      return;
-    }
+    const task = found.task;
 
     // The auto-resume, the state gate, the todo write and its event are services/agent/task-write.ts.
     // aimeat_task_todo wrote its own, and that copy carried two things this one did not: the

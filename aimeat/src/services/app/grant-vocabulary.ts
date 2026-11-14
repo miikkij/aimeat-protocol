@@ -1,0 +1,198 @@
+/**
+ * @file src/services/app/grant-vocabulary.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The scope vocabulary an app may ask an owner for, each with the sentence the consent
+ *   screen falls back to when a locale has no line for it. Moved out of routes/app-grants.ts by pure
+ *   extraction when that file passed 800 lines; nothing else changed, and the route still owns every
+ *   decision made WITH this list.
+ * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
+ * @usage import { APP_GRANTABLE_SCOPES } from './grant-vocabulary.js';
+ * @version-history
+ *   2026-11-04 — Moved unchanged from routes/ to services/: build-app-prompt.ts read it through
+ *     routes/app-grants.ts, which closed a 14-file run-time import cycle, and two more services read
+ *     it from routes/ (codebase analysis 2026-11-03, item D-d).
+ *   2026-11-02 — exchange:invoke, split out of exchange:write: calling an app tool, askable by an app.
+ *   2026-10-23 — exchange:read and exchange:write, askable by an app. EXCHANGE (the marketplace app)
+ *     could not show a signed-in person's contracts, work or listings, nor contract, post a need or
+ *     list anything: those routes ask these two words, no app could hold them, and declaring one
+ *     refused the whole sign-in (wish-apps-cannot-hold-exchange-read-exchange-write-exchange-signe).
+ *   2026-10-16 — The consent text says what memory:delete and memory:purge really do: a delete goes to
+ *     the bin first; a purge also covers a whole workspace or organism (invariant 8, ruled by the
+ *     developer on 2026-10-16).
+ *   2026-10-15 — mcp:use, calling tools on the owner's attached MCP servers, askable by an app
+ *     (feature-list audit #12).
+ *   v1.9.0 -- 2026-10-12 -- agent:read, the word the agent list asks from 4.0.0 (auth/rest-scope-gate.ts).
+ *   v1.8.0 -- 2026-10-12 -- packages:read, the word the install reads ask from 4.0.0 (auth/rest-scope-gate.ts).
+ *   v1.7.0 -- 2026-10-09 -- ext:invoke, running an installed extension's action, askable by an app: an
+ *     automation step that calls an extension costs it, and an app could not otherwise save one.
+ *   v1.6.0 -- 2026-10-01 -- contacts:read, reading the owner's address book (GET /v1/contacts), askable
+ *     by an app: the developer's ruling of 2026-10-01.
+ *   v1.5.0 -- 2026-09-26 -- work:request, giving agents work, askable by an app: an automation step
+ *     that dispatches to an agent costs it, and an app could not otherwise save one.
+ *   v1.4.0 -- 2026-09-24 -- connections:read-through, reading what is in a connected account, and
+ *     connections:use says what it does: publish and send. The one word used to open the mailbox
+ *     too while the consent screen said "publish" (security audit A5-1).
+ *   v1.3.0 -- 2026-09-07 -- Document the enforced publishing scope and existing migration.
+ *   v1.3.0 -- 2026-10-02 -- memory:purge: deleting shared workspace records for good.
+ *   v1.2.0 -- 2026-09-06 -- secrets:manage: the owner's credential vault, askable by an app.
+ *   v1.1.0 -- 2026-08-29 -- organism:rows: the person's half of the two-hand rule that lets an app
+ *     keep an append-only trail on a row space the organism opened to it.
+ *   v1.0.0 -- 2026-08-18 -- Extracted verbatim from routes/app-grants.ts (max-file-lines).
+ */
+/**
+ * Scopes an app may request, each with a short description key for the consent UI. Drawn from the
+ * scope vocabulary the node actually enforces (auth/middleware.ts requireScope). Deliberately a
+ * curated subset — not operator/admin or destructive-by-default scopes.
+ */
+export const APP_GRANTABLE_SCOPES: Record<string, string> = {
+  'memory:read': 'Read your stored memories and data',
+  'memory:write': 'Create and update your memories and data',
+  // What memory:delete removes goes to the deleted-memory bin first (Jouni, 2026-10-16).
+  'memory:delete': 'Delete your memories and data (they go to the bin first and can be restored)',
+  // 2026-10-02: removing shared workspace records for good, with no grace window to take them back.
+  // 2026-10-16: deleting a whole workspace or organism asks it too.
+  'memory:purge': 'Delete records for good, a whole workspace or organism included (they cannot be restored)',
+  'storage:read': 'Read your stored files (images, documents)',
+  'storage:write': 'Save and update your stored files (images, documents)',
+  'catalogue:read': 'Read the public catalogue/directory',
+  'social:read': 'Read boards you can access',
+  'social:write': 'Post to boards on your behalf',
+  'messages:send': 'Send direct messages on your behalf across the federation',
+  'messages:read': 'Read direct messages addressed to you across the federation',
+  // The owner's address book, read-only (GET /v1/contacts): names, accounts and what the owner wrote
+  // about each person. Its own word rather than messages:read, because an app that lists people to
+  // pick from has no business reading the conversations, and the route leaves those fields empty
+  // unless the app also holds messages:read (the developer's ruling of 2026-10-01).
+  'contacts:read': 'See the names and accounts of the people in your address book',
+  'wallet:read': 'See your morsel balance and transactions',
+  'knowledge:read': 'Read your knowledge packages',
+  // Installing a package REGISTERS an app, a cortex, an extension and any @activate cron the
+  // manifest declares, under the installer's identity. Until 2026-08-15 that door asked for nothing,
+  // so it arrived inside whatever single scope the owner had approved. Named here so the consent
+  // screen can say what it is and the owner can uncheck it.
+  'packages:write': 'Install packages for you (registers their apps, extensions and scheduled jobs)',
+  // The install reads (GET /v1/instances and its two siblings) ask it from 4.0.0 (auth/rest-scope-gate.ts).
+  // An app that reads installs declares it; a grant follows its app's declaration, so the one-time grant
+  // (services/rest-scope-gates-migration.ts) writes it onto agents only.
+  'packages:read': 'See which packages are installed for you and which version each one runs',
+  // The agent list (GET /v1/agents) asks it from 4.0.0 (auth/rest-scope-gate.ts). An app that lists the
+  // owner's agents declares it, beside task:read for the list's task figures.
+  'agent:read': 'See your agents and how each one is set up',
+  // The app-grantable half of a two-hand rule (2026-08-29). A row space on an organism workspace
+  // names the apps it is open to (manifest objectTypes[].apps); this scope is the person's half.
+  // Only both together let the app append to and read that one space, and only while the person
+  // is an active member. Nothing else on the organism opens: no other space, no records, no
+  // documents, no membership.
+  'organism:rows': 'Append to, and read back, the organism row spaces that name this app — an event log or audit trail the app keeps on a group you belong to',
+  // task:* and workflow:* let a control-plane app (e.g. AGENCY) orchestrate the owner's OWN
+  // agents on their behalf. The task routes enforce an owner-match (an app may only create/read
+  // tasks for agents whose owner is the app's own owner) and workflow routes already resolve to
+  // the owner's memory namespace, so a granted app never reaches another owner's agents/data.
+  'task:read': "See your agents' tasks, runs, and results",
+  'task:write': 'Create and start tasks for your own agents on your behalf',
+  'workflow:read': 'See your automations (workflows) and their runs',
+  'workflow:write': 'Create, save, and run your automations (workflows)',
+  // Giving an agent work: an automation step that dispatches to one of the owner's agents costs it
+  // (services/workflow/step-authority.ts), and so do the work, capability and dispute doors. Its own
+  // tick, not part of workflow:write: saving an automation and handing agents jobs are two favours.
+  'work:request': 'Ask agents and apps to do work for you, including the steps of your automations, and rate the results',
+  'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
+  // Running an installed extension's action. POST /v1/ext/:name/:action asks an app for no word at
+  // all, but the same action as an automation step costs ext:invoke (services/workflow/step-authority.ts),
+  // so an app holding workflow:write could not save or run a workflow that calls the owner's own
+  // extension, however much the owner wanted it to (the SOC console, 2026-10-09). Its own tick:
+  // installing or removing an extension stays ext:write, which no app may ask for.
+  'ext:invoke': 'Run actions of the extensions installed on your account, also as steps of your automations (never install or remove one)',
+  // Calling a tool on an MCP server the owner attached (POST /v1/mcp-servers/:id/call). The node holds
+  // the credential and the app never sees the server's address. The owner narrows one app with a grant
+  // written for `app:{owner}/{file}` (services/mcp-client/grants.ts). Attaching and removing servers
+  // stays mcp:manage, which no app may ask for (Jouni, feature-list audit #12, 2026-10-15).
+  'mcp:use': 'Call tools on the MCP servers you have attached. This AIMEAT holds the credential and spends it for you; the app never sees it',
+  // TARGET-057. Deliberately NOT connections:write: an app that may publish to an account you
+  // already connected is a different favour from one that may attach new accounts to your name.
+  // Attaching is a human act at the provider's own consent screen and no app performs it.
+  'connections:use': 'Publish and send through accounts you have already connected (never read what is in them, never change the accounts)',
+  // Reading what is IN a connected account (a mailbox, its attachments, its send-as addresses) is its
+  // own favour and its own tick. It rode connections:use until 2026-09-24, so an app the owner
+  // allowed to publish could read their mail. Grants made before then were not given this word.
+  'connections:read-through': 'Read what is in accounts you have already connected: your mail, its attachments and the addresses you send from',
+  // TARGET-058. Recording what the node OBSERVED needs no permission — that happens whether anyone
+  // asks or not. Asserting how content was made is different: a declaration can say a person wrote
+  // or reviewed something, which is exactly the statement that decides whether a visible AI label is
+  // owed. So the assertion is the thing an owner grants, and staying silent is always free.
+  'provenance:write': 'State how content it creates was made (whether AI wrote it, and whether a person reviewed it)',
+  // Spending is its own permission. Reading your memory and buying on your behalf are not the same
+  // favour, and until this existed the narrowest grant there is was enough to draw on any contract
+  // its owner held — the app presented the owner's own GHII, so the money layer could not tell them
+  // apart. Paired with a per-app ceiling (`spend_cap_units`) so the answer can be an amount rather
+  // than a yes.
+  'contract:spend': 'Buy on your behalf using contracts you hold (spends your morsels or money)',
+  // The other side of the same coin: an app that manages who may use ITS owner's capability.
+  // A membership gate that approves someone and cannot open the door for them is decoration, and
+  // the owner is the one paying for what it gives away — so it is asked for, never assumed.
+  // Handing another account a standing right to read part of your memory is not something
+  // memory:write covers, and reading it that way would be the wrong bargain: an app allowed to
+  // write your records would silently also be allowed to publish them to people you never named.
+  // So it is asked for on its own, exactly as exchange:grant is for giving away what you sell.
+  'share:manage': 'Share parts of your memory with people and groups you have set up (and stop sharing)',
+  // The marketplace as the person sees it: their contracts and their spend under each, the work they
+  // started or must deliver, the proposals on a contract, and who uses what they sell. Offerings and
+  // open needs are public and ask nothing.
+  'exchange:read': 'See your marketplace contracts, the work you started or must deliver, and who uses what you sell',
+  // Acting on the marketplace: accepting an offering under a budget cap, posting a need or a bid,
+  // proposing new terms, delivering work, listing and withdrawing what you sell. Spending under a
+  // contract is still contract:spend with its per-app ceiling; this word only opens or changes them.
+  'exchange:invoke': 'Call app tools under the contracts you already have; it opens no new contract',
+  'exchange:write': 'Make and end marketplace contracts within a budget you set, post needs and bids, deliver work, and list what you sell',
+  'exchange:grant': 'Give and withdraw free access to capabilities you sell (you carry the cost)',
+  // Declaring that part of your revenue goes to someone else, and paying it out, both move value out
+  // of the owner's own pocket. That is a spending decision even though nobody is being charged for it,
+  // so an app that arranges revenue sharing asks for it rather than inheriting it from selling.
+  'exchange:beneficiary': 'Share part of what you earn with other accounts, and pay those shares out',
+  // The owner's secrets vault. An app may set and remove the named credentials this account holds,
+  // and can never read one back — no door returns a value. Its own word rather than a memory one:
+  // handing this to memory:write would have given it to every grant already live, and deleting a
+  // secret silently stops whatever was using it, which is a decision the owner makes per app.
+  'secrets:manage': 'Store and remove the named keys and passwords in your vault (it can never read one back)',
+  // Making something public without a request to the owner (services/publish-gate.ts). Only asked
+  // while the node's publish gate covers apps; a community app whose visitors post public entries
+  // declares it, and the owner sees it on the consent screen (plan doc-mvcn6c7e4e5q, V4.1).
+  'publish:public': 'Make what it creates public to anyone, without asking you each time',
+  // Outside parties (services/parties/): a key handed to a person or a program with no account here
+  // reads the owner's shared data from outside, so an app asks for it by name (plan doc-mvwxcas3dom3, D2.7).
+  'party:manage': 'Give people and programs outside this server a key, and share your data packages with them',
+  'notifications:send': 'Send you notifications (bell + browser push) that open this app',
+  // NARROWER THAN push:manage ON PURPOSE. That word lists and removes every device the person has,
+  // across every app and the node itself, and no app has any business there. This one registers and
+  // removes THIS app's own device and nothing else, which is what an installed app needs so its
+  // notifications arrive as itself. The node stamps which app a subscription belongs to from the
+  // grant, so the word cannot be used to reach another app's devices.
+  'push:receive': 'Show this app\'s notifications on this device, under its own name and icon',
+  'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
+  'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',
+  'organism:write': 'Create organisms and workspaces on your behalf (an app that provisions its own structured data space)',
+  // Company-in-a-box. Reading the books and writing them are different favours: TILIT (the
+  // accountant app) reads; an invoicing surface writes. Neither implies the other, and neither
+  // implies outbound:send — sending a message to a customer is a third, separate favour.
+  'finance:read': 'Read your bookkeeping: invoices, vouchers, VAT reports and exports',
+  'finance:write': 'Create and send invoices and book accounting vouchers on your behalf',
+  'outbound:send': 'Send email/messages to your saved outbound contacts on your behalf (opt-outs and daily limits always apply)',
+  // Measuring what was reached. Split in two because they are different favours: setting up a
+  // counter is housekeeping, while READING one tells you who opened what and when — the closest
+  // thing this node holds to watching a named person, even though it stores no address and no IP.
+  // An app that measures its own campaign needs the first; handing over the second is a decision.
+  'signals:write': 'Set up counters for what you send and publish (campaigns, links, pages)',
+  'signals:read': 'Read what those counters collected, including which recipients opened or clicked',
+  // A company is an addressable public identity, so claiming one and pointing its address
+  // somewhere are separate from reading the registry.
+  'company:read': 'See the companies you have registered and their addresses',
+  'company:write': 'Register companies in your name and set what their address serves',
+  // Publishing under the owner's name requires app:write on inline publishing, presigned URL
+  // issuance and draft promotion, as well as fork/patch. Deletion uses app:manage instead.
+  // Owner sessions retain their bypass.
+  // Apps declare this word in aimeat-scopes and obtain the owner's approval; updating HTML alone
+  // does not expand an existing grant. scope-vocabulary-migration.ts handles eligible legacy
+  // credentials and preserves deliberately narrowed grants. A scoped reader cannot publish.
+  'app:write': 'Publish and update apps in your name (each one gets a public address anyone with the link can open)',
+};

@@ -505,7 +505,7 @@ export interface ExtensionRecord {
    * for an agent or an ecosystem app. `installedBy` beside it is the bare ACCOUNT name, which
    * cannot tell the two apart, so this is what names the AGENT to the owner on the extension's
    * page, and what `unattendedReadAuthority: 'installer'` narrows an unattended read to
-   * (services/extension-system-run.ts). Absent on a record written before 2026-10-20.
+   * (services/extension/system-run.ts). Absent on a record written before 2026-10-20.
    */
   installedByPrincipal?: string;
   /**

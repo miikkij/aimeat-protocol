@@ -175,7 +175,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 // The grantable scope vocabulary — imported so the prompt's scope list can NEVER drift from
 // what the authorize endpoint actually accepts (guessed scope names were an AEB-2 finding).
-import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
+import { APP_GRANTABLE_SCOPES } from './app/grant-vocabulary.js';
 // The library-pack registry — the prompt's library sections are GENERATED from it so the
 // lists can never drift from /v1/libs, /v1/library-packs, bootstrap or llms.txt (Phase 1
 // of the Library Acceleration Program killed the 4-way hardcoded-list drift).

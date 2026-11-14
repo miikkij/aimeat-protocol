@@ -30,7 +30,7 @@
  *     lowercase owner/filename.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
-import { isRowBackedSpace, isMemoryBackedSpace, MAX_INDEX_ON } from '../workspace-meta.js';
+import { isRowBackedSpace, isMemoryBackedSpace, MAX_INDEX_ON } from '../workspace/meta.js';
 
 /** Raised by every function here; the route and the MCP tool both map it to their own envelope. */
 export class WorkspaceRowError extends Error {

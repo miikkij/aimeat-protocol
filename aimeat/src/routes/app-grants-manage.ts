@@ -21,7 +21,7 @@
  *   "publish". POST /v1/app-grants/:grantId/read-through lets the owner, signed in themselves, add
  *   that one word to a grant that already holds connections:use, and DELETE takes it away. The word
  *   is recorded as the owner's own (`ownerAddedScopes`), so the narrowing to the app's declaration
- *   keeps it (services/app-grant-scopes.ts). Any other word still comes only from the consent screen.
+ *   keeps it (services/app/grant-scopes.ts). Any other word still comes only from the consent screen.
  * @structure appGrantsManageRouter(config, storage): GET /v1/app-grants, PATCH /v1/app-grants/:grantId,
  *   POST|DELETE /v1/app-grants/:grantId/read-through, PATCH /v1/app-grants/:grantId/spend-cap,
  *   DELETE /v1/app-grants/:grantId
@@ -44,8 +44,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireRoleOrScope, requireOwnerPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { READ_THROUGH_SCOPE, heldOwnerAdded } from '../services/app-grant-scopes.js';
-import { listActiveAppGrants } from '../services/app-grant-list.js';
+import { READ_THROUGH_SCOPE, heldOwnerAdded } from '../services/app/grant-scopes.js';
+import { listActiveAppGrants } from '../services/app/grant-list.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 

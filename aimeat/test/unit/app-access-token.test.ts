@@ -1,6 +1,6 @@
 /**
  * @file app-access-token.test.ts
- * @description Unit tests for the app-access grant (src/services/app-access-token.ts): the token
+ * @description Unit tests for the app-access grant (src/services/app/access-token.ts): the token
  *   the apex mints after it has checked an app's access code or licence, and the only thing the
  *   session-less app origin can check. Everything here is a "may this token open this app" question,
  *   so the interesting cases are the refusals: another app, another owner, an expired grant, a token
@@ -19,7 +19,7 @@ import { initDraftTokenKeys, generateDraftToken } from '../../src/services/draft
 import { decodeJwt } from 'jose';
 import {
     generateAppAccessToken, appAccessGranted, generatePageAccessToken, grantExpiresAt,
-} from '../../src/services/app-access-token.js';
+} from '../../src/services/app/access-token.js';
 
 const NODE = 'aimeat-local-001-dev';
 const FILE = 'gated-demo.html';

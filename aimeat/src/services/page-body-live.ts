@@ -47,7 +47,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { appSeoIndexable } from './app-seo.js';
+import { appSeoIndexable } from './app/seo.js';
 import { listSearchableMembers } from './portfolio-members.js';
 import { logger } from '../utils/logger.js';
 

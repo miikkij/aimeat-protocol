@@ -3,9 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The app member roster, round 2, below HTTP:
- *   - the pure rules (services/app-member-rules.ts): the 7-day wait after a decline, who manages,
+ *   - the pure rules (services/app/member-rules.ts): the 7-day wait after a decline, who manages,
  *     the one-click role that never names a managing role, search and paging, the audit rows;
- *   - the notices (services/app-member-notices.ts) in en, fi and es, and the invitation email
+ *   - the notices (services/app/member-notices.ts) in en, fi and es, and the invitation email
  *     escaping what the inviter typed;
  *   - on SQLite in memory: an invitation becomes a membership when its address is verified, an
  *     expired one and one naming the app's owner are dropped, the roster view searches by display
@@ -21,14 +21,14 @@ import type { Storage } from '../../src/storage/interface.js';
 import {
   reaskRetryAt, REASK_WAIT_MS, canManageRoster, isManagerRole, suggestRole, parseRosterPaging,
   matchesQuery, pageRows, memberAuditRows, roleShapeError,
-} from '../../src/services/app-member-rules.js';
-import { memberNoticeText, memberActionLabel, noticeLang, appMemberInviteEmail } from '../../src/services/app-member-notices.js';
-import { putInvite, listInvites, applyAppInvitesForVerifiedEmail, NS_INVITE, inviteKey } from '../../src/services/app-member-invites.js';
+} from '../../src/services/app/member-rules.js';
+import { memberNoticeText, memberActionLabel, noticeLang, appMemberInviteEmail } from '../../src/services/app/member-notices.js';
+import { putInvite, listInvites, applyAppInvitesForVerifiedEmail, NS_INVITE, inviteKey } from '../../src/services/app/member-invites.js';
 import { inviteEmailHash } from '../../src/services/invitations.js';
-import { getMemberRow, putMember, putRequest, noteVisit, writePrivateRecord } from '../../src/services/app-members.js';
-import { rosterView } from '../../src/services/app-member-roster.js';
-import { eraseAppMembership } from '../../src/services/app-member-erasure.js';
-import type { AppAuditEntry } from '../../src/services/app-audit.js';
+import { getMemberRow, putMember, putRequest, noteVisit, writePrivateRecord } from '../../src/services/app/members.js';
+import { rosterView } from '../../src/services/app/member-roster.js';
+import { eraseAppMembership } from '../../src/services/app/member-erasure.js';
+import type { AppAuditEntry } from '../../src/services/app/audit.js';
 
 describe('app-member-rules', () => {
   it('a declined person waits 7 days, counted from the decline', () => {

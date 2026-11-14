@@ -2,7 +2,7 @@
  * @file test/unit/extension-buy-not-yours.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description ctx.buy (services/extension-purchase.ts) asks the rule the capability invoke route
+ * @description ctx.buy (services/extension/purchase.ts) asks the rule the capability invoke route
  *   asks (capability-invoke.ts, EXTENSION_CAPABILITY_NOT_YOURS): a capability another account
  *   registered never chooses which of the buyer's own extension actions runs. Its ref is resolved in
  *   the seller's namespace, and a ref that lands on the buyer's own extension is refused before
@@ -18,7 +18,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { CapabilityRecord, ExtensionRecord } from '../../src/storage/interface.js';
-import { buyForExtension } from '../../src/services/extension-purchase.js';
+import { buyForExtension } from '../../src/services/extension/purchase.js';
 import { appToolsKey } from '../../src/models/app-tool-schemas.js';
 import { loadConfig } from '../../src/config.js';
 

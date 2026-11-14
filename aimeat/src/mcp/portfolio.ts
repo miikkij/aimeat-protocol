@@ -58,7 +58,7 @@ import { emitChange } from '../services/event-bus.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
-import { publishAskedFields } from '../services/app-publish-gate.js';
+import { publishAskedFields } from '../services/app/publish-gate.js';
 import { mergePortfolioConfig, portfolioSwitchState } from '../services/portfolio-config.js';
 import { notePortfolioWriter } from '../services/portfolio-read-hold.js';
 import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';

@@ -19,7 +19,7 @@
  *
  *   Where it is enforced: once for every REST route under /v1/organisms/:id (routes/organisms.ts),
  *   once for every node MCP tool that takes `organism_id` (mcp/organism-agent-gate.ts), and in the
- *   shared gates reached from elsewhere: canReadWorkspace (services/workspace-access.ts), the
+ *   shared gates reached from elsewhere: canReadWorkspace (services/workspace/access.ts), the
  *   `organism.*` key gate (services/organism-namespace-access.ts) and consent to an organism
  *   (services/consent.ts).
  * @structure agentAccessOf(), agentBarred(), organismsAdmitting(), attachedAsParticipant(), participantRefusalMessage(),

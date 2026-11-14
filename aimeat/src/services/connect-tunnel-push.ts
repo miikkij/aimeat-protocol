@@ -36,9 +36,9 @@ import { logger } from '../utils/logger.js';
 import type { MemoryWriteEvent } from './event-bus.js';
 import { parseWorkspaceRecordKey, spaceKeyOf } from './connect-tunnel-wire.js';
 import { isStopped } from './agent/stop-rules.js';
-import { retiredFromWorkspace, type WorkspaceEngagement } from './workspace-engagements.js';
+import { retiredFromWorkspace, type WorkspaceEngagement } from './workspace/engagements.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
-import { recordAt } from './workspace-record-key.js';
+import { recordAt } from './workspace/record-key.js';
 
 /**
  * Just enough of a connection for a push: whose it is, whether its socket is still open, and whether
@@ -178,7 +178,7 @@ export interface RecordPushContext {
   spaceSubscribers: Map<string, Set<string>>;
   sendTo: (conn: PushConn, frame: ConnectFrame) => void;
   canPrincipalReadSpace: (conn: PushConn, organismId: string, ws: string) => Promise<boolean>;
-  /** Every engagement stated on one workspace, active and retired (services/workspace-engagements.ts). */
+  /** Every engagement stated on one workspace, active and retired (services/workspace/engagements.ts). */
   workspaceEngagements: (organismId: string, ws: string) => Promise<WorkspaceEngagement[]>;
   clearSubscriptionFor: (principal: string, sk: string) => void;
   pushTaskCancellations: (ownerGaii: string, key: string) => Promise<void>;

@@ -19,7 +19,7 @@
  *   A legal page is pre-contract information, so it is served without the app's access code and
  *   for a parked app; only an operator-hidden app is a 404 to anyone but its owner, the same rule
  *   the app itself follows. The writes are on PATCH /v1/apps/:filename (fork-manage.ts) and on
- *   the MCP tool, both through services/app-legal.ts.
+ *   the MCP tool, both through services/app/legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
  *   2026-10-21 — authenticated() asks isAnonymousPrincipal, so the minted anonymous token is no owner of
@@ -64,15 +64,15 @@ import { sandboxedCsp } from './inline-frame.js';
 import {
   appLegalState, legalReadiness, renderLegalPage, isLegalKind, LEGAL_KIND_INFO, legalLinksFor, apexLegalBase,
   appSellsForMoney,
-} from '../../services/app-legal.js';
-import { readAppAudit } from '../../services/app-audit.js';
-import { listArchives, readArchiveYear, effectiveKeep } from '../../services/app-audit-archive.js';
-import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../../services/app-audit-keep.js';
+} from '../../services/app/legal.js';
+import { readAppAudit } from '../../services/app/audit.js';
+import { listArchives, readArchiveYear, effectiveKeep } from '../../services/app/audit-archive.js';
+import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../../services/app/audit-keep.js';
 import { sendAppOp } from '../app-op-answer.js';
-import { auditAppWithPlaytest } from '../../services/app-playtest.js';
-import { applyServeMarks } from '../../services/app-serve-marks.js';
+import { auditAppWithPlaytest } from '../../services/app/playtest.js';
+import { applyServeMarks } from '../../services/app/serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
-import { appReviewedBy } from '../../services/app-marks.js';
+import { appReviewedBy } from '../../services/app/marks.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import type { CanonicalOwner } from './helpers.js';
@@ -253,7 +253,7 @@ export function registerLegalRoutes(
     const { owner } = await canonicalOwner(req);
     res.redirect(307, `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(req.params.filename as string)}/audit/archive`);
   });
-  // The owner test, the refusals and the move are services/app-audit-keep.ts, which the
+  // The owner test, the refusals and the move are services/app/audit-keep.ts, which the
   // aimeat_app_manage MCP tool (audit_archive) calls too.
   router.post('/v1/apps/:owner/:filename/audit/archive', requireAuth(), requireScope('app:write'), async (req, res) =>
     sendAppOp(res, config.nodeId, await archiveAuditFor(storage, config, req.auth!, {
@@ -263,7 +263,7 @@ export function registerLegalRoutes(
   // ── How much of each app's audit log the owner keeps. `keep` 0 or "all" keeps everything; a
   //    number keeps that many newest entries per app and deletes the rest at once. Deleting audit
   //    entries is the person's own act: an app or an agent may read the setting and set "all", and
-  //    only the signed-in person sets a number (services/app-audit-keep.ts, which the
+  //    only the signed-in person sets a number (services/app/audit-keep.ts, which the
   //    aimeat_app_manage MCP tool's audit_keep calls too). `keep: null` returns to the node default. ──
   router.get('/v1/audit/apps/settings', requireAuth(), requireScope('app:write'), async (req, res) =>
     sendAppOp(res, config.nodeId, await readAuditKeep(storage, config, req.auth!)));

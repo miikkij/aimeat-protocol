@@ -11,6 +11,11 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-13 — aimeat_organism_search, the three comment tools, aimeat_organism_update and
+ *     aimeat_organism_export read the organism through services/organism-read/ (member.ts,
+ *     comments.ts, manager.ts), the gate their REST routes ask (structure programme 2026-11, unit 2b).
+ *     aimeat_organism_list's public half and the resource list call listedOrganisms (list.ts), the
+ *     browse GET /v1/organisms serves; aimeat_organism_leave calls leaveOrganismAs (leave.ts).
  *   2026-11-13 — SECURITY: aimeat_organism_members names no agent when the roster is hidden from the
  *     caller, by the members route's rule (rosterAgentsFor); aimeat_organism_list filters with
  *     organismsAdmitting, which GET /v1/organisms?member= now asks too (structure programme 2026-11, unit 7).
@@ -104,17 +109,22 @@ import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism-search.js';
 import { organismArchiveOp } from '../services/organism-archive-op.js';
-import { canAccessWorkspaceComments, addComment, listComments, deleteComment } from '../services/organism-comments.js';
+import { addComment, listComments } from '../services/organism-comments.js';
+import { commentWorkspace, deleteCommentIn } from '../services/organism-read/comments.js';
+import { organismMemberGate, organismForActiveMember } from '../services/organism-read/member.js';
+import { organismForManager } from '../services/organism-read/manager.js';
+import { listedOrganisms } from '../services/organism-read/list.js';
+import { leaveOrganismAs } from '../services/organism-read/leave.js';
 import { toolError } from './tool-error.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { provenanceForWrite } from '../services/ai/provenance.js';
-import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../services/organism-lifecycle.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism } from '../services/organism-lifecycle.js';
 import { canSeeMembers, rosterAgentsFor, type RosterCaller } from '../services/organism-privacy.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
-import { isOrganismOwner, organismOwners } from '../services/organism-ownership.js';
+import { organismOwners } from '../services/organism-ownership.js';
 import { organismsAdmitting } from '../services/organism-agent-access.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -166,7 +176,8 @@ export function registerOrganismsTools(
         'organism-details',
         new ResourceTemplate('aimeat://organisms/{id}', {
             list: async () => {
-                const organisms = await storage.listOrganisms({ visibility: 'public', archived: 'exclude' });
+                // The browse GET /v1/organisms serves with no query: services/organism-read/list.ts.
+                const organisms = await listedOrganisms({ storage, config }, caller().auth, {});
                 return {
                     resources: organisms.map(o => ({
                         uri: `aimeat://organisms/${encodeURIComponent(o.id)}`,
@@ -237,8 +248,9 @@ export function registerOrganismsTools(
         },
         async ({ visibility }) => {
             const ownerName = getOwnerName();
-            // Get public organisms (archived ones are read-only/hidden from AI operations — excluded)
-            const publicOrgs = await storage.listOrganisms({ visibility: 'public', archived: 'exclude' });
+            // Get public organisms (archived ones are read-only/hidden from AI operations — excluded):
+            // the browse GET /v1/organisms serves with no query (services/organism-read/list.ts).
+            const publicOrgs = await listedOrganisms({ storage, config }, caller().auth, {});
             // Get organisms the owner is a member of (may include private ones); archived excluded too
             // An organism that does not admit this agent is not one it works in (agentAccess).
             const memberOrgs = organismsAdmitting(await storage.listOrganisms({ member: ownerName, archived: 'exclude' }), agentGaii);
@@ -371,12 +383,9 @@ export function registerOrganismsTools(
             annotations: annotationsFor('aimeat_organism_leave'),
         },
         async ({ organism_id }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-
-            // Shared with POST /:id/leave (services/organism-lifecycle.ts): the membership row and
-            // the roster/admin sync go together.
-            const result = await leaveOrganism({ storage, config }, organism, getOwnerName());
+            // Shared with POST /:id/leave (services/organism-read/leave.ts): the organism read, then
+            // the membership row and the roster/admin sync together (services/organism-lifecycle.ts).
+            const result = await leaveOrganismAs({ storage, config }, organism_id, { owner: getOwnerName() });
             if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
 
             emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
@@ -459,16 +468,11 @@ export function registerOrganismsTools(
         async ({ organism_id, q, ws, archived }) => {
             const query = (q ?? '').trim();
             if (query.length < 2) return { content: [{ type: 'text' as const, text: 'Query must be at least 2 characters' }], isError: true };
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            const ownerName = getOwnerName();
-            // Membership gate: an org agent or an active member.
-            let isMember = organism.agentGaiis.includes(agentGaii);
-            if (!isMember) {
-                const m = await storage.getMembership(organism_id, ownerName);
-                isMember = !!m && m.status === 'active';
-            }
-            if (!isMember) return { content: [{ type: 'text' as const, text: 'Not an active member of this organism' }], isError: true };
+            // The organism and the membership gate (an org agent or an active member):
+            // services/organism-read/member.ts, which GET /v1/organisms/:id/search asks too.
+            const gate = await organismMemberGate(storage, organism_id, { sub: agentGaii, owner: getOwnerName() });
+            if (!gate.ok) return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'Not an active member of this organism' }], isError: true };
+            const organism = gate.organism;
             // Caller identity for the workspace read gate: the full GAII (agent) resolves via same-owner.
             const { results, truncated } = await searchOrganismContent(storage, config, organism, agentGaii, query, ws,
                 { archived, reader: readerForAgent({ storage, config }, agentGaii) });
@@ -508,12 +512,10 @@ export function registerOrganismsTools(
         },
         async ({ organism_id, ws, space, instance_id, body, anchor, parent_id, ai_provenance, ai_provenance_id }) => {
             if (typeof body !== 'string' || !body.trim()) return { content: [{ type: 'text' as const, text: 'A non-empty body is required' }], isError: true };
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            const ownerName = getOwnerName();
-            if (!(await canAccessWorkspaceComments(storage, config, organism, agentGaii, ownerName, agentGaii, ws))) {
-                return { content: [{ type: 'text' as const, text: 'You cannot comment in this workspace' }], isError: true };
-            }
+            // The organism and the comment gate: services/organism-read/comments.ts, which
+            // POST /v1/organisms/:id/comments asks too.
+            const gate = await commentWorkspace({ storage, config }, organism_id, { sub: agentGaii, owner: getOwnerName(), gaii: agentGaii }, ws);
+            if (!gate.ok) return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'You cannot comment in this workspace' }], isError: true };
             // TARGET-058. A comment is discussion a person reads and answers — the same act as a
             // board reply, in a members-only room. The body is stored truncated to 10 000 chars, so
             // the hash is taken over the SAME slice that is stored: a record about bytes nobody kept
@@ -547,12 +549,10 @@ export function registerOrganismsTools(
             annotations: annotationsFor('aimeat_workspace_comments'),
         },
         async ({ organism_id, ws, space, instance_id }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            const ownerName = getOwnerName();
-            if (!(await canAccessWorkspaceComments(storage, config, organism, agentGaii, ownerName, agentGaii, ws))) {
-                return { content: [{ type: 'text' as const, text: 'You cannot read this workspace' }], isError: true };
-            }
+            // The organism and the comment gate: services/organism-read/comments.ts, which
+            // GET /v1/organisms/:id/comments asks too.
+            const gate = await commentWorkspace({ storage, config }, organism_id, { sub: agentGaii, owner: getOwnerName(), gaii: agentGaii }, ws);
+            if (!gate.ok) return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'You cannot read this workspace' }], isError: true };
             const comments = await listComments(storage, readerForAgent({ storage, config }, agentGaii), organism_id, ws, space, instance_id);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ comments, total: comments.length }, null, 2) }] };
         },
@@ -568,9 +568,9 @@ export function registerOrganismsTools(
             annotations: annotationsFor('aimeat_workspace_comment_delete'),
         },
         async ({ organism_id, ws, space, instance_id, comment_id }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { ...toolError('NOT_FOUND', 'Organism not found') };
-            const result = await deleteComment(storage, config, organism,
+            // The organism read, the gate and the author rule: services/organism-read/comments.ts,
+            // which DELETE /v1/organisms/:id/comments/:commentId calls too.
+            const result = await deleteCommentIn({ storage, config }, organism_id,
                 { sub: agentGaii, owner: getOwnerName(), gaii: agentGaii },
                 { ws, space, instanceId: instance_id, commentId: comment_id });
             if (!result.ok) return { ...toolError(result.code, result.message) };
@@ -632,12 +632,11 @@ export function registerOrganismsTools(
             annotations: annotationsFor('aimeat_organism_update'),
         },
         async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access, access_requests, location, max_members, member_visibility }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            const ownerName = getOwnerName();
-            if (!isOrganismOwner(organism, ownerName) && !organism.admins.includes(ownerName)) {
-                return { content: [{ type: 'text' as const, text: 'Only the creator or an admin can update this organism' }], isError: true };
-            }
+            // The read and the owner-or-admin rule: services/organism-read/manager.ts, which
+            // PUT /v1/organisms/:id asks too.
+            const gate = await organismForManager(storage, organism_id, { owner: getOwnerName() });
+            if (!gate.ok) return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'Only the creator or an admin can update this organism' }], isError: true };
+            const organism = gate.organism;
             // Shared with PUT /v1/organisms/:id (services/organism-lifecycle.ts): the field
             // validation, the record update and the README key. An unrecognised join_policy or
             // visibility is refused here rather than dropped, so "updated" means it was.
@@ -665,13 +664,11 @@ export function registerOrganismsTools(
         inputSchema: zodShapeFor('aimeat_organism_export'),
         annotations: annotationsFor('aimeat_organism_export') },
         async ({ organism_id }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = ownerOf();
-            const m = await storage.getMembership(organism_id, ownerName);
-            // Any active member: the bundle holds only what the member reads live (gate matches the
-            // read model — the REST route applies the same policy).
-            if (!m || m.status !== 'active') return { content: [{ type: 'text' as const, text: 'Only an active member of the organism can export it.' }], isError: true };
+            // Any active member: the bundle holds only what the member reads live. The read and the
+            // rule are services/organism-read/manager.ts, which GET /v1/organisms/:id/export asks too.
+            const gate = await organismForActiveMember(storage, organism_id, { owner: ownerName });
+            if (!gate.ok) return { content: [{ type: 'text' as const, text: gate.code === 'NOT_FOUND' ? 'Organism not found' : 'Only an active member of the organism can export it.' }], isError: true };
             const { buffer, filename, workspaces, leftOut, truncated } = await exportOrganism(storage, config, {
                 orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`,
                 // Who is actually asking: the bundle READS as the owner, and deciding workspace

@@ -6,7 +6,7 @@
  *   structure page in appcat draws, from the first moment of building, before any code or publish.
  *
  *   Registered on the app router like the design spec. Each handler is one call of
- *   services/app-structure.ts, which aimeat_app_manage (structure, structure_set, plans) calls too.
+ *   services/app/structure.ts, which aimeat_app_manage (structure, structure_set, plans) calls too.
  *
  *   WHO MAY: everybody inside the build reads and writes it, the same test the draft and the design
  *   spec make. GET /v1/app-plans lists the caller's own plans, which is how a person finds an app
@@ -26,7 +26,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { validateBody } from '../../models/schemas.js';
 import { safeText } from '../../models/input-limits.js';
-import { readStructureFor, writePlanFor, listPlansFor } from '../../services/app-structure.js';
+import { readStructureFor, writePlanFor, listPlansFor } from '../../services/app/structure.js';
 import { sendAppOp } from '../app-op-answer.js';
 
 /** The app this request names: `:owner` (`me` for the caller's own) and `:filename`. */
@@ -34,7 +34,7 @@ const refOf = (req: Request) => ({ owner: String(req.params.owner ?? ''), filena
 
 /**
  * The shape and the bounds of a plan write. Which values a choice may take is the service's
- * (services/app-plan.ts readPlanPatch), because they come from the node's registries and its refusal
+ * (services/app/plan.ts readPlanPatch), because they come from the node's registries and its refusal
  * names them; this holds the lengths and the types, so a write the service would cut is refused first.
  */
 const PlanWriteSchema = z.object({

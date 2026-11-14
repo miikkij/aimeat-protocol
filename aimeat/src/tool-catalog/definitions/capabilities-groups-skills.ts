@@ -7,6 +7,7 @@
  * @version-history
  *   2026-11-13 — aimeat_group_list and aimeat_group_get say which groups an agent sees with and without
  *     consent:groups (developer ruling 2026-11-13; structure programme 2026-11, unit 7).
+ *   2026-11-13 — aimeat_knowledge_links takes relation (unit 3b).
  *   2026-11-13 — aimeat_group_create takes default_permissions (unit 3b).
  *   2026-11-13 — aimeat_consent_list takes recipient (unit 3b).
  *   2026-11-13 — aimeat_instance_list takes platform (unit 3b).
@@ -560,6 +561,8 @@ export const capabilitiesGroupsSkillsTools = [
         input: {
             package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
             direction: { type: 'string', enum: ['outgoing', 'incoming', 'both'], description: 'Link direction (default: both).' },
+            // As GET /v1/knowledge/:id/links reads it (unit 3b).
+            relation: { type: 'string', description: 'List only the links of this relation: related-to, extends, derived-from, contradicts, supersedes or references.', zod: z.string().max(INPUT_LIMITS.name) },
         },
     },
     {

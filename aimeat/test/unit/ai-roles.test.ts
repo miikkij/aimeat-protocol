@@ -1,7 +1,7 @@
 /**
  * @file test/unit/ai-roles.test.ts
  * @description AI roles, the pure parts (wish-tekoalyn-roolit): an app's role declarations read from its
- *   meta (services/app-ai-roles.ts, through app-ai-posture.ts), a change to the roles checked
+ *   meta (services/app/ai-roles.ts, through app-ai-posture.ts), a change to the roles checked
  *   (normaliseRolesInput), the built-in roles showing the legacy setting (rolesWithLegacy), and a call's
  *   role resolved or refused with its code (resolveRole).
  * @usage pnpm test -- ai-roles
@@ -9,8 +9,8 @@
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { parseAppAiRoles } from '../../src/services/app-ai-roles.js';
-import { parseAiPosture } from '../../src/services/app-ai-posture.js';
+import { parseAppAiRoles } from '../../src/services/app/ai-roles.js';
+import { parseAiPosture } from '../../src/services/app/ai-posture.js';
 import { normaliseRolesInput, rolesWithLegacy, resolveRole, bindingKey, type RolesRecord } from '../../src/services/ai/roles.js';
 import type { AiProvider } from '../../src/services/ai/providers.js';
 

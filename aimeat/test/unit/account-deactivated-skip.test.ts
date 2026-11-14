@@ -31,7 +31,7 @@ vi.mock('../../src/utils/logger.js', async (importOriginal) => {
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { Scheduler } from '../../src/services/scheduler.js';
 import { refuseTriggerStart } from '../../src/services/workflow/trigger-authority.js';
-import { runExtensionActionAsSystem } from '../../src/services/extension-system-run.js';
+import { runExtensionActionAsSystem } from '../../src/services/extension/system-run.js';
 import { deactivatedAccountSkip } from '../../src/services/account-deactivated.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import type { ScheduledJobRecord, Storage } from '../../src/storage/interface.js';

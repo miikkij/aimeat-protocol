@@ -33,8 +33,8 @@
 import { ZipArchive } from 'archiver';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { collectWorkspace, type ExportTruncation } from './workspace-export.js';
-import { listOrganismWorkspaceEntries } from './workspace-meta.js';
+import { collectWorkspace, type ExportTruncation } from './workspace/export.js';
+import { listOrganismWorkspaceEntries } from './workspace/meta.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 import type { ContentReader } from './classification/reader.js';

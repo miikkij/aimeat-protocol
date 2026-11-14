@@ -108,7 +108,7 @@ import { generateSessionId, issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
-import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
+import { applyAppInvitesForVerifiedEmail } from '../../services/app/member-invites.js';
 import { sendHeldKeyCredentials, keyCredentialsPending, notePreSignInAgentKey } from '../../services/key-credentials.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
@@ -540,7 +540,7 @@ export function registerWebVerifyRoutes(
         await promoteContactsForVerifiedEmail(storage, record.emailHash, ghii)
             .catch(err => { logger.warn('verify-email: contact promotion is best-effort', { error: String(err) }); });
         // An invitation to an app's roster sent to this address becomes a membership now
-        // (services/app-member-invites.ts). Best-effort for the same reason.
+        // (services/app/member-invites.ts). Best-effort for the same reason.
         await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
             .catch(err => { logger.warn('verify-email: app invitations are best-effort', { error: String(err) }); });
         // A code key's first sign-in credentials that waited for a proven address go now (never throws).

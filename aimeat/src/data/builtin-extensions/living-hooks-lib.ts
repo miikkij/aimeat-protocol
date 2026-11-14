@@ -228,7 +228,7 @@ function livingBytes(s) {
  * was that ours is safe, which is the reasoning that ends badly once a second extension wants the
  * same thing and writes its own version.
  *
- * ctx.fetch does it now (services/extension-ctx.ts, services/owner-secrets.ts), AFTER this script
+ * ctx.fetch does it now (services/extension/ctx.ts, services/owner-secrets.ts), AFTER this script
  * has handed the request over: it fills the {{secret:NAME}} placeholder in header VALUES from the
  * caller's own vault, falls back to this extension's secrets config, and refuses by name when
  * neither has it. So this file still validates WHICH headers may be sent — that is a living-hooks

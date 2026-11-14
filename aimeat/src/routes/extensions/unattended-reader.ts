@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description GET and PATCH /v1/extensions/:name/unattended-reader: what an installed extension may
  *   read when it runs with nobody present, and the account holder's control over it. The work is
- *   services/extension-read-authority.ts, shared with the MCP tool
+ *   services/extension/read-authority.ts, shared with the MCP tool
  *   aimeat_extension_unattended_reader_set.
  *
  *   READ AND WRITE TAKE DIFFERENT GATES, AND THE ASYMMETRY IS THE POINT. The PATCH is the control
@@ -36,7 +36,7 @@ import { logger } from '../../utils/logger.js';
 import { mayManageInstalledExt } from './permissions.js';
 import { findExtension } from '../../services/component-address.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { describeReadAuthority, readAuthorityPayload, setReadAuthority, READ_AUTHORITIES, type ReadAuthority } from '../../services/extension-read-authority.js';
+import { describeReadAuthority, readAuthorityPayload, setReadAuthority, READ_AUTHORITIES, type ReadAuthority } from '../../services/extension/read-authority.js';
 
 const OWNER_ONLY = 'Only the account holder in person may change what an extension reads when it runs on its own.';
 

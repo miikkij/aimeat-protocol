@@ -28,7 +28,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { DataIntermediationMode } from '../../config/data-access.js';
 import { listDocs, type ComplianceScope } from '../compliance/docs.js';
 import type { IntermediationNotification } from '../compliance/docs-schemas.js';
-import { isOrgManager } from '../workspace-access.js';
+import { isOrgManager } from '../workspace/access.js';
 import { offeringDeliversData } from './contract.js';
 
 export const DATA_INTERMEDIATION_NOT_OFFERED = 'DATA_INTERMEDIATION_NOT_OFFERED';

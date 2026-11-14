@@ -24,8 +24,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { provisionWorkspace } from '../../src/services/workspace-provision.js';
-import { updateWorkspaceMeta, readWorkspaceManifest } from '../../src/services/workspace-meta.js';
+import { provisionWorkspace } from '../../src/services/workspace/provision.js';
+import { updateWorkspaceMeta, readWorkspaceManifest } from '../../src/services/workspace/meta.js';
 import { loadConfig } from '../../src/config.js';
 
 const ORG = 'org-rows';

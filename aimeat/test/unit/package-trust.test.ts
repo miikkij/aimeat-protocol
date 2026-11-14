@@ -11,12 +11,12 @@
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, PackageComponent } from '../../src/storage/interface.js';
-import { executeExtensionAction } from '../../src/services/extension-runtime.js';
-import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
-import { buildExtensionRecordFromManifest } from '../../src/services/extension-manifest.js';
+import { executeExtensionAction } from '../../src/services/extension/runtime.js';
+import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
+import { buildExtensionRecordFromManifest } from '../../src/services/extension/manifest.js';
 import {
     capabilitiesOfRecord, CAPABILITY_DECLARATION_KEY, type ExtensionCapabilitySet,
-} from '../../src/services/extension-capability-declaration.js';
+} from '../../src/services/extension/capability-declaration.js';
 import { packageCapabilities } from '../../src/services/packages/install/package-capabilities.js';
 import { appScopesOf, parseAppScopes } from '../../src/services/protected-resource.js';
 import { grantEntitlement, readEntitlements } from '../../src/services/packages/sale/package-entitlements.js';

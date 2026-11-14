@@ -10,6 +10,8 @@
  * @structure registerCoreResources(mcp, storage, config, agentGaii)
  * @usage registerCoreResources(mcp, storage, config, agentGaii);  // from registerCoreTools
  * @version-history
+ *   2026-11-13 — The file read is readStoredFileShownTo (services/datapackage/source-labels.ts), the read
+ *     and ask GET /v1/memory/files/:key calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — The file list asks storedFilesShownTo, the function GET /v1/memory/files asks
  *     (structure programme 2026-11, unit 7).
  *   2026-11-08 — The file read goes through the one ask of a stored file's read (datapackage/source-labels.ts
@@ -24,7 +26,7 @@ import type { Storage } from '../storage/interface.js';
 import { presentMemory } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { memoryTarget } from '../services/classification/labels.js';
-import { storedFileShownTo, storedFilesShownTo } from '../services/datapackage/source-labels.js';
+import { readStoredFileShownTo, storedFilesShownTo } from '../services/datapackage/source-labels.js';
 
 export function registerCoreResources(mcp: McpServer, storage: Storage, config: AimeatConfig, agentGaii: string): void {
     // Resource template: memory entries
@@ -78,8 +80,8 @@ export function registerCoreResources(mcp: McpServer, storage: Storage, config: 
             const key = decodeURIComponent(variables.key as string);
             // The one ask of a stored file's read (datapackage/source-labels.ts): the file's own label, and
             // the labels a data package version keeps, which no file of an agent's namespace has.
-            const stored = await storage.getStorageFile(agentGaii, key);
-            const file = stored ? await storedFileShownTo({ storage, config }, readerForAgent({ storage, config }, agentGaii), agentGaii, key, stored) : undefined;
+            // The read and that ask are readStoredFileShownTo, which GET /v1/memory/files/:key calls too.
+            const file = await readStoredFileShownTo({ storage, config }, readerForAgent({ storage, config }, agentGaii), agentGaii, key);
             if (!file) return { contents: [{ uri: uri.toString(), text: 'Not found' }] };
             return { contents: [{ uri: uri.toString(), blob: file.data.toString('base64'), mimeType: file.mimeType }] };
         },

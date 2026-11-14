@@ -19,7 +19,7 @@
  *   and linked; the skill's last section says so.
  *
  *   WHAT IT MUST AGREE WITH. The node's behaviour (services/decide/), the library (sdk-libs/decide/),
- *   the publish check (services/app-decide-posture.ts) and the ruling that what an app sends is the
+ *   the publish check (services/app/decide-posture.ts) and the ruling that what an app sends is the
  *   app's responsibility.
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';

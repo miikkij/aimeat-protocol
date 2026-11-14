@@ -6,6 +6,11 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-13 — PUT /v1/organisms/:id asks services/organism-read/manager.ts organismForManager, the
+ *     read and the rule aimeat_organism_update asks; the answers are unchanged (structure programme
+ *     2026-11, unit 2b). buildOrganismList's query and its rules moved unchanged to
+ *     services/organism-read/list.ts listedOrganisms, which the MCP organism list calls for the browse.
+ *     POST /:id/leave calls services/organism-read/leave.ts leaveOrganismAs.
  *   2026-11-13 — SECURITY: GET /v1/organisms?member= leaves out, for an agent, an organism that does not
  *     admit it, as aimeat_organism_list and GET /v1/organisms/waiting do (organismsAdmitting,
  *     services/organism-agent-access.ts; structure programme 2026-11, unit 7).
@@ -83,27 +88,25 @@ import { validateBody } from '../../models/schemas.js';
 import { OrganismCreateBody, OrganismUpdateBody } from '../../models/write-body-schemas.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { requireAuth, requireRole, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { showOrganismReadme } from '../../services/organism-readme.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism, deleteOrganismRecords } from '../../services/organism-lifecycle.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism, deleteOrganismRecords } from '../../services/organism-lifecycle.js';
 import { publicShapes } from '../../data/organism-shapes.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
+import { organismForManager } from '../../services/organism-read/manager.js';
+import { listedOrganisms } from '../../services/organism-read/list.js';
+import { leaveOrganismAs } from '../../services/organism-read/leave.js';
 import { openJoinRequests } from '../../services/organism-join-requests/requests.js';
-import { isOwnerInPerson, localAccountName, resolveIdentity } from '../../utils/gaii.js';
+import { isOwnerInPerson, resolveIdentity } from '../../utils/gaii.js';
 import { agentBarred, organismsAdmitting } from '../../services/organism-agent-access.js';
-import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 
-/** What GET /v1/organisms lists to a caller who is neither the member asked about nor an operator:
- *  the same two visibilities the directory indexes (services/directory.ts). */
-const BROWSABLE_VISIBILITIES = new Set(['public', 'listed']);
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -168,38 +171,10 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     auth: Express.Request['auth'],
     params: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; include?: string },
   ): Promise<{ organisms: unknown[]; total: number }> {
-    const memberBare = params.member ? localAccountName(params.member) : undefined;
-    // The operator half asks isOperatorCaller, as the MCP tools do: the operator's agent holding
-    // operator:admin passes too. A list read writes no operator trail.
-    const operator = !!auth && await isOperatorCaller(storage, auth);
-    const selfOrOperator = operator || (!!auth && !isAnonymousPrincipal(auth) && auth.owner === memberBare);
-    // Browsing without a member filter shows what the directory shows: 'public' and 'listed'. The
-    // caller's ?visibility= went to storage unchecked before, so ?visibility=private answered every
-    // private organism of the node to an anonymous caller. Only an operator browses past that.
-    const asked = params.visibility || 'public';
-    if (!params.member && !operator && !BROWSABLE_VISIBILITIES.has(asked)) return { organisms: [], total: 0 };
-    const organisms = await storage.listOrganisms({
-      type: params.type,
-      city: params.city,
-      interest: params.interest,
-      member: memberBare,
-      visibility: params.member ? (selfOrOperator ? params.visibility : 'public') : asked,
-      // Pass pagination through untouched: a member-scoped list (the owner's own organisms) must return ALL
-      // of them — the storage layer only page-caps browse/discovery (no member filter). Forcing perPage here
-      // silently dropped the owner's oldest organisms out of "My Organisms" once they belonged to 20+.
-      page: params.page,
-      perPage: params.perPage,
-      // The owner's OWN list includes archived (the client splits them into an "Archived" section);
-      // browsing/discovery excludes archived — retired organisms are read-only and not discoverable.
-      archived: (params.member && selfOrOperator) ? 'include' : 'exclude',
-    });
-
-    // A member list leaves out, for an agent, an organism that does not admit it, as
-    // aimeat_organism_list does: its name is its own (services/organism-agent-access.ts). Not an agent:
-    // the list is as before. Browsing (no member filter) is the directory and is not narrowed here.
-    const listed = params.member && auth && !isAnonymousPrincipal(auth)
-      ? organismsAdmitting(organisms, resolveIdentity(auth, config.nodeId))
-      : organisms;
+    // Which organisms this caller is listed (the browse rule, the member rule, the operator's reach
+    // and the agent-access filter): services/organism-read/list.ts, which aimeat_organism_list and
+    // the aimeat://organisms resource list call for the browse.
+    const listed = await listedOrganisms({ storage, config }, auth, params);
 
     // ?include=counts — attach workspace_count per org via ONE batched registry read.
     const include = String(params.include ?? '').split(',').map(s => s.trim());
@@ -361,17 +336,15 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
 
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+    // Only creator or admin can update. The read and the rule: services/organism-read/manager.ts,
+    // which aimeat_organism_update asks too.
+    const gate = await organismForManager(storage, id, { owner: ghii });
+    if (!gate.ok) {
+      if (gate.code === 'NOT_FOUND') res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      else res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only creator or admin can update'));
       return;
     }
-
-    // Only creator or admin can update
-    if (!isOrganismOwner(organism, ghii) && !organism.admins.includes(ghii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only creator or admin can update'));
-      return;
-    }
+    const organism = gate.organism;
 
     const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility, agent_access, access_requests } = req.body ?? {};
 
@@ -457,16 +430,10 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
 
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
-      return;
-    }
-
-    // Membership removal, the roster/admin sync and the departed member's agents and workspace roles
-    // (revokeDepartedMemberAccess) live in services/organism-lifecycle.ts, shared with
-    // aimeat_organism_leave.
-    const result = await leaveOrganism({ storage, config }, organism, ghii);
+    // The organism read, then the membership removal, the roster/admin sync and the departed member's
+    // agents and workspace roles (revokeDepartedMemberAccess, services/organism-lifecycle.ts):
+    // services/organism-read/leave.ts, shared with aimeat_organism_leave.
+    const result = await leaveOrganismAs({ storage, config }, id, { owner: ghii });
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;

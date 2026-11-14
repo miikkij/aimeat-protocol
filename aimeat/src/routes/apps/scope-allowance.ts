@@ -2,7 +2,7 @@
  * @file src/routes/apps/scope-allowance.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The permissions an app kept when the node moved to 4.0 (services/app-scope-allowance.ts):
+ * @description The permissions an app kept when the node moved to 4.0 (services/app/scope-allowance.ts):
  *   read them, and the owner takes one away.
  *
  *   Registered on the app router like the design spec, so nothing had to be added to the boot path.
@@ -18,7 +18,7 @@ import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
-import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../../services/app-scope-allowance.js';
+import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../../services/app/scope-allowance.js';
 import { sendAppOp } from '../app-op-answer.js';
 
 /** The app this request names: `:owner` (`me` for the caller's own) and `:filename`. */

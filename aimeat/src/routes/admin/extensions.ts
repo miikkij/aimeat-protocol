@@ -41,8 +41,8 @@ import type { Scheduler } from '../../services/scheduler.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
-import { writeExtensionRecord, activateExtension } from '../../services/extension-lifecycle.js';
+import { buildExtensionRecordFromManifest } from '../../services/extension/manifest.js';
+import { writeExtensionRecord, activateExtension } from '../../services/extension/lifecycle.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 

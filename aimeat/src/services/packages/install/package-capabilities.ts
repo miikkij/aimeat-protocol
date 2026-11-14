@@ -44,16 +44,16 @@
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../../config.js';
 import type { PackageComponent } from '../../../storage/interface.js';
-import { buildExtensionRecordFromManifest } from '../../extension-manifest.js';
-import { WORKSPACE_DECLARATION_KEY } from '../../extension-workspace-declaration.js';
-import { AI_PROVIDER_DECLARATION_KEY } from '../../extension-ai-provider-declaration.js';
-import { SECRET_KEYS_FIELD } from '../../extension-secrets.js';
+import { buildExtensionRecordFromManifest } from '../../extension/manifest.js';
+import { WORKSPACE_DECLARATION_KEY } from '../../extension/workspace-declaration.js';
+import { AI_PROVIDER_DECLARATION_KEY } from '../../extension/ai-provider-declaration.js';
+import { SECRET_KEYS_FIELD } from '../../extension/secrets.js';
 import { cortexComponentsOf } from '../compose/package-component-collisions.js';
 import { memoryComponentEntries } from './package-memory-component.js';
 import { skillComponentName } from './package-skill-component.js';
 import { appScopesOf } from '../../protected-resource.js';
-import { capabilitiesOfRecord, declaredHostsOf } from '../../extension-capability-declaration.js';
-import { hostFieldsOf, type NetworkHostField } from '../../extension-network-hosts.js';
+import { capabilitiesOfRecord, declaredHostsOf } from '../../extension/capability-declaration.js';
+import { hostFieldsOf, type NetworkHostField } from '../../extension/network-hosts.js';
 
 export interface ExtensionCapabilities {
   component: string; name: string; actions: string[];
@@ -98,7 +98,7 @@ function extensionCapabilities(comp: PackageComponent, config: AimeatConfig, own
   const built = buildExtensionRecordFromManifest(parsed.manifest ?? '', parsed.scripts ?? {}, config, owner, new Date().toISOString(), false);
   if (!built.ok) return null;
   const rec = built.record;
-  // The list the sandbox enforces (services/extension-capability-declaration.ts), so the approval
+  // The list the sandbox enforces (services/extension/capability-declaration.ts), so the approval
   // shows exactly what the scripts will be allowed to do.
   const can = capabilitiesOfRecord(rec);
   const cfg = (rec.config ?? {}) as Record<string, unknown>;

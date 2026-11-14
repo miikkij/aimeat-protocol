@@ -304,7 +304,7 @@ export function registerCoreHandlers(
   // this handler exists for the one-shot cleanup (admin maintenance route) or an operator-scheduled
   // sweep. Append-only spaces + workspaces without a readable manifest are never touched.
   scheduler.registerCoreHandler('workspace-version-compaction', async () => {
-    const { compactWorkspaceVersions } = await import('./workspace-versions.js');
+    const { compactWorkspaceVersions } = await import('./workspace/versions.js');
     await compactWorkspaceVersions(storage, config);
   });
   // Onboarding funnel rescue: one email to a day-old account with a verified email and no MCP

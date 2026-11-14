@@ -182,7 +182,7 @@ parts are public.
 ### 4.1 Manifest (`manifest.yaml`)
 
 The server validates this shape strictly (`buildExtensionRecordFromManifest` in
-`src/services/extension-manifest.ts`): the identity fields live under a `metadata:`
+`src/services/extension/manifest.ts`): the identity fields live under a `metadata:`
 block (`name`, `version`, `description` and `author` are all required), and **every
 action requires `id`, `method`, `path`, AND `script`**. An action missing
 `method`/`path` fails the whole install with `INVALID_MANIFEST`. The full manifest
@@ -876,7 +876,7 @@ When starting a new ext+cortex+app stack:
   (source `src/services/build-app-prompt.ts`) is the Classic track's
 - `aimeat/src/routes/agent-tasks.ts` — every task API endpoint, listed in
   its header
-- `aimeat/src/services/extension-ctx-contract.ts` — what `ctx` contains,
+- `aimeat/src/services/extension/ctx-contract.ts` — what `ctx` contains,
   member by member
 
 ---

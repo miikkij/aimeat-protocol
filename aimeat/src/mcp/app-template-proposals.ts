@@ -6,7 +6,7 @@
  *   aimeat_app_template_propose (upsert; call after a successful publish, model mandatory),
  *   aimeat_app_template_list, aimeat_app_template_get (adds the source app's LIVE commerce
  *   fields + a fork-vs-scaffold instruction so a buyer/next-builder knows how to start),
- *   aimeat_app_template_delete. Thin wrappers over services/app-template-proposals.ts.
+ *   aimeat_app_template_delete. Thin wrappers over services/app/template-proposals.ts.
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
@@ -34,11 +34,11 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import {
     proposeTemplate, listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
-} from '../services/app-template-proposals.js';
+} from '../services/app/template-proposals.js';
 import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { appToll } from '../services/app-pacing.js';
+import { appToll } from '../services/app/pacing.js';
 import { templateSourceApp } from '../services/appdev/template-source.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config/pacing.js';
 

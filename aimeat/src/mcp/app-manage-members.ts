@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The aimeat_app_manage actions over an app's roster, its carry plan, its audit log
  *   keeping, its development rights and its design spec, on the node's own MCP server. Each action
- *   calls the service its REST route calls (services/app-roster-ops.ts, app-roster-write.ts,
+ *   calls the service its REST route calls (services/app/roster-ops.ts, app-roster-write.ts,
  *   app-audit-keep.ts, app-dev-grant-ops.ts, app-design-spec-ops.ts) with the session as the caller,
  *   and answers the same JSON the route answers under `data`, or the route's refusal as
  *   `CODE: message`.
@@ -27,17 +27,17 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { AppOpCaller } from '../services/app-op-outcome.js';
+import type { AppOpCaller } from '../services/app/op-outcome.js';
 import {
   listRoster, rosterMe, readCarryPlan, dismissGuest, sweepRoster, requestMembership, declineRequest,
   rosterAuditTrail, cancelInvite,
-} from '../services/app-roster-ops.js';
-import { setCarryPlan, setMember, removeRosterMember } from '../services/app-roster-write.js';
-import { listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app-dev-grant-ops.js';
-import { readDesignSpecFor, writeDesignSpecFor, clearDesignSpecFor } from '../services/app-design-spec-ops.js';
-import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../services/app-scope-allowance.js';
-import { readStructureFor, writePlanFor, listPlansFor } from '../services/app-structure.js';
-import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../services/app-audit-keep.js';
+} from '../services/app/roster-ops.js';
+import { setCarryPlan, setMember, removeRosterMember } from '../services/app/roster-write.js';
+import { listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app/dev-grant-ops.js';
+import { readDesignSpecFor, writeDesignSpecFor, clearDesignSpecFor } from '../services/app/design-spec-ops.js';
+import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../services/app/scope-allowance.js';
+import { readStructureFor, writePlanFor, listPlansFor } from '../services/app/structure.js';
+import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../services/app/audit-keep.js';
 import { opAnswer, type ToolAnswer } from './app-manage-answers.js';
 import { listAppParties, removeAppParty, setAppPartyStatus, setRegistration } from '../services/app-parties/owner.js';
 

@@ -3,13 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The intake forms an app declares in <meta name="aimeat-intake"> and the ones its code
- *   calls (services/app-intake-forms.ts), and the intake routes the content-access gate opens for an
+ *   calls (services/app/intake-forms.ts), and the intake routes the content-access gate opens for an
  *   opened form (services/internet-opening/opening-registry.ts isOpenedIntakeRoute, with nothing open).
  * @version-history
  *   v1.0.0 - 2026-10-25 - Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { parseDeclaredIntakeForms, scanCalledIntakeForms, undeclaredCalledForms } from '../../src/services/app-intake-forms.js';
+import { parseDeclaredIntakeForms, scanCalledIntakeForms, undeclaredCalledForms } from '../../src/services/app/intake-forms.js';
 import { INTAKE_ROUTE, isOpenedIntakeRoute } from '../../src/services/internet-opening/opening-registry.js';
 
 const ORG = '1f0c2c3e-1111-4222-8333-944455556666';

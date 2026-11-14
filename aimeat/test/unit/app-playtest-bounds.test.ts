@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import * as capture from '../../src/services/screenshot-capture.js';
-import * as playtest from '../../src/services/app-playtest.js';
+import * as playtest from '../../src/services/app/playtest.js';
 
 describe('withHeadlessContext closes the browser at its deadline', () => {
   it('a callback that never settles is answered by the deadline (or null with no browser)', async () => {

@@ -6,7 +6,7 @@
  *   doc-mvcn6c7e4e5q, V2 and V3.10).
  *
  *   An app that needs a sign-in or an access code, a welcome page and a company page with restricted
- *   access are opened on their own origin with `?access=<grant>` (services/app-access-token.ts, one
+ *   access are opened on their own origin with `?access=<grant>` (services/app/access-token.ts, one
  *   hour). Served as-is, the grant stayed in the address bar: a person who copied or bookmarked the
  *   address handed the next person an hour of access with no sign-in. So the origin accepts the query
  *   grant on the first request only. It verifies the grant, sets it as a cookie and answers 302 to the
@@ -29,7 +29,7 @@
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import { grantExpiresAt } from '../services/app-access-token.js';
+import { grantExpiresAt } from '../services/app/access-token.js';
 import { logger } from '../utils/logger.js';
 
 /** The cookie that carries an app-access grant on the app's own origin. */

@@ -26,8 +26,8 @@
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 import type { AppRecord } from '../../storage/interface.js';
-import { appAccessOf } from '../app-access.js';
-import { recordAppAudit } from '../app-audit.js';
+import { appAccessOf } from '../app/access.js';
+import { recordAppAudit } from '../app/audit.js';
 import { recordOperatorAction } from '../operator-access-audit.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';

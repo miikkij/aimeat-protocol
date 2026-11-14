@@ -320,7 +320,7 @@ export function appToolSellableResolver(): SellableResolver {
             await import('../services/capability-invoke.js');
           // The manifest NAMES a capability; it does not confer one. A throw here refunds the
           // collect, so the buyer pays nothing for a tool bound to a capability its seller does not
-          // own (services/extension-purchase.ts has refused the same since the August 2026 audit
+          // own (services/extension/purchase.ts has refused the same since the August 2026 audit
           // H-17; this path checked nothing until secaudit 2026-10).
           const misbound = appToolBindingRefusal(cap, sellerOwner, appRef, toolName);
           if (misbound) throw new CommerceError(misbound.code, misbound.statusCode, misbound.message);

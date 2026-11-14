@@ -22,6 +22,8 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.10.4 -- 2026-11-13 -- canAccessTask and canReadTask ask services/agent/task-access.ts, the rule the
+ *     task MCP tools ask too (structure programme 2026-11, unit 2b).
  *   v1.10.3 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.10.2 -- 2026-10-05 -- tokenHasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.10.1 -- 2026-10-04 -- A declined task archives by age like a done or failed one (isTerminalTaskStatus).
@@ -57,8 +59,9 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { isTerminalTaskStatus } from '../storage/interface.js';
-import { resolveIdentity, agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
+import { resolveIdentity, agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { mayActOnTask, mayReadTask } from '../services/agent/task-access.js';
 import type { WebhookDispatcher, TaskBucket, TaskRouteHelpers } from './agent-tasks/helpers.js';
 import { registerTaskCreateReadRoutes } from './agent-tasks/create-read.js';
 import { registerTaskLifecycleRoutes } from './agent-tasks/lifecycle.js';
@@ -106,12 +109,8 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
    * that check task:write explicitly (create + start).
    */
   function canAccessTask(req: Express.Request, task: AgentTaskRecord): boolean {
-    if (isOwnerInPerson(req.auth)) {
-      const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
-      return task.ownerGaii === ownerGhii;
-    }
-    // Agent session -- must match agent GAII
-    return task.agentGaii === req.auth!.sub;
+    // The rule is services/agent/task-access.ts, which the task MCP tools ask as well.
+    return mayActOnTask(req.auth!, task, config.nodeId);
   }
 
   /**
@@ -120,11 +119,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
    * the write/lifecycle routes that gate on canAccessTask.
    */
   function canReadTask(req: Express.Request, task: AgentTaskRecord): boolean {
-    if (canAccessTask(req, task)) return true;
-    if (req.auth!.roles.includes('app') && tokenHasScope(req, 'task:read')) {
-      return task.ownerGaii === `${req.auth!.owner}@${config.nodeId}`;
-    }
-    return false;
+    return mayReadTask(req.auth!, task, config.nodeId);
   }
 
   // Bundle the helper closures (+ deriveTaskBucket + webhookDispatcher) so the extracted

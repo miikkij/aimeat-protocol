@@ -14,6 +14,8 @@
  *   - GET /v1/agents/:name/refusals      -- calls the node refused this agent, still unresolved
  *   - POST /v1/agents/:name/refusals/decline -- the owner will not give those permissions
  * @version-history
+ *   2026-11-13 — GET /:name/activity reads the agent and its history through services/agent/activity-read.ts,
+ *     the gate and reads aimeat_agent_activity calls (structure programme 2026-11, unit 2b).
  *   2026-10-25 — POST /refusals/decline tells the agent the "no" (secaudit2026oct22, the approval standard).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.6.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -41,6 +43,7 @@ import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, ownerGhiiOf, mayActOnAgent } from '../utils/gaii.js';
 import { readAgentAccess, refusalView, scopeRequestView, declineRefusals } from '../services/agent/refusals.js';
+import { agentActivityFor } from '../services/agent/activity-read.js';
 import { tellPermissionAnswer, closePermissionAsk } from '../services/permission-ask-notice.js';
 import { requireOwnerPrincipal } from '../auth/account-security.js';
 import { recomputeAndCacheStatistics } from '../services/agent/statistics.js';
@@ -256,23 +259,19 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
 
-    if (!canAccess(req, agentGaii)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
-      return;
-    }
-
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
-      return;
-    }
-
     // Parse query params
     const days = Math.min(365, Math.max(1, parseInt(req.query.days as string, 10) || 30));
     const granularity = (req.query.granularity as string) === 'hourly' ? 'hourly' : 'daily';
 
-    // Get time-series activity history
-    const history = await storage.getActivityHistory(agentGaii, { days, granularity });
+    // Who may read (canAccess's rule), the agent and its time-series history are
+    // services/agent/activity-read.ts, which aimeat_agent_activity calls too.
+    const read = await agentActivityFor({ storage, config }, req.auth, agentGaii, { days, granularity });
+    if (!read.ok) {
+      if (read.code === 'NOT_YOURS') res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
+      else res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+    const { agent, history } = read;
 
     // Get scheduled jobs belonging to extensions installed by this agent
     const allExtensions = await storage.listExtensions();

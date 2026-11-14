@@ -127,12 +127,12 @@ import {
   daemonsForOwner as rosterDaemonsForOwner,
   parseRunModes, parseInstallName, parseRuntimeFeatures, type ConnectedDaemonEntry,
 } from './connect-tunnel-roster.js';
-import { listByWorkspace as listEngagementsByWorkspace } from './workspace-engagements.js';
+import { listByWorkspace as listEngagementsByWorkspace } from './workspace/engagements.js';
 import {
   onDeliveryEvent, offDeliveryEvent, type DeliveryEvent,
   onMemoryWrittenEvent, offMemoryWrittenEvent, type MemoryWriteEvent,
 } from './event-bus.js';
-import { canReadWorkspace } from './workspace-access.js';
+import { canReadWorkspace } from './workspace/access.js';
 import { resolveIdentity, runAsNode } from '../utils/gaii.js';
 
 export const CONNECT_TUNNEL_PROTOCOL_VERSION = '1.0';

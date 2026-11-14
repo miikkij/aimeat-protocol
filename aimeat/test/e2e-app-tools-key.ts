@@ -6,7 +6,7 @@
  *   was given, while the old catalogue (/app-catalog.html) and appcat (/v1/appcat) read the owner's
  *   own `apps.{filename}.tools`. On aimeat.io, kkk published the tools of `ai-slop-detector.html` as
  *   `ai-slop-detector`, and no catalogue showed them. The key is now decided once, in the shared
- *   memory write (services/app-tools-key.ts), so every door lands the manifest under the filename.
+ *   memory write (services/app/tools-key.ts), so every door lands the manifest under the filename.
  *
  *   WHAT A CATALOGUE READS. Both pages read `GET /v1/memory/apps.{filename}.tools` as the owner
  *   (public/views/appcat/sections/tools-manifest.js, src/static/app-catalog/). That exact read is

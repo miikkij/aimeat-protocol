@@ -23,7 +23,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { signedInOnly } from '../../config/visibility.js';
 import { readDoc } from '../compliance/docs.js';
 import type { IntermediationNotification } from '../compliance/docs-schemas.js';
-import { isOrgManager } from '../workspace-access.js';
+import { isOrgManager } from '../workspace/access.js';
 import { DGA_REFS, type Art12Row, type DgaRef, type IntermediationFinding } from './contract.js';
 import { art12Rows } from './art12.js';
 import { buildFindings, gatherFacts } from './findings.js';

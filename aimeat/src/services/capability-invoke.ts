@@ -153,7 +153,7 @@ export async function authorityFromToken(storage: Storage, token: string | undef
  * `action_id` in an `apps.{appId}.tools` manifest is a bare id in a node-wide registry, and the only
  * thing that supplied it is the app owner's own memory record. So an owner could name SOMEBODY
  * ELSE'S capability there and have every caller of their tool invoke it, with the manifest's
- * `lockedInput` deciding the arguments. `services/extension-purchase.ts` has refused that since the
+ * `lockedInput` deciding the arguments. `services/extension/purchase.ts` has refused that since the
  * August 2026 audit (H-17); the WebMCP route, its MCP twin and the checkout resolver loaded the
  * capability by id and checked nothing (secaudit 2026-10).
  *
@@ -184,7 +184,7 @@ function registrantOwnerGhii(principal: string, nodeId: string): string {
 /**
  * Throws when the capability may not be run at all: not directly callable, disabled by the
  * operator, or withdrawn. Asked by invokeCapability and by ctx.buy, which runs a seller's extension
- * action in-process (services/extension-purchase.ts).
+ * action in-process (services/extension/purchase.ts).
  */
 export function assertCapabilityRunnable(capability: CapabilityRecord): void {
   if (!capability.callable) {

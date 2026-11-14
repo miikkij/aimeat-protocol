@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The shapes a workspace share is described in, and what a share hands out. Moved out
- *   of shared.ts unchanged so the public collectors (services/workspace-public-collectors.ts, once
+ *   of shared.ts unchanged so the public collectors (services/workspace/public-collectors.ts, once
  *   routes/organisms/shared-public.ts) can name them without importing shared.ts, which imports
  *   them (an import cycle, check:deps). shared.ts re-exports them, so no importer changes.
  * @structure ShareAccess · ShareMeta · ResolvedShare · PublicDoc · PublicRecord
@@ -23,7 +23,7 @@ export type ShareAccess = 'open' | 'password' | 'account' | 'organism';
 /** `icsKeyHash`: the SHA-256 of the feed key that opens the ICS rendering of a shared records space
  *  to a calendar program, which cannot sign in or send a share token (services/calendar-feed.ts). */
 /** `until`: when a target stops being shared, keyed `*` (the workspace), `space:<name>` or
- *  `<space>/<id>`, as an ISO date (services/workspace-share.ts isDocPublicAt). */
+ *  `<space>/<id>`, as an ISO date (services/workspace/share.ts isDocPublicAt). */
 export type ShareMeta = {
   public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean>;
   access?: ShareAccess; passwordHash?: string | null; icsKeyHash?: string | null;

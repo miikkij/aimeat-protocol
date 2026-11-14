@@ -94,7 +94,7 @@ export const APP_FRAME_SANDBOX: readonly string[] = [
  * Measured, not assumed: with wasm compilation allowed and this missing, a real encode still died
  * on "Refused to connect ... blob:".
  *
- * `opts.sandboxed` is the isolated frame (services/app-isolation.ts): a node several people share,
+ * `opts.sandboxed` is the isolated frame (services/app/isolation.ts): a node several people share,
  * with no app origin, serves an app on its own address, and this directive is what keeps the app
  * from being that address. Without allow-same-origin the document gets an opaque origin, so it can
  * read no cookie, no localStorage and no IndexedDB of the node, and a request it makes carries

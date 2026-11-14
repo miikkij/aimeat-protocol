@@ -8,6 +8,8 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   2026-11-13 — aimeat_message_history reads through services/agent/message-history.ts, the gate and
+ *     read GET /v1/agents/:name/messages calls (structure programme 2026-11, unit 2b).
  *   2026-11-13 — aimeat_message_history filters by direction, as GET /v1/agents/:name/messages does
  *     (structure programme 2026-11, unit 3b).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -47,6 +49,9 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
 import { sendAgentMessage } from '../services/agent/message-send.js';
+import { messageHistoryFor } from '../services/agent/message-history.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import { localAccountName } from '../utils/gaii.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentMessageTools(
@@ -58,8 +63,13 @@ export function registerAgentMessageTools(
     _emitResourceListChanged: (agentGaii: string) => void,
     /** The session's scopes: a declaration needs provenance:write there as well as on the grant. */
     scopes?: readonly string[],
+    /** The session's caller (services/caller-context.ts); built from the session's facts when not given. */
+    caller?: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
+    const sessionCaller = (): CallerContext => caller
+        ? caller()
+        : agentSessionCaller(agentGaii, localAccountName(agentGaii), scopes ?? [], config.nodeId, storage);
 
     // ── Tool 1: aimeat_message_inbox ──
     mcp.registerTool(
@@ -164,13 +174,16 @@ export function registerAgentMessageTools(
             annotations: annotationsFor('aimeat_message_history'),
         },
         async ({ thread_id, page, per_page, direction }) => {
-            const result = await storage.listMessages(agentGaii, {
+            // The gate and the read are services/agent/message-history.ts, which GET
+            // /v1/agents/:name/messages calls too. The session is the agent itself, so the gate passes.
+            const result = await messageHistoryFor({ storage, config }, sessionCaller().auth, agentGaii, {
                 threadId: thread_id,
                 // The same read filter GET /v1/agents/:name/messages passes (unit 3b).
                 ...(direction ? { direction } : {}),
                 page: page ?? 1,
                 perPage: per_page ?? 20,
             });
+            if (!result.ok) return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
             // Return oldest-first so the agent reads the conversation in order.
             const ordered = [...result.messages].sort(
                 (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),

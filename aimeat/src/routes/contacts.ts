@@ -82,7 +82,7 @@ import { contactTogether } from '../services/contacts-together.js';
 import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
 import { invitePublic } from '../services/invitations.js';
 import { mintContactHandle, resolveContactHandle } from '../services/contact-handles.js';
-import { resolveAppOriginTarget } from '../services/app-origin-target.js';
+import { resolveAppOriginTarget } from '../services/app/origin-target.js';
 
 /** Links as the caller sent them. Shape only — what is ACCEPTABLE (http(s), caps, count) is the
  *  service's decision, made once in normalizeLinks rather than again per surface. */

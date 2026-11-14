@@ -63,7 +63,7 @@ import { CONSENT_LANGS, consentTexts, consentSettingsLabels, type ConsentService
 
 type BannerConfig = Pick<AimeatConfig, 'cookieConsentCategories' | 'cookieConsentPolicyUrl'>;
 
-/** The attribute on the start script; services/app-serve-marks-strip.ts takes it out of a served copy. */
+/** The attribute on the start script; services/app/serve-marks-strip.ts takes it out of a served copy. */
 export const COOKIE_BANNER_MARK = 'data-aimeat-cookie-banner';
 
 /**

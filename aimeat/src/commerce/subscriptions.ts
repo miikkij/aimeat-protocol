@@ -29,7 +29,7 @@
  *   the seller as an undelivered payment and never charged again.
  *
  *   READING: an extension sees the caller's running subscriptions to it on `ctx.caller.subscriptions`
- *   (services/extension-invoke.ts); the buyer lists and cancels theirs on /v1/commerce/subscriptions.
+ *   (services/extension/invoke.ts); the buyer lists and cancels theirs on /v1/commerce/subscriptions.
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history

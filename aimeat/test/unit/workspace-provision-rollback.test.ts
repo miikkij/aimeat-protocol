@@ -21,7 +21,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { provisionWorkspace } from '../../src/services/workspace-provision.js';
+import { provisionWorkspace } from '../../src/services/workspace/provision.js';
 import { loadConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 

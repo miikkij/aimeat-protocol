@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description aimeat_app_fork, moved out of mcp/apps.ts by pure extraction when that file passed
  *   the 800-line limit. What is left here is the tool's own business: its two gates, and the answer
- *   it renders. The copy itself is services/app-lifecycle.ts.
+ *   it renders. The copy itself is services/app/lifecycle.ts.
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged, caller)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
@@ -35,15 +35,15 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { forkApp, resolveAppOwnerScope } from '../services/app-lifecycle.js';
+import { forkApp, resolveAppOwnerScope } from '../services/app/lifecycle.js';
 import { logger } from '../utils/logger.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
-import { appIsPaced, appToll } from '../services/app-pacing.js';
-import { currentAppRow } from '../services/app-served-protection.js';
+import { appIsPaced, appToll } from '../services/app/pacing.js';
+import { currentAppRow } from '../services/app/served-protection.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { publishAskOf } from '../services/publish-requests/ask.js';
-import { publishAskedFields } from '../services/app-publish-gate.js';
+import { publishAskedFields } from '../services/app/publish-gate.js';
 
 export function registerAppForkTool(
     mcp: McpServer,
@@ -51,7 +51,7 @@ export function registerAppForkTool(
     config: AimeatConfig,
     getAgentGaii: () => string,
     emitResourceListChanged: (agentGaii: string) => void,
-    /** The session's caller, for the publish gate a new app passes (services/app-publish-gate.ts). */
+    /** The session's caller, for the publish gate a new app passes (services/app/publish-gate.ts). */
     caller: () => CallerContext,
 ): void {
     // ── Tool 6: aimeat_app_fork ──
@@ -95,7 +95,7 @@ export function registerAppForkTool(
             }
 
             try {
-                // From here it is services/app-lifecycle.ts — the same copy POST .../fork performs,
+                // From here it is services/app/lifecycle.ts — the same copy POST .../fork performs,
                 // including the target-name check, the per-owner quota, the lineage event, the
                 // change log and the feed.
                 const out = await forkApp(storage, config, {

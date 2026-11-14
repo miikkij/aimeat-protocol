@@ -88,7 +88,7 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   catalogue: 'catalogue:read',
   apps: 'catalogue:read',
   // An app's plan changed: a choice on its structure page, or a line from the AI building it
-  // (services/app-structure.ts). The word the plan's own read and write ask.
+  // (services/app/structure.ts). The word the plan's own read and write ask.
   'app-plans': 'app:write',
   // The people registered to an app without an account changed (services/app-parties/store.ts).
   // The word the list's own read asks (GET /v1/apps/{owner}/{filename}/parties).

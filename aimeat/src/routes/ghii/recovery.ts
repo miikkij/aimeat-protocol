@@ -78,7 +78,7 @@ import { appendMailLog } from '../../services/notification-settings.js';
 import { passwordResetEmail } from '../../services/email-template-reset.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
-import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
+import { applyAppInvitesForVerifiedEmail } from '../../services/app/member-invites.js';
 import { sendHeldKeyCredentials } from '../../services/key-credentials.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { recordAccountEvent } from '../../services/account-events.js';

@@ -9,8 +9,8 @@
  *   v1.0.0 — 2026-11-06 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { parseOwnerSettingsInput, appSettingsState, SETTINGS_PRESENTATION_FIELDS, APP_ABOUT_MAX_CHARS } from '../../src/services/app-settings.js';
-import { appOwnWords } from '../../src/services/app-seo.js';
+import { parseOwnerSettingsInput, appSettingsState, SETTINGS_PRESENTATION_FIELDS, APP_ABOUT_MAX_CHARS } from '../../src/services/app/settings.js';
+import { appOwnWords } from '../../src/services/app/seo.js';
 import type { AppRecord, AppSummaryRecord } from '../../src/storage/interface.js';
 
 const parse = (body: Record<string, unknown>) => parseOwnerSettingsInput(body);

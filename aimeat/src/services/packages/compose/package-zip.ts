@@ -35,7 +35,7 @@ import yauzl from 'yauzl';
 import YAML from 'yaml';
 import type { PackageRecord, PackageComponentType } from '../../../storage/interface.js';
 import { isUnsafeName } from '../../safe-zip.js';
-import { yamlErrorText } from '../../extension-manifest.js';
+import { yamlErrorText } from '../../extension/manifest.js';
 import { expectsOf, type PackageExpects } from './package-expects.js';
 
 // ---------------------------------------------------------------------------

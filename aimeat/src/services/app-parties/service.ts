@@ -18,7 +18,7 @@
  *   THE LINK is 32 random bytes, mailed to the app's own address as `?aimeat_party_link=`, kept as its
  *   SHA-256 on the party, good for 30 minutes and once, and mailed at most once a minute to one person.
  *   Opening it activates a pending party, puts it on
- *   the app's roster with the registration's role (services/app-members.ts; no exchange grant, since a
+ *   the app's roster with the registration's role (services/app/members.ts; no exchange grant, since a
  *   party has no account to carry), and answers the session: a purpose token naming the app and the
  *   party's epoch. Only that first opening makes the roster row; a later sign-in link leaves the roster
  *   as the owner or a manager left it. A password-free passkey sign-in can join here later as a second way to answer
@@ -52,10 +52,10 @@ import { isValidEmail } from '../../utils/email-validator.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 import { nodeContext } from '../node-context.js';
 import { sendMail } from '../mail-gate.js';
-import { resolveAppUrls } from '../app-urls.js';
+import { resolveAppUrls } from '../app/urls.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
-import { getMember, putMember, removeMember } from '../app-members.js';
+import { getMember, putMember, removeMember } from '../app/members.js';
 import { newPartyUid } from '../parties/keys.js';
 import { partyRefOf, PARTY_TOKEN_PREFIX } from '../parties/contract.js';
 import { mintPartyToken, verifyPartyToken } from '../parties/token.js';

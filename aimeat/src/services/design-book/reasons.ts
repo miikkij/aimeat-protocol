@@ -40,7 +40,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance/register.js';
-import type { BuildNotes } from '../app-build-notes.js';
+import type { BuildNotes } from '../app/build-notes.js';
 import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 
 export const REASONS_KEY_PREFIX = 'atelier.book.reasons.';

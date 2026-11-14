@@ -151,10 +151,9 @@
       "reads": {
         "listMemory": 1,
         "getMemory": 1,
-        "listStorageFiles": 1,
-        "getStorageFile": 1
+        "listStorageFiles": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): the file read asks through storedFileShownTo; an agent's namespace holds no data package version, so it asks the file's own label only."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): the file read asks through storedFileShownTo; an agent's namespace holds no data package version, so it asks the file's own label only. 2026-11-13 (structure programme unit 2b): the file read moved into readStoredFileShownTo (services/datapackage/source-labels.ts)."
     },
     "src/mcp/core.ts": {
       "reads": {
@@ -489,8 +488,7 @@
     "src/routes/memory/files.ts": {
       "reads": {
         "listStorageFilesForOwners": 1,
-        "listStorageFiles": 1,
-        "getStorageFile": 1
+        "listStorageFiles": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file. 2026-11-09 (performance round 2): GET /v1/memory/files lists the owner's and their agents' file metadata, to the owner in person, in one IN query (listStorageFilesForOwners) where it read listStorageFiles once per identity; the same rows, the same metadata, no bytes."
     },
@@ -543,7 +541,7 @@
       "reads": {
         "listAllMemory": 5
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; the other reads serve a write or the node's own bookkeeping. The batch delete's key-only scan moved to services/workspace-tool-ops.ts on 2026-10-06."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; the other reads serve a write or the node's own bookkeeping. The batch delete's key-only scan moved to services/workspace/tool-ops.ts on 2026-10-06."
     },
     "src/routes/organisms/workspace-read.ts": {
       "reads": {
@@ -909,70 +907,70 @@
       },
       "why": "Moved 2026-11-13 from src/mcp/workspace-members.ts and two reads of src/routes/organisms/workspace-access.ts with listWorkspaceAccessRequests (structure programme unit 2). Reviewed 2026-09-29 (TARGET-082 V4) there, the node's own read: workspace access-request state records."
     },
-    "src/services/app-agent-deploy.ts": {
+    "src/services/app/agent-deploy.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public offer declarations and the deploy state record."
     },
-    "src/services/app-ai-use.ts": {
+    "src/services/app/ai-use.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-09, the node's own read: the same public tool manifest the WebMCP listing serves to anyone, counted for the app's \"Use with your AI\" mark; no content leaves, only the number of public tools."
     },
-    "src/services/app-audit-archive.ts": {
+    "src/services/app/audit-archive.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-10-01, the node's own read: the owner's audit.settings record and the yearly archive records of an app's audit trail (audit.apps.<file>.archive.<year>), the node's system records under the reserved audit. prefix, never content."
     },
-    "src/services/app-audit.ts": {
+    "src/services/app/audit.ts": {
       "reads": {
         "getMemory": 4,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app audit-trail record. 2026-10-01: the archive-before and keep paths read the same record, and the owner-wide limit lists the owner's own audit.apps.* records to apply it; all of them are the node's system records under the reserved audit. prefix, never content."
     },
-    "src/services/app-config.ts": {
+    "src/services/app/config.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The app configuration values record."
     },
-    "src/services/app-dev-grant.ts": {
+    "src/services/app/dev-grant.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App-dev grant records in a system namespace."
     },
-    "src/services/app-legal.ts": {
+    "src/services/app/legal.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The tool manifest, read to check for priced tools."
     },
-    "src/services/app-lifecycle.ts": {
+    "src/services/app/lifecycle.ts": {
       "reads": {
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published app's screenshot copied into a fork; published by the owner."
     },
-    "src/services/app-member-erasure.ts": {
+    "src/services/app/member-erasure.ts": {
       "reads": {
         "listAllMemory": 1,
         "listAllDeletedMemory": 1
       },
       "why": "Reviewed 2026-10-01, the node's own read: account erasure lists the system namespaces of app membership (members, requests, visits, carry plans, blanket development rights), and the bin of the same namespaces, to delete the erased account's rows. Nothing it reads is shown to anyone."
     },
-    "src/services/app-member-roster.ts": {
+    "src/services/app/member-roster.ts": {
       "reads": {
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-10-01, the node's own read: one bounded page of an app's member rows in the system namespace app-member, read for their role names only, to choose the role a request notification's one-click approval offers. Nothing it reads is shown to the caller."
     },
-    "src/services/app-members.ts": {
+    "src/services/app/members.ts": {
       "reads": {
         "listAllMemory": 1,
         "getMemory": 1
@@ -999,52 +997,52 @@
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4), the node's own read: an app's service-owned `app-parties.` record (its signup setting and the people who registered), which only the app party service writes."
     },
-    "src/services/app-record-keys.ts": {
+    "src/services/app/record-keys.ts": {
       "reads": {
         "getMemory": 5,
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership, plan, request and roadmap system records."
     },
-    "src/services/app-scope-allowance-store.ts": {
+    "src/services/app/scope-allowance-store.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-13, the node's own read: an app's scope allowance record under the node's app-scope-allowance namespace (the permission words the app kept at the move to 4.0, and the code lines that need them), which the grant routes and the app's owner read. Not the owner's content."
     },
-    "src/services/app-seo.ts": {
+    "src/services/app/seo.ts": {
       "reads": {
         "listStorageFiles": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only whether an icon or screenshot exists."
     },
-    "src/services/app-template-proposals.ts": {
+    "src/services/app/template-proposals.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Template proposal manifests, listed to and read by their owner."
     },
-    "src/services/app-tool-interfaces.ts": {
+    "src/services/app/tool-interfaces.ts": {
       "reads": {
         "getMemory": 3,
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool interface schema snapshots and the latest pointer."
     },
-    "src/services/app-tool-invoke-keep.ts": {
+    "src/services/app/tool-invoke-keep.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, v72), the node's own read: the once-only step's own record under system@<node>, which lists the agents and ecosystem apps that keep calling app tools over HTTP; no content is shown to anyone from here."
     },
-    "src/services/app-tool-names.ts": {
+    "src/services/app/tool-names.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public tool names from the manifest."
     },
-    "src/services/app-tools-key.ts": {
+    "src/services/app/tools-key.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 2
@@ -1058,7 +1056,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the app layout configuration record and its earlier versions."
     },
-    "src/services/app-workspaces.ts": {
+    "src/services/app/workspaces.ts": {
       "reads": {
         "getMemory": 2
       },
@@ -1579,9 +1577,10 @@
     },
     "src/services/datapackage/source-labels.ts": {
       "reads": {
-        "getStorageFileMeta": 1
+        "getStorageFileMeta": 1,
+        "getStorageFile": 1
       },
-      "why": "Reviewed 2026-11-08 (secaudit2026nov08b round 15), the node's own read: the metadata of a data package version's resource file (packageCopyTargets), only for its workspaceRef, to name the file's label address beside the version's label source. No bytes are read and nothing of the file is answered; the rows the caller copies were read before through loadResourceRows, which passes the caller's classification reader."
+      "why": "Reviewed 2026-11-08 (secaudit2026nov08b round 15), the node's own read: the metadata of a data package version's resource file (packageCopyTargets), only for its workspaceRef, to name the file's label address beside the version's label source. No bytes are read and nothing of the file is answered; the rows the caller copies were read before through loadResourceRows, which passes the caller's classification reader. 2026-11-13 (structure programme unit 2b): getStorageFile is readStoredFileShownTo's read, which passes the file to storedFileShownTo with the caller's reader in the same function before anything is answered; GET /v1/memory/files/:key and the MCP storage resource moved their read here."
     },
     "src/services/datapackage/store.ts": {
       "reads": {
@@ -1984,40 +1983,40 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool manifests, read to list the priced tool bindings."
     },
-    "src/services/extension-ctx.ts": {
+    "src/services/extension/ctx.ts": {
       "reads": {
         "getMemory": 6,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/services/extension-files.ts": {
+    "src/services/extension/files.ts": {
       "reads": {
         "getStorageFileMeta": 1,
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-10-20 (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii), checked: the file passes reader.show as the READER, after authorizeRead judged against the same reader. The reader is the caller on an attended call and the principal that wrote the extension's code on an unattended one. Since 2026-10-22 (secaudit 2026-10, v68 and v69) the publish gate reads a stored file's metadata only, to learn whether a write raises it to public."
     },
-    "src/services/extension-host-bounds.ts": {
+    "src/services/extension/host-bounds.ts": {
       "reads": {
         "listMemoryMetaForOwners": 1,
         "getMemory": 1
       },
       "why": "Moved from extension-ctx.ts on 2026-10-25 (secaudit2026oct22): getPublic by a bare owner name finds which of the owner's agents holds the key from metadata and reads that one record; the record goes back to getPublic in extension-ctx.ts, which lets it leave only through the caller's presentation, as before."
     },
-    "src/services/extension-lifecycle.ts": {
+    "src/services/extension/lifecycle.ts": {
       "reads": {
         "listMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists ext: namespace keys to delete them on uninstall."
     },
-    "src/services/extension-publish-keep.ts": {
+    "src/services/extension/publish-keep.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, v68 and v69), the node's own read: the once-only step's own record under system@<node>, which lists the extensions that keep publishing as before until their code changes; no content is shown to anyone from here."
     },
-    "src/services/extension-purchase.ts": {
+    "src/services/extension/purchase.ts": {
       "reads": {
         "getMemory": 1
       },
@@ -3253,19 +3252,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The system open-refusals index and refused-run state."
     },
-    "src/services/workspace-access-decision.ts": {
+    "src/services/workspace/access-decision.ts": {
       "reads": {
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An access-request record, read to update."
     },
-    "src/services/workspace-change-core.ts": {
+    "src/services/workspace/change-core.ts": {
       "reads": {
         "listMemoryKeysByPrefix": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A key existence scan (keys only)."
     },
-    "src/services/workspace-content.ts": {
+    "src/services/workspace/content.ts": {
       "reads": {
         "listAllMemoryMeta": 1,
         "listAllMemory": 1,
@@ -3273,13 +3272,13 @@
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. 2026-11-04 (codebase analysis C7): with valuesOnDemand it loads the rows without values (listAllMemoryMeta), passes those rows through the reader, and reads the values (getMemoryByKeys, getMemory where a provider has no bulk read) only of rows the reader showed."
     },
-    "src/services/workspace-engagements.ts": {
+    "src/services/workspace/engagements.ts": {
       "reads": {
         "listAllMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Agent engagement records."
     },
-    "src/services/workspace-export.ts": {
+    "src/services/workspace/export.ts": {
       "reads": {
         "listAllMemoryPages": 1,
         "listStorageFiles": 1,
@@ -3287,42 +3286,42 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-16 (QA audit F06c-01): the records are read to the end with listAllMemoryPages and pass the same reader."
     },
-    "src/services/workspace-import.ts": {
+    "src/services/workspace/import.ts": {
       "reads": {
         "getMemory": 1,
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update, file dedupe existence and registry append."
     },
-    "src/services/workspace-meta-read.ts": {
+    "src/services/workspace/meta-read.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4) in services/workspace-meta.ts and moved here unchanged on 2026-10-13, the node's own read: the registry scan and the meta-copy reader; readme and manifest content reaches callers through workspace-content.ts with a reader."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4) in services/workspace/meta.ts and moved here unchanged on 2026-10-13, the node's own read: the registry scan and the meta-copy reader; readme and manifest content reaches callers through workspace-content.ts with a reader."
     },
-    "src/services/workspace-meta.ts": {
+    "src/services/workspace/meta.ts": {
       "reads": {
         "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Registry and meta-copy helpers; readme and manifest content reaches callers through workspace-content.ts with a reader."
     },
-    "src/services/workspace-provision.ts": {
+    "src/services/workspace/provision.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of meta records and the registry."
     },
-    "src/services/workspace-public-collectors.ts": {
+    "src/services/workspace/public-collectors.ts": {
       "reads": {
         "listAllMemory": 2
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Moved from src/routes/organisms/shared-public.ts unchanged on 2026-10-16."
     },
-    "src/services/workspace-records-delete-op.ts": {
+    "src/services/workspace/records-delete-op.ts": {
       "reads": {
         "listMemoryKeysByPrefix": 1
       },
-      "why": "The batch delete's key-only scan and its value-scan fallback, moved unchanged from services/workspace-tool-ops.ts on 2026-10-16 (max-file-lines): they find the addresses a delete removes, and no value reaches the caller."
+      "why": "The batch delete's key-only scan and its value-scan fallback, moved unchanged from services/workspace/tool-ops.ts on 2026-10-16 (max-file-lines): they find the addresses a delete removes, and no value reaches the caller."
     },
     "src/services/workspace-rows/row-service.ts": {
       "reads": {
@@ -3331,44 +3330,44 @@
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
     },
-    "src/services/workspace-share-gate.ts": {
+    "src/services/workspace/share-gate.ts": {
       "reads": {
         "listAllMemoryMeta": 1
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3 gap closed in L5), the node's own read: the keys of the published pages of a space a share is about to show wider, no value, so that each page is held to its own label's audience cap before the share is stored. Nothing is returned to the caller but the refusal naming the page."
     },
-    "src/services/workspace-tool-ops.ts": {
+    "src/services/workspace/tool-ops.ts": {
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. The batch delete's scans, here from 2026-10-06, moved to services/workspace-records-delete-op.ts on 2026-10-16."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. The batch delete's scans, here from 2026-10-06, moved to services/workspace/records-delete-op.ts on 2026-10-16."
     },
-    "src/services/workspace-transfer-rows.ts": {
+    "src/services/workspace/transfer-rows.ts": {
       "reads": {
         "listWorkspaceRows": 1
       },
       "why": "Reviewed 2026-10-15 (feature-list audit #68): the rows of a workspace's row spaces for its export. Every page passes the exporter's classification reader, show and then leave with the destination export (rowTarget, as readRows addresses a row), before a row enters the bundle; what leave keeps back is named in leftOut."
     },
-    "src/services/workspace-versions.ts": {
+    "src/services/workspace/versions.ts": {
       "reads": {
         "listMemoryKeysByPrefix": 2,
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Version-row key refs and manifest retention config."
     },
-    "src/services/workspace-write-guards.ts": {
+    "src/services/workspace/write-guards.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The archived-flag check."
     },
-    "src/services/workspace-write-items.ts": {
+    "src/services/workspace/write-items.ts": {
       "reads": {
         "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest object types for a write. 2026-10-18: resolveSpaceNamespace reads the same manifest copies to turn a space's name into its namespace; nothing from it reaches a reader."
     },
-    "src/services/workspace-write.ts": {
+    "src/services/workspace/write.ts": {
       "reads": {
         "listAllMemory": 3
       },

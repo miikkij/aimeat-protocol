@@ -13,7 +13,7 @@
  *   tested the use, only the refusal. Each test here names the use and fails when the use is gone.
  *
  *   FAIL FIRST, 2026-10-21, both backends: with ctx.fetch reading no vault for another account's
- *   extension (services/extension-ctx.ts, vaultOwner null when the installer is not the caller's
+ *   extension (services/extension/ctx.ts, vaultOwner null when the installer is not the caller's
  *   account, the shape of the first wave's fix), tests 5, 6 and 7 are red; restored byte for byte.
  *
  *   THE RECEIVER runs on 127.0.0.1 (the runner admits private egress) on E2E_PURPOSE_SHARED_PORT,

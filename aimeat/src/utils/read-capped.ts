@@ -52,7 +52,7 @@ import { logger } from './logger.js';
 /**
  * How much of one answer this node reads from a service outside it that a person, or code acting
  * for them, chose to call: a read from a connected account (services/connections/read.ts), an
- * extension's ctx.fetch (services/extension-ctx.ts) and a decision provider's answer
+ * extension's ctx.fetch (services/extension/ctx.ts) and a decision provider's answer
  * (services/decide/systemone-client.ts). One number, so the three cannot drift apart; 4 MB is the
  * ceiling the connection read had first.
  */
@@ -60,7 +60,7 @@ export const OUTBOUND_READ_MAX_BYTES = 4 * 1024 * 1024;
 
 /**
  * The most an extension's manifest may raise its own ctx.fetch ceiling to (`limits.fetch_max_mb`,
- * services/extension-manifest.ts). A manifest that asks for more is clamped here, so the number
+ * services/extension/manifest.ts). A manifest that asks for more is clamped here, so the number
  * an installer approves is the number the sandbox gets. 32 MB holds a national TV guide inflated
  * and stays well under the 64 MB a sandbox has for everything.
  */

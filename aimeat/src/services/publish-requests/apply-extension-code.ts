@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An operator allowed the extension code a package brought into an account that may not
- *   install extension code (services/extension-code-hold.ts filed the question). The hold is taken off
+ *   install extension code (services/extension/code-hold.ts filed the question). The hold is taken off
  *   and the extension is switched on the way the activate door switches it on: its schedules, its
  *   capability rows and its `@activate` jobs. Only what the operator was asked about is switched on:
  *   the same extension, installed by the same account, still waiting on this request, at the same
@@ -16,9 +16,9 @@
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c, extensions-08).
  */
 import { localAccountName } from '../../utils/gaii.js';
-import { actionCodeDigest } from '../extension-email-policy-ask.js';
-import { heldCodeRequest, withoutCodeHold } from '../extension-code-hold.js';
-import { activateExtension } from '../extension-lifecycle.js';
+import { actionCodeDigest } from '../extension/email-policy-ask.js';
+import { heldCodeRequest, withoutCodeHold } from '../extension/code-hold.js';
+import { activateExtension } from '../extension/lifecycle.js';
 import { nodeContext } from '../node-context.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 

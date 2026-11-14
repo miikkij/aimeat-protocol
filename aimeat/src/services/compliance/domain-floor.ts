@@ -42,7 +42,7 @@ import { appTarget, organismTarget, workspaceTarget } from '../classification/co
 import { readContentLabel, setLabel, type LabelActor, type ClassificationDeps } from '../classification/labels.js';
 import type { ComplianceScope } from './docs.js';
 import type { ComplianceRegister } from './docs-schemas.js';
-import { isOrgManager } from '../workspace-access.js';
+import { isOrgManager } from '../workspace/access.js';
 
 export interface FloorOutcome {
   register: string;

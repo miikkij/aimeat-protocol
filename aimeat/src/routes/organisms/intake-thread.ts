@@ -44,7 +44,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
-import { readPublishSpace } from '../../services/workspace-write-items.js';
+import { readPublishSpace } from '../../services/workspace/write-items.js';
 import { readThreadForm as readThreadFormOf, latestThreadRecord, type ThreadForm } from '../../services/intake/visitor-thread.js';
 import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';

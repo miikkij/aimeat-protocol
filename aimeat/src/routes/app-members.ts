@@ -19,12 +19,12 @@
  *   string, so the owner's own agents administer the roster too (an owner who manages members from
  *   an AI chat is the normal case here, not an edge one). A member whose role the carry plan lists
  *   in `manageRoles` manages the roster beside the owner, except the plan, the sweep and the
- *   managing roles themselves (services/app-roster-context.ts). Everyone else may only ask, and read
+ *   managing roles themselves (services/app/roster-context.ts). Everyone else may only ask, and read
  *   their own standing.
  *
  *   Each per-app handler is the route's gate (requireAuth plus the scope word) and one service call:
- *   the roster logic is in services/app-roster-ops.ts and services/app-roster-write.ts, the per-app
- *   development right in services/app-dev-grant-ops.ts, so the aimeat_app_manage MCP tool calls the
+ *   the roster logic is in services/app/roster-ops.ts and services/app/roster-write.ts, the per-app
+ *   development right in services/app/dev-grant-ops.ts, so the aimeat_app_manage MCP tool calls the
  *   same functions. The blanket development right stays here: no MCP action reaches it.
  * @structure appMembersRouter(config, storage) — GET/POST/DELETE members, GET/POST requests, GET me,
  *   GET/PUT plan, sweep, seen, GET/PUT/DELETE dev-grants (per app), GET/PUT/DELETE /v1/app-dev-grants
@@ -95,22 +95,22 @@ import { requireAuth, requireOwnerPrincipal, requireScope } from '../auth/middle
 import { requireScopeOrOwnApp } from '../auth/app-own-gate.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { listAppRecords } from '../services/app-record-keys.js';
-import { accountOf, isLive } from '../services/app-members.js';
+import { listAppRecords } from '../services/app/record-keys.js';
+import { accountOf, isLive } from '../services/app/members.js';
 import {
   APP_DEV_LEVEL_LIST, actsFor, levelName, parseDevLevel,
   putBlanketGrant, listBlanketGrants, removeBlanketGrant,
-} from '../services/app-dev-grant.js';
+} from '../services/app/dev-grant.js';
 import { notify } from '../services/notify.js';
 import { logger } from '../utils/logger.js';
 import { appMembersExtraRouter } from './app-members-extra.js';
 import { appPartiesRouter } from './app-parties.js';
-import { memberAddress } from '../services/app-member-approve.js';
+import { memberAddress } from '../services/app/member-approve.js';
 import {
   listRoster, rosterMe, readCarryPlan, dismissGuest, sweepRoster, requestMembership, declineRequest, type AppRef,
-} from '../services/app-roster-ops.js';
-import { setCarryPlan, setMember, removeRosterMember } from '../services/app-roster-write.js';
-import { DEV_RUNGS, listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app-dev-grant-ops.js';
+} from '../services/app/roster-ops.js';
+import { setCarryPlan, setMember, removeRosterMember } from '../services/app/roster-write.js';
+import { DEV_RUNGS, listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app/dev-grant-ops.js';
 import { sendAppOp } from './app-op-answer.js';
 import { appPartyFromRequest } from '../services/app-parties/service.js';
 import { partyBearer, partyRosterMe } from '../services/app-parties/iam-gate.js';
@@ -225,7 +225,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     if (req.query.include_apps === 'true') {
       const rows = await listAppRecords(storage, 'app-member', 'appmember.');
       for (const { value } of rows.items) {
-        const row = value as import('../services/app-members.js').AppMemberRecord;
+        const row = value as import('../services/app/members.js').AppMemberRecord;
         if (!row?.appId || accountOf(row.appId.split('/')[0]) !== me || typeof row.dev !== 'number' || !isLive(row)) continue;
         (perApp[row.appId] ??= []).push({ account: row.owner, level: row.dev, levelName: levelName(row.dev), since: row.devSince, grantedBy: row.devBy });
       }

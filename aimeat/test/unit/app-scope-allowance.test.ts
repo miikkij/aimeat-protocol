@@ -2,7 +2,7 @@
  * @file test/unit/app-scope-allowance.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The published apps half of the 4.0.x keep-working step (services/app-scope-allowance.ts,
+ * @description The published apps half of the 4.0.x keep-working step (services/app/scope-allowance.ts,
  *   services/rest-scope-keep-working-migration.ts), and the take-back from anonymous mode's shared agent.
  *
  *   - An app published before the step whose code calls /v1/ext/... and declares nothing gets an
@@ -33,10 +33,10 @@ import { generateKeyPair } from '../../src/auth/keypair.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { migrateRestScopeKeepWorkingOnce, APP_SCOPE_KEEP_WORKING_KEY, REST_SCOPE_KEEP_WORKING_KEY } from '../../src/services/rest-scope-keep-working-migration.js';
 import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../../src/services/rest-scope-gates-migration.js';
-import { readAppScopeAllowance, readScopeAllowanceFor, removeScopeAllowanceFor } from '../../src/services/app-scope-allowance.js';
-import { narrowToDeclared } from '../../src/services/app-grant-scopes.js';
+import { readAppScopeAllowance, readScopeAllowanceFor, removeScopeAllowanceFor } from '../../src/services/app/scope-allowance.js';
+import { narrowToDeclared } from '../../src/services/app/grant-scopes.js';
 import { readAccountEvents } from '../../src/services/account-events.js';
-import { readAppAudit } from '../../src/services/app-audit.js';
+import { readAppAudit } from '../../src/services/app/audit.js';
 
 const NODE_ID = 'aimeat-app-scope-allowance';
 const OWNER = 'allowowner';

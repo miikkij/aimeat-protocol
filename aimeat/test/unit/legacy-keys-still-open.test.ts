@@ -80,7 +80,7 @@ beforeAll(async () => {
   (await import('../../src/services/design-book/preview-token.js')).initDesignBookPreviewTokenKeys(privateKey, publicKey);
   // Imported here for the cold start: these two pull in much of the node.
   await import('../../src/services/external-login.js');
-  await import('../../src/services/app-access-token.js');
+  await import('../../src/services/app/access-token.js');
 
   // The short-lived rows as the storage held them (the upload address).
   const rows = F.ephemeralClaims as Array<{ kind: string; id: string; payload: string; expiresAt: number }>;
@@ -172,7 +172,7 @@ describe('the short purpose tokens still verify', () => {
   });
 
   it('an app grant, an app screenshot grant and a page grant', async () => {
-    const a = await import('../../src/services/app-access-token.js');
+    const a = await import('../../src/services/app/access-token.js');
     expect(await a.appAccessGranted(T.appAccess, OWNER, 'notes.html')).toBe(true);
     expect(await a.appShotGranted(T.appShot, OWNER, 'notes.html')).toBe(true);
     expect(await a.pageAccessGranted(T.pageAccess, { kind: 'portfolio', owner: OWNER })).toBe(true);
@@ -209,7 +209,7 @@ describe('stored secrets sealed at 0c741df55 still open', () => {
   it('a secret Config setting, an MCP server header and an extension secret', async () => {
     const { openStoredSetting } = await import('../../src/services/config/at-rest.js');
     const { openTransportSecrets } = await import('../../src/services/mcp-client/transport-secrets.js');
-    const { decryptSecretFields } = await import('../../src/services/extension-secrets.js');
+    const { decryptSecretFields } = await import('../../src/services/extension/secrets.js');
     const { getEncryptionKey } = await import('../../src/services/encryption.js');
     expect(openStoredSetting(S.sealedSetting.path, S.sealedSetting.stored, KEY_CONFIG)).toBe(S.sealedSetting.serialized);
     const open = openTransportSecrets(S.mcpTransport.sealed, KEY_CONFIG as never, S.mcpTransport.serverId) as { headers?: Record<string, string> };

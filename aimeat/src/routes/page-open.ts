@@ -7,7 +7,7 @@
  *
  *   - pageOriginRefused(): the page origin (`<user>.portfolio.<apex>`, `<slug>.co.<apex>`) holds no
  *     session, so a page whose `access` needs a sign-in is served there only against a page grant
- *     (services/app-access-token.ts pageAccessGranted), taken from the query once and from the
+ *     (services/app/access-token.ts pageAccessGranted), taken from the query once and from the
  *     origin's grant cookie after that (routes/origin-grant-cookie.ts). A browser without one goes to /v1/app-open,
  *     the SPA page that holds the session; every other caller gets the origin's uniform 404.
  *   - answerPageOpen(): POST /v1/portfolio/:username/open (routes/portfolio.ts) and
@@ -37,7 +37,7 @@ import { isSameAccount } from '../utils/same-account.js';
 import { pageNeedsSignIn, mayOpenPage, pageOpenPath } from '../services/page-access.js';
 import {
   APP_ACCESS_TTL_SECONDS, generatePageAccessToken, pageAccessGranted, type PageRef,
-} from '../services/app-access-token.js';
+} from '../services/app/access-token.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { originGrant, PAGE_ACCESS_COOKIE } from './origin-grant-cookie.js';
 

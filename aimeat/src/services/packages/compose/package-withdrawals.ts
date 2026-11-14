@@ -25,7 +25,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, PackageInstanceRecord } from '../../../storage/interface.js';
 import type { Scheduler } from '../../scheduler.js';
-import { deactivateExtension } from '../../extension-lifecycle.js';
+import { deactivateExtension } from '../../extension/lifecycle.js';
 import { firstNoticeFor } from './package-notices.js';
 import { notify } from '../../notify.js';
 import { emitChange } from '../../event-bus.js';

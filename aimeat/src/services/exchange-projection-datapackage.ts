@@ -15,7 +15,7 @@
  *   terms without usage terms (USAGE_TERMS_REQUIRED) and terms without a price or pacing (NOT_PRICED).
  *
  *   THE INTERFACE. A pass that writes pins the package's current schemas as an interface version
- *   (services/app-tool-interfaces.ts, `datapkg:{name}` / `read`): unchanged schemas reuse the version,
+ *   (services/app/tool-interfaces.ts, `datapkg:{name}` / `read`): unchanged schemas reuse the version,
  *   changed ones mint the next. The listing's surface names it and its sourceHash carries it, so a
  *   schema change updates the same listing and a contract signed earlier keeps its own version.
  *
@@ -33,7 +33,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { ReconcileChange, DesiredListing } from './exchange-projection-types.js';
 import { usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './exchange-source-terms.js';
-import { ensureInterfaceVersion, getLatestInterface } from './app-tool-interfaces.js';
+import { ensureInterfaceVersion, getLatestInterface } from './app/tool-interfaces.js';
 import {
     datapackageCoordinate, packageIfaceApp, packageForSale, packageDescriptor, packageSchemaDef, plansForTerms,
     proposeDeliversData, DATAPACKAGE_ACTION,

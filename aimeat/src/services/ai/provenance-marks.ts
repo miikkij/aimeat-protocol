@@ -135,7 +135,7 @@ export interface ServeOptions {
   surface?: ServedSurface;
   /**
    * Records the route KNOWS anyone can read through something the SQL predicate cannot see: an open
-   * workspace share (services/workspace-share.ts shareIsOpen). Served as public; the rest still ask
+   * workspace share (services/workspace/share.ts shareIsOpen). Served as public; the rest still ask
    * the predicate. Ignored when `surface.visibility` is given.
    */
   alsoPublic?: ReadonlySet<string>;

@@ -17,6 +17,9 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-13 — denyReason and aimeat_workspace_revert_to_draft's role read the organism through
+ *     services/organism-read/member.ts, the gate the REST workspace routes ask (requireMember); the
+ *     revert reads the organism once (structure programme 2026-11, unit 2b).
  *   2026-11-13 — The meta.* role (memberRoleOf) is services/workspace-share.ts memberRoleOf, the rule the
  *     REST routes ask; its answer here is unchanged (structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_workspace_read hands archived ('only') to readWorkspaceOp (unit 3b).
@@ -199,26 +202,26 @@ import { createOrganismGate } from '../services/organism-gate.js';
 import { registerWorkspaceCreateTool } from './workspace-create.js';
 import { registerWorkspaceRowTools } from './workspace-rows.js';
 import { registerWorkspaceDocumentTools } from './workspace-documents.js';
-import { archivedRefusal } from '../services/workspace-write-guards.js';
-import { resolveSpaceNamespace } from '../services/workspace-write-items.js';
+import { archivedRefusal } from '../services/workspace/write-guards.js';
+import { resolveSpaceNamespace } from '../services/workspace/write-items.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
-import { canReadWorkspace } from '../services/workspace-access.js';
+import { canReadWorkspace } from '../services/workspace/access.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace/meta.js';
 import { emitChange, workspaceOfKey } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { workspaceTarget } from '../services/classification/containers.js';
 import { classifyContainerAfterWrite } from '../services/classify-on-write.js';
-import { writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace-write.js';
-import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp, type WorkspaceOpsCaller } from '../services/workspace-tool-ops.js';
-import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace-roles.js';
+import { writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace/write.js';
+import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp, type WorkspaceOpsCaller } from '../services/workspace/tool-ops.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace/roles.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
 import { registerWorkspaceMemberChangeTools } from './workspace-member-changes.js';
-import { unfileDeletedDocument } from '../services/workspace-member-changes.js';
+import { unfileDeletedDocument } from '../services/workspace/member-changes.js';
 import { registerWorkspaceTransferTool } from './workspace-transfer.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { logger } from '../utils/logger.js';
@@ -227,8 +230,9 @@ import type { CallerContext } from '../services/caller-context.js';
 import { fencedSpaceRefusal } from '../services/fenced-space.js';
 import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
 import { toolError } from './tool-error.js';
-import { setWorkspaceShareOp, memberRoleOf as organismMemberRoleOf } from '../services/workspace-share.js';
-import { shareBodyFromToolInput } from '../services/workspace-share-input.js';
+import { setWorkspaceShareOp } from '../services/workspace/share.js';
+import { organismMemberGate } from '../services/organism-read/member.js';
+import { shareBodyFromToolInput } from '../services/workspace/share-input.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -259,7 +263,7 @@ export function registerWorkspaceTools(
     // write everything under ownerGhii, collapsing every agent action onto the owner), else the owner
     // GHII. Workspace META (manifest / registry / schemas / sections) stays under ownerGhii.
     const writerGaii = parsed ? agentGaii : ownerGhii;
-    // The session caller, in the shape services/workspace-tool-ops.ts takes: the read, the draft
+    // The session caller, in the shape services/workspace/tool-ops.ts takes: the read, the draft
     // write and the publish run there, so the extension sandbox can run them as its caller too.
     // Its roles are the agent role alone: an MCP session is always an agent record (mcp/index.ts).
     // It carries the session's scopes, which two rules read: a provenance declaration asks
@@ -311,34 +315,17 @@ export function registerWorkspaceTools(
         return v;
     };
 
-    /** Membership gate — an organism agent, or the owner is an active member. Returns null if allowed. */
+    /** Membership gate — an organism agent, or the owner is an active member. Returns null if allowed.
+     *  The read and the rule are services/organism-read/member.ts, which the REST workspace routes ask
+     *  too (requireMember). */
     async function denyReason(orgId: string): Promise<string | null> {
-        const org = await storage.getOrganism(orgId);
-        if (!org) return 'Organism not found';
-        if (org.agentGaiis?.includes(agentGaii)) return null;
-        const m = await storage.getMembership(orgId, ownerName);
-        return m && m.status === 'active' ? null : 'Not an active member of this organism';
-    }
-
-    /**
-     * The caller's role in an organism, for the meta.* rule. denyReason answers "may they be here at
-     * all"; this answers "may they change the structure", and the two are different questions —
-     * publishing over the manifest or the config is not the same act as writing a document.
-     *
-     * The rule the REST routes ask (services/workspace-share.ts memberRoleOf): the owner's membership
-     * first, so an agent on the organism's agent list whose owner is an active member keeps its
-     * owner's role (attaching never narrows an agent, ruling 2026-11-13); an agent on the list whose
-     * owner is not a member is a member and nothing more.
-     */
-    async function memberRoleOf(orgId: string): Promise<'creator' | 'admin' | 'member' | null> {
-        const org = await storage.getOrganism(orgId);
-        if (!org) return null;
-        const role = await organismMemberRoleOf(storage, org, orgId, { sub: agentGaii, owner: ownerName });
-        return role === 'creator' || role === 'admin' || role === 'member' ? role : null;
+        const gate = await organismMemberGate(storage, orgId, { sub: agentGaii, owner: ownerName });
+        if (gate.ok) return null;
+        return gate.code === 'NOT_FOUND' ? 'Organism not found' : 'Not an active member of this organism';
     }
 
     /** Write one workspace record: ONE owner per key, forked copies collapsed, and the fan-out every
-     *  other write surface runs. The whole of it is services/workspace-write.ts; `owner` defaults to
+     *  other write surface runs. The whole of it is services/workspace/write.ts; `owner` defaults to
      *  the member GHII and is named explicitly only for META that must stay under a given identity. */
     const writeRecord = (
         key: string, value: unknown, prev: MemoryRecord | null, owner: string = ownerGhii,
@@ -408,7 +395,7 @@ export function registerWorkspaceTools(
         inputSchema: zodShapeFor('aimeat_workspace_read'),
         annotations: annotationsFor('aimeat_workspace_read') },
         async ({ organism_id, ws, ids, space, include_archived, archived }): Promise<TextResult> => {
-            // The work is services/workspace-tool-ops.ts, which the extension sandbox's
+            // The work is services/workspace/tool-ops.ts, which the extension sandbox's
             // ctx.workspace calls as well: a workspace is SHARED, authorization is at the workspace
             // level (whoever may read the manifest sees all of its content), version history is
             // never surfaced, and row spaces answer with a count.
@@ -445,7 +432,7 @@ export function registerWorkspaceTools(
         inputSchema: zodShapeFor('aimeat_workspace_write'),
         annotations: annotationsFor('aimeat_workspace_write') },
         async ({ organism_id, ws, space, value, id, section, items, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
-            // services/workspace-tool-ops.ts: membership, the organism namespace rule, every item
+            // services/workspace/tool-ops.ts: membership, the organism namespace rule, every item
             // resolved and schema-validated before any is written, the archive flags, the memory
             // ceilings, one provenance record per item, and the fan-out a workspace write sets off.
             // The extension sandbox's ctx.workspace.write is the same function.
@@ -462,7 +449,7 @@ export function registerWorkspaceTools(
         inputSchema: zodShapeFor('aimeat_workspace_publish'),
         annotations: annotationsFor('aimeat_workspace_publish') },
         async ({ organism_id, ws, namespace, id, expected_version }): Promise<TextResult> => {
-            // services/workspace-tool-ops.ts: membership, the meta.* role, the archive flag, the
+            // services/workspace/tool-ops.ts: membership, the meta.* role, the archive flag, the
             // publish gate (read across every owner), then the same publishDraft POST
             // /v1/organisms/:id/publish calls, the decision-log entry and the timeline snapshot.
             const r = await publishWorkspaceOp({ storage, config }, opsCaller(), { organismId: organism_id, ws, namespace, id, expectedVersion: expected_version ?? null });
@@ -474,7 +461,7 @@ export function registerWorkspaceTools(
         inputSchema: zodShapeFor('aimeat_workspace_share'),
         annotations: annotationsFor('aimeat_workspace_share') },
         async ({ organism_id, ws, space, id, shared, access, password, until }): Promise<TextResult> => {
-            // services/workspace-share.ts: membership, the creator-or-admin rule, the merge, the end
+            // services/workspace/share.ts: membership, the creator-or-admin rule, the merge, the end
             // dates and the HTML page default, the same code PUT /v1/organisms/:id/workspace/share runs.
             const input = shareBodyFromToolInput({ space, id, shared, access, password, until });
             if ('error' in input) return toolError('INVALID_INPUT', input.error);
@@ -492,8 +479,16 @@ export function registerWorkspaceTools(
         async ({ organism_id, ws, namespace: given, id }): Promise<TextResult> => {
             // A space's name is taken as well as its namespace, before the role check and the fence read it.
             const namespace = await resolveSpaceNamespace(storage, organism_id, ws, given);
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const revertRole = await memberRoleOf(organism_id);
+            // The organism and the caller's role, read once: services/organism-read/member.ts, which
+            // POST /v1/organisms/:id/revert asks too (requireMember). Being in the organism is not
+            // the right to change its structure: the role then meets the meta.* rule. The role is
+            // services/workspace/share.ts memberRoleOf: the owner's membership first, so an agent on
+            // the organism's agent list whose owner is an active member keeps its owner's role
+            // (attaching never narrows an agent, ruling 2026-11-13); an agent on the list whose owner
+            // is not a member is a member and nothing more.
+            const revertGate = await organismMemberGate(storage, organism_id, { sub: agentGaii, owner: ownerName });
+            if (!revertGate.ok) return fail(revertGate.code === 'NOT_FOUND' ? 'Organism not found' : 'Not an active member of this organism');
+            const revertRole = revertGate.role === 'creator' || revertGate.role === 'admin' || revertGate.role === 'member' ? revertGate.role : null;
             if (!revertRole || !canWriteNamespaceRule(revertRole, namespace)) {
                 return fail('Admin/creator role required to reopen a meta.* record');
             }
@@ -504,8 +499,7 @@ export function registerWorkspaceTools(
             // record's full value into a draft the caller then owns. Without this, an agent whose
             // owner holds no grant on this workspace reads its records one revert at a time, while
             // aimeat_workspace_read answers them "no access". Same gate as the REST door.
-            const revertOrg = await storage.getOrganism(organism_id);
-            if (!revertOrg || !(await canReadWorkspace(storage, config, revertOrg, agentGaii, ownerName, ownerGhii, ws))) {
+            if (!(await canReadWorkspace(storage, config, revertGate.organism, agentGaii, ownerName, ownerGhii, ws))) {
                 return fail(`No access to workspace ${ws} — request access with aimeat_workspace_access.`);
             }
             // Reading is not writing: the draft write test, as on the REST route. A viewer reads the
@@ -583,7 +577,7 @@ export function registerWorkspaceTools(
     // the REST routes call too, so neither door can answer differently from the other.
     registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, scopes }, caller);
     // The two in-place DOCUMENT edits, extracted for the same reason and calling the same service
-    // the REST routes call: services/workspace-doc-edit.ts.
+    // the REST routes call: services/workspace/doc-edit.ts.
     registerWorkspaceDocumentTools(mcp, { storage, config }, caller);
 
     mcp.registerTool('aimeat_workspace_object_delete', { description: descriptionFor('aimeat_workspace_object_delete'),
@@ -602,11 +596,11 @@ export function registerWorkspaceTools(
             const delGuard = await checkDeleteGuard(`${base}.latest`, storage);
             if (!delGuard.valid) return fail('Delete refused: ' + (delGuard.errors?.[0]?.message ?? 'append-only namespace'));
             // The whole instance — the bare key plus `.draft` / `.latest` / every `.version.N`, own
-            // and same-owner only — through services/workspace-write.ts, which is the predicate the
+            // and same-owner only — through services/workspace/write.ts, which is the predicate the
             // batched REST delete applies too.
             const deleted = await deleteWorkspaceInstance(storage, { base, callerGhii: ownerGhii });
             if (deleted === 0) return fail(`Nothing to delete at ${base} (no record/draft/latest/version).`);
-            // Take the id out of the document space's section index: services/workspace-member-changes.ts,
+            // Take the id out of the document space's section index: services/workspace/member-changes.ts,
             // which writes the index that counts and keeps its owner. This wrote the index under the
             // caller and deleted the creator's, so a member's delete took the tree away from the creator.
             // Only when no copy of the document is left under anyone.

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description One ceiling for what this node reads of an answer from a service a person chose to
  *   call, and the three reads that share it (OUTBOUND_READ_MAX_BYTES in utils/read-capped.ts, 4 MB):
- *     - an extension's ctx.fetch (services/extension-ctx.ts), which every road into the sandbox
+ *     - an extension's ctx.fetch (services/extension/ctx.ts), which every road into the sandbox
  *       takes from one builder;
  *     - a decision provider's answer (services/decide/systemone-client.ts);
  *     - a read from a connected account (services/connections/read.ts), which had the ceiling first.
@@ -80,9 +80,9 @@ vi.mock('../../src/services/connections/refresh.js', () => ({
 }));
 
 const { OUTBOUND_READ_MAX_BYTES } = await import('../../src/utils/read-capped.js');
-const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
-const { executeExtensionAction } = await import('../../src/services/extension-runtime.js');
-const { runExtensionActionAsSystem } = await import('../../src/services/extension-system-run.js');
+const { buildExtensionCtx } = await import('../../src/services/extension/ctx.js');
+const { executeExtensionAction } = await import('../../src/services/extension/runtime.js');
+const { runExtensionActionAsSystem } = await import('../../src/services/extension/system-run.js');
 const { callSystemOne, SystemOneError } = await import('../../src/services/decide/systemone-client.js');
 const { readResource } = await import('../../src/services/connections/read.js');
 const { buildOutboundProviders } = await import('../../src/services/connections/providers.js');

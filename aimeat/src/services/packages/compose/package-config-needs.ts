@@ -34,7 +34,7 @@ import type { Storage, PackageRecord, InstalledComponent } from '../../../storag
 import { bundleOfPackage } from '../../install-set-spec.js';
 import { planPackageConfig, configPreview } from './package-config.js';
 import { packageVisibleTo } from './package-read.js';
-import type { NetworkHostField } from '../../extension-network-hosts.js';
+import type { NetworkHostField } from '../../extension/network-hosts.js';
 
 /** One thing to ask. `package` and `component` place the answer in the install set's config or secrets. */
 export interface ConfigQuestion {

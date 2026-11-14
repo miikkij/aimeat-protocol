@@ -8,6 +8,8 @@
  * @structure boardTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { boardTools } from './tool-call-defs-boards.js';
  * @version-history
+ *   2026-11-13 -- aimeat_board_post forwards ttl_hours (unit 3b).
+ *   2026-11-13 -- aimeat_board_create forwards federate (unit 3b).
  *   v1.2.0 -- 2026-10-08 -- aimeat_board_post and aimeat_board_reply send ai_provenance and
  *     ai_provenance_id to their routes, which record both now (aiprov D5).
  *   v1.1.0 -- 2026-09-13 -- aimeat_board_create forwards `rules`, and aimeat_board_rules_set joins the
@@ -17,7 +19,7 @@
  *     that had been sitting apart from the rest (board_read, board_post) join them here.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalRecord, requiredRecord, withProvenanceFields } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord, withProvenanceFields } from './tool-call-helpers.js';
 
 export const boardTools: ConnectCliToolDefinition[] = [
     {
@@ -33,6 +35,7 @@ export const boardTools: ConnectCliToolDefinition[] = [
             const body: JsonObject = { title: requiredString(input, 'title'), body: requiredString(input, 'body') };
             const category = optionalString(input, 'category');
             if (category) body.category = category;
+            const ttlHours = optionalNumber(input, 'ttl_hours'); if (ttlHours !== undefined) body.ttl_hours = ttlHours;
             return client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`, withProvenanceFields(body, input));
         },
     },
@@ -56,6 +59,7 @@ export const boardTools: ConnectCliToolDefinition[] = [
             // removed seven days after they are written.
             const rules = optionalRecord(input, 'rules');
             if (rules) body.rules = rules;
+            const federate = optionalBoolean(input, 'federate'); if (federate !== undefined) body.federate = federate;
             return client.post('/v1/boards', body);
         },
     },

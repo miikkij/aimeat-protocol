@@ -30,9 +30,9 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageInstanceRecord } from '../storage/interface.js';
-import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
+import { APP_GRANTABLE_SCOPES } from './app/grant-vocabulary.js';
 import { appScopesOf } from './protected-resource.js';
-import { upsertAppGrant } from './app-grant-upsert.js';
+import { upsertAppGrant } from './app/grant-upsert.js';
 
 /** One app's grant, as the apply record keeps it, by grant target `owner/filename`. */
 export interface AppGrantStep {
