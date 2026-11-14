@@ -30,8 +30,9 @@
  *   session can run is a capability `aimeat_invoke` runs with the agent's own credential through the
  *   same route (src/services/invoke/route-capabilities.ts). A `rest-only`, `no-twin` or `no-twin-write`
  *   finding on such a route is therefore reached and needs no entry. An entry the file keeps for one
- *   stays held: it says why the route itself refuses an agent (requireRole('owner'), an operator word
- *   or account:security that no wildcard carries). A finding on a route the catalogue leaves out (a
+ *   stays held: it says why the route itself refuses every agent (requireRole('owner')). A route that
+ *   admits an agent holding a word, even one no wildcard carries (an operator word, account:security),
+ *   is reached by that agent, so it gets no such entry. A finding on a route the catalogue leaves out (a
  *   non-JSON body, a stream, an outside credential) is measured as before.
  *   An entry is either an ANSWER or the seeding's placeholder, `NOT YET REVIEWED`. Re-seeding
  *   forgives the whole backlog, so it is a decision. It keeps every entry already in the file as
@@ -50,6 +51,8 @@
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts          # report only, never fails
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts --seed   # rewrite the exemption file
  * @version-history
+ *   v2.3.1 — 2026-11-14 — A route that admits an agent on an operator word or account:security is
+ *     reached too; only a route that refuses every agent keeps a "ROUTE REFUSES AN AGENT" entry.
  *   v2.3.0 — 2026-11-14 — A finding on a route capability is reached through aimeat_invoke and needs
  *     no entry; an entry kept for one is held, and both counts have a report line.
  *   v2.2.0 — 2026-11-12 — `no-twin-write:` joins the ratchet, with its own report line. --seed keeps
