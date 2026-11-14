@@ -10,7 +10,7 @@
         "aimeat/src/services/compliance/lia-schemas.ts",
         "aimeat/src/data/compliance-lia.ts"
       ],
-      "digest": "sha256:9a24bb02949ab9810628e8a9"
+      "digest": "sha256:ba6b9e2b1bca29d282c80ede"
     },
     "node:aimeat-app-agents": {
       "reviewedOn": "2026-11-13",
@@ -910,8 +910,8 @@
     },
     "node:balancing-test": {
       "aimeat/src/services/compliance/lia-need.ts": "514460f16c8f93eb",
-      "aimeat/src/services/compliance/lia-write.ts": "69e7db40deeaea92",
-      "aimeat/src/services/compliance/lia-ops.ts": "fd27895549e9c135",
+      "aimeat/src/services/compliance/lia-write.ts": "0c5e76c48f2c7aae",
+      "aimeat/src/services/compliance/lia-ops.ts": "0a211c9ae90b8014",
       "aimeat/src/services/compliance/lia-schemas.ts": "079ffbab932aeca8",
       "aimeat/src/data/compliance-lia.ts": "3b1e5d64573f5bd6"
     },
