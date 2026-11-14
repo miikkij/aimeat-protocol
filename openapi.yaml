@@ -7170,11 +7170,11 @@ components:
 
     ScheduleCreate:
       type: object
-      required: [kind, cron, display_name]
+      required: [kind, cron]
       properties:
         kind: { type: string, enum: [ai, agent_task, extension, eco-capability, connections-publish, refinery, dataproduct] }
         cron: { type: string, example: '0 7 * * *' }
-        display_name: { type: string }
+        display_name: { type: string, description: 'The name the schedule is listed under. Without it, `title` is used, and without that "<kind> schedule".' }
         timezone: { type: string, example: Europe/Helsinki }
         description: { type: string }
         purpose: { type: string }
@@ -7186,7 +7186,14 @@ components:
         system_prompt: { type: string }
         model: { type: string }
         output_key: { type: string, description: 'ai: memory key for the result (auto-generated if omitted). A key naming a record this node keeps for itself is refused with 403 RESERVED_KEY.' }
-        output_visibility: { type: string, enum: [private, owner, public] }
+        output_visibility:
+          description: >-
+            ai: who may read the record the answer lands at, as memory takes it (private by default).
+            `group` needs an output_key whose record already has a group; `organism:<id>` needs the
+            caller to be in that organism. Null is the default.
+          anyOf:
+            - $ref: '#/components/schemas/Visibility'
+            - type: 'null'
         task_template:
           type: object
           description: 'agent_task: the task materialised each fire.'
