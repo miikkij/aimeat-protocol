@@ -86,7 +86,7 @@
         "aimeat/src/services/usage/usage-read.ts",
         "aimeat/public/views/appcat.js"
       ],
-      "digest": "sha256:47ea664064e900b9e87b37b4"
+      "digest": "sha256:df05779a3cabf4a0ed17e800"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -299,11 +299,11 @@
       "digest": "sha256:5c7fea7dd0017128af1a94f9"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:8237e3e3ba2d96235896d82f"
+      "digest": "sha256:63100708afc6ed5285a9669b"
     },
     "node:manage-my-agents": {
       "reviewedOn": "2026-11-14",
@@ -311,7 +311,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:4a1dddd0f77200e855e424ec"
+      "digest": "sha256:00d2bcd7fc7a4f1151ab1882"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -340,13 +340,13 @@
       "digest": "sha256:fb75c452344b308939da84cc"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-11-08",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:0c5f61f80837c08426f18038"
+      "digest": "sha256:3e63b43a8a04716c05720578"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-11-13",
@@ -381,7 +381,7 @@
       "digest": "sha256:ccb5ae7a323cd1e5f0dde1ed"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -390,7 +390,7 @@
         "aimeat/src/services/agent/profile-write.ts",
         "aimeat/src/services/agent/task-rules.ts"
       ],
-      "digest": "sha256:b30ba9886db65eb25cb01e3b"
+      "digest": "sha256:0eb02aa78c5ac91b717f4f6b"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-13",
@@ -439,7 +439,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:31ead85ce09540381260c4bd",
+      "digest": "sha256:91098741e2fffe553da005f7",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -566,11 +566,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:acbf702d759c6e2c1a9fa6ff"
+      "digest": "sha256:94f87e79d7393ecec8cc6023"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -693,10 +693,10 @@
       "aimeat/src/services/ai/provenance.ts": "68296bdb24b7667c"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "b3979e8fec8a4866"
+      "aimeat/src/mcp/core-admin.ts": "0c3d4f33a5fb029e"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "ca6c5dcbfc2650e2",
+      "aimeat/src/mcp/core.ts": "7c71be00305642a2",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "4673e1e1ed9ec147"
     },
     "node:manage-my-profile-data": {
@@ -714,7 +714,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "2618cea800a5c7ed"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "5fdb428636fbf718",
+      "aimeat/src/routes/ai.ts": "7ed5c5273e4bfb1f",
       "aimeat/src/routes/ai-providers.ts": "f36dfc6dc8278951",
       "aimeat/src/services/ai/routing.ts": "e6c717ef353fd296"
     },
@@ -756,7 +756,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "fcf8ceec09db0f2d"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "35d1a080316443d1"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -807,7 +807,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "7988907b4567d61b",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "fcf8ceec09db0f2d",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "35d1a080316443d1",
       "aimeat/src/routes/organisms/workspace-access.ts": "fe023bacaef89f2b",
       "aimeat/src/services/agent/profile-write.ts": "a643a8315ca182f4",
       "aimeat/src/services/agent/task-rules.ts": "3d0abc3361b12a54"
@@ -822,14 +822,14 @@
       "aimeat/src/services/extension/schedules.ts": "ae3a0c93f2e7baf7"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "9e57591cb29d22c2",
+      "aimeat/src/routes/memory/bulk.ts": "abad3a6bc645e733",
       "aimeat/src/routes/memory/key.ts": "1954090b6085c062",
       "aimeat/src/services/memory-bin.ts": "af03c3dad61b242b",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
       "aimeat/src/services/owner-erasure.ts": "3c892baa7262d64a",
       "aimeat/src/services/archive.ts": "8a08d72e2732e5ed",
-      "aimeat/src/mcp/organisms.ts": "cfde906b1ae83ccf"
+      "aimeat/src/mcp/organisms.ts": "ffcf31f00d0cc0f0"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",
@@ -916,7 +916,7 @@
       "aimeat/src/data/compliance-lia.ts": "3b1e5d64573f5bd6"
     },
     "node:aimeat-find-my-app": {
-      "aimeat/src/mcp/apps.ts": "d2a5689cfb74e88a",
+      "aimeat/src/mcp/apps.ts": "050fc28e0333e90c",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "9aaa1c75a9accaea",
       "aimeat/src/services/usage/usage-read.ts": "5d85342c8a5aeebd",
       "aimeat/public/views/appcat.js": "325750f08208eb54"
