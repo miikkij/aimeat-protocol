@@ -2674,6 +2674,38 @@ components:
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
 
+    CataloguePublish:
+      type: object
+      description: >-
+        The fields POST /v1/catalogue reads. The id is the node's, made at the publish, and is not
+        taken from the body.
+      required: [display_name, description]
+      properties:
+        display_name:
+          type: string
+          example: Text Translation
+        description:
+          type: string
+        category:
+          type: string
+          description: Left out, general.
+        toll_morsels:
+          type: [number, string, 'null']
+          description: >-
+            Pacing per use, a whole number of at least 0. Any other value is ignored and the node's
+            default applies.
+        price_morsels:
+          type: [number, string, 'null']
+          description: >-
+            The 3.x name of toll_morsels, read the same way while the legacy morsel fields are live;
+            refused with MORSEL_PRICE_REMOVED after that.
+        unit:
+          type: string
+          description: The unit a use is counted in, such as call.
+        webhook_url:
+          type: string
+          description: Where work on the service is announced.
+
     ActionUpdate:
       type: object
       description: >-
@@ -33124,7 +33156,10 @@ paths:
     post:
       operationId: registerCatalogueAction
       summary: Register action in catalogue
-      description: Publish an action to the catalogue. Agent auth required.
+      description: >-
+        Publish a service to the catalogue under the caller's full identity. The node gives the
+        service its id; input and output schemas start empty. A person or an agent holding
+        work:publish.
       tags: [Catalogue]
       security:
         - BearerAuth: []
@@ -33133,7 +33168,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ActionPublish'
+              $ref: '#/components/schemas/CataloguePublish'
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
