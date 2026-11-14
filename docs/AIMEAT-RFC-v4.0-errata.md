@@ -1,5 +1,7 @@
 # AIMEAT RFC v4.0: known errata and pending changes
 
+> Historical document. It records the v4.0 errata up to node 4.0.0 and is not maintained; where it calls Core 2026-11 a draft, it describes the time before that release.
+
 > **Superseded.** Since node 4.0.0 (2026-10-13) the Core is [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md) and the platform is described by the [Platform reference](AIMEAT-Platform-reference.md). This list records where the v4.0 documents had drifted from the code up to that release, and it is no longer updated.
 
 **Applies to:** [AIMEAT-RFC-v4.0-Core-full.md](AIMEAT-RFC-v4.0-Core-full.md) and [AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md)

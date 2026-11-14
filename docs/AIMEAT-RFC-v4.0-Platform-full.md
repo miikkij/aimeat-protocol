@@ -1,5 +1,7 @@
 # AIMEAT.IO Platform & Ecosystem Specification v4.0
 
+> Historical document. It records Platform v4.0 as published and is not maintained; the lines below about building against it describe the time before node 4.0.0.
+
 > **Superseded.** Since node 4.0.0 (2026-10-13) the platform is described by the [Platform reference](AIMEAT-Platform-reference.md), on top of [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md). This document is kept unchanged as the historical v4.0 text. Do not build against it.
 
 ## What Is Built On The Core

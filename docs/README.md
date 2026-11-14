@@ -15,18 +15,20 @@ purpose and maintenance status. [Maintenance](maintenance.md) explains the check
 | Connect an external application | [Ecosystem guide](building-an-aimeat-compatible-ecosystem-app.md) |
 | Build a hosted app | The target node's `/v1/prompts/build-app-atelier` (`/v1/prompts/build-app` for an app already on the Classic track, or when the owner asks for it), then [app development](portal-developer-guide.md) |
 | Configure a node | [Configuration](b-config.md), [environment examples](coding-guidelines/environment-configs.md) |
-| Develop the platform | [Development guides](coding-guidelines/README.md), [CLAUDE.md](../CLAUDE.md) |
+| Develop the platform | [Development guides](coding-guidelines/README.md), [CLAUDE.md](../CLAUDE.md), [frontend guide](frontend-development-guide.md), [installed web app and push notifications](aimeat-pwa-guide.md) |
 | Approve and run a node in an organisation | [IT adoption package](it-adoption/README.md): the go-live checklist, shared responsibility, identity, data, AI models, security, hardening, compliance mapping, known limitations, and templates for the organisation's own records |
 | Operate a node | [Operations guides](operations/README.md): [production deployment](operations/production-deployment.md), [backup and restore](operations/backup-and-restore.md), [upgrading](operations/upgrading.md), [federation](operations/federation.md), [bookkeeping settings](operations/bookkeeping.md); [deployment checks](security/deployment-checklist.md), [observability](../aimeat/docs/observability-guide.md), [incident response](security/incident-response.md) |
 | Know what the node promises about people's data | [Data ownership](data-ownership.md), [data classification, compliance register and cookie banner](data-classification.md) |
 | Work with shared data | [Workspace contracts](agent-workspace-contracts.md), [memory contracts](coding-guidelines/memory-contracts.md) |
 | Build services | [Service owner manual](manuals/service-owner-manual.md), [CSM](csm-spec.md), [extensions](manuals/service-extensions-manual.md) |
+| Build an app with agents, a cortex or an extension | [Extension, cortex and app stack](guides/building-extension-cortex-app-stack.md), [agent-data dashboard](guides/agent-data-dashboard-cookbook.md), [protecting your work with extensions](guides/protecting-your-work-with-extensions.md), the [agent commissioner example](examples/agent-commissioner.html) |
+| Describe data so that others can read it | [Interest profile fields](aimeat-interest-profile-spec.md), [semantic annotations and the core ontology](aimeat-semantic-ontology.md) |
 | Review identity-wallet support | [Current EUDIW status](aimeat-eudiw-integration.md), [credential format](aimeat-vc-spec.md) |
 
 ## Which source decides
 
 - **API fields and routes:** `openapi.yaml`, checked against the implementation.
-- **Configuration:** `aimeat/src/config*.ts`, the configuration field schema and `.env.example`.
+- **Configuration:** `aimeat/src/config.ts`, the `aimeat/src/config/` folder, the configuration field schema (`aimeat/src/services/config/`) and `.env.example`.
 - **Development rules:** `CLAUDE.md`, its path rules and current node skills.
 - **App-building instructions:** the target node's build-app prompt, skills and appdev knowledge base.
 - **Runtime behavior:** the current implementation and tests. A past test result does not prove the current release.
@@ -54,5 +56,4 @@ Development Notes. The repository keeps the protocol, the contracts and the guid
 of earlier plans and manual test plans was removed on 2026-10-11; git history keeps every file.
 
 `docs/internal/` also contains local, gitignored working material. It is not part
-of the public documentation set. This cleanup covers tracked files and preserves
-local private material. The one tracked audit there is listed as historical in the catalog.
+of the public documentation set.

@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The default app grant is memory and storage only. This page lists the person's agents
+     (agent:read), gives one a task (task:write), follows it and its events (task:read) and reads
+     the deliverable from the agent's memory (memory:read). The tag replaces the default set. -->
+<meta name="aimeat-scopes" content="memory:read agent:read task:read task:write">
 <title>Agent Commissioner — AIMEAT demo</title>
 <style>
   :root { --bg:#0f1020; --card:#1a1c33; --line:#2a2d4a; --txt:#e8e8f0; --dim:#9aa0c0; --accent:#E8564A; --ok:#10b981; --warn:#F59E0B; }

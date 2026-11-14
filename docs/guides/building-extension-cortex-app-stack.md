@@ -463,36 +463,28 @@ curl -X POST https://node/v1/cortex \
   -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
   -d '{"manifest": "<manifest.yaml contents>", "libs": {"mytool.js": "<source>"}}'
 
-# Update in place:
+# Update in place. The PUT swaps the lib files and, for an active cortex,
+# runs init again, so the new code is live when it answers (§5.4):
 curl -X PUT https://node/v1/cortex/mytool \
   -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
   -d '{"manifest": "...", "libs": {...}}'
-
-# New code only loads through a deactivate → activate cycle (activate alone is
-# idempotent and SKIPS reloading an already-active cortex — §5.4):
-curl -X POST https://node/v1/cortex/mytool/deactivate -H "Authorization: Bearer $JWT"
-curl -X POST https://node/v1/cortex/mytool/activate -H "Authorization: Bearer $JWT"
 ```
 
 Apps load it with `<script src="/v1/cortex/mytool/libs/mytool.js"></script>`.
 
-### 5.4 Re-activation pitfall
+### 5.4 Deploying new cortex code
 
-Re-activating an already-active cortex SKIPS the activation step
-silently. To deploy new lib code:
+Update the installed cortex in place: `PUT /v1/cortex/<name>`, or
+`aimeat_cortex_install` with `update: true` and the manifest inline. The
+node swaps the lib files while it keeps
+serving them, and for an active cortex it runs init again. The answer says
+`updated`, with `reinitialized` true when init ran. Identical files answer
+`unchanged`. An update never uses a quota slot
+(`src/services/cortex/upsert.ts`).
 
-```bash
-aimeat_cortex_deactivate --name mytool
-aimeat_cortex_activate --name mytool
-```
-
-Or delete + install:
-
-```bash
-aimeat_cortex_delete --name mytool
-aimeat_cortex_install --file mytool-cortex.zip
-aimeat_cortex_activate --name mytool
-```
+Re-activating an already-active cortex does NOT load new code: activate
+alone skips init. A deactivate and an activate after a PUT is not
+necessary.
 
 ---
 
@@ -617,16 +609,27 @@ manual reload.
 ### 7.1 What the node sends
 
 The node's event stream says only **which kinds of data changed**, at most
-once a second per client: each message is `data: {"domains": [...]}`. There
-are no named events and no per-extension channels, and an extension cannot
-emit one of its own.
+once a second per client: each message is `data: {"domains": [...]}`, with no
+payload. An app runs under an app grant, and the stream tells it only the
+domains its scopes cover (`src/auth/sse-domain-scopes.ts`): `memory` with
+`memory:read` (the person's own keys, which agents write), `agent-tasks` with
+`task:read`.
 
-An app runs under an app grant, and the stream tells it only the domains its
-scopes cover (`src/auth/sse-domain-scopes.ts`): `memory` with `memory:read`
-(the person's own keys, which agents write), `agent-tasks` with `task:read`.
+Each extension also has a live domain of its own, `ext:<installer>/<name>`.
+The extension sends it with `ctx.changed({ owners })`
+(`src/services/extension-live/changed.ts`): the node tells the open pages of
+the named owners of this node, or the caller's owner when `owners` is left
+out, that the data this extension serves changed for them. The call answers
+how many owners it told, at most 100. It reaches a page only when the page's
+scopes include `ext:invoke`, the scope it needs to call the extension at all.
+An extension can name only its own domain, never another extension's or a
+core domain. One call counts as one outbound call of the action's budget
+(`limits.max_api_calls`). This works on a scheduled run too, so an extension
+whose data lives in an outside service tells the open pages when a sync
+brings in something new.
+
 The `extensions` domain that an action call raises reaches the owner's own
-portal session, never an app. So an app re-reads after its own action calls,
-and listens for `memory` and `agent-tasks`.
+portal session, never an app.
 
 `ctx.notify(message, opts)` does something else: it sends a notification
 to a person (the caller's owner, or another owner who consented). Use it
@@ -634,18 +637,27 @@ when a person should be told, not to refresh an app.
 
 ### 7.2 App subscribes and re-reads
 
+In the extension, after a write that an open page should show:
+
 ```javascript
-const ticket = await session.fetch('/v1/events/ticket', { method: 'POST' });
-const sse = new EventSource(`/v1/events?ticket=${ticket.data.ticket}`);
-sse.onmessage = (ev) => {
-  const { domains = [] } = JSON.parse(ev.data);
-  if (domains.includes('memory') || domains.includes('agent-tasks')) reloadItems();   // re-read through the cortex
-};
+// in an action or a scheduled run
+await ctx.changed();                                // the caller's owner
+await ctx.changed({ owners: ['alice', 'bob'] });    // named people of this node
 ```
 
-A write an extension makes in its own namespace, on a schedule or in an
-action someone else called, does not reach an app's stream. An app that
-shows such data also re-reads when it regains focus or on a slow timer.
+In the app, with `aimeat-live.js` loaded after `aimeat-auth.js`:
+
+```javascript
+const off = AIMEAT.live.subscribe(
+  ['ext:alice/my-extension', 'memory', 'agent-tasks'],
+  () => reloadItems(),   // re-read through the cortex
+);
+```
+
+`AIMEAT.live` holds one shared event stream for every tab of the page and
+reconnects by itself. Do not re-read on a timer: an event arrives for every
+change the extension reports, and a page that polls repeats work the node
+already tells it about.
 
 ---
 
@@ -791,8 +803,9 @@ the data changed.
    Never copy them into `ext:{name}`: a copy goes stale, and an `ext:` key
    is public unless written private.
 
-4. **Re-activation is idempotent.** To deploy new cortex code:
-   `cortex deactivate` → `cortex activate`. Or delete + reinstall.
+4. **Re-activation is idempotent.** To deploy new cortex code, update it
+   in place (`PUT /v1/cortex/<name>`, or `aimeat_cortex_install` with
+   `update: true`); that runs init again for an active cortex (§5.4).
 
 5. **session.fetch returns parsed JSON.** Don't call `.json()` on the
    result — it's already an object with `.data`, `.ok`, `.error`.

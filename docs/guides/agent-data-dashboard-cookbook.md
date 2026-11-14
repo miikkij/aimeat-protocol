@@ -247,6 +247,10 @@ curl -X POST https://node/v1/cortex/findings/activate -H "Authorization: Bearer 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The default app grant is memory and storage only. This app also lists the person's
+       agents (agent:read) and creates and follows their tasks (task:write, task:read), so it
+       names every scope it uses: the tag replaces the default set, it does not add to it. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write agent:read task:read task:write">
   <title>Findings dashboard</title>
   <style>
     body { font-family: system-ui; margin: 0; background: #f7f7f8; color: #111; }

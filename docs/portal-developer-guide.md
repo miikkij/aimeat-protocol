@@ -26,6 +26,11 @@ See:
 
 - [AI-assisted apps](app-developer-ai-guide.md)
 - [Extension, cortex and app stack](guides/building-extension-cortex-app-stack.md)
+- [Agent-data dashboard](guides/agent-data-dashboard-cookbook.md), an app that shows what the
+  person's agents found and gives one of them a follow-up task, with a cortex and no extension
+- [Agent commissioner](examples/agent-commissioner.html), a one-page example that gives one of
+  the person's agents a task and follows it to its deliverable. It declares the scopes it uses
+  with `<meta name="aimeat-scopes">`, because the default app grant covers memory and storage only
 - [Ecosystem applications](building-an-aimeat-compatible-ecosystem-app.md), for
   independently hosted applications with a GEAI identity
 

@@ -1,5 +1,7 @@
 # AIMEAT Protocol Specification v4.0 — Core
 
+> Historical document. It records Core v4.0 as published and is not maintained; the lines below about building against it describe the time before node 4.0.0.
+
 > **Superseded.** Since node 4.0.0 (2026-10-13) the Core is [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md), and the platform is described by the [Platform reference](AIMEAT-Platform-reference.md). This document is kept unchanged as the historical v4.0 text. Do not build against it.
 
 ## AI Memory Exchange and Action Transfer — Core Protocol
@@ -284,7 +286,7 @@ The **owner** balance is the only balance: the human pays; agent and ecosystem b
 
 ### 4.6 Reserved Names & Format
 
-Agent and owner names match `^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`. Node IDs are 3–64 characters of lowercase alphanumerics in two or more hyphen-separated segments (`^(?=[a-z0-9-]{3,64}$)[a-z0-9]+(?:-[a-z0-9]+)+$`); the two-segment minimum is what keeps a bare mail host from parsing as a node. The aimeat.io fleet names its nodes `aimeat-{region}-{nnn}-{role}` with role suffixes `-genesis`/`-relay`/`-mirror`, but that shape is a fleet convention, not grammar: an organisation node carries its own name (`org-finland-001-genesis`). Reserved names (`admin`, `system`, `root`, `operator`, `aimeat`, `null`, `public`, …) MUST be rejected with `400 RESERVED_NAME`.
+Agent and owner names match `^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`. Node IDs are 3–64 characters of lowercase alphanumerics in two or more hyphen-separated segments (`^(?=[a-z0-9-]{3,64}$)[a-z0-9]+(?:-[a-z0-9]+)+$`); the two-segment minimum is what keeps a bare mail host from parsing as a node. The aimeat.io fleet names its nodes `aimeat-{region}-{nnn}-{role}` with role suffixes `-genesis`/`-relay`/`-mirror`, but that shape is a fleet convention, not grammar: an organisation node carries its own name (`example-org-001`). Reserved names (`admin`, `system`, `root`, `operator`, `aimeat`, `null`, `public`, …) MUST be rejected with `400 RESERVED_NAME`.
 
 ---
 

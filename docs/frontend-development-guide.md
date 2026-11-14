@@ -858,8 +858,10 @@ port of the worktree's own. `playwright.config.ts` still names `http://localhost
 2. Create `public/css/views/my-view.css` with a prefix of its own, and add its `<link>` to
    `spa.html`.
 3. Register the route in **both** places: `ROUTES` in `spa.html` (the client-side route) and
-   `spaRoutes` in `src/routes/portal.ts` (so a reload of that address serves the shell). With only
-   the first, F5 on the page answers 404.
+   `SPA_PAGE_PATHS` in `src/data/spa-page-paths.ts`. That one list tells `src/routes/portal.ts` to
+   serve the shell on a reload of the address, and tells the content access gate to let the page
+   through on a signed-in-only node. With only the first, F5 on the page answers 404. Do not add
+   the path in `portal.ts` itself: a second list is the defect the shared one fixed.
 4. Add an importmap entry in `spa.html` for every new absolute module the view imports.
 5. A public content page also gets an entry in `PUBLIC_PAGES` (`src/data/public-pages.ts`) for its
    title, description and sitemap line.
