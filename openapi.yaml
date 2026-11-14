@@ -85424,13 +85424,20 @@ paths:
           application/json:
             schema:
               type: object
-              required: [seller, buyer, lines]
+              required: [buyer, lines]
               properties:
-                organism_id: { type: string, nullable: true }
+                organism_id: { type: [string, 'null'], maxLength: 80 }
+                company_id:
+                  type: string
+                  maxLength: 80
+                  description: >-
+                    Bill as this registered company of the caller's: the seller is filled from its
+                    record when `seller` is absent. Another owner's company is 404. Without seller and
+                    company_id the answer is 400 INVALID_PARTY.
                 seller:
                   type: object
                   required: [name]
-                  description: Party snapshot (name, businessId, vatId, address, iban/bic, einvoice address/operator)
+                  description: Party snapshot (name, businessId, vatId, address, iban/bic, einvoice address/operator). Wins over company_id.
                   properties:
                     name: { type: string }
                     businessId: { type: string }
@@ -85473,7 +85480,7 @@ paths:
                       vatCodeId: { type: string }
                 currency: { type: string, default: EUR }
                 payment_terms_days: { type: integer, default: 14 }
-                notes: { type: string, nullable: true }
+                notes: { type: [string, 'null'], maxLength: 2000 }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
