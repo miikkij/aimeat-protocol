@@ -11,6 +11,8 @@
  *   - GET  /v1/wallet/history      — deprecated alias for /transactions
  *   - POST /v1/wallet/request      — request daily allowance morsels
  * @version-history
+ *   2026-11-14 — GET /v1/wallet/transactions reads `limit` as aimeat_wallet_transactions takes it (1 to
+ *     200), which the connector's copy of the tool sends (unit 2b, B18).
  *   2026-11-14 — GET /v1/wallet reads the balance and the account's escrow through walletStanding
  *     (services/wallet/wallet-standing.ts), which aimeat_wallet_balance now asks too (structure
  *     programme 2026-11, unit 2b, B3).
@@ -127,7 +129,13 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/wallet/transactions', requireAuth(), requireScope('wallet:read'), async (req, res) => {
     const typeFilter = req.query.type as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
-    const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
+    // `limit` is what aimeat_wallet_transactions takes (1 to 200) and what the connector's copy of the
+    // tool sends here; it was dropped without a word. Given, it sets the page size; per_page and its
+    // default of 50 stay for every other caller (structure programme 2026-11, unit 2b, B18).
+    const limitParam = req.query.limit !== undefined ? parseInt(String(req.query.limit), 10) : NaN;
+    const perPage = Number.isFinite(limitParam)
+      ? Math.min(200, Math.max(1, limitParam))
+      : Math.min(200, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
 
     const ownerName = req.auth!.owner as string;
     const ghiiRecord = await storage.getGHIIByOwner(ownerName);

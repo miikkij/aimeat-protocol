@@ -32436,6 +32436,15 @@ paths:
             example: pacing_charge
         - $ref: '#/components/parameters/Pagination'
         - $ref: '#/components/parameters/PerPage'
+        - name: limit
+          in: query
+          description: >
+            The page size as aimeat_wallet_transactions takes it (1 to 200). Given, it is used in
+            place of per_page; per_page and its default of 50 apply otherwise.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

@@ -1129,7 +1129,7 @@ await test('B18 USE KEPT: the tool and the route list the same newest transactio
     assert(ids(tool.data) === ids(rest.body.data.transactions), 'the two pages hold different transactions');
 });
 
-await test('B18 RECORDED DIFFERENCE (question: one default page, and should the route read `limit`): the tool lists 20 by default and honours limit=5; the route lists 50 by default and ignores limit=5', async () => {
+await test('B18 DECIDED (developer approval 2026-11-14): limit=5 gives five on the tool and the route alike; each keeps its own default (tool 20, route 50)', async () => {
     const tool = await callTool(pbWorkerMcp, 'aimeat_wallet_transactions', {});
     assert(!tool.isError && tool.data.length === 20, `tool default: ${tool.data.length}`);
     const tool5 = await callTool(pbWorkerMcp, 'aimeat_wallet_transactions', { limit: 5 });
@@ -1138,7 +1138,7 @@ await test('B18 RECORDED DIFFERENCE (question: one default page, and should the 
     const total = rest.body.data.total as number;
     assert(rest.status === 200 && total > 25 && rest.body.data.transactions.length === Math.min(50, total), `route default: ${show(rest)}`);
     const rest5 = await call('GET', '/v1/wallet/transactions?limit=5', pbWorker.token);
-    assert(rest5.status === 200 && rest5.body.data.transactions.length === Math.min(50, total), `route limit 5: ${rest5.body.data.transactions.length}`);
+    assert(rest5.status === 200 && rest5.body.data.transactions.length === 5, `route limit 5: ${rest5.body.data.transactions.length}`);
 });
 
 // B2: alice's agent reads its own message history, GET /v1/agents/:name/messages and aimeat_message_history.
