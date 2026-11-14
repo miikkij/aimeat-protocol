@@ -98,6 +98,7 @@ number is never reused.
 | 127 | A PATCH that sends one field quietly resets other fields to their defaults | 1 |
 | 128 | A search engine reports a page as a duplicate of the same page on another node or account | 3 |
 | 129 | Adding an agent to an organism's list takes its workspace writes away, and the refusal says "request access" | 3 |
+| 130 | A pure `git mv` refactor typechecks, and one route answers 404 or an empty list | · |
 
 ---
 
@@ -581,3 +582,11 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** One list, two meanings. Under "listed", `agentGaiis` is the admit list and a listed agent acts with its owner's rights. Under "all", the organism rule (`aimeat/src/services/organism-namespace-access.ts`) read a listed agent as an organism-level participant (shared area, meta read, no workspace) before it asked about the owner's membership, so the list narrowed the agent of an active member. It was met on 2026-10-13 and worked around in one client (`public/js/services/agent-draft-known.js` `joinsAgentList` leaves such an agent off the list), and met again on aimeat.io on 2026-11-10 when the creator's attached agent stopped a client project. The draft write (`aimeat/src/services/workspace/tool-ops.ts` `writeWorkspaceDraftsOp`) replaced the rule's real refusal with its own sentence, so the agent was sent to request access to its own workspace. Fixed on 2026-11-10: `attachedAsParticipant` takes the owner's membership, and the draft write passes the rule's code and reason through.
 - **The rule.** A list that admits never takes a right away: an agent whose owner is an active member acts with the owner's rights whether or not it is listed, in both modes, and the list only adds what it was made for. A door that asks a shared rule passes that rule's refusal through (status, code, reason); it rewrites the wording only where the rule's sentence names something internal, and then keeps the code.
 - **The tell.** A gate that reads list membership before the caller's own standing and returns early. A refusal built as a literal string right after a call that returned a reason. A client that works around a server rule ("keep it off the list") instead of the rule being fixed.
+
+## 130. A file moved one folder deeper still loads, and a path it builds from its own folder now points elsewhere
+
+*Symptoms: a pure `git mv` refactor typechecks, every import resolves, the line-by-line diff shows only import paths, and one route answers 404 or an empty list for something on disk.*
+
+- **The case.** On 2026-11-13 a refactor moved `routes/admin-extensions.ts` to `routes/admin/extensions.ts`. The file finds `docs/extensions` with `join(__dirname, '..', '..', '..', 'docs', 'extensions')`, so one folder deeper the same line named a different folder. Nine assertions of `e2e-admin-doors` failed; the fix was one more `..` on each of two lines (dev tree and built tree). No diff review could see it, because the line did not change, its meaning did.
+- **The rule.** Before a move lands, grep every moved file for `__dirname|import.meta.url|fileURLToPath|createRequire` and check each hit for both the source tree (`src/…`) and the built tree (`dist/src/…`). About 33 files under `aimeat/src` build a path this way.
+- **The tell.** A move commit whose only non-import changes are path strings, and a suite that reads a folder on disk going red in an area nobody edited.
