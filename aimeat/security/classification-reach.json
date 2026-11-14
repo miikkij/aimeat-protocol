@@ -1386,6 +1386,12 @@
       },
       "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: which keys exist in the owner's and their agents' namespaces (to choose the items of a scan, each then inspected through pipeline.ts and its reader) and whether an item still exists (prune). No content is read or shown here."
     },
+    "src/services/content/service.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-14, the node's own read: sourceFor decides which record an agent's facts, inspect or correct request names. The first read asks whether the agent holds a record of its own under the key; the second asks whether the owner's record exists and whether the owner-scope memory rule admits the agent (memory:read-as-owner, or a record kept at owner, members or public visibility). Nothing from either record is answered here; a refused or absent record answers as absent, and the item is read again by pipeline.ts loadItem through the caller's classification reader before anything is read from it."
+    },
     "src/services/content/settings.ts": {
       "reads": {
         "getMemory": 1
