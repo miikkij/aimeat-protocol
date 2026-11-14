@@ -65213,11 +65213,11 @@ paths:
                 name: { type: string }
                 summary: { type: string }
                 source:
-                  type: object
                   description: >-
                     Where the capability runs. `type` defaults to `manual`; `ref` is required for
                     every other type; `version` defaults to 1.0.0. An `extension` ref is
-                    ext:<name>[@<version>][:<action>].
+                    ext:<name>[@<version>][:<action>]. A value that is no object (null, a string, a
+                    number) is read as a source with no fields, which is manual.
                   properties:
                     type: { type: string, enum: [extension, action, cortex, app, manual, ecosystem, mcp] }
                     ref: { type: string }
@@ -65345,10 +65345,11 @@ paths:
                   description: private, owner or public. The stored word sent back unchanged passes.
                 status: { type: string, maxLength: 256 }
                 source:
-                  type: object
                   description: >-
                     Checked as POST checks it when it differs from the stored source. The stored
-                    source sent back unchanged passes, whatever its type.
+                    source sent back unchanged passes, whatever its type. A value that is no object
+                    (null, a string, a number) is read as a source with no fields, which is manual,
+                    so on a record that holds a webhook it meets the webhook policy.
                   properties:
                     type: { type: string, maxLength: 256 }
                     ref: { type: string, maxLength: 1024 }
