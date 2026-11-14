@@ -9,6 +9,7 @@
  *   inside can reach, which is the exact failure this page exists to prevent.
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-ownership-model.test.ts
  * @version-history
+ *   2026-11-15 — Invented fixture names in place of real account and organism names.
  *   v1.0.0 — 2026-09-12 — Initial (the Organism ownership page in the poster face).
  */
 import { describe, it, expect } from 'vitest';
@@ -18,16 +19,16 @@ import {
 
 const OWNERS = [
   { name: 'jouni', roles: ['owner', 'operator'], agents: [], created_at: '2026-03-13T00:00:00.000Z', disabled_at: null },
-  { name: 'kanderss', roles: ['owner'], agents: [], created_at: '2026-04-30T00:00:00.000Z', disabled_at: null },
-  { name: 'zenmaisteri', roles: ['owner'], agents: [], created_at: '2026-05-04T00:00:00.000Z', disabled_at: null },
-  { name: 't25', roles: ['owner'], agents: [], created_at: '2026-04-28T00:00:00.000Z', disabled_at: '2026-08-02T00:00:00.000Z' },
-  { name: 'happy2', roles: ['owner'], agents: [], created_at: '2026-03-14T00:00:00.000Z', disabled_at: null },
+  { name: 'kate', roles: ['owner'], agents: [], created_at: '2026-04-30T00:00:00.000Z', disabled_at: null },
+  { name: 'zoe', roles: ['owner'], agents: [], created_at: '2026-05-04T00:00:00.000Z', disabled_at: null },
+  { name: 'trent', roles: ['owner'], agents: [], created_at: '2026-04-28T00:00:00.000Z', disabled_at: '2026-08-02T00:00:00.000Z' },
+  { name: 'heidi', roles: ['owner'], agents: [], created_at: '2026-03-14T00:00:00.000Z', disabled_at: null },
 ];
 
 const ORGANISMS = [
   { id: 'org-alive', name: 'Experience Center', owners: ['jouni'], created_by: 'jouni', members: 2, created_at: '2026-07-17T00:00:00.000Z', archived_at: null },
-  { id: 'org-stuck', name: 'Lakisivudemo', owners: ['t25'], created_by: 't25', members: 3, created_at: '2026-08-29T00:00:00.000Z', archived_at: null },
-  { id: 'org-half', name: 'HeroPlay', owners: ['t25', 'kanderss'], created_by: 't25', members: 4, created_at: '2026-06-16T00:00:00.000Z', archived_at: null },
+  { id: 'org-stuck', name: 'Lakiesimerkki', owners: ['trent'], created_by: 'trent', members: 3, created_at: '2026-08-29T00:00:00.000Z', archived_at: null },
+  { id: 'org-half', name: 'Pelistudio', owners: ['trent', 'kate'], created_by: 'trent', members: 4, created_at: '2026-06-16T00:00:00.000Z', archived_at: null },
   { id: 'org-gone', name: 'Vanha projekti', owners: ['someone-who-left'], created_by: 'someone-who-left', members: 1, created_at: '2026-05-01T00:00:00.000Z', archived_at: null },
   { id: 'org-old', name: 'Arkistoitu', owners: ['jouni'], created_by: 'jouni', members: 1, created_at: '2026-02-01T00:00:00.000Z', archived_at: '2026-08-20T00:00:00.000Z' },
 ];
@@ -38,7 +39,7 @@ describe('which organisms nobody inside can repair', () => {
 
   it('calls an organism stuck when its only owner is deactivated', () => {
     expect(row('org-stuck')).toMatchObject({ stuck: true, reachable: 0 });
-    expect(row('org-stuck').ownerStates).toEqual([{ name: 't25', state: 'off' }]);
+    expect(row('org-stuck').ownerStates).toEqual([{ name: 'trent', state: 'off' }]);
   });
 
   it('calls one stuck when its owner has no account on this node at all', () => {
@@ -97,28 +98,28 @@ describe('the figures and the filters', () => {
   it('finds an organism by its name, by its id, and by the name of anybody holding it', () => {
     expect(search(rows, 'all', 'laki').map(r => r.id)).toEqual(['org-stuck']);
     expect(search(rows, 'all', 'org-half').map(r => r.id)).toEqual(['org-half']);
-    expect(search(rows, 'all', 'kanderss').map(r => r.id)).toEqual(['org-half']);
+    expect(search(rows, 'all', 'kate').map(r => r.id)).toEqual(['org-half']);
     expect(search(rows, 'all', 'nobody')).toEqual([]);
   });
 });
 
 describe('who may be offered the organism', () => {
   const ownership = {
-    owners: ['t25'],
+    owners: ['trent'],
     members: [
-      { ghii: 't25', role: 'creator', status: 'active' },
-      { ghii: 'kanderss', role: 'admin', status: 'active' },
-      { ghii: 'happy2', role: 'member', status: 'banned' },
+      { ghii: 'trent', role: 'creator', status: 'active' },
+      { ghii: 'kate', role: 'admin', status: 'active' },
+      { ghii: 'heidi', role: 'member', status: 'banned' },
     ],
   };
   const list = candidates(OWNERS, ownership);
   const c = (name: string) => list.find(x => x.name === name)!;
 
   it('says why each name cannot take it, so nothing has to be pressed to be refused', () => {
-    expect(c('t25')).toMatchObject({ state: 'already' });
-    expect(c('happy2')).toMatchObject({ state: 'blocked' });
-    expect(c('kanderss')).toMatchObject({ state: 'ok', member: true });
-    expect(c('zenmaisteri')).toMatchObject({ state: 'ok', member: false });
+    expect(c('trent')).toMatchObject({ state: 'already' });
+    expect(c('heidi')).toMatchObject({ state: 'blocked' });
+    expect(c('kate')).toMatchObject({ state: 'ok', member: true });
+    expect(c('zoe')).toMatchObject({ state: 'ok', member: false });
   });
 
   it('refuses a deactivated account by arithmetic, because handing it over repairs nothing', () => {
@@ -127,7 +128,7 @@ describe('who may be offered the organism', () => {
   });
 
   it('offers the ones who can act first, and inside those the people already in the organism', () => {
-    expect(list.map(x => x.name)).toEqual(['kanderss', 'jouni', 'zenmaisteri', 'happy2', 't25']);
+    expect(list.map(x => x.name)).toEqual(['kate', 'jouni', 'zoe', 'heidi', 'trent']);
   });
 
   it('is empty rather than throwing when nothing has been read yet', () => {

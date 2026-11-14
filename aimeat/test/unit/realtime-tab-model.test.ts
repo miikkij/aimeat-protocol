@@ -8,6 +8,7 @@
  *   three kinds of empty are told apart (they all drew as the same three zeros).
  * @usage cd aimeat && pnpm exec vitest run test/unit/realtime-tab-model.test.ts
  * @version-history
+ *   2026-11-15 — Invented fixture names in place of real account names.
  *   v1.0.0 — 2026-09-12 — Initial (the Realtime page in the poster face).
  */
 import { describe, it, expect } from 'vitest';
@@ -34,7 +35,7 @@ const OVERVIEW = {
       max_peers: 20, is_public: true, tags: ['q3'], peer_count: 2,
       peers: [
         { peer_id: 'p-9f13', nick: 'jouni', joined_at: AGO(184 * MIN) },
-        { peer_id: 'p-2a77', nick: 'kanderss', joined_at: AGO(18 * MIN) },
+        { peer_id: 'p-2a77', nick: 'kate', joined_at: AGO(18 * MIN) },
       ],
       yjs_docs: [{ doc_id: 'doc-brief', snapshot_size: 14_336 }],
       created_at: AGO(184 * MIN), last_activity_at: AGO(4_000),
@@ -42,7 +43,7 @@ const OVERVIEW = {
     {
       id: 'r-standup', name: 'parvi-standup', app_type: 'chat', created_by: 'happydude500001',
       max_peers: 20, is_public: false, tags: [], peer_count: 1,
-      peers: [{ peer_id: 'p-71bc', nick: 'zenmaisteri', joined_at: AGO(27 * MIN) }],
+      peers: [{ peer_id: 'p-71bc', nick: 'zoe', joined_at: AGO(27 * MIN) }],
       yjs_docs: [],
       created_at: AGO(60 * MIN), last_activity_at: AGO(27 * MIN),
     },
@@ -68,7 +69,7 @@ describe('the rooms as rows', () => {
   });
 
   it('carries the peers with what each one called itself and how long it has been there', () => {
-    expect(row('r-brief').peers.map(p => p.nick)).toEqual(['jouni', 'kanderss']);
+    expect(row('r-brief').peers.map(p => p.nick)).toEqual(['jouni', 'kate']);
     expect(row('r-brief').peers[1].joinedMs).toBe(18 * MIN);
     expect(row('r-brief').empty).toBe(false);
     expect(row('r-left').empty).toBe(true);

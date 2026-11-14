@@ -10,6 +10,7 @@
  *   test/e2e-admin-doors-2.ts; this is the page's fold over the list it already fetches.
  * @usage cd aimeat && pnpm exec vitest run test/unit/owners-tab-model.test.ts
  * @version-history
+ *   2026-11-15 — Invented fixture names in place of real account names.
  *   v1.0.0 — 2026-09-12 — Initial (the Owners page in the poster face).
  */
 import { describe, it, expect } from 'vitest';
@@ -22,21 +23,21 @@ const OWNERS = [
   { name: 'jouni', display_name: 'jouni', roles: ['owner', 'operator'], agents: [{ gaii: 'a' }, { gaii: 'b' }], created_at: DAYS(180) },
   { name: 'happydude500001', display_name: 'happydude500001', roles: ['owner', 'operator'], agents: [{ gaii: 'c' }], created_at: DAYS(179) },
   { name: 'anonymous', display_name: 'Anonymous Node', roles: ['owner'], agents: [{ gaii: 'd' }], created_at: DAYS(182) },
-  { name: 'kanderss', display_name: 'kanderss', roles: ['owner'], agents: [], created_at: DAYS(40) },
-  { name: 't25', display_name: 't25', roles: ['owner'], agents: [], created_at: DAYS(30), disabled_at: DAYS(3) },
-  { name: 'happy2', display_name: 'happy2', roles: ['owner'], agents: [], created_at: DAYS(2), managed_by: 'conn-entra-1' },
+  { name: 'kate', display_name: 'kate', roles: ['owner'], agents: [], created_at: DAYS(40) },
+  { name: 'trent', display_name: 'trent', roles: ['owner'], agents: [], created_at: DAYS(30), disabled_at: DAYS(3) },
+  { name: 'heidi', display_name: 'heidi', roles: ['owner'], agents: [], created_at: DAYS(2), managed_by: 'conn-entra-1' },
 ];
 
 describe('the rows', () => {
   it('reads oldest registration first, whatever order the node served', () => {
     expect(decorate(OWNERS, 'jouni').map((r) => r.name))
-      .toEqual(['anonymous', 'jouni', 'happydude500001', 'kanderss', 't25', 'happy2']);
+      .toEqual(['anonymous', 'jouni', 'happydude500001', 'kate', 'trent', 'heidi']);
   });
 
   it('keeps a display name only when it differs from the name', () => {
     const rows = decorate(OWNERS, 'jouni');
     expect(rows.find((r) => r.name === 'anonymous')!.display).toBe('Anonymous Node');
-    expect(rows.find((r) => r.name === 'kanderss')!.display).toBeNull();
+    expect(rows.find((r) => r.name === 'kate')!.display).toBeNull();
   });
 
   it('survives a list the node served without the optional fields', () => {
@@ -68,12 +69,12 @@ describe('the doors a row may draw', () => {
   });
 
   it('offers grant on an ordinary owner and never on a deactivated one', () => {
-    expect(row('kanderss')).toMatchObject({ canGrant: true, canDisable: true, canEnable: false });
-    expect(row('t25')).toMatchObject({ canGrant: false, canDisable: false, canEnable: true });
+    expect(row('kate')).toMatchObject({ canGrant: true, canDisable: true, canEnable: false });
+    expect(row('trent')).toMatchObject({ canGrant: false, canDisable: false, canEnable: true });
   });
 
   it('keeps both doors on a directory-managed account, which the operator may still offboard', () => {
-    expect(row('happy2')).toMatchObject({ managedBy: 'conn-entra-1', canGrant: true, canDisable: true });
+    expect(row('heidi')).toMatchObject({ managedBy: 'conn-entra-1', canGrant: true, canDisable: true });
   });
 });
 
@@ -113,13 +114,13 @@ describe('the filters and the search', () => {
 
   it('leaves the rows each chip names', () => {
     expect(search(rows, 'operators', '').map((r) => r.name)).toEqual(['jouni', 'happydude500001']);
-    expect(search(rows, 'quiet', '').map((r) => r.name)).toEqual(['kanderss', 't25', 'happy2']);
-    expect(search(rows, 'off', '').map((r) => r.name)).toEqual(['t25']);
+    expect(search(rows, 'quiet', '').map((r) => r.name)).toEqual(['kate', 'trent', 'heidi']);
+    expect(search(rows, 'off', '').map((r) => r.name)).toEqual(['trent']);
     expect(search(rows, 'all', '').length).toBe(6);
   });
 
   it('matches the name and the display name, ignoring case and surrounding space', () => {
-    expect(search(rows, 'all', '  HAPPY ').map((r) => r.name)).toEqual(['happydude500001', 'happy2']);
+    expect(search(rows, 'all', '  H ').map((r) => r.name)).toEqual(['happydude500001', 'heidi']);
     expect(search(rows, 'all', 'anonymous node').map((r) => r.name)).toEqual(['anonymous']);
     expect(search(rows, 'all', 'nobody')).toEqual([]);
   });

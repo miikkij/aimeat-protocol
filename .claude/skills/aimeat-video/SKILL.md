@@ -52,10 +52,9 @@ video, ten scenes, 2:56).
    to its end is black. Start the effect, then screenshot within a second or two.
 3. **Full-page screenshots are the raw material for scrolls** (`fullPage: true`); the cutter
    pans them at a constant 280 px/s. Viewport screenshots become slow push-ins.
-4. **What may not appear:** Example by name (ARCHIMATE's model list carries it; open the
+4. **What may not appear:** a real company's model in ARCHIMATE's model list (open the
    Verso Medical example instead), any organism or company that is not Jouni's own in a
-   selector list (WithSecure, Vastuu Group, HeroPlay names in AIMEAT Pages), CADENCE with real
-   customer rows, and admin pages that list people's names or e-mails (use compliance,
+   selector list (AIMEAT Pages lists some), CADENCE with real customer rows, and admin pages that list people's names or e-mails (use compliance,
    statistics and federation). SUUNTA's competitor matrix is shown only when Jouni says so for
    that video.
 5. **His own e-mail is on some surfaces** (hatchery cockpit top bar, M-ROOM deliver panel). Say

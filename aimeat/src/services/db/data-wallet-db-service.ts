@@ -12,13 +12,14 @@
  *
  *   The audit comes back GROUPED (who × what × outcome → count, first, last, keys) with only the newest
  *   rows verbatim, and the response carries the NAMES of every organism and workspace the consents and
- *   the audit keys point at, so the page says "HeroPlay · Kehitys" instead of a pattern. Both were the
+ *   the audit keys point at, so the page says "Pelistudio · Kehitys" instead of a pattern. Both were the
  *   two server additions the Tietolompakko design canvas asked for: aimeat.io served 2 856 audit rows on
  *   a 30-day mount and 1.4 MB on 90 days, and the page had no name for any of its 13 organisms.
  *
  * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?, opts?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-15 — Comment only: the example organism name is an invented one.
  *   2026-11-09 — Additive: `group_limit` sends only the biggest groups (the page sends 0 and reads the
  *     day buckets instead, 1.23 MB of 1.27 MB at a heavy account's size), `today_from` and
  *     `yesterday_from` add the buckets, and the refusal totals the page summed come from here.
