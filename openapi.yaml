@@ -86656,8 +86656,8 @@ paths:
               additionalProperties: false
               properties:
                 enabled: { type: boolean }
-                clarity_project_id: { type: string, nullable: true, pattern: '^[a-z0-9]{6,20}$', description: 'Clarity: Settings > Overview > Project ID. null removes it.' }
-                ga4_measurement_id: { type: string, nullable: true, pattern: '^G-[A-Z0-9]{4,20}$', description: 'The Measurement ID of a GA4 web data stream. null removes it.' }
+                clarity_project_id: { type: [string, 'null'], maxLength: 40, pattern: '^\s*([A-Za-z0-9]{6,20})?\s*$', description: 'Clarity: Settings > Overview > Project ID, 6 to 20 letters and digits, stored in lower case without surrounding spaces. null or an empty string removes it.' }
+                ga4_measurement_id: { type: [string, 'null'], maxLength: 40, pattern: '^\s*([Gg]-[A-Za-z0-9]{4,20})?\s*$', description: 'The Measurement ID of a GA4 web data stream (G-ABC123XYZ9), stored in upper case without surrounding spaces. null or an empty string removes it.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
