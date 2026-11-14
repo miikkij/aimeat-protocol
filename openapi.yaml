@@ -53101,9 +53101,9 @@ paths:
                         start: { type: string, example: '22:00' }
                         end: { type: string, example: '07:00' }
                         tz: { type: string, example: Europe/Helsinki }
-                        breakthrough: { type: array, items: { type: string, enum: [organisms, messages, workflows, apps, account, other] } }
-                    throttleMinutes: { type: integer, minimum: 0, maximum: 120 }
-                    emailDigest: { type: object, properties: { enabled: { type: boolean }, afterHours: { type: integer, minimum: 1, maximum: 168 } } }
+                        breakthrough: { type: array, items: { type: string }, description: 'The groups that break through quiet hours: organisms, messages, workflows, apps, account, other. Another word is dropped.' }
+                    throttleMinutes: { type: number, description: 'Minutes between two pushes from one sender (default 10). Rounded and held to 0..120.' }
+                    emailDigest: { type: object, properties: { enabled: { type: boolean }, afterHours: { type: number, description: 'Rounded and held to 1..168 (default 8).' } } }
                     email:
                       type: object
                       description: The emails the node sends to the owner's own address that are theirs to switch off; a code, a login link and a password reset always go.
