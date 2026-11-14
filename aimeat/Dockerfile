@@ -1,9 +1,22 @@
-# Both stages pin the same node:24-alpine image by digest (OpenSSF Scorecard PinnedDependencies).
+# Build from aimeat/ with the repository root as a second build context named `repo`:
+#   docker build --build-context repo=.. .
+# docker compose up --build passes it already (additional_contexts in both compose files). The build
+# reads files that live at the repository root, outside aimeat/ (see the `build` stage).
+#
+# Every stage pins the same node:24-alpine image by digest (OpenSSF Scorecard PinnedDependencies).
 # To move to a newer image, take the new digest from `docker buildx imagetools inspect node:24-alpine`
-# and change it on both FROM lines together.
+# and change it on all three FROM lines together.
 FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS base
 RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 WORKDIR /app
+
+# Stands in for the `repo` build context. `--build-context repo=..` replaces this stage with the
+# repository root; without it this stage runs and stops the build at once with the command to use,
+# instead of a missing file deep in `pnpm run build`.
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS repo
+RUN echo "ERROR: this build needs the repository root as the build context 'repo'." >&2 && \
+    echo "From aimeat/ run: docker build --build-context repo=.. .   (docker compose up --build passes it already)" >&2 && \
+    exit 1
 
 # Build: install all deps, then compile TypeScript.
 FROM base AS build
@@ -19,6 +32,13 @@ COPY locales/ locales/
 COPY public/ public/
 COPY docs/ docs/
 COPY .env.example ./
+# scripts/copy-dist-assets.mjs also copies files from the repository root (../ of /app, so / here):
+# the two catalogues, the public record contracts it names one by one, and the API contract. Keep
+# this list equal to the `../` paths in that script.
+COPY --from=repo docs/msm-examples/ /docs/msm-examples/
+COPY --from=repo docs/extensions/ /docs/extensions/
+COPY --from=repo docs/specs/signals-contract.md docs/specs/visibility-contract.md docs/specs/tracked-response-contract.md docs/specs/package-sale.md docs/specs/datamap.md /docs/specs/
+COPY --from=repo openapi.yaml /openapi.yaml
 RUN pnpm run build
 # The build is done with the dev dependencies (TypeScript, the test runners, the linters), so
 # drop them before the production stage copies node_modules.

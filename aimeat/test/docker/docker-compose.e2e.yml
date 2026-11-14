@@ -3,6 +3,9 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
+      # repo: the repository root, for the files the build reads from outside aimeat/ (see Dockerfile).
+      additional_contexts:
+        repo: ../../..
     ports:
       - "${E2E_PORT:-3200}:3200"
     environment:

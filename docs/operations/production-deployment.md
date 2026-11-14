@@ -162,7 +162,10 @@ server {
   ceiling (`NODE_OPTIONS`). `LD_PRELOAD` must be in the unit or the environment; a `.env` read by Node
   is too late for it.
 - **Docker:** `aimeat/Dockerfile` with `aimeat/docker-compose.yml` (PostgreSQL) or
-  `aimeat/docker-compose.sqlite.yml` (SQLite). **Neither compose file keeps the node's key directory
+  `aimeat/docker-compose.sqlite.yml` (SQLite); `docker compose up --build` in `aimeat/` builds the
+  image. To build the image alone, run `docker build --build-context repo=.. .` in `aimeat/`: the
+  build also reads files from the repository root (the API contract and two catalogues), which it
+  gets as the build context `repo`, and a build without it stops at once and names this command. **Neither compose file keeps the node's key directory
   on a volume.** Mount one at the key path, or set `AIMEAT_NODE_KEY_PATH` to a file on a volume, or a
   new container starts without the node's identity (see [backup and restore](backup-and-restore.md)).
   The image's `HEALTHCHECK` calls `/v1/health/ready` on 127.0.0.1 every 30 s, after a 120 s start

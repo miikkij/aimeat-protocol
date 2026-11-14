@@ -1,6 +1,6 @@
 # 15 Operations runbook
 
-> Checked against AIMEAT node 4.2.0 (commit f36018fcd) on 2026-11-05. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit a650f0d2c) on 2026-11-14. Maintained with the code: see the README for how.
 
 How an AIMEAT node is installed, configured and run day to day, what to do when a common symptom appears, and who is responsible for what. It is for the operator (the account with the node's admin role, `docs/coding-guidelines/identity-model.md`) and for the IT and security staff behind that account. The order of first-time steps is on [00 Go-live checklist](00-go-live-checklist.md); this page is what comes after, plus the short install sequence.
 
@@ -11,7 +11,7 @@ Day-to-day operation is done from the admin page (`/v1/admin`) or by the operato
 The full procedure is in [build and operate a node](../coding-guidelines/getting-started.md#build-and-operate-a-node) and [production deployment](../operations/production-deployment.md). The short sequence:
 
 1. Prepare the host: Node.js 24, PostgreSQL (or a SQLite file location), a reverse proxy with TLS, and the DNS names from [00 Go-live checklist, phase 2](00-go-live-checklist.md#phase-2-dns-and-tls).
-2. Install one of three ways: the npm package (`npx aimeat init`, then `npx aimeat start`), a source build (`pnpm build`, `pnpm start` in `aimeat/`), or Docker (`aimeat/Dockerfile` with `aimeat/docker-compose.yml` for PostgreSQL or `aimeat/docker-compose.sqlite.yml` for SQLite).
+2. Install one of three ways: the npm package (`npx aimeat init`, then `npx aimeat start`), a source build (`pnpm build`, `pnpm start` in `aimeat/`), or Docker (`aimeat/Dockerfile` with `aimeat/docker-compose.yml` for PostgreSQL or `aimeat/docker-compose.sqlite.yml` for SQLite; `docker compose up --build` in `aimeat/` builds and starts it, and `docker build --build-context repo=.. .` there builds the image alone, [production deployment, process manager](../operations/production-deployment.md#process-manager)).
 3. Write `.env` (or the process manager's environment) with the decisions from [00 Go-live checklist, phases 1 and 3](00-go-live-checklist.md#phase-1-decide-before-install). `aimeat init` generates the keys; never run it again on an existing node, because it writes a new configuration ([upgrading](../operations/upgrading.md#the-update)).
 4. Run under a process manager: `aimeat/deploy/aimeat.service` for systemd carries the restart policy, memory limits and stop timeout. On Docker, put the key directory on a volume (`AIMEAT_NODE_KEY_PATH`); the image's `HEALTHCHECK` calls `/v1/health/ready` on 127.0.0.1, so a node bound to another address (`AIMEAT_BIND_HOST`) needs its own ([production deployment, process manager](../operations/production-deployment.md#process-manager)).
 5. Run `aimeat validate`, start the node, copy the setup code from the start log, create the operator account ([00 Go-live checklist, phase 4](00-go-live-checklist.md#phase-4-first-start)).

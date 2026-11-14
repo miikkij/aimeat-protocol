@@ -172,6 +172,7 @@ Or with Docker, one compose file per storage backend, run from `aimeat/`:
 export AIMEAT_ADMIN_PASSWORD='<a password of your own>'    # no default; compose refuses to start without it
 docker compose up --build                                  # PostgreSQL with Kysely, the production backend
 docker compose -f docker-compose.sqlite.yml up --build     # SQLite, no external database
+docker build --build-context repo=.. -t aimeat .           # the image alone; repo is the repository root
 ```
 
 A fresh node with no owner serves its setup page (`/v1/setup/wizard`) for every page address. The

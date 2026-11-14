@@ -1,6 +1,6 @@
 # 12 Updates and releases
 
-> Checked against AIMEAT node 4.3.1 (commit 682799b99) on 2026-11-13. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit a650f0d2c) on 2026-11-14. Maintained with the code: see the README for how.
 
 This page is for the people who approve and apply updates: the system owner, the sysadmin and the security officer. It says how the project makes a release, what a release consists of, what you can verify about its integrity and what you cannot, how an update and a rollback work, and how security fixes are announced. The step-by-step procedure stays in [Upgrading](../operations/upgrading.md).
 
@@ -35,7 +35,7 @@ flowchart TD
 | Node package `aimeat` | npm registry | Carries `npm-shrinkwrap.json`, so `npm install -g aimeat` and `npx aimeat` install the exact dependency versions the lock file pins, each checked against its integrity hash | `aimeat/scripts/gen-shrinkwrap.mjs` |
 | Source | Git tag `vX.Y.Z` on GitHub | Build from source with `pnpm install` and `pnpm build` in the aimeat folder | [Upgrading](../operations/upgrading.md#the-update) |
 | MCP registry entry | The name in `server.json` | Points at the project's demo node, not at your node; it is not an installable artefact | `server.json` |
-| Docker image | Not published | Build it yourself from `aimeat/Dockerfile`; the base image is pinned by digest | `aimeat/Dockerfile` |
+| Docker image | Not published | Build it yourself from `aimeat/Dockerfile`: `docker compose up --build` in `aimeat/`, or `docker build --build-context repo=.. .` there for the image alone; the base image is pinned by digest | `aimeat/Dockerfile` |
 | CrewAI package `aimeat-crewai` | PyPI | Published with PyPI trusted publishing (OIDC, no stored token); the log prints the SHA256 of each uploaded file | `.github/workflows/publish-aimeat-crewai.yml` |
 | Desktop app installers | GitHub Releases on `desktop-v*` tags | The files the in-app updater installs are signed with the Tauri updater key (minisign). The installers are not code-signed for Windows or macOS | `.github/workflows/release-desktop.yml` |
 

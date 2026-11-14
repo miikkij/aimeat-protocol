@@ -8,7 +8,11 @@
 # (secaudit2026oct22)
 services:
   aimeat:
-    build: .
+    # repo: the repository root, for the files the build reads from outside aimeat/ (see Dockerfile).
+    build:
+      context: .
+      additional_contexts:
+        repo: ..
     ports:
       - "${AIMEAT_PORT:-40050}:40050"
     environment:
