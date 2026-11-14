@@ -17,10 +17,12 @@
  *   suite, because an E2E test cannot hold a buffer's flush or its storage write open.
  *
  *   FAIL FIRST, 2026-11-14, on both providers: every section below was red before its buffer held
- *   the account (the stored row was there after the erasure).
+ *   the account (the stored row was there after the erasure), except the two WAITING sections that
+ *   say they were green: those buffers read the agent before they write, and the erasure removed it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-write-buffers.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-write-buffers.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-14 — The record of the permissions a `*` agent uses.
  *   v1.2.0 — 2026-11-14 — The memory write tally.
  *   v1.1.0 — 2026-11-14 — The usage call stream.
  *   v1.0.0 — 2026-11-14 — Initial: the consent audit.
@@ -34,6 +36,7 @@ import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent-audit-buffer.js';
 import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';
 import { initWriteTallyBuffer, recordMemoryTouch, flushWriteTallyBuffer, resetWriteTallyBuffer } from '../../src/services/data-map/write-tally-buffer.js';
+import { initScopeUse, noteScopeUse, flushScopeUse, SCOPE_USE_KEY } from '../../src/services/scope-use.js';
 
 requirePostgresWhenAsked('erasure-write-buffers');
 
@@ -259,5 +262,31 @@ describe.each(names)('%s: a write buffer and an account erasure', provider => {
       await flushWriteTallyBuffer();
     } finally { held.restore(); }
     expect(await tally(s, p.aliceGhii)).toEqual([]);
+  });
+
+  // ── The permissions a `*` agent uses (services/scope-use.ts) ──
+  it('scope use, WAITING: no record of the erased account is stored after the erasure (green before the fix too: the write reads the agent first)', async () => {
+    const s = st();
+    const p = await people(s);
+    initScopeUse(s);
+    noteScopeUse(p.star, ['memory:read']);
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushScopeUse(s);
+
+    expect(await s.getMemory(p.aliceGhii, SCOPE_USE_KEY)).toBeNull();
+  });
+
+  it('scope use, BEING WRITTEN: a record whose write is in progress is not stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    initScopeUse(s);
+    // The flush reads the agent, then writes: held after the read, the write comes after the erasure.
+    const held = holdFirst(s, 'getAgent', 'after');
+    try {
+      noteScopeUse(p.star, ['memory:read']);
+      await eraseDuring(s, p, held, flushScopeUse(s));
+    } finally { held.restore(); }
+    expect(await s.getMemory(p.aliceGhii, SCOPE_USE_KEY)).toBeNull();
   });
 });

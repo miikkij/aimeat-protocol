@@ -28,13 +28,17 @@
  *   (utils/reserved-keys.ts): no memory route writes, restores or deletes it, so no agent can forge
  *   its own history.
  * @structure SCOPE_USE_KEY · OBSERVE_DAYS · noteScopeUse() · flushScopeUse() · initScopeUse() ·
- *   shutdownScopeUse() · readScopeUse() · writeScopeUse() · wildcardStatus()
+ *   shutdownScopeUse() · holdScopeUseForErasure() · readScopeUse() · writeScopeUse() · wildcardStatus()
  *   (the narrowing itself is services/scope-narrowing.ts: this file is imported by the auth
  *   middleware and must not reach the connector, which reaches the middleware back)
  * @usage
  *   noteScopeUse(req.auth.sub, ['memory:read']);
  *   const status = wildcardStatus(agent, (await readScopeUse(storage, ownerGhii)).agents[agent.name]);
  * @version-history
+ *   v1.3.0 — 2026-11-14 — holdScopeUseForErasure: before the erasure cascade, the account's noted words
+ *     are dropped and a write in progress answers, and no word of the account is noted until it ends.
+ *     A write that had read the agent before the cascade stored the record after it (register finding
+ *     f-2026-11-13-write-buffers-and-erasure).
  *   v1.2.0 — 2026-10-28 — A ready record only offers the narrowing; the node never applies it (Jouni
  *     2026-10-28). provenance:write is noted when the provenance check admits a declaration.
  *   v1.1.0 — 2026-10-18 — A ready record no longer holds the agent's tasks: the next start decision
@@ -45,6 +49,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { isOutsideWildcard } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from './erasure/holds.js';
 
 export const SCOPE_USE_KEY = 'scope-use.agents';
 /** How long the record must run before its narrowing is worth offering: two weeks catches a weekly job twice. */
@@ -62,6 +67,8 @@ let timer: ReturnType<typeof setInterval> | null = null;
 let inFlight: Promise<void> | null = null;
 /** ownerGhii → agent name → words noted since the last flush. */
 let pending = new Map<string, Map<string, Set<string>>>();
+/** The accounts whose erasure runs now: their agents' words are not noted (holdScopeUseForErasure). */
+const erasing = new ErasureHolds();
 
 /**
  * Note that `principal` (an agent's GAII) used `words`. Synchronous, never throws, never waits.
@@ -70,6 +77,8 @@ let pending = new Map<string, Map<string, Set<string>>>();
 export function noteScopeUse(principal: string, words: readonly string[]): void {
     const hash = principal.indexOf('#');
     if (hash <= 0) return;
+    // An agent of an account being erased: the cascade deletes the record, so it is not started again.
+    if (erasing.covers(principal)) return;
     const name = principal.slice(0, hash);
     const owner = ownerGhiiOf(principal);
     let agents = pending.get(owner);
@@ -138,6 +147,23 @@ export function initScopeUse(storage: Storage): void {
 export async function shutdownScopeUse(): Promise<void> {
     if (timer) { clearInterval(timer); timer = null; }
     await flushScopeUse();
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no word of the account's agents
+ * is noted from now on, a write in progress answers first so the cascade deletes what it stored, and
+ * the account's noted words are dropped. A waiting batch alone did no harm, because the write reads
+ * the agent first and the cascade removes it; a write that had read the agent before the cascade
+ * stored the record after it. The returned function ends the hold, after the cascade.
+ */
+export async function holdScopeUseForErasure(account: ErasedAccount): Promise<() => void> {
+    const release = erasing.hold(account);
+    // A write never rejects: writeBatch catches and logs its own failure.
+    while (inFlight) await inFlight;
+    for (const owner of [...pending.keys()]) {
+        if (ErasureHolds.isOf(owner, account)) pending.delete(owner);
+    }
+    return release;
 }
 
 export interface WildcardStatus {
