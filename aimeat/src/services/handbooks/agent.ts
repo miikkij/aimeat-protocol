@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.66.0 -- 2026-11-14 -- Secret shares and requests: the aimeat_secret_share_* tools, the three
+ *     protections, and the code and deposit address that come back once.
  *   v1.65.2 -- 2026-11-08 -- A receiver is an incoming webhook and its key an API key in what an agent
  *     reads and says; the tool aimeat_receiver keeps its name (developer, 2026-11-08; secaudit2026nov08b
  *     round 15b).
@@ -180,6 +182,20 @@ apps in their browser can send files straight to it; when they cannot, its \`rul
 add and where, which only the owner can add in their cloud console. Tell them, and after they have
 added it, call \`aimeat_file_store_set\` with the store's \`name\` alone to test it again. You need no rule
 yourself.
+
+**Giving a secret to someone, or asking for one.** A secret share holds one key, password, set of
+.env lines or file that your owner lets named people, their agents (when the share allows agents), an
+organism's members or a pickup code's holder pick up; a request is an empty share another person fills.
+\`aimeat_secret_share_create\` makes either one, and the maker decides who picks it up, how long it lasts
+and what an agent may receive: an open share gives you the content, a sealed one (the default) only lets
+you copy it into your owner's vault with \`aimeat_secret_share_pickup\` \`to: "vault"\` and use it as
+{{secret:NAME}} in an extension header, and an end-to-end share opens only in a person's own browser.
+\`aimeat_secret_share_list\` shows what your owner made, what waits for them and what they are asked to
+fill (\`aimeat_secret_share_deposit\`); \`aimeat_secret_share_get\` and \`aimeat_secret_share_revoke\` read
+and withdraw one. The pickup code and the deposit address come back once: tell your owner to pass them on
+outside the node, and keep them out of memory. When a secret is very sensitive and your owner would rather
+handle it themselves, give them the share's pickup page and tell them where to paste it. These need
+secrets:share, which your owner ticks for you on its own.
 
 **Making something public may wait for your owner.** When this node asks the owner first and you do
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is

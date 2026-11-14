@@ -18,6 +18,8 @@
  *   - devLinksShown() — whether the footer shows the developer links (site.dev_links)
  * @usage import { siteLink, hasSite } from '/js/site.js';
  * @version-history
+ *   v1.7.2 — 2026-11-14 — /v1/secret-pickup and /v1/secret-deposit are sign-in steps: a person picks up
+ *     or fills a secret share from a link there, often with no account.
  *   v1.7.1 — 2026-10-31 — SIGN_IN_STEPS names its server copy, src/data/sign-in-steps.ts.
  *   v1.7.0 — 2026-10-30 — devLinksShown(): the footer's developer links follow site.dev_links.
  *   v1.6.0 — 2026-10-29 — customerNode() and storeOrdersHref(): a node the store made for a buyer
@@ -195,7 +197,7 @@ export function signedInOnly() {
  * (/v1/agents/verify) and the OAuth consent are the server's own pages and never reach the SPA.
  */
 // The server holds the same list in src/data/sign-in-steps.ts (test/unit/sign-in-steps.test.ts).
-export const SIGN_IN_STEPS = new Set(['/v1/app-grant', '/v1/app-open', '/v1/invite', '/v1/oauth-round', '/v1/allow', '/v1/secret-allow', '/v1/eco-capability-allow']);
+export const SIGN_IN_STEPS = new Set(['/v1/app-grant', '/v1/app-open', '/v1/invite', '/v1/oauth-round', '/v1/allow', '/v1/secret-allow', '/v1/eco-capability-allow', '/v1/secret-pickup', '/v1/secret-deposit']);
 
 /**
  * Whether the view at `pathname` gives way to the sign-in page: on a signed-in-only node, for a

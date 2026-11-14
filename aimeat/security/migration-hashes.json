@@ -130,6 +130,7 @@
     "0126_ephemeral_claim.sql": "64a46075bd26fafda9758cfb8dabe20ee956976926df294706b3e0bcb25a8f15",
     "0127_csm_versions.sql": "8c950ddcc8f560a6bcbab58e6a3f7ebd724423b4fad888ed324b6877166b4db1",
     "0128_storage_file_row_version.sql": "96bfdffc1e8dae59145c16790dd9610bf0347f087e629fd839f5aacfc22ea17c",
-    "0129_access_requests.sql": "4ae2a72e08492b532eba4e26c1d2b937ed2d81cc809a050a88dfae77461f9f1b"
+    "0129_access_requests.sql": "4ae2a72e08492b532eba4e26c1d2b937ed2d81cc809a050a88dfae77461f9f1b",
+    "0130_secret_shares.sql": "2cd0df2976e2a46039e45c756b4600b6df98bda34e1f6ae24cc0d1ae2c4e204c"
   }
 }

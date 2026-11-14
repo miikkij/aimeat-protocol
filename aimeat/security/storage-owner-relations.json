@@ -93,6 +93,46 @@
       "verification": "behavior-tested",
       "decision": "existing-contract"
     },
+    "SecretShare.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteSecretSharesByOwner (step secret_shares): the person's shares and requests go with their content, events and member rows, and the person's member rows on others' shares go too.",
+      "reason": "A share holds one person's secret and terms; it cannot pass to a new registrant of the same name.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/secret-shares.ts",
+        "src/storage/providers/sqlite/methods/secret-shares.ts"
+      ],
+      "test": "test/unit/secret-shares-storage.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
+    "SecretShare.createdBy": {
+      "role": "authorship",
+      "current": "Deleted with the share by deleteSecretSharesByOwner (step secret_shares): createdBy is always the maker or one of the maker's own agents, so the maker's erasure removes every row it names.",
+      "reason": "The principal that made a share acts in the maker's name; it is never a different person.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/services/secret-shares/service.ts",
+        "src/storage/providers/postgres-kysely/methods/secret-shares.ts",
+        "src/storage/providers/sqlite/methods/secret-shares.ts"
+      ],
+      "test": "test/unit/secret-shares-storage.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
+    "VaultDeviceKey.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteVaultDeviceKeysByOwner (step vault_device_keys).",
+      "reason": "A public key of one person's browser; a new registrant of the same name must not receive shares sealed for it.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/secret-shares.ts",
+        "src/storage/providers/sqlite/methods/secret-shares.ts"
+      ],
+      "test": "test/unit/secret-shares-storage.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
     "McpServer.createdBy": {
       "role": "authorship",
       "current": "Kept, with the column rewritten to the erasure's pseudonym by the owner cascade on both providers (src/storage/erased-account-records.ts, action pseudonymise), so the next holder of the name reads none of it.",

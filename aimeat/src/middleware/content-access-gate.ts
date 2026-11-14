@@ -45,6 +45,8 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.9 — 2026-11-14 — A secret share's card and deposit card (GET) and its pickup with a code and
+ *     deposit with a token (POST) are open: a person with no account picks up or deposits there.
  *   v1.4.8 — 2026-11-06 — GET /index.html is open beside /everything and /start: a constant 301 to the
  *     front page, which holds no content (TARGET-091).
  *   v1.4.7 — 2026-11-05 — A browser navigation to GET /v1/provenance/:id goes to /v1/provenance-open, the
@@ -160,6 +162,12 @@ export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; w
   { method: null, path: /^\/v1\/docsign\/wallet(\/.*)?$/, why: 'document-signing wallet session' },
   { method: 'POST', path: /^\/$/, why: 'document-signing wallet response' },
   { method: 'POST', path: /^\/v1\/commerce\/webhooks\/.+$/, why: 'payment webhooks (signed)' },
+  // A secret share's pickup and deposit pages, for a person with no account: the card names the share
+  // and its maker to whoever holds its unguessable id, the deposit card needs the link's token, and
+  // the two writes are refused without a code or a token (credential kinds secret-share-code and
+  // secret-share-deposit).
+  { method: 'GET', path: /^\/v1\/secret-shares\/shr_[a-z2-7]{20}\/(card|deposit-card)$/, why: 'a secret share\'s pickup and deposit pages (its id; the deposit token)' },
+  { method: 'POST', path: /^\/v1\/secret-shares\/shr_[a-z2-7]{20}\/(pickup-with-code|deposit-with-token)$/, why: 'a secret share\'s pickup code or a request\'s deposit token' },
   // Federation: the protocol messages a peer signs (POST), and the GETs a handshake needs. The public
   // federation reads (directory, catalogue, book, packages, templates, stats) list this node's
   // people and content, so on this node they answer a signed-in account only.

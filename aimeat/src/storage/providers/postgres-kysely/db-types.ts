@@ -476,6 +476,70 @@ export interface EphemeralClaim {
   expiresAt: string;
 }
 
+/** A secret share or request (migration 0130). JSON columns are TEXT; times are ISO strings. */
+export interface SecretShare {
+  id: string;
+  ownerGhii: string;
+  createdBy: string;
+  organismId: string | null;
+  kind: string;
+  name: string;
+  note: Generated<string>;
+  format: string;
+  fileName: string | null;
+  contentType: string | null;
+  ciphertext: string | null;
+  sizeBytes: Generated<number>;
+  protection: string;
+  recipients: Generated<string>;
+  codeHash: string | null;
+  codeLogin: Generated<boolean>;
+  codeSalt: string | null;
+  retention: string;
+  maxPickups: number | null;
+  expiresAt: string | null;
+  pickups: Generated<number>;
+  status: string;
+  depositTokenHash: string | null;
+  requestExpiresAt: string | null;
+  depositedAt: string | null;
+  depositedBy: string | null;
+  check: string | null;
+  e2eKeys: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revokedAt: string | null;
+  revokedBy: string | null;
+}
+
+/** One entry of a secret share's log (migration 0130). `detail` is a JSON object in TEXT. */
+export interface SecretShareEvent {
+  id: string;
+  shareId: string;
+  at: string;
+  kind: string;
+  actor: string;
+  onBehalfOf: string;
+  detail: Generated<string>;
+}
+
+/** A person named on a secret share, as a picker or a depositor (migration 0130). */
+export interface SecretShareMember {
+  shareId: string;
+  ghii: string;
+  role: string;
+}
+
+/** A browser's public key for end-to-end secret shares (migration 0130). */
+export interface VaultDeviceKey {
+  ownerGhii: string;
+  keyId: string;
+  publicKey: string;
+  label: Generated<string>;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export interface AccountEvent {
   id: string;
   ownerGhii: string;
@@ -2457,6 +2521,10 @@ export interface DB {
   MemoryFamilyTally: MemoryFamilyTally;
   MemoryTotals: MemoryTotals;
   EphemeralClaim: EphemeralClaim;
+  SecretShare: SecretShare;
+  SecretShareEvent: SecretShareEvent;
+  SecretShareMember: SecretShareMember;
+  VaultDeviceKey: VaultDeviceKey;
   AccountEventArchive: AccountEventArchive;
   WorkspaceRow: WorkspaceRow;
   WorkspaceRowRevision: WorkspaceRowRevision;

@@ -14,9 +14,12 @@
  * @structure SIGN_IN_STEP_PATHS
  * @usage import { SIGN_IN_STEP_PATHS } from '../data/sign-in-steps.js';
  * @version-history
+ *   v1.1.0 — 2026-11-14 — /v1/secret-pickup and /v1/secret-deposit: a person picks up or fills a secret
+ *     share from a link, often with no account (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   v1.0.0 — 2026-10-31 — Initial.
  */
 
 export const SIGN_IN_STEP_PATHS: ReadonlySet<string> = new Set([
   '/v1/app-grant', '/v1/app-open', '/v1/invite', '/v1/oauth-round', '/v1/allow', '/v1/secret-allow', '/v1/eco-capability-allow',
+  '/v1/secret-pickup', '/v1/secret-deposit',
 ]);

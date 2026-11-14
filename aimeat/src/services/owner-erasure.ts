@@ -40,6 +40,8 @@
  *     it does not act on the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-04 — The service_records step erases the person's service namespace (services/service-records.ts),
  *     and the log names it only when it held records (codebase analysis 2026-11-03, item B6).
+ *   2026-11-14 — The secret_shares and vault_device_keys steps: the person's secret shares and requests,
+ *     their place on others', and their browsers' end-to-end keys.
  *   2026-11-02 — The mcp_user_credentials step erases the person's own sign-ins on shared MCP servers.
  *   2026-10-29 — The app_builder_records step erases the app plans too (services/app-plan.ts).
  *   2026-10-27 — The app_builder_records step erases the design specs and roadmaps of the person's apps,
@@ -371,6 +373,20 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     await step('mcp_user_credentials', async () => {
       const n = await storage.deleteMcpUserCredentialsByOwner(ghii);
       return n ? `mcp_user_credentials:${n}` : null;
+    }, deletionLog, storage);
+
+    // The secret shares and requests this person made, with their content, events and named people,
+    // and this person's place as a recipient or depositor on others' shares. A copy someone already
+    // picked up is theirs and stays where they put it.
+    await step('secret_shares', async () => {
+      const n = await storage.deleteSecretSharesByOwner(ghii);
+      return n ? `secret_shares:${n}` : null;
+    }, deletionLog, storage);
+
+    // The public keys of this person's browsers for end-to-end shares.
+    await step('vault_device_keys', async () => {
+      const n = await storage.deleteVaultDeviceKeysByOwner(ghii);
+      return n ? `vault_device_keys:${n}` : null;
     }, deletionLog, storage);
 
     // The client registrations a person brought themselves (their own Entra app, their own X app),

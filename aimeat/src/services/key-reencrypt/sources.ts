@@ -7,9 +7,10 @@
  *
  *   THE LIST. Memory records under eight key prefixes (the payment provider record, the AI and
  *   decision provider keys, the file store credentials, the stored mail, a first sign-in's password
- *   waiting for a verified address), and eleven table columns
+ *   waiting for a verified address), and twelve table columns
  *   (connected accounts and their app secrets, MCP server credentials and transport values, a
- *   person's MCP sign-in, a company's SMTP password, the secrets vault, two-step sign-in secrets,
+ *   person's MCP sign-in, a company's SMTP password, the secrets vault, a secret share's content
+ *   under protection open or sealed, two-step sign-in secrets,
  *   sealed Config rows, extension and instance configs, and the node key's database copy), plus the
  *   binding rows of an extension's shared secrets, which are named by an HMAC under the data key.
  *   test/unit/key-reencrypt-sources.test.ts holds the list to the code: a file that calls the data
@@ -20,7 +21,11 @@
  *   MCP server's OAuth verifier, a two-step setup ticket) lives 10 to 15 minutes and opens with either
  *   key while it lives. An app's watermark is sealed into the copy a person downloads, so it is not
  *   stored here at all: reading the watermark of a copy made before the rotation needs the old key,
- *   which the runbook says to keep with the backups (docs/operations/key-rotation.md).
+ *   which the runbook says to keep with the backups (docs/operations/key-rotation.md). A secret
+ *   share's pickup code and a request's deposit link are stored as an HMAC under the data key
+ *   (services/secret-shares/rules.ts secretHmac); the HMAC cannot be computed again without the code,
+ *   so it is not moved, and such a code stops working once the old key is removed. An e2e share's
+ *   envelope is made by a browser for device keys and is not the data key's.
  *
  *   ORDER. The legacy OpenRouter key record comes before the provider key records, because reading
  *   the providers copies the legacy record's ciphertext into a provider record (services/ai/
@@ -28,6 +33,8 @@
  * @structure SourceCtx · RowPlan · ReencryptSource · REENCRYPT_SOURCES · SEALED_BY
  * @usage for (const s of REENCRYPT_SOURCES) { const rows = await storage.listSealedColumn(s.column, { prefix: s.prefix, ... }); }
  * @version-history
+ *   v1.0.2 — 2026-11-14 — Secret shares' content (SecretShare.ciphertext, protection open and
+ *     sealed) is a source; services/secret-shares/service.ts is in SEALED_BY.
  *   v1.0.1 — 2026-11-05 — The held first sign-in password (key-credentials.ts, decision 14a) is a
  *     source, so the old key's count reaches 0 only when it too is resealed (decisions 4a and 14a).
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
@@ -179,6 +186,9 @@ export const REENCRYPT_SOURCES: readonly ReencryptSource[] = [
   { id: 'personal MCP sign-ins', column: 'mcp-user-credential.credential', planRow: (row, ctx) => unboundString(row.value, ctx.key) },
   { id: 'company SMTP passwords', column: 'company-smtp.password', planRow: (row, ctx) => unboundString(row.value, ctx.key) },
   { id: 'secrets vault', column: 'secret.ciphertext', planRow: (row, ctx) => unboundString(row.value, ctx.key) },
+  // A share's content under protection open or sealed. An e2e share's envelope is not the data key's:
+  // the column spec keeps it out of the listing, so it is neither moved nor counted.
+  { id: 'secret shares', column: 'secret-share.ciphertext', planRow: (row, ctx) => unboundString(row.value, ctx.key) },
   { id: 'two-step sign-in secrets', column: 'ghii.totp-secret', planRow: (row, ctx) => unboundString(row.value, ctx.key) },
   {
     id: 'secret Config settings', column: 'system-setting.value',
@@ -283,6 +293,7 @@ export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/services/mcp-client/transport-secrets.ts': 'MCP server headers and environment',
   'src/services/company/company-smtp.ts': 'company SMTP passwords',
   'src/services/owner-secrets.ts': 'secrets vault',
+  'src/services/secret-shares/service.ts': 'secret shares',
   'src/services/totp.ts': 'two-step sign-in secrets',
   'src/services/config/at-rest.ts': 'secret Config settings',
   'src/services/extension/secrets.ts': 'extension settings, extension instance settings',

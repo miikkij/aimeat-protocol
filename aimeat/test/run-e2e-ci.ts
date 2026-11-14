@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-14 -- e2e-secret-shares.ts joins the list (not the guard tier): secret shares and secret requests (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   2026-11-13 -- e2e-compliance-lia.ts joins the list (not the guard tier): the balancing test of an app whose register rests on legitimate interests.
  *   2026-11-13 -- e2e-tool-route-parity.ts joins the list (not the guard tier): seven places where an MCP tool and its REST route answered one caller differently (structure programme 2026-11, unit 7).
  *   2026-11-13 -- e2e-agent-field-adds.ts joins the list (not the guard tier): an MCP tool takes the fields its REST route takes, and refuses through the tool what the route refuses.
@@ -1352,6 +1353,9 @@ const ALL_SUITES = [
     // A person an app refuses asks the organism's owners for access: the request, the decision, the
     // organism's switch, and the same over MCP.
     'test/e2e-app-access-request.ts',
+    // Secret shares and secret requests: deposit, pickup by person, organism, code or allowed agent,
+    // sealed and vault, retention, revoke, the code lockout, device keys.
+    'test/e2e-secret-shares.ts',
     'test/e2e-organism-member-visibility.ts',
     // A board and a skill at organism:<id>: the members read, an outsider and anonymous do not.
     'test/e2e-audience-boards-skills.ts',

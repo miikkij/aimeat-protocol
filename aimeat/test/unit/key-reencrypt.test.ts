@@ -18,12 +18,16 @@
  *     was; the old key is not removable while it is there. Once it is gone, a run reports 0 and the
  *     old key is removable, and with key A removed every value still opens.
  *   - A shared secret's host binding is carried to the name under key B.
+ *   - A secret share's content under protection open is moved; an e2e share's envelope is neither
+ *     listed, moved, written nor counted unreadable, even when its text looks like a sealed value.
  *   - SealedColumnRepository: a swap over a value that changed meanwhile writes nothing, on both
  *     providers, for a text column and a JSON column.
  * @usage
  *   cd aimeat && pnpm exec vitest run test/unit/key-reencrypt.test.ts
  *   cd aimeat && node --env-file=.env.test.postgres-kysely --import tsx node_modules/vitest/vitest.mjs run test/unit/key-reencrypt.test.ts
  * @version-history
+ *   v1.0.3 — 2026-11-14 — A secret share under open and one under e2e: the first is moved, the second
+ *     is left out of the listing, the swap and the unreadable count.
  *   v1.0.2 — 2026-11-06 — The PostgreSQL half asks ownNodeDb for PostgreSQL by name: CI's unit lane sets
  *     DATABASE_URL and no AIMEAT_DB, so the helper handed it no database URL and every case failed there.
  *   v1.0.1 — 2026-11-05 — The two-key config runs with several processes per node, since the job case
@@ -39,6 +43,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { ownNodeDb } from '../helpers/own-node-db.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord, ExtensionRecord } from '../../src/storage/interface.js';
+import type { SecretShareProtection, SecretShareRecord } from '../../src/storage/types/secret-shares.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 
 vi.mock('../../src/utils/logger.js', () => ({
@@ -106,6 +111,24 @@ describe.each(providers)('the data key ring and the re-encrypt job on %s', (prov
     const now = new Date().toISOString();
     return { key, ownerGaii: owner, value, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now };
   };
+  const SHARE_OPEN = `ss-open-${RUN}`;
+  const SHARE_E2E = `ss-e2e-${RUN}`;
+  /** A ready secret share of alice's, for one named recipient. */
+  const share = (id: string, protection: SecretShareProtection, ciphertext: string): SecretShareRecord => {
+    const now = new Date().toISOString();
+    return {
+      id, ownerGhii: `alice@${NODE_ID}`, createdBy: `alice@${NODE_ID}`, organismId: null, kind: 'share', name: 'API_KEY', note: '',
+      secretFormat: 'text', fileName: null, fileType: null, ciphertext, sizeBytes: 3, protectionLevel: protection,
+      recipients: { people: [`bob@${NODE_ID}`], agents: false, organism: false, code: false },
+      codeHash: null, codeLogin: false, codeSalt: null, retention: 'keep', maxPickups: null, expiresAt: null, pickups: 0, status: 'ready',
+      depositTokenHash: null, requestExpiresAt: null, depositedAt: now, depositedBy: `alice@${NODE_ID}`, check: null,
+      e2eKeys: protection === 'e2e' ? [{ ghii: `bob@${NODE_ID}`, keyId: 'k1', wrapped: 'w' }] : null,
+      createdAt: now, updatedAt: now, revokedAt: null, revokedBy: null,
+    };
+  };
+  /** The e2e share's stored text: written in the data key's form under key C, so that the job would
+   *  count it as unreadable if the listing let it through. Only the column's filter keeps it out. */
+  let e2eStored = '';
 
   it('a node with one key: the status reads nothing, the job refuses and writes nothing, the forms are as before', async () => {
     db = await database(provider);
@@ -146,6 +169,10 @@ describe.each(providers)('the data key ring and the re-encrypt job on %s', (prov
     await storage.setSecret({ ownerGaii: `alice@${NODE_ID}`, name: 'API_TOKEN', ciphertext: p.enc.encrypt('tok', a), setAt: now, updatedAt: now, usedBy: {}, hosts: [], hostBinding: null, approvals: [] } as never);
     await storage.createGHII({ username: 'alice', nodeId: NODE_ID, ghii: `alice@${NODE_ID}`, displayName: 'Alice', verificationLevel: 0, ownerName: 'alice', createdAt: now, updatedAt: now } as never);
     await storage.updateGHII(`alice@${NODE_ID}`, { totpSecret: p.enc.encrypt('JBSWY3DPEHPK3PXP', a) } as never);
+    // A secret share under protection open, and one under e2e, whose envelope is not the data key's.
+    await storage.createSecretShare(share(SHARE_OPEN, 'open', p.enc.encrypt('shared-value', a)), [{ shareId: SHARE_OPEN, ghii: `bob@${NODE_ID}`, role: 'pickup' }]);
+    e2eStored = p.enc.encrypt('browser-envelope', Buffer.from(C, 'hex'));
+    await storage.createSecretShare(share(SHARE_E2E, 'e2e', e2eStored), [{ shareId: SHARE_E2E, ghii: `bob@${NODE_ID}`, role: 'pickup' }]);
     await storage.setConfigValue('ai.instance_key', 'sealed:' + p.enc.encryptBound('"node-ai-key"', a, p.atRest.contextOf('ai.instance_key')));
     // An extension's settings, its shared secret map, and the shared value's host binding.
     await storage.createExtension({
@@ -230,6 +257,14 @@ describe.each(providers)('the data key ring and the re-encrypt job on %s', (prov
     const secret = (await sr.getSecret(`alice@${NODE_ID}`, 'API_TOKEN'))!;
     expect(secret.ciphertext).toMatch(/^v3u:1:/);
     expect(secret.hosts).toEqual([]);
+    // The open share is moved; the e2e share is neither moved nor counted (unreadable stays 1 above).
+    const openShare = (await sr.getSecretShare(SHARE_OPEN))!;
+    expect(openShare.ciphertext).toMatch(/^v3u:1:/);
+    expect(pr.enc.decrypt(openShare.ciphertext!, key)).toBe('shared-value');
+    expect((await sr.getSecretShare(SHARE_E2E))!.ciphertext).toBe(e2eStored);
+    expect(status.job!.unreadable_at.some(u => u.source === 'secret shares')).toBe(false);
+    expect((await sr.listSealedColumn('secret-share.ciphertext', { limit: 500 })).map(r => r.id[0])).toEqual([SHARE_OPEN]);
+    expect(await sr.swapSealedColumn('secret-share.ciphertext', [SHARE_E2E], e2eStored, 'written')).toBe(false);
     const ghii = (await sr.getGHII(`alice@${NODE_ID}`))!;
     expect(pr.enc.decrypt(ghii.totpSecret!, key)).toBe('JBSWY3DPEHPK3PXP');
     expect((await sr.getAllConfigValues())['ai.instance_key']).toMatch(/^sealed:v3:1:/);

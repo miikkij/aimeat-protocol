@@ -24,6 +24,9 @@
  *   return { ...securityDoorDefaults(), … };
  *   if (!ownerKeyLoginAllowed(config)) refuse();
  * @version-history
+ *   v1.6.0 — 2026-11-14 — secretShareMaxBytes (AIMEAT_SECRET_SHARE_MAX_BYTES, default 1 MB): the largest
+ *     secret one share holds (services/secret-shares/rules.ts); secretShareCheck
+ *     (AIMEAT_SECRET_SHARE_CHECK, default true): the check call to a deposited secret's service.
  *   v1.5.0 — 2026-10-25 — secretHostAskDefault (AIMEAT_SECRET_HOST_ASK_DEFAULT, default true): the node's
  *     default for "Ask me before my secret is sent to a new address for the first time" (secaudit2026oct22).
  *   v1.4.0 — 2026-10-12 — OWNER_KEY_LOGIN_REMOVED_IN and WS_QUERY_TOKEN_REMOVED_IN (4.0.0) with
@@ -119,6 +122,22 @@ export interface SecurityDoorConfig {
    * true (secaudit2026oct22; Jouni, 2026-10-25).
    */
   secretHostAskDefault: boolean;
+
+  /**
+   * The largest secret one share may hold, in bytes (services/secret-shares/rules.ts): a key, a
+   * password, a configuration, a certificate, a service-account file. The share row holds its
+   * content and is read in one piece, so the ceiling is 25 MB. Read on every deposit, so a live
+   * change applies at once. AIMEAT_SECRET_SHARE_MAX_BYTES, default 1048576 (1 MB).
+   */
+  secretShareMaxBytes: number;
+
+  /**
+   * Whether a deposited secret is checked with the service it belongs to (services/secret-shares/
+   * check.ts): one call to that service's fixed account address with the secret, to learn whether it
+   * works and which account it opens. Off: no such call is made and shares carry no check.
+   * AIMEAT_SECRET_SHARE_CHECK, default true.
+   */
+  secretShareCheck: boolean;
 }
 
 /**
@@ -149,5 +168,7 @@ export function securityDoorDefaults(): SecurityDoorConfig {
     ownerKeyLogin: process.env.AIMEAT_OWNER_KEY_LOGIN !== 'false' && !versionAtLeast(getSoftwareVersion(), OWNER_KEY_LOGIN_REMOVED_IN),
     wsQueryToken: process.env.AIMEAT_WS_QUERY_TOKEN !== 'false' && !versionAtLeast(getSoftwareVersion(), WS_QUERY_TOKEN_REMOVED_IN),
     secretHostAskDefault: process.env.AIMEAT_SECRET_HOST_ASK_DEFAULT !== 'false',
+    secretShareMaxBytes: parseInt(process.env.AIMEAT_SECRET_SHARE_MAX_BYTES ?? '1048576', 10),
+    secretShareCheck: process.env.AIMEAT_SECRET_SHARE_CHECK !== 'false',
   };
 }

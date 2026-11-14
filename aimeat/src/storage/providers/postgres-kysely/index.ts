@@ -15,6 +15,8 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-14 — secretShareMethods bound (SecretShare, SecretShareEvent, SecretShareMember,
+ *     VaultDeviceKey; migration 0130).
  *   2026-11-04 — A query-builder read outside a transaction that met a lost connection (class 08,
  *     57P01-57P03) or 40001 is tried once more, and a lost connection leaves the pool (./read-retry.ts;
  *     codebase analysis 2026-11-03, item HA stage 3).
@@ -133,6 +135,7 @@ import { secretMethods } from './methods/secrets.js';
 import { heldNameMethods } from './methods/held-names.js';
 import { ephemeralClaimMethods } from './methods/ephemeral-claims.js';
 import { sealedColumnMethods } from './methods/sealed-columns.js';
+import { secretShareMethods } from './methods/secret-shares.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -292,6 +295,7 @@ Object.assign(
   heldNameMethods,
   ephemeralClaimMethods,
   sealedColumnMethods,
+  secretShareMethods,
   identityMethods,
   walletMethods,
   sessionMethods,

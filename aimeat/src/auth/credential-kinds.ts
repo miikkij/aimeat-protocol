@@ -15,6 +15,8 @@
  * @structure CREDENTIAL_KINDS · CredentialKind
  * @usage import { CREDENTIAL_KINDS, type CredentialKind } from './credential-kinds.js';
  * @version-history
+ *   v1.3.0 — 2026-11-14 — 'secret-share-code' and 'secret-share-deposit': a secret share's pickup code
+ *     and a secret request's deposit token.
  *   v1.2.1 — 2026-11-08 — The 'receiver' kind's text says incoming webhook and API key; the kind keeps
  *     its name (secaudit2026nov08b round 15b).
  *   v1.2.0 — 2026-11-07 — 'receiver': an outside program's key for one receiver of an owner
@@ -100,6 +102,19 @@ export const CREDENTIAL_KINDS = {
     'package-claimant': {
         credential: 'A node redeeming a package claim code: a request signed with the key its own body names, by the node '
             + 'its body names (services/packages/sale/package-sale-auth.ts verifyRequestWithKey). Unsigned is 401.',
+        admitsNoCredential: false,
+    },
+    'secret-share-code': {
+        credential: 'A holder of a secret share\'s pickup code: the code in the body\'s `code` (or `code_verifier` for an '
+            + 'end-to-end share), compared as an HMAC under the node key for the route\'s :id (services/secret-shares/pickup.ts '
+            + 'verifyShareCode). No code and an unknown share are 404, a wrong code 403, ten wrong codes per share or address '
+            + 'in 15 minutes 429.',
+        admitsNoCredential: false,
+    },
+    'secret-share-deposit': {
+        credential: 'A holder of a secret request\'s deposit link: the token in the body\'s `token`, compared as an HMAC under '
+            + 'the node key for the route\'s :id (services/secret-shares/service.ts verifyDepositToken). No token, a wrong one '
+            + 'and an unknown request are the same 404.',
         admitsNoCredential: false,
     },
 } as const satisfies Record<string, CredentialKindInfo>;

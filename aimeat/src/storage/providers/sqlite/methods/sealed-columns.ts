@@ -10,22 +10,28 @@
  * @structure sealedColumnMethods
  * @usage Object.assign(SqliteStorage.prototype, sealedColumnMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-14 — A spec's `exclude` filter on the listing and on the swap (a secret share's
+ *     end-to-end envelope is neither listed nor written).
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  */
 import type { SqliteStorage } from '../index.js';
 import { logger } from '../../../../utils/logger.js';
-import { SEALED_COLUMNS, type SealedColumn, type SealedColumnRow } from '../../../repositories/sealed-column.repository.js';
+import { SEALED_COLUMNS, type SealedColumn, type SealedColumnRow, type SealedColumnSpec } from '../../../repositories/sealed-column.repository.js';
 import { globPrefix } from '../../../key-prefix.js';
 
 const q = (name: string): string => `"${name}"`;
 
 export const sealedColumnMethods = {
   async listSealedColumn(this: SqliteStorage, column: SealedColumn, opts: { after?: string[] | null; limit: number; prefix?: string }): Promise<SealedColumnRow[]> {
-    const spec = SEALED_COLUMNS[column];
+    const spec: SealedColumnSpec = SEALED_COLUMNS[column];
     const idList = spec.ids.map(q).join(', ');
     const conds: string[] = [];
     const params: unknown[] = [];
     if (spec.column) conds.push(`${q(spec.column)} IS NOT NULL`);
+    if (spec.exclude) {
+      conds.push(`${q(spec.exclude.column)} <> ?`);
+      params.push(spec.exclude.value);
+    }
     if (column === 'memory') {
       if (!opts.prefix) throw new Error('listSealedColumn(memory) needs a key prefix');
       conds.push('deletedAt IS NULL', 'key GLOB ?');
@@ -53,18 +59,20 @@ export const sealedColumnMethods = {
   },
 
   async swapSealedColumn(this: SqliteStorage, column: SealedColumn, id: string[], expected: unknown, next: unknown): Promise<boolean> {
-    const spec = SEALED_COLUMNS[column];
+    const spec: SealedColumnSpec = SEALED_COLUMNS[column];
     if (!spec.column) throw new Error('memory is written on its version through the memory methods');
     if (id.length !== spec.ids.length) throw new Error(`swapSealedColumn(${column}) needs ${spec.ids.length} id value(s)`);
-    const match = spec.ids.map(c => `${q(c)} = ?`).join(' AND ');
+    const exclude = spec.exclude ? ` AND ${q(spec.exclude.column)} <> ?` : '';
+    const match = spec.ids.map(c => `${q(c)} = ?`).join(' AND ') + exclude;
+    const matchParams: unknown[] = spec.exclude ? [...id, spec.exclude.value] : [...id];
     const col = q(spec.column);
     if (!spec.json) {
-      return this.db.prepare(`UPDATE ${spec.sqlite} SET ${col} = ? WHERE ${match} AND ${col} = ?`).run(next, ...id, expected).changes > 0;
+      return this.db.prepare(`UPDATE ${spec.sqlite} SET ${col} = ? WHERE ${match} AND ${col} = ?`).run(next, ...matchParams, expected).changes > 0;
     }
     // The provider writes these columns with JSON.stringify, so the stored text of the value the caller
     // read is JSON.stringify of it (the listing parsed it, keeping its key order); text the listing
     // handed over as text is compared as it is. Either way one statement writes only over that text.
     const expectedText = typeof expected === 'string' ? expected : JSON.stringify(expected ?? null);
-    return this.db.prepare(`UPDATE ${spec.sqlite} SET ${col} = ? WHERE ${match} AND ${col} = ?`).run(JSON.stringify(next ?? null), ...id, expectedText).changes > 0;
+    return this.db.prepare(`UPDATE ${spec.sqlite} SET ${col} = ? WHERE ${match} AND ${col} = ?`).run(JSON.stringify(next ?? null), ...matchParams, expectedText).changes > 0;
   },
 };

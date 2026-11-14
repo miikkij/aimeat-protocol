@@ -125,6 +125,22 @@ tags:
     description: Human (GHII) presence/availability — manual/auto status, who-can-see visibility, federated cache
   - name: Secrets
     description: The owner's write-only credential vault — named keys the node uses on their behalf and nothing reads back
+  - name: Secret shares
+    description: >-
+      A secret share holds one secret (a key, a password, NAME=value lines or a file) that its maker
+      lets named people, those people's agents, the members of an organism, or whoever holds a pickup
+      code pick up. A request is an empty share: its maker names who is asked to fill it, and the
+      person asked fills it signed in or through the link's deposit token, with no account. The maker
+      decides every term, and a depositor sets none of them. Protection says what an agent may
+      receive: `open` (anyone allowed, agents included, receives the content), `sealed` (an agent
+      only copies it into its owner's vault, where it is used as `{{secret:NAME}}` and never read
+      back; a person receives it) and `e2e` (only a recipient's own registered browser opens it, and
+      the node cannot). Retention says when it ends: `once` (the first pickup), `count`
+      (`max_pickups`), `until` (`expires_at`) or `keep` (until it is revoked). Revoking ends a share
+      and removes its content at once; copies already picked up stay where they went. Content is
+      encrypted at rest under the node key, or by the browser for `e2e`, and no answer except a
+      pickup carries it. Every agent call needs the permission `secrets:share`, which no wildcard
+      carries; the account holder signed in needs no permission word.
   - name: Admin
     description: Operator dashboard and configuration
   - name: MCP
@@ -7752,6 +7768,454 @@ components:
                   lastProgressAt: { type: string, format: date-time }
         startedAt: { type: string, format: date-time }
         endedAt: { type: string, format: date-time }
+
+    # ── Secret shares ──────────────────────────────────────────
+    SecretShareRecipients:
+      type: object
+      description: >-
+        Who may pick the share up. Several may be chosen at once, and at least one of `people`,
+        `organism` and `code` is required (NO_RECIPIENTS).
+      properties:
+        people:
+          type: array
+          maxItems: 50
+          items: { type: string }
+          description: >-
+            Account names or GHIIs on this node. In an answer, always GHIIs. A name with no account
+            on this node is refused with UNKNOWN_PERSON: someone on another node is reached with a
+            code.
+        agents:
+          type: boolean
+          default: false
+          description: The named people's own agents (and, with `organism`, the members' agents) may pick it up in their name. Refused with `e2e`.
+        organism:
+          type: boolean
+          default: false
+          description: Every active member of the organism named in `organism` may pick it up. Refused with `e2e`.
+        code:
+          type: boolean
+          default: false
+          description: Anyone who presents the pickup code may pick it up.
+        code_login:
+          type: boolean
+          default: false
+          description: The code works only for someone signed in to this node. The top-level `code_login` is read when this is absent.
+
+    SecretShareCheck:
+      type: object
+      nullable: true
+      description: >-
+        What the node learned when it tried a deposited text secret against the service it belongs to
+        (a fixed, bundled check: elevenlabs, openrouter, anthropic, openai, stripe, github). Never the
+        secret. A failed or slow check does not block the deposit; it is recorded with `ok: false`.
+      required: [service, ok, status, at]
+      properties:
+        service: { type: string, example: elevenlabs }
+        ok: { type: boolean }
+        status: { type: integer, description: "The HTTP status of the check call, or 0 when the service did not answer." }
+        account: { type: string, description: "A short tag of the account the secret opens, so two people can see they mean the same account without seeing each other's key." }
+        facts:
+          type: object
+          additionalProperties: { type: string }
+          description: Readable facts the service reported, such as plan, usage, limit and reset.
+        at: { type: string, format: date-time }
+
+    SecretShareEvent:
+      type: object
+      required: [at, kind, actor, on_behalf_of, detail]
+      properties:
+        at: { type: string, format: date-time }
+        kind:
+          type: string
+          enum: [created, requested, deposited, checked, picked_up, refused, ended, revoked]
+        actor:
+          type: string
+          description: The principal that acted (a GHII or an agent GAII), `code` for a code holder with no session, or `link` for a deposit through the deposit token.
+        on_behalf_of: { type: string, description: "The person in whose name the actor acted." }
+        detail:
+          type: object
+          additionalProperties: { type: string }
+          description: >-
+            What else a reader needs, never content. For picked_up `to` (reveal, vault, device), `via`
+            (named, organism, code) and `vault_name`; for refused `reason` (wrong_code); for ended
+            `reason` (pickups, time).
+
+    SecretShareView:
+      type: object
+      description: >-
+        A share as a caller with a role on it sees it. Never the content, a code, a token, a hash or
+        the wrapped end-to-end keys.
+      required: [id, kind, name, note, format, protection, recipients, retention, pickups, status, maker, created_by, created_at, updated_at, you]
+      properties:
+        id: { type: string, pattern: '^shr_[a-z2-7]{20}$' }
+        kind: { type: string, enum: [share, request] }
+        name: { type: string, example: ELEVENLABS_API_KEY }
+        note: { type: string, description: "The maker's words, such as what rights the key needs." }
+        format: { type: string, enum: [text, pairs, file] }
+        file_name: { type: string, nullable: true }
+        content_type: { type: string, nullable: true }
+        size_bytes: { type: integer, description: "The content's size. For `e2e` it is what the browser declared." }
+        protection: { type: string, enum: [open, sealed, e2e] }
+        recipients:
+          type: object
+          required: [people, agents, organism, code, code_login]
+          properties:
+            people: { type: array, items: { type: string }, description: "GHIIs." }
+            agents: { type: boolean }
+            organism: { type: boolean }
+            code: { type: boolean }
+            code_login: { type: boolean }
+        organism: { type: string, nullable: true, description: "The organism whose vault the share sits in." }
+        retention: { type: string, enum: [once, count, until, keep] }
+        max_pickups: { type: integer, nullable: true, description: "1 for `once`, the maker's number for `count`, null otherwise." }
+        expires_at: { type: string, format: date-time, nullable: true }
+        pickups: { type: integer }
+        status:
+          type: string
+          enum: [waiting, ready, ended, revoked]
+          description: waiting is a request not yet filled; content exists only while ready.
+        maker: { type: string, description: "The GHII of the person who made it and decides its terms." }
+        created_by: { type: string, description: "The principal that made it, the maker or one of the maker's agents." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        request_expires_at: { type: string, format: date-time, nullable: true, description: "Until when a request can be filled." }
+        deposited_at: { type: string, format: date-time, nullable: true }
+        deposited_by: { type: string, nullable: true, description: "The principal that filled it, or `link` for the deposit token." }
+        check: { $ref: '#/components/schemas/SecretShareCheck' }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        revoked_by: { type: string, nullable: true }
+        you:
+          type: object
+          required: [manage, pickup, deposit]
+          description: What this caller may do with it.
+          properties:
+            manage: { type: boolean, description: "Read every event and revoke. The maker and the maker's agents, and the creator and admins of its organism." }
+            pickup: { type: boolean, description: "May pick it up as a named person, an organism member, or their agent. A code holder is decided at pickup." }
+            deposit: { type: boolean, description: "May fill this waiting request." }
+        events:
+          type: array
+          description: Only on GET /v1/secret-shares/{id} and revoke, newest first, at most 200. A caller who does not manage it sees no other person's pickups.
+          items: { $ref: '#/components/schemas/SecretShareEvent' }
+
+    SecretShareCard:
+      type: object
+      description: >-
+        What the pickup and deposit pages show before anyone signs in. Never the note, the content or
+        the recipients.
+      required: [id, kind, name, maker, status, format, protection, code, code_login]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [share, request] }
+        name: { type: string }
+        maker: { type: string, description: "The maker's GHII." }
+        status: { type: string, enum: [waiting, ready, ended, revoked] }
+        format: { type: string, enum: [text, pairs, file] }
+        file_name: { type: string, nullable: true }
+        protection: { type: string, enum: [open, sealed, e2e] }
+        code: { type: boolean, description: "A pickup code opens it." }
+        code_login: { type: boolean, description: "The code works only signed in." }
+        code_salt: { type: string, nullable: true, description: "For `e2e` with a code, the salt the browser derives the content key from the code with." }
+        check:
+          allOf: [{ $ref: '#/components/schemas/SecretShareCheck' }]
+          nullable: true
+          description: Null on the public card. The depositor's own deposit answer carries it.
+        request_expires_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+
+    SecretShareDepositCard:
+      allOf:
+        - $ref: '#/components/schemas/SecretShareCard'
+        - type: object
+          required: [note, device_keys, recipients, retention, max_pickups]
+          properties:
+            note: { type: string, description: "The maker's note, which the public card leaves out." }
+            recipients:
+              type: object
+              description: Who may pick the filled request up, as its maker decided.
+              properties:
+                people: { type: array, items: { type: string } }
+                agents: { type: boolean }
+                organism: { type: boolean }
+                code: { type: boolean }
+                code_login: { type: boolean }
+            retention: { type: string, enum: [once, count, until, keep] }
+            max_pickups: { type: integer, nullable: true }
+            device_keys:
+              type: array
+              description: For an `e2e` request, the public keys of every named recipient's registered browsers, to encrypt the content key to. Empty otherwise.
+              items:
+                type: object
+                required: [ghii, key_id, public_key]
+                properties:
+                  ghii: { type: string }
+                  key_id: { type: string }
+                  public_key: { type: string, description: 'The P-256 public key as JWK JSON text.' }
+
+    SecretShareE2eKey:
+      type: object
+      required: [ghii, key_id, wrapped]
+      properties:
+        ghii: { type: string, description: "The recipient the key is wrapped for." }
+        key_id: { type: string, description: "The recipient's device key, from GET /v1/vault/device-keys/of/{who}." }
+        wrapped: { type: string, maxLength: 4095, description: "The content key, wrapped by the browser for that device key." }
+
+    SecretShareContentFields:
+      type: object
+      description: >-
+        The content of a share or a deposit. Under `open` and `sealed` it is sent as `content`, or as
+        `content_base64` with `format: file`, and the node encrypts it. Under `e2e` the browser has
+        already encrypted it and sends `envelope` with `e2e_keys` and/or `code_salt`; the node checks
+        only the shape. The node's limit is 1 MB by default (setting `secrets.share_max_bytes`, at
+        most 25 MB).
+      properties:
+        format:
+          type: string
+          enum: [text, pairs, file]
+          default: text
+          description: text is a key, a password or a token; pairs is NAME=value lines such as an .env file; file is `content_base64` with `file_name`.
+        content: { type: string, description: "The secret as text, for text and pairs. Required for those under open and sealed." }
+        content_base64: { type: string, format: byte, description: "The file in standard base64, for `format` file." }
+        file_name: { type: string, maxLength: 200, description: "Defaults to secret.bin for a file." }
+        content_type: { type: string, description: 'A media type such as application/json. Defaults to application/octet-stream for a file.' }
+        service:
+          type: string
+          description: >-
+            Optional. The service the secret belongs to (elevenlabs, openrouter, anthropic, openai,
+            stripe, github), so the node checks a text secret against that service once. Left out,
+            the node guesses from the name and the key's prefix.
+        envelope: { type: string, pattern: '^[A-Za-z0-9_\-.:]+$', description: '`e2e` only: the content as the browser encrypted it.' }
+        e2e_keys:
+          type: array
+          maxItems: 200
+          description: '`e2e` only: the content key wrapped for each recipient device.'
+          items: { $ref: '#/components/schemas/SecretShareE2eKey' }
+        code_salt: { type: string, pattern: '^[A-Za-z0-9_-]{16,64}$', description: '`e2e` with a code: the salt the browser derived the content key from the code with.' }
+        size_bytes: { type: integer, description: '`e2e` only: the plaintext size the browser declares, capped at the node limit.' }
+
+    SecretShareCreateBody:
+      allOf:
+        - $ref: '#/components/schemas/SecretShareContentFields'
+        - type: object
+          required: [name]
+          properties:
+            kind:
+              type: string
+              enum: [share, request]
+              default: share
+              description: request makes an empty share for someone else to fill; it carries no content.
+            name:
+              type: string
+              pattern: '^[\p{L}\p{N} _.-]{1,128}$'
+              description: What the secret is called, 1 to 128 letters, digits, spaces, dots, underscores or hyphens.
+              example: ELEVENLABS_API_KEY
+            note: { type: string, maxLength: 2000, description: "Why, what rights the key needs, where to make it." }
+            protection: { type: string, enum: [open, sealed, e2e], default: sealed }
+            recipients:
+              allOf: [{ $ref: '#/components/schemas/SecretShareRecipients' }]
+              description: "Required for a share. A request without it goes to its maker and the maker's agents (`{ people: [maker], agents: true }`)."
+            code_login: { type: boolean, description: "Same as `recipients.code_login`, read when that is absent." }
+            organism: { type: string, description: "The organism whose vault the share sits in. The maker must be an active member. Required with `recipients.organism`." }
+            retention: { type: string, enum: [once, count, until, keep], default: once }
+            max_pickups: { type: integer, minimum: 1, maximum: 1000, description: "Required with retention count." }
+            expires_at: { type: string, format: date-time, description: "Required with retention until; in the future and at most 365 days away." }
+            code_verifier:
+              type: string
+              pattern: '^[0-9a-f]{64}$'
+              description: '`e2e` with `recipients.code`: the verifier the browser made from the code it made. Under open and sealed the node makes the code and returns it once.'
+            depositors:
+              type: array
+              items: { type: string }
+              description: A request only. Account names or GHIIs on this node who are asked to fill it; each is told. Anyone else fills it through `deposit_url`.
+            request_days: { type: integer, minimum: 1, maximum: 90, default: 14, description: "A request only. How many days it can be filled." }
+
+    SecretShareCreated:
+      type: object
+      required: [share, pickup_url]
+      properties:
+        share: { $ref: '#/components/schemas/SecretShareView' }
+        code:
+          type: string
+          description: >-
+            The pickup code, under open and sealed with `recipients.code`, such as KARHU-7215-SUMU-VALO.
+            Returned this once and stored only as an HMAC. Case and spaces do not matter when it is
+            entered.
+        deposit_token: { type: string, description: "A request only. The token in the deposit link, returned this once." }
+        deposit_url: { type: string, description: "A request only. The deposit page with the token in its fragment (`#t=`)." }
+        pickup_url: { type: string, description: "The pickup page. It carries no credential." }
+
+    SecretShareLists:
+      type: object
+      required: [made, for_me, to_fill, organisms]
+      properties:
+        made: { type: array, items: { $ref: '#/components/schemas/SecretShareView' }, description: "What the caller's person made, in any status." }
+        for_me: { type: array, items: { $ref: '#/components/schemas/SecretShareView' }, description: "Ready shares naming the caller's person, or open to their organisms' members." }
+        to_fill: { type: array, items: { $ref: '#/components/schemas/SecretShareView' }, description: "Waiting requests naming the caller's person as a depositor." }
+        organisms: { type: array, items: { $ref: '#/components/schemas/SecretShareView' }, description: "Shares in the vaults of organisms the caller's person creates or administers, made by someone else." }
+
+    SecretShareDepositBody:
+      allOf:
+        - $ref: '#/components/schemas/SecretShareContentFields'
+        - type: object
+          description: The maker's terms stay as they are; a depositor sends only the content.
+          properties:
+            token: { type: string, description: "The deposit token from the link. Required on deposit-with-token; on deposit a valid token also admits a caller who is not a named depositor." }
+
+    SecretSharePickupBody:
+      type: object
+      properties:
+        to:
+          type: string
+          enum: [reveal, vault]
+          default: reveal
+          description: reveal answers the content; vault copies it into the caller's owner's vault and answers the vault entry, never the value.
+        code: { type: string, description: "The pickup code, for a code holder." }
+        code_verifier: { type: string, description: '`e2e` with a code: the verifier the browser made from the code, read when `code` is absent.' }
+        name: { type: string, pattern: '^[A-Za-z0-9_-]{1,64}$', description: 'to: vault. The vault name; defaults to the share name with other characters turned to underscores.' }
+        host: { type: string, description: 'to: vault. The one host the vault secret may be sent to, such as api.elevenlabs.io: no scheme, no path. Left out, its first use binds it.' }
+
+    SecretSharePickupResult:
+      type: object
+      required: [share]
+      properties:
+        share:
+          oneOf:
+            - $ref: '#/components/schemas/SecretShareView'
+            - $ref: '#/components/schemas/SecretShareCard'
+          description: The view when the caller is signed in, the card for a code holder with no session. As it is after this pickup was counted.
+        content:
+          type: object
+          description: 'to: reveal under open and sealed.'
+          required: [format, file_name, content_type]
+          properties:
+            format: { type: string, enum: [text, pairs, file] }
+            text: { type: string, description: "For text and pairs." }
+            content_base64: { type: string, format: byte, description: "For file." }
+            file_name: { type: string, nullable: true }
+            content_type: { type: string, nullable: true }
+        vault:
+          type: object
+          description: 'to: vault. The vault entry it became (as GET /v1/secrets lists it), never the value.'
+          additionalProperties: true
+        envelope: { type: string, description: '`e2e`: the encrypted content, for the browser to open.' }
+        wrapped_keys:
+          type: array
+          description: '`e2e` for a named recipient: the content key wrapped for each of the caller''s devices. Empty for a code holder.'
+          items:
+            type: object
+            required: [key_id, wrapped]
+            properties:
+              key_id: { type: string }
+              wrapped: { type: string }
+        code_salt: { type: string, nullable: true, description: '`e2e` for a code holder: the salt to derive the content key from the code with.' }
+
+    VaultDeviceKey:
+      type: object
+      description: >-
+        One browser's public key for end-to-end shares. The browser makes a P-256 key pair and keeps
+        the private key where script cannot export it; the node keeps the public key.
+      required: [key_id, label, public_key, created_at, last_used_at]
+      properties:
+        key_id: { type: string, description: "The first 16 characters of the key's SHA-256, base64url." }
+        label: { type: string, maxLength: 80, description: "The person's name for the browser. Empty when another person's keys are read." }
+        public_key: { type: string, description: 'The public key as JWK JSON text: { "kty": "EC", "crv": "P-256", "x", "y" }.' }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time, nullable: true }
+
+    VaultDeviceKeyRegisterBody:
+      type: object
+      required: [public_key]
+      properties:
+        public_key:
+          type: object
+          description: A P-256 public key as a JWK, with no private part (`d` is refused).
+          required: [kty, crv, x, y]
+          properties:
+            kty: { type: string, enum: [EC] }
+            crv: { type: string, enum: [P-256] }
+            x: { type: string, pattern: '^[A-Za-z0-9_-]{40,48}$' }
+            y: { type: string, pattern: '^[A-Za-z0-9_-]{40,48}$' }
+        label: { type: string, maxLength: 80, default: Browser }
+
+    SecretShareViewEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/SecretShareView' }
+    SecretShareCreatedEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/SecretShareCreated' }
+    SecretShareListsEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/SecretShareLists' }
+    SecretShareCardEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/SecretShareCard' }
+    SecretShareDepositCardEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/SecretShareDepositCard' }
+    SecretShareDepositedEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [share]
+              properties:
+                share: { $ref: '#/components/schemas/SecretShareCard' }
+    SecretSharePickupEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/SecretSharePickupResult' }
+    VaultDeviceKeyEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/VaultDeviceKey' }
+    VaultDeviceKeyListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data: { type: array, items: { $ref: '#/components/schemas/VaultDeviceKey' } }
+    VaultDeviceKeysOfEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [ghii, keys]
+              properties:
+                ghii: { type: string }
+                keys: { type: array, items: { $ref: '#/components/schemas/VaultDeviceKey' } }
+    VaultDeviceKeyRemovedEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [key_id, removed]
+              properties:
+                key_id: { type: string }
+                removed: { type: boolean, const: true }
 
   # === Reusable Response Wrappers ===
   responses:
@@ -46236,6 +46700,410 @@ paths:
         '200': { description: '{ declined: true } when a question was removed, false when none waited' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: IN_PERSON_ONLY }
+
+  /v1/secret-shares:
+    post:
+      operationId: secretShareCreate
+      summary: Make a secret share, or a request someone else fills
+      description: |
+        With content, a share: the secret is encrypted and stored, the named people are told in the
+        bell, and the answer carries the pickup page. With `kind: request`, an empty share: the
+        people in `depositors` are told, and the answer carries `deposit_url` with a deposit token
+        for anyone else to fill it with no account. The maker sets every term (recipients,
+        protection, retention) and a depositor sets none.
+
+        Under `open` and `sealed` with `recipients.code` the node makes the pickup code and returns it
+        in `code`, this once; it is stored only as an HMAC. Under `e2e` the browser makes the code
+        and sends `code_verifier`, and an `e2e` request cannot have a code (E2E_REQUEST_NO_CODE).
+        Every named recipient of an `e2e` share must have a registered browser (NO_DEVICE_KEY).
+
+        Everything is checked before anything is written: terms, people, organism membership, the
+        node's encryption key, then the content. A text secret whose service the node knows is
+        checked once against that service (`share.check`).
+
+        An agent needs `secrets:share`, which no wildcard carries.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SecretShareCreateBody' }
+      responses:
+        '201':
+          description: Made. `code` and `deposit_token` are in this answer only.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareCreatedEnvelope' }
+        '400':
+          description: >-
+            INVALID_KIND, INVALID_NAME, INVALID_NOTE, INVALID_PROTECTION, TOO_MANY_PEOPLE (over 50),
+            ORGANISM_REQUIRED (recipients.organism without `organism`), E2E_NAMED_ONLY (`e2e` with
+            recipients.organism or recipients.agents), INVALID_RETENTION, INVALID_MAX_PICKUPS,
+            INVALID_EXPIRES_AT, NO_RECIPIENTS, UNKNOWN_PERSON (a person or depositor with no account
+            on this node), E2E_REQUEST_NO_CODE, INVALID_FORMAT, INVALID_CONTENT, INVALID_ENVELOPE,
+            INVALID_E2E_KEYS, INVALID_CODE_VERIFIER or INVALID_REQUEST_DAYS. Nothing was written.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED (an agent without secrets:share) or NOT_A_MEMBER (the maker is not an active member of `organism`) }
+        '409': { description: 'NO_DEVICE_KEY: a named recipient of an `e2e` share has no registered browser' }
+        '413': { description: 'SECRET_TOO_LARGE: over the node''s limit (secrets.share_max_bytes, 1 MB by default)' }
+        '503': { description: 'SECRET_STORE_UNAVAILABLE: this node has no encryption key, and nothing was written' }
+    get:
+      operationId: secretShareList
+      summary: What I made, what waits for me, what I am asked to fill, and my organisms' vaults
+      description: |
+        Four lists of share views, for the caller's person: `made`, `for_me` (ready shares that name
+        them or are open to their organisms' members), `to_fill` (waiting requests that name them as
+        a depositor) and `organisms` (shares in the vaults of organisms they create or administer).
+        Shares and requests whose time ran out are ended first. Never content.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The four lists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareListsEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED }
+
+  /v1/secret-shares/{id}:
+    get:
+      operationId: secretShareGet
+      summary: One share with its events
+      description: |
+        For its maker or an admin of its organism (every event), a person it names or their allowed
+        agent, or a person asked to fill it. Anyone else gets the same 404 as for an id that does
+        not exist. A caller who does not manage it sees no other person's pickups.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^shr_[a-z2-7]{20}$' } }
+      responses:
+        '200':
+          description: The view with `events`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareViewEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED }
+        '404': { description: 'NOT_FOUND: no such share, or it is not yours to see' }
+
+  /v1/secret-shares/{id}/card:
+    get:
+      operationId: secretShareCard
+      summary: What the pickup and deposit pages show before sign-in (public)
+      description: |
+        The name, the maker, the kind, the status, and whether a code and a sign-in are needed. Never
+        the note, which may describe the secret, and never content. The share id is the only thing
+        asked for.
+      tags: [Secret shares]
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The card
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareCardEnvelope' }
+        '404': { description: NOT_FOUND }
+
+  /v1/secret-shares/{id}/deposit-card:
+    get:
+      operationId: secretShareDepositCard
+      summary: The deposit page's card, with the request's deposit token (public)
+      description: |
+        The card plus the maker's note and, for an `e2e` request, the public keys of the named
+        recipients' browsers to encrypt to. The token goes in the `X-Deposit-Token` header, so it
+        stays out of the address and the logs. A missing or wrong token gets the same 404 as an id
+        that does not exist.
+      tags: [Secret shares]
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - name: X-Deposit-Token
+          in: header
+          required: true
+          description: The token from the deposit link's fragment (`#t=`).
+          schema: { type: string }
+      responses:
+        '200':
+          description: The card, the note and the device keys
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareDepositCardEnvelope' }
+        '404': { description: 'NOT_FOUND: no such request, or the token does not open it' }
+
+  /v1/secret-shares/{id}/deposit:
+    post:
+      operationId: secretShareDeposit
+      summary: Fill a request, signed in
+      description: |
+        For a person the request names as a depositor (or their agent with `secrets:share`), or a
+        signed-in caller who sends the request's `token`. Only a waiting request is filled, once; the
+        maker's terms stay as they are. The maker and the named recipients are told. The answer is the
+        card with this deposit's `check`.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SecretShareDepositBody' }
+      responses:
+        '200':
+          description: Filled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareDepositedEnvelope' }
+        '400': { description: 'INVALID_FORMAT, INVALID_CONTENT, INVALID_ENVELOPE or INVALID_E2E_KEYS' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED }
+        '404': { description: 'NOT_FOUND: no such request, or you are not asked to fill it' }
+        '409': { description: 'NOT_WAITING: already filled, ended or withdrawn' }
+        '410': { description: 'REQUEST_ENDED: the time to fill it ran out; the request is ended now' }
+        '413': { description: SECRET_TOO_LARGE }
+        '503': { description: SECRET_STORE_UNAVAILABLE }
+
+  /v1/secret-shares/{id}/deposit-with-token:
+    post:
+      operationId: secretShareDepositWithToken
+      summary: Fill a request with the link's deposit token (no account needed)
+      description: |
+        The body's `token` is the credential. Without a session the deposit is recorded as made
+        through the link (`deposited_by: link`); with one, the signed-in principal is recorded. A
+        missing or wrong token is refused with 404 before the handler runs. Otherwise the same rules
+        and answers as POST /v1/secret-shares/{id}/deposit.
+      tags: [Secret shares]
+      security:
+        - {}
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SecretShareDepositBody'
+                - type: object
+                  required: [token]
+      responses:
+        '200':
+          description: Filled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareDepositedEnvelope' }
+        '400': { description: 'INVALID_FORMAT, INVALID_CONTENT, INVALID_ENVELOPE or INVALID_E2E_KEYS' }
+        '404': { description: 'NOT_FOUND: no such request, or the link is not valid' }
+        '409': { description: NOT_WAITING }
+        '410': { description: REQUEST_ENDED }
+        '413': { description: SECRET_TOO_LARGE }
+        '503': { description: SECRET_STORE_UNAVAILABLE }
+
+  /v1/secret-shares/{id}/pickup:
+    post:
+      operationId: secretSharePickup
+      summary: Pick a share up, signed in
+      description: |
+        The caller qualifies as a person the share names, a member of its organism (when the maker
+        chose `recipients.organism`), the allowed agent of either, or with `code`. Every check runs
+        before one pickup is counted, and the count is atomic: two callers racing for the last pickup
+        get one share and one 410.
+
+        The protection decides what comes back:
+        - `open`: the content, to anyone allowed, agents included.
+        - `sealed`: a person gets the content. An agent gets 403 SEALED for `to: reveal` and may use
+          `to: vault`, which copies the secret into its owner's vault and answers the vault entry.
+        - `e2e`: the envelope and the caller's own wrapped keys, for the browser to open. No agent,
+          no vault copy.
+
+        `to: vault` takes text and pairs up to 4096 bytes (the vault's limit); a file or anything
+        larger is TOO_LARGE_FOR_VAULT. The maker is told of every pickup. When the pickup was the
+        last one the retention allows, the share ends and its content is removed.
+
+        Wrong codes count per share and per address: after 10 in 15 minutes the answer is 429 until
+        the window ends.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SecretSharePickupBody' }
+      responses:
+        '200':
+          description: Picked up
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretSharePickupEnvelope' }
+        '400': { description: 'E2E_NO_VAULT, TOO_LARGE_FOR_VAULT, INVALID_SECRET_NAME (the vault name) or INVALID_SECRET_HOST' }
+        '401': { description: 'CODE_REQUIRED: the share opens with its pickup code, and none was sent' }
+        '403': { description: 'SCOPE_DENIED, WRONG_CODE, AGENTS_NOT_ALLOWED (a named person''s agent, and the maker did not allow agents), NOT_A_RECIPIENT (the maker or an organism admin who is not named to pick it up), SEALED (an agent asked for the content of a sealed share) or E2E_PERSON_ONLY' }
+        '404': { description: 'NOT_FOUND: no such share, or it is not yours to pick up' }
+        '409': { description: 'NO_DEVICE_KEY: the `e2e` share was not sealed for any of your registered browsers' }
+        '410': { description: 'NOT_AVAILABLE: revoked, ended (pickups or time ran out), or a request not yet filled' }
+        '429': { description: 'TOO_MANY_TRIES: too many wrong codes; wait 15 minutes' }
+        '503': { description: SECRET_STORE_UNAVAILABLE }
+
+  /v1/secret-shares/{id}/pickup-with-code:
+    post:
+      operationId: secretSharePickupWithCode
+      summary: Pick a share up with its pickup code (signed in only when the maker asked)
+      description: |
+        The body's `code` (or `code_verifier` for `e2e`) is the credential, compared before the
+        handler runs. A share that does not open with a code, or a call without one, gets 404. When
+        the maker set `code_login`, a caller with no session gets 401 SIGN_IN_REQUIRED, and so does
+        `to: vault` without a session. A code holder with no session is whoever holds the code: under
+        `sealed` the node hands the content over, which the maker chose by choosing a code alone.
+        A signed-in agent with the code is still bound by the protection. Otherwise the same rules
+        and answers as POST /v1/secret-shares/{id}/pickup.
+      tags: [Secret shares]
+      security:
+        - {}
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SecretSharePickupBody' }
+      responses:
+        '200':
+          description: Picked up. `share` is the card for a caller with no session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretSharePickupEnvelope' }
+        '400': { description: 'E2E_NO_VAULT, TOO_LARGE_FOR_VAULT, INVALID_SECRET_NAME or INVALID_SECRET_HOST' }
+        '401': { description: SIGN_IN_REQUIRED }
+        '403': { description: 'WRONG_CODE, SCOPE_DENIED, SEALED or E2E_PERSON_ONLY' }
+        '404': { description: 'NOT_FOUND: no such share, it does not open with a code, or no code was sent' }
+        '410': { description: NOT_AVAILABLE }
+        '429': { description: TOO_MANY_TRIES }
+        '503': { description: SECRET_STORE_UNAVAILABLE }
+
+  /v1/secret-shares/{id}/revoke:
+    post:
+      operationId: secretShareRevoke
+      summary: Withdraw a share or a request
+      description: |
+        For its maker (or the maker's agent with `secrets:share`) and the creator and admins of its
+        organism. The content and the wrapped keys are removed at once and pickups stop. Copies
+        already picked up stay where they went: rotate the key at its service when that matters.
+        A share that already ended answers its view unchanged. A person the share names gets
+        NOT_MAKER; anyone else the same 404 as for an id that does not exist.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The view after the revoke, with its events
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecretShareViewEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: SCOPE_DENIED or NOT_MAKER }
+        '404': { description: NOT_FOUND }
+
+  /v1/vault/device-keys:
+    get:
+      operationId: vaultDeviceKeyList
+      summary: My browsers' public keys for end-to-end shares
+      description: An agent needs secrets:share; the account holder in person needs no word.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The keys of the caller's person, with their labels
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VaultDeviceKeyListEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'SCOPE_DENIED: an agent without secrets:share' }
+    post:
+      operationId: vaultDeviceKeyRegister
+      summary: Register this browser's public key (account holder in person)
+      description: |
+        The browser makes a P-256 key pair, keeps the private key where script cannot export it, and
+        sends the public key. Registering the same key again updates its label. Only the account
+        holder signed in registers a key: an agent that could add one could receive every
+        end-to-end share made to its owner afterwards. At most 20 keys per account.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VaultDeviceKeyRegisterBody' }
+      responses:
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VaultDeviceKeyEnvelope' }
+        '400': { description: 'INVALID_PUBLIC_KEY: not a P-256 public JWK, or it carries a private part' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY }
+        '409': { description: TOO_MANY_DEVICE_KEYS }
+
+  /v1/vault/device-keys/{keyId}:
+    delete:
+      operationId: vaultDeviceKeyRemove
+      summary: Remove one of my browser keys (account holder in person)
+      description: |
+        Shares already sealed for that key can no longer be opened on that browser. Only the account
+        holder signed in removes a key.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: keyId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VaultDeviceKeyRemovedEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY }
+        '404': { description: 'NOT_FOUND: no device key with that id on your account' }
+
+  /v1/vault/device-keys/of/{who}:
+    get:
+      operationId: vaultDeviceKeysOf
+      summary: A person's public browser keys, to encrypt a share to
+      description: |
+        `who` is an account name or a GHII on this node. Public keys are public by design, so anyone
+        signed in reads them (an agent with secrets:share); the labels are left out. A name with no
+        account, or a person with no registered browser, answers an empty list.
+      tags: [Secret shares]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: who, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The person's GHII and keys
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VaultDeviceKeysOfEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'SCOPE_DENIED: an agent without secrets:share' }
 
   /v1/ghii/login/passkey/options:
     post:

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.34.0 -- 2026-11-14 -- "Vault" under Account, after Access: the secrets a person shares and receives (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   v1.33.0 -- 2026-11-08 -- "Contexts" under Information, after Memory: the things a person keeps working on with their AI, each one record their AI shapes in chat (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  *   v1.32.0 -- 2026-11-07 -- "Receivers" under Automation, after Workflows: the addresses and keys outside programs write into one place of the person's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.31.0 -- 2026-11-02 -- "Data you share" under Account, before the Data Wallet, and in the basic menu (WP11).
@@ -695,6 +696,9 @@ export const SIDEBAR_GROUPS = [
     { id: 'dataWallet', labelKey: 'profile.tabs.dataWallet' },
     { id: 'storage', labelKey: 'profile.tabs.storage' },
     { id: 'access', labelKey: 'profile.tabs.access' },
+    /* Secrets a person shares and receives: keys, passwords, configurations and files (design
+     * canvas "Holvi", 2026-11-14). */
+    { id: 'vault', labelKey: 'profile.tabs.vault' },
     { id: 'exposure', labelKey: 'profile.tabs.exposure' },
     { id: 'agreements', labelKey: 'profile.tabs.agreements' },
   ] },

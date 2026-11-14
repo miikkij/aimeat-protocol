@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.19.0 — 2026-11-14 — Ends with applySecretShareSchema: secret_shares, secret_share_events,
+ *     secret_share_members and vault_device_keys (secret shares). Mirrors Postgres 0130.
  *   v1.18.0 — 2026-11-07 — Ends with applyCsmVersionSchema: csms.visibility, csms.version and the
  *     csm_versions table (CSM visibility and versions). Mirrors Postgres 0127.
  *   v1.17.0 — 2026-11-04 — Ends with applyEphemeralClaimSchema: ephemeral_claim, short-lived values every
@@ -44,6 +46,7 @@ import { applyWorkspaceRowRevisionSchema } from './schema-workspace-row-revision
 import { applyMcpUserCredentialSchema } from './schema-mcp-user-credentials.js';
 import { applyEphemeralClaimSchema } from './schema-ephemeral-claim.js';
 import { applyCsmVersionSchema } from './schema-csm-versions.js';
+import { applySecretShareSchema } from './schema-secret-shares.js';
 
 export function applySchemaTables4(db: Database.Database): void {
   db.exec(`
@@ -792,4 +795,6 @@ export function applySchemaTables4(db: Database.Database): void {
   applyEphemeralClaimSchema(db);
   // CSM visibility, version and the replaced versions, after csms exists in part 1 (Postgres 0127).
   applyCsmVersionSchema(db);
+  // Secret shares, their events, named people and device keys (Postgres 0130).
+  applySecretShareSchema(db);
 }

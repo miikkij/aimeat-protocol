@@ -22,6 +22,7 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.15.0 — 2026-11-14 — `secret-shares` → secrets:share.
  *   v1.14.0 — 2026-11-09 — An extension's own domain (`ext:<installer>/<name>`, sent by its ctx.changed())
  *     passes for a principal holding ext:invoke, the word a page needs to call the extension at all.
  *   v1.13.0 — 2026-11-07 — `ai-usage` passes for a principal holding ai:use: today's AI spend changed,
@@ -153,6 +154,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // owner ticked for the vault hears it. Deny-by-default would have handled it, but a name in the
   // map is a decision somebody made and an absence is a question nobody asked.
   secrets: 'secrets:manage',
+  // Secret shares made by, waiting for, or asked of this account (services/secret-shares/). The same
+  // fence as the vault: only a principal the owner ticked for shares hears that one changed.
+  'secret-shares': 'secrets:share',
 
   // Remote MCP servers. Gated on the READ word rather than the manage word, because the event says
   // "the set of attached servers changed" and that is what a reader of the list needs to hear —

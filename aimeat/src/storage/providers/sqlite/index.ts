@@ -15,6 +15,8 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   2026-11-14 — secretShareMethods bound (secret_shares, secret_share_events, secret_share_members,
+ *     vault_device_keys; schema-secret-shares.ts).
  *   2026-11-05 — sealedColumnMethods bound (the data key's re-encrypt job; codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 — ephemeralClaimMethods bound (ephemeral_claim; codebase analysis 2026-11-03,
@@ -101,6 +103,7 @@ import { financeMethods } from './methods/finance.js';
 import { heldNameMethods } from './methods/held-names.js';
 import { ephemeralClaimMethods } from './methods/ephemeral-claims.js';
 import { sealedColumnMethods } from './methods/sealed-columns.js';
+import { secretShareMethods } from './methods/secret-shares.js';
 import { identityMethods } from './methods/identity.js';
 import { identityExtraMethods } from './methods/identity-extras.js';
 import { knowledgeMethods } from './methods/knowledge.js';
@@ -317,6 +320,7 @@ Object.assign(
   heldNameMethods,
   ephemeralClaimMethods,
   sealedColumnMethods,
+  secretShareMethods,
   identityMethods,
   identityExtraMethods,
   knowledgeMethods,

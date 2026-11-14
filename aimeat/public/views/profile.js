@@ -10,6 +10,9 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-11-14 — The "Vault" tab (views/profile/vault-tab.js, id 'vault'): the secrets a person shares
+ *     and receives, and this browser's key for end-to-end shares
+ *     (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   2026-11-09 — A tab's module is imported when the tab first opens (TABS `load`, LazyTab), not with
  *     this file: a Settings page loaded all 53 tabs and 859 module files before (perf round 4).
  *   2026-11-08 — The "Contexts" tab (views/profile/contexts-tab.js, id 'contexts'): the person's
@@ -150,6 +153,7 @@ const TABS = [
   { id: 'federation',    key: 'profile.tabs.federation',     load: () => import('./profile/federation-tab.js').then(byDefault),     minTier: 'experienced' },
   { id: 'nodes',         key: 'profile.tabs.nodes',          load: () => import('./profile/nodes-tab.js').then(byDefault),          minTier: 'experienced' },
   { id: 'access',        key: 'profile.tabs.access',         load: () => import('./profile/access-tab.js').then(byDefault),         minTier: 'new' },
+  { id: 'vault',         key: 'profile.tabs.vault',          load: () => import('./profile/vault-tab.js').then(byDefault),          minTier: 'new' },
   { id: 'exposure',      key: 'profile.tabs.exposure',       load: () => import('./profile/exposure-tab.js').then(byDefault),       minTier: 'new' },
   { id: 'agreements',    key: 'profile.tabs.agreements',     load: () => import('./profile/agreements-tab.js').then(byDefault),     minTier: 'new' },
   { id: 'sharedData',    key: 'profile.tabs.sharedData',     load: () => import('./profile/shared-data-tab.js').then(byDefault),    minTier: 'new' },

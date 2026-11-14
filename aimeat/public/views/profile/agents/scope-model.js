@@ -18,6 +18,7 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-11-14 — secrets:share, outside every wildcard: making, filling and picking up secret shares.
  *   2026-11-07 — csm:write, inside the wildcard: make, change and delete the account's data
  *     descriptions (CSM) and choose who reads each one.
  *   2026-11-02 — exchange:invoke, split out of exchange:write: calling an app tool.
@@ -157,6 +158,10 @@ export const NOT_IN_WILDCARD = [
   // "Full access" is one click, and nobody clicking it is deciding that an agent may rotate the key
   // their extensions call the world with.
   'secrets:manage',
+  // ── Added 2026-11-14 ─────────────────────────────────────────────────────────────────────────
+  // Secret shares: making, filling and picking up shares in the owner's name. Unlike the vault, a
+  // share hands content out, and a key someone gave the owner is not for an agent to take by default.
+  'secrets:share',
   // ── Added 2026-09-07 ─────────────────────────────────────────────────────────────────────────
   // Removing a message from the owner's own mailbox, as the owner. A separate word from
   // send-as-owner and not a widening of it: replying for someone is additive and they can read what
@@ -337,7 +342,10 @@ export const SCOPE_DOMAINS = [
   //   rather than a read and a write: the list is names and dates, and an agent that could see a
   //   name and not set it has learned nothing it can act on. Without a row here an owner could not
   //   grant it from this page at all.
-  { key: 'secrets',  permissions: ['manage'] },
+  // secrets:share — make secret shares and requests in the owner's name, fill a request, and pick up a
+  //   share whose maker allowed agents (services/secret-shares/). Outside every wildcard: a share hands
+  //   content out, so "Full access" must not mean an agent may take a key someone gave its owner.
+  { key: 'secrets',  permissions: ['manage', 'share'] },
   // publish:public — make something public without a request to the owner (plan doc-mvcn6c7e4e5q,
   //   V4.1). Outside every wildcard (NOT_IN_WILDCARD above).
   { key: 'publish',  permissions: ['public'] },

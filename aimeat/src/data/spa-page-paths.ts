@@ -16,6 +16,8 @@
  * @structure SPA_PAGE_PATHS
  * @usage import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
  * @version-history
+ *   v1.3.0 — 2026-11-14 — /v1/secret-pickup and /v1/secret-deposit, the pages a secret share's link and
+ *     a secret request's link open (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
  *   v1.2.0 — 2026-11-05 — /v1/provenance-open, the page an AI label's record link reaches on a
  *     signed-in-only node.
  *   v1.1.0 — 2026-11-01 — /v1/shared-data, the page a share link opens (WP9b).
@@ -76,6 +78,8 @@ export const SPA_PAGE_PATHS: readonly string[] = [
   '/v1/secret-allow', // The owner allows an extension to send a secret to one address (SPA, ?secret=&extension=&host=)
   '/v1/eco-capability-allow', // The owner allows another account's capability to run one action of their outside app (SPA, ?app=&capability=)
   '/v1/shared-data', // A person with no account opens a share link: the terms, the key once, the connection file (SPA, ?invite=; services/parties/invite.ts)
+  '/v1/secret-pickup', // A secret share's pickup page: signed in, with a code, or opened on this device (SPA, ?share=; services/secret-shares/)
+  '/v1/secret-deposit', // A secret request's deposit page, with the link's token after # or signed in (SPA, ?share=#t=; services/secret-shares/)
   '/v1/provenance-open', // An AI label's "how this was made" record, read with the session on a signed-in-only node (SPA, ?id=; middleware/content-access-gate.ts)
   // The public dataset page /v1/dataset/{owner}/{name} is parameterized, so routes/portal.ts serves it
   // with its own head and the content access gate names it with a pattern of its own.

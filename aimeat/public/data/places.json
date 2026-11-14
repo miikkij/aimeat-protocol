@@ -225,6 +225,13 @@
           { "id": "ac-addresses", "num": "07", "labelKey": "accesspage.secAddresses" },
           { "id": "ac-roads", "num": "08", "labelKey": "accesspage.secRoads" }
         ] },
+        { "id": "vault", "labelKey": "profile.tabs.vault", "sections": [
+          { "id": "vs-for-me", "num": "01", "labelKey": "secretShares.secForMe" },
+          { "id": "vs-to-fill", "num": "02", "labelKey": "secretShares.secToFill" },
+          { "id": "vs-made", "num": "03", "labelKey": "secretShares.secMade" },
+          { "id": "vs-organisms", "num": "04", "labelKey": "secretShares.secOrganisms" },
+          { "id": "vs-device", "num": "05", "labelKey": "secretShares.secDevice" }
+        ] },
         { "id": "exposure", "labelKey": "profile.tabs.exposure", "sections": [
           { "id": "ex-conflicts", "num": "01", "labelKey": "exposure.cls.conflictsTitle" },
           { "id": "ex-data", "num": "02", "labelKey": "exposure.data.title" },

@@ -31,6 +31,7 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-11-14 — secrets:share (SECRETS_SHARE_SCOPE), outside the wildcard: secret shares hand content out.
  *   2026-11-07 — receivers:manage (RECEIVERS_MANAGE_SCOPE) joins the own-tick family: a receiver key
  *     an outside program writes into the owner's data with.
  *   2026-11-02 — exchange:invoke is covered by exchange:write (COVERED_BY_WIDER_WORD), the split of the app tool call.
@@ -244,6 +245,15 @@ export const THEME_WRITE_SCOPE = 'site:theme-write';
 export const SECRETS_MANAGE_SCOPE = 'secrets:manage';
 
 /**
+ * Secret shares (services/secret-shares/): make a share or a request in the owner's name, fill a
+ * request, and pick up a share whose maker allowed agents. Unlike the vault, a share hands content
+ * out, so the word is outside the wildcard for the same reason secrets:manage is: "Full access"
+ * must not mean an agent may take a key someone gave its owner. Nobody is grandfathered onto it,
+ * because the capability did not exist before (2026-11-14).
+ */
+export const SECRETS_SHARE_SCOPE = 'secrets:share';
+
+/**
  * Attaching another MCP server to this account, or removing one.
  *
  * THREE WORDS, AND ONLY THIS ONE IS OUT. `mcp:read` (what is attached) and `mcp:use` (call a tool
@@ -378,7 +388,7 @@ const OWN_TICK_SCOPES = [
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
     WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, OPERATOR_ADMIN_SCOPE,
     COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
-    MCP_MANAGE_SCOPE,
+    SECRETS_SHARE_SCOPE, MCP_MANAGE_SCOPE,
     ...OWN_TICK_SCOPES,
 ];
 

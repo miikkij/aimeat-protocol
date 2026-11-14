@@ -31,6 +31,8 @@
  *     const participant = credentialOf(req, 'dsp-participant');
  *   });
  * @version-history
+ *   v1.6.0 — 2026-11-14 — 'secret-share-code' and 'secret-share-deposit' (services/secret-shares/): a
+ *     share's pickup code and a request's deposit token, each with its one verifier.
  *   v1.5.0 — 2026-11-07 — 'receiver' (services/receivers/verify.ts): the route's :owner and :name and
  *     the key in the Authorization header.
  *   v1.4.0 — 2026-11-05 — 'intake-visitor', 'docsign-wallet', 'party-optional', and the kinds of another
@@ -57,6 +59,8 @@ import { visitorThread, type VisitorThread } from '../services/intake/visitor-th
 import { walletSessionFor, openWalletSessionByState, type WalletSession } from '../services/docsign/eudi.js';
 import { DocsignError } from '../services/docsign/records.js';
 import { verifyReceiverRequest, type ReceiverContext } from '../services/receivers/verify.js';
+import { verifyShareCode } from '../services/secret-shares/pickup.js';
+import { verifyDepositToken } from '../services/secret-shares/service.js';
 import { logger } from '../utils/logger.js';
 import {
     federationPeer, packageSeller, packageClaimant,
@@ -78,6 +82,8 @@ export interface CredentialPrincipals {
     'package-seller': PackageSeller;
     'package-claimant': PackageClaimant;
     receiver: ReceiverContext;
+    'secret-share-code': { shareId: string };
+    'secret-share-deposit': { shareId: string };
 }
 
 /** A UCP platform: the profile its UCP-Agent header names, whose keys verified the signature when one was sent. */
@@ -105,6 +111,10 @@ export interface StrategyOptions {
     'package-claimant': { config: AimeatConfig; purpose: string };
     /** The receiver is the route's :owner and :name; the key is the Authorization header's. */
     receiver: { storage: Storage; config: AimeatConfig };
+    /** The share is the route's :id; the code is the body's `code` or `code_verifier`. */
+    'secret-share-code': { storage: Storage; config: AimeatConfig };
+    /** The request is the route's :id; the token is the body's `token`. */
+    'secret-share-deposit': { storage: Storage; config: AimeatConfig };
 }
 
 /** A principal on the request, tagged with its kind. */
@@ -265,8 +275,29 @@ const receiverKey: Strategy<'receiver'> = deps => async (req, res) => {
     return null;
 };
 
+/** A secret share's pickup code (services/secret-shares/pickup.ts verifyShareCode, the one verifier). */
+const secretShareCode: Strategy<'secret-share-code'> = deps => async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const offered = typeof body.code === 'string' ? body.code : typeof body.code_verifier === 'string' ? body.code_verifier : '';
+    const v = await verifyShareCode(deps, String(req.params.id ?? ''), offered, req.ip ?? '', null);
+    if (v.ok) return { shareId: v.share.id };
+    res.status(v.status).json(error(deps.config.nodeId, v.code, v.message));
+    return null;
+};
+
+/** A secret request's deposit token (services/secret-shares/service.ts verifyDepositToken, the one verifier). */
+const secretShareDeposit: Strategy<'secret-share-deposit'> = deps => async (req, res) => {
+    const token = (req.body as Record<string, unknown> | undefined)?.token;
+    const share = await verifyDepositToken(deps, String(req.params.id ?? ''), typeof token === 'string' ? token : '');
+    if (share) return { shareId: share.id };
+    res.status(404).json(error(deps.config.nodeId, 'NOT_FOUND', 'No such secret request, or the link is not valid.'));
+    return null;
+};
+
 const STRATEGIES: { [K in CredentialKind]: Strategy<K> } = {
     receiver: receiverKey,
+    'secret-share-code': secretShareCode,
+    'secret-share-deposit': secretShareDeposit,
     'dsp-participant': dspParticipant,
     party: outsideParty,
     'app-party': appParty,

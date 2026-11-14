@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-14 — SecretShareRepository: secret shares and requests, their events, named people and
+ *     the browsers' end-to-end device keys (types/secret-shares.ts).
  *   2026-11-05 — SealedColumnRepository: the data key's re-encrypt job reads every sealed column a
  *     page at a time and writes a resealed value only over the value it read (codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
@@ -163,6 +165,7 @@ import type { McpServerRepository } from './repositories/mcp-server.repository.j
 import type { HeldAccountNameRepository } from './repositories/held-names.repository.js';
 import type { EphemeralClaimRepository } from './repositories/ephemeral-claim.repository.js';
 import type { SealedColumnRepository } from './repositories/sealed-column.repository.js';
+import type { SecretShareRepository } from './repositories/secret-share.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository,
@@ -210,6 +213,7 @@ export interface Storage extends
   HeldAccountNameRepository,
   EphemeralClaimRepository,
   SealedColumnRepository,
+  SecretShareRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

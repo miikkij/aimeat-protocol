@@ -30,6 +30,7 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.8.3 — 2026-11-14 — aimeat_secret_share_create joins AI_PROVENANCE_REVIEWED_WITHOUT (a credential and its note).
  *   v1.8.2 — 2026-11-02 — aimeat_files_write joins AI_PROVENANCE_REVIEWED_WITHOUT (the person's own SharePoint).
  *   v1.8.1 — 2026-10-21 — aimeat_dm_group_create joins AI_PROVENANCE_REQUIRED (group chat).
  *   v1.8.0 — 2026-10-16 — Assertion 8, label views (lib/check-ai-label-views.ts): every view that shows
@@ -367,6 +368,13 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // promises is that no such row exists. "Who wrote this" has no answer here, because nobody wrote
   // it; Stripe did.
   'aimeat_secret_set',
+  // DECIDED, 2026-11-14 (the session that built secret shares; the developer reviews it with the
+  // build). The content is a credential, as for aimeat_secret_set. The one free text is `note`: a
+  // short instruction about that credential (which rights the key needs, which workspace), shown
+  // only to the people the share names. Who wrote it is already on the share itself: `created_by`
+  // names the principal, an agent's GAII when an agent made it, and the share's events name every
+  // actor. A separate provenance record would be a second, durable row about a credential.
+  'aimeat_secret_share_create',
   // DECIDED, Phase 8b. A draft is inline-only staging that nobody but its author can see, and its
   // content is stamped at PUBLISH by the one publish path. A record minted at save time would
   // describe bytes that were never shown to anyone and that the next save replaces — and it would

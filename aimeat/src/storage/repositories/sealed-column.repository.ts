@@ -25,6 +25,8 @@
  *   const rows = await storage.listSealedColumn('connection.credential', { after: lastId, limit: 100 });
  *   const written = await storage.swapSealedColumn('connection.credential', row.id, row.value, resealed);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — 'secret-share.ciphertext' (a secret share's content), and a spec's `exclude`
+ *     filter, which keeps a share's end-to-end envelope out of the listing and out of every swap.
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  */
 
@@ -36,6 +38,11 @@ export interface SealedColumnSpec {
   /** The column with the sealed value; null for `memory`, which is listed by id only. */
   column: string | null;
   json: boolean;
+  /**
+   * Rows whose `column` equals `value` are not the data key's: they are never listed and never
+   * written (a secret share with protection `e2e` holds an envelope only the recipient's browser opens).
+   */
+  exclude?: { column: string; value: string };
 }
 
 export const SEALED_COLUMNS = {
@@ -46,6 +53,7 @@ export const SEALED_COLUMNS = {
   'mcp-user-credential.credential': { pg: 'McpUserCredential', sqlite: 'mcp_user_credentials', ids: ['serverId', 'ownerGhii'], column: 'credential', json: false },
   'company-smtp.password': { pg: 'CompanySmtp', sqlite: 'company_smtp', ids: ['companyId'], column: 'passwordEnc', json: false },
   'secret.ciphertext': { pg: 'Secret', sqlite: 'secrets', ids: ['ownerGaii', 'name'], column: 'ciphertext', json: false },
+  'secret-share.ciphertext': { pg: 'SecretShare', sqlite: 'secret_shares', ids: ['id'], column: 'ciphertext', json: false, exclude: { column: 'protection', value: 'e2e' } },
   'ghii.totp-secret': { pg: 'Ghii', sqlite: 'ghiis', ids: ['ghii'], column: 'totpSecret', json: false },
   'system-setting.value': { pg: 'SystemSetting', sqlite: 'system_settings', ids: ['key'], column: 'value', json: false },
   'extension.config': { pg: 'Extension', sqlite: 'extensions', ids: ['name'], column: 'config', json: true },
