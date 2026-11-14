@@ -68,7 +68,7 @@
       "digest": "sha256:721df0d789228c1377de7586"
     },
     "node:aimeat-context": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/services/context/index-line.ts",
         "aimeat/src/services/mcp-build-inputs.ts",
@@ -76,7 +76,7 @@
         "aimeat/src/services/context/check.ts",
         "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:eb66ed922a0db8baf0cdd0e2"
+      "digest": "sha256:908328df04f194f1c3a83e82"
     },
     "node:aimeat-find-my-app": {
       "reviewedOn": "2026-11-14",
@@ -136,13 +136,13 @@
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-14",
       "watches": [
         "aimeat/src/data/organism-shapes.ts",
         "aimeat/src/services/organism-lifecycle.ts",
         "aimeat/src/services/organism-shape-apply.ts"
       ],
-      "digest": "sha256:14a4e51677ae293f706034ec",
+      "digest": "sha256:49d7ab37ef125d2d42b93fa7",
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:565f55743540f8f6054a63a8",
+      "digest": "sha256:4c959c8707e40faa9e3f0559",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -812,7 +812,7 @@
       "aimeat/public/views/home/journey-prompts.js": "24765a8656779b80"
     },
     "node:aimeat-organisms": {
-      "aimeat/src/data/organism-shapes.ts": "c7048e0e20dc36ac",
+      "aimeat/src/data/organism-shapes.ts": "d78ae356b66efad4",
       "aimeat/src/services/organism-lifecycle.ts": "ff839cb5056c0846",
       "aimeat/src/services/organism-shape-apply.ts": "ffc09f5c134e5fb8"
     },
@@ -841,7 +841,7 @@
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
       "aimeat/src/services/owner-erasure.ts": "dd1af74cc96ea366",
       "aimeat/src/services/archive.ts": "8a08d72e2732e5ed",
-      "aimeat/src/mcp/organisms.ts": "ffcf31f00d0cc0f0"
+      "aimeat/src/mcp/organisms.ts": "78311ac4ded02b9a"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",
@@ -907,7 +907,7 @@
     },
     "node:aimeat-context": {
       "aimeat/src/services/context/index-line.ts": "635f3d9f01f7cc1d",
-      "aimeat/src/services/mcp-build-inputs.ts": "30340abebd1814dc",
+      "aimeat/src/services/mcp-build-inputs.ts": "b072fc92778f9ae0",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
       "aimeat/src/services/context/check.ts": "472918ab30ee8263",
       "aimeat/src/services/memory-versions/history.ts": "1e7cb0431167c4d5"
