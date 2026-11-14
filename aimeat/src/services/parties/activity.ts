@@ -21,9 +21,14 @@
  *   counts it, so the owner sees how many reads the log could not keep. The first entries of the month
  *   stay; a refused read past the cap is counted the same way.
  * @structure READ_LOG_MONTH_CAP · PartyReadEntry · PartyReadLog · logPartyRead · noteKeyUse ·
- *   noteFailedAttempt · takeReadSlot · flushOwner · flushAll · readLogKey · parseReadLog
+ *   noteFailedAttempt · takeReadSlot · flushOwner · flushAll · readLogKey · parseReadLog ·
+ *   holdPartyActivityForErasure
  * @usage logPartyRead(storage, ownerGhii, { at, share, party, uid, what, verdict: 'served' });
  * @version-history
+ *   v1.2.0 — 2026-11-14 — holdPartyActivityForErasure: before the erasure cascade, the owner's waiting
+ *     read entries and counters are dropped and a write in progress answers, and none of the owner's is
+ *     kept until it ends. A waiting entry wrote the month's read log back under the erased GHII
+ *     (register finding f-2026-11-13-write-buffers-and-erasure).
  *   v1.1.0 — 2026-11-01 — A served entry names the version read when it is known (plan D6.4).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.9, D3.5).
  */
@@ -31,6 +36,7 @@ import type { Storage } from '../../storage/interface.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
 import { PARTIES_KEY, PARTY_READS_PREFIX, parsePartiesValue } from './contract.js';
+import { ErasureHolds, type ErasedAccount } from '../erasure/holds.js';
 
 /** The most read entries one owner's month record keeps; past it they are counted in `dropped`. */
 export const READ_LOG_MONTH_CAP = 4000;
@@ -86,6 +92,9 @@ interface OwnerPending {
 }
 
 const pending = new Map<string, OwnerPending>();
+/** The owners whose erasure runs now, whose entries are not kept, and the writes in progress an
+ *  erasure waits for (holdPartyActivityForErasure). */
+const erasing = new ErasureHolds();
 
 function pendingOf(storage: Storage, ownerGhii: string): OwnerPending {
     let p = pending.get(ownerGhii);
@@ -109,6 +118,7 @@ function scheduleTouchFlush(ownerGhii: string, p: OwnerPending): void {
 
 /** A key of the party was used: the key's lastUsedAt and the party's lastSeenAt move, at most once a minute. */
 export function noteKeyUse(storage: Storage, ownerGhii: string, uid: string, kid: string, at = new Date().toISOString()): void {
+    if (erasing.covers(ownerGhii)) return;
     const p = pendingOf(storage, ownerGhii);
     const t = touchOf(p, uid);
     t.lastSeenAt = at;
@@ -118,6 +128,7 @@ export function noteKeyUse(storage: Storage, ownerGhii: string, uid: string, kid
 
 /** A wrong key was presented for the party (D2.9). */
 export function noteFailedAttempt(storage: Storage, ownerGhii: string, uid: string): void {
+    if (erasing.covers(ownerGhii)) return;
     const p = pendingOf(storage, ownerGhii);
     touchOf(p, uid).failed++;
     scheduleTouchFlush(ownerGhii, p);
@@ -125,6 +136,8 @@ export function noteFailedAttempt(storage: Storage, ownerGhii: string, uid: stri
 
 /** One read, served or refused, for the owner's read log. */
 export function logPartyRead(storage: Storage, ownerGhii: string, entry: PartyReadEntry): void {
+    // An owner being erased: the cascade deletes the read log, so it is not started again.
+    if (erasing.covers(ownerGhii)) return;
     const p = pendingOf(storage, ownerGhii);
     p.reads.push(entry);
     if (p.readTimer) return;
@@ -137,17 +150,17 @@ async function flushReads(ownerGhii: string): Promise<void> {
     if (!p) return;
     if (p.readTimer) { clearTimeout(p.readTimer); p.readTimer = undefined; }
     const batch = p.reads.splice(0);
-    if (!batch.length) return;
+    if (!batch.length || erasing.covers(ownerGhii)) return;
     // An entry belongs to the month it happened in; a batch across a month boundary writes two records.
     const byKey = new Map<string, PartyReadEntry[]>();
     for (const e of batch) { const k = readLogKey(e.at); (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(e); }
     for (const [key, entries] of byKey) {
         const month = key.slice(PARTY_READS_PREFIX.length);
         try {
-            await updateRecord(p.storage, ownerGhii, key, v => parseReadLog(v, month), cur => {
+            await erasing.track(updateRecord(p.storage, ownerGhii, key, v => parseReadLog(v, month), cur => {
                 const room = Math.max(0, READ_LOG_MONTH_CAP - cur.entries.length);
                 return { month, entries: [...cur.entries, ...entries.slice(0, room)], dropped: cur.dropped + Math.max(0, entries.length - room) };
-            }, { tag: 'party-reads' });
+            }, { tag: 'party-reads' }));
         } catch (err) {
             logger.warn('party read log: a batch could not be written; those entries are lost', { owner: ownerGhii, entries: entries.length, error: String(err) });
         }
@@ -162,8 +175,9 @@ async function flushTouches(ownerGhii: string): Promise<void> {
     const touches = new Map(p.touches);
     p.touches.clear();
     p.lastTouchFlush = Date.now();
+    if (erasing.covers(ownerGhii)) return;
     try {
-        await updateRecord(p.storage, ownerGhii, PARTIES_KEY, parsePartiesValue, cur => {
+        await erasing.track(updateRecord(p.storage, ownerGhii, PARTIES_KEY, parsePartiesValue, cur => {
             let changed = false;
             const parties = cur.parties.map(party => {
                 const t = touches.get(party.uid);
@@ -178,7 +192,7 @@ async function flushTouches(ownerGhii: string): Promise<void> {
             });
             // A party deleted meanwhile is not written back: its touches are dropped.
             return changed ? { parties } : UNCHANGED;
-        }, { tag: 'parties' });
+        }, { tag: 'parties' }));
     } catch (err) {
         logger.warn('party counters: could not be written; the last minute of key use is lost', { owner: ownerGhii, error: String(err) });
     }
@@ -193,6 +207,24 @@ export async function flushOwner(ownerGhii: string): Promise<void> {
 /** Write every owner's pending entries now: the node-wide counts read this first. */
 export async function flushAll(): Promise<void> {
     for (const owner of [...pending.keys()]) await flushOwner(owner);
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no read entry or counter of the
+ * owner is kept from now on, a write in progress answers first so the cascade deletes what it stored,
+ * and the owner's waiting entries and counters are dropped with their timers. The returned function
+ * ends the hold, after the cascade.
+ */
+export async function holdPartyActivityForErasure(account: ErasedAccount): Promise<() => void> {
+    const release = erasing.hold(account);
+    await erasing.writesSettled();
+    for (const [owner, p] of [...pending]) {
+        if (!ErasureHolds.isOf(owner, account)) continue;
+        if (p.readTimer) clearTimeout(p.readTimer);
+        if (p.touchTimer) clearTimeout(p.touchTimer);
+        pending.delete(owner);
+    }
+    return release;
 }
 
 const windows = new Map<string, { start: number; count: number }>();

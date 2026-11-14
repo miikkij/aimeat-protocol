@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-14 — The outside party read log and counters hold the account for the length of the
+ *     erasure (holdPartyActivityForErasure): a waiting read entry wrote the month's read log back under
+ *     the erased GHII (register finding f-2026-11-13-write-buffers-and-erasure).
  *   2026-11-14 — The call timings hold the account for the length of the erasure
  *     (holdCallTimingsForErasure): a waiting duration wrote the public timing record back under the
  *     erased GHII (register finding f-2026-11-13-write-buffers-and-erasure).
@@ -127,6 +130,7 @@ import { holdWriteTallyForErasure } from './data-map/write-tally-buffer.js';
 import { holdScopeUseForErasure } from './scope-use.js';
 import { holdAgentRefusalsForErasure } from './agent/refusals.js';
 import { holdCallTimingsForErasure } from './call-timing.js';
+import { holdPartyActivityForErasure } from './parties/activity.js';
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app/member-erasure.js';
 import { eraseAppDesignSpecsOf } from './app/design-spec.js';
@@ -548,6 +552,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     releases.push(await holdScopeUseForErasure(account));
     releases.push(await holdAgentRefusalsForErasure(account));
     releases.push(await holdCallTimingsForErasure(account));
+    releases.push(await holdPartyActivityForErasure(account));
     // The cascade deletes the classification audit rows of the person's content and renames the person
     // where they were the reader of someone else's. A row that waits in memory, or is being written
     // while the cascade runs, would be stored after it and bring the erased person back into the log

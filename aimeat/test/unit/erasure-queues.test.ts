@@ -23,12 +23,15 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/erasure-queues.test.ts
  *   With PostgreSQL: node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/erasure-queues.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-14 — The outside party read log.
  *   v1.0.0 — 2026-11-14 — Initial: the call timings.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { recordCallDuration, flushCallTimings, timingKey } from '../../src/services/call-timing.js';
+import { logPartyRead, flushOwner, readLogKey } from '../../src/services/parties/activity.js';
+import { PARTY_READS_PREFIX } from '../../src/services/parties/contract.js';
 import { twoProviders, NODE, people, holdFirst, eraseDuring } from './erasure-test-kit.js';
 
 requirePostgresWhenAsked('erasure-queues');
@@ -67,5 +70,40 @@ describe.each(names)('%s: an in-process queue and an account erasure', provider 
       await eraseDuring(s, p, held, flushCallTimings(s));
     } finally { held.restore(); }
     expect(await s.getMemory(p.aliceGhii, timingKey('ext2', 'act'))).toBeNull();
+  });
+
+  // ── The outside party read log (services/parties/activity.ts) ──
+  const read = (uid: string) => ({ at: new Date().toISOString(), share: null, party: 'carol', uid, what: 'pkg', verdict: 'served' as const });
+
+  it('party read log, WAITING: no read log of the erased owner is stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    // The log writes two seconds later on its own timer; that timer is taken off here.
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    logPartyRead(s, p.aliceGhii, read('u1'));
+    logPartyRead(s, p.bobGhii, read('u2'));
+    vi.useRealTimers();
+
+    await eraseOwner(s, NODE, p.alice);
+    await flushOwner(p.aliceGhii);
+    await flushOwner(p.bobGhii);
+
+    expect(await s.getMemory(p.aliceGhii, readLogKey())).toBeNull();
+    // POSITIVE CONTROL: bob's read log is stored.
+    expect(await s.getMemory(p.bobGhii, readLogKey())).not.toBeNull();
+  });
+
+  it('party read log, BEING WRITTEN: a read log whose write is in progress is not stored after the erasure', async () => {
+    const s = st();
+    const p = await people(s);
+    // The write reads the month's record, then writes it: held after the read.
+    const held = holdFirst(s, 'getMemory', 'after', keyArg(PARTY_READS_PREFIX));
+    try {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      logPartyRead(s, p.aliceGhii, read('u3'));
+      vi.useRealTimers();
+      await eraseDuring(s, p, held, flushOwner(p.aliceGhii));
+    } finally { held.restore(); }
+    expect(await s.getMemory(p.aliceGhii, readLogKey())).toBeNull();
   });
 });
