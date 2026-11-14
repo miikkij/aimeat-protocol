@@ -183,6 +183,7 @@
     "check:storage-conformance": "tsx scripts/check-storage-conformance.ts",
     "check:denial-coverage:report": "tsx scripts/check-denial-coverage.ts",
     "check:denial-coverage:seed": "tsx scripts/check-denial-coverage.ts --seed",
+    "check:design-language-publish": "tsx scripts/check-design-language-publish.ts",
     "check:mcp-test-calls": "tsx scripts/check-mcp-test-calls.ts --strict",
     "check:mcp-test-calls:report": "tsx scripts/check-mcp-test-calls.ts",
     "check:route-scopes:report": "tsx scripts/check-route-scopes.ts",
