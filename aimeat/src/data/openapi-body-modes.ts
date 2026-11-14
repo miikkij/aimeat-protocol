@@ -97,6 +97,7 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/admin/federation/join',
     'POST /v1/admin/setup/register',
     'POST /v1/admin/subdomains',
+    'PATCH /v1/admin/subdomains/{subdomain}', // e2e-app-origin: 400 INVALID_ORIGIN
     'POST /v1/admin/usage/archive/prune',
     // Account, sign-in, secrets, settings (e2e-access-tokens, e2e-account-events, e2e-admin-stats-page,
     // e2e-account-doors: the registration rate limit counts the call, e2e-security, e2e-secrets,
@@ -171,6 +172,23 @@ const ROUTE_OWN_REFUSAL: readonly string[] = [
     'POST /v1/federation/peers',
     'POST /v1/federation/peer/request',
     'POST /v1/federation/trust-advisory',
+    'PUT /v1/federation/peers/{nodeId}/settlement-ceiling', // e2e-federation-peer-bounds: 400 INVALID_INPUT for 0
+    'PUT /v1/federation/peers/{nodeId}/relay-claim', // e2e-federation-relay-claim: 400 INVALID_INPUT
+    'POST /v1/memory/push-home', // e2e-federated-session: 400 INVALID_INPUT without key
+    'POST /v1/memory/list-remote', // e2e-memory-federation-remote: 400 INVALID_INPUT without peer_node_id
+    // Second pass: suites that run a node of their own (e2e-app-internet-opening, e2e-email-delivery,
+    // e2e-ai-jobs, e2e-ai-decide, e2e-refinery, e2e-agent-schedules, e2e-federated-visitor-names,
+    // e2e-package-repository, e2e-ai-gen-rules)
+    'POST /v1/apps/{owner}/{filename}/internet-opening', // 400 INVALID_INPUT without a reason
+    'POST /v1/organisms/{id}/invitations/email', // 400 INVALID_INPUT for a locale with no template
+    'POST /v1/ai/jobs', // 400 INVALID_BODY for an unknown op
+    'PUT /v1/ai/decide/settings', // 400 INVALID_BODY for a policy that is not an object
+    'PUT /v1/memory/{key}', // 403 on a reserved key for a body without version
+    'POST /v1/refinery/runs', // 400 INVALID_INPUT for a prefix that is not a definition name
+    'POST /v1/schedules', // 400 INVALID_AI_JOB for an output_visibility that is no visibility
+    'POST /v1/workflows/{id}/run', // 403 for a visitor, whose probe body names no mode
+    'PUT /v1/packages/{groupId}/entitlements/{nodeId}', // 400 INVALID_INPUT for an unknown channel
+    'PUT /v1/ai/gen-rules', // 400 GEN_RULES_INVALID with every problem named
 ];
 
 /** Routes observed in enforce mode, each with its reason. */
