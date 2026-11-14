@@ -9,6 +9,8 @@
  *     consent:groups (developer ruling 2026-11-13; structure programme 2026-11, unit 7).
  *   2026-11-13 — aimeat_knowledge_links takes relation (unit 3b).
  *   2026-11-13 — aimeat_group_create takes default_permissions (unit 3b).
+ *   2026-11-14 — aimeat_consent_list says whose consents it lists: the agent's own, or the account's with
+ *     consent:read-as-owner.
  *   2026-11-13 — aimeat_consent_list takes recipient (unit 3b).
  *   2026-11-13 — aimeat_instance_list takes platform (unit 3b).
  *   2026-11-13 — aimeat_catalogue_directory takes country and interests (unit 3b).
@@ -259,7 +261,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_consent_list',
-        description: 'List the consent records owned by your GHII (data pattern, recipient, purpose, scope, expiry, and status including revoked ones). Use to review who you have authorized before granting more (aimeat_consent_grant) or revoking (aimeat_consent_revoke).',
+        description: 'List the consent records you hold (data pattern, recipient, purpose, scope, expiry, and status including revoked ones): an agent sees the consents it granted itself; with consent:read-as-owner, which no wildcard carries, it sees every consent of its owner\'s account, the owner\'s own and the other agents\', as the owner does. Use to review who has been authorized before granting more (aimeat_consent_grant) or revoking (aimeat_consent_revoke).',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Consents', readOnlyHint: true },

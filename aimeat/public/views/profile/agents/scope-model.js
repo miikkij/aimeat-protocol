@@ -19,6 +19,8 @@
  *   await save(collapseScopes(checked));
  * @version-history
  *   2026-11-14 — secrets:share, outside every wildcard: making, filling and picking up secret shares.
+ *   2026-11-14 — consent:read-as-owner, outside every wildcard: seeing the account's consents, the
+ *     owner's and the other agents', as the owner does.
  *   2026-11-07 — csm:write, inside the wildcard: make, change and delete the account's data
  *     descriptions (CSM) and choose who reads each one.
  *   2026-11-02 — exchange:invoke, split out of exchange:write: calling an app tool.
@@ -220,6 +222,11 @@ export const NOT_IN_WILDCARD = [
   // Giving an outside program a receiver key that writes into the owner's data (src/services/receivers/).
   // Without it an agent proposes a receiver and the owner approves it in person.
   'receivers:manage',
+  // ── Added 2026-11-14 ─────────────────────────────────────────────────────────────────────────
+  // Seeing the account's consents as the owner: the ones the owner gave in person and the ones the
+  // other agents gave. Without it an agent sees the consents it gave itself. The list is the owner's
+  // whole sharing picture, so it costs its own tick for the reason memory:read-as-owner does.
+  'consent:read-as-owner',
 ];
 
 /**
@@ -272,7 +279,9 @@ export const SCOPE_DOMAINS = [
   { key: 'wallet',    permissions: ['read'] },
   // consent:groups — create a sharing group and decide who is in it. A sharing group IS the
   //   boundary of who reads the owner's memory, so it is separated from managing consents.
-  { key: 'consent',   permissions: ['manage', 'groups'] },
+  // read-as-owner — see the account's consents, the owner's and the other agents', as the owner does
+  //   (2026-11-14). `manage` alone shows the agent the consents it gave itself.
+  { key: 'consent',   permissions: ['manage', 'read-as-owner', 'groups'] },
   // Key-space shares: what a sharing group actually reaches. The group is the audience (consent:groups);
   // this is what they may read. Without a row here an owner could not grant it in this editor at all.
   { key: 'share',     permissions: ['manage'] },

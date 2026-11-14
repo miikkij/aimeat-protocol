@@ -45563,7 +45563,12 @@ paths:
     get:
       operationId: listConsent
       summary: List own consent grants
-      description: List all consent grants for the authenticated agent.
+      description: >-
+        List the consent grants the caller sees. Needs `consent:manage`. The account holder in person
+        sees every consent of the account, the ones their agents gave included. An agent sees the
+        consents it gave itself; an agent holding `consent:read-as-owner`, which no wildcard carries,
+        sees every consent of its owner's account, as the owner does. `aimeat_consent_list` and the
+        consent-record MCP resource list the same set.
       tags: [Consent]
       security:
         - BearerAuth: []
@@ -45610,7 +45615,11 @@ paths:
     get:
       operationId: getConsent
       summary: Get a single consent grant
-      description: Retrieve a specific consent grant by ID. Requires agent authentication.
+      description: >-
+        Retrieve a specific consent grant by ID. Needs `consent:manage`. Answers 403 ACCESS_DENIED for
+        a consent the caller does not see by the rule of GET /v1/consent (an agent without
+        `consent:read-as-owner` sees only the consents it gave itself); the operator's pass reads
+        another account's consent and writes the operator trail.
       tags: [Consent]
       security:
         - BearerAuth: []

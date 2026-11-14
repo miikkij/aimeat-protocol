@@ -22946,6 +22946,7 @@
           },
           "consent": {
             "manage": "Näe ja muuta lupia jotka olet antanut muille ihmisille ja palveluille.",
+            "read-as-owner": "Näe kaikki luvat, jotka sinä ja muut agenttisi olette antaneet muille ihmisille ja palveluille, samoin kuin itse näet ne. Ilman tätä agentti näkee vain ne, jotka se on antanut itse. Vaikuttaa vain yhdessä yllä olevan rivin kanssa.",
             "groups": "Luo jakoryhmiä ja valitse keitä niissä on. Jakoryhmä ratkaisee kuka muu saa lukea tietosi."
           },
           "cortex": {

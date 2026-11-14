@@ -11,6 +11,10 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_consent_list and the consent-record resource list through listConsentsFor
+ *     (services/consent/consent-read.ts), as GET /v1/consent does: an agent sees the consents it gave
+ *     itself, and the account's only when it holds consent:read-as-owner. The tool listed the
+ *     account's for every agent.
  *   2026-11-14 — The consent-record resource lists and reads the consents the session's principal
  *     holds, as GET /v1/consent and /v1/consent/:id do: an agent no longer names or reads a consent its
  *     owner gave in person there (unit 2b, B13b). aimeat_consent_list stays account-wide.
@@ -47,11 +51,10 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { grantConsent, revokeConsent, listAccountConsents } from '../services/consent-write.js';
-import { consentRecordFor } from '../services/consent/consent-read.js';
+import { grantConsent, revokeConsent } from '../services/consent-write.js';
+import { consentRecordFor, listConsentsFor } from '../services/consent/consent-read.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -74,11 +77,6 @@ export function registerConsentTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    /** Resolve owner GHII from agent GAII */
-    function ownerGhii(): string {
-        return `${localAccountName(agentGaii)}@${config.nodeId}`;
-    }
-
     /**
      * The consent services' caller: the SESSION'S PRINCIPAL, with this session's scopes and roles.
      *
@@ -92,7 +90,7 @@ export function registerConsentTools(
      * through this tool therefore covered every private record in the owner's own namespace, which
      * the REST route refuses for the same token, and revokeConsent's accountHoldsConsent admitted an
      * agent revoking a consent the owner had made in person (secaudit 2026-10, consent-identity).
-     * aimeat_consent_list stays account-wide (ownerGhii): reading the account's consents is by design.
+     * Whose consents a session lists and reads is consentHolderOf (services/consent/consent-read.ts).
      */
     function consentCaller(): { ownerGaii: string; scopes: string[]; roles: string[]; collectionMethod: string } {
         const session = caller();
@@ -108,9 +106,9 @@ export function registerConsentTools(
         'consent-record',
         new ResourceTemplate('aimeat://consent/{id}', {
             list: async () => {
-                // The consents the session's principal holds, as GET /v1/consent lists them: an agent
-                // names its own, never the ones its owner gave in person.
-                const consents = await listAccountConsents(storage, caller().principal);
+                // The consents this session sees, as GET /v1/consent lists them: an agent names its
+                // own, and the account's only when it holds consent:read-as-owner.
+                const consents = await listConsentsFor(storage, caller());
                 return {
                     resources: consents.map(c => ({
                         uri: `aimeat://consent/${encodeURIComponent(c.id)}`,
@@ -221,9 +219,9 @@ export function registerConsentTools(
             annotations: annotationsFor('aimeat_consent_list'),
         },
         async ({ recipient }) => {
-            const ghii = ownerGhii();
-            // The same read filter GET /v1/consent passes (unit 3b).
-            const consents = await listAccountConsents(storage, ghii, recipient ? { recipient } : {});
+            // Whose consents, and the read filter, as GET /v1/consent passes them: the agent's own, or
+            // the account's for an agent holding consent:read-as-owner (consentHolderOf).
+            const consents = await listConsentsFor(storage, caller(), recipient ? { recipient } : {});
 
             return {
                 content: [{

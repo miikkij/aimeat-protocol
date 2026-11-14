@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.36.2 -- 2026-11-14 -- aimeat_consent_list lists the agent's own consents, and the account's with
+ *     consent:read-as-owner.
  *   v1.36.1 -- 2026-11-14 -- The balancing test setting (required, optional, off) and who approves.
  *   v1.36.0 -- 2026-11-13 -- Records of processing: an app's balancing test (legitimate interests),
  *     read across every app with part lias, and the gaps that name it.
@@ -344,6 +346,8 @@ call a \`maturity\` with \`declared: false\` an undeclared word rather than prin
 **Consent (GDPR access control + audit).** \`aimeat_consent_grant\` (who may read which data-pattern,
 for what purpose, with TTL) · \`aimeat_consent_list\` · \`aimeat_consent_revoke\`. Consent records are
 what the server enforces on cross-agent reads — this is the access-control layer, not just metadata.
+\`aimeat_consent_list\` shows you the consents you gave yourself; to see every consent of your owner's
+account, the owner's own and the other agents', ask the owner for \`consent:read-as-owner\`.
 
 **Owner-managed agent classification.** \`aimeat_agent_mode_set\` (autonomous/interactive/task-runner/
 coordinator/workstation) · \`aimeat_agent_tags_set\` (crew:/role:/project: tags, max 20).

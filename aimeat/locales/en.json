@@ -22175,6 +22175,7 @@
           },
           "consent": {
             "manage": "See and change the permissions you have given to other people and services.",
+            "read-as-owner": "See all the permissions you and your other agents have given to other people and services, as you see them yourself. Without this it sees only the ones it gave itself. Only does anything together with the row above.",
             "groups": "Create sharing groups and choose who is in them. A sharing group decides who else can read your knowledge."
           },
           "cortex": {

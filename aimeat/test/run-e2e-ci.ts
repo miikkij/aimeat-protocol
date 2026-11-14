@@ -13,6 +13,7 @@
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
  *   2026-11-14 -- e2e-secret-shares.ts joins the list (not the guard tier): secret shares and secret requests (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
+ *   2026-11-14 -- e2e-consent-read-as-owner.ts joins the list (not the guard tier): an agent sees its own consents, and the account's with consent:read-as-owner, on the route, the tool and the resource.
  *   2026-11-13 -- e2e-compliance-lia.ts joins the list (not the guard tier): the balancing test of an app whose register rests on legitimate interests.
  *   2026-11-13 -- e2e-tool-route-parity.ts joins the list (not the guard tier): seven places where an MCP tool and its REST route answered one caller differently (structure programme 2026-11, unit 7).
  *   2026-11-13 -- e2e-agent-field-adds.ts joins the list (not the guard tier): an MCP tool takes the fields its REST route takes, and refuses through the tool what the route refuses.
@@ -1734,6 +1735,9 @@ const ALL_SUITES = [
     // An MCP tool and its REST route give one caller one answer: approvals, discovery, the roster, the
     // organism list, the file list, the sharing groups and an attached agent's role.
     'test/e2e-tool-route-parity.ts',
+    // Whose consents a caller sees: an agent its own, an agent holding consent:read-as-owner the
+    // account's, on GET /v1/consent, aimeat_consent_list and the consent-record resource alike.
+    'test/e2e-consent-read-as-owner.ts',
     // A draft is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
     'test/e2e-capability-reach.ts',
     // Round 8, group memory-b: the side routes answer what the main route answers (secaudit2026oct26).

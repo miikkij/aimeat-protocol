@@ -32,6 +32,8 @@
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
  *   2026-11-14 — secrets:share (SECRETS_SHARE_SCOPE), outside the wildcard: secret shares hand content out.
+ *   2026-11-14 — consent:read-as-owner (CONSENT_READ_AS_OWNER_SCOPE) joins the own-tick family: an agent
+ *     seeing the account's consents, the owner's and its siblings', as the owner does.
  *   2026-11-07 — receivers:manage (RECEIVERS_MANAGE_SCOPE) joins the own-tick family: a receiver key
  *     an outside program writes into the owner's data with.
  *   2026-11-02 — exchange:invoke is covered by exchange:write (COVERED_BY_WIDER_WORD), the split of the app tool call.
@@ -95,6 +97,12 @@ export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
 
 /** The scope an owner grants an agent to read the owner's and its siblings' records as the owner. */
 export const READ_AS_OWNER_SCOPE = 'memory:read-as-owner';
+
+/**
+ * The scope an owner grants an agent to see the account's consents as the owner: the ones the owner
+ * gave in person and the ones the other agents gave (services/consent/consent-read.ts consentHolderOf).
+ */
+export const CONSENT_READ_AS_OWNER_SCOPE = 'consent:read-as-owner';
 
 /**
  * The stronger grant on top of it: also the RESERVED, server-trusted keys — `openrouter.*` (the URL
@@ -371,6 +379,14 @@ const OWN_TICK_SCOPES = [
     // its own; reading the owner's mailbox is a delegation the owner grants on its own tick, for the
     // reason messages:read-as-owner is. Not grandfathered: the capability did not exist before.
     'connections:read-as-owner',
+    // See the account's consents AS the owner: every consent the owner gave in person and every one
+    // their other agents gave, on GET /v1/consent, aimeat_consent_list and the consent-record
+    // resource. Without it an agent sees the consents it gave itself (services/consent/consent-read.ts).
+    // A consent says who may read the owner's data, so the list is the owner's sharing picture, and it
+    // costs its own tick for the reason memory:read-as-owner does. Not grandfathered: until 2026-11-14
+    // aimeat_consent_list gave every agent holding consent:manage the account's list, which the route
+    // and the resource did not.
+    CONSENT_READ_AS_OWNER_SCOPE,
     // Make something public, to anyone, without the owner answering a request first
     // (services/publish-gate.ts). Outside the wildcard because "Full access" is one click, and
     // nobody clicking it is deciding that an agent may show their data to the whole internet.

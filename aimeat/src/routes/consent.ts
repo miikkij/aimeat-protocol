@@ -13,6 +13,8 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   2026-11-14 — GET /v1/consent and /v1/consent/:id show an agent holding consent:read-as-owner the
+ *     account's consents, through listConsentsFor and consentRecordFor (services/consent/consent-read.ts).
  *   2026-11-14 — GET /v1/consent/:id reads through consentRecordFor (services/consent/consent-read.ts),
  *     which the consent-record MCP resource now asks too (structure programme 2026-11, unit 2b, B13).
  *   2026-11-09 — Additive query parameters for the Data Wallet trail read by day: GET /v1/data-wallet
@@ -39,8 +41,8 @@ import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
 import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { grantConsent, revokeConsent, listAccountConsents } from '../services/consent-write.js';
-import { consentRecordFor } from '../services/consent/consent-read.js';
+import { grantConsent, revokeConsent } from '../services/consent-write.js';
+import { consentRecordFor, listConsentsFor } from '../services/consent/consent-read.js';
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 import { callerOf } from '../middleware/caller.js';
@@ -134,7 +136,6 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     });
 
     router.get('/v1/consent', requireAuth(), requireScope('consent:manage'), async (req, res) => {
-        const ownerGaii = resolve(req);
         const opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {};
 
         if (req.query.status) {
@@ -144,7 +145,10 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             opts.recipient = req.query.recipient as string;
         }
 
-        const consents = await listAccountConsents(storage, ownerGaii, opts);
+        // Whose consents: the session's principal, or the account for an agent holding
+        // consent:read-as-owner (consentHolderOf), the function aimeat_consent_list and the
+        // consent-record resource ask.
+        const consents = await listConsentsFor(storage, callerOf(req, config.nodeId, storage), opts);
 
         res.json(success(config.nodeId, {
             consents: consents.map(c => ({

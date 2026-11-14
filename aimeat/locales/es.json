@@ -20998,6 +20998,7 @@
           },
           "consent": {
             "manage": "Ver y cambiar los permisos que les has dado a otras personas y servicios.",
+            "read-as-owner": "Ver todos los permisos dados por ti y por tus otros agentes a otras personas y servicios, como los ves tú. Sin esto solo ve los que dio él mismo. Solo hace algo junto con la línea de arriba.",
             "groups": "Crear grupos para compartir y elegir quién está en ellos. Un grupo decide quién más puede leer lo que sabes."
           },
           "cortex": {
