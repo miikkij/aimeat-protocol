@@ -26169,7 +26169,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [work]
+              description: >-
+                The work comes inside `work`, or flat beside `action` and `reason` (title, kind, agent,
+                wants and the rest at the top of the body), which is read when `work` is absent.
               properties:
                 action: { type: string, enum: [add, leave] }
                 work: { type: object }
