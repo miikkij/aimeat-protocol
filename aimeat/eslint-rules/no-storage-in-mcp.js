@@ -90,7 +90,6 @@ const EXEMPT = new Set([
   'src/mcp/agent-schedules.ts',
   'src/mcp/agent-tasks.ts',
   'src/mcp/apps.ts',
-  'src/mcp/boards.ts',
   'src/mcp/capabilities.ts',
   'src/mcp/chat-instances.ts',
   'src/mcp/commerce.ts',

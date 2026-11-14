@@ -32808,7 +32808,12 @@ paths:
     patch:
       operationId: updateBoardMembers
       summary: Update board member list
-      description: Add or remove external agents from a shared board's allowed_gaiis list. Only the board owner (GHII) or operator can manage members.
+      description: >-
+        Add or remove external agents from a shared board's allowed_gaiis list. The board owner in
+        person, the operator in person (the operator trail records it), or an agent of the board's
+        owner holding `social:members` may manage members, as `aimeat_board_members` admits; an agent
+        without that word answers 403 SCOPE_DENIED, and another owner's agent or a visitor 403
+        ACCESS_DENIED.
       tags: [Boards]
       security:
         - bearerAuth: []
@@ -32843,7 +32848,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '403':
-          description: Only board owner or operator can manage members
+          description: Not the board owner, the operator or the owner's agent holding social:members
         '404':
           description: Board not found
 

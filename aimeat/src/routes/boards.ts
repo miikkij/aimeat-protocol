@@ -13,6 +13,10 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   2026-11-14 — PATCH /v1/boards/:boardId/members passes its caller object (callerOf) to setBoardMembersAs.
+ *   2026-11-14 — PATCH /v1/boards/:boardId/members calls services/boards/board-members.ts, which
+ *     aimeat_board_members calls too: an agent of the board's owner holding social:members changes the
+ *     reader list here as well (developer approval 2026-11-14).
  *   2026-11-13 — GET /v1/boards asks services/boards/board-list.ts and PATCH /v1/boards/:boardId/rules
  *     services/boards/board-rules.ts, which the MCP board tools call too; the answers are unchanged
  *     (structure programme 2026-11, unit 2b).
@@ -110,13 +114,14 @@ import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../ser
 import { boardPostsPage } from '../services/boards/posts-page.js';
 import { boardsVisibleTo } from '../services/boards/board-list.js';
 import { setBoardRulesAs } from '../services/boards/board-rules.js';
+import { setBoardMembersAs } from '../services/boards/board-members.js';
 import {
-  createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, deleteBoardById, boardRulesBlock,
+  createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, deleteBoardById, boardRulesBlock,
 } from '../services/board-write.js';
 import { setBoardVisibility } from '../services/board-visibility.js';
 import { callerOf } from '../middleware/caller.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator-override.js';
-import { resolveIdentity, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai/provenance-marks.js';
@@ -273,38 +278,12 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // ── Update board members ───────────────────────────────
   router.patch('/v1/boards/:boardId/members', requireAuth(), async (req, res) => {
     const boardId = req.params.boardId as string;
-    const board = await storage.getBoard(boardId);
-    if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
-      return;
-    }
-
-    // Authorization: only owner session (GHII, not agent). Operator owner sessions can manage any board.
-    // Agent sessions are always rejected — even operator agents must use their owner session.
-    // A federated session is rejected with them: the ownership test below compares owner NAMES, and
-    // a visitor from another node carries the local part of THEIR name, which matches the local
-    // account that shares it. Their boards are on their home node.
-    if (!isOwnerInPerson(req.auth)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner (owner session) or operator can manage members'));
-      return;
-    }
-    // An owner session must own the board, or be the operator in person (agents were refused above,
-    // so operatorOverride here admits only the operator's own owner session and writes the trail).
-    // The board's owner comes from localAccountName, which keeps an owner of another node whole, so
-    // a visitor's board is never the namesake's.
-    const boardOwner = localAccountName(board.ownerGaii);
-    if (req.auth!.owner !== boardOwner && !(await operatorOverride(storage, config, req.auth,
-      { ownerOf: board.ownerGaii, area: 'board', action: 'members', subject: board.name }))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this board'));
-      return;
-    }
-
-    // The roster arithmetic, the write and the change event are services/board-write.ts, which
-    // aimeat_board_members also calls. The authorization above stays here because the two doors
-    // answer it differently on purpose: this one demands an owner session, the tool accepts an agent
-    // of the same owner holding `social:members`.
+    // The board read, who may change its readers (the owner or the operator in person, or an agent of
+    // the owner holding social:members; never a visitor from another node, whose owner NAME could
+    // match a local account) and the roster write: services/boards/board-members.ts, which
+    // aimeat_board_members calls too (developer approval 2026-11-14).
     const { add, remove } = req.body ?? {};
-    const out = await setBoardMembers({ storage, config }, board, { add, remove });
+    const out = await setBoardMembersAs({ storage, config }, callerOf(req, config.nodeId, storage), boardId, { add, remove });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;

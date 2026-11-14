@@ -27,9 +27,8 @@
  *                    consent the posts GET /v1/boards/:id/posts and aimeat_board_read give it.
  *     JOIN-PRIVATE   a private organism answers an outside agent's join as not found on both
  *                    surfaces (developer decision 2026-11-14).
- *     BOARD-MEMBERS  an owner's agent holding social:members changes a shared board's reader list
- *                    (a question: REST takes the owner in person only, the tool admits the agent on
- *                    purpose).
+ *     BOARD-MEMBERS  an owner's agent holding social:members changes a shared board's reader list on
+ *                    both surfaces (developer decision 2026-11-14).
  *     ORG-READ       who reads a private organism on GET /v1/organisms/:id, aimeat_organism_get and
  *                    the aimeat://organisms resource: one answer per caller.
  *     ROSTER-PRIVATE a private organism's member list is for its active members only, on all three
@@ -39,11 +38,11 @@
  *     MEMBER-LIST    the organisms a caller's owner is in: one answer on GET /v1/organisms?member=
  *                    and aimeat_organism_list for the owner's agent, another owner's agent and the
  *                    operator's agent.
- *   BOARD-MEMBERS asserts today's two answers and names the question.
  *   The operator (the suite's first account) turns classification on for the FILES section only and
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.10.0 — 2026-11-14 — BOARD-MEMBERS asserts the developer's decision instead of today's answers.
  *   v1.9.0 — 2026-11-14 — Unit 2b part 2, phase B, the other seventeen rows: B11, B13, B10, B9, B7 and
  *     B3 assert the rule both surfaces now share (operator pass and trail, fork gates, the anonymous
  *     own/building refusal, the account's escrow); B13b, B16, B17, B8, B12, B14, B15, B18, B2 and B4
@@ -458,12 +457,24 @@ await test('Setup: alice\'s shared board; an agent of alice holding social:membe
     bmAgent = await makeAgent(BASE, alice, ['social:read', 'social:write', 'social:members'], N('bmag'));
 });
 
-await test('QUESTION for the developer (today\'s two answers): REST refuses alice\'s agent a board\'s reader list; aimeat_board_members lets it change the list, on purpose per the tool', async () => {
-    const add = `ext-${stamp}#someone@aimeat-fi-001-test`;
-    const rest = await call('PATCH', `/v1/boards/${bmBoard}/members`, bmAgent.token, { add: [add] });
-    const tool = await callTool(await openSession(BASE, bmAgent.token, 'u2b-board-members'), 'aimeat_board_members', { board_id: bmBoard, add: [add] });
-    assert(rest.status === 403, `REST today refuses the agent: ${show(rest)}`);
-    assert(!tool.isError && tool.text.includes(add), `tool today changes the list: ${tool.text.slice(0, 200)}`);
+await test('DECIDED (developer, 2026-11-14): alice\'s agent holding social:members changes her board\'s reader list on PATCH /v1/boards/:id/members and aimeat_board_members', async () => {
+    const restAdd = `ext-${stamp}#rest@aimeat-fi-001-test`;
+    const toolAdd = `ext-${stamp}#tool@aimeat-fi-001-test`;
+    const rest = await call('PATCH', `/v1/boards/${bmBoard}/members`, bmAgent.token, { add: [restAdd] });
+    const tool = await callTool(await openSession(BASE, bmAgent.token, 'u2b-board-members'), 'aimeat_board_members', { board_id: bmBoard, add: [toolAdd] });
+    assert(rest.status === 200 && rest.text.includes(restAdd), `REST: ${show(rest)}`);
+    assert(!tool.isError && tool.text.includes(toolAdd), `tool: ${tool.text.slice(0, 200)}`);
+});
+
+await test('REFUSED: bob\'s agent holding social:members, and alice\'s agent without it, change nothing on REST; bob\'s agent nothing over MCP', async () => {
+    const other = await makeAgent(BASE, bob, ['social:read', 'social:write', 'social:members'], N('bmother'));
+    const rest = await call('PATCH', `/v1/boards/${bmBoard}/members`, other.token, { add: [`x-${stamp}#y@aimeat-fi-001-test`] });
+    assert(rest.status === 403, `bob's agent, REST: ${show(rest)}`);
+    const tool = await callTool(await openSession(BASE, other.token, 'u2b-board-members-other'), 'aimeat_board_members', { board_id: bmBoard, add: [`x-${stamp}#y@aimeat-fi-001-test`] });
+    assert(tool.isError, `bob's agent, tool: ${tool.text.slice(0, 200)}`);
+    const narrow = await makeAgent(BASE, alice, ['social:read', 'social:write'], N('bmnarrow'));
+    const nRest = await call('PATCH', `/v1/boards/${bmBoard}/members`, narrow.token, { add: [`x-${stamp}#y@aimeat-fi-001-test`] });
+    assert(nRest.status === 403, `alice's agent without social:members, REST: ${show(nRest)}`);
 });
 
 // ─── ORG-READ ───

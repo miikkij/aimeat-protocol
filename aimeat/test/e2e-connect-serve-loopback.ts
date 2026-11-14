@@ -24,6 +24,9 @@
 //     stays up. A request with no secret is refused with 401 as well.
 //
 // Version history:
+//   2026-11-14 — board_members over /local/call also accepts SCOPE_DENIED: PATCH /v1/boards/:id/members
+//     admits an agent of the board's owner holding social:members, so the daemon's agent, which lacks
+//     the word, is refused by scope. The assertion still proves the parameter reached the route.
 //   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
 //   2026-10-16 — capabilities_create over /local/call now SAVES the agent's private capability: POST
 //     /v1/capabilities admits the owner's agent holding capability:write, as the node MCP tool always
@@ -586,12 +589,13 @@ await test('POST /local/call/:tool — the doors the catalog and the handler spe
   assert(board.status === 200 && board.body.ok !== false, `board_create: ${board.status} ${JSON.stringify(board.body).slice(0, 300)}`);
   const boardId = (board.body.data?.board?.id ?? board.body.data?.id) as string;
   assert(typeof boardId === 'string' && boardId.length > 0, `no board id in ${JSON.stringify(board.body.data).slice(0, 300)}`);
-  // Managing members is an owner-session act even on a board the agent created, so the node's 403
-  // is the reachable proof: a dispatch refusal would have named the parameter instead.
+  // Managing members takes the owner in person, or an agent of the board's owner holding
+  // social:members. The daemon's agent does not hold that word, so the node's 403 (SCOPE_DENIED, or
+  // ACCESS_DENIED) is the reachable proof: a dispatch refusal would have named the parameter instead.
   const boardMembers = await json(loopbackBase, '/local/call/aimeat_board_members', {
     method: 'POST', body: JSON.stringify({ board_id: boardId, add: [grantee] }),
   });
-  assert(boardMembers.body.error?.code === 'ACCESS_DENIED' || boardMembers.body.ok !== false,
+  assert(['ACCESS_DENIED', 'SCOPE_DENIED'].includes(boardMembers.body.error?.code) || boardMembers.body.ok !== false,
     `board_members: ${boardMembers.status} ${JSON.stringify(boardMembers.body).slice(0, 300)}`);
   assert(boardMembers.body.error?.code !== 'UNKNOWN_PARAMETER',
     `board_members was refused by the DISPATCH: ${JSON.stringify(boardMembers.body).slice(0, 300)}`);

@@ -11,6 +11,9 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_board_members passes the session's caller object to setBoardMembersAs.
+ *   2026-11-14 — aimeat_board_members calls services/boards/board-members.ts, which PATCH
+ *     /v1/boards/:id/members calls too (developer approval 2026-11-14).
  *   2026-11-13 — The aimeat://boards/{id} resource reads through services/boards/posts-page.ts, the
  *     read and the gate GET /v1/boards/:id/posts and aimeat_board_read ask: a reader holding the
  *     board owner's consent reads the posts there too, and a refused read writes the consent-denial
@@ -70,16 +73,16 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
 import { boardPostsPage } from '../services/boards/posts-page.js';
 import {
-    createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers,
+    createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
 } from '../services/board-write.js';
+import { setBoardMembersAs } from '../services/boards/board-members.js';
 import { boardsVisibleTo } from '../services/boards/board-list.js';
 import { setBoardRulesAs } from '../services/boards/board-rules.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
@@ -432,21 +435,12 @@ export function registerBoardsTools(
             annotations: annotationsFor('aimeat_board_members'),
         },
         async ({ board_id, add, remove }) => {
-            const board = await storage.getBoard(board_id);
-            if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
-
-            // Auth: agent's owner must be the board owner. This check stays on the door because the
-            // two doors answer it differently on purpose — PATCH /v1/boards/:id/members demands an
-            // owner session and rejects every agent session, while here an agent holding
-            // `social:members` acts for its owner, which is what makes an agent a first-class user.
-            const agentOwner = localAccountName(agentGaii);
-            const boardOwner = localAccountName(board.ownerGaii);
-            if (agentOwner !== boardOwner) {
-                return { content: [{ type: 'text' as const, text: 'Only the board owner can manage members' }], isError: true };
-            }
-
-            // The roster arithmetic, the write and the change event are services/board-write.ts.
-            const out = await setBoardMembers({ storage, config }, board, { add, remove });
+            // The board read, who may change its readers (an agent of the board's owner holding
+            // social:members acts for its owner) and the roster write: services/boards/board-members.ts,
+            // which PATCH /v1/boards/:id/members calls too (developer approval 2026-11-14).
+            const out = await setBoardMembersAs({ storage, config }, caller(), board_id, { add, remove });
+            if (!out.ok && out.code === 'NOT_FOUND') return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
+            if (!out.ok && out.message === 'Only the board owner can manage members') return { content: [{ type: 'text' as const, text: out.message }], isError: true };
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
             const updated = out.board;
 
