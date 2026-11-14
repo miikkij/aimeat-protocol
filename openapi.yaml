@@ -6333,7 +6333,7 @@ components:
         content:
           type: string
           minLength: 1
-          maxLength: 10000
+          maxLength: 200000
         direction:
           type: string
           enum: [inbound, outbound]
