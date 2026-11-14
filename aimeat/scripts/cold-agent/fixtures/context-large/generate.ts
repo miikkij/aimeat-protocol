@@ -42,6 +42,8 @@
  *   AIMEAT_CLAUDE_CMD=<path to claude.exe> sets the program; --concurrency 5 by default.
  * @version-history
  *   v1.0.0 — 2026-11-08 — Initial: 40 Larder sessions and 6 Tidewater playtests from truth.json.
+ *   v1.0.1 -- 2026-11-15 -- Each call also removes the CLI's project folder for its temporary
+ *     directory (../../claude-project-dir.ts).
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -49,6 +51,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { longDate, type Decision, type Project, type Session, type Term, type Truth } from '../../context-large.js';
+import { removeClaudeProjectDir } from '../../claude-project-dir.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SESSIONS = join(HERE, 'sessions');
@@ -225,7 +228,8 @@ function prompt(p: Project, s: Session, main: boolean): string {
 /** One `claude` call in print mode, from an empty directory with no project settings. */
 function callClaude(text: string): Promise<string> {
     const cmd = process.env.AIMEAT_CLAUDE_CMD ?? 'claude';
-    const cwd = mkdtempSync(join(tmpdir(), 'aimeat-ctx-large-'));
+    const tmpPrefix = join(tmpdir(), 'aimeat-ctx-large-');
+    const cwd = mkdtempSync(tmpPrefix);
     return new Promise((resolve, reject) => {
         // One command string, as run.ts spawns the agent: an argument array under a shell drops the
         // empty value of --tools.
@@ -236,6 +240,8 @@ function callClaude(text: string): Promise<string> {
         child.on('error', reject);
         child.on('close', (code) => {
             rmSync(cwd, { recursive: true, force: true });
+            // The note is in `out`; the CLI's own copy of the session is not needed.
+            removeClaudeProjectDir(cwd, tmpPrefix);
             if (code !== 0 || !out.trim()) reject(new Error(`claude exited ${code}: ${err.slice(0, 300)}`));
             else resolve(out.trim());
         });

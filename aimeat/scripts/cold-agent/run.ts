@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm cold-agent --suite context-private --fixtures "<dir>" --onto on   # own material (context-private.ts)
  *   cd aimeat && pnpm cold-agent --suite context-large --onto off   # invented material at real scale (context-large.ts)
  * @version-history
+ *   v1.6.1 -- 2026-11-15 -- A run also removes the CLI's project folder for its temporary directory
+ *     (claude-project-dir.ts), which had stayed under ~/.claude/projects after every run.
  *   v1.6.0 — 2026-11-08 — `--onto graph` for the private suite: the context's ontology and its use
  *     rules are seeded beside the context (context-private.ts v1.2.0).
  *   v1.5.0 — 2026-11-08 — `--suite context-large`: the context questions over a 40-session invented
@@ -78,6 +80,7 @@ import { skillTasks } from './skill-cases.js';
 import { contextTasks, type Onto } from './context-cases.js';
 import { largeContextTasks } from './context-large.js';
 import { privateContextTasks, type PrivateArm } from './context-private.js';
+import { removeClaudeProjectDir } from './claude-project-dir.js';
 import { SANDBOX_MAX_APPS } from '../lib/sandbox-limits.js';
 
 const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -271,7 +274,8 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
 
     // A task id may carry a colon (`skill:<name>:<n>`), which a Windows file name cannot.
     const fileId = task.id.replaceAll(':', '_');
-    const cwd = mkdtempSync(join(tmpdir(), `aimeat-cold-agent-${fileId}-`));
+    const tmpPrefix = join(tmpdir(), 'aimeat-cold-agent-');
+    const cwd = mkdtempSync(`${tmpPrefix}${fileId}-`);
     const stopApproving = task.door === 'url' ? autoApprove(s) : () => undefined;
     let raw: string;
     try {
@@ -286,6 +290,9 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     } finally {
         stopApproving();
         rmSync(cwd, { recursive: true, force: true });
+        // The transcript is in `raw`, taken from stdout, and every follow-up turn has resumed: the
+        // CLI's own copy under ~/.claude/projects is no longer needed.
+        removeClaudeProjectDir(cwd, tmpPrefix);
     }
     writeFileSync(join(outDir, `${fileId}.${run}.jsonl`), raw);
 
