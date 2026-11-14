@@ -4,6 +4,28 @@
     {
       "date": "2026-11-14",
       "kind": "feature",
+      "id": "2026-11-14-your-home-shows-what-it-holds-beside-the-page",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Your home shows what it holds, beside the page",
+        "fi": "Kotisivu näyttää sisältönsä sivun vieressä"
+      },
+      "summary": {
+        "en": "A menu beside your home lists the parts of the page with their counts. Press a line to go there.",
+        "fi": "Kotisivun vieressä on valikko, joka luettelee sivun osat ja niiden luvut. Rivi vie suoraan osaan."
+      },
+      "body": {
+        "en": "A menu beside your home and the Settings & Controls overview lists the parts of the page with their counts. Press a line to go there. On a phone the menu is one closed row at the top of the page. The operator can turn it off for the home in Admin > Portal > Member home, or ask their AI to do it.",
+        "fi": "Kotisivun ja Asetukset ja hallinta -etusivun vieressä on valikko, joka luettelee sivun osat ja niiden luvut. Kun painat riviä, sivu siirtyy siihen kohtaan. Puhelimessa valikko on sivun yläosassa yksi suljettu rivi. Ylläpitäjä voi ottaa valikon pois kotisivulta kohdassa Ylläpito > Portaali > Jäsenen koti tai pyytää tekoälyään tekemään sen."
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "kind": "feature",
       "id": "2026-11-14-your-agent-sees-the-consents-you-allow-it-to-see",
       "highlight": false,
       "audience": [
