@@ -34,13 +34,20 @@
  *   v1.1.4 -- 2026-11-01 -- Ceiling 41,200 -> 41,700 for the rule that the IT adoption package stays true to the code.
  *   v1.1.5 -- 2026-11-04 -- Ceiling 41,700 -> 43,000 for the rule that this public repository names no organisation node.
  *   v1.1.6 -- 2026-11-11 -- Ceiling 43,000 -> 44,000 for two rules: a fix covers the whole defect, and a session's commit message is short.
+ *   v1.2.0 -- 2026-11-15 -- From the instruction review of 2026-11-14 (TP8.1, TP8.5): the agent files
+ *     and AGENTS.md are held to the em-dash ban and their backticked repository paths must exist;
+ *     AGENTS.md must carry the public-repository rule and the release-tag rule; CLAUDE.md and
+ *     AGENTS.md carry no live count that grows by design. Ceiling 44,000 -> 36,000 after content
+ *     that holds only for some work moved into the rule files and guides.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
+import { instructionPathProblems, liveCountProblems, missingAgentsRules } from './lib/instruction-rules.mjs';
 
 const REPO = join(process.cwd(), '..');
 const CLAUDE_MD = join(REPO, 'CLAUDE.md');
+const AGENTS_MD = join(REPO, 'AGENTS.md');
 const RULES_DIR = join(REPO, '.claude', 'rules');
 const SKILLS_DIR = join(REPO, '.claude', 'skills');
 
@@ -67,8 +74,11 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * Raised to 44,000 on 2026-11-11 for two rules the developer asked for after a fix was reported with
  * part of its defect left for a second session: a fix covers the whole defect, and a session's
  * commit message is short and names no approval. Both hold in every session.
+ * Lowered to 36,000 on 2026-11-15, when the instruction review moved about 11 kB that held only for
+ * some work into the rule files, the guides and the node skill (CLAUDE.md went from 43,927 bytes to
+ * about 33,000). The ceiling keeps that room for rules that hold in every session.
  */
-const CEILING_BYTES = 44_000;
+const CEILING_BYTES = 36_000;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
@@ -159,9 +169,12 @@ function main(): void {
     }
     // 2. The root file bans em-dashes and used them on eight lines; skill aimeat-writing bans them
     //    and used them on five, with two more skills beside it. The project skills are held to it
-    //    too. The rule files and the agent files still carry thirteen between them (2026-09-19),
-    //    moved verbatim from the old root file, and are not read here until somebody rewrites them.
-    for (const file of [CLAUDE_MD, ...skills]) {
+    //    too, and since 2026-11-15 the agent files and AGENTS.md, which every subagent and every
+    //    other coding agent reads first. The rule files still carry some, moved verbatim from the old
+    //    root file, and are not read here until somebody rewrites them.
+    const agents = markdownFiles(join(REPO, '.claude', 'agents'), (n) => n.endsWith('.md'));
+    const agentsMd = existsSync(AGENTS_MD) ? [AGENTS_MD] : [];
+    for (const file of [CLAUDE_MD, ...skills, ...agents, ...agentsMd]) {
         readFileSync(file, 'utf-8').split('\n').forEach((line, i) => {
             if (line.includes('—')) problems.push(`${rel(file)}:${i + 1} has an em-dash, which this project's writing rule bans. Use a comma, a colon or two sentences.`);
         });
@@ -173,9 +186,8 @@ function main(): void {
         for (const name of Object.keys((JSON.parse(readFileSync(pkg, 'utf-8')) as { scripts?: Record<string, string> }).scripts ?? {})) scripts.add(name);
     }
     const PNPM_BUILTIN = new Set(['install', 'exec', 'add', 'remove', 'run', 'dlx', 'update', 'audit', 'store', 'why', 'list', 'outdated', 'link', 'pack', 'publish', 'rebuild', 'prune', 'import', 'i']);
-    const agents = markdownFiles(join(REPO, '.claude', 'agents'), (n) => n.endsWith('.md'));
     let commands = 0;
-    for (const file of [CLAUDE_MD, ...rules, ...skills, ...agents]) {
+    for (const file of [CLAUDE_MD, ...rules, ...skills, ...agents, ...agentsMd]) {
         const text = readFileSync(file, 'utf-8');
         for (const m of text.matchAll(/`pnpm ((?:--dir \S+ )?)([a-z][a-z0-9:_-]*)/g)) {
             const name = m[2];
@@ -190,11 +202,28 @@ function main(): void {
             if (!scripts.has(name)) problems.push(`${rel(file)} names \`pnpm ${name}\`, which no package.json defines.`);
         }
     }
-    console.log(`  ${agents.length} agent file(s); ${commands} pnpm command(s) named in the instructions checked against package.json`);
+    console.log(`  ${agents.length} agent file(s)${agentsMd.length ? ' and AGENTS.md' : ''}; ${commands} pnpm command(s) named in the instructions checked against package.json`);
+
+    // 4. A backticked repository path in an agent file or AGENTS.md that names nothing. Both are read
+    //    by an agent before it has looked at the tree, so a moved file sends it the wrong way.
+    // A gitignored path (docs/internal/, aimeat/.sandbox.json, .worktrees/) exists only where it was
+    // made, never in a fresh worktree, so git's answer that it is ignored is enough.
+    const ignored = (p: string): boolean => {
+        // Both spellings, since a directory pattern (`docs/internal/`) matches only a name that ends in `/`.
+        return [p, `${p}/`].some((q) => {
+            try { execFileSync('git', ['-C', REPO, 'check-ignore', '-q', q], { stdio: 'ignore' }); return true; } catch { return false; }
+        });
+    };
+    const exists = (p: string): boolean => existsSync(join(REPO, p)) || existsSync(join(REPO, 'aimeat', p)) || ignored(p);
+    for (const file of [...agents, ...agentsMd]) problems.push(...instructionPathProblems(readFileSync(file, 'utf-8'), rel(file), exists));
+    // 5. AGENTS.md carries the rules that bite before an agent would find them in CLAUDE.md.
+    if (agentsMd.length) problems.push(...missingAgentsRules(readFileSync(AGENTS_MD, 'utf-8')));
+    // 6. No live count that grows by design in the files every session or agent reads first.
+    for (const file of [CLAUDE_MD, ...agentsMd]) problems.push(...liveCountProblems(readFileSync(file, 'utf-8'), rel(file)));
     console.log('');
 
     if (!problems.length) {
-        console.log('  ✓ under the ceiling; every paths pattern names real files; every rule is in the table; no em-dash; every pnpm command exists');
+        console.log('  ✓ under the ceiling; every paths pattern names real files; every rule is in the table; no em-dash; every pnpm command and path exists; AGENTS.md carries its rules; no live count');
         return;
     }
     for (const p of problems) console.log(`  ✗ ${p}`);
