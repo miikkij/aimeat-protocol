@@ -11,6 +11,8 @@
  *   3. A named reason releases over a nightly sweep that is red, missing or running, and over nothing
  *      else; without one the check refuses as before (Jouni, decision 2026-10-16).
  * @version-history
+ *   2026-11-14 -- Each case may take 30 s: its git commits and script starts outran the 5 s default
+ *     under load. The nightly's needs list no longer names release-4-0-0.
  *   v1.3.0 -- 2026-10-30 -- A node release is refused while the released commit's ADOPTION_CUTOFF is
  *     null (secaudit2026oct26 round 8c, connector-04).
  *   v1.2.0 -- 2026-10-20 -- A green nightly of an earlier commit on main counts for 24 hours.
@@ -18,12 +20,16 @@
  *     tag message, the loud line, the job summary and step output, and the two workflows that pass it.
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W08).
  */
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// A case makes git commits and starts the script as a process, up to four starts a case; on Windows
+// under load that ran past vitest's 5 s default in four runs of 2026-11-14 and passed alone each time.
+vi.setConfig({ testTimeout: 30_000 });
 
 const AIMEAT = fileURLToPath(new URL('../..', import.meta.url));
 const REPO = join(AIMEAT, '..');
