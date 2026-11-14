@@ -8,6 +8,11 @@
  *   duplicate check, catalog staleness report (a warning, never a failure).
  * @usage pnpm check:docs
  * @version-history
+ *   v1.4.0 - 2026-11-15 - Every catalog row says how it stays true: "checked YYYY-MM-DD" (compared
+ *     with its source's last commit, as before) or "held by <check>" with a test, a check script or a
+ *     ledger as its source (never compared: the holder fails when the file goes wrong). A row with
+ *     neither fails, unless it is historical. 64 of 115 date warnings came from holders' own files
+ *     changing for reasons that left the docs true, and 40 undated rows could not warn at all.
  *   v1.3.1 - 2026-10-12 - PENDING_ELSEWHERE is gone, the list and the code that read it: a waiting
  *     list in a gate is a standing way to silence a finding, and a dead reference in a file another
  *     session is editing is fixed by that session before its own push, as check-doc-links.ts does.
@@ -53,14 +58,31 @@ const files = [...new Set(execFileSync('git', [
 ], { cwd: ROOT, encoding: 'utf8' }).split('\0').filter(Boolean))]
   .filter(path => existsSync(resolve(ROOT, path))).sort();
 const catalog = new Map();
+// Every row says how it stays true, in one of two ways. "checked YYYY-MM-DD" names the day someone
+// read the file against its source; a source that changed after that day is a warning below. "held
+// by <check>" names a test, a check script or a ledger that already fails when the file goes wrong
+// (a loader test for a runtime asset, the it-adoption ledger), so a date would only repeat what the
+// holder knows and warn whenever the holder's own file changed. A historical file is never updated
+// and needs neither.
+const HOLDER = /^aimeat\/(test|scripts|security)\//;
+let heldRows = 0;
 for (const line of read('docs/catalog.md').split('\n')) {
-  const match = line.match(/^\| \[([^\]]+)\]\([^)]+\) \| ([^|]+) \| [^|]+ \| `([^`]+)` \|$/);
+  const match = line.match(/^\| \[([^\]]+)\]\([^)]+\) \| ([^|]+) \| ([^|]+) \| `([^`]+)` \|$/);
   if (!match) continue;
-  const [, path, rawStatus, source] = match;
+  const [, path, rawStatus, purpose, source] = match;
   const status = rawStatus.trim();
   if (catalog.has(path)) errors.push(`Duplicate catalog entry: ${path}`);
   if (!statuses.has(status)) errors.push(`Unknown status for ${path}: ${status}`);
   if (!existsSync(resolve(ROOT, source))) errors.push(`Missing source for ${path}: ${source}`);
+  const dated = /checked \d{4}-\d{2}-\d{2}/i.test(purpose);
+  const held = /\bheld by\b/i.test(purpose);
+  if (held) {
+    heldRows++;
+    if (dated) errors.push(`Catalog row both dated and held: ${path} (a held row takes its date from its holder; drop "checked …")`);
+    if (!HOLDER.test(source)) errors.push(`Catalog row held by something that is not a test, a check or a ledger: ${path} (${source})`);
+  } else if (!dated && status !== 'historical') {
+    errors.push(`Catalog row says neither when it was checked nor what holds it: ${path} (write "checked YYYY-MM-DD" or "held by <check>")`);
+  }
   catalog.set(path, status);
 }
 for (const path of files) if (!catalog.has(path)) errors.push(`Unclassified file: ${path}`);
@@ -132,7 +154,7 @@ const stale = staleCatalogRows(rows, { isFile: path => trackedFiles().has(path),
 const dated = rows.filter(row => row.checked).length;
 for (const row of stale) warnings.push(`Catalog row checked ${row.checked}, source changed ${row.changed}: ${row.path} (${row.source})`);
 if (warnings.length) console.warn(warnings.join('\n'));
-console.log(`Catalog: ${dated} of ${rows.length} rows say when they were checked; ${stale.length} of them predate their source's last commit (warning only).`);
+console.log(`Catalog: ${dated} of ${rows.length} rows say when they were checked, ${heldRows} are held by a test, a check or a ledger; ${stale.length} dated rows predate their source's last commit (warning only).`);
 
 if (errors.length) {
   console.error(errors.join('\n'));

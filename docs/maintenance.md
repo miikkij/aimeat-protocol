@@ -27,7 +27,7 @@ Runtime assets require separate behavior tests when their content changes.
    [CLAUDE.md](../CLAUDE.md) for `pnpm gate` and CI.
 
 When adding, moving or retiring a file, update its catalog row with a concrete
-"check against" path and the date it was checked. Use a maintained guide for present
+"check against" path and either the date it was checked or the check that holds it. Use a maintained guide for present
 instructions. Plans, design specifications and build notes live on the node, in the
 AIMEAT development organism (Development, and Platform Development Notes); the repository's
 archive of old plans was removed on 2026-10-11, and git history keeps it. Do not add plans,
@@ -53,10 +53,15 @@ cannot open it. A path is left alone when it is clearly a placeholder: it holds 
 or `...`, one of its names starts with `my-`, `your-` or `example-`, or it has no file extension.
 The rules are in `aimeat/scripts/lib/doc-rules.mjs`.
 
-A catalog row that says "checked YYYY-MM-DD" and names a source file is listed as a warning when
-that file's last commit is newer than the date, with a count at the end of the output. The
-warning does not fail the check: a source changes for many reasons that leave its guide true.
-Read the guide against the change, then move the date.
+Every catalog row says how it stays true. A row that says "checked YYYY-MM-DD" and names a source
+file is listed as a warning when that file's last commit is newer than the date, with a count at
+the end of the output. The warning does not fail the check: read the guide against the change, then
+move the date. Name the narrowest source that decides what the guide says, so a warning means that
+something the guide describes changed. A row that says "held by <check>" names a test, a check
+script or a ledger under `aimeat/test/`, `aimeat/scripts/` or `aimeat/security/` as its source and
+carries no date: the holder fails when the file goes wrong (a runtime asset's loader test, the
+it-adoption ledger). A row with neither fails the check, unless the file is historical, and so does
+a row that is both dated and held.
 
 `pnpm check:doc-links` refuses a string the node serves (in `aimeat/src` and
 `aimeat/public`) that links a repository `docs/` file the node does not serve. A source
