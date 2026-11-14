@@ -82127,7 +82127,8 @@ paths:
         Return the owner's AI spend controls: daily budget, per-app quotas, an optional app
         allowlist, the node defaults, and the node's limits (`voice_msg_max_seconds`, the longest
         voice message the recorder takes, and `stt_max_mb`, the largest audio file transcription
-        takes). Requires the `owner` role. Not removed in node 4.0.0:
+        takes). The owner in person, or the owner's agent holding `memory:write-reserved` and
+        `memory:write-as-owner` (the caller POST admits), which reads its owner's settings. Not removed in node 4.0.0:
         the budget, the quotas and the allowlist have no successor under /v1/ai/providers.
       security:
         - BearerAuth: []

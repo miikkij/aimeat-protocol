@@ -22,6 +22,9 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-11-14 — GET /v1/ai/settings admits the caller POST /v1/ai/settings admits, through the same gate:
+ *     the owner's agent holding memory:write-reserved and memory:write-as-owner reads its owner's
+ *     settings, as aimeat_operator_ai_config shows them (structure programme 2026-11, unit 2b, B17).
  *   2026-11-08 — The files, the audio and the input pictures of a call are read with { storage, config }, so a package file asks the labels its version keeps, as GET /v1/pub does (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  *   2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer aiPayerOf gave
  *     (codebase analysis 2026-11-03, item B1).
@@ -566,10 +569,16 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   // ── GET /v1/ai/settings ── the budget, the per-app caps, the allowlist, and the node's voice limit.
   // Not removed in 4.0.0: nothing under /v1/ai/providers holds these. `limits` is the voice recorder's
   // ceiling, which the inbox read from GET /v1/openrouter/settings until that route was removed.
+  // WHO. The caller POST /v1/ai/settings admits, through the same gate: the owner in person, or their
+  // agent holding memory:write-reserved and memory:write-as-owner, which reads the owner's record
+  // (resolveWriteTarget). aimeat_operator_ai_config showed that agent the budget and GET refused it
+  // (structure programme 2026-11, unit 2b, B17).
   router.get('/v1/ai/settings',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('agent'), requireScope('memory:write-reserved'),
     async (req: Request, res: Response) => {
-      const gaii = resolve(req);
+      const target = resolveWriteTarget(req, config, true);
+      if ('deny' in target) return res.status(403).json(error(config.nodeId, target.deny.code, target.deny.message));
+      const gaii = target.gaii;
       const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
       const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
       res.json(success(config.nodeId, {

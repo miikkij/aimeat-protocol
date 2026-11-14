@@ -838,11 +838,20 @@ await test('B17 REFUSED: alice\'s agent without memory:write-reserved is refused
     assert(tool.isError, `tool: ${tool.text.slice(0, 200)}`);
 });
 
-await test('B17 RECORDED DIFFERENCE (question: may an agent that may set the budget also read it on REST): the tool shows the agent alice\'s budget, GET /v1/ai/settings refuses the same agent', async () => {
+await test('B17 DECIDED (developer approval 2026-11-14): the agent that may set the budget reads it on the tool and GET /v1/ai/settings alike', async () => {
     const tool = await callTool(pbAiMcp, 'aimeat_operator_ai_config', {});
     assert(!tool.isError && tool.data.current.daily_budget_usd === 3, `tool: ${tool.text.slice(0, 300)}`);
     const rest = await call('GET', '/v1/ai/settings', pbAiAg.token);
-    assert(rest.status === 403, `route: ${show(rest)}`);
+    assert(rest.status === 200 && rest.body.data.daily_budget_usd === 3, `route: ${show(rest)}`);
+});
+
+await test('B17 REFUSED: alice\'s agent without memory:write-reserved, and bob\'s agent, cannot read alice\'s budget on the route', async () => {
+    const mine = await call('GET', '/v1/ai/settings', pbAliceAg.token);
+    assert(mine.status === 403, `alice's agent without the word: ${show(mine)}`);
+    const tool = await callTool(pbAliceMcp, 'aimeat_operator_ai_config', {});
+    assert(tool.isError, `tool, without the word: ${tool.text.slice(0, 200)}`);
+    const bob = await call('GET', '/v1/ai/settings', pbBobAg.token);
+    assert(bob.status === 403 || (bob.status === 200 && bob.body.data.daily_budget_usd !== 3), `bob's agent: ${show(bob)}`);
 });
 
 // B10: alice's private capability, read by bob's agent and the operator's agent. The operator's pass
