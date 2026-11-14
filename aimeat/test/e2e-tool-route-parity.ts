@@ -754,11 +754,23 @@ await test('B13 FIXED: the operator\'s agent holding operator:admin reads alice\
     assert(res.includes(pbConsent) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
 });
 
-await test('B13b RECORDED DIFFERENCE (question: may an agent read the consents its owner gave in person): alice\'s agent reads her consent on the resource and gets 403 on the route', async () => {
+await test('B13b DECIDED (developer approval 2026-11-14): alice\'s agent is refused the consent alice gave in person on the route and the resource, and the resource list does not name it', async () => {
     const r = await call('GET', `/v1/consent/${encodeURIComponent(pbConsent)}`, pbAliceAg.token);
     assert(r.status === 403, `route: ${show(r)}`);
     const res = await consentResource(pbAliceMcp, pbConsent);
-    assert(res.includes(pbConsent) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
+    assert(res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
+    const list = await mcpRpc(pbAliceMcp, 'resources/list', {});
+    assert(!JSON.stringify(list).includes(pbConsent), 'the resource list names the consent');
+});
+
+await test('B13b USE KEPT: a consent alice\'s agent gives is read by that agent on the route and the resource', async () => {
+    const g = await call('POST', '/v1/consent', pbAliceAg.token, { data_pattern: `${N('pbagnotes')}.*`, recipient: pbBobAg.gaii, purpose: 'phase B agent consent' });
+    assert(g.status === 201, `grant: ${show(g)}`);
+    const id = g.body.data.id ?? g.body.data.consent?.id;
+    const r = await call('GET', `/v1/consent/${encodeURIComponent(id)}`, pbAliceAg.token);
+    assert(r.status === 200, `route: ${show(r)}`);
+    const res = await consentResource(pbAliceMcp, id);
+    assert(res.includes(id) && !res.includes('ACCESS_DENIED'), `resource: ${res.slice(0, 200)}`);
 });
 
 // B16: alice's public, members and private records read by bob's agent on aimeat_memory_read_public

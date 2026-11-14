@@ -231,7 +231,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         // Another person's record: the operator's pass (operatorOverride) admits the operator and the
         // operator's agent holding operator:admin, and writes the operator trail. The same function
         // answers the consent-record MCP resource.
-        const read = await consentRecordFor(storage, config, callerOf(req, config.nodeId, storage), id, 'principal');
+        const read = await consentRecordFor(storage, config, callerOf(req, config.nodeId, storage), id);
 
         if (read.status === 'missing') {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Consent not found: ${id}`));

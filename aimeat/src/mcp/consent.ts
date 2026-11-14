@@ -11,6 +11,9 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — The consent-record resource lists and reads the consents the session's principal
+ *     holds, as GET /v1/consent and /v1/consent/:id do: an agent no longer names or reads a consent its
+ *     owner gave in person there (unit 2b, B13b). aimeat_consent_list stays account-wide.
  *   2026-11-14 — The consent-record resource reads through consentRecordFor (services/consent/consent-read.ts),
  *     as GET /v1/consent/:id does: the operator's agent holding operator:admin reads another owner's
  *     consent, with the operator trail (unit 2b, B13).
@@ -105,8 +108,9 @@ export function registerConsentTools(
         'consent-record',
         new ResourceTemplate('aimeat://consent/{id}', {
             list: async () => {
-                const ghii = ownerGhii();
-                const consents = await listAccountConsents(storage, ghii);
+                // The consents the session's principal holds, as GET /v1/consent lists them: an agent
+                // names its own, never the ones its owner gave in person.
+                const consents = await listAccountConsents(storage, caller().principal);
                 return {
                     resources: consents.map(c => ({
                         uri: `aimeat://consent/${encodeURIComponent(c.id)}`,
@@ -120,9 +124,9 @@ export function registerConsentTools(
         { mimeType: 'application/json', description: 'Consent record details' },
         async (uri, variables) => {
             const id = decodeURIComponent(variables.id as string);
-            // The account's consents, as aimeat_consent_list reads them, or the operator's pass; the
-            // same function answers GET /v1/consent/:id (for the session's principal).
-            const read = await consentRecordFor(storage, config, caller(), id, 'account');
+            // A consent the session's principal holds, or the operator's pass: the function GET
+            // /v1/consent/:id asks.
+            const read = await consentRecordFor(storage, config, caller(), id);
             if (read.status === 'missing') return { contents: [{ uri: uri.toString(), text: 'Consent not found' }] };
 
             if (read.status === 'refused') {
