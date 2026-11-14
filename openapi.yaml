@@ -2823,14 +2823,15 @@ components:
 
     WorkRating:
       type: object
-      required: [score]
+      description: As models/schemas.ts WorkRatingSchema reads it; other fields are ignored.
+      required: [rating]
       properties:
-        score:
-          type: integer
-          minimum: 1
-          maximum: 5
+        rating:
+          type: string
+          enum: [positive, negative]
         comment:
           type: string
+          maxLength: 10000
 
     # === Disputes ===
     DisputeOpen:
