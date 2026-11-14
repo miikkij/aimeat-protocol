@@ -67135,15 +67135,19 @@ paths:
           application/json:
             schema:
               type: object
-              required: [type]
+              required: [type, message]
               properties:
                 type:
                   type: string
-                  enum: [progress, log, stalled]
+                  enum: [started, progress, todo_completed, todo_failed, memory_write, extension_install, app_publish, verification, completed, failed, message, revision_requested]
+                  description: The event types AgentTaskEventSchema (models/agent-task-schemas.ts) takes.
                 message:
                   type: string
+                  minLength: 1
+                  maxLength: 4096
                 details:
                   type: object
+                  description: Free-form event details. A `telemetry` object (ai_calls, tokens_in, tokens_out, duration_seconds) is added to the task's totals.
       responses:
         '200':
           description: Event added
