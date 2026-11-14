@@ -63253,9 +63253,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [label]
               properties:
-                label: { type: string }
+                label: { type: string, description: 'The name of this install. Absent or empty: "<package name> instance".' }
                 version: { type: string, description: 'Specific version to install; defaults to latest published.' }
                 dry_run: { type: boolean, description: 'Report what would be registered and register nothing. With install role operator the preview lists in extension_code_awaits_operator the extension components a real install would store switched off, waiting for an operator.' }
                 mode:
