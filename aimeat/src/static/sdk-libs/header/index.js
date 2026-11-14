@@ -10,9 +10,19 @@
  *   a self-running shim (mounts into #aimeat-header or prepends to <body>) — it does not attach to
  *   window.AIMEAT. From _core it takes only the language (lang.js), which touches no namespace.
  * @structure readLang/readTheme/applyTheme/flatten/ensureThemeCss/loadScript/loadTranslations/
- *   modalI18n/buildMarkup/wire/refreshSession/init — runs init() on DOM ready.
+ *   loadNavConfig/modalI18n/buildMarkup/wire/fitBar/refreshSession/init — runs init() on DOM ready.
+ *   The links themselves are data in ./nav.js.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.5.0 — 2026-11-14 — The bar is the shell's bar again. A signed-in person gets Home, Messages,
+ *     Agents and Chat (in the shell since 2026-10-18 and never here), Apps opens /v1/appcat in the
+ *     same tab (it opened the old /app-catalog.html in a new one), and the wordmark takes them home.
+ *     The public links follow the operator's order and hidden list (/v1/site/header-nav) and carry
+ *     Learn when the node has one; a customer's node and a signed-in-only node get the shorter bar
+ *     the shell gives them (window.__AIMEAT_HEADER_CFG__, written by routes/libs.ts). The bar folds
+ *     to the menu button when it measures an overflow, as the shell's does: eight links and the pill
+ *     do not fit every window above the stylesheet's fixed width. The links moved to ./nav.js, which
+ *     test/unit/sdk-header-nav.test.ts holds against spa.html.
  *   v1.4.0 — 2026-11-12 — A language button asks for the page again without ?lang= in the address,
  *     which would otherwise win over the button, and the press carries the pick mark (writeLang),
  *     so the node's front page follows it.
@@ -29,6 +39,7 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-header.ts (SDK-libs migration Phase 1).
  */
 import { readLang as resolveLang, writeLang } from '../_core/lang.js';
+import { headerLinks, linkShown, brandPath } from './nav.js';
 
 if (!window.__AIMEAT_HEADER_MOUNTED__) {
   window.__AIMEAT_HEADER_MOUNTED__ = true;
@@ -39,9 +50,8 @@ function main() {
   var THEME_KEY = 'aimeat-theme';
   // The languages the node ships UI text in. Mirrors LOCALES in src/i18n.ts.
   var LANGS = ['en', 'fi', 'es'];
+  // The links carry their own fallback text (./nav.js); these two are the pill's.
   var NAV_FALLBACK = {
-    'nav.howItWorks': 'How it works', 'nav.business': 'For your business', 'nav.help': 'Help',
-    'nav.apps': 'Apps', 'nav.profile': 'Profile', 'nav.admin': 'Admin',
     'nav.themeToDark': 'Switch to dark mode', 'nav.themeToLight': 'Switch to light mode',
   };
 
@@ -116,6 +126,25 @@ function main() {
     return t;
   }
 
+  /**
+   * The operator's arrangement of the public links (their order and the hidden ones). Public, and
+   * the same answer the shell's bar reads. A failed request leaves the declared order.
+   */
+  async function loadNavConfig() {
+    try {
+      var r = await fetch('/v1/site/header-nav');
+      var d = r.ok ? await r.json() : null;
+      return (d && d.ok && d.data) ? d.data : null;
+    } catch (err) {
+      console.warn('AIMEAT header: the order of the public links was not read; the declared order stands', err);
+      return null;
+    }
+  }
+
+  function esc(v) {
+    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   function modalI18n(t) {
     var keys = ['descNew', 'descReturning', 'usernameLabel', 'usernamePlaceholder', 'passwordLabel',
       'passwordPlaceholder', 'displayNameLabel', 'displayNameHint', 'displayNamePlaceholder', 'signInBtn',
@@ -150,27 +179,25 @@ function main() {
     return m ? m[1] + m[2] + path : path;
   }
 
-  function buildMarkup(t) {
-    function label(k) { return t[k] || NAV_FALLBACK[k] || k; }
+  function buildMarkup(t, links) {
     var nav = document.createElement('nav');
     nav.className = 'topnav';
     nav.innerHTML =
       '<div style="display:flex;align-items:center;gap:20px">' +
-        '<a href="' + nodeHref('/v1/portal') + '" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a>' +
+        '<a href="' + nodeHref(brandPath(false)) + '" class="topnav-brand" data-brand>AIME<span class="heart">♥</span><span class="brand-at">AT</span></a>' +
         '<span class="brand-morsels" data-morsels style="display:none"></span>' +
       '</div>' +
       '<div class="topnav-right">' +
         '<button class="topnav-burger" aria-label="Menu" data-burger>☰</button>' +
         '<div class="topnav-menu" data-menu>' +
-          // Same split as the SPA header (spa.html PUBLIC_NAV_LINKS `when`): the marketing pages
-          // are for someone who has not signed in, and they step aside for Apps/Profile/Admin the
-          // moment there is a session. One row, five targets at most, in either state.
-          '<a href="' + nodeHref('/v1/how-it-works') + '" data-anon-only>' + label('nav.howItWorks') + '</a>' +
-          '<a href="' + nodeHref('/v1/business') + '" data-anon-only>' + label('nav.business') + '</a>' +
-          '<a href="' + nodeHref('/v1/help') + '">' + label('nav.help') + '</a>' +
-          '<a href="' + nodeHref('/app-catalog.html') + '" target="_blank" data-auth-only style="display:none">' + label('nav.apps') + '</a>' +
-          '<a href="' + nodeHref('/v1/profile') + '" class="profile-link visible" data-auth-only style="display:none">' + label('nav.profile') + '</a>' +
-          '<a href="' + nodeHref('/v1/admin') + '" data-operator-only style="display:none">' + label('nav.admin') + '</a>' +
+          // The shell's links (./nav.js): the marketing pages for someone who has not signed in,
+          // and Home, Messages, Agents, Chat, Apps and Settings the moment there is a session.
+          // Every one is drawn hidden and refreshSession shows the ones this session gets.
+          links.map(function (l, i) {
+            return '<a href="' + esc(l.external ? l.href : nodeHref(l.href)) + '" data-link="' + i + '"' +
+              (l.cls ? ' class="' + l.cls + '"' : '') + (l.external ? ' target="_blank" rel="noopener"' : '') +
+              ' style="display:none">' + esc(t[l.key] || l.fallback) + '</a>';
+          }).join('') +
           '<div class="topnav-center">' +
             // Theme toggle now lives inside the login pill (mountLoginButton) — see init().
             LANGS.map(function (l) {
@@ -215,19 +242,35 @@ function main() {
     });
   }
 
-  function refreshSession(nav, t) {
+  /**
+   * Fold the bar to the menu button when its row does not fit, by measurement (spa.html Header does
+   * the same, and components/top-bar.css draws `.topnav--compact`). How much room the row needs
+   * depends on the session and the language, which a fixed width cannot know. The test runs with
+   * the bar expanded, since a folded bar always fits; no paint happens in between.
+   */
+  function fitBar(nav) {
+    var menu = nav.querySelector('[data-menu]');
+    var wasCompact = nav.classList.contains('topnav--compact');
+    if (wasCompact) nav.classList.remove('topnav--compact');
+    var group = /** @type {HTMLElement|null} */ (nav.lastElementChild);
+    var contentRight = nav.getBoundingClientRect().right - (parseFloat(getComputedStyle(nav).paddingRight) || 0);
+    var overflows = nav.scrollWidth > nav.clientWidth + 1 ||
+      (!!group && (group.scrollWidth > group.clientWidth + 1 || group.getBoundingClientRect().right > contentRight + 1));
+    nav.classList.toggle('topnav--compact', overflows);
+    if (!overflows && wasCompact && menu) menu.classList.remove('open');
+  }
+
+  function refreshSession(nav, t, links, site) {
     var hasSession = !!(window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.hasSession);
     var session = hasSession && window.AIMEAT.auth.getSession ? window.AIMEAT.auth.getSession() : null;
-    nav.querySelectorAll('[data-auth-only]').forEach(function (el) {
-      /** @type {HTMLElement} */ (el).style.display = session ? '' : 'none';
+    nav.querySelectorAll('[data-link]').forEach(function (el) {
+      var link = links[Number(el.getAttribute('data-link'))];
+      /** @type {HTMLElement} */ (el).style.display = (link && linkShown(link, session)) ? '' : 'none';
     });
-    nav.querySelectorAll('[data-anon-only]').forEach(function (el) {
-      /** @type {HTMLElement} */ (el).style.display = session ? 'none' : '';
-    });
+    // The wordmark goes to one place per session state: the home signed in, the front page signed out.
+    var brand = nav.querySelector('[data-brand]');
+    if (brand) brand.setAttribute('href', nodeHref(brandPath(!!session)));
     var isOp = session && session.roles && session.roles.indexOf('operator') !== -1;
-    nav.querySelectorAll('[data-operator-only]').forEach(function (el) {
-      /** @type {HTMLElement} */ (el).style.display = isOp ? '' : 'none';
-    });
     var updateEl = /** @type {HTMLElement} */ (nav.querySelector('[data-node-update]'));
     updateEl.style.display = 'none';
     if (isOp && session.jwt) {
@@ -243,7 +286,8 @@ function main() {
         .catch(function () { updateEl.style.display = 'none'; });
     }
     var morselEl = /** @type {HTMLElement} */ (nav.querySelector('[data-morsels]'));
-    if (session && session.jwt) {
+    // A bare number by the wordmark says nothing to the buyer of a customer's node (as in the shell).
+    if (session && session.jwt && !site.customerNode) {
       fetch('/v1/wallet', { headers: { 'Authorization': 'Bearer ' + session.jwt } })
         .then(function (r) { return r.json(); })
         .then(function (d) {
@@ -264,8 +308,12 @@ function main() {
     var lang = readLang();
     document.documentElement.lang = lang;
 
-    var t = await loadTranslations(lang);
-    var nav = buildMarkup(t);
+    // What the node says about itself for this bar (routes/libs.ts writes it before the bundle).
+    var site = window.__AIMEAT_HEADER_CFG__ || {};
+    var loaded = await Promise.all([loadTranslations(lang), loadNavConfig()]);
+    var t = loaded[0];
+    var links = headerLinks(site, loaded[1]);
+    var nav = buildMarkup(t, links);
 
     var mount = document.getElementById('aimeat-header');
     if (mount) { mount.appendChild(nav); }
@@ -295,8 +343,25 @@ function main() {
       } catch (e) { console.error('AIMEAT header: auth mount failed', e); }
     }
     mountPill();
-    refreshSession(nav, t);
-    window.addEventListener('aimeat-auth-change', function () { refreshSession(nav, t); });
+    refreshSession(nav, t, links, site);
+    window.addEventListener('aimeat-auth-change', function () { refreshSession(nav, t, links, site); });
+
+    // The row is measured whenever its width or its contents change: the window, the session (the
+    // pill and the links), a font arriving late.
+    var raf = 0;
+    function schedule() {
+      if (raf) return;
+      raf = requestAnimationFrame(function () { raf = 0; fitBar(nav); });
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+      var ro = new ResizeObserver(schedule);
+      ro.observe(nav);
+      var slot = nav.querySelector('#headerAuth');
+      if (slot) ro.observe(slot);
+    }
+    window.addEventListener('resize', schedule);
+    window.addEventListener('aimeat-auth-change', schedule);
+    schedule();
   }
 
   if (document.readyState === 'loading') {

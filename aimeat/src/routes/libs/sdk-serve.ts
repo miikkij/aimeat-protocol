@@ -8,9 +8,11 @@
  *   reads as the final fallback in its `<meta> → location.origin → prelude` resolution. This replaces
  *   the old build-time `${config.baseUrl}` / `${config.nodeId}` interpolation into a JS string.
  *   Bundles are read once and cached in memory; the prelude is the only per-request variance.
- * @structure configPrelude(config) · readSdkBundle(name) · sdkLibSource(config, name)
+ * @structure configPrelude(config) · headerPrelude(config) · readSdkBundle(name) · sdkLibSource(config, name)
  * @usage import { sdkLibSource } from './libs/sdk-serve.js';  sendJavascriptLibrary(res, sdkLibSource(config, 'speech'));
  * @version-history
+ *   v1.2.0 — 2026-11-14 — headerPrelude(): what the served header needs to draw the shell's bar on a
+ *     page outside the shell (the Learn link, a customer's node, a signed-in-only node).
  *   v1.1.0 — 2026-10-31 — The prelude carries `defaultLocale` (site.default_locale) when the node names one.
  *   v1.0.0 — 2026-07-19 — Initial: prelude + committed-bundle serving (SDK-libs migration Phase 0).
  */
@@ -18,6 +20,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../../config.js';
+import { signedInOnly } from '../../config/visibility.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -50,6 +53,23 @@ export function configPrelude(config: AimeatConfig): string {
     ...(defaultLocale ? { defaultLocale } : {}),
   };
   return `window.__AIMEAT_SDK_CFG__=${JSON.stringify(cfg)};\n`;
+}
+
+/**
+ * The header's own prelude, `window.__AIMEAT_HEADER_CFG__`: what the node says about itself for the
+ * bar. The shell's bar reads the same three facts from window.__SITE (routes/portal-spa.ts), which a
+ * page outside the shell does not carry: the operator's Learn address (site.learn), whether this is
+ * a customer's node (site.purchase_plan is set) and whether the node shows its content to signed-in
+ * accounts only. All three are already public there; a fact that is not set is left out.
+ */
+export function headerPrelude(config: AimeatConfig): string {
+  const learn = (config.siteLinks?.learn ?? '').trim();
+  const cfg = {
+    ...(learn ? { learn } : {}),
+    ...((config.siteLinks?.purchasePlan ?? '').trim() ? { customerNode: true } : {}),
+    ...(signedInOnly(config) ? { signedInOnly: true } : {}),
+  };
+  return `window.__AIMEAT_HEADER_CFG__=${JSON.stringify(cfg)};\n`;
 }
 
 /** Read (and cache) the committed IIFE bundle for `name` → the static text served to every node. */
