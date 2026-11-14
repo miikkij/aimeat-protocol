@@ -5,7 +5,8 @@
  * @description The labels of the spaces and fields the node's own workspace shapes make, in the three
  *   languages the node ships, written into each workspace's `manifest.i18n` (space labels at
  *   "type.<name>", field labels at "<namespace>.<field>"). The workspace page already reads that block
- *   for the reader's language (public/views/profile/organisms/workspace.js wsT), the way a workspace
+ *   for the reader's language (public/views/profile/organisms/workspace.js wsT; the summary under the
+ *   workspace's title at "summary"), the way a workspace
  *   an AI generated carries it; a shaped workspace carried none, so every reader saw the raw
  *   identifiers (page, decision, title, why).
  * @structure SPACE_LABELS · FIELD_LABELS · manifestI18n
@@ -65,9 +66,11 @@ export const FIELD_LABELS: Record<string, L> = {
     visibility: { en: 'Visibility', fi: 'Näkyvyys', es: 'Visibilidad' },
 };
 
-/** The `manifest.i18n` block for a workspace's spaces: every space and every labelled field, in en, fi and es. */
-export function manifestI18n(spaces: readonly { name: string; namespace: string; schema?: Record<string, unknown> }[]): Record<'en' | 'fi' | 'es', Record<string, string>> {
+/** The `manifest.i18n` block for a workspace: its summary ("summary"), every space and every labelled
+ *  field, in en, fi and es. */
+export function manifestI18n(spaces: readonly { name: string; namespace: string; schema?: Record<string, unknown> }[], summary?: L): Record<'en' | 'fi' | 'es', Record<string, string>> {
     const out: Record<'en' | 'fi' | 'es', Record<string, string>> = { en: {}, fi: {}, es: {} };
+    if (summary) for (const lang of ['en', 'fi', 'es'] as const) out[lang].summary = summary[lang];
     for (const s of spaces) {
         const label = SPACE_LABELS[s.name];
         if (label) for (const lang of ['en', 'fi', 'es'] as const) out[lang][`type.${s.name}`] = label[lang];

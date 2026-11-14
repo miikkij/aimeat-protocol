@@ -15,7 +15,7 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
- *   v1.14.2 -- 2026-11-14 -- A team workspace's title and its team in the crumb are in the reader's language (team setup T24).
+ *   v1.14.2 -- 2026-11-14 -- A team workspace's title and its team in the crumb are in the reader's language, and the summary under the title is the manifest's `i18n.summary` for the reader when it has one (team setup T24).
  *   v1.14.1 -- 2026-10-18 -- The figure strip's "{n} types" and "{n} spaces" in the language's plural form (i18n.js tn): "1 space".
  *   v1.14.0 -- 2026-10-16 -- A document space's head offers "+ HTML page" beside "+ New document".
  *   v1.13.0 -- 2026-09-26 -- Every part is a library component that takes data: the cover and every page
@@ -301,7 +301,7 @@ function renderCover(ctx) {
         ws.manifest?.updatedAt ? { label: `${tr('organisms.lastSaved', 'Last saved')} ${fmtDate(ws.manifest.updatedAt)}` } : null,
         showArchived ? { tone: 'sun', label: tr('organisms.archivedView', 'Archived view') } : null,
       ]}
-      desc=${ws.manifest?.summary || null} actions=${actions} strip=${strip}
+      desc=${ctx.wsT?.('summary') || ws.manifest?.summary || null} actions=${actions} strip=${strip}
       side=${railTree ? renderTree(ctx, 'overview') : null}
       rail=${railTree ? null : { title: RAIL_TITLE(), groups: [
         { label: RAIL_TITLE(), items: sectionItems },

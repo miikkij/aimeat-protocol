@@ -203,7 +203,7 @@ export function shapeWorkspaceInput(shape: OrganismShape, index: number, lang: s
     const manifest = {
         manifestVersion: '1.0', id: '', name, kind: shape.id, language: lang, summary: purpose, status: 'active',
         // The space and field labels in every language, which the workspace page reads for its reader.
-        i18n: manifestI18n(ws.spaces),
+        i18n: manifestI18n(ws.spaces, ws.purpose),
         ...(shape.manifestExtra ?? {}),
         objectTypes: ws.spaces.map(s => ({
             name: s.name, schemaRef: `schema:${shape.id}/${s.name}@1`, namespace: s.namespace, mode: s.mode,

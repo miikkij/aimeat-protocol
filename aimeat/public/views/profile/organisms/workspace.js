@@ -120,7 +120,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     let cancelled = false;
     orgService.listWorkspaces(orgId).then(list => {
       if (cancelled) return;
-      const name = wsDisplayName(org, wsId, (list.find(w => w.id === wsId)?.name) || '');
+      const name = (list.find(w => w.id === wsId)?.name) || '';
       setWsName(name);
       // Feed the home page's "Continue" list with a real display name.
       recordRecent({ type: 'workspace', id: `${orgId}/${wsId}`, label: name || wsId, sub: org.name || '', data: { orgId, wsId } });
@@ -710,7 +710,10 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     } catch (e) { showToast((e && e.message) || 'Failed to build prompt'); }
   }, [orgId, org, wsId, ws, showToast]);
 
-  const back = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws });
+  // A team workspace's name in the reader's language, decided when the page draws, by which time the
+  // organism (and its team names) has loaded even on a cold link.
+  const shownWsName = wsDisplayName(org, wsId, wsName);
+  const back = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName: shownWsName, ws });
 
   if (ws === undefined) return html`<div><${Crumb} steps=${back} /><${Note} kind="loading">${t('organisms.loading') || 'Loading...'}<//></div>`;
 
@@ -749,7 +752,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   // One ctx bag threaded to every extracted render function (cover, doc-space, record-space,
   // overview, panels). Assembled once per render; the parent still owns all hooks/state/callbacks above.
   const rctx = {
-    orgId, wsId, org, ws, wsName, busy, showArchived, setShowArchived, allTypes, wsCanEdit, showToast, load,
+    orgId, wsId, org, ws, wsName: shownWsName, busy, showArchived, setShowArchived, allTypes, wsCanEdit, showToast, load,
     onBack, onBackToList, activeDoc, setActiveDoc, expandedSeries, setExpandedSeries, editingSec, setEditingSec,
     expandedRec, setExpandedRec, adding, addingId, addingSchema, addingInitial,
     sectionsByType, wsEvents, wsObjectives, wsGraph, wsTocSeed, saveWsReadme, onWsMapNav,
