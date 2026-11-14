@@ -26,7 +26,9 @@
  *   - the opened organism is organism-ownership-tab.detail.js
  * @usage registered in views/admin.js under the Identity group
  * @version-history
- *   v3.0.0 — 2026-09-27 — Library components only (the admin pages on the shared set): Section,
+ *   v3.1.0 — 2026-11-15 — The teams on this node, counts only, after the opened organism
+ *     (organism-ownership-tab.teams.js, GET /v1/admin/teams; team setup T16).
+ *   v3.0.0 — 2026-09-27 —Library components only (the admin pages on the shared set): Section,
  *     Verdict, FigureStrip, the List, the filter Tabs, TextField, More, SettingBox; the question's
  *     rows are Facts in a Box. The page sheet admin-organism-ownership.css goes.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
@@ -62,6 +64,7 @@ import { Row as Line, Stack } from '/components/Layout.js';
 import { getAdminOrganisms, getOrganismOwnership, addOrganismOwner } from '/js/services/admin.js';
 import { decorate, summarise, counts, search, FILTERS, PAGE } from './organism-ownership-tab.model.js';
 import OrganismDetail, { ownerMarks } from './organism-ownership-tab.detail.js';
+import { AdminTeams, useAdminTeams } from './organism-ownership-tab.teams.js';
 
 const O = (key, params) => t('admin.orgOwnership.' + key, params);
 const day = (iso) => (iso ? fmtDate(iso) : '—');
@@ -86,6 +89,7 @@ export default function OrganismOwnershipTab({ data, reload }) {
   const [openId, setOpenId] = useState(null);
   const [ownership, setOwnership] = useState(null);
   const [busy, setBusy] = useState(false);
+  const teams = useAdminTeams();
 
   // Memoised because every fold below depends on it, and `data.owners || []` would be a new array
   // on every render of the shell, which re-runs all four of them for nothing.
@@ -273,7 +277,9 @@ export default function OrganismOwnershipTab({ data, reload }) {
           onClose=${() => { setOpenId(null); setOwnership(null); }}
           onAdd=${askAdd} />`}
 
-      <${Section} id=${ACTS_ID} num=${openRow ? '04' : '03'} title=${O('actsTitle')}>
+      ${teams ? html`<${AdminTeams} view=${teams} num=${openRow ? '04' : '03'} />` : null}
+
+      <${Section} id=${ACTS_ID} num=${String(3 + (teams ? 1 : 0) + (openRow ? 1 : 0)).padStart(2, '0')} title=${O('actsTitle')}>
         <${CardGrid} cols="sections">
           <${SettingBox} label=${O('crossLabel')}>
             <p>${O('crossBody')}</p>

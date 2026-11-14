@@ -404,6 +404,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/admin/agents${query({ limit: optionalNumber(input, 'limit') })}`),
     },
     {
+        // → GET /v1/admin/teams
+        name: 'aimeat_admin_teams',
+        handler: ({ client }) => client.get('/v1/admin/teams'),
+    },
+    {
         name: 'aimeat_admin_config',
         handler: ({ client }, input) => client.get(`/v1/admin/config${query({
             section: optionalString(input, 'section'), q: optionalString(input, 'q'),

@@ -427,6 +427,16 @@ export const discoveryWorkBoardsTools = [
         },
     },
     {
+        name: 'aimeat_admin_teams',
+        description: 'Operator-only. Every team on the node with counts only: the leads, how many members and how many of them for a set time, how many have their own AI connected, when the team last changed shape, its last day, and the decisions, open matters and waiting items of the last seven days. No team content: that is read by the team\'s members. Use it when the operator asks which teams exist, which ones have gone quiet, or where AIs are not connected yet.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        annotations: { title: 'Admin: Teams', readOnlyHint: true },
+        scope: 'operator:admin',
+        surfaces: ['admin'],
+        input: {},
+    },
+    {
         name: 'aimeat_admin_config',
         description: 'Operator-only. Every node setting the admin Config page shows, the same list as GET /v1/admin/config: each one\'s value, type, range or choices, where the value comes from (default, env, file, consul, database or sealed), whether it can be changed here (`editable`), whether a saved value waits for the next start (`appliesAt: "restart"`, `restartPending`), and settings set by whoever runs this node (`sealed`). A secret shows only whether it is set (`<path>_configured`), and `set_path` when the operator may set it. The whole list is over four hundred settings: pass `section` (the first part of a path, such as ai, auth, packages) or `q` (text in a path or description) for the part you need. Change a setting with aimeat_admin_config_set. Returns an operator-role error for non-operators.',
         caller: 'operator',

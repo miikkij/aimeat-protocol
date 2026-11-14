@@ -5059,6 +5059,23 @@
       "bundleFor": "Written for {name}: its own config path and the install line that works there."
     },
     "orgOwnership": {
+      "teams": {
+        "title": "All teams",
+        "sub": "{count} teams. In {quiet} of them, some members have not connected their own AI yet.",
+        "partial": "Only the first 1000 organisms were looked through, so a team may be missing.",
+        "colTeam": "Team",
+        "colState": "State",
+        "colPeople": "People",
+        "colChanged": "Last change",
+        "leads": "Leads: {names}",
+        "team": "team",
+        "virtual": "virtual team",
+        "ai": "AI {n}/{of}",
+        "temporary": "{n} for a set time",
+        "ends": "ends {date}",
+        "week": "last 7 days: {decided} decided, {open} open, {waiting} waiting",
+        "privacy": "You see counts only. A team's records, decisions and context are for its members: running this AIMEAT does not make you one."
+      },
       "desc": "Put an owner back on an organism whose own owners can no longer be reached. Adding is additive: nobody inside loses anything.",
       "idPlaceholder": "Organism id",
       "look": "Look up",

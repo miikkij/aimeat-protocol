@@ -80,6 +80,7 @@ export const enableOwner     = (name) => apiPost(`/v1/admin/owners/${encodeURICo
 
 // ── Organism ownership: the operator's break-glass over an organism nobody inside can repair ──
 export const getAdminOrganisms   = (archived) => apiGet(`/v1/admin/organisms${archived ? '?archived=include' : ''}`);
+export const getAdminTeams       = () => apiGet('/v1/admin/teams');
 export const getOrganismOwnership = (id) => apiGet(`/v1/admin/organisms/${encodeURIComponent(id)}/ownership`);
 export const addOrganismOwner    = (id, ghii) => apiPost(`/v1/admin/organisms/${encodeURIComponent(id)}/ownership`, { ghii });
 

@@ -17,10 +17,12 @@
  * @structure
  *   - adminOrganismsRouter(config, storage): Router factory
  *   - GET  /v1/admin/organisms: every organism on this node and who holds it
+ *   - GET  /v1/admin/teams: every team on this node, counts only (team setup T16)
  *   - GET  /v1/admin/organisms/:id/ownership: read the ownership state before changing it
  *   - POST /v1/admin/organisms/:id/ownership: install `ghii` as the organism's creator
  *
  * @version-history
+ *   v1.2.0 — 2026-11-15 — GET /v1/admin/teams (services/node-admin/teams-view.ts; team setup T16).
  *   v1.1.1 — 2026-11-13 — GET /:id/ownership reads through services/node-admin/organism-ownership-view.ts,
  *     which aimeat_admin_organism_ownership reads too (structure programme 2026-11, unit 2b).
  *   v1.1.0 — 2026-09-12 — GET /v1/admin/organisms. The repair door took an organism id, and no
@@ -33,11 +35,12 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireOperatorPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireOperatorPrincipal, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { addOrganismOwner, organismOwners } from '../../services/organism-ownership.js';
 import { organismOwnershipView } from '../../services/node-admin/organism-ownership-view.js';
+import { nodeTeamsView } from '../../services/node-admin/teams-view.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -79,6 +82,17 @@ export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Ro
             method: 'GET',
             url: '/v1/admin/organisms/{id}/ownership',
         }]));
+    });
+
+    /* ── GET /v1/admin/teams ──
+     * Every team on this node with counts only: leads, members, connected AIs, last change and the
+     * week's numbers (services/node-admin/teams-view.ts, which aimeat_admin_teams reads too). No
+     * team content: the operator runs the node and is not a member of its teams by doing so. */
+    // operator:admin, the word of the operator's read-only node views, not the repair word: this
+    // reads counts and changes nothing.
+    router.get('/v1/admin/teams', requireAuth(), requireOperator(storage), async (req, res) => {
+        const locale = (await storage.getGHIIByOwner(req.auth!.owner))?.locale ?? null;
+        res.json(success(config.nodeId, await nodeTeamsView(storage, { now: Date.now(), locale })));
     });
 
     /* ── GET /v1/admin/organisms/:id/ownership ──

@@ -13,6 +13,8 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-11-15 — aimeat_admin_teams: every team on the node, counts only, through
+ *     services/node-admin/teams-view.ts as GET /v1/admin/teams reads it (team setup T16).
  *   2026-11-14 — aimeat_admin_agents reads through operatorAgentList (services/node-admin/agent-list.ts), as
  *     GET /v1/admin/agents does: a limit that is not a positive whole number lists every agent (unit 2b, B6).
  *   2026-11-13 — aimeat_admin_stats reads through services/node-admin/activity.ts, the reads and 24-hour
@@ -65,6 +67,8 @@ import { mintMorsels, morselsInCirculation } from '../services/morsel.js';
 import { nodeActivity } from '../services/node-admin/activity.js';
 import { addOrganismOwner } from '../services/organism-ownership.js';
 import { organismOwnershipView } from '../services/node-admin/organism-ownership-view.js';
+import { nodeTeamsView } from '../services/node-admin/teams-view.js';
+import { parseGAII } from '../utils/gaii.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
@@ -233,6 +237,25 @@ export function registerCoreAdminTools(
             }
             emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: minted.minted, new_balance: minted.newBalance }, null, 2) }] };
+        },
+    );
+
+    // ── aimeat_admin_teams ──
+    // Counts only, read through services/node-admin/teams-view.ts as GET /v1/admin/teams reads it.
+    mcp.registerTool(
+        'aimeat_admin_teams',
+        {
+            description: descriptionFor('aimeat_admin_teams'),
+            inputSchema: zodShapeFor('aimeat_admin_teams'),
+            annotations: annotationsFor('aimeat_admin_teams'),
+        },
+        async () => {
+            if (!(await isOperator())) return notOperator;
+            // The team names in the operator's own language, as the REST door gives them.
+            const owner = parseGAII(agentGaii)?.owner ?? null;
+            const locale = owner ? (await storage.getGHIIByOwner(owner))?.locale ?? null : null;
+            const view = await nodeTeamsView(storage, { now: Date.now(), locale });
+            return { content: [{ type: 'text' as const, text: JSON.stringify(view, null, 2) }] };
         },
     );
 

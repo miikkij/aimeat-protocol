@@ -5103,6 +5103,23 @@
       "bundleFor": "Kirjoitettu kohteelle {name}: sen oma asetuspolku ja siellä toimiva asennusrivi."
     },
     "orgOwnership": {
+      "teams": {
+        "title": "Kaikki tiimit",
+        "sub": "Tiimejä on {count}. Niistä {quiet} tiimissä joku jäsen ei ole vielä liittänyt omaa tekoälyään.",
+        "partial": "Läpi käytiin vain ensimmäiset 1000 organismia, joten jokin tiimi voi puuttua.",
+        "colTeam": "Tiimi",
+        "colState": "Tila",
+        "colPeople": "Ihmiset",
+        "colChanged": "Viimeksi muuttunut",
+        "leads": "Vetäjät: {names}",
+        "team": "tiimi",
+        "virtual": "virtuaalitiimi",
+        "ai": "Tekoäly {n}/{of}",
+        "temporary": "{n} määräajan",
+        "ends": "päättyy {date}",
+        "week": "7 päivää: {decided} päätetty, {open} auki, {waiting} odottaa",
+        "privacy": "Näet vain lukumäärät. Tiimin tietueet, päätökset ja konteksti kuuluvat sen jäsenille. Ylläpito ei tee sinusta jäsentä."
+      },
       "desc": "Palauta omistaja organismiin jonka omiin omistajiin ei enää saa yhteyttä. Lisäys on lisäävä: kukaan sisällä ei menetä mitään.",
       "idPlaceholder": "Organismin tunnus",
       "look": "Hae",

@@ -37615,6 +37615,62 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/admin/teams:
+    get:
+      operationId: adminListTeams
+      summary: Every team on this node, counts only (operator)
+      description: |
+        The teams on this node as the operator sees them: the leads, how many members and how many
+        of them for a set time, how many have their own AI connected, when the team's shape last
+        changed, its last day when it has one, and the number of decisions, open matters and
+        waiting items of the last seven days. No record, title or team context is returned: a
+        team's content is read by its members.
+
+        At most 1000 organisms are looked through; `complete` says whether that was all of them.
+        Reserved to the node operator; the MCP twin is `aimeat_admin_teams`.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The teams on this node
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          teams:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                organism_id: { type: string }
+                                name: { type: string }
+                                kind: { type: string, enum: [team, virtual] }
+                                team_type: { type: string }
+                                leads: { type: array, items: { type: string } }
+                                members: { type: integer }
+                                temporary: { type: integer }
+                                ai_connected: { type: integer }
+                                last_change: { type: string, format: date-time, nullable: true }
+                                ends_on: { type: string, nullable: true }
+                                week:
+                                  type: object
+                                  properties:
+                                    decided: { type: integer }
+                                    open: { type: integer }
+                                    waiting: { type: integer }
+                                created_at: { type: string, format: date-time }
+                          count: { type: integer }
+                          complete: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/admin/organisms:
     get:
       operationId: adminListOrganisms

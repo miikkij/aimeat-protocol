@@ -4029,6 +4029,23 @@
       "bundleFor": "Escrito para {name}: su propia ruta de configuración y la línea de instalación que funciona allí."
     },
     "orgOwnership": {
+      "teams": {
+        "title": "Todos los equipos",
+        "sub": "{count} equipos. En {quiet} de ellos, algún miembro aún no ha conectado su propia IA.",
+        "partial": "Solo se revisaron los primeros 1000 organismos, así que puede faltar algún equipo.",
+        "colTeam": "Equipo",
+        "colState": "Estado",
+        "colPeople": "Personas",
+        "colChanged": "Último cambio",
+        "leads": "Responsables: {names}",
+        "team": "equipo",
+        "virtual": "equipo virtual",
+        "ai": "IA {n}/{of}",
+        "temporary": "{n} por tiempo fijo",
+        "ends": "termina el {date}",
+        "week": "últimos 7 días: {decided} decididas, {open} abiertas, {waiting} en espera",
+        "privacy": "Solo ves cifras. Los registros, las decisiones y el contexto de un equipo son de sus miembros: administrar este AIMEAT no te convierte en uno."
+      },
       "desc": "Devuelve un propietario a un organismo cuyos propios propietarios ya no se alcanzan. Añadir es aditivo: nadie de dentro pierde nada.",
       "idPlaceholder": "Id del organismo",
       "look": "Buscar",
