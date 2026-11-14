@@ -17185,6 +17185,10 @@
     "cfg_security_secret_host_ask_default": "Kysy omistajalta, ennen kuin salaisuus menee uuteen osoitteeseen (oletus)",
     "cfg_security_secret_share_max_bytes": "Jaetun salaisuuden enimmäiskoko (tavua)",
     "cfg_security_secret_share_check": "Tarkista jaettu avain sen palvelusta",
+    "cfg_security_request_body_check": "Hylkää pyynnöt, joiden data ei vastaa API-kuvausta",
+    "cfgDesc_security_request_body_check": "Ohjelmat ja sivut lähettävät palvelimelle dataa pyynnössä. API-kuvaus (openapi.yaml) kertoo, mitä kukin pyyntö saa sisältää. Hylkää poikkeava (oletus): kun kirjautunut käyttäjä lähettää dataa, joka ei vastaa kuvausta, hän saa virheen, joka nimeää kentän, eikä mitään tehdä. Kirjautumaton saa tavallisen vastauksensa. Vain raportoi: mitään ei hylätä, ja jokainen poikkeama kirjataan lokiin. Muutos tulee voimaan heti.",
+    "cfgOpt_security_request_body_check_enforce": "Hylkää poikkeava",
+    "cfgOpt_security_request_body_check_observe": "Vain raportoi",
     "cfg_security_admin_setup_open_after_first_operator": "Käyttöönotto luo operaattoreita ensimmäisen jälkeen (vain testi)",
     "cfg_security_password_lockout_attempts": "Salasanalukitus N epaonnistumisen jalkeen",
     "cfg_security_password_lockout_minutes": "Salasanalukituksen kesto (minuuttia)",
@@ -32913,6 +32917,15 @@
           "ex1": "Tyhjä (oletus): kuvakaappaus sovelluksesta, joka lukee intranetiäsi, näyttää sovelluksen ilman niitä tietoja.",
           "ex2": "http://intranet.local:8080: palvelimen avaama sivu saa hakea tältä yhdeltä palvelimelta, mutta ei mistään muusta yksityisestä osoitteesta.",
           "tip": "Lisää vain palvelimia, joiden sisältö saa näkyä julkisessa kuvakaappauksessa. Julkaistun sovelluksen kuvakaappaus on julkinen."
+        },
+        "request_body_check": {
+          "title": "Hylkää pyynnöt, joiden data ei vastaa API-kuvausta",
+          "short": "Hylkääkö palvelin datan, joka ei vastaa sen julkaisemaa API-kuvausta. Oletus on Hylkää poikkeava.",
+          "what": "Jokainen ohjelma, joka kirjoittaa tälle palvelimelle, lähettää datansa pyynnössä: palvelimen omat sivut, tekoäly, sovellus tai skripti. Palvelin julkaisee API-kuvauksen (openapi.yaml). Se kertoo, mitä kenttiä kukin pyyntö saa sisältää ja minkä tyyppisinä. Kun asetus on Hylkää poikkeava, palvelin vertaa jokaista pyyntöä kuvaukseen ennen kuin se tekee mitään. Jos kirjautuneen käyttäjän pyyntö ei vastaa kuvausta, hän saa virheen VALIDATION_ERROR, joka nimeää kentän, eikä mitään tallenneta. Kirjautumaton saa saman vastauksen kuin ennenkin, yleensä kehotuksen kirjautua. Koodissa on muutama poikkeus, kukin perusteluineen, ja niistä vain raportoidaan. Kun asetus on Vain raportoi, mitään ei hylätä. Jokaisesta poikkeamasta tulee palvelimen lokiin rivi (openapi body mismatch), jossa on pyyntö, kenttä ja syy mutta ei koskaan arvoa.",
+          "range": "Toinen kahdesta: Hylkää poikkeava (oletus) tai Vain raportoi. Muutos tulee voimaan seuraavasta pyynnöstä, eikä palvelinta tarvitse käynnistää uudelleen.",
+          "ex1": "Hylkää poikkeava: sovellus lähettää numeron kenttään, johon kuvaus pyytää tekstiä. Sovellus saa virheen, joka nimeää kentän, eikä mitään kirjoiteta.",
+          "ex2": "Vain raportoi: sama pyyntö tallennetaan kuten ennenkin, ja lokiin tulee rivi, joka nimeää pyynnön ja kentän.",
+          "tip": "Vaihda Vain raportoi -tilaan, jos ennen toiminut ohjelma saa päivityksen jälkeen hylkäyksen. Ilmoita siitä, jotta kuvaus tai ohjelma korjataan. Vaihda sitten takaisin."
         }
       },
       "federation_sync": {

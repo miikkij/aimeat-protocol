@@ -4,11 +4,13 @@
  *   middleware/openapi-body-guard.ts). Observe mode is proven to change nothing a caller sees: the
  *   same route answers the same status and body with the guard mounted as without it, for a body
  *   that matches the contract and for one that does not, and the log line names the route, the field
- *   and the reason but never the value. Enforce mode is proven on a route the test enforces (none is
- *   enforced in data/openapi-body-modes.ts). The real openapi.yaml is read, and the operations whose
+ *   and the reason but never the value. Enforce mode is proven on a route the test enforces; the node
+ *   setting that enforces every route is proven in openapi-body-guard-mode.test.ts. The real openapi.yaml is read, and the operations whose
  *   schema ajv cannot compile are listed, so a new one is seen.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openapi-body-guard.test.ts
  * @version-history
+ *   v1.0.2 — 2026-11-14 — The case "no route is enforced in the mode table" is deleted, as ruled for
+ *     the first enforcement commit (structure programme 2026-11, unit 1, decision 1).
  *   v1.0.1 — 2026-11-13 — The list of body schemas that do not compile is empty: the five contract
  *     entries it named were corrected (structure programme 2026-11, unit 1, decision 2).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B5).
@@ -19,7 +21,6 @@ import express from 'express';
 import type { AddressInfo } from 'node:net';
 import { buildBodyContract, loadBodyContract, routeKey, type BodyContract } from '../../src/services/openapi-body-contract.js';
 import { openapiBodyGuard, type OpenApiBodyGuardOptions } from '../../src/middleware/openapi-body-guard.js';
-import { ENFORCED_BODY_ROUTES } from '../../src/data/openapi-body-modes.js';
 import { logger } from '../../src/utils/logger.js';
 import ts from 'typescript';
 import { classify, applyEnforced, enforcedProblems } from '../../scripts/check-write-validation.js';
@@ -242,10 +243,6 @@ describe('enforce mode', () => {
         assert.equal((await send(base, 'POST', '/v1/files/a.json', { size: -1 })).status, 201, 'not enforced: observed');
         await settle();
         assert.deepEqual(guard!.observations().map(o => o.route), ['POST /v1/files/{name}.json']);
-    });
-
-    it('no route is enforced in the mode table', () => {
-        assert.deepEqual(ENFORCED_BODY_ROUTES, []);
     });
 });
 

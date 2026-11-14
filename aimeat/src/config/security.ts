@@ -24,6 +24,9 @@
  *   return { ...securityDoorDefaults(), … };
  *   if (!ownerKeyLoginAllowed(config)) refuse();
  * @version-history
+ *   v1.7.0 — 2026-11-14 — requestBodyCheck (AIMEAT_REQUEST_BODY_CHECK: observe, enforce; default
+ *     enforce): whether a request body that does not match openapi.yaml is refused (structure
+ *     programme 2026-11, unit 1).
  *   v1.6.0 — 2026-11-14 — secretShareMaxBytes (AIMEAT_SECRET_SHARE_MAX_BYTES, default 1 MB): the largest
  *     secret one share holds (services/secret-shares/rules.ts); secretShareCheck
  *     (AIMEAT_SECRET_SHARE_CHECK, default true): the check call to a deposited secret's service.
@@ -43,6 +46,7 @@
  *   v1.0.0 — 2026-08-17 — Initial: the refusal log and the credential-door tarpit.
  */
 import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
+import { bodyCheckModeFrom, type BodyCheckMode } from '../data/openapi-body-modes.js';
 
 /** The release in which the owner-key sign-in on POST /v1/auth/token is gone (Core 2026-11 AUTH-05). */
 export const OWNER_KEY_LOGIN_REMOVED_IN = '4.0.0';
@@ -138,6 +142,16 @@ export interface SecurityDoorConfig {
    * AIMEAT_SECRET_SHARE_CHECK, default true.
    */
   secretShareCheck: boolean;
+
+  /**
+   * Whether a request body that does not match openapi.yaml is refused (middleware/openapi-body-guard.ts,
+   * data/openapi-body-modes.ts). enforce: every route with a JSON body schema in the contract answers
+   * such a body 400 VALIDATION_ERROR naming the field, before the route runs, for a caller with a
+   * session; the exempt routes are observed. observe: nothing is refused, a mismatch is logged and
+   * counted. Read on every request, so a live change applies at once. AIMEAT_REQUEST_BODY_CHECK,
+   * default enforce.
+   */
+  requestBodyCheck: BodyCheckMode;
 }
 
 /**
@@ -170,5 +184,6 @@ export function securityDoorDefaults(): SecurityDoorConfig {
     secretHostAskDefault: process.env.AIMEAT_SECRET_HOST_ASK_DEFAULT !== 'false',
     secretShareMaxBytes: parseInt(process.env.AIMEAT_SECRET_SHARE_MAX_BYTES ?? '1048576', 10),
     secretShareCheck: process.env.AIMEAT_SECRET_SHARE_CHECK !== 'false',
+    requestBodyCheck: bodyCheckModeFrom(process.env.AIMEAT_REQUEST_BODY_CHECK),
   };
 }

@@ -3,13 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Checks a request's JSON body against the schema openapi.yaml declares for its route
- *   (services/openapi-body-contract.ts). Two modes per route:
- *   - observe (every route today): a body that does not match is logged as one structured line
+ *   (services/openapi-body-contract.ts). The node setting security.request_body_check (option `mode`,
+ *   asked on every request, so an operator's change applies without a restart) decides which mode a
+ *   route is in: in enforce mode (the default) every route with a JSON body schema is enforced except
+ *   the exempt routes of data/openapi-body-modes.ts; in observe mode every route is observed.
+ *   - observe: a body that does not match is logged as one structured line
  *     (route, field, reason, the status the route answered, and the running counts; never the value)
  *     and counted, and the request goes on to its route exactly as before. Nothing is refused,
  *     nothing in the body changes. The line is written when the response is done, so it says whether
  *     the route accepted the body (the contract disagrees with a working client) or refused it too.
- *   - enforce (the routes in data/openapi-body-modes.ts, none today): the same mismatch is answered
+ *   - enforce: the same mismatch is answered
  *     400 VALIDATION_ERROR with the field named, as validateBody answers (models/validation-issues.ts).
  *     Only a caller with a session is refused. The guard runs before the route, so before the route's
  *     sign-in check: a caller without a session is passed on and gets the route's own answer (401),
@@ -30,8 +33,10 @@
  *   contract says the body is required, that absence. A body in another media type is not checked.
  *   The middleware never throws: any failure of its own passes the request on.
  *
- *   COST. Reading openapi.yaml takes about a second, so in observe mode it is read once per process
- *   after the server is built, off the boot path, and requests before that are passed on unchecked.
+ *   COST. Reading openapi.yaml takes about a second. In enforce mode it is read when the middleware
+ *   is built; in observe mode once per process after the server is built, off the boot path, and
+ *   requests before that are passed on unchecked. A switch to enforce before that read reads it at
+ *   the next request.
  *   A route's schema is compiled at its first request. Matching a path and validating a body cost
  *   under a microsecond each (measurements in the commit that added this file).
  *
@@ -41,6 +46,9 @@
  * @structure openapiBodyGuard(nodeId, opts) → middleware with observations() and ready()
  * @usage app.use(openapiBodyGuard(config.nodeId));
  * @version-history
+ *   v1.2.0 — 2026-11-14 — Options `mode` and `exempt`: the node setting security.request_body_check
+ *     enforces every route except the exempt ones, or observes every route; `enforced` no longer
+ *     defaults to a list in data/ (structure programme 2026-11, unit 1).
  *   v1.1.0 — 2026-11-13 — Option hasSession: an enforced route refuses a body only from a caller with
  *     a session, so a caller without one keeps the route's 401 (structure programme 2026-11, unit 1).
  *   v1.0.0 — 2026-11-04 — Initial, observe mode only (codebase analysis 2026-11-03, item B5).
@@ -49,7 +57,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { createT } from '../i18n.js';
 import { logger } from '../utils/logger.js';
 import { requestLocale, validationFailure, type ValidationDetail } from '../models/validation-issues.js';
-import { ENFORCED_BODY_ROUTES } from '../data/openapi-body-modes.js';
+import { EXEMPT_BODY_ROUTES, type BodyCheckMode } from '../data/openapi-body-modes.js';
 import {
     firstIssue, routeKey, sharedBodyContract,
     type BodyContract, type BodyIssue,
@@ -75,8 +83,16 @@ export interface BodyObservation {
 export interface OpenApiBodyGuardOptions {
     /** Where the contract comes from; the running code's openapi.yaml by default. */
     load?: () => BodyContract | null;
-    /** Route keys to enforce, as openapi.yaml writes them; data/openapi-body-modes.ts by default. */
+    /** Route keys to enforce whatever the mode, as openapi.yaml writes them. None by default. */
     enforced?: readonly string[];
+    /**
+     * The node's mode, asked on every request (server.ts passes config.requestBodyCheck, the setting
+     * security.request_body_check): 'enforce' enforces every contract operation except `exempt`.
+     * Without it the guard observes every route outside `enforced`.
+     */
+    mode?: () => BodyCheckMode;
+    /** Route keys observed in enforce mode, as openapi.yaml writes them; data/openapi-body-modes.ts by default. */
+    exempt?: readonly string[];
     /**
      * Read the contract while the middleware is built rather than after. Always so when a route is
      * enforced, because an enforced route must never be passed unchecked.
@@ -122,10 +138,15 @@ function detailOf(issue: BodyIssue, t: ReturnType<typeof createT>): ValidationDe
 
 export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions = {}): OpenApiBodyGuard {
     const load = opts.load ?? sharedBodyContract;
-    const enforced = new Set((opts.enforced ?? ENFORCED_BODY_ROUTES).map(r => {
+    const keysOf = (list: readonly string[]): Set<string> => new Set(list.map(r => {
         const [method, path] = r.split(' ');
         return routeKey(method, path);
     }));
+    const enforced = keysOf(opts.enforced ?? []);
+    const exempt = keysOf(opts.exempt ?? EXEMPT_BODY_ROUTES.map(e => e.route));
+    /** The node is in enforce mode now. */
+    const enforcing = (): boolean => opts.mode?.() === 'enforce';
+    const isEnforced = (key: string): boolean => enforced.has(key) || (enforcing() && !exempt.has(key));
     const linesPerMinute = opts.logLinesPerMinute ?? LOG_LINES_PER_MINUTE;
 
     let contract: BodyContract | null = null;
@@ -140,7 +161,7 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
             logger.warn('openapi body guard: could not read openapi.yaml; request bodies are not checked against the contract', { error: String(err) });
         }
     };
-    if (opts.loadNow || enforced.size > 0) read();
+    if (opts.loadNow || enforced.size > 0 || enforcing()) read();
     else setTimeout(read, 0).unref();
 
     const counters = new Map<string, BodyObservation>();
@@ -181,7 +202,11 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
     /** The issue to refuse with, or undefined to pass the request on. Never throws. */
     const check = (req: Request, res: Response): BodyIssue | undefined => {
         try {
-            if (!contract || !CHECKED_METHODS.has(req.method)) return undefined;
+            if (!CHECKED_METHODS.has(req.method)) return undefined;
+            // Switched to enforce before the deferred read ran: read now, so no request of an
+            // enforced route is passed unchecked.
+            if (!loaded && enforcing()) read();
+            if (!contract) return undefined;
             const op = contract.match(req.method, req.path);
             if (!op) return undefined;
 
@@ -196,7 +221,7 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
             if (!issue) return undefined;
             // A caller without a session is the route's to answer (401), whatever its body: refusing
             // the body first would change that answer to 400. Its mismatch is observed instead.
-            if (enforced.has(op.key) && (!opts.hasSession || opts.hasSession(req))) return issue;
+            if (isEnforced(op.key) && (!opts.hasSession || opts.hasSession(req))) return issue;
             observe(op.route, issue, res);
         } catch (err) {
             logger.warn('openapi body guard: check failed; the request goes on unchecked', { error: String(err) });

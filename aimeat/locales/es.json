@@ -15549,6 +15549,10 @@
     "cfg_security_secret_host_ask_default": "Preguntar antes de que un secreto vaya a una dirección nueva (por defecto)",
     "cfg_security_secret_share_max_bytes": "Tamaño máximo de un secreto compartido (bytes)",
     "cfg_security_secret_share_check": "Comprobar una clave compartida con su servicio",
+    "cfg_security_request_body_check": "Rechazar solicitudes cuyos datos no coinciden con la descripción de la API",
+    "cfgDesc_security_request_body_check": "Los programas y las páginas envían datos al servidor en una solicitud. La descripción de la API (openapi.yaml) dice qué puede contener cada solicitud. Rechazar lo que no coincide (predeterminado): si alguien con sesión iniciada envía datos que no coinciden, recibe un error que nombra el campo y no se hace nada. Quien no ha iniciado sesión recibe la respuesta de siempre. Solo informar: no se rechaza nada y cada diferencia se anota en el registro. El cambio se aplica al momento.",
+    "cfgOpt_security_request_body_check_enforce": "Rechazar lo que no coincide",
+    "cfgOpt_security_request_body_check_observe": "Solo informar",
     "cfg_security_admin_setup_open_after_first_operator": "La puesta en marcha crea operadores tras el primero (solo pruebas)",
     "cfg_security_password_lockout_attempts": "Bloquear la contraseña tras N fallos",
     "cfg_security_password_lockout_minutes": "Duración del bloqueo (minutos)",
@@ -30535,6 +30539,15 @@
           "ex1": "Vacío (por defecto): la captura de una app que lee tu intranet muestra la app sin esos datos.",
           "ex2": "http://intranet.local:8080: una página que abre el servidor puede cargar de ese servidor y de ninguna otra dirección privada.",
           "tip": "Pon solo servidores cuyo contenido pueda aparecer en una captura pública. La captura de una app publicada es pública."
+        },
+        "request_body_check": {
+          "title": "Rechazar solicitudes cuyos datos no coinciden con la descripción de la API",
+          "short": "Si el servidor rechaza los datos que no coinciden con la descripción de la API que publica. Rechazar lo que no coincide es el valor predeterminado.",
+          "what": "Todo programa que escribe en este servidor (sus propias páginas, una IA, una app o un script) envía sus datos en una solicitud. El servidor publica una descripción de la API, openapi.yaml, que dice qué campos puede contener cada solicitud y de qué tipo. Con Rechazar lo que no coincide, el servidor compara cada solicitud con esa descripción antes de hacer nada. Si la solicitud de alguien con sesión iniciada no coincide, recibe el error VALIDATION_ERROR, que nombra el campo, y no se guarda nada. Quien no ha iniciado sesión recibe la misma respuesta que antes, normalmente que debe iniciar sesión. Unas pocas solicitudes figuran en el código como excepciones, cada una con su motivo, y de ellas solo se informa. Con Solo informar no se rechaza nada: cada diferencia es una línea en el registro del servidor (openapi body mismatch) con la solicitud, el campo y el motivo, nunca el valor.",
+          "range": "Uno de dos: Rechazar lo que no coincide (predeterminado) o Solo informar. El cambio se aplica desde la siguiente solicitud, sin reiniciar.",
+          "ex1": "Rechazar lo que no coincide: una app envía un número donde la descripción pide texto. La app recibe un error que nombra el campo y no se escribe nada.",
+          "ex2": "Solo informar: la misma solicitud se guarda como antes y el registro recibe una línea que nombra la solicitud y el campo.",
+          "tip": "Cambia a Solo informar si un programa que funcionaba es rechazado tras una actualización, y avisa para que se corrija la descripción o el programa. Después vuelve a cambiarlo."
         }
       },
       "federation_sync": {

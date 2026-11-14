@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-14 — openapiBodyGuard() is given mode, config.requestBodyCheck (security.request_body_check,
+ *     default enforce): every route with a JSON body schema is enforced but the exempt ones.
  *   2026-11-14 — /v1/secret-shares is parsed at the large JSON limit: a secret share carries a file inline.
  *   2026-11-13 — openapiBodyGuard() is given hasSession (auth/middleware.ts): on an enforced route a
  *     caller without a session is passed on to the route's sign-in check. No route is enforced yet.
@@ -348,13 +350,14 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // flood of junk still counts against them.
   app.use(inputJunkGuard(config.nodeId));
 
-  // The JSON body of a route openapi.yaml gives a body schema is compared with that schema. Every
-  // route observes: a mismatch is logged and counted and the request goes on unchanged; a route in
-  // data/openapi-body-modes.ts (none today) would be answered 400 (middleware/openapi-body-guard.ts).
+  // The JSON body of a route openapi.yaml gives a body schema is compared with that schema. The
+  // setting security.request_body_check, read on every request, decides what a mismatch gets: enforce
+  // (the default) answers it 400 on every route but the exempt ones of data/openapi-body-modes.ts;
+  // observe logs and counts it and the request goes on unchanged (middleware/openapi-body-guard.ts).
   // After the junk guard, so the body it reads is one the node keeps as sent. After optionalAuth(),
   // whose reading of the session it takes: an enforced route refuses a body only from a caller with
   // a session, and a caller without one goes on to the route's own sign-in check.
-  app.use(openapiBodyGuard(config.nodeId, { hasSession }));
+  app.use(openapiBodyGuard(config.nodeId, { hasSession, mode: () => config.requestBodyCheck }));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency(config.nodeId));

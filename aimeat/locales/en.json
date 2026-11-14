@@ -16418,6 +16418,10 @@
     "cfg_security_secret_host_ask_default": "Ask owners before a secret goes to a new address (default)",
     "cfg_security_secret_share_max_bytes": "Largest shared secret (bytes)",
     "cfg_security_secret_share_check": "Check a shared key with its service",
+    "cfg_security_request_body_check": "Refuse requests whose data does not match the API description",
+    "cfgDesc_security_request_body_check": "Programs and pages send the server data in a request. The API description (openapi.yaml) says what each request may hold. Refuse a mismatch (the default): a signed-in caller who sends data that does not match gets an error that names the field, and nothing is done. A caller who is not signed in gets the usual answer. Report only: nothing is refused, and each mismatch is written to the log. A change takes effect at once.",
+    "cfgOpt_security_request_body_check_enforce": "Refuse a mismatch",
+    "cfgOpt_security_request_body_check_observe": "Report only",
     "cfg_security_admin_setup_open_after_first_operator": "Setup creates operators after the first (test servers only)",
     "cfg_security_password_lockout_attempts": "Password lockout after N failures",
     "cfg_security_password_lockout_minutes": "Password lockout duration (minutes)",
@@ -32165,6 +32169,15 @@
           "ex1": "Empty (the default): a screenshot of an app that reads your intranet shows the app without that data.",
           "ex2": "http://intranet.local:8080: a page the server opens may load from that one server, and from no other private address.",
           "tip": "List only servers whose content may appear in a public screenshot. A screenshot of a published app is public."
+        },
+        "request_body_check": {
+          "title": "Refuse requests whose data does not match the API description",
+          "short": "Whether the server refuses data that does not match the API description it publishes. Refuse a mismatch is the default.",
+          "what": "Every program that writes to this server (the server's own pages, an AI, an app, a script) sends its data in a request. The server publishes an API description, openapi.yaml, that says which fields each request may hold and of which type. With Refuse a mismatch, the server compares each request with that description before it does anything. When a signed-in caller's request does not match, the caller gets the error VALIDATION_ERROR, which names the field, and nothing is stored. A caller who is not signed in gets the answer they got before, usually that they must sign in. A few requests are listed as exempt in the code, each with its reason, and are only reported. With Report only, nothing is refused: each mismatch is a line in the server log (openapi body mismatch) with the request, the field and the reason, never the value.",
+          "range": "One of two: Refuse a mismatch (the default) or Report only. A change takes effect at the next request, with no restart.",
+          "ex1": "Refuse a mismatch: an app sends a number where the description asks for text. The app gets an error that names the field, and nothing is written.",
+          "ex2": "Report only: the same request is stored as before, and the log gets one line that names the request and the field.",
+          "tip": "Switch to Report only when a program that worked before is refused after an update, and report it, so that the description or the program is corrected. Then switch back."
         }
       },
       "federation_sync": {

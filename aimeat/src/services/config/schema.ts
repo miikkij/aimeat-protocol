@@ -27,6 +27,9 @@
  *   2026-10-25 — personal_nodes.max_per_owner (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, 0 = no
  *     limit; secaudit2026oct22, personal-anchor-no-per-owner-slot-limit). The node limits rows
  *     (config-schema-node-limits.ts) are spread after the MCP rows.
+ *   2026-11-14 — security.request_body_check (AIMEAT_REQUEST_BODY_CHECK: observe, enforce), mutable,
+ *     default enforce: whether a request body that does not match openapi.yaml is refused
+ *     (middleware/openapi-body-guard.ts; structure programme 2026-11, unit 1).
  *   2026-11-14 — security.secret_share_max_bytes (AIMEAT_SECRET_SHARE_MAX_BYTES), mutable, default 1 MB;
  *     security.secret_share_check (AIMEAT_SECRET_SHARE_CHECK), mutable, default on.
  *   2026-10-25 — security.secret_host_ask_default (AIMEAT_SECRET_HOST_ASK_DEFAULT), mutable, default on (secaudit2026oct22).
@@ -166,6 +169,7 @@ import { EXTENSION_LOAD_CONFIG_FIELDS } from './schema-extension-load.js';
 import { NODE_LIMITS_CONFIG_FIELDS } from './schema-node-limits.js';
 import { COMMERCE_CONFIG_FIELDS } from './schema-commerce.js';
 import { FILE_STORE_CONFIG_FIELDS } from './schema-file-store.js';
+import { BODY_CHECK_MODES } from '../../data/openapi-body-modes.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -516,6 +520,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'secretHostAskDefault', dotPath: 'security.secret_host_ask_default', envVar: 'AIMEAT_SECRET_HOST_ASK_DEFAULT', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'The default, for every account that has not chosen, of "Ask me before my secret is sent to a new address for the first time". On (the default): when code one of the account\'s agents wrote, or an address such an agent set, sends a stored secret to an address it has never gone to, the owner is asked first with one press, unless that agent holds secrets:manage. Off: it is sent and the address is kept, as before. Each owner can switch their own on or off.' },
   { key: 'secretShareMaxBytes', dotPath: 'security.secret_share_max_bytes', envVar: 'AIMEAT_SECRET_SHARE_MAX_BYTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1024 && (v as number) <= 26214400, immutable: false, description: 'The largest secret one secret share may hold, in bytes: a key, a password, an .env file, a certificate or a service-account file. Default 1048576 (1 MB), at most 26214400 (25 MB). A larger secret is refused when it is shared or deposited; shares already made keep what they hold.', range: '1024-26214400' },
   { key: 'secretShareCheck', dotPath: 'security.secret_share_check', envVar: 'AIMEAT_SECRET_SHARE_CHECK', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Check a deposited secret with the service it belongs to. On (the default): when a shared or deposited key matches a service the node knows (ElevenLabs, OpenRouter, Anthropic, OpenAI, Stripe, GitHub), the node makes one call to that service\'s fixed account address with the key, and both people see whether it works and which account, plan and usage it opens. Off: no such call is made.' },
+  { key: 'requestBodyCheck', dotPath: 'security.request_body_check', envVar: 'AIMEAT_REQUEST_BODY_CHECK', type: 'string', ...oneOf(...BODY_CHECK_MODES), immutable: false, description: 'Whether a request whose JSON body does not match the API description (openapi.yaml) is refused. enforce (the default): such a body from a signed-in caller is answered 400 VALIDATION_ERROR with the field named, before the route runs; a caller who is not signed in gets the route\'s own answer, and the routes listed as exempt in src/data/openapi-body-modes.ts only report. observe: nothing is refused; each mismatch is written to the log (openapi body mismatch) and the request is answered as before. Switch to observe when a working program is refused because it sends a body the description does not cover, and report it. Read on every request, so a change applies at once', range: 'observe|enforce' },
   { key: 'adminSetupOpenAfterFirstOperator', dotPath: 'security.admin_setup_open_after_first_operator', envVar: 'AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test servers only; keep it off on a public server. When on, the admin password can still create operators through /v1/admin/setup/register after the first operator exists. When off (the default), that route refuses with 410 once an operator exists, and an operator adds another on the Owners page.' },
 
   // ── Email (mutable, additional) ──

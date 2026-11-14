@@ -20,9 +20,12 @@
  *   - by hand: its inline handler reads `req.body` and parses nothing.
  *   - elsewhere: the handler is not written inline, or hands `req` to another function, so what it
  *     does with the body cannot be read here.
- *   - contract: the route is ENFORCED by middleware/openapi-body-guard.ts (listed in
- *     src/data/openapi-body-modes.ts), so its body is checked against openapi.yaml before it runs,
- *     whatever the handler does. This class wins over "by hand" and "elsewhere".
+ *   - contract: the route is counted as checked against openapi.yaml before it runs, whatever the
+ *     handler does (COUNTED_AS_CONTRACT). This class wins over "by hand" and "elsewhere". No route is
+ *     counted: middleware/openapi-body-guard.ts enforces every route only while the node setting
+ *     security.request_body_check is enforce, which can be switched at run time, and never checks a
+ *     caller without a session. An EXEMPT entry of src/data/openapi-body-modes.ts must name a route
+ *     the contract gives a compilable JSON body schema and src/routes/ declares.
  *   "By hand" and "elsewhere" must be listed in security/write-validation-baseline.json. Each entry
  *   was seeded `UNREVIEWED` on 2026-10-27; giving the route a schema, or enforcing its contract,
  *   removes it, and an entry whose route no longer needs one fails until it is deleted, so the count
@@ -34,6 +37,9 @@
  *   cd aimeat && pnpm check:write-validation --list   # every route and its class
  *   cd aimeat && pnpm check:write-validation --seed   # rewrite the baseline from today's code (ask first)
  * @version-history
+ *   v1.2.0 — 2026-11-14 — The per-route enforced list is gone (the guard's mode is a node setting);
+ *     the exempt entries are held to the contract and the routes instead (structure programme
+ *     2026-11, unit 1).
  *   v1.1.0 — 2026-11-04 — A route enforced against openapi.yaml (src/data/openapi-body-modes.ts)
  *     counts as validated, class "contract" (codebase analysis 2026-11-03, item B5).
  *   v1.0.0 — 2026-10-27 — Initial (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -42,7 +48,15 @@ import ts from 'typescript';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENFORCED_BODY_ROUTES } from '../src/data/openapi-body-modes.js';
+import { EXEMPT_BODY_ROUTES } from '../src/data/openapi-body-modes.js';
+
+/**
+ * Routes the gate counts as checked against the contract. None: the guard enforces every route
+ * only while the node setting security.request_body_check is enforce, which an operator can switch
+ * to observe at run time, and a caller without a session is never checked, so enforcement is not
+ * counted as a schema here.
+ */
+const COUNTED_AS_CONTRACT: readonly string[] = [];
 import { loadBodyContract, routeKey, type BodyContract } from '../src/services/openapi-body-contract.js';
 
 const AIMEAT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -101,7 +115,7 @@ export function classify(file: string, source: ts.SourceFile): WriteRoute[] {
 }
 
 /** Class an enforced route "contract": its body is checked against openapi.yaml before its handler runs. */
-export function applyEnforced(routes: WriteRoute[], enforced: readonly string[] = ENFORCED_BODY_ROUTES): WriteRoute[] {
+export function applyEnforced(routes: WriteRoute[], enforced: readonly string[] = COUNTED_AS_CONTRACT): WriteRoute[] {
     const keys = new Set(enforced.map(r => { const [m, p] = r.split(' '); return routeKey(m, p); }));
     for (const r of routes) if (keys.has(r.key) && r.cls !== 'schema' && r.cls !== 'no body') r.cls = 'contract';
     return routes;
@@ -111,7 +125,7 @@ export function applyEnforced(routes: WriteRoute[], enforced: readonly string[] 
  * Why an enforced entry would enforce nothing: the contract has no JSON body for it, its schema does
  * not compile, or no route declares it. The contract is read only when something is enforced.
  */
-export function enforcedProblems(routes: readonly WriteRoute[], enforced: readonly string[] = ENFORCED_BODY_ROUTES,
+export function enforcedProblems(routes: readonly WriteRoute[], enforced: readonly string[] = COUNTED_AS_CONTRACT,
     load: () => BodyContract | null = loadBodyContract): string[] {
     if (enforced.length === 0) return [];
     const contract = load();
@@ -180,9 +194,9 @@ export function main(): boolean {
     console.log('');
     if (process.argv.includes('--list')) for (const r of routes) console.log(`    ${r.cls.padEnd(10)} ${r.id}  ${r.file}:${r.line}`);
 
-    const problems = enforcedProblems(routes);
+    const problems = enforcedProblems(routes, EXEMPT_BODY_ROUTES.map(e => e.route));
     if (problems.length > 0) {
-        console.error('✖ An entry in src/data/openapi-body-modes.ts would enforce nothing:');
+        console.error('✖ An exempt entry in src/data/openapi-body-modes.ts names no route the guard checks:');
         for (const p of problems) console.error(`    ${p}`);
         return false;
     }
