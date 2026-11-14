@@ -73908,7 +73908,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [provider, fields]
+              required: [provider]
               properties:
                 provider:
                   type: string
@@ -73921,7 +73921,9 @@ paths:
                   type: object
                   additionalProperties:
                     type: string
-                  description: Keyed by the names the provider declared in attachFields.
+                  description: >-
+                    Keyed by the names the provider declared in attachFields. Omitted, it is empty,
+                    and the provider refuses the field it misses with 400 MISSING_FIELD.
       responses:
         '200':
           description: An account already connected was repaired with a new credential.
