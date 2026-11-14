@@ -10,7 +10,8 @@
  * @version-history
  *   v1.3.0 — 2026-11-15 — The not-found page: an unknown subdomain and an address no route answers give
  *     a browser's navigation the page in its language, a client that asks for JSON the envelope, and
- *     a direct request for /not-found.html a 301 to the front page.
+ *     a direct request for /not-found.html a 301 to the front page. The same for a missing app at
+ *     /v1/apps/<owner>/<file>, its missing legal page and its missing icon.
  *   v1.2.0 — 2026-10-25 — Every subdomain request addresses a real `<sub>.<apex>` Host through
  *     helpers/host-request.ts (fetch drops Host). X-Subdomain on the apex Host, or naming another
  *     site than the Host, no longer chooses the site: the redirect site's 301 on the apex was the
@@ -322,6 +323,29 @@ await test('An address no route answers: a browser gets the page, a POST keeps t
     assert(String(page.body._raw).includes('<html lang="en">'), 'the page is in English');
     const post = await json('/v1/no-such-address-e2e', { method: 'POST', headers: { Accept: BROWSER_ACCEPT }, body: '{}' });
     assert(post.status === 404 && post.body.error?.code === 'NOT_FOUND', `POST: expected the JSON 404, got ${post.status}`);
+});
+
+await test('A missing app at /v1/apps/<owner>/<file>: a browser gets the page, a client the JSON', async () => {
+    for (const path of [`/v1/apps/${opName}/missing-e2e.html`, `/v1/apps/nobody-e2e/missing-e2e.html`]) {
+        const page = await json(`${path}?lang=en`, { headers: { Accept: BROWSER_ACCEPT } });
+        assert(page.status === 404 && /^text\/html/.test(page.body._ct ?? ''), `${path}: expected the HTML 404, got ${page.status} ${page.body._ct}`);
+        assert(String(page.body._raw).includes('<html lang="en">') && !String(page.body._raw).includes('missing-e2e'), `${path}: the page, naming nothing from the request`);
+        for (const accept of ['*/*', 'application/json']) {
+            const r = await json(path, { headers: { Accept: accept } });
+            assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND', `${path} ${accept}: expected the JSON 404, got ${r.status}`);
+        }
+    }
+});
+
+await test('An app\'s missing legal page and icon: a browser gets the page, an <img> and a client the JSON', async () => {
+    const legal = await json(`/v1/apps/${opName}/${APP_FILENAME}/legal/terms`, { headers: { Accept: BROWSER_ACCEPT } });
+    assert(legal.status === 404 && /^text\/html/.test(legal.body._ct ?? ''), `legal page: expected the HTML 404, got ${legal.status} ${legal.body._ct}`);
+    const legalJson = await json(`/v1/apps/${opName}/${APP_FILENAME}/legal/terms`, { headers: { Accept: 'application/json' } });
+    assert(legalJson.status === 404 && legalJson.body.error?.code === 'NOT_FOUND', `legal page, JSON client: ${legalJson.status}`);
+    const icon = await json(`/v1/apps/${opName}/${APP_FILENAME}/icon`, { headers: { Accept: BROWSER_ACCEPT } });
+    assert(icon.status === 404 && /^text\/html/.test(icon.body._ct ?? ''), `icon: expected the HTML 404, got ${icon.status} ${icon.body._ct}`);
+    const img = await json(`/v1/apps/${opName}/${APP_FILENAME}/icon`, { headers: { Accept: 'image/avif,image/webp,image/*,*/*;q=0.8' } });
+    assert(img.status === 404 && img.body.error?.code === 'NOT_FOUND', `icon as an <img>: expected the JSON 404, got ${img.status} ${img.body._ct}`);
 });
 
 await test('The not-found template itself is not served: /not-found.html → 301 to /', async () => {

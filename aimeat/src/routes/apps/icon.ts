@@ -20,6 +20,8 @@
  * @structure registerAppIconRoutes() — GET and POST /v1/apps/:owner/:filename/icon
  * @usage registerAppIconRoutes(router, config, storage, appTarget); // from appsRouter
  * @version-history
+ *   v1.3.0 — 2026-11-15 — GET answers a browser's navigation to a missing app or icon with the
+ *     not-found page (middleware/not-found-page.ts); an <img> and every other caller keep the JSON 404.
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.2 — 2026-09-26 — The owner segment is read with localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
@@ -35,6 +37,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { sendNotFound } from '../../middleware/not-found-page.js';
 import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
@@ -75,22 +78,24 @@ export function registerAppIconRoutes(
             return;
         }
 
+        // Each 404 here answers a browser's navigation with the not-found page; an <img> asks for an
+        // image and keeps the JSON, as does every other caller (middleware/not-found-page.ts).
         const app = await storage.getAppByOwnerName(owner, filename);
         if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
             return;
         }
 
         const file = await storage.getStorageFile(app.ownerGaii, appIconKey(filename));
         if (!file) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No icon image for app "${filename}"`));
+            sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `No icon image for app "${filename}"`));
             return;
         }
         // A PICTURE, TYPED BY ITS BYTES, OR NOTHING. The stored label is not believed: this door sent
         // it as it was, so a page stored under this key by another door came back as a page on the
         // node's origin (A7-2). setStoredImageHeaders also sets nosniff and the stored-file CSP.
         if (!setStoredImageHeaders(res, { key: file.key, data: file.data, name: `${pictureName(filename)}-icon` })) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+            sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND',
                 `The file stored as the icon of "${filename}" is not a PNG, JPEG, WebP, GIF or AVIF image, so it is not served.`));
             return;
         }

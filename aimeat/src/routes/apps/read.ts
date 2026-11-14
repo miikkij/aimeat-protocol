@@ -9,6 +9,9 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-11-15 — The app, its draft and its screenshot answer a browser's navigation to a missing or
+ *     hidden one with the not-found page (middleware/not-found-page.ts); every other caller gets the
+ *     same JSON 404 as before. A person who opened /v1/apps/<owner>/<missing> saw the JSON envelope.
  *   2026-11-04 — The version list reads the caller and answers what the app read answers for them: a
  *     hidden app 404, an app that needs a sign-in 401 or 403 (services/app-read-gate.ts, whose
  *     hiddenFromReader() the app read asks too, unchanged); it reads no content (codebase analysis
@@ -145,6 +148,7 @@ import { collectAppLineage, resolveAppStatus } from '../../services/app/lineage.
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
 import { currentAppRow } from '../../services/app/served-protection.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
+import { sendNotFound } from '../../middleware/not-found-page.js';
 import { serveAppAgentFace } from '../../services/agent/face.js';
 import { formatMdLang } from '../../services/app/format-md.js';
 import { appOriginUrl, appTargetOr, withForwardedQuery, type AppTargetFor, type CanonicalOwner } from './helpers.js';
@@ -267,7 +271,7 @@ export function registerReadRoutes(
         // (see POST /v1/apps), not under any agent GAII. Resolve the app first.
         const app = await storage.getAppByOwnerName(owner, filename);
         if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
             return;
         }
 
@@ -285,7 +289,7 @@ export function registerReadRoutes(
                 key: file.key, data: file.data, name: `${filename.replace(/\.html?$/i, '') || 'app'}-screenshot`,
             });
             if (!shown) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND',
                     `The file stored as the screenshot of "${filename}" is not a PNG, JPEG, WebP, GIF or AVIF image, so it is not served.`));
                 return;
             }
@@ -295,7 +299,7 @@ export function registerReadRoutes(
             return;
         }
 
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Screenshot not found for app "${filename}"`));
+        sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `Screenshot not found for app "${filename}"`));
     });
 
     // POST /v1/apps/:owner/:filename/screenshot — set/replace an app's screenshot WITHOUT
@@ -421,7 +425,7 @@ export function registerReadRoutes(
             // code reached the silent sign-in the published app gets. A draft link names the draft
             // origin, which serves it at `/` (routes/subdomains.ts; audit of the secaudit last items).
             if (await appOfRequestOrigin(storage, req)) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'A draft runs only at its own draft address.'));
+                sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', 'A draft runs only at its own draft address.'));
                 return;
             }
             // H-2: never execute runnable draft HTML on the authenticated apex origin.
@@ -435,7 +439,7 @@ export function registerReadRoutes(
             }
             const draft = await storage.getAppDraft(draftOwnerGhii, filename);
             if (!draft) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}"`));
+                sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}"`));
                 return;
             }
             // A draft is runnable whatever `mode` says, so it takes the same isolated frame as the live
@@ -470,7 +474,7 @@ export function registerReadRoutes(
             app = await storage.getAppByOwnerName(bare, filename, version);
         }
         if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
+            sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
             return;
         }
         // The row whose settings decide the gates below: the latest version's, also when an older
@@ -492,7 +496,7 @@ export function registerReadRoutes(
             storage, config, req.auth, { ownerOf: appOwnerName, area: 'app', action: 'read', subject: filename }));
 
         if (await hiddenFromReader(current, app.ownerName, appReaderOf(req, canonicalOwner, operatorReads))) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
+            sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
             return;
         }
 

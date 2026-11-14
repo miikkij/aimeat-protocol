@@ -15,6 +15,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.40.0 — 2026-11-15 — A draft link whose draft is gone answers a browser with the not-found page
+ *     too; serveDraftPreview takes the request for that.
  *   v1.39.0 — 2026-11-09 — An unknown app, portfolio or company address answers a browser with the
  *     not-found page in its language (middleware/not-found-page.ts); every other caller gets the same
  *     JSON 404 as before. A person who mistyped an app address saw the JSON envelope.
@@ -413,7 +415,7 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
  * cached (no-store) and no download is counted.
  */
 async function serveDraftPreview(
-  res: Response, storage: Storage, config: AimeatConfig,
+  req: Request, res: Response, storage: Storage, config: AimeatConfig,
   siteTarget: string, token: string, csp: string, apexOrigin: string,
 ): Promise<void> {
   const slash = siteTarget.indexOf('/');
@@ -437,7 +439,7 @@ async function serveDraftPreview(
   }
   const draft = await storage.getAppDraft(claim.sub, filename);
   if (!draft) {
-    res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No draft to preview'));
+    sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', 'No draft to preview'));
     return;
   }
   res.setHeader('Content-Type', appContentType(draft.mimeType));
@@ -596,7 +598,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (!draftSite || !draftSite.enabled || draftSite.kind !== 'app') return notFound();
       if (!req.appOrigin && !apexServesSite(draftSite, draftOf, config)) return toAppOrigin();
       if (!draftToken) return notFound();
-      await serveDraftPreview(res, storage, config, draftSite.target, draftToken, appCsp(apexOrigin), apexOrigin);
+      await serveDraftPreview(req, res, storage, config, draftSite.target, draftToken, appCsp(apexOrigin), apexOrigin);
       return;
     }
 

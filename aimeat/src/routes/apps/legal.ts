@@ -22,6 +22,8 @@
  *   the MCP tool, both through services/app/legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   2026-11-15 — GET …/legal/:kind answers a browser's navigation to a missing app, kind or page with
+ *     the not-found page (middleware/not-found-page.ts); every other caller gets the same JSON 404.
  *   2026-10-21 — authenticated() asks isAnonymousPrincipal, so the minted anonymous token is no owner of
  *     an app here (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.6.1 — 2026-10-08 — A legal page's label is decided for a public surface when served (it is served without the access code).
@@ -60,6 +62,7 @@ import { optionalAuth, requireAuth, requireScope } from '../../auth/middleware.j
 import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { detectLocale } from '../../i18n.js';
+import { sendNotFound } from '../../middleware/not-found-page.js';
 import { sandboxedCsp } from './inline-frame.js';
 import {
   appLegalState, legalReadiness, renderLegalPage, isLegalKind, LEGAL_KIND_INFO, legalLinksFor, apexLegalBase,
@@ -165,18 +168,20 @@ export function registerLegalRoutes(
     const owner = req.params.owner as string;
     const filename = req.params.filename as string;
     const kind = req.params.kind as string;
+    // A legal page is opened in a browser, so each 404 here answers a browser's navigation with the
+    // not-found page and every other caller with the JSON (middleware/not-found-page.ts).
     if (!isLegalKind(kind)) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `"${kind}" is not a kind of legal page`));
+      sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `"${kind}" is not a kind of legal page`));
       return;
     }
     const app = await visibleApp(req, owner, filename);
     if (!app || app === 'hidden') {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+      sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
       return;
     }
     const doc = app.manifest?.legal?.[kind];
     if (!doc) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `This app has no ${LEGAL_KIND_INFO[kind].title.toLowerCase()} page`));
+      sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', `This app has no ${LEGAL_KIND_INFO[kind].title.toLowerCase()} page`));
       return;
     }
     const locale = detectLocale(req.headers['accept-language']);
