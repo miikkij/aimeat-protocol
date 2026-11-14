@@ -1,5 +1,5 @@
 /**
- * @file src/services/notify-text.ts
+ * @file src/services/notifications/recipient-words.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A notification's words in its RECIPIENT's language, decided when it is written: the
@@ -16,12 +16,12 @@
  *   v1.0.0 — 2026-11-14 — Initial: notifications are written in the recipient's language
  *     (Jouni, 2026-11-14: "ilmoitukset pitäisi luoda lukijan kielelle").
  */
-import type { Storage } from '../storage/interface.js';
-import { createT, toLocale, type Locale } from '../i18n.js';
-import { localAccountName } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { readTeamRecord, teamDisplayName } from './team/record.js';
-import type { NotifText } from './notify.js';
+import type { Storage } from '../../storage/interface.js';
+import { createT, toLocale, type Locale } from '../../i18n.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { readTeamRecord, teamDisplayName } from '../team/record.js';
+import type { NotifText } from '../notify.js';
 
 /** The language a person reads their notifications in: their account's locale, English without one. */
 export async function recipientLocale(storage: Storage, recipientGhii: string): Promise<Locale> {

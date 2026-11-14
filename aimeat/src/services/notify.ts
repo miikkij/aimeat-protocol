@@ -28,7 +28,7 @@
  * @version-history
  *   2026-11-14 — A notification is written in its recipient's language: notify() resolves the
  *     recipient's locale and stores the title and body from `notiftext.<key>` filled for them, and an
- *     organism named through `i18n.orgVars` by its team name in that language (services/notify-text.ts).
+ *     organism named through `i18n.orgVars` by its team name in that language (services/notifications/recipient-words.ts).
  *   2026-11-04 — No per-key loop for a storage without bulkDeleteMemory: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-25 -- NotifyInput.ref: the question a notice asks, so the flow that decides it can mark
@@ -71,7 +71,7 @@ import { logger } from '../utils/logger.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
 import { localAccountName } from '../utils/gaii.js';
 import { readNotificationSettings, prefsFor, quietState, senderKey, type NotifSource } from './notification-settings.js';
-import { notifWords } from './notify-text.js';
+import { notifWords } from './notifications/recipient-words.js';
 
 export const NOTIF_PREFIX = 'notif.';
 const NOTIF_TTL_HOURS = 24 * 90;   // 90 days
@@ -258,7 +258,7 @@ export async function notify(storage: Storage, recipientGhii: string, given: Not
       result.muted = true;
       return result;
     }
-    // The words in the recipient's own language, decided now (services/notify-text.ts): what is stored,
+    // The words in the recipient's own language, decided now (services/notifications/recipient-words.ts): what is stored,
     // shown in the bell and pushed is what this person reads.
     const words = await notifWords(storage, recipientGhii, input.i18n, { title: input.title, body: input.body ?? '' });
     input = { ...input, title: words.title, body: words.body, ...(words.i18n ? { i18n: words.i18n } : {}) };
