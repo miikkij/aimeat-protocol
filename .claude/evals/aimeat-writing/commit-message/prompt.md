@@ -1,5 +1,5 @@
 ---
-description: A commit message for a real-shaped change; the skill says a commit message explains why the change exists and what it costs, without the AI tells.
+description: A commit message for a real-shaped change; the skill says a commit message explains why the change exists and what it costs, without the AI tells, within the commit-msg hook's limits (subject at most 72 characters, body at most 600).
 tags: [english, commit]
 max_turns: 8
 allowed_tools: [Read, Glob, Grep, Skill]

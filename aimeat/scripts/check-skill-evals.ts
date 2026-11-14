@@ -12,7 +12,8 @@
  *   Jouni, 2026-09-28: the eval runs only when a skill changes, and the gate marks that and asks.
  *
  *   HOW. security/skill-evals.json holds, per skill with a suite under .claude/evals/<skill>/, a
- *   digest of the skill's text and of its suite as they stood at the last decision, and what the
+ *   digest of the skill's instructions (its SKILL.md, not its references/) and of its suite as they
+ *   stood at the last decision, and what the
  *   decision was: `ran` (with the scores) or `skipped` (with the reason). The gate fails when the
  *   digest differs, and the message names the command, a cost ceiling, and the two ways to record
  *   the decision. An AI session that meets this failure asks the developer before it runs the eval
@@ -29,6 +30,9 @@
  *   pnpm check:skill-evals --record aimeat-writing --ran "opus, 3 runs: +0.08 +0.08 +0.33"
  *   pnpm check:skill-evals --record aimeat-writing --skip "wording only; Jouni 2026-09-28"
  * @version-history
+ *   v1.1.0 — 2026-11-15 — A project skill's digest is its SKILL.md alone. The digest had covered
+ *     every file of the folder, so each new row in aimeat-writing's language context failed the gate
+ *     and asked the developer for a run-or-skip decision on a change no instruction carried.
  *   v1.0.1 — 2026-10-06 — The digest skips a suite's gitignored `results/` folder. A checkout that had
  *     run the eval digested its own results, so a decision recorded there read as a change everywhere
  *     else, and the other way round.
@@ -74,11 +78,16 @@ function suites(): string[] {
     return readdirSync(EVALS).filter(n => statSync(join(EVALS, n)).isDirectory()).sort();
 }
 
-/** Where the skill's text lives: the project folder, or the built-in entry. Null when neither. */
+/**
+ * Where the skill's instructions live: SKILL.md of the project folder, or the built-in entry. Null
+ * when neither. A project skill's `references/` and other files are not digested: they are data
+ * the instructions point at (aimeat-writing's language context gains rows every week), and a new
+ * row is not a change to what the skill tells a model to do.
+ */
 function skillSource(skill: string): { kind: 'project' | 'node'; texts: Array<[string, string]> } | null {
-    const dir = join(PROJECT_SKILLS, skill);
-    if (existsSync(join(dir, 'SKILL.md'))) {
-        return { kind: 'project', texts: filesUnder(dir).map(f => [f.slice(REPO.length + 1).replace(/\\/g, '/'), fold(readFileSync(f, 'utf8'))]) };
+    const skillMd = join(PROJECT_SKILLS, skill, 'SKILL.md');
+    if (existsSync(skillMd)) {
+        return { kind: 'project', texts: [[skillMd.slice(REPO.length + 1).replace(/\\/g, '/'), fold(readFileSync(skillMd, 'utf8'))]] };
     }
     const builtin = BUILTIN_SKILLS.find(s => s.name === skill);
     return builtin ? { kind: 'node', texts: [[`node:${skill}`, fold(builtin.skillMd)]] } : null;

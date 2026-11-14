@@ -39,6 +39,10 @@ AI slop; the same rule applies there).
 
 **Speak human.** A term from the system's own vocabulary carries its meaning in the same sentence, or it does not appear. "agentAutonomy is L3 and meta.decisions is alwaysGate" tells the reader nothing; "the agent may write on its own, but decisions and gaps wait for your approval" says the same thing and can be acted on. This applies hardest when reporting to the developer: an identifier, a config key or a status enum is evidence, and the sentence still has to work without it. The same goes for a number: say what it means, not only what it is.
 
+**A reply to the developer is written in ASD-STE100 Simplified Technical English.** This covers every direct answer and report to him in chat, in English. Use the simplest word and the simplest sentence that is true: one instruction or one fact per sentence, active voice, the same word for the same thing every time (no synonyms for variety), and no techno-babble. Do not physicalise abstract things: a check refuses a commit, it does not "guard a door"; a setting is on, it is not "a switch in the hand". Answer first, then the evidence.
+
+**When he writes Finnish, the reply is Finnish, and it follows selkeä kieli (SFS-ISO 24495-1, Kotus guidance).** That is plain language for every reader, not selkokieli, which is for special reader groups. Finnish has no controlled language like STE, so the rules are these: the main point first, one matter per sentence; verbs before nouns ("tarkistan", not "suoritan tarkistuksen"), no chains of -minen nouns; name the doer ("sinä hyväksyt"), use the passive only when the doer does not matter, and never "toimesta"; a Finnish word before an anglicism; one word for one thing. Compose it in Finnish (the Finnish section below).
+
 **An operator surface is written for an administrator, in the industry's own words** (Jouni,
 2026-09-12, on the Email page). Two rules, and they pull against each other on purpose:
 
@@ -63,7 +67,8 @@ first-draft closing paragraphs lose nothing.
 `references/language-context.md` carries what the writer needs and the text itself cannot supply:
 what each thing in this product actually is, in one sentence, and the word this product has already
 settled on for it in English, Finnish and Spanish. Read it before composing, and add the row when
-you name something it does not cover.
+you name something it does not cover, with its dated line in `references/language-context-changes.md`
+(the history of the table, which a writer does not need to read).
 
 It exists because a word gets chosen twice for one concept otherwise, six weeks apart, by writers
 who cannot see each other. Measured on 2026-09-12, it prevented three terminology defects in one
@@ -157,7 +162,7 @@ itse ei nähnyt yhtään.
 2. **Käynnistä erillinen agentti** (Agent-työkalu, ei sama sessio: kirjoittajalla on koko
    keskustelun konteksti päässään eikä hän voi kylmälukea omaa tekstiään). Agentille annetaan
    vain tiedostopolku ja alla oleva tehtävä.
-3. **Promptipohja**, neljä luokkaa:
+3. **Promptipohja**, kuusi luokkaa:
 
    > Olet suomenkielinen lukija, joka ei tiedä mitään tuotteesta, jonka tekstiä luet. Lue
    > jokainen lause ensimmäisellä lukemalla ja raportoi:
@@ -321,3 +326,9 @@ Four things worth knowing about the loop:
   work.
 - **A commit message** explains why the change exists and what it costs, in the same voice as the
   rest of this. It is the one piece of writing that is read years later by someone with no context.
+  It is short, and the `commit-msg` hook refuses one that is not: **a subject of at most 72
+  characters, and a body of at most 600 characters** that says why. It uses industry terms
+  (endpoint, route, MCP tool, code path), never metaphors such as door, road or hand. It never says
+  who asked for or approved the change, and never quotes the developer; that record is on the wish.
+  Test results, how the defect was found and the list of files go to the report and the development
+  notes, not to the message.
