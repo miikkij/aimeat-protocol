@@ -9,7 +9,9 @@
  *   the state; changes are made in the person's own AI ("the AI chat is the primary interface").
  *   Reads GET /v1/teams/status?organism_id= and GET /v1/teams/waiting, and reads again on a live
  *   update of organisms or memory.
- * @structure useTeam · TeamSections
+ *   Under what waits, the way for an AI that cannot connect over MCP (T9): the team's ready prompt to
+ *   copy, and the answer pasted back, shown as what would be written before it is.
+ * @structure useTeam · PromptPath · TeamSections
  * @usage const team = useTeam(org); … ${team ? html`<${TeamSections} team=${team} me=${owner} num=${num} />` : null}
  * @version-history
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T14, T15).
@@ -18,7 +20,9 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t, tOr } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPost } from '/js/api.js';
+import { TextArea } from '/components/TextField.js';
+import { Action, Actions, Loud } from '/components/Action.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { Section } from '/components/Section.js';
@@ -57,6 +61,46 @@ export function useTeam(org) {
   return team;
 }
 
+/**
+ * For an AI that cannot connect over MCP (team setup T9): copy the team's ready prompt into your own
+ * chat, paste its answer back, see what would be written, and write it. GET /v1/teams/:id/prompt and
+ * POST /v1/teams/:id/paste (a dry run first, as the route defaults to).
+ */
+function PromptPath({ orgId }) {
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [text, setText] = useState('');
+  const [plan, setPlan] = useState(null);
+  const [done, setDone] = useState(null);
+  const [error, setError] = useState('');
+  const base = `/v1/teams/${encodeURIComponent(orgId)}`;
+  useEffect(() => {
+    if (!open || prompt) return;
+    apiGet(`${base}/prompt`).then((r) => setPrompt(r?.data?.prompt ?? ''))
+      .catch((err) => { swallowed('team-sections: prompt', err); setError(err?.message || x('failed')); });
+  }, [open, prompt, base]);
+  const paste = async (dryRun) => {
+    setError('');
+    try {
+      const r = await apiPost(`${base}/paste`, { text, dry_run: dryRun });
+      if (dryRun) setPlan(r?.data?.entries ?? []);
+      else { setDone(r?.data?.written ?? 0); setPlan(null); setText(''); }
+    } catch (err) { swallowed('team-sections: paste', err); setError(err?.message || x('failed')); }
+  };
+  return html`
+    <${Section} fold id="og-team-prompt" num="" title=${x('promptTitle')} sub=${x('promptSub')} open=${open} onToggle=${() => setOpen((o) => !o)}>
+      ${prompt ? html`<${Actions}><${Action} small copy=${prompt} copiedLabel=${x('copied')}>${x('copyPrompt')}<//><//>` : null}
+      <${TextArea} label=${x('pasteLabel')} rows=${6} value=${text} onInput=${(v) => { setText(v); setPlan(null); setDone(null); }} />
+      <${Actions}><${Action} small disabled=${!text.trim()} onClick=${() => paste(true)}>${x('check')}<//><//>
+      ${plan ? html`
+        ${plan.length ? html`<${LineList} rows=${plan.map((e, i) => ({ id: String(i), name: e.title, text: x(`tag.${e.tag}`), href: `/v1/profile?tab=organisms&org=${encodeURIComponent(orgId)}` }))} />
+          <${Actions}><${Loud} control onClick=${() => paste(false)}>${x('write', { n: plan.length })}<//><//>`
+          : html`<${Note}>${x('nothingFound')}<//>`}` : null}
+      ${done !== null ? html`<${Note} kind="message">${x('written', { n: done })}<//>` : null}
+      ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
+    <//>`;
+}
+
 function when(iso) {
   return iso ? String(iso).slice(0, 10) : '';
 }
@@ -82,6 +126,7 @@ export function TeamSections({ team, me, num }) {
         ? html`<${LineList} rows=${waitingRows} />`
         : html`<${Note}>${x('waitingNone')}<//>`}
       <${Note} kind="quiet">${x('waitingChat')}<//>
+      <${PromptPath} orgId=${status.organism_id} />
     <//>
     <${Section} id="og-team-brain" num=${num(2)} title=${x('brainTitle')}>
       <${LineList} rows=${[

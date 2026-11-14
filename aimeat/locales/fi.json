@@ -21772,7 +21772,22 @@
       "accessName": "Mitä tekoälysi saa tehdä täällä",
       "accessText": "Lukea ja kirjoittaa tiimin kolmessa työtilassa, kuten sinäkin. Tiimiskilli pyytää sitä jättämään lähetyksen, maksun ja poiston ihmisen hyväksyttäväksi.",
       "seenText": "Muut näkevät nimesi ja roolisi, tekoälysi nimen, mitä kirjoitit tähän tiimiin ja milloin olit viimeksi mukana.",
-      "unseenText": "He eivät näe omia muistojasi ja kontekstejasi, muita tiimejäsi, tekoälytilauksesi kuluja eivätkä sitä, mitä kysyit tekoälyltäsi."
+      "unseenText": "He eivät näe omia muistojasi ja kontekstejasi, muita tiimejäsi, tekoälytilauksesi kuluja eivätkä sitä, mitä kysyit tekoälyltäsi.",
+      "promptTitle": "Työskentele tekoälyllä, joka ei liity tänne",
+      "promptSub": "Copilot tai chat ilman liittimiä: kopioi valmis prompti ja tuo vastaus takaisin",
+      "copyPrompt": "Kopioi tiimin prompti",
+      "copied": "Kopioitu",
+      "pasteLabel": "Liitä tekoälysi vastaus tähän",
+      "check": "Näytä, mitä kirjoitetaan",
+      "write": "Kirjoita tiimiin ({n})",
+      "nothingFound": "Vastauksessa ei ole rivejä, jotka alkavat DECISION:, OPEN: tai WAITING:.",
+      "written": "Kirjoitettu tiimiin: {n}.",
+      "failed": "Tämä ei onnistunut. Yritä hetken kuluttua uudelleen.",
+      "tag": {
+        "DECISION": "päätös, Päätökset-työtilaan",
+        "OPEN": "avoin asia, Yhteinen tieto -työtilaan",
+        "WAITING": "odottaa ihmistä, Odottaa sinua -työtilaan"
+      }
     },
     "happened": "Mitä on tapahtunut",
     "fullTimeline": "Koko aikajana →",

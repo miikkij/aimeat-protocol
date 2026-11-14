@@ -21005,7 +21005,22 @@
       "accessName": "What your AI may do here",
       "accessText": "Read and write in the team's three workspaces, as you may. The team skill asks it to leave a send, a payment and a delete waiting for a person.",
       "seenText": "The others see your name and role, your AI's name, what you wrote in this team, and when you last took part.",
-      "unseenText": "They do not see your own memory and contexts, your other teams, your AI subscription's costs, or what you asked your AI."
+      "unseenText": "They do not see your own memory and contexts, your other teams, your AI subscription's costs, or what you asked your AI.",
+      "promptTitle": "Work with an AI that cannot connect",
+      "promptSub": "Copilot, a chat without connectors: copy a ready prompt, bring the answer back",
+      "copyPrompt": "Copy the team's prompt",
+      "copied": "Copied",
+      "pasteLabel": "Paste your AI's answer here",
+      "check": "Show what would be written",
+      "write": "Write {n} into the team",
+      "nothingFound": "The answer has no lines that start with DECISION:, OPEN: or WAITING:.",
+      "written": "Written into the team: {n}.",
+      "failed": "That did not work. Try again in a moment.",
+      "tag": {
+        "DECISION": "a decision, into Decisions",
+        "OPEN": "an open matter, into Shared knowledge",
+        "WAITING": "waits for a person, into Waiting for you"
+      }
     },
     "happened": "What has happened",
     "fullTimeline": "Full timeline →",

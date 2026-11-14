@@ -19829,7 +19829,22 @@
       "accessName": "Qué puede hacer tu IA aquí",
       "accessText": "Leer y escribir en los tres espacios de trabajo del equipo, como tú. La skill del equipo le pide dejar un envío, un pago y un borrado a la espera de una persona.",
       "seenText": "Los demás ven tu nombre y tu rol, el nombre de tu IA, lo que escribiste en este equipo y cuándo participaste por última vez.",
-      "unseenText": "No ven tu propia memoria ni tus contextos, tus otros equipos, los costes de tu suscripción de IA ni lo que preguntaste a tu IA."
+      "unseenText": "No ven tu propia memoria ni tus contextos, tus otros equipos, los costes de tu suscripción de IA ni lo que preguntaste a tu IA.",
+      "promptTitle": "Trabaja con una IA que no se conecta",
+      "promptSub": "Copilot o un chat sin conectores: copia un prompt listo y trae la respuesta",
+      "copyPrompt": "Copiar el prompt del equipo",
+      "copied": "Copiado",
+      "pasteLabel": "Pega aquí la respuesta de tu IA",
+      "check": "Mostrar lo que se escribiría",
+      "write": "Escribir en el equipo ({n})",
+      "nothingFound": "La respuesta no tiene líneas que empiecen por DECISION:, OPEN: o WAITING:.",
+      "written": "Escrito en el equipo: {n}.",
+      "failed": "No ha funcionado. Inténtalo de nuevo en un momento.",
+      "tag": {
+        "DECISION": "una decisión, en Decisiones",
+        "OPEN": "un asunto abierto, en Conocimiento compartido",
+        "WAITING": "espera a una persona, en Pendiente de ti"
+      }
     },
     "happened": "Qué ha pasado",
     "fullTimeline": "Línea de tiempo completa →",
