@@ -10,6 +10,9 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.10.1 — 2026-11-14 — auth, refreshOnFocus and authApi come from auth.js, which registers the
+ *     sign-in dialog and the pill for session.js (two import cycles end). The surface apps see, and
+ *     the bundle version, stay the same.
  *   v1.10.0 — 2026-11-08 — `?auth_step=key_credentials` opens the sign-in dialog on a code key's new
  *     sign-in details (secaudit2026nov08 round 14); the bundle version moves.
  *   v1.9.0 — 2026-11-05 — AIMEAT.auth.displayPrefs(): the signed-in person's own region and clock,
@@ -47,7 +50,7 @@
  *     stored palette applied at parse time (theme system v2).
  *   v1.0.0 — 2026-07-19 — Componentized rewrite of src/routes/libs/auth-lib*.ts (SDK-libs migration Phase 3).
  */
-import { auth, refreshOnFocus, authApi } from './session.js';
+import { auth, refreshOnFocus, authApi } from './auth.js';
 import { maybeShowGoogleSignup } from './signup.js';
 import { readAuthError, readAuthStep, readTwoStepToken } from './auth-error.js';
 import { showLoginModal } from './modal.js';

@@ -1,66 +1,6 @@
 [
   {
     "type": "cycle",
-    "from": "src/static/sdk-libs/auth/modal.js",
-    "to": "src/static/sdk-libs/auth/session.js",
-    "unresolvedTo": "./session.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/static/sdk-libs/auth/session.js",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/static/sdk-libs/auth/modal.js",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
-    "from": "src/static/sdk-libs/auth/pill.js",
-    "to": "src/static/sdk-libs/auth/session.js",
-    "unresolvedTo": "./session.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/static/sdk-libs/auth/session.js",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/static/sdk-libs/auth/pill.js",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/config-types.ts",
     "to": "src/services/config/sealing.ts",
     "unresolvedTo": "./services/config/sealing.js",

@@ -13,6 +13,7 @@
  *   because three live apps reload from it. signIn() and showLoginModal() call each callback once.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-auth-onlogin.test.ts
  * @version-history
+ *   v1.1.1 — 2026-11-14 — Imports auth.js (session.js with the dialog and the pill registered); the import path is the only change.
  *   v1.1.0 — 2026-09-13 — onSession carries the restore; onLogin stays sign-in only. Cases rewritten.
  *   v1.0.0 — 2026-09-13 — Initial. Run against the unchanged library first: every case failed except
  *     "a throwing onLogin", which guards a risk the change itself introduces and could not fail
@@ -145,7 +146,7 @@ beforeAll(async () => {
     } else if (u.includes('/locales/')) { ok = false; body = {}; }
     return { ok, status: ok ? 200 : 404, json: async () => body };
   };
-  ({ auth } = await import('../../src/static/sdk-libs/auth/session.js'));
+  ({ auth } = await import('../../src/static/sdk-libs/auth/auth.js'));
   events = await import('../../src/static/sdk-libs/auth/events.js');
 });
 

@@ -17,6 +17,7 @@
  *     too, so a page's own auth.login() and the pill's can overlap. They share one restore.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-auth-session.test.ts
  * @version-history
+ *   v1.1.1 — 2026-11-14 — Imports auth.js (session.js with the sign-in dialog registered); the import path is the only change.
  *   v1.1.0 — 2026-09-13 — The developer's onLogin decision: the login event carries { restored }, and
  *     signIn({ onLogin }) calls it once, with that flag, for the session its dialog produced. Both
  *     failed on the lib before the change. "Not called when the dialog closes without a sign-in, nor
@@ -122,7 +123,7 @@ beforeAll(async () => {
         : { ok: true, data: {} };
     return { ok: true, status: 200, json: async () => body };
   };
-  const session = await import('../../src/static/sdk-libs/auth/session.js');
+  const session = await import('../../src/static/sdk-libs/auth/auth.js');
   auth = session.auth;
   createSession = session.createSession;
   const events = await import('../../src/static/sdk-libs/auth/events.js');

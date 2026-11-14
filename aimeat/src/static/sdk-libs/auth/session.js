@@ -5,13 +5,18 @@
  *   stays in ONE module — no cross-module setter plumbing. Contains: api/authApi; the session object
  *   factory + persistence + refresh scheduling; the H-2 app-origin seamless SSO (silent same-site
  *   bridge, scope-drift self-heal, apex logout, PKCE consent popup); and the full AIMEAT.auth public
- *   API. The UI methods delegate out — mountLoginButton → pill.js, showLoginModal → modal.js (circular
- *   imports, resolved at call time). Merges the session code from auth-lib-part1/2/3.ts.
+ *   API. The UI methods delegate out — mountLoginButton → pill.js, showLoginModal → modal.js — through
+ *   session-ui.js, where auth.js registers both, because pill.js and modal.js import this file.
+ *   A caller that opens a screen imports `auth` from ./auth.js, which re-exports this file.
+ *   Merges the session code from auth-lib-part1/2/3.ts.
  * @structure state · api/authApi · persistSession/restoreSessionFromCookie · isAppOrigin/appScopeDrift/
  *   silentAppToken/apexLogout/PKCE consent/_buildAppSession/restoreSessionFromAppOrigin ·
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.9.1 — 2026-11-14 — mountPill and showLoginModal come from session-ui.js, not from pill.js and
+ *     modal.js, which import this file: two import cycles end. auth.js registers both and re-exports
+ *     this file. Same calls, same arguments.
  *   v1.9.0 — 2026-11-10 — auth.offlineIdentity(): the last person who signed in here, when the node
  *     gives no answer (last-identity.js); logout() removes the kept identity.
  *   v1.8.1 — 2026-11-01 — A boot with no stored session restores from the cookie only when the node's
@@ -58,8 +63,7 @@
 import { importEd25519Key, storeKey, loadKey, deleteKey, migrateKeysToIndexedDB, sign, save, load, remove, parseJwt, isExpired } from './crypto.js';
 import { NODE_URL, NODE_ID, appDeclaredScopes } from './config.js';
 import { emit, on, off } from './events.js';
-import { mountPill } from './pill.js';
-import { showLoginModal } from './modal.js';
+import { mountPill, showLoginModal } from './session-ui.js';
 import { isAppOrigin, appScopeDrift, silentAppToken, apexLogout, requestConsentPopup, reportUngrantableScopes } from './app-origin.js';
 import { passkeySupported, passkeySignIn, passkeyAdd } from './passkey.js';
 import { api, authApi, sessionHeaders } from './http.js';

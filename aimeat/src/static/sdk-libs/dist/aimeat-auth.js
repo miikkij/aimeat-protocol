@@ -217,6 +217,1319 @@
     listeners[event] = listeners[event].filter((f) => f !== fn);
   }
 
+  // src/static/sdk-libs/auth/session-ui.js
+  var ui = { showLoginModal: null, mountPill: null };
+  function provideSessionUi(parts) {
+    ui.showLoginModal = parts.showLoginModal;
+    ui.mountPill = parts.mountPill;
+  }
+  function missing(name) {
+    return new Error("[aimeat-auth] " + name + " was called before auth.js registered it in session-ui.js. Import auth from ./auth.js.");
+  }
+  function showLoginModal(opts, renderBtn, onClosed) {
+    if (!ui.showLoginModal) throw missing("showLoginModal");
+    return ui.showLoginModal(opts, renderBtn, onClosed);
+  }
+  function mountPill(auth2, selector, opts) {
+    if (!ui.mountPill) throw missing("mountPill");
+    return ui.mountPill(auth2, selector, opts);
+  }
+
+  // src/static/sdk-libs/auth/pkce.js
+  function b64url(buf) {
+    var bytes = new Uint8Array(buf), s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  async function pkce() {
+    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
+    if (crypto.subtle && crypto.subtle.digest) {
+      var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+      return { verifier, challenge: b64url(digest), method: "S256" };
+    }
+    return { verifier, challenge: verifier, method: "plain" };
+  }
+
+  // src/static/sdk-libs/auth/app-frame.js
+  function inIsolatedFrame() {
+    try {
+      var f = (
+        /** @type {any} */
+        window.__AIMEAT_FRAME__
+      );
+      return !!(f && f.host) && window.parent !== window;
+    } catch {
+      return false;
+    }
+  }
+  var sequence = 0;
+  function frameHost() {
+    var named = (
+      /** @type {any} */
+      window.__AIMEAT_FRAME__
+    );
+    return {
+      host: named && typeof named.origin === "string" && named.origin || location.protocol + "//" + location.host,
+      secret: named && typeof named.secret === "string" && named.secret || ""
+    };
+  }
+  function postToFrameHost(message, timeoutMs, accept) {
+    return new Promise(function(resolve) {
+      var at = frameHost();
+      var channel = new MessageChannel();
+      var timer = null;
+      function done(value) {
+        if (timer) clearTimeout(timer);
+        try {
+          channel.port1.close();
+        } catch {
+        }
+        resolve(value);
+      }
+      channel.port1.onmessage = function(e) {
+        var d = e.data || {};
+        if (accept && !accept(d)) return;
+        done(d);
+      };
+      if (timeoutMs) timer = setTimeout(function() {
+        done(null);
+      }, timeoutMs);
+      try {
+        window.parent.postMessage(Object.assign({}, message, { secret: at.secret }), at.host, [channel.port2]);
+      } catch {
+        done(null);
+      }
+    });
+  }
+  function parentAuth(timeoutMs) {
+    var pick = function(d) {
+      return d && d.type === "aimeat-auth" && d.jwt ? { jwt: String(d.jwt), nodeUrl: d.nodeUrl ? String(d.nodeUrl) : "" } : null;
+    };
+    if (inIsolatedFrame()) {
+      return postToFrameHost({ type: "aimeat-request-auth" }, timeoutMs, function(d) {
+        return d.type === "aimeat-auth";
+      }).then(pick);
+    }
+    return new Promise(function(resolve) {
+      var timer = setTimeout(function() {
+        window.removeEventListener("message", onMessage);
+        resolve(null);
+      }, timeoutMs);
+      function onMessage(e) {
+        if (e.source !== window.parent || !e.data || e.data.type !== "aimeat-auth") return;
+        clearTimeout(timer);
+        window.removeEventListener("message", onMessage);
+        resolve(pick(e.data));
+      }
+      window.addEventListener("message", onMessage);
+      window.parent.postMessage({ type: "aimeat-request-auth" }, "*");
+    });
+  }
+  function askFrameHost(op, payload, timeoutMs) {
+    var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
+    var request = Object.assign({}, payload || {}, { type: "aimeat_frame_req", id, op });
+    return postToFrameHost(request, timeoutMs, function(d) {
+      return d.type === "aimeat_frame_res" && d.id === id;
+    }).then(function(d) {
+      return d && d.result !== void 0 ? d.result : null;
+    });
+  }
+
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  var LANG_CHOSEN_KEY = "aimeat-lang-chosen";
+  var COOKIE_MAX_AGE = 31536e3;
+  function readLocales(opts) {
+    let list = opts && Array.isArray(opts.locales) ? opts.locales : null;
+    if (!list) {
+      try {
+        const m = (
+          /** @type {HTMLMetaElement|null} */
+          document.querySelector('meta[name="aimeat-locales"]')
+        );
+        if (m && m.content) list = m.content.split(/[\s,]+/);
+      } catch {
+      }
+    }
+    if (!list) return [];
+    const seen = {};
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const c = String(list[i] || "").trim().toLowerCase();
+      if (/^[a-z]{2}$/.test(c) && !seen[c]) {
+        seen[c] = 1;
+        out.push(c);
+      }
+    }
+    return out.length > 1 ? out : [];
+  }
+  function servedPageLang() {
+    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
+    const m = (
+      /** @type {HTMLMetaElement|null} */
+      document.querySelector('meta[name="aimeat-page-lang"]')
+    );
+    const code = m && m.content ? m.content.trim().toLowerCase() : "";
+    return /^[a-z]{2}$/.test(code) ? code : null;
+  }
+  function readLang(locales) {
+    const list = Array.isArray(locales) ? locales : null;
+    const pick = list ? function(v) {
+      return v && list.indexOf(v) >= 0 ? v : null;
+    } : function(v) {
+      return v ? String(v).slice(0, 2) : null;
+    };
+    const served = pick(servedPageLang());
+    if (served) return served;
+    try {
+      const u = pick(new URLSearchParams(location.search).get("lang"));
+      if (u) return u;
+      const s = pick(localStorage.getItem(LANG_KEY));
+      if (s) return s;
+      const c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+      const cv = c ? pick(c[1]) : null;
+      if (cv) return cv;
+    } catch {
+    }
+    const cfg2 = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
+    const node = pick(cfg2 && cfg2.defaultLocale);
+    if (node) return node;
+    let nav = null;
+    try {
+      nav = pick(String(navigator.language || "").slice(0, 2).toLowerCase());
+    } catch {
+    }
+    if (nav) return nav;
+    return list ? list[0] : "en";
+  }
+  function writeLang(lang) {
+    const keep = ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
+    try {
+      document.cookie = LANG_KEY + "=" + lang + keep;
+      document.cookie = LANG_CHOSEN_KEY + "=1" + keep;
+      localStorage.setItem(LANG_KEY, lang);
+      localStorage.setItem(LANG_CHOSEN_KEY, "1");
+    } catch {
+    }
+  }
+
+  // src/static/sdk-libs/auth/app-origin.js
+  function isAppOrigin() {
+    if (inIsolatedFrame()) return true;
+    try {
+      return location.origin !== new URL(APEX_URL).origin;
+    } catch {
+      return false;
+    }
+  }
+  function appScopeDrift(session) {
+    if (!session || !session._appOrigin || !session.jwt) return [];
+    var have = (parseJwt(session.jwt) || {}).scopes || [];
+    return appDeclaredScopes().split(" ").filter(function(s) {
+      return s && have.indexOf(s) < 0;
+    });
+  }
+  function silentAppToken() {
+    if (inIsolatedFrame()) return askFrameHost("login", { scope: appDeclaredScopes() }, 8e3);
+    return new Promise(function(resolve) {
+      var apexOrigin;
+      try {
+        apexOrigin = new URL(APEX_URL).origin;
+      } catch {
+        resolve(null);
+        return;
+      }
+      if (location.origin === apexOrigin) {
+        resolve(null);
+        return;
+      }
+      var settled = false, iframe = null, timer = null;
+      function finish(v) {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener("message", onMsg);
+        if (timer) clearTimeout(timer);
+        if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        resolve(v);
+      }
+      function onMsg(e) {
+        if (e.origin !== apexOrigin) return;
+        var d = e.data || {};
+        if (d.type !== "aimeat_app_login") return;
+        finish(d.result || null);
+      }
+      window.addEventListener("message", onMsg);
+      iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.src = apexOrigin + "/app-silent.html?scope=" + encodeURIComponent(appDeclaredScopes());
+      (document.body || document.documentElement).appendChild(iframe);
+      timer = setTimeout(function() {
+        finish(null);
+      }, 8e3);
+    });
+  }
+  function reportUngrantableScopes(r) {
+    try {
+      console.error("[aimeat-auth] Nobody can sign in to " + (r.app || "this app") + ': its <meta name="aimeat-scopes"> asks for ' + (r.unknown ? r.unknown : "a word") + ", which this node cannot grant, and one such word refuses the whole sign-in. Take the words from GET /v1/app-grants/scopes and publish the app again.");
+    } catch {
+    }
+  }
+  function apexLogout() {
+    if (inIsolatedFrame()) return askFrameHost("logout", {}, 8e3).then(function(r) {
+      return !!(r && r.ok);
+    });
+    return new Promise(function(resolve) {
+      var apexOrigin;
+      try {
+        apexOrigin = new URL(APEX_URL).origin;
+      } catch {
+        resolve(false);
+        return;
+      }
+      if (location.origin === apexOrigin) {
+        resolve(false);
+        return;
+      }
+      var settled = false, iframe = null, timer = null;
+      function finish(v) {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener("message", onMsg);
+        if (timer) clearTimeout(timer);
+        if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        resolve(v);
+      }
+      function onMsg(e) {
+        if (e.origin !== apexOrigin) return;
+        var d = e.data || {};
+        if (d.type !== "aimeat_app_logout") return;
+        finish(!!(d.result && d.result.ok));
+      }
+      window.addEventListener("message", onMsg);
+      iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.src = apexOrigin + "/app-silent.html?mode=logout";
+      (document.body || document.documentElement).appendChild(iframe);
+      timer = setTimeout(function() {
+        finish(false);
+      }, 8e3);
+    });
+  }
+  async function requestConsentPopup(app, scopeStr, manage, prompt) {
+    if (inIsolatedFrame()) {
+      return askFrameHost("consent", { scope: scopeStr || appDeclaredScopes(), manage: !!manage, prompt: prompt === "create" ? "create" : "" }, 15 * 60 * 1e3);
+    }
+    var apexOrigin;
+    try {
+      apexOrigin = new URL(APEX_URL).origin;
+    } catch {
+      return null;
+    }
+    var p = await pkce();
+    var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+    var redirectUri = location.origin + "/";
+    var scope = scopeStr || appDeclaredScopes();
+    var url = apexOrigin + "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + (prompt === "create" ? "&prompt=create" : "") + "&lang=" + encodeURIComponent(String(readLang(["en", "fi", "es"]))) + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope) + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
+    var w = 460, h = 660;
+    var left = window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0;
+    var top = window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0;
+    var popup = window.open(url, "aimeat_consent", "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top);
+    if (!popup) {
+      try {
+        console.warn("[aimeat-auth] consent popup blocked — app-origin sign-in needs a real user click (user activation). Synthetic/automated clicks cannot open the consent window.");
+      } catch {
+      }
+      emit("popup-blocked", { app });
+      return null;
+    }
+    var msg = await new Promise(function(resolve) {
+      var done = false, iv = null;
+      function onMsg(e) {
+        if (e.origin !== apexOrigin) return;
+        var d = e.data || {};
+        if (d.type !== "aimeat_app_grant" || d.state !== state) return;
+        done = true;
+        cleanup();
+        resolve(d);
+      }
+      function cleanup() {
+        window.removeEventListener("message", onMsg);
+        if (iv) clearInterval(iv);
+      }
+      window.addEventListener("message", onMsg);
+      iv = setInterval(function() {
+        if (popup.closed && !done) {
+          cleanup();
+          resolve(null);
+        }
+      }, 500);
+    });
+    if (msg && msg.revoked) return { revoked: true };
+    if (!msg || !msg.code) return null;
+    try {
+      var resp = await fetch(apexOrigin + "/v1/app-grants/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grant_type: "authorization_code", code: msg.code, code_verifier: p.verifier, redirect_uri: redirectUri })
+      });
+      var j = await resp.json();
+      return j && j.ok && j.data && j.data.access_token ? j.data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // src/static/sdk-libs/auth/http.js
+  async function api(path, opts = {}) {
+    const url = NODE_URL + path;
+    const headers = { "Content-Type": "application/json", ...opts.headers };
+    const resp = await fetch(url, { ...opts, headers });
+    const data = await resp.json();
+    if (!data.ok) {
+      const err = (
+        /** @type {Error & { code?: string, details?: unknown, status?: number }} */
+        new Error(data.error?.message || "API error")
+      );
+      err.code = data.error?.code;
+      err.details = data.error?.details;
+      err.status = resp.status;
+      throw err;
+    }
+    return data;
+  }
+  async function authApi(path, jwt, opts = {}) {
+    return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
+  }
+  function sessionHeaders(given, jwt, body) {
+    const headers = new Headers(given || void 0);
+    if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + jwt);
+    if (!headers.has("Content-Type") && (body == null || typeof body === "string")) {
+      headers.set("Content-Type", "application/json");
+    }
+    return headers;
+  }
+
+  // src/static/sdk-libs/auth/passkey.js
+  function passkeySupported() {
+    try {
+      return typeof window !== "undefined" && typeof window.PublicKeyCredential === "function" && !!(navigator.credentials && navigator.credentials.create && navigator.credentials.get);
+    } catch {
+      return false;
+    }
+  }
+  function toBuffer(value) {
+    var s = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    var raw = atob(s);
+    var bytes = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bytes.buffer;
+  }
+  function toB64u(buffer) {
+    var bytes = new Uint8Array(buffer);
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function creationOptions(options) {
+    var out = Object.assign({}, options);
+    out.challenge = toBuffer(options.challenge);
+    out.user = Object.assign({}, options.user, { id: toBuffer(options.user.id) });
+    if (Array.isArray(options.excludeCredentials)) {
+      out.excludeCredentials = options.excludeCredentials.map(function(c) {
+        return Object.assign({}, c, { id: toBuffer(c.id) });
+      });
+    }
+    return out;
+  }
+  function requestOptions(options) {
+    var out = Object.assign({}, options);
+    out.challenge = toBuffer(options.challenge);
+    if (Array.isArray(options.allowCredentials)) {
+      out.allowCredentials = options.allowCredentials.map(function(c) {
+        return Object.assign({}, c, { id: toBuffer(c.id) });
+      });
+    }
+    return out;
+  }
+  function isCancellation(err) {
+    var name = err && err.name;
+    return name === "NotAllowedError" || name === "AbortError";
+  }
+  function cancelled() {
+    var e = (
+      /** @type {Error & { code?: string }} */
+      new Error("cancelled")
+    );
+    e.code = "PASSKEY_CANCELLED";
+    return e;
+  }
+  async function passkeySignIn(username) {
+    var started = await api("/v1/ghii/login/passkey/options", {
+      method: "POST",
+      credentials: "include",
+      body: JSON.stringify(username ? { username } : {})
+    });
+    var assertion;
+    try {
+      assertion = await navigator.credentials.get({ publicKey: requestOptions(started.data.options) });
+    } catch (err) {
+      if (isCancellation(err)) throw cancelled();
+      throw err;
+    }
+    if (!assertion) throw cancelled();
+    var response = {
+      id: assertion.id,
+      rawId: toB64u(assertion.rawId),
+      type: assertion.type,
+      clientExtensionResults: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {},
+      response: {
+        clientDataJSON: toB64u(assertion.response.clientDataJSON),
+        authenticatorData: toB64u(assertion.response.authenticatorData),
+        signature: toB64u(assertion.response.signature),
+        userHandle: assertion.response.userHandle ? toB64u(assertion.response.userHandle) : void 0
+      }
+    };
+    return api("/v1/ghii/login/passkey/verify", {
+      method: "POST",
+      credentials: "include",
+      body: JSON.stringify({ ceremony_id: started.data.ceremony_id, response })
+    });
+  }
+  async function passkeyAdd(jwt, label) {
+    var started = await authApi("/v1/ghii/passkeys/register/options", jwt, { method: "POST", body: "{}" });
+    var credential;
+    try {
+      credential = await navigator.credentials.create({ publicKey: creationOptions(started.data.options) });
+    } catch (err) {
+      if (isCancellation(err)) throw cancelled();
+      throw err;
+    }
+    if (!credential) throw cancelled();
+    var response = {
+      id: credential.id,
+      rawId: toB64u(credential.rawId),
+      type: credential.type,
+      clientExtensionResults: credential.getClientExtensionResults ? credential.getClientExtensionResults() : {},
+      response: {
+        clientDataJSON: toB64u(credential.response.clientDataJSON),
+        attestationObject: toB64u(credential.response.attestationObject),
+        transports: credential.response.getTransports ? credential.response.getTransports() : []
+      }
+    };
+    return authApi("/v1/ghii/passkeys/register/verify", jwt, {
+      method: "POST",
+      body: JSON.stringify({ ceremony_id: started.data.ceremony_id, response, label: label || "" })
+    });
+  }
+
+  // src/static/sdk-libs/auth/on-login.js
+  function sessionIdentity(session) {
+    if (!session) return null;
+    return String(session.ghii || session.owner || session.identity || session.gaii || "?");
+  }
+  function runCallback(name, fn, args) {
+    if (typeof fn !== "function") return;
+    var report = function(e) {
+      try {
+        console.error("[aimeat-auth] The page's " + name + " failed. The session is signed in; fix the callback:", e);
+      } catch {
+      }
+    };
+    try {
+      var result = fn.apply(null, args);
+      if (result && typeof result.then === "function") result.then(null, report);
+    } catch (e) {
+      report(e);
+    }
+  }
+  function reportSession(callbacks, session, restored) {
+    var cb = callbacks || {};
+    runCallback("onSession", cb.onSession, [session, { restored: !!restored }]);
+    if (!restored) runCallback("onLogin", cb.onLogin, [session]);
+  }
+  function loginWatcher(callbacks, liveSession) {
+    var reported = sessionIdentity(liveSession);
+    if (liveSession && callbacks && typeof callbacks.onSession === "function") {
+      setTimeout(function() {
+        if (sessionIdentity(liveSession) === reported) runCallback("onSession", callbacks.onSession, [liveSession, { restored: true }]);
+      }, 0);
+    }
+    return {
+      login: function(session, meta) {
+        var who = sessionIdentity(session);
+        if (!who || who === reported) return;
+        reported = who;
+        reportSession(callbacks, session, !!(meta && meta.restored));
+      },
+      logout: function() {
+        reported = null;
+      }
+    };
+  }
+  function onLoginWhileOpen(callbacks) {
+    var cb = callbacks || {};
+    if (typeof cb.onLogin !== "function" && typeof cb.onSession !== "function") return function() {
+    };
+    var done = false;
+    function hear(session, meta) {
+      if (done || !session) return;
+      done = true;
+      off("login", hear);
+      reportSession(cb, session, !!(meta && meta.restored));
+    }
+    on("login", hear);
+    return function stop() {
+      done = true;
+      off("login", hear);
+    };
+  }
+
+  // src/static/sdk-libs/auth/session-hint.js
+  function hasSessionHint() {
+    try {
+      return typeof document !== "undefined" && /(?:^|;\s*)aimeat_session_hint=1(?:;|$)/.test(document.cookie || "");
+    } catch (e) {
+      console.warn("[aimeat-auth] The cookie could not be read:", e && /** @type {Error} */
+      e.message);
+      return true;
+    }
+  }
+
+  // src/static/sdk-libs/auth/last-identity.js
+  var KEY = "last_identity";
+  var PROBE_MS = 5e3;
+  var announced = null;
+  var returning = null;
+  on("login", function(session) {
+    announced = null;
+    if (!session || !session.owner || session.gaii) return;
+    save(KEY, {
+      owner: String(session.owner),
+      ghii: String(session.ghii || ""),
+      displayName: String(session.displayName || ""),
+      at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  });
+  function lastIdentity() {
+    const v = load(KEY);
+    return v && typeof v.owner === "string" && v.owner ? v : null;
+  }
+  function forgetLastIdentity() {
+    announced = null;
+    remove(KEY);
+  }
+  function offlineIdentity() {
+    return announced;
+  }
+  function nodeUnreachable() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(true);
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = setTimeout(function() {
+      if (ctl) ctl.abort();
+    }, PROBE_MS);
+    return fetch(NODE_URL + "/v1/build", { cache: "no-store", credentials: "omit", mode: "no-cors", signal: ctl ? ctl.signal : void 0 }).then(function() {
+      return false;
+    }, function() {
+      return true;
+    }).finally(function() {
+      clearTimeout(timer);
+    });
+  }
+  function settleNoSession(retry, knownDown) {
+    return (knownDown ? Promise.resolve(true) : nodeUnreachable()).then(function(down) {
+      if (!down) {
+        const stood = !!announced || !!load("session");
+        remove("session");
+        forgetLastIdentity();
+        if (stood) emit("logout");
+        return false;
+      }
+      const who = lastIdentity();
+      if (who && !announced) {
+        announced = who;
+        emit("offline", who);
+      }
+      if (!returning && typeof window !== "undefined") {
+        returning = function() {
+          window.removeEventListener(
+            "online",
+            /** @type {() => void} */
+            returning
+          );
+          returning = null;
+          try {
+            retry();
+          } catch (e) {
+            console.warn("[aimeat-auth] The restore after the network returned failed:", e && /** @type {Error} */
+            e.message);
+          }
+        };
+        window.addEventListener("online", returning);
+      }
+      return true;
+    });
+  }
+
+  // src/static/sdk-libs/auth/session.js
+  var currentSession = null;
+  var refreshTimer = null;
+  var ownerRefreshInFlight = null;
+  var _appOriginLoginInFlight = null;
+  var focusRefreshInFlight = null;
+  var loginInFlight = null;
+  function persistSession(session) {
+    save("session", {
+      owner: session.owner,
+      gaii: session.gaii,
+      ghii: session.ghii,
+      jwt: session.jwt,
+      publicKey: session.publicKey,
+      roles: session.roles,
+      displayName: session.displayName || "",
+      federated: session.federated || false,
+      homeNode: session.homeNode || "",
+      homeUrl: session.homeUrl || "",
+      // H-2 app-origin grant session metadata (drives the consent gear on the login pill).
+      _appOrigin: session._appOrigin || false,
+      _app: session._app || null,
+      _own: session._own || false
+    });
+  }
+  async function restoreSessionFromCookie() {
+    try {
+      const data = await api("/v1/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-AIMEAT-Refresh": "1" }
+      });
+      const token = data && data.data && data.data.token;
+      if (!token) return null;
+      const payload = parseJwt(token) || {};
+      const ownerName = payload.owner || payload.sub;
+      if (!ownerName) return null;
+      const session = createSession({
+        owner: ownerName,
+        ghii: String(ownerName).indexOf("@") >= 0 ? ownerName : ownerName + "@" + NODE_ID,
+        gaii: null,
+        jwt: token,
+        roles: payload.roles || [],
+        displayName: ""
+      });
+      persistSession(session);
+      currentSession = session;
+      scheduleAutoRefresh(session);
+      emit("login", session, { restored: true });
+      return session;
+    } catch (e) {
+      if (!(e && /** @type {any} */
+      e.code)) console.warn("[aimeat-auth] Restoring the session from the cookie failed:", e && /** @type {Error} */
+      e.message);
+      return null;
+    }
+  }
+  function _buildAppSession(accessToken, appId, own, displayName, restored) {
+    var payload = parseJwt(accessToken) || {};
+    var ownerName = payload.owner || payload.sub;
+    if (!ownerName) return null;
+    var session = createSession({
+      owner: ownerName,
+      ghii: String(ownerName).indexOf("@") >= 0 ? ownerName : ownerName + "@" + NODE_ID,
+      gaii: null,
+      jwt: accessToken,
+      roles: payload.roles || [],
+      displayName: displayName || ""
+    });
+    session._appOrigin = true;
+    session._app = appId || null;
+    session._own = !!own;
+    persistSession(session);
+    currentSession = session;
+    scheduleAutoRefresh(session);
+    emit("login", session, { restored: !!restored });
+    return session;
+  }
+  function restoreSessionFromAppOrigin(interactive, prompt) {
+    if (currentSession) return Promise.resolve(currentSession);
+    if (_appOriginLoginInFlight) return _appOriginLoginInFlight;
+    _appOriginLoginInFlight = (async function() {
+      var r = await silentAppToken();
+      var grant = r && r.ok && r.access_token ? r : null;
+      var appId = r && r.app || null;
+      var own = !!(r && r.own);
+      if (!grant && r && r.error === "invalid_scope") {
+        reportUngrantableScopes(r);
+        return null;
+      }
+      if (!grant && interactive && r && r.app && (r.error === "consent_required" || r.error === "login_required")) {
+        appId = r.app;
+        grant = await requestConsentPopup(r.app, r.scope, false, prompt);
+        own = !!(grant && grant.own);
+        if (grant && grant.app) appId = grant.app;
+      }
+      if (!grant || !grant.access_token) return null;
+      return _buildAppSession(grant.access_token, appId, own, grant.display_name, !interactive);
+    })();
+    _appOriginLoginInFlight.finally(function() {
+      _appOriginLoginInFlight = null;
+    });
+    return _appOriginLoginInFlight;
+  }
+  function scheduleAutoRefresh(session) {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    if (!session?.jwt) return;
+    const payload = parseJwt(session.jwt);
+    if (!payload || !payload.exp) return;
+    const msUntilExpiry = payload.exp * 1e3 - Date.now();
+    const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1e3, 1e4);
+    refreshTimer = setTimeout(async () => {
+      try {
+        await session.refresh();
+        emit("refreshed", session);
+        scheduleAutoRefresh(session);
+      } catch (e) {
+        console.warn("[aimeat-auth] Auto-refresh failed:", e.message);
+        emit("expired", { reason: "refresh_failed", error: e.message });
+      }
+    }, refreshIn);
+  }
+  function createSession(data) {
+    const jwtPayload = data.jwt ? parseJwt(data.jwt) : null;
+    let ownerVal = data.owner;
+    if (ownerVal != null && typeof ownerVal !== "string") {
+      ownerVal = typeof ownerVal === "object" && typeof ownerVal.name === "string" ? ownerVal.name : String(ownerVal);
+    }
+    let ghiiVal = data.ghii;
+    if (ghiiVal != null && typeof ghiiVal !== "string") {
+      ghiiVal = typeof ghiiVal === "object" && typeof ghiiVal.ghii === "string" ? ghiiVal.ghii : String(ghiiVal);
+    }
+    const session = (
+      /** @type {Record<string, any>} */
+      {
+        ghii: ghiiVal || null,
+        owner: ownerVal,
+        gaii: data.gaii || null,
+        identity: data.gaii || ghiiVal || null,
+        jwt: data.jwt,
+        roles: jwtPayload?.roles || data.roles || [],
+        displayName: data.displayName || "",
+        // SECURITY: Private keys are non-extractable CryptoKeys in IndexedDB, NOT here. _cryptoKey = in-memory ref only.
+        _cryptoKey: data._cryptoKey || null,
+        publicKey: data.publicKey,
+        nodeUrl: NODE_URL,
+        federated: data.federated || false,
+        homeNode: data.homeNode || "",
+        homeUrl: data.homeUrl || "",
+        // Authenticated fetch wrapper — returns the parsed envelope for every answer, ok or not, without
+        // throwing, so a caller can branch on res.ok / res.error.code itself. A caller MUST branch: an
+        // envelope with ok:false is a refused call (401, 403, 429, 5xx), never an empty result, and a read
+        // that was refused is never the basis of a write (AIMEAT.data.get() resolves null only for
+        // NOT_FOUND and throws for the rest). An answer that is not JSON rejects from resp.json().
+        async fetch(path, opts = {}) {
+          if (isExpired(session.jwt)) {
+            await session.refresh();
+          }
+          const url = NODE_URL + path;
+          const headers = sessionHeaders(opts.headers, session.jwt, opts.body);
+          const resp = await fetch(url, { ...opts, headers });
+          if (resp.status === 403 && session._appOrigin && !session._scopeHealTried) {
+            var missing2 = appScopeDrift(session);
+            if (missing2.length) {
+              session._scopeHealTried = true;
+              var t = await silentAppToken();
+              if (t && t.ok && t.access_token && !appScopeDrift({ _appOrigin: true, jwt: t.access_token })) {
+                session.jwt = t.access_token;
+                persistSession(session);
+                scheduleAutoRefresh(session);
+                var retryHeaders = new Headers(headers);
+                retryHeaders.set("Authorization", "Bearer " + session.jwt);
+                var retry = await fetch(url, { ...opts, headers: retryHeaders });
+                return retry.json();
+              }
+              emit("scopes-stale", { app: session._app || null, missing: missing2 });
+            }
+          }
+          return resp.json();
+        },
+        // Notify the signed-in owner (header bell + browser push if subscribed).
+        async notify(title, opts = {}) {
+          return session.fetch("/v1/notifications", {
+            method: "POST",
+            body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type })
+          });
+        },
+        // Get a fresh access token. Owner sessions use the httpOnly refresh cookie; agent sessions
+        // re-sign with their IndexedDB key. Concurrent owner refreshes share one in-flight request.
+        async refresh() {
+          if (session._appOrigin) {
+            var t = await silentAppToken();
+            if (!t || !t.access_token) throw new Error("App session expired — the owner is not logged in on the node.");
+            session.jwt = t.access_token;
+            session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+            persistSession(session);
+            scheduleAutoRefresh(session);
+            return session;
+          }
+          if (session.federated) {
+            throw new Error("Federated session expired. Please log in again.");
+          }
+          if (session.gaii) {
+            const key = session._cryptoKey || await loadKey("agent_key");
+            if (!key) throw new Error("Cannot refresh — no signing key found in IndexedDB");
+            const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+            const signature = await sign(key, session.gaii + timestamp);
+            const d2 = await api("/v1/auth/token", {
+              method: "POST",
+              body: JSON.stringify({ gaii: session.gaii, timestamp, signature })
+            });
+            session.jwt = d2.data.token;
+            session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+            persistSession(session);
+            scheduleAutoRefresh(session);
+            return session;
+          }
+          if (ownerRefreshInFlight) return ownerRefreshInFlight;
+          ownerRefreshInFlight = (async () => {
+            const resp = await fetch(NODE_URL + "/v1/auth/refresh", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json", "X-AIMEAT-Refresh": "1" }
+            });
+            let data2 = null;
+            let unreadable = null;
+            try {
+              data2 = await resp.json();
+            } catch (e) {
+              unreadable = e;
+            }
+            if (!resp.ok || !data2 || data2.ok === false) {
+              throw new Error(
+                data2?.error?.message || "Session refresh failed" + (unreadable ? " (HTTP " + resp.status + ", the answer was not JSON)" : ""),
+                unreadable ? { cause: unreadable } : void 0
+              );
+            }
+            session.jwt = data2.data.token;
+            session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+            var freshClaims = parseJwt(session.jwt) || {};
+            if (freshClaims.owner && freshClaims.owner !== session.owner) {
+              session.owner = freshClaims.owner;
+              if (freshClaims.node) session.ghii = freshClaims.owner + "@" + freshClaims.node;
+              session.identity = session.gaii || session.ghii || null;
+            }
+            if (typeof data2.data.display_name === "string") session.displayName = data2.data.display_name;
+            persistSession(session);
+            scheduleAutoRefresh(session);
+            return session;
+          })();
+          try {
+            return await ownerRefreshInFlight;
+          } finally {
+            ownerRefreshInFlight = null;
+          }
+        },
+        // Check if session is valid
+        get valid() {
+          return session.jwt && !isExpired(session.jwt);
+        }
+      }
+    );
+    return session;
+  }
+  function refreshOnFocus() {
+    const session = currentSession;
+    if (!session || !session.jwt || session.federated) return;
+    const payload = parseJwt(session.jwt);
+    if (!payload || !payload.exp) return;
+    const msUntilExpiry = payload.exp * 1e3 - Date.now();
+    if (msUntilExpiry > 5 * 60 * 1e3) return;
+    if (focusRefreshInFlight) return;
+    const wasExpired = msUntilExpiry <= 0;
+    focusRefreshInFlight = session.refresh().then(() => {
+      emit("refreshed", session);
+    }).catch((e) => {
+      console.warn("[aimeat-auth] Focus refresh failed:", e.message);
+      if (wasExpired) emit("expired", { reason: "refresh_failed", error: e.message });
+    }).finally(() => {
+      focusRefreshInFlight = null;
+    });
+  }
+  function generatedPassword() {
+    const bytes = crypto.getRandomValues(new Uint8Array(18));
+    let random = "";
+    for (const b of bytes) random += String.fromCharCode(b);
+    return "Aa1-" + btoa(random).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  async function sessionFromLogin(data) {
+    const d = data.data;
+    let ownerCryptoKey = null;
+    if (d.owner_private_key) {
+      ownerCryptoKey = await importEd25519Key(d.owner_private_key);
+      await storeKey("owner_key", ownerCryptoKey);
+    }
+    const session = createSession({
+      ghii: d.ghii.ghii,
+      owner: d.owner.name,
+      gaii: null,
+      jwt: d.token,
+      _cryptoKey: ownerCryptoKey,
+      publicKey: d.owner_public_key || "",
+      displayName: d.ghii.display_name || "",
+      federated: d.federated || false,
+      homeNode: d.home_node || "",
+      homeUrl: d.home_url || ""
+    });
+    if (d.key_credentials) session._keyCredentials = d.key_credentials;
+    persistSession(session);
+    currentSession = session;
+    scheduleAutoRefresh(session);
+    emit("login", session, { restored: false });
+    return session;
+  }
+  async function restoreStoredSession(username) {
+    const stored = load("session");
+    if (!stored) return hasSessionHint() ? await restoreSessionFromCookie() : null;
+    if (username && stored.owner !== username) return null;
+    await migrateKeysToIndexedDB();
+    if (stored.gaii) {
+      stored.gaii = null;
+    }
+    const cryptoKey = stored.gaii ? await loadKey("agent_key") : await loadKey("owner_key");
+    const session = createSession({ ...stored, _cryptoKey: cryptoKey });
+    const isOwnerLocal = !session.federated && !session.gaii;
+    if (isOwnerLocal || isExpired(session.jwt)) {
+      try {
+        await session.refresh();
+      } catch (e) {
+        remove("session");
+        emit("expired", { reason: "refresh_failed", error: e && /** @type {Error} */
+        e.message });
+        return null;
+      }
+    }
+    currentSession = session;
+    scheduleAutoRefresh(session);
+    emit("login", session, { restored: true });
+    return session;
+  }
+  var auth = {
+    nodeUrl: NODE_URL,
+    nodeId: NODE_ID,
+    /**
+     * Register a new human identity (GHII) and get an authenticated session.
+     *
+     * The account signs in with a password, always: the session comes from POST /v1/ghii/login and
+     * renews with the httpOnly refresh cookie. A call without `opts.password` used to sign in with the
+     * account key (POST /v1/auth/token), which node 4.0.0 removes (OWNER_KEY_LOGIN_REMOVED_IN). Such a
+     * call now gets a strong random password, made here and sent only to this node; the returned
+     * session carries it once as `generatedPassword` (never stored), so the caller can show it to the
+     * person, who needs it to sign in again on another device or after the session ends.
+     * @param {string} username
+     * @param {string} displayName
+     * @param {{ password?: string, bio?: string, avatar?: string, locale?: string }} [opts]
+     * @returns {Promise<object>} Session object with .fetch(), .refresh(), .jwt, .ghii (and
+     *   .generatedPassword when the caller gave no password)
+     */
+    async register(username, displayName, opts = {}) {
+      const generated = opts.password ? "" : generatedPassword();
+      const password = opts.password || generated;
+      await api("/v1/ghii", {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          username,
+          display_name: displayName,
+          bio: opts.bio,
+          avatar: opts.avatar,
+          locale: opts.locale,
+          password
+        })
+      });
+      const session = await this.loginWithPassword(username, password);
+      if (generated) session.generatedPassword = generated;
+      return session;
+    },
+    /**
+     * Login with stored credentials (auto-refreshes JWT if expired).
+     * @returns {Promise<object|null>} Session or null if no stored credentials
+     */
+    async login(username) {
+      if (isAppOrigin()) return await restoreSessionFromAppOrigin(false);
+      if (username) return restoreStoredSession(username);
+      if (!loginInFlight) {
+        loginInFlight = (async () => {
+          try {
+            return await restoreStoredSession();
+          } finally {
+            loginInFlight = null;
+          }
+        })();
+      }
+      return loginInFlight;
+    },
+    /**
+     * Sign in, interactively. Call it from a click handler: on an app origin it may open the consent
+     * popup, and a browser opens a popup only inside a user gesture.
+     *
+     * On an app origin this is the silent bridge with the visible consent step allowed; anywhere else
+     * it opens the sign-in modal, with `opts` passed to it ({ tab: 'register', onLogin, i18n }).
+     * Resolves to the session, or null when nobody signed in: the popup was closed or blocked, the
+     * modal was dismissed, or the app asks for a scope this node cannot grant. An existing session is
+     * returned as it is, and reports nothing.
+     *
+     * `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once, on both
+     * roads, for the session this call produced (on-login.js). onLogin was the modal's to call until
+     * 2026-09-13, so on an app origin nobody called it.
+     *
+     * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
+     * apps reached it by clicking `#login button`, which is the theme control that renders first.
+     * @param {object & { onLogin?: Function, register?: boolean, tab?: string }} [opts]
+     * @returns {Promise<object|null>}
+     */
+    signIn(opts) {
+      var o = opts || {};
+      if (currentSession) return Promise.resolve(currentSession);
+      var stop = onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession });
+      if (isAppOrigin()) {
+        return restoreSessionFromAppOrigin(true, o.register || o.tab === "register" ? "create" : "").finally(stop);
+      }
+      return new Promise(function(resolve) {
+        showLoginModal(o, function() {
+        }, function() {
+          stop();
+          resolve(currentSession);
+        });
+      });
+    },
+    /**
+     * Login with username + password (works from any device).
+     *
+     * An account with two-step sign-in refuses the first call with code TOTP_REQUIRED; call again with
+     * the second factor. The password travels a second time on purpose: the server holds no partial
+     * login state between the two calls, so there is nothing a stolen intermediate token could carry.
+     *
+     * @param {string} username
+     * @param {string} password
+     * @param {{ totpCode?: string, backupCode?: string }} [secondFactor] The code from the
+     *   authenticator app, or one unused backup code. Pass one, not both.
+     * @returns {Promise<object>} Session object
+     */
+    async loginWithPassword(username, password, secondFactor) {
+      const body = { username, password };
+      if (secondFactor && secondFactor.totpCode) body.totp_code = secondFactor.totpCode;
+      else if (secondFactor && secondFactor.backupCode) body.backup_code = secondFactor.backupCode;
+      const data = await api("/v1/ghii/login", {
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify(body)
+      });
+      return sessionFromLogin(data);
+    },
+    /**
+     * Sign in with a passkey. `username` is optional and leaving it out is the better path: the
+     * ceremony is discoverable, the device offers whatever it holds for this domain, and its answer
+     * names the account. Ends in the same session the password path builds, because the server ends
+     * in the same response.
+     *
+     * Throws with code PASSKEY_CANCELLED when the person closed the prompt, which a caller should
+     * treat as "they changed their mind" rather than as a failure to show in red.
+     */
+    async signInWithPasskey(username) {
+      const data = await passkeySignIn(username);
+      return sessionFromLogin(data);
+    },
+    /** The answer of POST /v1/ghii/login/two-step/finish is a sign-in answer: the session it carries. */
+    adoptLoginAnswer(data) {
+      return sessionFromLogin(data);
+    },
+    /** Does this browser have WebAuthn? A caller shows the passkey button only when it does. */
+    passkeySupported,
+    /** Add THIS device to the signed-in account. Returns the stored passkey as the node describes it. */
+    async addPasskey(label) {
+      if (!currentSession?.jwt) throw new Error("Sign in first");
+      const data = await passkeyAdd(currentSession.jwt, label);
+      return data.data.passkey;
+    },
+    /** Get the current session (or null if not logged in) */
+    getSession() {
+      return currentSession;
+    },
+    /**
+     * Who to open an offline copy for: { owner, ghii, displayName, at } when this page load restored no
+     * session because the node gave no answer and somebody signed in on this browser before; null while
+     * a session is live and whenever the node was reached. It names a person and authorises nothing.
+     * The 'offline' event carries the same value when it is found (last-identity.js).
+     */
+    offlineIdentity() {
+      return currentSession ? null : offlineIdentity();
+    },
+    /**
+     * Patch mutable, non-secret session metadata in place (e.g. displayName after a profile edit),
+     * persist it, and notify the login pill so it re-renders live — no page reload.
+     */
+    updateSessionMeta(patch) {
+      if (!currentSession || !patch) return;
+      Object.assign(currentSession, patch);
+      persistSession(currentSession);
+      emit("session-updated", currentSession);
+    },
+    /**
+     * Logout — clear stored credentials from localStorage and IndexedDB.
+     * ORDER MATTERS: local state is dropped and 'logout' emitted SYNCHRONOUSLY, before the revoke.
+     * "Logged out" must not depend on a network round-trip — with the revoke awaited first, every
+     * subscriber reading getSession() meanwhile still saw the old session, which is how the header
+     * kept the bell and "Me" next to a "Sign In" button (2026-08-07). Revoke + apex logout are
+     * best-effort cleanup that runs after the UI already shows the truth.
+     */
+    async logout() {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+      ownerRefreshInFlight = null;
+      const jwt = currentSession?.jwt;
+      const onAppOrigin = isAppOrigin();
+      currentSession = null;
+      remove("session");
+      remove("owner_key");
+      forgetLastIdentity();
+      emit("logout");
+      await deleteKey("agent_key");
+      await deleteKey("owner_key");
+      try {
+        await fetch(NODE_URL + "/v1/auth/revoke", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...jwt ? { "Authorization": "Bearer " + jwt } : {} }
+        });
+      } catch (e) {
+        console.warn("[aimeat-auth] Sign-out could not reach the node; the server session may still be open:", e && /** @type {Error} */
+        e.message);
+      }
+      if (onAppOrigin) {
+        try {
+          await apexLogout();
+        } catch (e) {
+          console.warn("[aimeat-auth] Sign-out on the node address failed:", e && /** @type {Error} */
+          e.message);
+        }
+      }
+    },
+    /**
+     * Re-open the consent screen for the current app (H-2 in-app grant management).
+     */
+    async manageGrant() {
+      const s = currentSession || load("session");
+      if (!s || !s._app) return null;
+      const res = await requestConsentPopup(s._app, appDeclaredScopes(), true);
+      if (res && res.revoked) {
+        await auth.logout();
+        return { revoked: true };
+      }
+      if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own, void 0, false);
+      return null;
+    },
+    /** True inside a published app that is kept apart from the node: on its own origin, or in the node's isolated frame. */
+    isAppOrigin() {
+      return isAppOrigin();
+    },
+    /** Open the sign-in modal (password + Google if configured). If a session arrives while it is open,
+     *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js).
+     *  `opts.redirect` is where an emailed sign-in link returns the person; this page when absent. */
+    showLoginModal(opts) {
+      var o = opts || {};
+      showLoginModal(o, function() {
+      }, onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession }));
+    },
+    /** Check if there are stored credentials */
+    get hasSession() {
+      return !!load("session");
+    },
+    /** Get stored GHII without authenticating */
+    get storedGhii() {
+      const s = load("session");
+      return s?.ghii || null;
+    },
+    /** Register an event listener. A 'login' listener gets (session, { restored }). */
+    on(event, fn) {
+      on(event, fn);
+    },
+    /** Remove an event listener */
+    off(event, fn) {
+      off(event, fn);
+    },
+    /** Check if running inside a sandboxed iframe (no localStorage access) */
+    get inSandbox() {
+      try {
+        localStorage.getItem("_test");
+        return false;
+      } catch {
+        return true;
+      }
+    },
+    /**
+     * Request auth credentials from the parent window via postMessage (sandboxed-iframe fallback).
+     * @returns {Promise<object|null>} Session-like object with .jwt and .fetch(), or null
+     */
+    requestParentAuth(timeout = 3e3) {
+      if (window === window.parent) return Promise.resolve(null);
+      return parentAuth(timeout).then((answer) => {
+        if (!answer) return null;
+        const jwt = answer.jwt;
+        const effectiveNodeUrl = answer.nodeUrl || NODE_URL;
+        const session = (
+          /** @type {Record<string, any>} */
+          {
+            jwt,
+            nodeUrl: effectiveNodeUrl,
+            owner: null,
+            gaii: null,
+            ghii: null,
+            identity: null,
+            get valid() {
+              return jwt && !isExpired(jwt);
+            },
+            async fetch(path, opts = {}) {
+              const url = effectiveNodeUrl + path;
+              const headers = sessionHeaders(opts.headers, jwt, opts.body);
+              const resp = await fetch(url, { ...opts, headers });
+              return resp.json();
+            },
+            async notify(title, opts = {}) {
+              return session.fetch("/v1/notifications", {
+                method: "POST",
+                body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type })
+              });
+            }
+          }
+        );
+        const payload = parseJwt(jwt);
+        if (payload) {
+          session.gaii = payload.sub || null;
+          session.owner = payload.owner || null;
+          session.identity = session.gaii || session.ghii || null;
+        }
+        currentSession = session;
+        emit("login", session, { restored: true });
+        return session;
+      });
+    },
+    // Capability flag so an embedding app can feature-detect the compact login pill.
+    compactPill: true,
+    /**
+     * Mount a login/register button that handles the full flow. Delegates the render to pill.js.
+     * onLogin(session, { restored }) runs once for each session that appears while it is mounted,
+     * the restore on page load included (on-login.js).
+     * @param {string|Element|object} selector - CSS selector, DOM element, OR (options-first) the opts.
+     * @param {object} [opts] - { onLogin, onSession, onLogout, buttonText, compact }. onSession(session,
+     *   { restored }) runs for a restore and a sign-in alike; onLogin(session) for a sign-in only.
+     */
+    mountLoginButton(selector, opts = {}) {
+      return mountPill(auth, selector, opts);
+    }
+  };
+
   // src/static/sdk-libs/auth/ink.js
   var LIGHT = "--aimeat-ink:var(--aimeat-pill-fg,var(--text,#1A1A2E));--aimeat-paper:var(--aimeat-pill-bg,var(--bg,#FAFAF8))";
   var DARK = "--aimeat-ink:var(--aimeat-pill-fg,var(--text,#EDEEF2));--aimeat-paper:var(--aimeat-pill-bg,var(--bg,#14151A))";
@@ -445,764 +1758,6 @@
     return s.slice(0, 2).toUpperCase();
   }
 
-  // src/static/sdk-libs/auth/http.js
-  async function api(path, opts = {}) {
-    const url = NODE_URL + path;
-    const headers = { "Content-Type": "application/json", ...opts.headers };
-    const resp = await fetch(url, { ...opts, headers });
-    const data = await resp.json();
-    if (!data.ok) {
-      const err = (
-        /** @type {Error & { code?: string, details?: unknown, status?: number }} */
-        new Error(data.error?.message || "API error")
-      );
-      err.code = data.error?.code;
-      err.details = data.error?.details;
-      err.status = resp.status;
-      throw err;
-    }
-    return data;
-  }
-  async function authApi(path, jwt, opts = {}) {
-    return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
-  }
-  function sessionHeaders(given, jwt, body) {
-    const headers = new Headers(given || void 0);
-    if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + jwt);
-    if (!headers.has("Content-Type") && (body == null || typeof body === "string")) {
-      headers.set("Content-Type", "application/json");
-    }
-    return headers;
-  }
-
-  // src/static/sdk-libs/auth/cluster.js
-  function ensureClusterStyles() {
-    if (document.getElementById("aimeat-cluster-css")) return;
-    var st = document.createElement("style");
-    st.id = "aimeat-cluster-css";
-    st.textContent = [
-      /* The cluster row. Inherits text colour from its host (gold pill or page header). */
-      ".aimeat-ctl{display:inline-flex;align-items:center;gap:6px}",
-      /* Segmented group: one bordered pill, every option a button. */
-      ".aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;",
-      "border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);",
-      "overflow:hidden;background:transparent}",
-      ".aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;",
-      'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
-      "padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;",
-      "transition:opacity var(--motion-fast,120ms) ease,background var(--motion-fast,120ms) ease}",
-      ".aimeat-seg button:hover{opacity:.9}",
-      ".aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}",
-      '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
-      "background:var(--aimeat-ink);color:var(--aimeat-paper)}",
-      ".aimeat-seg button+button{border-left:0}",
-      ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
-      /* A control that has stood down. The group keeps its frame so it still reads as an
-         instrument that exists, and the whole thing dims and takes the arrow cursor so nobody
-         aims at it twice — the reason is on the group's title, because a native tooltip on a
-         disabled button never appears. Used by a page that keeps its own palette (a genre body). */
-      ".aimeat-seg--fixed{opacity:.55;cursor:default}",
-      ".aimeat-seg button[disabled]{cursor:default;opacity:.6}",
-      ".aimeat-seg button[disabled]:hover{opacity:.6}",
-      /* Popover trigger (palette picker; language picker when 4+ languages). */
-      ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
-      ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
-      "gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;",
-      "border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);",
-      'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
-      "transition:background var(--motion-fast,120ms) ease}",
-      ".aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}",
-      ".aimeat-pop-btn:focus-visible{outline:2px solid currentColor;outline-offset:-2px}",
-      /* The popover panel: a real themed surface (not the host pill), so swatches read true. */
-      ".aimeat-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1200;display:none;",
-      "background:var(--color-base-200,#ffffff);color:var(--color-base-content,#1a1a2e);",
-      "border:1px solid var(--color-base-300,#d9dbe1);border-radius:var(--radius-box,14px);",
-      "box-shadow:var(--elev-pop,0 4px 10px rgb(15 18 25 / .1),0 18px 44px rgb(15 18 25 / .16));",
-      "padding:8px;width:max-content;max-width:calc(100vw - 24px)}",
-      ".aimeat-pop-wrap.aimeat-open .aimeat-pop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}",
-      ".aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}",
-      /* A group's name inside the popover (the node's themes above the theme's styles). */
-      '.aimeat-pop-head{grid-column:1/-1;padding:6px 9px 2px;font:800 10px/1.2 "Inter","Segoe UI",system-ui,sans-serif;',
-      "letter-spacing:calc(var(--shape-tracking-label,.1em) * .6);text-transform:var(--shape-case-label,uppercase);opacity:.7}",
-      /* A sentence in the popover (why the light/dark switch is off): plain words, not a group name. */
-      '.aimeat-pop-note{grid-column:1/-1;padding:4px 9px 6px;font:600 12px/1.35 "Inter","Segoe UI",system-ui,sans-serif}',
-      ".aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;",
-      "background:transparent;border:1px solid transparent;border-radius:calc(var(--radius-box,14px) - 6px);",
-      'cursor:pointer;color:inherit;font:600 12px/1.1 "Inter","Segoe UI",system-ui,sans-serif;text-align:left;',
-      "transition:background var(--motion-fast,120ms) ease}",
-      ".aimeat-pop button:hover{background:color-mix(in oklab,currentColor 8%,transparent)}",
-      ".aimeat-pop button:focus-visible{outline:2px solid var(--color-primary,#e8564a);outline-offset:-2px}",
-      '.aimeat-pop button[aria-pressed="true"]{border-color:var(--color-primary,#e8564a)}',
-      /* Palette swatch chips: page/card/accent of the palette IN THE CURRENT MODE. The three
-         colours are data (they vary per palette), so they arrive as inline background values on
-         these spans — layout and everything else stays here. */
-      ".aimeat-pal-chip{position:relative;flex:0 0 auto;width:26px;height:20px;border-radius:5px;",
-      "border:1px solid color-mix(in oklab,currentColor 25%,transparent);overflow:hidden}",
-      ".aimeat-pal-chip .pc-card{position:absolute;inset:5px 5px 3px 5px;border-radius:3px}",
-      ".aimeat-pal-chip .pc-acc{position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%}",
-      /* The trigger's icon: a painter's palette whose first blob is the active accent (palette.js). */
-      ".aimeat-pal-ico{display:block;flex:0 0 auto}",
-      /* A row across the whole popover: "Automatic: follows your device", above the looks. */
-      ".aimeat-pop .aimeat-pop-wide{grid-column:1/-1}"
-    ].join("");
-    (document.head || document.documentElement).appendChild(st);
-  }
-  function clampPopover(pop) {
-    pop.style.transform = "";
-    var r = pop.getBoundingClientRect();
-    var pad = 12;
-    var shift = 0;
-    if (r.left < pad) shift = pad - r.left;
-    else if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
-    if (shift) pop.style.transform = "translateX(" + Math.round(shift) + "px)";
-  }
-
-  // src/static/sdk-libs/_core/format.js
-  function fmt() {
-    const ns2 = typeof window !== "undefined" ? window.AIMEAT : null;
-    return ns2 && ns2.fmt ? ns2.fmt : null;
-  }
-  function person() {
-    const ns2 = typeof window !== "undefined" ? window.AIMEAT : null;
-    const auth2 = ns2 && ns2.auth;
-    const p = auth2 && typeof auth2.displayPrefs === "function" ? auth2.displayPrefs() : null;
-    return { region: p && p.region || null, timezone: p && p.timezone || null };
-  }
-  var refusedReported = "";
-  function asPerson(call, opts, clock) {
-    const p = person();
-    const zone = clock && p.timezone && !(opts && opts.timeZone) ? p.timezone : null;
-    if (!p.region && !zone) return call(void 0, opts);
-    try {
-      return call(p.region || void 0, zone ? Object.assign({}, opts, { timeZone: zone }) : opts);
-    } catch (e) {
-      const which = (p.region || "") + "|" + (zone || "");
-      if (refusedReported !== which) {
-        refusedReported = which;
-        console.warn('[aimeat] This browser cannot write dates with the region "' + (p.region || "") + '" and the time zone "' + (zone || "") + `" of the person's settings; the browser's own format is used:`, e && /** @type {Error} */
-        e.message);
-      }
-      return call(void 0, opts);
-    }
-  }
-  function num(n, opts) {
-    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
-    const f = fmt();
-    if (f && typeof f.num === "function") return f.num(n, opts);
-    try {
-      return asPerson((tag, o) => n.toLocaleString(tag, o), opts, false);
-    } catch {
-      return String(n);
-    }
-  }
-  function money(n, currency, opts) {
-    const f = fmt();
-    if (f && typeof f.money === "function") return f.money(n, currency, opts);
-    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
-    const code = String(currency || "USD").toUpperCase();
-    const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
-    const o = Object.assign(
-      { style: "currency", currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits },
-      opts
-    );
-    try {
-      return asPerson((tag, oo) => n.toLocaleString(tag, oo), o, false);
-    } catch {
-      return num(n) + " " + code;
-    }
-  }
-
-  // src/static/sdk-libs/auth/ai-state.js
-  var cache = { key: null, data: null, pending: null, session: null, listeners: /* @__PURE__ */ new Set() };
-  var DOMAINS = ["ai-usage", "ai-providers", "agents"];
-  function keyOf(session) {
-    return session && session.jwt ? session.jwt + "|" + (session._app || "") : null;
-  }
-  function tokenReadsAiState(session) {
-    var p = parseJwt(session && session.jwt || "") || {};
-    if (!Array.isArray(p.scopes)) return true;
-    var roles = Array.isArray(p.roles) ? p.roles : [];
-    if (roles.indexOf("owner") >= 0 && roles.indexOf("agent") < 0 && roles.indexOf("ecosystem") < 0) return true;
-    return p.scopes.indexOf("ai:use") >= 0 || p.scopes.indexOf("ai:*") >= 0 || p.scopes.indexOf("*") >= 0;
-  }
-  function fetchState(session) {
-    var key = keyOf(session);
-    if (!tokenReadsAiState(session)) {
-      cache.data = { unavailable: true, reason: "SCOPE_DENIED", refused: true };
-      cache.pending = null;
-      return Promise.resolve().then(function() {
-        if (cache.key === key) cache.listeners.forEach(function(fn) {
-          fn();
-        });
-      });
-    }
-    var path = "/v1/ai/capabilities" + (session._app ? "?app_id=" + encodeURIComponent(session._app) : "");
-    cache.pending = authApi(path, session.jwt).then(function(r) {
-      if (cache.key === key) cache.data = r.data || { unavailable: true, reason: "empty answer" };
-    }).catch(function(err) {
-      console.debug("[aimeat-auth] the AI state was not read:", err);
-      if (cache.key === key) cache.data = { unavailable: true, reason: String(err && err.code || err), refused: !!(err && err.code) };
-    }).then(function() {
-      if (cache.key !== key) return;
-      cache.pending = null;
-      cache.listeners.forEach(function(fn) {
-        fn();
-      });
-    });
-    return cache.pending;
-  }
-  var invalidate = null;
-  function listenOnce() {
-    if (invalidate || typeof window === "undefined") return;
-    invalidate = function(ev) {
-      var d = ev && ev.detail && ev.detail.domains;
-      if (d && typeof d.forEach === "function") {
-        var ours = false;
-        d.forEach(function(x) {
-          if (DOMAINS.indexOf(x) >= 0) ours = true;
-        });
-        if (!ours) return;
-      }
-      if (cache.data && cache.data.unavailable && cache.data.refused) return;
-      var s = cache.session;
-      if (s && keyOf(s) === cache.key && !cache.pending) fetchState(s);
-    };
-    window.addEventListener("aimeat-live-update", invalidate);
-    window.addEventListener("aimeat-ai-used", invalidate);
-  }
-  function readAiState(session, onChange) {
-    var key = keyOf(session);
-    if (!key) return null;
-    if (onChange) cache.listeners.add(onChange);
-    listenOnce();
-    if (cache.key !== key) {
-      cache.key = key;
-      cache.data = null;
-      cache.session = session;
-      fetchState(session);
-    }
-    return cache.data;
-  }
-  function forgetAiState() {
-    cache.key = null;
-    cache.data = null;
-    cache.pending = null;
-    cache.session = null;
-  }
-  var BOLT = "M13 2 3 14h9l-1 8 10-12h-9l1-8z";
-  var GLYPH = {
-    picture: '<rect x="2" y="4" width="13" height="11"/><path d="M5 15l-2 6M12 15l2 6M22 2l-7.5 7.5"/><path d="M14.5 9.5c-1.6 0-2.8 1.1-3 3 1.9-.2 3-1.4 3-3z" fill="currentColor"/>',
-    sound: '<rect x="3" y="2" width="6" height="11" rx="3"/><path d="M1 10a5 5 0 0 0 10 0M6 15v5M3.5 20h5"/><path d="M14 9h3l5-4v14l-5-4h-3zM25 9a4.5 4.5 0 0 1 0 6"/>'
-  };
-  var GLYPH_OF = { vision: "picture", image: "picture", transcription: "sound", speech: "sound" };
-  var WORD_OF = { vision: "capVision", image: "capImage", transcription: "capTranscription", speech: "capSpeech" };
-  function glyphSvg(cap, missing) {
-    var g = GLYPH_OF[cap];
-    var w = g === "sound" ? 23 : 19;
-    return '<svg class="aimeat-ai-need-ico" width="' + w + '" height="19" viewBox="0 0 ' + (g === "sound" ? 28 : 24) + ' 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + GLYPH[g] + (missing ? '<path d="M2 2l' + (g === "sound" ? 24 : 20) + ' 20" stroke-width="2.4"/>' : "") + "</svg>";
-  }
-  function boltSvg(size) {
-    return '<svg class="aimeat-ai-bolt-ico" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + BOLT + '" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
-  }
-  function fill(s, vars) {
-    return String(s).replace(/\{(\w+)\}/g, function(_, k) {
-      return vars[k] != null ? vars[k] : "";
-    });
-  }
-  function words(st, i) {
-    var main = st && st.main || {};
-    var power = st && st.power || { state: "none" };
-    return {
-      led: main.connected ? i.aiOn || "Your AI is connected" : i.aiOff || "No AI connected yet",
-      bolt: power.state === "ok" ? i.powerOk || "AI power available" : power.state === "over" ? i.powerOver || "Today's limit is reached" : i.powerNone || "No AI power here"
-    };
-  }
-  function popupHtml(st, i) {
-    var main = st.main || {};
-    var power = st.power || { state: "none" };
-    var caps = st.capabilities || {};
-    var w = words(st, i);
-    var out = '<div class="aimeat-ai-pop" role="dialog" aria-label="' + escHtml(i.powerName || "AI power") + '">';
-    out += '<p class="aimeat-ai-line"><span class="aimeat-ai-led-mini' + (main.connected ? "" : " is-off") + '" aria-hidden="true"></span><strong>' + escHtml(w.led) + "</strong></p>";
-    if (main.latest && main.latest.name) out += '<p class="aimeat-ai-sub">' + escHtml(fill(i.aiLatest || "Last active: {name}", { name: main.latest.name })) + "</p>";
-    if (main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(fill(i.aiAgents || "Agents: {n}", { n: main.agents })) + "</p>";
-    if (main.chat && !main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(i.aiChat || "The chat here is ready") + "</p>";
-    if (main.agents != null) {
-      out += main.connected ? '<a class="aimeat-ai-link" href="' + escHtml(NODE_URL + "/v1/home?agents=1") + '">' + escHtml(i.aiShow || "Show connections") + "</a>" : '<a class="aimeat-ai-link" href="' + escHtml(NODE_URL + "/v1/connect-your-ai") + '">' + escHtml(i.aiConnect || "Connect your AI") + "</a>";
-    }
-    out += '<hr class="aimeat-ai-rule"><p class="aimeat-ai-line"><span class="aimeat-ai-bolt is-' + escHtml(power.state) + '">' + boltSvg(18) + "</span><strong>" + escHtml(power.state === "ok" ? i.powerOk || "AI power available" : power.state === "over" ? i.powerOver || "Today's limit is reached" : i.powerNone || "No AI power here") + "</strong></p>";
-    if (power.state === "ok" && power.remainingUsd != null) {
-      out += '<p class="aimeat-ai-text">' + escHtml(power.payer === "node" ? fill(i.powerLeftNode || "{left} of your allowance left.", { left: money(power.remainingUsd, "USD") }) : fill(i.powerLeft || "{left} left today. Daily limit {limit}.", { left: money(power.remainingUsd, "USD"), limit: money(power.limitUsd, "USD") })) + (power.low ? " <strong>" + escHtml(i.powerLow || "Running low.") + "</strong>" : "") + "</p>";
-    }
-    if (power.payer) {
-      out += '<p class="aimeat-ai-sub">' + escHtml(power.payer === "node" ? i.payerNode || "This node pays." : power.payer === "agent" ? i.payerAgent || "The agent's own key pays." : i.payerOwn || "You pay with your own key.") + "</p>";
-    }
-    if (power.state !== "ok" && power.fix) out += '<p class="aimeat-ai-text">' + escHtml(power.fix) + "</p>";
-    if (power.state !== "ok" && main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(i.aiOwnStill || "Your connected AI still works on its own subscription.") + "</p>";
-    var rows = function(list) {
-      return list.map(function(r) {
-        return "<li><span>" + escHtml(i[WORD_OF[r.cap]] || r.cap) + '</span><strong class="' + (r.on ? "is-on" : "is-off") + '">' + escHtml(r.on ? i.capOn || "On" : i.capOff || "Off") + "</strong></li>";
-      }).join("");
-    };
-    if (Array.isArray(st.needs) && st.needs.length) {
-      out += '<p class="aimeat-ai-head">' + escHtml(i.needHead || "This app uses") + '</p><ul class="aimeat-ai-list">' + rows(st.needs.map(function(n) {
-        return { cap: n.capability, on: !!n.on };
-      })) + "</ul>";
-      var missing = st.needs.filter(function(n) {
-        return !n.on;
-      });
-      var said = missing.map(function(n) {
-        return n.fix;
-      }).filter(Boolean);
-      said.filter(function(s, k) {
-        return said.indexOf(s) === k;
-      }).forEach(function(s) {
-        out += '<p class="aimeat-ai-text">' + escHtml(s) + "</p>";
-      });
-      if (missing.some(function(n) {
-        return !n.fix;
-      })) out += '<p class="aimeat-ai-text">' + escHtml(i.needRole || "Connect this app's AI roles in your AI settings.") + "</p>";
-    } else if (power.state === "ok") {
-      out += '<p class="aimeat-ai-head">' + escHtml(i.canHead || "What you can do now") + '</p><ul class="aimeat-ai-list">' + rows(["vision", "image", "transcription", "speech"].map(function(c) {
-        return { cap: c, on: !!(caps[c] && caps[c].on) };
-      })) + "</ul>";
-    }
-    var settings = power.settingsUrl || (st.needs || []).map(function(n) {
-      return n.settingsUrl;
-    }).filter(Boolean)[0] || NODE_URL + "/v1/profile?tab=ai";
-    if (/^https?:\/\//.test(settings) || settings.charAt(0) === "/") {
-      out += '<a class="aimeat-ai-link" href="' + escHtml(settings) + '">' + escHtml(i.aiSettings || "AI settings") + "</a>";
-    }
-    return out + "</div>";
-  }
-  function aiStatusHtml(st, i, place) {
-    var w = words(st, i);
-    if (st && st.unavailable) return "";
-    if (place === "led") {
-      var cls = !st ? "" : st.main && st.main.connected ? " is-on" : " is-off";
-      return '<button type="button" class="aimeat-auth-dot aimeat-ai-led' + cls + '" data-ai-open' + (st ? ' aria-label="' + escHtml(w.led) + '" title="' + escHtml(w.led) + '"' : ' aria-hidden="true" tabindex="-1"') + "></button>";
-    }
-    if (!st || !st.power) return "";
-    var needs = Array.isArray(st.needs) ? st.needs : [];
-    return '<span class="aimeat-ai"><button type="button" class="aimeat-ai-bolt is-' + escHtml(st.power.state) + '" data-ai-open aria-haspopup="dialog" aria-expanded="false" aria-label="' + escHtml(w.bolt) + '" title="' + escHtml(w.bolt) + '">' + boltSvg(17) + "</button>" + needs.map(function(n) {
-      var label = (i[WORD_OF[n.capability]] || n.capability) + ": " + (n.on ? i.capOn || "On" : i.capOff || "Off");
-      return '<span class="aimeat-ai-need ' + (n.on ? "is-on" : "is-off") + '" role="img" aria-label="' + escHtml(label) + '" title="' + escHtml(label) + '">' + glyphSvg(n.capability, !n.on) + "</span>";
-    }).join("") + popupHtml(st, i) + "</span>";
-  }
-  function aiCompactHtml(st) {
-    if (!st || !st.power) return "";
-    return '<span class="aimeat-ai-bolt is-' + escHtml(st.power.state) + '" aria-hidden="true">' + boltSvg(14) + "</span>";
-  }
-  function aiDotClass(st) {
-    return !st || st.unavailable ? "" : st.main && st.main.connected ? " is-on" : " is-off";
-  }
-  function wireAiState(container) {
-    var group = (
-      /** @type {HTMLElement|null} */
-      container.querySelector(".aimeat-ai")
-    );
-    if (!group) return;
-    var bolt = group.querySelector(".aimeat-ai-bolt");
-    var pop = (
-      /** @type {HTMLElement|null} */
-      group.querySelector(".aimeat-ai-pop")
-    );
-    container.querySelectorAll("[data-ai-open]").forEach(function(b) {
-      b.addEventListener("click", function(ev) {
-        ev.stopPropagation();
-        var open = group.classList.toggle("aimeat-open");
-        if (bolt) bolt.setAttribute("aria-expanded", open ? "true" : "false");
-        if (open && pop) clampPopover(pop);
-      });
-    });
-    group.addEventListener("mouseenter", function() {
-      if (pop) clampPopover(pop);
-    });
-  }
-  function ensureAiStateStyles() {
-    if (document.getElementById("aimeat-ai-state-css")) return;
-    var st = document.createElement("style");
-    st.id = "aimeat-ai-state-css";
-    st.textContent = aiStateCss("var(--aimeat-ink)", "var(--aimeat-paper)", "var(--shape-frame,2px) solid ");
-    (document.head || document.documentElement).appendChild(st);
-  }
-  function aiStateCss(ink2, paper2, frame) {
-    var on2 = "var(--aimeat-pill-ok,var(--success-fg,#047857))";
-    var off2 = "var(--aimeat-pill-bad,var(--danger-fg,#C8322A))";
-    return [
-      ".aimeat-ai-led{appearance:none;border:0;padding:0;margin:0;cursor:pointer}",
-      /* Before the answer arrives the light says nothing: neither green nor off. */
-      ".aimeat-ai-led:not(.is-on):not(.is-off){background:color-mix(in oklab," + ink2 + " 18%,transparent);cursor:default}",
-      ".aimeat-ai-led.is-off,.aimeat-auth-compact .cdot.is-off{background:color-mix(in oklab," + ink2 + " 38%,transparent)}",
-      ".aimeat-ai-led:focus-visible,.aimeat-ai-bolt:focus-visible{outline:2px solid " + ink2 + ";outline-offset:2px}",
-      ".aimeat-ai{position:relative;display:inline-flex;align-items:center;gap:6px}",
-      ".aimeat-ai-bolt{appearance:none;display:inline-flex;align-items:center;justify-content:center;background:none;border:0;",
-      "padding:2px;margin:0;color:" + ink2 + ";cursor:pointer;line-height:0}",
-      ".aimeat-ai-bolt.is-ok path{fill:var(--aimeat-pill-power,var(--sun,#FFB52E))}",
-      ".aimeat-ai-bolt.is-over path{fill:var(--aimeat-pill-over,var(--danger,#E0453A))}",
-      ".aimeat-ai-bolt.is-none{opacity:.5}.aimeat-ai-bolt.is-none path{fill:none}",
-      ".aimeat-ai-need{display:inline-flex;line-height:0}.aimeat-ai-need.is-on{color:" + on2 + "}.aimeat-ai-need.is-off{color:" + off2 + "}",
-      ".aimeat-ai-pop{position:absolute;top:100%;right:0;z-index:1100;display:none;box-sizing:border-box;width:280px;",
-      "max-width:calc(100vw - 24px);margin-top:8px;padding:12px 14px;text-align:left;white-space:normal;",
-      "background:" + paper2 + ";color:" + ink2 + ";border:" + frame + ink2 + ";",
-      "box-shadow:0 8px 24px rgb(15 18 25 / .16);font-size:13px;line-height:1.45;font-weight:400}",
-      /* The hover bridge: the gap above the popup belongs to it, so the pointer can move in. */
-      '.aimeat-ai-pop::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px}',
-      ".aimeat-ai.aimeat-open .aimeat-ai-pop{display:block}",
-      "@media (hover:hover){.aimeat-ai:hover .aimeat-ai-pop{display:block}}",
-      ".aimeat-ai-pop p{margin:0 0 6px}",
-      ".aimeat-ai-line{display:flex;align-items:center;gap:8px;font-size:14px}",
-      ".aimeat-ai-line .aimeat-ai-bolt{padding:0;cursor:default}",
-      ".aimeat-ai-led-mini{display:inline-block;width:10px;height:10px;flex:0 0 auto;background:var(--aimeat-pill-live,var(--success,#10B981))}",
-      ".aimeat-ai-led-mini.is-off{background:color-mix(in oklab," + ink2 + " 38%,transparent)}",
-      ".aimeat-ai-sub{opacity:.78;font-size:12.5px}",
-      ".aimeat-ai-rule{border:0;border-top:1px solid color-mix(in oklab," + ink2 + " 18%,transparent);margin:10px 0}",
-      ".aimeat-ai-head{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.75;margin-top:10px!important}",
-      ".aimeat-ai-list{list-style:none;margin:0 0 8px;padding:0}",
-      ".aimeat-ai-list li{display:flex;justify-content:space-between;gap:12px;padding:2px 0}",
-      ".aimeat-ai-list .is-on{color:" + on2 + "}.aimeat-ai-list .is-off{color:" + off2 + "}",
-      /* Specific enough to win over a host header's own link rules (the SPA's `.topnav-right a`). */
-      ".aimeat-ai-pop a.aimeat-ai-link{display:inline-block;margin:2px 0 4px;padding:0;background:none;font-size:13px;font-weight:800;",
-      "color:" + ink2 + ";text-decoration:underline;text-underline-offset:3px}",
-      ".aimeat-ai-pop a.aimeat-ai-link:hover{color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
-      ".aimeat-auth-compact .aimeat-ai-bolt{padding:0}",
-      /* In the compact popover (a phone) the detail is part of the panel: shown, not hovered. */
-      "@media (max-width:600px){",
-      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai{flex:1 1 100%;flex-wrap:wrap}",
-      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai-pop{position:static;display:block;width:100%;margin:8px 0 0;box-shadow:none;border-width:1px}",
-      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai-pop::before{display:none}",
-      "}"
-    ].join("");
-  }
-
-  // src/static/sdk-libs/_core/lang.js
-  var LANG_KEY = "aimeat-lang";
-  var LANG_CHOSEN_KEY = "aimeat-lang-chosen";
-  var COOKIE_MAX_AGE = 31536e3;
-  function readLocales(opts) {
-    let list = opts && Array.isArray(opts.locales) ? opts.locales : null;
-    if (!list) {
-      try {
-        const m = (
-          /** @type {HTMLMetaElement|null} */
-          document.querySelector('meta[name="aimeat-locales"]')
-        );
-        if (m && m.content) list = m.content.split(/[\s,]+/);
-      } catch {
-      }
-    }
-    if (!list) return [];
-    const seen = {};
-    const out = [];
-    for (let i = 0; i < list.length; i++) {
-      const c = String(list[i] || "").trim().toLowerCase();
-      if (/^[a-z]{2}$/.test(c) && !seen[c]) {
-        seen[c] = 1;
-        out.push(c);
-      }
-    }
-    return out.length > 1 ? out : [];
-  }
-  function servedPageLang() {
-    if (typeof document === "undefined" || typeof document.querySelector !== "function") return null;
-    const m = (
-      /** @type {HTMLMetaElement|null} */
-      document.querySelector('meta[name="aimeat-page-lang"]')
-    );
-    const code = m && m.content ? m.content.trim().toLowerCase() : "";
-    return /^[a-z]{2}$/.test(code) ? code : null;
-  }
-  function readLang(locales) {
-    const list = Array.isArray(locales) ? locales : null;
-    const pick = list ? function(v) {
-      return v && list.indexOf(v) >= 0 ? v : null;
-    } : function(v) {
-      return v ? String(v).slice(0, 2) : null;
-    };
-    const served = pick(servedPageLang());
-    if (served) return served;
-    try {
-      const u = pick(new URLSearchParams(location.search).get("lang"));
-      if (u) return u;
-      const s = pick(localStorage.getItem(LANG_KEY));
-      if (s) return s;
-      const c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
-      const cv = c ? pick(c[1]) : null;
-      if (cv) return cv;
-    } catch {
-    }
-    const cfg2 = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
-    const node = pick(cfg2 && cfg2.defaultLocale);
-    if (node) return node;
-    let nav = null;
-    try {
-      nav = pick(String(navigator.language || "").slice(0, 2).toLowerCase());
-    } catch {
-    }
-    if (nav) return nav;
-    return list ? list[0] : "en";
-  }
-  function writeLang(lang) {
-    const keep = ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
-    try {
-      document.cookie = LANG_KEY + "=" + lang + keep;
-      document.cookie = LANG_CHOSEN_KEY + "=1" + keep;
-      localStorage.setItem(LANG_KEY, lang);
-      localStorage.setItem(LANG_CHOSEN_KEY, "1");
-    } catch {
-    }
-  }
-
-  // src/static/sdk-libs/auth/locale.js
-  function aimeatReadLang(locales) {
-    return readLang(locales);
-  }
-  function aimeatApplyLang(lang) {
-    writeLang(lang);
-    try {
-      document.documentElement.setAttribute("lang", lang);
-    } catch {
-    }
-    try {
-      window.dispatchEvent(new CustomEvent("aimeat-lang-change", { detail: { lang } }));
-    } catch {
-    }
-  }
-  function aimeatRestoreLang(opts) {
-    var locales = readLocales(opts);
-    if (!locales.length) return;
-    try {
-      document.documentElement.setAttribute("lang", aimeatReadLang(locales));
-    } catch {
-    }
-  }
-  function langName(code) {
-    try {
-      var dn = new Intl.DisplayNames([code], { type: "language" });
-      var n = dn.of(code);
-      if (n && n !== code) return n.charAt(0).toUpperCase() + n.slice(1);
-    } catch {
-    }
-    return code.toUpperCase();
-  }
-  var SEGMENT_MAX = 3;
-  function langSwitchHtml(i, locales) {
-    if (!locales.length) return "";
-    var cur = aimeatReadLang(locales);
-    var group = i && i.switchLanguage ? i.switchLanguage : "Language";
-    if (locales.length <= SEGMENT_MAX) {
-      return '<span id="aimeat-lang-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(group) + '">' + locales.map(function(c) {
-        return '<button type="button" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '" title="' + escHtml(langName(c)) + '" aria-label="' + escHtml(langName(c)) + '">' + escHtml(c.toUpperCase()) + "</button>";
-      }).join("") + "</span>";
-    }
-    return '<span id="aimeat-lang-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + escHtml(group) + '" aria-label="' + escHtml(group) + '">' + escHtml(cur.toUpperCase()) + ' <span aria-hidden="true">▾</span></button><span class="aimeat-pop aimeat-pop-list" role="listbox">' + locales.map(function(c) {
-      return '<button type="button" role="option" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '">' + escHtml(c.toUpperCase()) + " · " + escHtml(langName(c)) + "</button>";
-    }).join("") + "</span></span>";
-  }
-  function wireLangSwitch(container, i, locales) {
-    var root = container.querySelector("#aimeat-lang-switch");
-    if (!root || !locales.length) return;
-    var trigger = root.querySelector(".aimeat-pop-btn");
-    function sync(cur) {
-      root.querySelectorAll("button[data-lang]").forEach(function(b) {
-        b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === cur));
-      });
-      if (trigger) trigger.childNodes[0].textContent = cur.toUpperCase() + " ";
-    }
-    root.querySelectorAll("button[data-lang]").forEach(function(b) {
-      b.addEventListener("click", function() {
-        aimeatApplyLang(b.getAttribute("data-lang"));
-        sync(b.getAttribute("data-lang"));
-        root.classList.remove("aimeat-open");
-        if (trigger) trigger.setAttribute("aria-expanded", "false");
-      });
-    });
-    if (trigger) trigger.addEventListener("click", function(ev) {
-      ev.stopPropagation();
-      var open = root.classList.toggle("aimeat-open");
-      trigger.setAttribute("aria-expanded", String(open));
-      if (open) clampPopover(root.querySelector(".aimeat-pop"));
-    });
-    window.addEventListener("aimeat-lang-change", function(ev) {
-      var e = (
-        /** @type {CustomEvent} */
-        ev
-      );
-      var lang = e && e.detail && e.detail.lang;
-      if (lang && locales.indexOf(lang) >= 0) sync(lang);
-    });
-  }
-
-  // src/static/sdk-libs/auth/pill-strings.js
-  var PILL_STRINGS = {
-    en: {
-      loggedIn: "logged in",
-      logoutBtn: "Log out",
-      signInBtn: "❤️ Sign In",
-      account: "Account",
-      federated: "Federated",
-      manageAccess: "Manage permissions",
-      lightMode: "Light mode",
-      darkMode: "Dark mode",
-      themeLabel: "Light or dark",
-      autoMode: "Automatic: follows your device",
-      autoShort: "Auto",
-      fixedRegister: "This register keeps its own light",
-      styleLightOnly: "This style has a light mode only",
-      styleDarkOnly: "This style has a dark mode only",
-      lookThemes: "Themes",
-      lookStyles: "Styles in this theme",
-      modeOnly: "only",
-      chooseLook: "Choose look",
-      switchLanguage: "Language",
-      pageSettings: "Settings",
-      homeSettings: "Home settings",
-      toDark: "Switch to dark",
-      toLight: "Switch to light",
-      aiOn: "Your AI is connected",
-      aiOff: "No AI connected yet",
-      aiAgents: "Agents: {n}",
-      aiLatest: "Last active: {name}",
-      aiChat: "The chat here is ready",
-      aiConnect: "Connect your AI",
-      aiShow: "Show connections",
-      aiOwnStill: "Your connected AI still works on its own subscription.",
-      powerName: "AI power",
-      powerOk: "AI power available",
-      powerOver: "Today's limit is reached",
-      powerNone: "No AI power here",
-      powerLeft: "{left} left today. Daily limit {limit}.",
-      powerLeftNode: "{left} of your allowance left.",
-      powerLow: "Running low.",
-      payerOwn: "You pay with your own key.",
-      payerNode: "This node pays.",
-      payerAgent: "The agent's own key pays.",
-      canHead: "What you can do now",
-      needHead: "This app uses",
-      capVision: "Read pictures",
-      capImage: "Make pictures",
-      capTranscription: "Speech to text",
-      capSpeech: "Text to speech",
-      capOn: "On",
-      capOff: "Off",
-      aiSettings: "AI settings",
-      needRole: "Connect this app's AI roles in your AI settings."
-    },
-    fi: {
-      loggedIn: "kirjautuneena",
-      logoutBtn: "Kirjaudu ulos",
-      signInBtn: "❤️ Kirjaudu",
-      account: "Tili",
-      federated: "Federoitu",
-      manageAccess: "Hallitse oikeuksia",
-      lightMode: "Vaalea tila",
-      darkMode: "Tumma tila",
-      themeLabel: "Vaalea vai tumma",
-      autoMode: "Automaattinen: seuraa laitteesi asetusta",
-      autoShort: "Auto",
-      fixedRegister: "Tämä rekisteri pitää oman valonsa",
-      styleLightOnly: "Tällä tyylillä on vain vaalea tila",
-      styleDarkOnly: "Tällä tyylillä on vain tumma tila",
-      lookThemes: "Teemat",
-      lookStyles: "Tämän teeman tyylit",
-      modeOnly: "vain",
-      chooseLook: "Valitse tyyli",
-      switchLanguage: "Kieli",
-      pageSettings: "Asetukset",
-      homeSettings: "Kodin asetukset",
-      toDark: "Vaihda tummaan",
-      toLight: "Vaihda vaaleaan",
-      aiOn: "Tekoälysi on yhdistetty",
-      aiOff: "Tekoälyä ei ole vielä yhdistetty",
-      aiAgents: "Agentteja: {n}",
-      aiLatest: "Viimeksi käytössä: {name}",
-      aiChat: "Tämän noden chat on valmis",
-      aiConnect: "Yhdistä tekoäly",
-      aiShow: "Näytä yhteydet",
-      aiOwnStill: "Yhdistetty tekoälysi toimii silti omalla tilauksellaan.",
-      powerName: "Tekoälyvirta",
-      powerOk: "Tekoälyvirtaa on",
-      powerOver: "Päivän raja on täynnä",
-      powerNone: "Tekoälyvirtaa ei ole",
-      powerLeft: "{left} jäljellä tänään. Päivän raja on {limit}.",
-      powerLeftNode: "Osuuttasi on jäljellä {left}.",
-      powerLow: "Virta on vähissä.",
-      payerOwn: "Maksat omalla avaimellasi.",
-      payerNode: "Node maksaa.",
-      payerAgent: "Agentin oma avain maksaa.",
-      canHead: "Mitä voit tehdä nyt",
-      needHead: "Tämä sovellus käyttää",
-      capVision: "Kuvan tulkinta",
-      capImage: "Kuvien teko",
-      capTranscription: "Kuuntelu (puhe tekstiksi)",
-      capSpeech: "Puhe (teksti ääneksi)",
-      capOn: "Käytössä",
-      capOff: "Ei käytössä",
-      aiSettings: "Tekoälyn asetukset",
-      needRole: "Yhdistä tämän sovelluksen tekoälyroolit tekoälyn asetuksissa."
-    },
-    es: {
-      loggedIn: "sesión iniciada",
-      logoutBtn: "Cerrar sesión",
-      signInBtn: "❤️ Entrar",
-      account: "Cuenta",
-      federated: "Federado",
-      manageAccess: "Gestionar permisos",
-      lightMode: "Modo claro",
-      darkMode: "Modo oscuro",
-      themeLabel: "Claro u oscuro",
-      autoMode: "Automático: sigue el ajuste de tu dispositivo",
-      autoShort: "Auto",
-      fixedRegister: "Este registro conserva su propia luz",
-      styleLightOnly: "Este estilo solo tiene modo claro",
-      styleDarkOnly: "Este estilo solo tiene modo oscuro",
-      lookThemes: "Temas",
-      lookStyles: "Estilos de este tema",
-      modeOnly: "solo",
-      chooseLook: "Elige el aspecto",
-      switchLanguage: "Idioma",
-      pageSettings: "Ajustes",
-      homeSettings: "Configuración del hogar",
-      toDark: "Cambiar a oscuro",
-      toLight: "Cambiar a claro",
-      aiOn: "Tu IA está conectada",
-      aiOff: "Aún no hay ninguna IA conectada",
-      aiAgents: "Agentes: {n}",
-      aiLatest: "Activa por última vez: {name}",
-      aiChat: "El chat de este nodo está listo",
-      aiConnect: "Conecta tu IA",
-      aiShow: "Ver conexiones",
-      aiOwnStill: "Tu IA conectada sigue funcionando con su propia suscripción.",
-      powerName: "Energía de IA",
-      powerOk: "Hay energía de IA",
-      powerOver: "Se alcanzó el límite de hoy",
-      powerNone: "No hay energía de IA aquí",
-      powerLeft: "Quedan {left} hoy. Límite diario: {limit}.",
-      powerLeftNode: "Te quedan {left} de tu asignación.",
-      powerLow: "Queda poca.",
-      payerOwn: "Pagas con tu propia clave.",
-      payerNode: "Paga este nodo.",
-      payerAgent: "Paga la clave propia del agente.",
-      canHead: "Qué puedes hacer ahora",
-      needHead: "Esta aplicación usa",
-      capVision: "Leer imágenes",
-      capImage: "Crear imágenes",
-      capTranscription: "Escuchar (voz a texto)",
-      capSpeech: "Hablar (texto a voz)",
-      capOn: "Activo",
-      capOff: "Inactivo",
-      aiSettings: "Ajustes de IA",
-      needRole: "Conecta los roles de IA de esta aplicación en tus ajustes de IA."
-    }
-  };
-  function pillStrings(lang) {
-    var base = PILL_STRINGS.en;
-    var over = PILL_STRINGS[lang] || {};
-    var out = {};
-    for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = over[k] || base[k];
-    return out;
-  }
-
   // src/static/sdk-libs/auth/i18n.js
   var MODAL_LANGS = ["en", "fi", "es"];
   function currentModalLang() {
@@ -1246,574 +1801,6 @@
       if (Object.prototype.hasOwnProperty.call(t, k) && k.indexOf("modal.") === 0) out[k.slice(6)] = t[k];
     }
     return out;
-  }
-
-  // src/static/sdk-libs/auth/palette.js
-  var AIMEAT_PALETTE_KEY = "aimeat-palette";
-  var PALETTES = [
-    { id: "aimeat", label: "AIMEAT", swatch: {
-      light: { bg: "#eaeef7", card: "#ffffff", accent: "#e8564a" },
-      dark: { bg: "#14151a", card: "#21232e", accent: "#ff6f62" }
-    } },
-    { id: "paper", label: "Paper", swatch: {
-      light: { bg: "#eae2cf", card: "#fdfaf1", accent: "#a03040" },
-      dark: { bg: "#151110", card: "#282017", accent: "#e08590" }
-    } },
-    { id: "circuit", label: "Circuit", swatch: {
-      light: { bg: "#e9edf1", card: "#ffffff", accent: "#0e7290" },
-      dark: { bg: "#0a0f14", card: "#18202b", accent: "#4fd2f2" }
-    } },
-    { id: "contrast", label: "Contrast", swatch: {
-      light: { bg: "#e9e9e9", card: "#ffffff", accent: "#1d4ed8" },
-      dark: { bg: "#000000", card: "#17171c", accent: "#99c2ff" }
-    } },
-    { id: "mist", label: "Mist", swatch: {
-      light: { bg: "#e6eae4", card: "#fbfcfa", accent: "#47695a" },
-      dark: { bg: "#141715", card: "#252b27", accent: "#9cc0ae" }
-    } },
-    { id: "voltage", label: "Voltage", swatch: {
-      light: { bg: "#f1e4d2", card: "#ffffff", accent: "#c2187e" },
-      dark: { bg: "#150d20", card: "#2c1d3f", accent: "#ff4fa8" }
-    } }
-  ];
-  var HOUSE = "aimeat";
-  function look() {
-    try {
-      var L = (
-        /** @type {any} */
-        window.__aimeatLook
-      );
-      return L && typeof L.state === "function" ? L : null;
-    } catch {
-      return null;
-    }
-  }
-  function innerState() {
-    var L = look();
-    var s = L ? L.state() : null;
-    return s && s.inner ? s : null;
-  }
-  function currentTheme(s) {
-    for (var i = 0; i < s.themes.length; i++) if (s.themes[i].id === s.theme) return s.themes[i];
-    return s.themes[0] || null;
-  }
-  function paletteRegistry() {
-    var s = innerState();
-    var th = s ? currentTheme(s) : null;
-    if (!th) return PALETTES;
-    return th.styles.map(function(x) {
-      return { id: x.id, label: x.name, swatch: x.swatch };
-    });
-  }
-  function aimeatReadPalette() {
-    var L = look();
-    if (L) return L.state().style || HOUSE;
-    var ids = PALETTES.map(function(p) {
-      return p.id;
-    });
-    try {
-      var u = new URLSearchParams(location.search).get("palette");
-      if (u && ids.indexOf(u) >= 0) return u;
-    } catch {
-    }
-    try {
-      var s = localStorage.getItem(AIMEAT_PALETTE_KEY);
-      if (s && ids.indexOf(s) >= 0) return s;
-    } catch {
-    }
-    var attr = document.documentElement.getAttribute("data-palette");
-    return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
-  }
-  function aimeatApplyPalette(id) {
-    var L = look();
-    if (L) {
-      L.choose(null, id);
-      return;
-    }
-    if (id === HOUSE) document.documentElement.removeAttribute("data-palette");
-    else document.documentElement.setAttribute("data-palette", id);
-    try {
-      localStorage.setItem(AIMEAT_PALETTE_KEY, id);
-    } catch {
-    }
-    try {
-      window.dispatchEvent(new CustomEvent("aimeat-palette-change", { detail: { palette: id } }));
-    } catch {
-    }
-  }
-  function aimeatRestorePalette() {
-    var L = look();
-    if (!L) {
-      var cur = aimeatReadPalette();
-      if (cur !== HOUSE) document.documentElement.setAttribute("data-palette", cur);
-      else document.documentElement.removeAttribute("data-palette");
-    }
-    try {
-      window.addEventListener("storage", function(e) {
-        if (e.key !== AIMEAT_PALETTE_KEY && e.key !== "aimeat-look-theme") return;
-        var LL = look();
-        if (LL) LL.apply(location.pathname);
-        else if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
-      });
-    } catch {
-    }
-  }
-  function chipHtml(sw) {
-    return '<span class="aimeat-pal-chip" style="background:' + esc(sw.bg) + '"><span class="pc-card" style="background:' + esc(sw.card) + '"></span><span class="pc-acc" style="background:' + esc(sw.accent) + '"></span></span>';
-  }
-  var reopen = null;
-  function paletteIconHtml(accent2) {
-    return '<svg class="aimeat-pal-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z"/><circle class="aimeat-pal-cur" cx="7.5" cy="10.5" r="1.8" stroke="none" fill="' + esc(accent2) + '"/><circle cx="10.5" cy="6.5" r="1.8" stroke="none" fill="#FFB52E"/><circle cx="15.5" cy="6.5" r="1.8" stroke="none" fill="#10B981"/><circle cx="18" cy="10.5" r="1.8" stroke="none" fill="#3B82F6"/></svg>';
-  }
-  function paletteControlHtml(i, autoRow) {
-    var s = innerState();
-    if (s && !s.personalChoice) return "";
-    var list = paletteRegistry();
-    var cur = aimeatReadPalette();
-    var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    var curAcc = (list.find(function(p) {
-      return p.id === cur;
-    }) || list[0]).swatch[mode].accent;
-    var label = i && i.chooseLook || "Choose look";
-    var themes = s && s.themes.length > 1 ? s.themes : null;
-    var head = function(text) {
-      return '<span class="aimeat-pop-head">' + esc(text) + "</span>";
-    };
-    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '">' + paletteIconHtml(curAcc) + '</button><span class="aimeat-pop" role="listbox" aria-label="' + esc(label) + '">' + (autoRow || "") + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === "light" ? i && i.styleLightOnly || "This style has a light mode only" : i && i.styleDarkOnly || "This style has a dark mode only") + "</span>" : "") + (themes ? head(i && i.lookThemes || "Themes") + themes.map(function(t) {
-      var def = t.styles.find(function(x) {
-        return x.id === t.defaultStyle;
-      }) || t.styles[0];
-      return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '" aria-selected="' + (t.id === s.theme) + '">' + (def ? chipHtml(def.swatch[mode]) : "") + esc(t.name) + "</button>";
-    }).join("") + head(i && i.lookStyles || "Styles in this theme") : "") + list.map(function(p) {
-      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '" aria-selected="' + (p.id === cur) + '">' + chipHtml(p.swatch[mode]) + esc(p.label) + "</button>";
-    }).join("") + "</span></span>";
-  }
-  function wirePaletteControl(container, clampPopover2) {
-    var root = container.querySelector("#aimeat-palette-switch");
-    if (!root) return;
-    var trigger = (
-      /** @type {HTMLElement} */
-      root.querySelector(".aimeat-pop-btn")
-    );
-    var list = paletteRegistry();
-    function open() {
-      root.classList.add("aimeat-open");
-      trigger.setAttribute("aria-expanded", "true");
-      clampPopover2(
-        /** @type {HTMLElement} */
-        root.querySelector(".aimeat-pop")
-      );
-    }
-    function syncDot() {
-      var cur = aimeatReadPalette();
-      var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-      var p = list.find(function(x) {
-        return x.id === cur;
-      }) || list[0];
-      var dot = root.querySelector(".aimeat-pal-cur");
-      if (dot) dot.setAttribute("fill", p.swatch[mode].accent);
-      root.querySelectorAll("button[data-palette]").forEach(function(b) {
-        b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
-        b.setAttribute("aria-selected", String(b.getAttribute("data-palette") === cur));
-        var pp = list.find(function(x) {
-          return x.id === b.getAttribute("data-palette");
-        });
-        if (!pp) return;
-        var s = pp.swatch[mode];
-        var chip = (
-          /** @type {HTMLElement|null} */
-          b.querySelector(".aimeat-pal-chip")
-        );
-        var card = (
-          /** @type {HTMLElement|null} */
-          b.querySelector(".pc-card")
-        );
-        var acc = (
-          /** @type {HTMLElement|null} */
-          b.querySelector(".pc-acc")
-        );
-        if (chip) chip.style.background = s.bg;
-        if (card) card.style.background = s.card;
-        if (acc) acc.style.background = s.accent;
-      });
-    }
-    root.querySelectorAll("button[data-palette]").forEach(function(b) {
-      b.addEventListener("click", function() {
-        aimeatApplyPalette(b.getAttribute("data-palette") || HOUSE);
-        syncDot();
-        root.classList.remove("aimeat-open");
-        trigger.setAttribute("aria-expanded", "false");
-      });
-    });
-    root.querySelectorAll("button[data-look-theme]").forEach(function(b) {
-      b.addEventListener("click", function() {
-        var L = look();
-        if (!L) return;
-        reopen = { compact: !!container.querySelector(".aimeat-auth-wrap.aimeat-open") };
-        L.choose(b.getAttribute("data-look-theme"), null);
-      });
-    });
-    trigger.addEventListener("click", function(ev) {
-      ev.stopPropagation();
-      if (root.classList.contains("aimeat-open")) {
-        root.classList.remove("aimeat-open");
-        trigger.setAttribute("aria-expanded", "false");
-      } else open();
-    });
-    if (reopen) {
-      var again = reopen;
-      reopen = null;
-      setTimeout(function() {
-        var wrap = container.querySelector(".aimeat-auth-wrap");
-        if (again.compact && wrap) {
-          wrap.classList.add("aimeat-open");
-          var cb = wrap.querySelector(".aimeat-auth-compact");
-          if (cb) cb.setAttribute("aria-expanded", "true");
-        }
-        if (root.isConnected) open();
-      }, 0);
-    }
-    window.addEventListener("aimeat-palette-change", syncDot);
-    window.addEventListener("aimeat-theme-change", syncDot);
-  }
-  function esc(s) {
-    var d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
-  }
-
-  // src/static/sdk-libs/auth/on-login.js
-  function sessionIdentity(session) {
-    if (!session) return null;
-    return String(session.ghii || session.owner || session.identity || session.gaii || "?");
-  }
-  function runCallback(name, fn, args) {
-    if (typeof fn !== "function") return;
-    var report = function(e) {
-      try {
-        console.error("[aimeat-auth] The page's " + name + " failed. The session is signed in; fix the callback:", e);
-      } catch {
-      }
-    };
-    try {
-      var result = fn.apply(null, args);
-      if (result && typeof result.then === "function") result.then(null, report);
-    } catch (e) {
-      report(e);
-    }
-  }
-  function reportSession(callbacks, session, restored) {
-    var cb = callbacks || {};
-    runCallback("onSession", cb.onSession, [session, { restored: !!restored }]);
-    if (!restored) runCallback("onLogin", cb.onLogin, [session]);
-  }
-  function loginWatcher(callbacks, liveSession) {
-    var reported = sessionIdentity(liveSession);
-    if (liveSession && callbacks && typeof callbacks.onSession === "function") {
-      setTimeout(function() {
-        if (sessionIdentity(liveSession) === reported) runCallback("onSession", callbacks.onSession, [liveSession, { restored: true }]);
-      }, 0);
-    }
-    return {
-      login: function(session, meta) {
-        var who = sessionIdentity(session);
-        if (!who || who === reported) return;
-        reported = who;
-        reportSession(callbacks, session, !!(meta && meta.restored));
-      },
-      logout: function() {
-        reported = null;
-      }
-    };
-  }
-  function onLoginWhileOpen(callbacks) {
-    var cb = callbacks || {};
-    if (typeof cb.onLogin !== "function" && typeof cb.onSession !== "function") return function() {
-    };
-    var done = false;
-    function hear(session, meta) {
-      if (done || !session) return;
-      done = true;
-      off("login", hear);
-      reportSession(cb, session, !!(meta && meta.restored));
-    }
-    on("login", hear);
-    return function stop() {
-      done = true;
-      off("login", hear);
-    };
-  }
-
-  // src/static/sdk-libs/auth/last-identity.js
-  var KEY = "last_identity";
-  var PROBE_MS = 5e3;
-  var announced = null;
-  var returning = null;
-  on("login", function(session) {
-    announced = null;
-    if (!session || !session.owner || session.gaii) return;
-    save(KEY, {
-      owner: String(session.owner),
-      ghii: String(session.ghii || ""),
-      displayName: String(session.displayName || ""),
-      at: (/* @__PURE__ */ new Date()).toISOString()
-    });
-  });
-  function lastIdentity() {
-    const v = load(KEY);
-    return v && typeof v.owner === "string" && v.owner ? v : null;
-  }
-  function forgetLastIdentity() {
-    announced = null;
-    remove(KEY);
-  }
-  function offlineIdentity() {
-    return announced;
-  }
-  function nodeUnreachable() {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(true);
-    const ctl = typeof AbortController === "function" ? new AbortController() : null;
-    const timer = setTimeout(function() {
-      if (ctl) ctl.abort();
-    }, PROBE_MS);
-    return fetch(NODE_URL + "/v1/build", { cache: "no-store", credentials: "omit", mode: "no-cors", signal: ctl ? ctl.signal : void 0 }).then(function() {
-      return false;
-    }, function() {
-      return true;
-    }).finally(function() {
-      clearTimeout(timer);
-    });
-  }
-  function settleNoSession(retry, knownDown) {
-    return (knownDown ? Promise.resolve(true) : nodeUnreachable()).then(function(down) {
-      if (!down) {
-        const stood = !!announced || !!load("session");
-        remove("session");
-        forgetLastIdentity();
-        if (stood) emit("logout");
-        return false;
-      }
-      const who = lastIdentity();
-      if (who && !announced) {
-        announced = who;
-        emit("offline", who);
-      }
-      if (!returning && typeof window !== "undefined") {
-        returning = function() {
-          window.removeEventListener(
-            "online",
-            /** @type {() => void} */
-            returning
-          );
-          returning = null;
-          try {
-            retry();
-          } catch (e) {
-            console.warn("[aimeat-auth] The restore after the network returned failed:", e && /** @type {Error} */
-            e.message);
-          }
-        };
-        window.addEventListener("online", returning);
-      }
-      return true;
-    });
-  }
-
-  // src/static/sdk-libs/auth/pill.js
-  var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/><path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
-  var LOGOUT_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>';
-  function autoRowHtml(i) {
-    if (aimeatFixedLight()) return "";
-    var w = i.autoMode || "Automatic: follows your device";
-    return '<button type="button" class="aimeat-pop-wide" data-mode-auto aria-pressed="' + aimeatAutoChosen() + '">' + escHtml(w) + "</button>";
-  }
-  function mountPill(auth2, selector, opts = {}) {
-    let container;
-    if (selector && typeof selector === "object" && selector.nodeType === 1) {
-      container = selector;
-    } else if (selector && typeof selector === "object") {
-      opts = selector;
-      container = document.getElementById("aimeat-auth-bar");
-      if (!container) {
-        container = document.createElement("div");
-        container.id = "aimeat-auth-bar";
-        document.body.appendChild(container);
-      }
-    } else {
-      container = document.querySelector(selector);
-      if (!container) {
-        console.error("AIMEAT: mountLoginButton container not found for selector:", selector, "— pass a CSS selector string, a DOM element, or an options object.");
-        return;
-      }
-    }
-    const locales = readLocales(opts);
-    if (locales.length) aimeatRestoreLang({ locales });
-    const labelLangs = locales.length ? locales : MODAL_LANGS;
-    let i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
-    const useCompact = opts.compact !== void 0 ? !!opts.compact : true;
-    function wireCompactTrigger() {
-      var compactBtn = document.getElementById("aimeat-auth-compact");
-      if (compactBtn) compactBtn.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        var w = container.querySelector(".aimeat-auth-wrap");
-        if (!w) return;
-        var open = w.classList.toggle("aimeat-open");
-        compactBtn.setAttribute("aria-expanded", open ? "true" : "false");
-        var pop = (
-          /** @type {HTMLElement|null} */
-          w.querySelector(":scope > .aimeat-ctl, :scope > .aimeat-auth-pill")
-        );
-        if (open && pop) clampPopover(pop);
-      });
-    }
-    function redrawIfMounted() {
-      if (container.isConnected) render();
-    }
-    function render() {
-      i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
-      const stored = auth2.getSession() || load("session");
-      if (stored) {
-        var live = auth2.getSession();
-        var ai = live ? readAiState(live, redrawIfMounted) : null;
-        var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
-        var pillHtml = '<div class="aimeat-auth-pill">' + aiStatusHtml(ai, i, "led") + (opts.nameHref ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || "Home settings") + '">' + nameText + "</a>" : '<span class="aimeat-auth-ghii">' + nameText + "</span>") + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + aiStatusHtml(ai, i, "bolt") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + '</span><button type="button" id="aimeat-logout-btn" class="aimeat-icon-btn aimeat-auth-logout" aria-label="' + escHtml(i.logoutBtn || "Log out") + '" title="' + escHtml(i.logoutBtn || "Log out") + '">' + LOGOUT_ICON + "</button></div>";
-        ensureAuthPillStyles();
-        ensureAiStateStyles();
-        if (useCompact) {
-          var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
-          container.innerHTML = '<div class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.account || "Account") + '"><span class="cdot' + aiDotClass(ai) + '" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + "</span>" + aiCompactHtml(ai) + '<span class="ccar" aria-hidden="true">▾</span></button>' + pillHtml + "</div>";
-        } else {
-          container.innerHTML = pillHtml;
-        }
-        document.getElementById("aimeat-logout-btn").addEventListener("click", () => {
-          auth2.logout();
-        });
-        var gearBtn = document.getElementById("aimeat-grant-gear");
-        if (gearBtn) gearBtn.addEventListener("click", () => {
-          auth2.manageGrant().then(() => {
-            render();
-          }).catch(() => {
-          });
-        });
-        wireAiState(container);
-        wireCompactTrigger();
-      } else {
-        ensureAuthPillStyles();
-        var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + "</span>";
-        container.innerHTML = '<span class="aimeat-auth-out">' + (useCompact ? '<span class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.pageSettings || "Settings") + '" title="' + escHtml(i.pageSettings || "Settings") + '">' + SETTINGS_ICON + '<span class="ccar" aria-hidden="true">▾</span></button>' + clusterHtml + "</span>" : clusterHtml) + '<button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
-        document.getElementById("aimeat-login-btn").addEventListener("click", () => {
-          var signInOpts = {};
-          for (var k in opts) if (k !== "onLogin" && k !== "onSession") signInOpts[k] = opts[k];
-          auth2.signIn(signInOpts).then((s) => {
-            if (s) render();
-          }).catch(() => {
-          });
-        });
-        wireCompactTrigger();
-      }
-      wireModeSwitch(container, i);
-      wireAutoMode(container);
-      wireLangSwitch(container, i, locales);
-      wirePaletteControl(container, clampPopover);
-    }
-    const holder = (
-      /** @type {any} */
-      container
-    );
-    if (typeof holder.__aimeatPillUnmount === "function") holder.__aimeatPillUnmount();
-    ensureClusterStyles();
-    render();
-    window.addEventListener("aimeat-lang-change", render);
-    window.addEventListener("aimeat-look-change", render);
-    document.addEventListener("click", (ev) => {
-      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open").forEach((w) => {
-        if (!w.contains(
-          /** @type {Node} */
-          ev.target
-        )) {
-          w.classList.remove("aimeat-open");
-          var b = w.querySelector(".aimeat-pop-btn, .aimeat-ai-bolt");
-          if (b) b.setAttribute("aria-expanded", "false");
-        }
-      });
-    });
-    document.addEventListener("keydown", (ev) => {
-      if (ev.key !== "Escape") return;
-      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open").forEach((w) => {
-        w.classList.remove("aimeat-open");
-        var b = w.querySelector(".aimeat-pop-btn, .aimeat-ai-bolt");
-        if (b) b.setAttribute("aria-expanded", "false");
-      });
-    });
-    if (useCompact) {
-      var closeCompact = () => {
-        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
-        if (!w) return;
-        w.classList.remove("aimeat-open");
-        var cb = w.querySelector(".aimeat-auth-compact");
-        if (cb) cb.setAttribute("aria-expanded", "false");
-      };
-      document.addEventListener("click", (ev) => {
-        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
-        if (w && !w.contains(ev.target)) closeCompact();
-      });
-      document.addEventListener("keydown", (ev) => {
-        if (ev.key === "Escape") closeCompact();
-      });
-    }
-    const watcher = loginWatcher({ onLogin: opts.onLogin, onSession: opts.onSession }, auth2.getSession());
-    const onLoginEvent = (session, meta) => {
-      render();
-      watcher.login(session, meta);
-    };
-    const onLogoutEvent = () => {
-      watcher.logout();
-      forgetAiState();
-      render();
-      if (opts.onLogout) opts.onLogout();
-    };
-    auth2.on("login", onLoginEvent);
-    auth2.on("logout", onLogoutEvent);
-    auth2.on("session-updated", render);
-    holder.__aimeatPillUnmount = () => {
-      if (typeof auth2.off === "function") {
-        auth2.off("login", onLoginEvent);
-        auth2.off("logout", onLogoutEvent);
-        auth2.off("session-updated", render);
-      }
-      window.removeEventListener("aimeat-lang-change", render);
-      window.removeEventListener("aimeat-look-change", render);
-    };
-    if (isAppOrigin() && !auth2.getSession()) {
-      const tryRestore = () => {
-        if (navigator.onLine === false) {
-          settleNoSession(tryRestore, true);
-          return;
-        }
-        let settled = false;
-        nodeUnreachable().then((down) => {
-          if (down && !settled && !auth2.getSession()) {
-            settled = true;
-            settleNoSession(tryRestore, true);
-          }
-        });
-        restoreSessionFromAppOrigin(false).then((s) => {
-          if (s || settled) return;
-          settled = true;
-          settleNoSession(tryRestore);
-        }).catch(() => {
-        });
-      };
-      tryRestore();
-    } else if (!auth2.getSession() && load("session")) {
-      auth2.login().catch(() => null).then((s) => {
-        if (s) return;
-        if (load("session")) {
-          remove("session");
-          emit("logout");
-        } else render();
-      });
-    }
   }
 
   // src/static/sdk-libs/auth/modal-styles.js
@@ -2270,120 +2257,6 @@
     };
   }
 
-  // src/static/sdk-libs/auth/passkey.js
-  function passkeySupported() {
-    try {
-      return typeof window !== "undefined" && typeof window.PublicKeyCredential === "function" && !!(navigator.credentials && navigator.credentials.create && navigator.credentials.get);
-    } catch {
-      return false;
-    }
-  }
-  function toBuffer(value) {
-    var s = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
-    while (s.length % 4) s += "=";
-    var raw = atob(s);
-    var bytes = new Uint8Array(raw.length);
-    for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-    return bytes.buffer;
-  }
-  function toB64u(buffer) {
-    var bytes = new Uint8Array(buffer);
-    var s = "";
-    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-  function creationOptions(options) {
-    var out = Object.assign({}, options);
-    out.challenge = toBuffer(options.challenge);
-    out.user = Object.assign({}, options.user, { id: toBuffer(options.user.id) });
-    if (Array.isArray(options.excludeCredentials)) {
-      out.excludeCredentials = options.excludeCredentials.map(function(c) {
-        return Object.assign({}, c, { id: toBuffer(c.id) });
-      });
-    }
-    return out;
-  }
-  function requestOptions(options) {
-    var out = Object.assign({}, options);
-    out.challenge = toBuffer(options.challenge);
-    if (Array.isArray(options.allowCredentials)) {
-      out.allowCredentials = options.allowCredentials.map(function(c) {
-        return Object.assign({}, c, { id: toBuffer(c.id) });
-      });
-    }
-    return out;
-  }
-  function isCancellation(err) {
-    var name = err && err.name;
-    return name === "NotAllowedError" || name === "AbortError";
-  }
-  function cancelled() {
-    var e = (
-      /** @type {Error & { code?: string }} */
-      new Error("cancelled")
-    );
-    e.code = "PASSKEY_CANCELLED";
-    return e;
-  }
-  async function passkeySignIn(username) {
-    var started = await api("/v1/ghii/login/passkey/options", {
-      method: "POST",
-      credentials: "include",
-      body: JSON.stringify(username ? { username } : {})
-    });
-    var assertion;
-    try {
-      assertion = await navigator.credentials.get({ publicKey: requestOptions(started.data.options) });
-    } catch (err) {
-      if (isCancellation(err)) throw cancelled();
-      throw err;
-    }
-    if (!assertion) throw cancelled();
-    var response = {
-      id: assertion.id,
-      rawId: toB64u(assertion.rawId),
-      type: assertion.type,
-      clientExtensionResults: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {},
-      response: {
-        clientDataJSON: toB64u(assertion.response.clientDataJSON),
-        authenticatorData: toB64u(assertion.response.authenticatorData),
-        signature: toB64u(assertion.response.signature),
-        userHandle: assertion.response.userHandle ? toB64u(assertion.response.userHandle) : void 0
-      }
-    };
-    return api("/v1/ghii/login/passkey/verify", {
-      method: "POST",
-      credentials: "include",
-      body: JSON.stringify({ ceremony_id: started.data.ceremony_id, response })
-    });
-  }
-  async function passkeyAdd(jwt, label) {
-    var started = await authApi("/v1/ghii/passkeys/register/options", jwt, { method: "POST", body: "{}" });
-    var credential;
-    try {
-      credential = await navigator.credentials.create({ publicKey: creationOptions(started.data.options) });
-    } catch (err) {
-      if (isCancellation(err)) throw cancelled();
-      throw err;
-    }
-    if (!credential) throw cancelled();
-    var response = {
-      id: credential.id,
-      rawId: toB64u(credential.rawId),
-      type: credential.type,
-      clientExtensionResults: credential.getClientExtensionResults ? credential.getClientExtensionResults() : {},
-      response: {
-        clientDataJSON: toB64u(credential.response.clientDataJSON),
-        attestationObject: toB64u(credential.response.attestationObject),
-        transports: credential.response.getTransports ? credential.response.getTransports() : []
-      }
-    };
-    return authApi("/v1/ghii/passkeys/register/verify", jwt, {
-      method: "POST",
-      body: JSON.stringify({ ceremony_id: started.data.ceremony_id, response, label: label || "" })
-    });
-  }
-
   // src/static/sdk-libs/auth/modal-passkey.js
   var KEY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9M18 12v3M15 12v2"></path></svg>';
   function passkeyButtonHtml(i) {
@@ -2420,91 +2293,6 @@
         btn.innerHTML = KEY_SVG + escHtml(label);
         btn.disabled = false;
       }
-    });
-  }
-
-  // src/static/sdk-libs/auth/app-frame.js
-  function inIsolatedFrame() {
-    try {
-      var f = (
-        /** @type {any} */
-        window.__AIMEAT_FRAME__
-      );
-      return !!(f && f.host) && window.parent !== window;
-    } catch {
-      return false;
-    }
-  }
-  var sequence = 0;
-  function frameHost() {
-    var named = (
-      /** @type {any} */
-      window.__AIMEAT_FRAME__
-    );
-    return {
-      host: named && typeof named.origin === "string" && named.origin || location.protocol + "//" + location.host,
-      secret: named && typeof named.secret === "string" && named.secret || ""
-    };
-  }
-  function postToFrameHost(message, timeoutMs, accept) {
-    return new Promise(function(resolve) {
-      var at = frameHost();
-      var channel = new MessageChannel();
-      var timer = null;
-      function done(value) {
-        if (timer) clearTimeout(timer);
-        try {
-          channel.port1.close();
-        } catch {
-        }
-        resolve(value);
-      }
-      channel.port1.onmessage = function(e) {
-        var d = e.data || {};
-        if (accept && !accept(d)) return;
-        done(d);
-      };
-      if (timeoutMs) timer = setTimeout(function() {
-        done(null);
-      }, timeoutMs);
-      try {
-        window.parent.postMessage(Object.assign({}, message, { secret: at.secret }), at.host, [channel.port2]);
-      } catch {
-        done(null);
-      }
-    });
-  }
-  function parentAuth(timeoutMs) {
-    var pick = function(d) {
-      return d && d.type === "aimeat-auth" && d.jwt ? { jwt: String(d.jwt), nodeUrl: d.nodeUrl ? String(d.nodeUrl) : "" } : null;
-    };
-    if (inIsolatedFrame()) {
-      return postToFrameHost({ type: "aimeat-request-auth" }, timeoutMs, function(d) {
-        return d.type === "aimeat-auth";
-      }).then(pick);
-    }
-    return new Promise(function(resolve) {
-      var timer = setTimeout(function() {
-        window.removeEventListener("message", onMessage);
-        resolve(null);
-      }, timeoutMs);
-      function onMessage(e) {
-        if (e.source !== window.parent || !e.data || e.data.type !== "aimeat-auth") return;
-        clearTimeout(timer);
-        window.removeEventListener("message", onMessage);
-        resolve(pick(e.data));
-      }
-      window.addEventListener("message", onMessage);
-      window.parent.postMessage({ type: "aimeat-request-auth" }, "*");
-    });
-  }
-  function askFrameHost(op, payload, timeoutMs) {
-    var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
-    var request = Object.assign({}, payload || {}, { type: "aimeat_frame_req", id, op });
-    return postToFrameHost(request, timeoutMs, function(d) {
-      return d.type === "aimeat_frame_res" && d.id === id;
-    }).then(function(d) {
-      return d && d.result !== void 0 ? d.result : null;
     });
   }
 
@@ -3355,7 +3143,7 @@
       return typeof location !== "undefined" && location.host || "";
     }
   })();
-  function showLoginModal(opts, renderBtn, onClosed) {
+  function showLoginModal2(opts, renderBtn, onClosed) {
     if (signupInProgress()) return;
     var i = opts.i18n || {};
     var lang = currentModalLang();
@@ -3763,856 +3551,1089 @@
     }
   }
 
-  // src/static/sdk-libs/auth/pkce.js
-  function b64url(buf) {
-    var bytes = new Uint8Array(buf), s = "";
-    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  // src/static/sdk-libs/auth/cluster.js
+  function ensureClusterStyles() {
+    if (document.getElementById("aimeat-cluster-css")) return;
+    var st = document.createElement("style");
+    st.id = "aimeat-cluster-css";
+    st.textContent = [
+      /* The cluster row. Inherits text colour from its host (gold pill or page header). */
+      ".aimeat-ctl{display:inline-flex;align-items:center;gap:6px}",
+      /* Segmented group: one bordered pill, every option a button. */
+      ".aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;",
+      "border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);",
+      "overflow:hidden;background:transparent}",
+      ".aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;",
+      'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
+      "padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;",
+      "transition:opacity var(--motion-fast,120ms) ease,background var(--motion-fast,120ms) ease}",
+      ".aimeat-seg button:hover{opacity:.9}",
+      ".aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}",
+      '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
+      "background:var(--aimeat-ink);color:var(--aimeat-paper)}",
+      ".aimeat-seg button+button{border-left:0}",
+      ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
+      /* A control that has stood down. The group keeps its frame so it still reads as an
+         instrument that exists, and the whole thing dims and takes the arrow cursor so nobody
+         aims at it twice — the reason is on the group's title, because a native tooltip on a
+         disabled button never appears. Used by a page that keeps its own palette (a genre body). */
+      ".aimeat-seg--fixed{opacity:.55;cursor:default}",
+      ".aimeat-seg button[disabled]{cursor:default;opacity:.6}",
+      ".aimeat-seg button[disabled]:hover{opacity:.6}",
+      /* Popover trigger (palette picker; language picker when 4+ languages). */
+      ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
+      ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
+      "gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;",
+      "border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);",
+      'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
+      "transition:background var(--motion-fast,120ms) ease}",
+      ".aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}",
+      ".aimeat-pop-btn:focus-visible{outline:2px solid currentColor;outline-offset:-2px}",
+      /* The popover panel: a real themed surface (not the host pill), so swatches read true. */
+      ".aimeat-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1200;display:none;",
+      "background:var(--color-base-200,#ffffff);color:var(--color-base-content,#1a1a2e);",
+      "border:1px solid var(--color-base-300,#d9dbe1);border-radius:var(--radius-box,14px);",
+      "box-shadow:var(--elev-pop,0 4px 10px rgb(15 18 25 / .1),0 18px 44px rgb(15 18 25 / .16));",
+      "padding:8px;width:max-content;max-width:calc(100vw - 24px)}",
+      ".aimeat-pop-wrap.aimeat-open .aimeat-pop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}",
+      ".aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}",
+      /* A group's name inside the popover (the node's themes above the theme's styles). */
+      '.aimeat-pop-head{grid-column:1/-1;padding:6px 9px 2px;font:800 10px/1.2 "Inter","Segoe UI",system-ui,sans-serif;',
+      "letter-spacing:calc(var(--shape-tracking-label,.1em) * .6);text-transform:var(--shape-case-label,uppercase);opacity:.7}",
+      /* A sentence in the popover (why the light/dark switch is off): plain words, not a group name. */
+      '.aimeat-pop-note{grid-column:1/-1;padding:4px 9px 6px;font:600 12px/1.35 "Inter","Segoe UI",system-ui,sans-serif}',
+      ".aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;",
+      "background:transparent;border:1px solid transparent;border-radius:calc(var(--radius-box,14px) - 6px);",
+      'cursor:pointer;color:inherit;font:600 12px/1.1 "Inter","Segoe UI",system-ui,sans-serif;text-align:left;',
+      "transition:background var(--motion-fast,120ms) ease}",
+      ".aimeat-pop button:hover{background:color-mix(in oklab,currentColor 8%,transparent)}",
+      ".aimeat-pop button:focus-visible{outline:2px solid var(--color-primary,#e8564a);outline-offset:-2px}",
+      '.aimeat-pop button[aria-pressed="true"]{border-color:var(--color-primary,#e8564a)}',
+      /* Palette swatch chips: page/card/accent of the palette IN THE CURRENT MODE. The three
+         colours are data (they vary per palette), so they arrive as inline background values on
+         these spans — layout and everything else stays here. */
+      ".aimeat-pal-chip{position:relative;flex:0 0 auto;width:26px;height:20px;border-radius:5px;",
+      "border:1px solid color-mix(in oklab,currentColor 25%,transparent);overflow:hidden}",
+      ".aimeat-pal-chip .pc-card{position:absolute;inset:5px 5px 3px 5px;border-radius:3px}",
+      ".aimeat-pal-chip .pc-acc{position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%}",
+      /* The trigger's icon: a painter's palette whose first blob is the active accent (palette.js). */
+      ".aimeat-pal-ico{display:block;flex:0 0 auto}",
+      /* A row across the whole popover: "Automatic: follows your device", above the looks. */
+      ".aimeat-pop .aimeat-pop-wide{grid-column:1/-1}"
+    ].join("");
+    (document.head || document.documentElement).appendChild(st);
   }
-  async function pkce() {
-    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
-    if (crypto.subtle && crypto.subtle.digest) {
-      var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-      return { verifier, challenge: b64url(digest), method: "S256" };
-    }
-    return { verifier, challenge: verifier, method: "plain" };
-  }
-
-  // src/static/sdk-libs/auth/app-origin.js
-  function isAppOrigin() {
-    if (inIsolatedFrame()) return true;
-    try {
-      return location.origin !== new URL(APEX_URL).origin;
-    } catch {
-      return false;
-    }
-  }
-  function appScopeDrift(session) {
-    if (!session || !session._appOrigin || !session.jwt) return [];
-    var have = (parseJwt(session.jwt) || {}).scopes || [];
-    return appDeclaredScopes().split(" ").filter(function(s) {
-      return s && have.indexOf(s) < 0;
-    });
-  }
-  function silentAppToken() {
-    if (inIsolatedFrame()) return askFrameHost("login", { scope: appDeclaredScopes() }, 8e3);
-    return new Promise(function(resolve) {
-      var apexOrigin;
-      try {
-        apexOrigin = new URL(APEX_URL).origin;
-      } catch {
-        resolve(null);
-        return;
-      }
-      if (location.origin === apexOrigin) {
-        resolve(null);
-        return;
-      }
-      var settled = false, iframe = null, timer = null;
-      function finish(v) {
-        if (settled) return;
-        settled = true;
-        window.removeEventListener("message", onMsg);
-        if (timer) clearTimeout(timer);
-        if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
-        resolve(v);
-      }
-      function onMsg(e) {
-        if (e.origin !== apexOrigin) return;
-        var d = e.data || {};
-        if (d.type !== "aimeat_app_login") return;
-        finish(d.result || null);
-      }
-      window.addEventListener("message", onMsg);
-      iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.setAttribute("aria-hidden", "true");
-      iframe.src = apexOrigin + "/app-silent.html?scope=" + encodeURIComponent(appDeclaredScopes());
-      (document.body || document.documentElement).appendChild(iframe);
-      timer = setTimeout(function() {
-        finish(null);
-      }, 8e3);
-    });
-  }
-  function reportUngrantableScopes(r) {
-    try {
-      console.error("[aimeat-auth] Nobody can sign in to " + (r.app || "this app") + ': its <meta name="aimeat-scopes"> asks for ' + (r.unknown ? r.unknown : "a word") + ", which this node cannot grant, and one such word refuses the whole sign-in. Take the words from GET /v1/app-grants/scopes and publish the app again.");
-    } catch {
-    }
-  }
-  function apexLogout() {
-    if (inIsolatedFrame()) return askFrameHost("logout", {}, 8e3).then(function(r) {
-      return !!(r && r.ok);
-    });
-    return new Promise(function(resolve) {
-      var apexOrigin;
-      try {
-        apexOrigin = new URL(APEX_URL).origin;
-      } catch {
-        resolve(false);
-        return;
-      }
-      if (location.origin === apexOrigin) {
-        resolve(false);
-        return;
-      }
-      var settled = false, iframe = null, timer = null;
-      function finish(v) {
-        if (settled) return;
-        settled = true;
-        window.removeEventListener("message", onMsg);
-        if (timer) clearTimeout(timer);
-        if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
-        resolve(v);
-      }
-      function onMsg(e) {
-        if (e.origin !== apexOrigin) return;
-        var d = e.data || {};
-        if (d.type !== "aimeat_app_logout") return;
-        finish(!!(d.result && d.result.ok));
-      }
-      window.addEventListener("message", onMsg);
-      iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.setAttribute("aria-hidden", "true");
-      iframe.src = apexOrigin + "/app-silent.html?mode=logout";
-      (document.body || document.documentElement).appendChild(iframe);
-      timer = setTimeout(function() {
-        finish(false);
-      }, 8e3);
-    });
-  }
-  async function requestConsentPopup(app, scopeStr, manage, prompt) {
-    if (inIsolatedFrame()) {
-      return askFrameHost("consent", { scope: scopeStr || appDeclaredScopes(), manage: !!manage, prompt: prompt === "create" ? "create" : "" }, 15 * 60 * 1e3);
-    }
-    var apexOrigin;
-    try {
-      apexOrigin = new URL(APEX_URL).origin;
-    } catch {
-      return null;
-    }
-    var p = await pkce();
-    var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
-    var redirectUri = location.origin + "/";
-    var scope = scopeStr || appDeclaredScopes();
-    var url = apexOrigin + "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + (prompt === "create" ? "&prompt=create" : "") + "&lang=" + encodeURIComponent(String(readLang(["en", "fi", "es"]))) + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope) + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
-    var w = 460, h = 660;
-    var left = window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0;
-    var top = window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0;
-    var popup = window.open(url, "aimeat_consent", "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top);
-    if (!popup) {
-      try {
-        console.warn("[aimeat-auth] consent popup blocked — app-origin sign-in needs a real user click (user activation). Synthetic/automated clicks cannot open the consent window.");
-      } catch {
-      }
-      emit("popup-blocked", { app });
-      return null;
-    }
-    var msg = await new Promise(function(resolve) {
-      var done = false, iv = null;
-      function onMsg(e) {
-        if (e.origin !== apexOrigin) return;
-        var d = e.data || {};
-        if (d.type !== "aimeat_app_grant" || d.state !== state) return;
-        done = true;
-        cleanup();
-        resolve(d);
-      }
-      function cleanup() {
-        window.removeEventListener("message", onMsg);
-        if (iv) clearInterval(iv);
-      }
-      window.addEventListener("message", onMsg);
-      iv = setInterval(function() {
-        if (popup.closed && !done) {
-          cleanup();
-          resolve(null);
-        }
-      }, 500);
-    });
-    if (msg && msg.revoked) return { revoked: true };
-    if (!msg || !msg.code) return null;
-    try {
-      var resp = await fetch(apexOrigin + "/v1/app-grants/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grant_type: "authorization_code", code: msg.code, code_verifier: p.verifier, redirect_uri: redirectUri })
-      });
-      var j = await resp.json();
-      return j && j.ok && j.data && j.data.access_token ? j.data : null;
-    } catch {
-      return null;
-    }
+  function clampPopover(pop) {
+    pop.style.transform = "";
+    var r = pop.getBoundingClientRect();
+    var pad = 12;
+    var shift = 0;
+    if (r.left < pad) shift = pad - r.left;
+    else if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
+    if (shift) pop.style.transform = "translateX(" + Math.round(shift) + "px)";
   }
 
-  // src/static/sdk-libs/auth/session-hint.js
-  function hasSessionHint() {
+  // src/static/sdk-libs/_core/format.js
+  function fmt() {
+    const ns2 = typeof window !== "undefined" ? window.AIMEAT : null;
+    return ns2 && ns2.fmt ? ns2.fmt : null;
+  }
+  function person() {
+    const ns2 = typeof window !== "undefined" ? window.AIMEAT : null;
+    const auth2 = ns2 && ns2.auth;
+    const p = auth2 && typeof auth2.displayPrefs === "function" ? auth2.displayPrefs() : null;
+    return { region: p && p.region || null, timezone: p && p.timezone || null };
+  }
+  var refusedReported = "";
+  function asPerson(call, opts, clock) {
+    const p = person();
+    const zone = clock && p.timezone && !(opts && opts.timeZone) ? p.timezone : null;
+    if (!p.region && !zone) return call(void 0, opts);
     try {
-      return typeof document !== "undefined" && /(?:^|;\s*)aimeat_session_hint=1(?:;|$)/.test(document.cookie || "");
+      return call(p.region || void 0, zone ? Object.assign({}, opts, { timeZone: zone }) : opts);
     } catch (e) {
-      console.warn("[aimeat-auth] The cookie could not be read:", e && /** @type {Error} */
-      e.message);
-      return true;
-    }
-  }
-
-  // src/static/sdk-libs/auth/session.js
-  var currentSession = null;
-  var refreshTimer = null;
-  var ownerRefreshInFlight = null;
-  var _appOriginLoginInFlight = null;
-  var focusRefreshInFlight = null;
-  var loginInFlight = null;
-  function persistSession(session) {
-    save("session", {
-      owner: session.owner,
-      gaii: session.gaii,
-      ghii: session.ghii,
-      jwt: session.jwt,
-      publicKey: session.publicKey,
-      roles: session.roles,
-      displayName: session.displayName || "",
-      federated: session.federated || false,
-      homeNode: session.homeNode || "",
-      homeUrl: session.homeUrl || "",
-      // H-2 app-origin grant session metadata (drives the consent gear on the login pill).
-      _appOrigin: session._appOrigin || false,
-      _app: session._app || null,
-      _own: session._own || false
-    });
-  }
-  async function restoreSessionFromCookie() {
-    try {
-      const data = await api("/v1/auth/refresh", {
-        method: "POST",
-        credentials: "include",
-        headers: { "X-AIMEAT-Refresh": "1" }
-      });
-      const token = data && data.data && data.data.token;
-      if (!token) return null;
-      const payload = parseJwt(token) || {};
-      const ownerName = payload.owner || payload.sub;
-      if (!ownerName) return null;
-      const session = createSession({
-        owner: ownerName,
-        ghii: String(ownerName).indexOf("@") >= 0 ? ownerName : ownerName + "@" + NODE_ID,
-        gaii: null,
-        jwt: token,
-        roles: payload.roles || [],
-        displayName: ""
-      });
-      persistSession(session);
-      currentSession = session;
-      scheduleAutoRefresh(session);
-      emit("login", session, { restored: true });
-      return session;
-    } catch (e) {
-      if (!(e && /** @type {any} */
-      e.code)) console.warn("[aimeat-auth] Restoring the session from the cookie failed:", e && /** @type {Error} */
-      e.message);
-      return null;
-    }
-  }
-  function _buildAppSession(accessToken, appId, own, displayName, restored) {
-    var payload = parseJwt(accessToken) || {};
-    var ownerName = payload.owner || payload.sub;
-    if (!ownerName) return null;
-    var session = createSession({
-      owner: ownerName,
-      ghii: String(ownerName).indexOf("@") >= 0 ? ownerName : ownerName + "@" + NODE_ID,
-      gaii: null,
-      jwt: accessToken,
-      roles: payload.roles || [],
-      displayName: displayName || ""
-    });
-    session._appOrigin = true;
-    session._app = appId || null;
-    session._own = !!own;
-    persistSession(session);
-    currentSession = session;
-    scheduleAutoRefresh(session);
-    emit("login", session, { restored: !!restored });
-    return session;
-  }
-  function restoreSessionFromAppOrigin(interactive, prompt) {
-    if (currentSession) return Promise.resolve(currentSession);
-    if (_appOriginLoginInFlight) return _appOriginLoginInFlight;
-    _appOriginLoginInFlight = (async function() {
-      var r = await silentAppToken();
-      var grant = r && r.ok && r.access_token ? r : null;
-      var appId = r && r.app || null;
-      var own = !!(r && r.own);
-      if (!grant && r && r.error === "invalid_scope") {
-        reportUngrantableScopes(r);
-        return null;
-      }
-      if (!grant && interactive && r && r.app && (r.error === "consent_required" || r.error === "login_required")) {
-        appId = r.app;
-        grant = await requestConsentPopup(r.app, r.scope, false, prompt);
-        own = !!(grant && grant.own);
-        if (grant && grant.app) appId = grant.app;
-      }
-      if (!grant || !grant.access_token) return null;
-      return _buildAppSession(grant.access_token, appId, own, grant.display_name, !interactive);
-    })();
-    _appOriginLoginInFlight.finally(function() {
-      _appOriginLoginInFlight = null;
-    });
-    return _appOriginLoginInFlight;
-  }
-  function scheduleAutoRefresh(session) {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    if (!session?.jwt) return;
-    const payload = parseJwt(session.jwt);
-    if (!payload || !payload.exp) return;
-    const msUntilExpiry = payload.exp * 1e3 - Date.now();
-    const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1e3, 1e4);
-    refreshTimer = setTimeout(async () => {
-      try {
-        await session.refresh();
-        emit("refreshed", session);
-        scheduleAutoRefresh(session);
-      } catch (e) {
-        console.warn("[aimeat-auth] Auto-refresh failed:", e.message);
-        emit("expired", { reason: "refresh_failed", error: e.message });
-      }
-    }, refreshIn);
-  }
-  function createSession(data) {
-    const jwtPayload = data.jwt ? parseJwt(data.jwt) : null;
-    let ownerVal = data.owner;
-    if (ownerVal != null && typeof ownerVal !== "string") {
-      ownerVal = typeof ownerVal === "object" && typeof ownerVal.name === "string" ? ownerVal.name : String(ownerVal);
-    }
-    let ghiiVal = data.ghii;
-    if (ghiiVal != null && typeof ghiiVal !== "string") {
-      ghiiVal = typeof ghiiVal === "object" && typeof ghiiVal.ghii === "string" ? ghiiVal.ghii : String(ghiiVal);
-    }
-    const session = (
-      /** @type {Record<string, any>} */
-      {
-        ghii: ghiiVal || null,
-        owner: ownerVal,
-        gaii: data.gaii || null,
-        identity: data.gaii || ghiiVal || null,
-        jwt: data.jwt,
-        roles: jwtPayload?.roles || data.roles || [],
-        displayName: data.displayName || "",
-        // SECURITY: Private keys are non-extractable CryptoKeys in IndexedDB, NOT here. _cryptoKey = in-memory ref only.
-        _cryptoKey: data._cryptoKey || null,
-        publicKey: data.publicKey,
-        nodeUrl: NODE_URL,
-        federated: data.federated || false,
-        homeNode: data.homeNode || "",
-        homeUrl: data.homeUrl || "",
-        // Authenticated fetch wrapper — returns the parsed envelope for every answer, ok or not, without
-        // throwing, so a caller can branch on res.ok / res.error.code itself. A caller MUST branch: an
-        // envelope with ok:false is a refused call (401, 403, 429, 5xx), never an empty result, and a read
-        // that was refused is never the basis of a write (AIMEAT.data.get() resolves null only for
-        // NOT_FOUND and throws for the rest). An answer that is not JSON rejects from resp.json().
-        async fetch(path, opts = {}) {
-          if (isExpired(session.jwt)) {
-            await session.refresh();
-          }
-          const url = NODE_URL + path;
-          const headers = sessionHeaders(opts.headers, session.jwt, opts.body);
-          const resp = await fetch(url, { ...opts, headers });
-          if (resp.status === 403 && session._appOrigin && !session._scopeHealTried) {
-            var missing = appScopeDrift(session);
-            if (missing.length) {
-              session._scopeHealTried = true;
-              var t = await silentAppToken();
-              if (t && t.ok && t.access_token && !appScopeDrift({ _appOrigin: true, jwt: t.access_token })) {
-                session.jwt = t.access_token;
-                persistSession(session);
-                scheduleAutoRefresh(session);
-                var retryHeaders = new Headers(headers);
-                retryHeaders.set("Authorization", "Bearer " + session.jwt);
-                var retry = await fetch(url, { ...opts, headers: retryHeaders });
-                return retry.json();
-              }
-              emit("scopes-stale", { app: session._app || null, missing });
-            }
-          }
-          return resp.json();
-        },
-        // Notify the signed-in owner (header bell + browser push if subscribed).
-        async notify(title, opts = {}) {
-          return session.fetch("/v1/notifications", {
-            method: "POST",
-            body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type })
-          });
-        },
-        // Get a fresh access token. Owner sessions use the httpOnly refresh cookie; agent sessions
-        // re-sign with their IndexedDB key. Concurrent owner refreshes share one in-flight request.
-        async refresh() {
-          if (session._appOrigin) {
-            var t = await silentAppToken();
-            if (!t || !t.access_token) throw new Error("App session expired — the owner is not logged in on the node.");
-            session.jwt = t.access_token;
-            session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
-            persistSession(session);
-            scheduleAutoRefresh(session);
-            return session;
-          }
-          if (session.federated) {
-            throw new Error("Federated session expired. Please log in again.");
-          }
-          if (session.gaii) {
-            const key = session._cryptoKey || await loadKey("agent_key");
-            if (!key) throw new Error("Cannot refresh — no signing key found in IndexedDB");
-            const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-            const signature = await sign(key, session.gaii + timestamp);
-            const d2 = await api("/v1/auth/token", {
-              method: "POST",
-              body: JSON.stringify({ gaii: session.gaii, timestamp, signature })
-            });
-            session.jwt = d2.data.token;
-            session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
-            persistSession(session);
-            scheduleAutoRefresh(session);
-            return session;
-          }
-          if (ownerRefreshInFlight) return ownerRefreshInFlight;
-          ownerRefreshInFlight = (async () => {
-            const resp = await fetch(NODE_URL + "/v1/auth/refresh", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json", "X-AIMEAT-Refresh": "1" }
-            });
-            let data2 = null;
-            let unreadable = null;
-            try {
-              data2 = await resp.json();
-            } catch (e) {
-              unreadable = e;
-            }
-            if (!resp.ok || !data2 || data2.ok === false) {
-              throw new Error(
-                data2?.error?.message || "Session refresh failed" + (unreadable ? " (HTTP " + resp.status + ", the answer was not JSON)" : ""),
-                unreadable ? { cause: unreadable } : void 0
-              );
-            }
-            session.jwt = data2.data.token;
-            session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
-            var freshClaims = parseJwt(session.jwt) || {};
-            if (freshClaims.owner && freshClaims.owner !== session.owner) {
-              session.owner = freshClaims.owner;
-              if (freshClaims.node) session.ghii = freshClaims.owner + "@" + freshClaims.node;
-              session.identity = session.gaii || session.ghii || null;
-            }
-            if (typeof data2.data.display_name === "string") session.displayName = data2.data.display_name;
-            persistSession(session);
-            scheduleAutoRefresh(session);
-            return session;
-          })();
-          try {
-            return await ownerRefreshInFlight;
-          } finally {
-            ownerRefreshInFlight = null;
-          }
-        },
-        // Check if session is valid
-        get valid() {
-          return session.jwt && !isExpired(session.jwt);
-        }
-      }
-    );
-    return session;
-  }
-  function refreshOnFocus() {
-    const session = currentSession;
-    if (!session || !session.jwt || session.federated) return;
-    const payload = parseJwt(session.jwt);
-    if (!payload || !payload.exp) return;
-    const msUntilExpiry = payload.exp * 1e3 - Date.now();
-    if (msUntilExpiry > 5 * 60 * 1e3) return;
-    if (focusRefreshInFlight) return;
-    const wasExpired = msUntilExpiry <= 0;
-    focusRefreshInFlight = session.refresh().then(() => {
-      emit("refreshed", session);
-    }).catch((e) => {
-      console.warn("[aimeat-auth] Focus refresh failed:", e.message);
-      if (wasExpired) emit("expired", { reason: "refresh_failed", error: e.message });
-    }).finally(() => {
-      focusRefreshInFlight = null;
-    });
-  }
-  function generatedPassword() {
-    const bytes = crypto.getRandomValues(new Uint8Array(18));
-    let random = "";
-    for (const b of bytes) random += String.fromCharCode(b);
-    return "Aa1-" + btoa(random).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-  async function sessionFromLogin(data) {
-    const d = data.data;
-    let ownerCryptoKey = null;
-    if (d.owner_private_key) {
-      ownerCryptoKey = await importEd25519Key(d.owner_private_key);
-      await storeKey("owner_key", ownerCryptoKey);
-    }
-    const session = createSession({
-      ghii: d.ghii.ghii,
-      owner: d.owner.name,
-      gaii: null,
-      jwt: d.token,
-      _cryptoKey: ownerCryptoKey,
-      publicKey: d.owner_public_key || "",
-      displayName: d.ghii.display_name || "",
-      federated: d.federated || false,
-      homeNode: d.home_node || "",
-      homeUrl: d.home_url || ""
-    });
-    if (d.key_credentials) session._keyCredentials = d.key_credentials;
-    persistSession(session);
-    currentSession = session;
-    scheduleAutoRefresh(session);
-    emit("login", session, { restored: false });
-    return session;
-  }
-  async function restoreStoredSession(username) {
-    const stored = load("session");
-    if (!stored) return hasSessionHint() ? await restoreSessionFromCookie() : null;
-    if (username && stored.owner !== username) return null;
-    await migrateKeysToIndexedDB();
-    if (stored.gaii) {
-      stored.gaii = null;
-    }
-    const cryptoKey = stored.gaii ? await loadKey("agent_key") : await loadKey("owner_key");
-    const session = createSession({ ...stored, _cryptoKey: cryptoKey });
-    const isOwnerLocal = !session.federated && !session.gaii;
-    if (isOwnerLocal || isExpired(session.jwt)) {
-      try {
-        await session.refresh();
-      } catch (e) {
-        remove("session");
-        emit("expired", { reason: "refresh_failed", error: e && /** @type {Error} */
-        e.message });
-        return null;
-      }
-    }
-    currentSession = session;
-    scheduleAutoRefresh(session);
-    emit("login", session, { restored: true });
-    return session;
-  }
-  var auth = {
-    nodeUrl: NODE_URL,
-    nodeId: NODE_ID,
-    /**
-     * Register a new human identity (GHII) and get an authenticated session.
-     *
-     * The account signs in with a password, always: the session comes from POST /v1/ghii/login and
-     * renews with the httpOnly refresh cookie. A call without `opts.password` used to sign in with the
-     * account key (POST /v1/auth/token), which node 4.0.0 removes (OWNER_KEY_LOGIN_REMOVED_IN). Such a
-     * call now gets a strong random password, made here and sent only to this node; the returned
-     * session carries it once as `generatedPassword` (never stored), so the caller can show it to the
-     * person, who needs it to sign in again on another device or after the session ends.
-     * @param {string} username
-     * @param {string} displayName
-     * @param {{ password?: string, bio?: string, avatar?: string, locale?: string }} [opts]
-     * @returns {Promise<object>} Session object with .fetch(), .refresh(), .jwt, .ghii (and
-     *   .generatedPassword when the caller gave no password)
-     */
-    async register(username, displayName, opts = {}) {
-      const generated = opts.password ? "" : generatedPassword();
-      const password = opts.password || generated;
-      await api("/v1/ghii", {
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify({
-          username,
-          display_name: displayName,
-          bio: opts.bio,
-          avatar: opts.avatar,
-          locale: opts.locale,
-          password
-        })
-      });
-      const session = await this.loginWithPassword(username, password);
-      if (generated) session.generatedPassword = generated;
-      return session;
-    },
-    /**
-     * Login with stored credentials (auto-refreshes JWT if expired).
-     * @returns {Promise<object|null>} Session or null if no stored credentials
-     */
-    async login(username) {
-      if (isAppOrigin()) return await restoreSessionFromAppOrigin(false);
-      if (username) return restoreStoredSession(username);
-      if (!loginInFlight) {
-        loginInFlight = (async () => {
-          try {
-            return await restoreStoredSession();
-          } finally {
-            loginInFlight = null;
-          }
-        })();
-      }
-      return loginInFlight;
-    },
-    /**
-     * Sign in, interactively. Call it from a click handler: on an app origin it may open the consent
-     * popup, and a browser opens a popup only inside a user gesture.
-     *
-     * On an app origin this is the silent bridge with the visible consent step allowed; anywhere else
-     * it opens the sign-in modal, with `opts` passed to it ({ tab: 'register', onLogin, i18n }).
-     * Resolves to the session, or null when nobody signed in: the popup was closed or blocked, the
-     * modal was dismissed, or the app asks for a scope this node cannot grant. An existing session is
-     * returned as it is, and reports nothing.
-     *
-     * `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once, on both
-     * roads, for the session this call produced (on-login.js). onLogin was the modal's to call until
-     * 2026-09-13, so on an app origin nobody called it.
-     *
-     * Added 2026-09-13. Before it the login pill's own button was the only interactive road, and
-     * apps reached it by clicking `#login button`, which is the theme control that renders first.
-     * @param {object & { onLogin?: Function, register?: boolean, tab?: string }} [opts]
-     * @returns {Promise<object|null>}
-     */
-    signIn(opts) {
-      var o = opts || {};
-      if (currentSession) return Promise.resolve(currentSession);
-      var stop = onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession });
-      if (isAppOrigin()) {
-        return restoreSessionFromAppOrigin(true, o.register || o.tab === "register" ? "create" : "").finally(stop);
-      }
-      return new Promise(function(resolve) {
-        showLoginModal(o, function() {
-        }, function() {
-          stop();
-          resolve(currentSession);
-        });
-      });
-    },
-    /**
-     * Login with username + password (works from any device).
-     *
-     * An account with two-step sign-in refuses the first call with code TOTP_REQUIRED; call again with
-     * the second factor. The password travels a second time on purpose: the server holds no partial
-     * login state between the two calls, so there is nothing a stolen intermediate token could carry.
-     *
-     * @param {string} username
-     * @param {string} password
-     * @param {{ totpCode?: string, backupCode?: string }} [secondFactor] The code from the
-     *   authenticator app, or one unused backup code. Pass one, not both.
-     * @returns {Promise<object>} Session object
-     */
-    async loginWithPassword(username, password, secondFactor) {
-      const body = { username, password };
-      if (secondFactor && secondFactor.totpCode) body.totp_code = secondFactor.totpCode;
-      else if (secondFactor && secondFactor.backupCode) body.backup_code = secondFactor.backupCode;
-      const data = await api("/v1/ghii/login", {
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify(body)
-      });
-      return sessionFromLogin(data);
-    },
-    /**
-     * Sign in with a passkey. `username` is optional and leaving it out is the better path: the
-     * ceremony is discoverable, the device offers whatever it holds for this domain, and its answer
-     * names the account. Ends in the same session the password path builds, because the server ends
-     * in the same response.
-     *
-     * Throws with code PASSKEY_CANCELLED when the person closed the prompt, which a caller should
-     * treat as "they changed their mind" rather than as a failure to show in red.
-     */
-    async signInWithPasskey(username) {
-      const data = await passkeySignIn(username);
-      return sessionFromLogin(data);
-    },
-    /** The answer of POST /v1/ghii/login/two-step/finish is a sign-in answer: the session it carries. */
-    adoptLoginAnswer(data) {
-      return sessionFromLogin(data);
-    },
-    /** Does this browser have WebAuthn? A caller shows the passkey button only when it does. */
-    passkeySupported,
-    /** Add THIS device to the signed-in account. Returns the stored passkey as the node describes it. */
-    async addPasskey(label) {
-      if (!currentSession?.jwt) throw new Error("Sign in first");
-      const data = await passkeyAdd(currentSession.jwt, label);
-      return data.data.passkey;
-    },
-    /** Get the current session (or null if not logged in) */
-    getSession() {
-      return currentSession;
-    },
-    /**
-     * Who to open an offline copy for: { owner, ghii, displayName, at } when this page load restored no
-     * session because the node gave no answer and somebody signed in on this browser before; null while
-     * a session is live and whenever the node was reached. It names a person and authorises nothing.
-     * The 'offline' event carries the same value when it is found (last-identity.js).
-     */
-    offlineIdentity() {
-      return currentSession ? null : offlineIdentity();
-    },
-    /**
-     * Patch mutable, non-secret session metadata in place (e.g. displayName after a profile edit),
-     * persist it, and notify the login pill so it re-renders live — no page reload.
-     */
-    updateSessionMeta(patch) {
-      if (!currentSession || !patch) return;
-      Object.assign(currentSession, patch);
-      persistSession(currentSession);
-      emit("session-updated", currentSession);
-    },
-    /**
-     * Logout — clear stored credentials from localStorage and IndexedDB.
-     * ORDER MATTERS: local state is dropped and 'logout' emitted SYNCHRONOUSLY, before the revoke.
-     * "Logged out" must not depend on a network round-trip — with the revoke awaited first, every
-     * subscriber reading getSession() meanwhile still saw the old session, which is how the header
-     * kept the bell and "Me" next to a "Sign In" button (2026-08-07). Revoke + apex logout are
-     * best-effort cleanup that runs after the UI already shows the truth.
-     */
-    async logout() {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-        refreshTimer = null;
-      }
-      ownerRefreshInFlight = null;
-      const jwt = currentSession?.jwt;
-      const onAppOrigin = isAppOrigin();
-      currentSession = null;
-      remove("session");
-      remove("owner_key");
-      forgetLastIdentity();
-      emit("logout");
-      await deleteKey("agent_key");
-      await deleteKey("owner_key");
-      try {
-        await fetch(NODE_URL + "/v1/auth/revoke", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json", ...jwt ? { "Authorization": "Bearer " + jwt } : {} }
-        });
-      } catch (e) {
-        console.warn("[aimeat-auth] Sign-out could not reach the node; the server session may still be open:", e && /** @type {Error} */
+      const which = (p.region || "") + "|" + (zone || "");
+      if (refusedReported !== which) {
+        refusedReported = which;
+        console.warn('[aimeat] This browser cannot write dates with the region "' + (p.region || "") + '" and the time zone "' + (zone || "") + `" of the person's settings; the browser's own format is used:`, e && /** @type {Error} */
         e.message);
       }
-      if (onAppOrigin) {
-        try {
-          await apexLogout();
-        } catch (e) {
-          console.warn("[aimeat-auth] Sign-out on the node address failed:", e && /** @type {Error} */
-          e.message);
-        }
-      }
-    },
-    /**
-     * Re-open the consent screen for the current app (H-2 in-app grant management).
-     */
-    async manageGrant() {
-      const s = currentSession || load("session");
-      if (!s || !s._app) return null;
-      const res = await requestConsentPopup(s._app, appDeclaredScopes(), true);
-      if (res && res.revoked) {
-        await auth.logout();
-        return { revoked: true };
-      }
-      if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own, void 0, false);
-      return null;
-    },
-    /** True inside a published app that is kept apart from the node: on its own origin, or in the node's isolated frame. */
-    isAppOrigin() {
-      return isAppOrigin();
-    },
-    /** Open the sign-in modal (password + Google if configured). If a session arrives while it is open,
-     *  `opts.onLogin(session)` and `opts.onSession(session, { restored })` are called once (on-login.js).
-     *  `opts.redirect` is where an emailed sign-in link returns the person; this page when absent. */
-    showLoginModal(opts) {
-      var o = opts || {};
-      showLoginModal(o, function() {
-      }, onLoginWhileOpen({ onLogin: o.onLogin, onSession: o.onSession }));
-    },
-    /** Check if there are stored credentials */
-    get hasSession() {
-      return !!load("session");
-    },
-    /** Get stored GHII without authenticating */
-    get storedGhii() {
-      const s = load("session");
-      return s?.ghii || null;
-    },
-    /** Register an event listener. A 'login' listener gets (session, { restored }). */
-    on(event, fn) {
-      on(event, fn);
-    },
-    /** Remove an event listener */
-    off(event, fn) {
-      off(event, fn);
-    },
-    /** Check if running inside a sandboxed iframe (no localStorage access) */
-    get inSandbox() {
-      try {
-        localStorage.getItem("_test");
-        return false;
-      } catch {
-        return true;
-      }
-    },
-    /**
-     * Request auth credentials from the parent window via postMessage (sandboxed-iframe fallback).
-     * @returns {Promise<object|null>} Session-like object with .jwt and .fetch(), or null
-     */
-    requestParentAuth(timeout = 3e3) {
-      if (window === window.parent) return Promise.resolve(null);
-      return parentAuth(timeout).then((answer) => {
-        if (!answer) return null;
-        const jwt = answer.jwt;
-        const effectiveNodeUrl = answer.nodeUrl || NODE_URL;
-        const session = (
-          /** @type {Record<string, any>} */
-          {
-            jwt,
-            nodeUrl: effectiveNodeUrl,
-            owner: null,
-            gaii: null,
-            ghii: null,
-            identity: null,
-            get valid() {
-              return jwt && !isExpired(jwt);
-            },
-            async fetch(path, opts = {}) {
-              const url = effectiveNodeUrl + path;
-              const headers = sessionHeaders(opts.headers, jwt, opts.body);
-              const resp = await fetch(url, { ...opts, headers });
-              return resp.json();
-            },
-            async notify(title, opts = {}) {
-              return session.fetch("/v1/notifications", {
-                method: "POST",
-                body: JSON.stringify({ title, body: opts.body, link: opts.link, type: opts.type })
-              });
-            }
-          }
-        );
-        const payload = parseJwt(jwt);
-        if (payload) {
-          session.gaii = payload.sub || null;
-          session.owner = payload.owner || null;
-          session.identity = session.gaii || session.ghii || null;
-        }
-        currentSession = session;
-        emit("login", session, { restored: true });
-        return session;
+      return call(void 0, opts);
+    }
+  }
+  function num(n, opts) {
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const f = fmt();
+    if (f && typeof f.num === "function") return f.num(n, opts);
+    try {
+      return asPerson((tag, o) => n.toLocaleString(tag, o), opts, false);
+    } catch {
+      return String(n);
+    }
+  }
+  function money(n, currency, opts) {
+    const f = fmt();
+    if (f && typeof f.money === "function") return f.money(n, currency, opts);
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const code = String(currency || "USD").toUpperCase();
+    const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
+    const o = Object.assign(
+      { style: "currency", currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits },
+      opts
+    );
+    try {
+      return asPerson((tag, oo) => n.toLocaleString(tag, oo), o, false);
+    } catch {
+      return num(n) + " " + code;
+    }
+  }
+
+  // src/static/sdk-libs/auth/ai-state.js
+  var cache = { key: null, data: null, pending: null, session: null, listeners: /* @__PURE__ */ new Set() };
+  var DOMAINS = ["ai-usage", "ai-providers", "agents"];
+  function keyOf(session) {
+    return session && session.jwt ? session.jwt + "|" + (session._app || "") : null;
+  }
+  function tokenReadsAiState(session) {
+    var p = parseJwt(session && session.jwt || "") || {};
+    if (!Array.isArray(p.scopes)) return true;
+    var roles = Array.isArray(p.roles) ? p.roles : [];
+    if (roles.indexOf("owner") >= 0 && roles.indexOf("agent") < 0 && roles.indexOf("ecosystem") < 0) return true;
+    return p.scopes.indexOf("ai:use") >= 0 || p.scopes.indexOf("ai:*") >= 0 || p.scopes.indexOf("*") >= 0;
+  }
+  function fetchState(session) {
+    var key = keyOf(session);
+    if (!tokenReadsAiState(session)) {
+      cache.data = { unavailable: true, reason: "SCOPE_DENIED", refused: true };
+      cache.pending = null;
+      return Promise.resolve().then(function() {
+        if (cache.key === key) cache.listeners.forEach(function(fn) {
+          fn();
+        });
       });
+    }
+    var path = "/v1/ai/capabilities" + (session._app ? "?app_id=" + encodeURIComponent(session._app) : "");
+    cache.pending = authApi(path, session.jwt).then(function(r) {
+      if (cache.key === key) cache.data = r.data || { unavailable: true, reason: "empty answer" };
+    }).catch(function(err) {
+      console.debug("[aimeat-auth] the AI state was not read:", err);
+      if (cache.key === key) cache.data = { unavailable: true, reason: String(err && err.code || err), refused: !!(err && err.code) };
+    }).then(function() {
+      if (cache.key !== key) return;
+      cache.pending = null;
+      cache.listeners.forEach(function(fn) {
+        fn();
+      });
+    });
+    return cache.pending;
+  }
+  var invalidate = null;
+  function listenOnce() {
+    if (invalidate || typeof window === "undefined") return;
+    invalidate = function(ev) {
+      var d = ev && ev.detail && ev.detail.domains;
+      if (d && typeof d.forEach === "function") {
+        var ours = false;
+        d.forEach(function(x) {
+          if (DOMAINS.indexOf(x) >= 0) ours = true;
+        });
+        if (!ours) return;
+      }
+      if (cache.data && cache.data.unavailable && cache.data.refused) return;
+      var s = cache.session;
+      if (s && keyOf(s) === cache.key && !cache.pending) fetchState(s);
+    };
+    window.addEventListener("aimeat-live-update", invalidate);
+    window.addEventListener("aimeat-ai-used", invalidate);
+  }
+  function readAiState(session, onChange) {
+    var key = keyOf(session);
+    if (!key) return null;
+    if (onChange) cache.listeners.add(onChange);
+    listenOnce();
+    if (cache.key !== key) {
+      cache.key = key;
+      cache.data = null;
+      cache.session = session;
+      fetchState(session);
+    }
+    return cache.data;
+  }
+  function forgetAiState() {
+    cache.key = null;
+    cache.data = null;
+    cache.pending = null;
+    cache.session = null;
+  }
+  var BOLT = "M13 2 3 14h9l-1 8 10-12h-9l1-8z";
+  var GLYPH = {
+    picture: '<rect x="2" y="4" width="13" height="11"/><path d="M5 15l-2 6M12 15l2 6M22 2l-7.5 7.5"/><path d="M14.5 9.5c-1.6 0-2.8 1.1-3 3 1.9-.2 3-1.4 3-3z" fill="currentColor"/>',
+    sound: '<rect x="3" y="2" width="6" height="11" rx="3"/><path d="M1 10a5 5 0 0 0 10 0M6 15v5M3.5 20h5"/><path d="M14 9h3l5-4v14l-5-4h-3zM25 9a4.5 4.5 0 0 1 0 6"/>'
+  };
+  var GLYPH_OF = { vision: "picture", image: "picture", transcription: "sound", speech: "sound" };
+  var WORD_OF = { vision: "capVision", image: "capImage", transcription: "capTranscription", speech: "capSpeech" };
+  function glyphSvg(cap, missing2) {
+    var g = GLYPH_OF[cap];
+    var w = g === "sound" ? 23 : 19;
+    return '<svg class="aimeat-ai-need-ico" width="' + w + '" height="19" viewBox="0 0 ' + (g === "sound" ? 28 : 24) + ' 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + GLYPH[g] + (missing2 ? '<path d="M2 2l' + (g === "sound" ? 24 : 20) + ' 20" stroke-width="2.4"/>' : "") + "</svg>";
+  }
+  function boltSvg(size) {
+    return '<svg class="aimeat-ai-bolt-ico" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + BOLT + '" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  }
+  function fill(s, vars) {
+    return String(s).replace(/\{(\w+)\}/g, function(_, k) {
+      return vars[k] != null ? vars[k] : "";
+    });
+  }
+  function words(st, i) {
+    var main = st && st.main || {};
+    var power = st && st.power || { state: "none" };
+    return {
+      led: main.connected ? i.aiOn || "Your AI is connected" : i.aiOff || "No AI connected yet",
+      bolt: power.state === "ok" ? i.powerOk || "AI power available" : power.state === "over" ? i.powerOver || "Today's limit is reached" : i.powerNone || "No AI power here"
+    };
+  }
+  function popupHtml(st, i) {
+    var main = st.main || {};
+    var power = st.power || { state: "none" };
+    var caps = st.capabilities || {};
+    var w = words(st, i);
+    var out = '<div class="aimeat-ai-pop" role="dialog" aria-label="' + escHtml(i.powerName || "AI power") + '">';
+    out += '<p class="aimeat-ai-line"><span class="aimeat-ai-led-mini' + (main.connected ? "" : " is-off") + '" aria-hidden="true"></span><strong>' + escHtml(w.led) + "</strong></p>";
+    if (main.latest && main.latest.name) out += '<p class="aimeat-ai-sub">' + escHtml(fill(i.aiLatest || "Last active: {name}", { name: main.latest.name })) + "</p>";
+    if (main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(fill(i.aiAgents || "Agents: {n}", { n: main.agents })) + "</p>";
+    if (main.chat && !main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(i.aiChat || "The chat here is ready") + "</p>";
+    if (main.agents != null) {
+      out += main.connected ? '<a class="aimeat-ai-link" href="' + escHtml(NODE_URL + "/v1/home?agents=1") + '">' + escHtml(i.aiShow || "Show connections") + "</a>" : '<a class="aimeat-ai-link" href="' + escHtml(NODE_URL + "/v1/connect-your-ai") + '">' + escHtml(i.aiConnect || "Connect your AI") + "</a>";
+    }
+    out += '<hr class="aimeat-ai-rule"><p class="aimeat-ai-line"><span class="aimeat-ai-bolt is-' + escHtml(power.state) + '">' + boltSvg(18) + "</span><strong>" + escHtml(power.state === "ok" ? i.powerOk || "AI power available" : power.state === "over" ? i.powerOver || "Today's limit is reached" : i.powerNone || "No AI power here") + "</strong></p>";
+    if (power.state === "ok" && power.remainingUsd != null) {
+      out += '<p class="aimeat-ai-text">' + escHtml(power.payer === "node" ? fill(i.powerLeftNode || "{left} of your allowance left.", { left: money(power.remainingUsd, "USD") }) : fill(i.powerLeft || "{left} left today. Daily limit {limit}.", { left: money(power.remainingUsd, "USD"), limit: money(power.limitUsd, "USD") })) + (power.low ? " <strong>" + escHtml(i.powerLow || "Running low.") + "</strong>" : "") + "</p>";
+    }
+    if (power.payer) {
+      out += '<p class="aimeat-ai-sub">' + escHtml(power.payer === "node" ? i.payerNode || "This node pays." : power.payer === "agent" ? i.payerAgent || "The agent's own key pays." : i.payerOwn || "You pay with your own key.") + "</p>";
+    }
+    if (power.state !== "ok" && power.fix) out += '<p class="aimeat-ai-text">' + escHtml(power.fix) + "</p>";
+    if (power.state !== "ok" && main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(i.aiOwnStill || "Your connected AI still works on its own subscription.") + "</p>";
+    var rows = function(list) {
+      return list.map(function(r) {
+        return "<li><span>" + escHtml(i[WORD_OF[r.cap]] || r.cap) + '</span><strong class="' + (r.on ? "is-on" : "is-off") + '">' + escHtml(r.on ? i.capOn || "On" : i.capOff || "Off") + "</strong></li>";
+      }).join("");
+    };
+    if (Array.isArray(st.needs) && st.needs.length) {
+      out += '<p class="aimeat-ai-head">' + escHtml(i.needHead || "This app uses") + '</p><ul class="aimeat-ai-list">' + rows(st.needs.map(function(n) {
+        return { cap: n.capability, on: !!n.on };
+      })) + "</ul>";
+      var missing2 = st.needs.filter(function(n) {
+        return !n.on;
+      });
+      var said = missing2.map(function(n) {
+        return n.fix;
+      }).filter(Boolean);
+      said.filter(function(s, k) {
+        return said.indexOf(s) === k;
+      }).forEach(function(s) {
+        out += '<p class="aimeat-ai-text">' + escHtml(s) + "</p>";
+      });
+      if (missing2.some(function(n) {
+        return !n.fix;
+      })) out += '<p class="aimeat-ai-text">' + escHtml(i.needRole || "Connect this app's AI roles in your AI settings.") + "</p>";
+    } else if (power.state === "ok") {
+      out += '<p class="aimeat-ai-head">' + escHtml(i.canHead || "What you can do now") + '</p><ul class="aimeat-ai-list">' + rows(["vision", "image", "transcription", "speech"].map(function(c) {
+        return { cap: c, on: !!(caps[c] && caps[c].on) };
+      })) + "</ul>";
+    }
+    var settings = power.settingsUrl || (st.needs || []).map(function(n) {
+      return n.settingsUrl;
+    }).filter(Boolean)[0] || NODE_URL + "/v1/profile?tab=ai";
+    if (/^https?:\/\//.test(settings) || settings.charAt(0) === "/") {
+      out += '<a class="aimeat-ai-link" href="' + escHtml(settings) + '">' + escHtml(i.aiSettings || "AI settings") + "</a>";
+    }
+    return out + "</div>";
+  }
+  function aiStatusHtml(st, i, place) {
+    var w = words(st, i);
+    if (st && st.unavailable) return "";
+    if (place === "led") {
+      var cls = !st ? "" : st.main && st.main.connected ? " is-on" : " is-off";
+      return '<button type="button" class="aimeat-auth-dot aimeat-ai-led' + cls + '" data-ai-open' + (st ? ' aria-label="' + escHtml(w.led) + '" title="' + escHtml(w.led) + '"' : ' aria-hidden="true" tabindex="-1"') + "></button>";
+    }
+    if (!st || !st.power) return "";
+    var needs = Array.isArray(st.needs) ? st.needs : [];
+    return '<span class="aimeat-ai"><button type="button" class="aimeat-ai-bolt is-' + escHtml(st.power.state) + '" data-ai-open aria-haspopup="dialog" aria-expanded="false" aria-label="' + escHtml(w.bolt) + '" title="' + escHtml(w.bolt) + '">' + boltSvg(17) + "</button>" + needs.map(function(n) {
+      var label = (i[WORD_OF[n.capability]] || n.capability) + ": " + (n.on ? i.capOn || "On" : i.capOff || "Off");
+      return '<span class="aimeat-ai-need ' + (n.on ? "is-on" : "is-off") + '" role="img" aria-label="' + escHtml(label) + '" title="' + escHtml(label) + '">' + glyphSvg(n.capability, !n.on) + "</span>";
+    }).join("") + popupHtml(st, i) + "</span>";
+  }
+  function aiCompactHtml(st) {
+    if (!st || !st.power) return "";
+    return '<span class="aimeat-ai-bolt is-' + escHtml(st.power.state) + '" aria-hidden="true">' + boltSvg(14) + "</span>";
+  }
+  function aiDotClass(st) {
+    return !st || st.unavailable ? "" : st.main && st.main.connected ? " is-on" : " is-off";
+  }
+  function wireAiState(container) {
+    var group = (
+      /** @type {HTMLElement|null} */
+      container.querySelector(".aimeat-ai")
+    );
+    if (!group) return;
+    var bolt = group.querySelector(".aimeat-ai-bolt");
+    var pop = (
+      /** @type {HTMLElement|null} */
+      group.querySelector(".aimeat-ai-pop")
+    );
+    container.querySelectorAll("[data-ai-open]").forEach(function(b) {
+      b.addEventListener("click", function(ev) {
+        ev.stopPropagation();
+        var open = group.classList.toggle("aimeat-open");
+        if (bolt) bolt.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open && pop) clampPopover(pop);
+      });
+    });
+    group.addEventListener("mouseenter", function() {
+      if (pop) clampPopover(pop);
+    });
+  }
+  function ensureAiStateStyles() {
+    if (document.getElementById("aimeat-ai-state-css")) return;
+    var st = document.createElement("style");
+    st.id = "aimeat-ai-state-css";
+    st.textContent = aiStateCss("var(--aimeat-ink)", "var(--aimeat-paper)", "var(--shape-frame,2px) solid ");
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function aiStateCss(ink2, paper2, frame) {
+    var on2 = "var(--aimeat-pill-ok,var(--success-fg,#047857))";
+    var off2 = "var(--aimeat-pill-bad,var(--danger-fg,#C8322A))";
+    return [
+      ".aimeat-ai-led{appearance:none;border:0;padding:0;margin:0;cursor:pointer}",
+      /* Before the answer arrives the light says nothing: neither green nor off. */
+      ".aimeat-ai-led:not(.is-on):not(.is-off){background:color-mix(in oklab," + ink2 + " 18%,transparent);cursor:default}",
+      ".aimeat-ai-led.is-off,.aimeat-auth-compact .cdot.is-off{background:color-mix(in oklab," + ink2 + " 38%,transparent)}",
+      ".aimeat-ai-led:focus-visible,.aimeat-ai-bolt:focus-visible{outline:2px solid " + ink2 + ";outline-offset:2px}",
+      ".aimeat-ai{position:relative;display:inline-flex;align-items:center;gap:6px}",
+      ".aimeat-ai-bolt{appearance:none;display:inline-flex;align-items:center;justify-content:center;background:none;border:0;",
+      "padding:2px;margin:0;color:" + ink2 + ";cursor:pointer;line-height:0}",
+      ".aimeat-ai-bolt.is-ok path{fill:var(--aimeat-pill-power,var(--sun,#FFB52E))}",
+      ".aimeat-ai-bolt.is-over path{fill:var(--aimeat-pill-over,var(--danger,#E0453A))}",
+      ".aimeat-ai-bolt.is-none{opacity:.5}.aimeat-ai-bolt.is-none path{fill:none}",
+      ".aimeat-ai-need{display:inline-flex;line-height:0}.aimeat-ai-need.is-on{color:" + on2 + "}.aimeat-ai-need.is-off{color:" + off2 + "}",
+      ".aimeat-ai-pop{position:absolute;top:100%;right:0;z-index:1100;display:none;box-sizing:border-box;width:280px;",
+      "max-width:calc(100vw - 24px);margin-top:8px;padding:12px 14px;text-align:left;white-space:normal;",
+      "background:" + paper2 + ";color:" + ink2 + ";border:" + frame + ink2 + ";",
+      "box-shadow:0 8px 24px rgb(15 18 25 / .16);font-size:13px;line-height:1.45;font-weight:400}",
+      /* The hover bridge: the gap above the popup belongs to it, so the pointer can move in. */
+      '.aimeat-ai-pop::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px}',
+      ".aimeat-ai.aimeat-open .aimeat-ai-pop{display:block}",
+      "@media (hover:hover){.aimeat-ai:hover .aimeat-ai-pop{display:block}}",
+      ".aimeat-ai-pop p{margin:0 0 6px}",
+      ".aimeat-ai-line{display:flex;align-items:center;gap:8px;font-size:14px}",
+      ".aimeat-ai-line .aimeat-ai-bolt{padding:0;cursor:default}",
+      ".aimeat-ai-led-mini{display:inline-block;width:10px;height:10px;flex:0 0 auto;background:var(--aimeat-pill-live,var(--success,#10B981))}",
+      ".aimeat-ai-led-mini.is-off{background:color-mix(in oklab," + ink2 + " 38%,transparent)}",
+      ".aimeat-ai-sub{opacity:.78;font-size:12.5px}",
+      ".aimeat-ai-rule{border:0;border-top:1px solid color-mix(in oklab," + ink2 + " 18%,transparent);margin:10px 0}",
+      ".aimeat-ai-head{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.75;margin-top:10px!important}",
+      ".aimeat-ai-list{list-style:none;margin:0 0 8px;padding:0}",
+      ".aimeat-ai-list li{display:flex;justify-content:space-between;gap:12px;padding:2px 0}",
+      ".aimeat-ai-list .is-on{color:" + on2 + "}.aimeat-ai-list .is-off{color:" + off2 + "}",
+      /* Specific enough to win over a host header's own link rules (the SPA's `.topnav-right a`). */
+      ".aimeat-ai-pop a.aimeat-ai-link{display:inline-block;margin:2px 0 4px;padding:0;background:none;font-size:13px;font-weight:800;",
+      "color:" + ink2 + ";text-decoration:underline;text-underline-offset:3px}",
+      ".aimeat-ai-pop a.aimeat-ai-link:hover{color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
+      ".aimeat-auth-compact .aimeat-ai-bolt{padding:0}",
+      /* In the compact popover (a phone) the detail is part of the panel: shown, not hovered. */
+      "@media (max-width:600px){",
+      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai{flex:1 1 100%;flex-wrap:wrap}",
+      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai-pop{position:static;display:block;width:100%;margin:8px 0 0;box-shadow:none;border-width:1px}",
+      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai-pop::before{display:none}",
+      "}"
+    ].join("");
+  }
+
+  // src/static/sdk-libs/auth/locale.js
+  function aimeatReadLang(locales) {
+    return readLang(locales);
+  }
+  function aimeatApplyLang(lang) {
+    writeLang(lang);
+    try {
+      document.documentElement.setAttribute("lang", lang);
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("aimeat-lang-change", { detail: { lang } }));
+    } catch {
+    }
+  }
+  function aimeatRestoreLang(opts) {
+    var locales = readLocales(opts);
+    if (!locales.length) return;
+    try {
+      document.documentElement.setAttribute("lang", aimeatReadLang(locales));
+    } catch {
+    }
+  }
+  function langName(code) {
+    try {
+      var dn = new Intl.DisplayNames([code], { type: "language" });
+      var n = dn.of(code);
+      if (n && n !== code) return n.charAt(0).toUpperCase() + n.slice(1);
+    } catch {
+    }
+    return code.toUpperCase();
+  }
+  var SEGMENT_MAX = 3;
+  function langSwitchHtml(i, locales) {
+    if (!locales.length) return "";
+    var cur = aimeatReadLang(locales);
+    var group = i && i.switchLanguage ? i.switchLanguage : "Language";
+    if (locales.length <= SEGMENT_MAX) {
+      return '<span id="aimeat-lang-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(group) + '">' + locales.map(function(c) {
+        return '<button type="button" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '" title="' + escHtml(langName(c)) + '" aria-label="' + escHtml(langName(c)) + '">' + escHtml(c.toUpperCase()) + "</button>";
+      }).join("") + "</span>";
+    }
+    return '<span id="aimeat-lang-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + escHtml(group) + '" aria-label="' + escHtml(group) + '">' + escHtml(cur.toUpperCase()) + ' <span aria-hidden="true">▾</span></button><span class="aimeat-pop aimeat-pop-list" role="listbox">' + locales.map(function(c) {
+      return '<button type="button" role="option" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '">' + escHtml(c.toUpperCase()) + " · " + escHtml(langName(c)) + "</button>";
+    }).join("") + "</span></span>";
+  }
+  function wireLangSwitch(container, i, locales) {
+    var root = container.querySelector("#aimeat-lang-switch");
+    if (!root || !locales.length) return;
+    var trigger = root.querySelector(".aimeat-pop-btn");
+    function sync(cur) {
+      root.querySelectorAll("button[data-lang]").forEach(function(b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === cur));
+      });
+      if (trigger) trigger.childNodes[0].textContent = cur.toUpperCase() + " ";
+    }
+    root.querySelectorAll("button[data-lang]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        aimeatApplyLang(b.getAttribute("data-lang"));
+        sync(b.getAttribute("data-lang"));
+        root.classList.remove("aimeat-open");
+        if (trigger) trigger.setAttribute("aria-expanded", "false");
+      });
+    });
+    if (trigger) trigger.addEventListener("click", function(ev) {
+      ev.stopPropagation();
+      var open = root.classList.toggle("aimeat-open");
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) clampPopover(root.querySelector(".aimeat-pop"));
+    });
+    window.addEventListener("aimeat-lang-change", function(ev) {
+      var e = (
+        /** @type {CustomEvent} */
+        ev
+      );
+      var lang = e && e.detail && e.detail.lang;
+      if (lang && locales.indexOf(lang) >= 0) sync(lang);
+    });
+  }
+
+  // src/static/sdk-libs/auth/pill-strings.js
+  var PILL_STRINGS = {
+    en: {
+      loggedIn: "logged in",
+      logoutBtn: "Log out",
+      signInBtn: "❤️ Sign In",
+      account: "Account",
+      federated: "Federated",
+      manageAccess: "Manage permissions",
+      lightMode: "Light mode",
+      darkMode: "Dark mode",
+      themeLabel: "Light or dark",
+      autoMode: "Automatic: follows your device",
+      autoShort: "Auto",
+      fixedRegister: "This register keeps its own light",
+      styleLightOnly: "This style has a light mode only",
+      styleDarkOnly: "This style has a dark mode only",
+      lookThemes: "Themes",
+      lookStyles: "Styles in this theme",
+      modeOnly: "only",
+      chooseLook: "Choose look",
+      switchLanguage: "Language",
+      pageSettings: "Settings",
+      homeSettings: "Home settings",
+      toDark: "Switch to dark",
+      toLight: "Switch to light",
+      aiOn: "Your AI is connected",
+      aiOff: "No AI connected yet",
+      aiAgents: "Agents: {n}",
+      aiLatest: "Last active: {name}",
+      aiChat: "The chat here is ready",
+      aiConnect: "Connect your AI",
+      aiShow: "Show connections",
+      aiOwnStill: "Your connected AI still works on its own subscription.",
+      powerName: "AI power",
+      powerOk: "AI power available",
+      powerOver: "Today's limit is reached",
+      powerNone: "No AI power here",
+      powerLeft: "{left} left today. Daily limit {limit}.",
+      powerLeftNode: "{left} of your allowance left.",
+      powerLow: "Running low.",
+      payerOwn: "You pay with your own key.",
+      payerNode: "This node pays.",
+      payerAgent: "The agent's own key pays.",
+      canHead: "What you can do now",
+      needHead: "This app uses",
+      capVision: "Read pictures",
+      capImage: "Make pictures",
+      capTranscription: "Speech to text",
+      capSpeech: "Text to speech",
+      capOn: "On",
+      capOff: "Off",
+      aiSettings: "AI settings",
+      needRole: "Connect this app's AI roles in your AI settings."
     },
-    // Capability flag so an embedding app can feature-detect the compact login pill.
-    compactPill: true,
-    /**
-     * Mount a login/register button that handles the full flow. Delegates the render to pill.js.
-     * onLogin(session, { restored }) runs once for each session that appears while it is mounted,
-     * the restore on page load included (on-login.js).
-     * @param {string|Element|object} selector - CSS selector, DOM element, OR (options-first) the opts.
-     * @param {object} [opts] - { onLogin, onSession, onLogout, buttonText, compact }. onSession(session,
-     *   { restored }) runs for a restore and a sign-in alike; onLogin(session) for a sign-in only.
-     */
-    mountLoginButton(selector, opts = {}) {
-      return mountPill(auth, selector, opts);
+    fi: {
+      loggedIn: "kirjautuneena",
+      logoutBtn: "Kirjaudu ulos",
+      signInBtn: "❤️ Kirjaudu",
+      account: "Tili",
+      federated: "Federoitu",
+      manageAccess: "Hallitse oikeuksia",
+      lightMode: "Vaalea tila",
+      darkMode: "Tumma tila",
+      themeLabel: "Vaalea vai tumma",
+      autoMode: "Automaattinen: seuraa laitteesi asetusta",
+      autoShort: "Auto",
+      fixedRegister: "Tämä rekisteri pitää oman valonsa",
+      styleLightOnly: "Tällä tyylillä on vain vaalea tila",
+      styleDarkOnly: "Tällä tyylillä on vain tumma tila",
+      lookThemes: "Teemat",
+      lookStyles: "Tämän teeman tyylit",
+      modeOnly: "vain",
+      chooseLook: "Valitse tyyli",
+      switchLanguage: "Kieli",
+      pageSettings: "Asetukset",
+      homeSettings: "Kodin asetukset",
+      toDark: "Vaihda tummaan",
+      toLight: "Vaihda vaaleaan",
+      aiOn: "Tekoälysi on yhdistetty",
+      aiOff: "Tekoälyä ei ole vielä yhdistetty",
+      aiAgents: "Agentteja: {n}",
+      aiLatest: "Viimeksi käytössä: {name}",
+      aiChat: "Tämän noden chat on valmis",
+      aiConnect: "Yhdistä tekoäly",
+      aiShow: "Näytä yhteydet",
+      aiOwnStill: "Yhdistetty tekoälysi toimii silti omalla tilauksellaan.",
+      powerName: "Tekoälyvirta",
+      powerOk: "Tekoälyvirtaa on",
+      powerOver: "Päivän raja on täynnä",
+      powerNone: "Tekoälyvirtaa ei ole",
+      powerLeft: "{left} jäljellä tänään. Päivän raja on {limit}.",
+      powerLeftNode: "Osuuttasi on jäljellä {left}.",
+      powerLow: "Virta on vähissä.",
+      payerOwn: "Maksat omalla avaimellasi.",
+      payerNode: "Node maksaa.",
+      payerAgent: "Agentin oma avain maksaa.",
+      canHead: "Mitä voit tehdä nyt",
+      needHead: "Tämä sovellus käyttää",
+      capVision: "Kuvan tulkinta",
+      capImage: "Kuvien teko",
+      capTranscription: "Kuuntelu (puhe tekstiksi)",
+      capSpeech: "Puhe (teksti ääneksi)",
+      capOn: "Käytössä",
+      capOff: "Ei käytössä",
+      aiSettings: "Tekoälyn asetukset",
+      needRole: "Yhdistä tämän sovelluksen tekoälyroolit tekoälyn asetuksissa."
+    },
+    es: {
+      loggedIn: "sesión iniciada",
+      logoutBtn: "Cerrar sesión",
+      signInBtn: "❤️ Entrar",
+      account: "Cuenta",
+      federated: "Federado",
+      manageAccess: "Gestionar permisos",
+      lightMode: "Modo claro",
+      darkMode: "Modo oscuro",
+      themeLabel: "Claro u oscuro",
+      autoMode: "Automático: sigue el ajuste de tu dispositivo",
+      autoShort: "Auto",
+      fixedRegister: "Este registro conserva su propia luz",
+      styleLightOnly: "Este estilo solo tiene modo claro",
+      styleDarkOnly: "Este estilo solo tiene modo oscuro",
+      lookThemes: "Temas",
+      lookStyles: "Estilos de este tema",
+      modeOnly: "solo",
+      chooseLook: "Elige el aspecto",
+      switchLanguage: "Idioma",
+      pageSettings: "Ajustes",
+      homeSettings: "Configuración del hogar",
+      toDark: "Cambiar a oscuro",
+      toLight: "Cambiar a claro",
+      aiOn: "Tu IA está conectada",
+      aiOff: "Aún no hay ninguna IA conectada",
+      aiAgents: "Agentes: {n}",
+      aiLatest: "Activa por última vez: {name}",
+      aiChat: "El chat de este nodo está listo",
+      aiConnect: "Conecta tu IA",
+      aiShow: "Ver conexiones",
+      aiOwnStill: "Tu IA conectada sigue funcionando con su propia suscripción.",
+      powerName: "Energía de IA",
+      powerOk: "Hay energía de IA",
+      powerOver: "Se alcanzó el límite de hoy",
+      powerNone: "No hay energía de IA aquí",
+      powerLeft: "Quedan {left} hoy. Límite diario: {limit}.",
+      powerLeftNode: "Te quedan {left} de tu asignación.",
+      powerLow: "Queda poca.",
+      payerOwn: "Pagas con tu propia clave.",
+      payerNode: "Paga este nodo.",
+      payerAgent: "Paga la clave propia del agente.",
+      canHead: "Qué puedes hacer ahora",
+      needHead: "Esta aplicación usa",
+      capVision: "Leer imágenes",
+      capImage: "Crear imágenes",
+      capTranscription: "Escuchar (voz a texto)",
+      capSpeech: "Hablar (texto a voz)",
+      capOn: "Activo",
+      capOff: "Inactivo",
+      aiSettings: "Ajustes de IA",
+      needRole: "Conecta los roles de IA de esta aplicación en tus ajustes de IA."
     }
   };
+  function pillStrings(lang) {
+    var base = PILL_STRINGS.en;
+    var over = PILL_STRINGS[lang] || {};
+    var out = {};
+    for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = over[k] || base[k];
+    return out;
+  }
+
+  // src/static/sdk-libs/auth/palette.js
+  var AIMEAT_PALETTE_KEY = "aimeat-palette";
+  var PALETTES = [
+    { id: "aimeat", label: "AIMEAT", swatch: {
+      light: { bg: "#eaeef7", card: "#ffffff", accent: "#e8564a" },
+      dark: { bg: "#14151a", card: "#21232e", accent: "#ff6f62" }
+    } },
+    { id: "paper", label: "Paper", swatch: {
+      light: { bg: "#eae2cf", card: "#fdfaf1", accent: "#a03040" },
+      dark: { bg: "#151110", card: "#282017", accent: "#e08590" }
+    } },
+    { id: "circuit", label: "Circuit", swatch: {
+      light: { bg: "#e9edf1", card: "#ffffff", accent: "#0e7290" },
+      dark: { bg: "#0a0f14", card: "#18202b", accent: "#4fd2f2" }
+    } },
+    { id: "contrast", label: "Contrast", swatch: {
+      light: { bg: "#e9e9e9", card: "#ffffff", accent: "#1d4ed8" },
+      dark: { bg: "#000000", card: "#17171c", accent: "#99c2ff" }
+    } },
+    { id: "mist", label: "Mist", swatch: {
+      light: { bg: "#e6eae4", card: "#fbfcfa", accent: "#47695a" },
+      dark: { bg: "#141715", card: "#252b27", accent: "#9cc0ae" }
+    } },
+    { id: "voltage", label: "Voltage", swatch: {
+      light: { bg: "#f1e4d2", card: "#ffffff", accent: "#c2187e" },
+      dark: { bg: "#150d20", card: "#2c1d3f", accent: "#ff4fa8" }
+    } }
+  ];
+  var HOUSE = "aimeat";
+  function look() {
+    try {
+      var L = (
+        /** @type {any} */
+        window.__aimeatLook
+      );
+      return L && typeof L.state === "function" ? L : null;
+    } catch {
+      return null;
+    }
+  }
+  function innerState() {
+    var L = look();
+    var s = L ? L.state() : null;
+    return s && s.inner ? s : null;
+  }
+  function currentTheme(s) {
+    for (var i = 0; i < s.themes.length; i++) if (s.themes[i].id === s.theme) return s.themes[i];
+    return s.themes[0] || null;
+  }
+  function paletteRegistry() {
+    var s = innerState();
+    var th = s ? currentTheme(s) : null;
+    if (!th) return PALETTES;
+    return th.styles.map(function(x) {
+      return { id: x.id, label: x.name, swatch: x.swatch };
+    });
+  }
+  function aimeatReadPalette() {
+    var L = look();
+    if (L) return L.state().style || HOUSE;
+    var ids = PALETTES.map(function(p) {
+      return p.id;
+    });
+    try {
+      var u = new URLSearchParams(location.search).get("palette");
+      if (u && ids.indexOf(u) >= 0) return u;
+    } catch {
+    }
+    try {
+      var s = localStorage.getItem(AIMEAT_PALETTE_KEY);
+      if (s && ids.indexOf(s) >= 0) return s;
+    } catch {
+    }
+    var attr = document.documentElement.getAttribute("data-palette");
+    return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
+  }
+  function aimeatApplyPalette(id) {
+    var L = look();
+    if (L) {
+      L.choose(null, id);
+      return;
+    }
+    if (id === HOUSE) document.documentElement.removeAttribute("data-palette");
+    else document.documentElement.setAttribute("data-palette", id);
+    try {
+      localStorage.setItem(AIMEAT_PALETTE_KEY, id);
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("aimeat-palette-change", { detail: { palette: id } }));
+    } catch {
+    }
+  }
+  function aimeatRestorePalette() {
+    var L = look();
+    if (!L) {
+      var cur = aimeatReadPalette();
+      if (cur !== HOUSE) document.documentElement.setAttribute("data-palette", cur);
+      else document.documentElement.removeAttribute("data-palette");
+    }
+    try {
+      window.addEventListener("storage", function(e) {
+        if (e.key !== AIMEAT_PALETTE_KEY && e.key !== "aimeat-look-theme") return;
+        var LL = look();
+        if (LL) LL.apply(location.pathname);
+        else if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
+      });
+    } catch {
+    }
+  }
+  function chipHtml(sw) {
+    return '<span class="aimeat-pal-chip" style="background:' + esc(sw.bg) + '"><span class="pc-card" style="background:' + esc(sw.card) + '"></span><span class="pc-acc" style="background:' + esc(sw.accent) + '"></span></span>';
+  }
+  var reopen = null;
+  function paletteIconHtml(accent2) {
+    return '<svg class="aimeat-pal-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z"/><circle class="aimeat-pal-cur" cx="7.5" cy="10.5" r="1.8" stroke="none" fill="' + esc(accent2) + '"/><circle cx="10.5" cy="6.5" r="1.8" stroke="none" fill="#FFB52E"/><circle cx="15.5" cy="6.5" r="1.8" stroke="none" fill="#10B981"/><circle cx="18" cy="10.5" r="1.8" stroke="none" fill="#3B82F6"/></svg>';
+  }
+  function paletteControlHtml(i, autoRow) {
+    var s = innerState();
+    if (s && !s.personalChoice) return "";
+    var list = paletteRegistry();
+    var cur = aimeatReadPalette();
+    var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    var curAcc = (list.find(function(p) {
+      return p.id === cur;
+    }) || list[0]).swatch[mode].accent;
+    var label = i && i.chooseLook || "Choose look";
+    var themes = s && s.themes.length > 1 ? s.themes : null;
+    var head = function(text) {
+      return '<span class="aimeat-pop-head">' + esc(text) + "</span>";
+    };
+    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '">' + paletteIconHtml(curAcc) + '</button><span class="aimeat-pop" role="listbox" aria-label="' + esc(label) + '">' + (autoRow || "") + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === "light" ? i && i.styleLightOnly || "This style has a light mode only" : i && i.styleDarkOnly || "This style has a dark mode only") + "</span>" : "") + (themes ? head(i && i.lookThemes || "Themes") + themes.map(function(t) {
+      var def = t.styles.find(function(x) {
+        return x.id === t.defaultStyle;
+      }) || t.styles[0];
+      return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '" aria-selected="' + (t.id === s.theme) + '">' + (def ? chipHtml(def.swatch[mode]) : "") + esc(t.name) + "</button>";
+    }).join("") + head(i && i.lookStyles || "Styles in this theme") : "") + list.map(function(p) {
+      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '" aria-selected="' + (p.id === cur) + '">' + chipHtml(p.swatch[mode]) + esc(p.label) + "</button>";
+    }).join("") + "</span></span>";
+  }
+  function wirePaletteControl(container, clampPopover2) {
+    var root = container.querySelector("#aimeat-palette-switch");
+    if (!root) return;
+    var trigger = (
+      /** @type {HTMLElement} */
+      root.querySelector(".aimeat-pop-btn")
+    );
+    var list = paletteRegistry();
+    function open() {
+      root.classList.add("aimeat-open");
+      trigger.setAttribute("aria-expanded", "true");
+      clampPopover2(
+        /** @type {HTMLElement} */
+        root.querySelector(".aimeat-pop")
+      );
+    }
+    function syncDot() {
+      var cur = aimeatReadPalette();
+      var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      var p = list.find(function(x) {
+        return x.id === cur;
+      }) || list[0];
+      var dot = root.querySelector(".aimeat-pal-cur");
+      if (dot) dot.setAttribute("fill", p.swatch[mode].accent);
+      root.querySelectorAll("button[data-palette]").forEach(function(b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
+        b.setAttribute("aria-selected", String(b.getAttribute("data-palette") === cur));
+        var pp = list.find(function(x) {
+          return x.id === b.getAttribute("data-palette");
+        });
+        if (!pp) return;
+        var s = pp.swatch[mode];
+        var chip = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".aimeat-pal-chip")
+        );
+        var card = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".pc-card")
+        );
+        var acc = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".pc-acc")
+        );
+        if (chip) chip.style.background = s.bg;
+        if (card) card.style.background = s.card;
+        if (acc) acc.style.background = s.accent;
+      });
+    }
+    root.querySelectorAll("button[data-palette]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        aimeatApplyPalette(b.getAttribute("data-palette") || HOUSE);
+        syncDot();
+        root.classList.remove("aimeat-open");
+        trigger.setAttribute("aria-expanded", "false");
+      });
+    });
+    root.querySelectorAll("button[data-look-theme]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        var L = look();
+        if (!L) return;
+        reopen = { compact: !!container.querySelector(".aimeat-auth-wrap.aimeat-open") };
+        L.choose(b.getAttribute("data-look-theme"), null);
+      });
+    });
+    trigger.addEventListener("click", function(ev) {
+      ev.stopPropagation();
+      if (root.classList.contains("aimeat-open")) {
+        root.classList.remove("aimeat-open");
+        trigger.setAttribute("aria-expanded", "false");
+      } else open();
+    });
+    if (reopen) {
+      var again = reopen;
+      reopen = null;
+      setTimeout(function() {
+        var wrap = container.querySelector(".aimeat-auth-wrap");
+        if (again.compact && wrap) {
+          wrap.classList.add("aimeat-open");
+          var cb = wrap.querySelector(".aimeat-auth-compact");
+          if (cb) cb.setAttribute("aria-expanded", "true");
+        }
+        if (root.isConnected) open();
+      }, 0);
+    }
+    window.addEventListener("aimeat-palette-change", syncDot);
+    window.addEventListener("aimeat-theme-change", syncDot);
+  }
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // src/static/sdk-libs/auth/pill.js
+  var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/><path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
+  var LOGOUT_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>';
+  function autoRowHtml(i) {
+    if (aimeatFixedLight()) return "";
+    var w = i.autoMode || "Automatic: follows your device";
+    return '<button type="button" class="aimeat-pop-wide" data-mode-auto aria-pressed="' + aimeatAutoChosen() + '">' + escHtml(w) + "</button>";
+  }
+  function mountPill2(auth2, selector, opts = {}) {
+    let container;
+    if (selector && typeof selector === "object" && selector.nodeType === 1) {
+      container = selector;
+    } else if (selector && typeof selector === "object") {
+      opts = selector;
+      container = document.getElementById("aimeat-auth-bar");
+      if (!container) {
+        container = document.createElement("div");
+        container.id = "aimeat-auth-bar";
+        document.body.appendChild(container);
+      }
+    } else {
+      container = document.querySelector(selector);
+      if (!container) {
+        console.error("AIMEAT: mountLoginButton container not found for selector:", selector, "— pass a CSS selector string, a DOM element, or an options object.");
+        return;
+      }
+    }
+    const locales = readLocales(opts);
+    if (locales.length) aimeatRestoreLang({ locales });
+    const labelLangs = locales.length ? locales : MODAL_LANGS;
+    let i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
+    const useCompact = opts.compact !== void 0 ? !!opts.compact : true;
+    function wireCompactTrigger() {
+      var compactBtn = document.getElementById("aimeat-auth-compact");
+      if (compactBtn) compactBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        var w = container.querySelector(".aimeat-auth-wrap");
+        if (!w) return;
+        var open = w.classList.toggle("aimeat-open");
+        compactBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        var pop = (
+          /** @type {HTMLElement|null} */
+          w.querySelector(":scope > .aimeat-ctl, :scope > .aimeat-auth-pill")
+        );
+        if (open && pop) clampPopover(pop);
+      });
+    }
+    function redrawIfMounted() {
+      if (container.isConnected) render();
+    }
+    function render() {
+      i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
+      const stored = auth2.getSession() || load("session");
+      if (stored) {
+        var live = auth2.getSession();
+        var ai = live ? readAiState(live, redrawIfMounted) : null;
+        var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
+        var pillHtml = '<div class="aimeat-auth-pill">' + aiStatusHtml(ai, i, "led") + (opts.nameHref ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || "Home settings") + '">' + nameText + "</a>" : '<span class="aimeat-auth-ghii">' + nameText + "</span>") + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + aiStatusHtml(ai, i, "bolt") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + '</span><button type="button" id="aimeat-logout-btn" class="aimeat-icon-btn aimeat-auth-logout" aria-label="' + escHtml(i.logoutBtn || "Log out") + '" title="' + escHtml(i.logoutBtn || "Log out") + '">' + LOGOUT_ICON + "</button></div>";
+        ensureAuthPillStyles();
+        ensureAiStateStyles();
+        if (useCompact) {
+          var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
+          container.innerHTML = '<div class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.account || "Account") + '"><span class="cdot' + aiDotClass(ai) + '" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + "</span>" + aiCompactHtml(ai) + '<span class="ccar" aria-hidden="true">▾</span></button>' + pillHtml + "</div>";
+        } else {
+          container.innerHTML = pillHtml;
+        }
+        document.getElementById("aimeat-logout-btn").addEventListener("click", () => {
+          auth2.logout();
+        });
+        var gearBtn = document.getElementById("aimeat-grant-gear");
+        if (gearBtn) gearBtn.addEventListener("click", () => {
+          auth2.manageGrant().then(() => {
+            render();
+          }).catch(() => {
+          });
+        });
+        wireAiState(container);
+        wireCompactTrigger();
+      } else {
+        ensureAuthPillStyles();
+        var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + "</span>";
+        container.innerHTML = '<span class="aimeat-auth-out">' + (useCompact ? '<span class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.pageSettings || "Settings") + '" title="' + escHtml(i.pageSettings || "Settings") + '">' + SETTINGS_ICON + '<span class="ccar" aria-hidden="true">▾</span></button>' + clusterHtml + "</span>" : clusterHtml) + '<button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
+        document.getElementById("aimeat-login-btn").addEventListener("click", () => {
+          var signInOpts = {};
+          for (var k in opts) if (k !== "onLogin" && k !== "onSession") signInOpts[k] = opts[k];
+          auth2.signIn(signInOpts).then((s) => {
+            if (s) render();
+          }).catch(() => {
+          });
+        });
+        wireCompactTrigger();
+      }
+      wireModeSwitch(container, i);
+      wireAutoMode(container);
+      wireLangSwitch(container, i, locales);
+      wirePaletteControl(container, clampPopover);
+    }
+    const holder = (
+      /** @type {any} */
+      container
+    );
+    if (typeof holder.__aimeatPillUnmount === "function") holder.__aimeatPillUnmount();
+    ensureClusterStyles();
+    render();
+    window.addEventListener("aimeat-lang-change", render);
+    window.addEventListener("aimeat-look-change", render);
+    document.addEventListener("click", (ev) => {
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open").forEach((w) => {
+        if (!w.contains(
+          /** @type {Node} */
+          ev.target
+        )) {
+          w.classList.remove("aimeat-open");
+          var b = w.querySelector(".aimeat-pop-btn, .aimeat-ai-bolt");
+          if (b) b.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open").forEach((w) => {
+        w.classList.remove("aimeat-open");
+        var b = w.querySelector(".aimeat-pop-btn, .aimeat-ai-bolt");
+        if (b) b.setAttribute("aria-expanded", "false");
+      });
+    });
+    if (useCompact) {
+      var closeCompact = () => {
+        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
+        if (!w) return;
+        w.classList.remove("aimeat-open");
+        var cb = w.querySelector(".aimeat-auth-compact");
+        if (cb) cb.setAttribute("aria-expanded", "false");
+      };
+      document.addEventListener("click", (ev) => {
+        var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
+        if (w && !w.contains(ev.target)) closeCompact();
+      });
+      document.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") closeCompact();
+      });
+    }
+    const watcher = loginWatcher({ onLogin: opts.onLogin, onSession: opts.onSession }, auth2.getSession());
+    const onLoginEvent = (session, meta) => {
+      render();
+      watcher.login(session, meta);
+    };
+    const onLogoutEvent = () => {
+      watcher.logout();
+      forgetAiState();
+      render();
+      if (opts.onLogout) opts.onLogout();
+    };
+    auth2.on("login", onLoginEvent);
+    auth2.on("logout", onLogoutEvent);
+    auth2.on("session-updated", render);
+    holder.__aimeatPillUnmount = () => {
+      if (typeof auth2.off === "function") {
+        auth2.off("login", onLoginEvent);
+        auth2.off("logout", onLogoutEvent);
+        auth2.off("session-updated", render);
+      }
+      window.removeEventListener("aimeat-lang-change", render);
+      window.removeEventListener("aimeat-look-change", render);
+    };
+    if (isAppOrigin() && !auth2.getSession()) {
+      const tryRestore = () => {
+        if (navigator.onLine === false) {
+          settleNoSession(tryRestore, true);
+          return;
+        }
+        let settled = false;
+        nodeUnreachable().then((down) => {
+          if (down && !settled && !auth2.getSession()) {
+            settled = true;
+            settleNoSession(tryRestore, true);
+          }
+        });
+        restoreSessionFromAppOrigin(false).then((s) => {
+          if (s || settled) return;
+          settled = true;
+          settleNoSession(tryRestore);
+        }).catch(() => {
+        });
+      };
+      tryRestore();
+    } else if (!auth2.getSession() && load("session")) {
+      auth2.login().catch(() => null).then((s) => {
+        if (s) return;
+        if (load("session")) {
+          remove("session");
+          emit("logout");
+        } else render();
+      });
+    }
+  }
+
+  // src/static/sdk-libs/auth/auth.js
+  provideSessionUi({ showLoginModal: showLoginModal2, mountPill: mountPill2 });
 
   // src/static/sdk-libs/auth/signup.js
   var USERNAME_RE = new RegExp("^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$");
@@ -4658,7 +4679,7 @@
         primaryLabel: i.signupLinkSignInBtn || "Sign in with password",
         showCancel: true,
         onPrimary: function() {
-          showLoginModal({ i18n: i }, function() {
+          showLoginModal2({ i18n: i }, function() {
           });
         }
       });
@@ -4907,19 +4928,19 @@
   }
   function maybeShowAuthError() {
     var code = readAuthError();
-    if (code) showLoginModal({ authError: code }, function() {
+    if (code) showLoginModal2({ authError: code }, function() {
     });
     var step = readAuthStep();
     if (step === "second_factor") {
       loadModalI18n(currentModalLang()).then(function(i18n) {
-        showLoginModal({ i18n: i18n || {}, secondFactorLink: true }, function() {
+        showLoginModal2({ i18n: i18n || {}, secondFactorLink: true }, function() {
         });
       });
     }
     var setupToken = step === "two_step_setup" ? readTwoStepToken() : null;
     if (setupToken) {
       loadModalI18n(currentModalLang()).then(function(i18n) {
-        showLoginModal({ i18n: i18n || {}, twoStepSetup: setupToken }, function() {
+        showLoginModal2({ i18n: i18n || {}, twoStepSetup: setupToken }, function() {
         });
       });
     }
@@ -4933,7 +4954,7 @@
       );
       if (!session || !session.jwt) return null;
       return authApi("/v1/ghii/key-credentials", session.jwt, { method: "POST", body: "{}" }).then(function(r) {
-        showLoginModal({ i18n: got[0] || {}, keyCredentials: {
+        showLoginModal2({ i18n: got[0] || {}, keyCredentials: {
           credentials: r.data.key_credentials,
           jwt: session.jwt,
           continueTo: r.data.continue_to || null
