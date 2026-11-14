@@ -27033,10 +27033,16 @@ paths:
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [ext, action, pool_percent], properties: {
+        content: { application/json: { schema: { type: object, required: [ext, action], properties: {
           ext: { type: string, description: 'Metered coordinate — an extension name, apptool:{owner}/{appId}, or agentwork:{owner}/{agent}.' },
           action: { type: string, description: 'Metered coordinate — the action id, tool name, or task type.' },
-          pool_percent: { type: number, minimum: 0, maximum: 100, description: 'Share of YOUR cut routed to beneficiaries.' },
+          mode: { type: string, enum: [pool, roles], default: pool, description: '`pool`: pool_percent divided by weight between the beneficiaries. `roles`: each role takes its own percent of your cut, and pool_percent is not read.' },
+          pool_percent: { type: number, minimum: 0, maximum: 100, description: 'Share of YOUR cut routed to beneficiaries. Required in pool mode (400 INVALID_INPUT without it).' },
+          roles: { type: array, maxItems: 32, description: 'mode roles: the chain. The percents total at most 100 (400 INVALID_INPUT names the total otherwise); a role with no ghii is filled per sale and pays nobody until then.', items: { type: object, required: [role, percent], properties: {
+            role: { type: string, description: 'The role name, unique in the chain.' },
+            percent: { type: number, exclusiveMinimum: 0, maximum: 100 },
+            ghii: { type: [string, 'null'], description: 'The owner GHII this role pays, or null when the sale names it.' },
+            note: { type: string } } } },
           beneficiaries: { type: array, maxItems: 32, items: { type: object, required: [ghii], properties: {
             ghii: { type: string, description: 'Beneficiary owner GHII (owner@node-id).' },
             weight: { type: number, exclusiveMinimum: 0, description: 'Relative slice of the pool. Defaults to 1.' },
