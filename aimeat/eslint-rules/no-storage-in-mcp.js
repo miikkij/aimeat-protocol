@@ -94,7 +94,6 @@ const EXEMPT = new Set([
   'src/mcp/memory-extended.ts',
   'src/mcp/oauth.ts',
   'src/mcp/operator-config.ts',
-  'src/mcp/organisms.ts',
   'src/mcp/skills.ts',
   'src/mcp/wallet-extended.ts',
 ]);

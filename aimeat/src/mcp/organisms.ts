@@ -11,6 +11,10 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_organism_list's member half calls listedOrganisms (services/organism-read/
+ *     list.ts), the member list GET /v1/organisms?member=<owner> serves; the parity section MEMBER-LIST
+ *     gives the owner's agent, another owner's agent and the operator's agent one answer. This file
+ *     calls storage directly nowhere now (structure programme 2026-11, unit 2b).
  *   2026-11-14 — aimeat_organism_join asks services/organism-read/member.ts organismToJoin, the rule
  *     POST /v1/organisms/:id/join now asks too (developer approval 2026-11-14).
  *   2026-11-14 — aimeat_organism_members reads through services/organism-read/member.ts
@@ -134,7 +138,6 @@ import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { organismOwners } from '../services/organism-ownership.js';
-import { organismsAdmitting } from '../services/organism-agent-access.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -255,9 +258,11 @@ export function registerOrganismsTools(
             // Get public organisms (archived ones are read-only/hidden from AI operations — excluded):
             // the browse GET /v1/organisms serves with no query (services/organism-read/list.ts).
             const publicOrgs = await listedOrganisms({ storage, config }, caller().auth, {});
-            // Get organisms the owner is a member of (may include private ones); archived excluded too
-            // An organism that does not admit this agent is not one it works in (agentAccess).
-            const memberOrgs = organismsAdmitting(await storage.listOrganisms({ member: ownerName, archived: 'exclude' }), agentGaii);
+            // The organisms the owner is a member of (private ones included; archived ones left out for
+            // an agent; an organism that does not admit this agent left out, agentAccess): the member
+            // list GET /v1/organisms?member=<owner> serves, services/organism-read/list.ts (parity
+            // sections MEMBER-LIST, BARRED and ARCHIVED-LIST).
+            const memberOrgs = await listedOrganisms({ storage, config }, caller().auth, { member: ownerName });
             // Merge, deduplicate by id
             const seen = new Set<string>();
             const all = [...publicOrgs, ...memberOrgs].filter(o => {

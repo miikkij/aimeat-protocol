@@ -36,11 +36,15 @@
  *                    surfaces (developer decision 2026-11-14).
  *     ARCHIVED-LIST  an archived organism in the owner's own list, for the owner's agent.
  *     WS-UPDATE      an attached agent whose owner left changes a workspace's structure.
+ *     MEMBER-LIST    the organisms a caller's owner is in: one answer on GET /v1/organisms?member=
+ *                    and aimeat_organism_list for the owner's agent, another owner's agent and the
+ *                    operator's agent.
  *   BOARD-MEMBERS asserts today's two answers and names the question.
  *   The operator (the suite's first account) turns classification on for the FILES section only and
  *   off again at its end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-tool-route-parity
  * @version-history
+ *   v1.7.0 — 2026-11-14 — MEMBER-LIST.
  *   v1.6.0 — 2026-11-14 — JOIN-PRIVATE asserts the developer's decision instead of today's answers.
  *   v1.5.0 — 2026-11-14 — ROSTER-PRIVATE asserts the developer's decision instead of today's answers.
  *   v1.4.0 — 2026-11-14 — ORG-READ, ROSTER-PRIVATE, ARCHIVED-LIST and WS-UPDATE; the question sections
@@ -543,6 +547,34 @@ await test('SAME ANSWER: PUT /v1/organisms/:id/workspace and aimeat_workspace_up
     const rest = await call('PUT', `/v1/organisms/${roleOrg}/workspace`, carolAgent.token, { ws: bobWs, readme: `u2b ${stamp}` });
     const tool = await callTool(carolMcp, 'aimeat_workspace_update', { organism_id: roleOrg, ws: bobWs, readme: `u2b ${stamp}` });
     assert((rest.body.ok === true) === !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
+});
+
+// ─── MEMBER-LIST ───
+console.log('\nMEMBER-LIST: the organisms a caller\'s owner is in, on GET /v1/organisms?member=<owner> and aimeat_organism_list');
+
+let mlOrg = '';
+await test('Setup: alice\'s private organism (alice\'s archived organism from ARCHIVED-LIST stays)', async () => {
+    mlOrg = await organism(alice.token, `U2b member list ${stamp}`, { visibility: 'private' });
+});
+
+for (const [who, agent, owner] of [
+    ['alice\'s agent', () => arAgent, () => alice.name],
+    ['bob\'s agent', () => orMember, () => bob.name],
+    ['the operator\'s agent', () => orOperator, () => op.name],
+] as const) {
+    await test(`SAME ANSWER: ${who} sees alice's private and archived organisms alike on REST (?member=its owner) and in aimeat_organism_list`, async () => {
+        const rest = await call('GET', `/v1/organisms?${q({ member: owner() })}`, agent().token);
+        const tool = await callTool(await openSession(BASE, agent().token, 'u2b-member-list'), 'aimeat_organism_list', {});
+        assert(rest.status === 200 && !tool.isError, `REST ${show(rest)} vs tool ${tool.text.slice(0, 200)}`);
+        for (const id of [mlOrg, arOrg]) {
+            assert(rest.text.includes(id) === tool.text.includes(id), `${id}: REST lists it ${rest.text.includes(id)}, tool lists it ${tool.text.includes(id)}`);
+        }
+    });
+}
+
+await test('USE KEPT: alice in person lists her private and her archived organism on REST (the tool is an agent\'s surface)', async () => {
+    const rest = await call('GET', `/v1/organisms?${q({ member: alice.name })}`, alice.token);
+    assert(rest.status === 200 && rest.text.includes(mlOrg) && rest.text.includes(arOrg), show(rest));
 });
 
 // ─── FILES ───
