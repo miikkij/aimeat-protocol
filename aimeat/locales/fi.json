@@ -18003,6 +18003,8 @@
     "body": "Asennettuna se avautuu omaan ikkunaansa, näyttää lukemattomien määrän kuvakkeessa ja ottaa jaot suoraan chattiisi.",
     "iosBody": "iPhonella ja iPadilla: avaa jakovalikko ja valitse \"Lisää Koti-valikkoon\".",
     "bodyBuyer": "Saat AIMEATin omaksi kuvakkeeksi puhelimeen tai työpöydälle.",
+    "titleApps": "Sovelluksesi yhden napautuksen päähän",
+    "bodyApps": "Kun asennat Omat sovellukset, se saa oman kuvakkeen puhelimen kotinäytölle ja avautuu suoraan sovelluksiisi.",
     "install": "Asenna",
     "notNow": "Ei nyt"
   },

@@ -17236,6 +17236,8 @@
     "body": "Installed, it opens in its own window, shows unread counts on its icon, and takes shares straight into your chat.",
     "iosBody": "On iPhone and iPad: open the Share menu and choose \"Add to Home Screen\".",
     "bodyBuyer": "You get AIMEAT as its own icon on your phone or desktop.",
+    "titleApps": "Your apps one tap away",
+    "bodyApps": "Installed, My Apps gets its own icon on your phone's home screen and opens straight to your apps.",
     "install": "Install",
     "notNow": "Not now"
   },

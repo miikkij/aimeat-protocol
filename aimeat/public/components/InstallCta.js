@@ -9,9 +9,12 @@
  *   no such offer exists, the card explains Share → Add to Home Screen instead. Where there is
  *   neither an offer nor an iOS path (desktop Firefox), it renders nothing: instructions that end
  *   nowhere are worse than silence.
- * @structure InstallCta({ compact }) — compact drops the body line for tight surfaces (chat).
+ * @structure InstallCta({ compact, id, title, body }) — compact drops the body line for tight surfaces
+ *   (chat); id, title and body for a page that installs as an app of its own (installAs, the App Catalog).
  * @usage import { InstallCta } from '/components/InstallCta.js';  html`<${InstallCta} />`
  * @version-history
+ *   v1.5.0 — 2026-11-14 — `id`, `title`, `body`: the App Catalog offers itself as an app of its own,
+ *     with its own words and its own "not now" (install-prompt.js installAs). Additive.
  *   v1.4.0 — 2026-11-01 — On a node the store sold, the body says what the buyer gets in plain words
  *     (install.bodyBuyer), not "jaot" (Jouni's review of v34).
  *   v1.3.0 — 2026-10-31 — On a node the store sold, the title names the buyer's own AIMEAT, not
@@ -33,11 +36,11 @@ import {
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-export function InstallCta({ compact = false }) {
+export function InstallCta({ compact = false, id, title, body }) {
     const [, bump] = useState(0);
     useEffect(() => onInstallChange(() => bump((n) => n + 1)), []);
 
-    if (isInstalled() || installDismissed()) return null;
+    if (isInstalled() || installDismissed(id)) return null;
     const offer = installAvailable();
     const ios = isIos();
     if (!offer && !ios) return null;
@@ -45,18 +48,18 @@ export function InstallCta({ compact = false }) {
     const install = async () => {
         await promptInstall();
         // Declining the browser dialog counts as an answer too: the card stops asking either way.
-        dismissInstall();
+        dismissInstall(id);
     };
 
     return html`
         <div class="install-cta ${compact ? 'install-cta--compact' : ''}" role="note">
             <div class="install-cta-text">
-                <span class="install-cta-title">${customerNode()
+                <span class="install-cta-title">${title || (customerNode()
                     ? tr('install.titleBuyer', 'Put your AIMEAT behind its own button')
-                    : tr('install.title', 'Put AIMEAT.IO behind its own button')}</span>
+                    : tr('install.title', 'Put AIMEAT.IO behind its own button'))}</span>
                 ${!compact && html`<span class="install-cta-body">
                     ${offer
-                        ? (customerNode()
+                        ? body || (customerNode()
                             ? tr('install.bodyBuyer', 'You get AIMEAT as its own icon on your phone or desktop.')
                             : tr('install.body', 'Installed, it opens in its own window, shows unread counts on its icon, and takes shares straight into your chat.'))
                         : tr('install.iosBody', 'On iPhone and iPad: open the Share menu and choose "Add to Home Screen".')}
@@ -69,7 +72,7 @@ export function InstallCta({ compact = false }) {
                 ${offer && html`<button type="button" class="poster-action install-cta-install"
                     onClick=${install}>${tr('install.install', 'Install')}</button>`}
                 <button type="button" class="poster-action poster-action--text install-cta-dismiss"
-                    onClick=${() => dismissInstall()}>${tr('install.notNow', 'Not now')}</button>
+                    onClick=${() => dismissInstall(id)}>${tr('install.notNow', 'Not now')}</button>
             </div>
         </div>
     `;

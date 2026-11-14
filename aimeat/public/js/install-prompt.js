@@ -17,10 +17,16 @@
  * @structure
  *   installAvailable/isInstalled/isIos — what the UI may offer · promptInstall() — open the real
  *   dialog (one-shot per event) · onInstallChange(cb) — re-render hook · dismissInstall/
- *   installDismissed — the person said not now, remembered per browser
+ *   installDismissed — the person said not now, remembered per browser (per `id` when one is given) ·
+ *   installAs({ manifest, title }) — while a page is shown, what installing it installs
  * @usage
  *   import { installAvailable, promptInstall, onInstallChange } from '/js/install-prompt.js';
+ *   useEffect(() => installAs({ manifest: '/manifest-apps.json', title: 'Apps' }), []);
  * @version-history
+ *   v1.1.0 — 2026-11-14 — installAs(): a page installs as an app of its own (the App Catalog, so a
+ *     phone's home screen opens straight to the apps). It points the page's manifest link at its own
+ *     manifest while the page is shown, and the browser hands over a new offer for it. The "not now"
+ *     is kept per `id`, so declining one offer does not hide the other. Additive.
  *   v1.0.0 — 2026-08-16 — Initial: capture-early holder + prompt + dismissal.
  */
 
@@ -90,19 +96,43 @@ export function onInstallChange(cb) {
     return () => listeners.delete(cb);
 }
 
-/** "Not now", remembered per browser so the suggestion does not nag. */
-export function dismissInstall() {
+/**
+ * While a page is shown, installing it installs `manifest` (a web-app manifest with an `id` and a
+ * `start_url` of its own), named `title` on iOS, whose Add to Home Screen reads the meta tag. The
+ * offer the browser held belonged to the manifest before, so it is let go; a Chromium browser reads
+ * the changed link and hands over a new one. Returns the function that puts the site's own back:
+ * a useEffect's cleanup.
+ */
+export function installAs({ manifest, title }) {
+    if (typeof document === 'undefined') return () => {};
+    const link = document.querySelector('link[rel="manifest"]');
+    const meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    const before = { href: link?.getAttribute('href'), title: meta?.getAttribute('content') };
+    const swap = (href, name) => {
+        if (link && href && link.getAttribute('href') !== href) {
+            link.setAttribute('href', href);
+            deferred = null;
+            notify();
+        }
+        if (meta && name) meta.setAttribute('content', name);
+    };
+    swap(manifest, title);
+    return () => swap(before.href, before.title);
+}
+
+/** "Not now", remembered per browser so the suggestion does not nag; per `id` for a page's own offer. */
+export function dismissInstall(id) {
     try {
-        localStorage.setItem(DISMISS_KEY, '1');
+        localStorage.setItem(id ? `${DISMISS_KEY}:${id}` : DISMISS_KEY, '1');
      
     } catch (err) { void err; }
     notify();
 }
 
-export function installDismissed() {
+export function installDismissed(id) {
     let stored = null;
     try {
-        stored = localStorage.getItem(DISMISS_KEY);
+        stored = localStorage.getItem(id ? `${DISMISS_KEY}:${id}` : DISMISS_KEY);
     } catch (err) {
         // Storage blocked: not dismissed is the answer that keeps the offer visible.
         void err;

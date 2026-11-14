@@ -20,6 +20,9 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.5.0 — 2026-11-14 — The page installs as an app of its own (manifest-apps.json, installAs): a
+ *     phone's home screen gets a My Apps icon that opens straight to the apps. A signed-in person
+ *     sees the offer under the masthead (InstallCta id "apps"), on a browser that makes one.
  *   v1.4.0 — 2026-11-01 — The page opens the live stream (relayLiveUpdates). The started apps and the
  *     internet-opening section listened for `aimeat-live-update` and nothing on this route dispatched
  *     it, so they showed what they read at load.
@@ -50,6 +53,9 @@ import { CatMasthead, openAdd } from '/views/appcat/masthead.js';
 import { CatBand, CatTools, CortexBar, SEARCH_ID } from '/views/appcat/tools.js';
 import { LibraryList, CommunityList, FavouritesList, BuildingList, CatFoot } from '/views/appcat/lists.js';
 import { StartedList } from '/views/appcat/started.js';
+import { InstallCta } from '/components/InstallCta.js';
+import { installAs } from '/js/install-prompt.js';
+import { t } from '/js/i18n.js';
 import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
@@ -89,6 +95,10 @@ export default function AppCat() {
   // The stream that dispatches `aimeat-live-update` to the blocks that listen for it (started.js,
   // sections/internet.js): this route opens it, as the home's routes do.
   useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session]);
+
+  // Installed from this page, the app is My Apps itself (src/static/manifest-apps.json): its icon on
+  // a phone's home screen opens straight to the apps, not to the site's home.
+  useEffect(() => installAs({ manifest: '/manifest-apps.json', title: x('header.title') }), []);
 
   // The listing: on load, on a sign-in or sign-out, and on a language change (F120, F86, F342).
   useEffect(() => {
@@ -209,6 +219,7 @@ export default function AppCat() {
   return html`
     <${IndexFrame} dense index=${rail} label=${x('header.title')}>
       <${CatMasthead} own=${cat.own} me=${cat.me} loaded=${cat.loaded} />
+      ${cat.me ? html`<${InstallCta} id="apps" title=${t('install.titleApps')} body=${t('install.bodyApps')} />` : null}
       ${view === 'library' && cat.loaded && cat.own.length > 0 ? html`<${CatBand} counts=${counts} n=${cat.own.length} />` : null}
       <${CatTools} q=${q} onQuery=${setQ} sort=${sort} onSort=${setSort} />
       ${view === 'library' ? html`<${CortexBar} />` : null}
