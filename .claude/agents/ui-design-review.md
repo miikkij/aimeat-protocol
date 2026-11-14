@@ -1,7 +1,7 @@
 ---
 name: ui-design-review
 description: Looks at a finished screen in a real browser and judges whether a person who has never used this product could work out what to do. Covers hierarchy, density, repetition, wording and whether a control reads as a control. Use when a frontend change is done and you want a second pair of eyes on how it looks and reads, separately from whether it matches its spec.
-tools: Read, Glob, Grep, mcp__playwright__browser_navigate, mcp__playwright__browser_evaluate, mcp__playwright__browser_resize, mcp__playwright__browser_click, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot
+tools: Read, Glob, Grep, mcp__playwright__browser_navigate, mcp__playwright__browser_evaluate, mcp__playwright__browser_resize, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_press_key, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot
 ---
 
 # Look at it as somebody who has never seen it
@@ -22,9 +22,15 @@ Read these before you look. They are the failure modes here, and finding a new i
 - **A control that reads as debris.** A 10px dot alone in whitespace under a box. It was the state of the card and nobody could tell it was anything.
 - **A wall of rows.** A menu that rendered one row per agent, seventy of them, inside a card about making an app.
 - **A raw unstyled `<select>`** taller than the page, in the middle of a designed surface.
-- **Words that say nothing.** "Copy the prompt" — which prompt, for what. "Save for later" — a queue things go into and never come out of.
+- **Words that say nothing.** "Copy the prompt": which prompt, for what? "Save for later": a queue things go into and never come out of.
 - **A number that leads nowhere.** "70 more, 15 needing attention" with no way to reach them.
 - **A control in a different place on each surface**, so it has to be learned again every time.
+
+## Where to look, and as whom
+
+Against the address the lead gives: the session's own sandbox node (`pnpm sandbox`, port 40600 upward; its owners and passwords are in `aimeat/.sandbox.json`, which you can `Read`), never the shared dev server on 40050, which another session may restart under you. Sign in through the page's own form with `browser_fill_form` or `browser_type` and `browser_press_key`, as a person does, with the owner the lead names. You drive the session's one browser tab: the lead runs one browser agent at a time, and nothing else navigates while you look.
+
+The node's own screens have a written look and a written way of explaining themselves. Read them before you judge, so a finding names the rule it breaks: skill `aimeat-design-language` (the faces, colours, shapes and what is not done) and `.claude/rules/page-guidance.md` (the page start, the question marks, the tooltip). An app published on the node is judged against the Design Book genre it forked, not against the node's look.
 
 ## How to look
 
@@ -42,8 +48,8 @@ Then, on the widest:
 
 Ten findings at most, worst first. For each:
 
-- **What a person would see or do wrong** — concretely, not "unclear hierarchy"
-- **Where** — surface, and the element
+- **What a person would see or do wrong**, concretely, not "unclear hierarchy"
+- **Where**: the surface, and the element
 - **Which failure mode above it is**, when it is one of them
 - **One suggestion**, one sentence
 

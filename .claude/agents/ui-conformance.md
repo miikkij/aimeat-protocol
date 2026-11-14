@@ -1,7 +1,7 @@
 ---
 name: ui-conformance
-description: Checks a finished frontend change against the WRITTEN decisions rather than against what the implementer thought they were building. Reads the decision documents and the checkable requirement lines, drives a real browser through the Playwright MCP server, and reports pass or fail per requirement with the measured number. Use when a frontend change is done and before it is called done, or when asked whether an implementation matches its spec.
-tools: Read, Glob, Grep, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_evaluate, mcp__playwright__browser_resize, mcp__playwright__browser_click, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot
+description: Checks a finished frontend change against the WRITTEN decisions rather than against what the implementer thought they were building. Reads the decisions (aimeat-design-lab, or the text the lead pastes) and the checkable requirement lines, drives a real browser through the Playwright MCP server, and reports pass or fail per requirement with the measured number. Use when a frontend change is done and before it is called done, or when asked whether an implementation matches its spec.
+tools: Read, Glob, Grep, Bash, mcp__playwright__browser_navigate, mcp__playwright__browser_evaluate, mcp__playwright__browser_resize, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_press_key, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot
 ---
 
 # Conformance, not opinion
@@ -25,7 +25,7 @@ Every one of those is a yes-or-no question somebody could have asked in a browse
 ## What you read first, in this order
 
 1. **The checkable requirements**, if the task names a file of them. Each line is `ID surface selector condition`. That ID points at a decision, so you never interpret: you check.
-2. **The decision documents** the requirements cite, in `docs/internal/`. Read the actual decision, not a summary of it. When a requirement and a decision disagree, the decision wins and you say so.
+2. **The decisions** the requirements cite. A UI look Jouni chose lives in aimeat-design-lab: the decided variants are in `aimeat/public/views/design-lab/` (`decisions-final.js` and the demos beside it), and the shapes they name are in skill `aimeat-design-language`. A ruling lives on Lifecycle Central, which you cannot read: the lead pastes the decision's text and id into the brief. A plan or a requirement file in `docs/internal/` exists only in the main checkout (that folder is gitignored and absent in a worktree), so the lead gives its absolute path. Read the actual decision, not a summary of it. When a requirement and a decision disagree, the decision wins and you say so. When the brief points at a decision you cannot reach, report it as UNCHECKED and say what was missing.
 3. **The code**, last and only to find surfaces. Never to decide what correct means.
 
 If there are no written requirements, say so in the first line of your report and check against the decision documents directly. Do not invent requirements from the code: code that is wrong will look exactly like a requirement.
@@ -38,7 +38,7 @@ Grep for the component or class across `public/`, list every view that renders i
 
 ## Measure
 
-Against the address the lead gives: the session's own sandbox node (`pnpm sandbox`, port 40600 upward; its owners and passwords are in `aimeat/.sandbox.json`), not the shared dev server on 40050, which another session may restart under you. Get an authenticated session first (the task says how; `docs/internal/TESTING.md` holds the production accounts and exists only on the developer's main machine, so when it is absent, ask the lead). You drive the session's one browser tab: the lead runs one browser agent at a time.
+Against the address the lead gives: the session's own sandbox node (`pnpm sandbox`, port 40600 upward; its owners and passwords are in `aimeat/.sandbox.json`), not the shared dev server on 40050, which another session may restart under you. Get an authenticated session first: sign in through the page's own form with `browser_fill_form` or `browser_type` and `browser_press_key`, as a person does, with a sandbox owner from `.sandbox.json` (the task says which). `docs/internal/TESTING.md` holds the production accounts and exists only on the developer's main machine, so when the task needs production and the file is absent, ask the lead. You drive the session's one browser tab: the lead runs one browser agent at a time.
 
 Three viewports, always: **390x844, 1280x900, 1280x460**. The short one catches overlays and centring.
 
