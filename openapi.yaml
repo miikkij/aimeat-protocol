@@ -52165,8 +52165,8 @@ paths:
               properties:
                 until:
                   type: object
-                  additionalProperties: { type: string, nullable: true, format: date-time }
-                  description: 'Target (`*`, `space:<name>`, `<space>/<id>`) → ISO end date, or null to remove it'
+                  additionalProperties: { type: [string, 'null'] }
+                  description: 'Target (`*`, `space:<name>`, `<space>/<id>`) → ISO end date in the future (a date such as 2027-01-31 or a date-time), or null to remove it. A past date, an unparsable one or a key that is not a target is refused with 400 INVALID_INPUT.'
                 public: { type: boolean, description: 'Whole document portion public?' }
                 spaces:
                   type: object
@@ -52184,14 +52184,12 @@ paths:
                     of this node (never a visitor from another node). `organism`: the members of the
                     workspace's own organism; a signed-in outsider gets 403 SHARE_MEMBERS_ONLY.
                 password:
-                  type: string
-                  nullable: true
+                  type: [string, 'null']
                   minLength: 4
                   maxLength: 128
                   description: Set (string) or clear (null) the share password; absent keeps the previous one
                 ics_key:
-                  type: boolean
-                  nullable: true
+                  type: [boolean, 'null']
                   description: true makes a new feed key for the calendar format (shown once in the answer, ends the one before); null clears it; absent keeps it
       responses:
         '200': { description: 'The merged share state (redacted: has_password and has_ics_key, never a hash), `viewer_url`, and for one shared page `ends_at` and, when it is an HTML page, `window_url`. With ics_key true also `ics_key` and `ics_url`, once.' }
