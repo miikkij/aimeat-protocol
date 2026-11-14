@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-14 — GET /v1/organisms and GET /v1/organisms/:id carry `team_names` ({ names, language })
+ *     for an organism set up as a team (services/team/record.ts teamNamesFor), so a page names the
+ *     team in its reader's language.
  *   2026-11-14 — POST /v1/organisms/:id/join asks services/organism-read/member.ts organismToJoin: a
  *     private organism answers an agent outside it 404, as aimeat_organism_join answers it (developer
  *     approval 2026-11-14); the person in person joins as before.
@@ -99,6 +102,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { showOrganismReadme } from '../../services/organism-readme.js';
+import { teamNamesFor } from '../../services/team/record.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, deleteOrganismRecords } from '../../services/organism-lifecycle.js';
 import { publicShapes } from '../../data/organism-shapes.js';
@@ -195,9 +199,12 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // agentGaiis fields. member_count is pre-redaction (a count is not an identity). The shared anonymous
     // identity is treated as unauthenticated (rosterCallerFromAuth).
     const listCaller = await rosterCallerFromAuth(storage, auth);
+    // A team's names in every language, so the page shows each reader the name in theirs.
+    const teamNames = await teamNamesFor(storage, listed);
     payload = await Promise.all((payload as Array<OrganismRecord & { workspace_count?: number }>).map(async (o) => {
       const canSee = await canSeeMembers(storage, o, listCaller);
-      return { ...redactOrganism(o, canSee), member_count: o.members.length, members_hidden: !canSee };
+      const team = teamNames.get(o.id);
+      return { ...redactOrganism(o, canSee), member_count: o.members.length, members_hidden: !canSee, ...(team ? { team_names: team } : {}) };
     }));
 
     return { organisms: payload, total: payload.length };
@@ -312,9 +319,11 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const detailCaller = await rosterCallerFromAuth(storage, req.auth);
     const canSeeRoster = await canSeeMembers(storage, organism, detailCaller);
     const yourMembership = detailCaller.ownerName ? await storage.getMembership(id, detailCaller.ownerName) : null;
+    const team = (await teamNamesFor(storage, [organism])).get(organism.id);
 
     res.json(success(config.nodeId, {
       organism: redactOrganism(organism, canSeeRoster),
+      ...(team ? { team_names: team } : {}),
       member_count: members.length,
       readme,
       members_hidden: !canSeeRoster,

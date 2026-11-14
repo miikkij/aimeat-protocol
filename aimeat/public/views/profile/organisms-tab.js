@@ -19,6 +19,8 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.39.1 -- 2026-11-14 -- A team's row and the joined banner name the team in the reader's language (orgName, team setup T24).
+ *   v2.39.0 -- 2026-11-14 -- The joined banner asks which AI the newcomer uses and opens the connect page on that AI's instruction (rememberTool), so the step after joining is one press (team setup T3).
  *   v2.38.0 -- 2026-11-08 -- The create form's shape, join policy and visibility drop-downs each have their question mark beside them: organism.shape, organism.joinPolicy, organism.visibility (components/HelpTip.js); the notes under them stay, because they follow the current choice.
  *   v2.37.0 -- 2026-11-08 -- The Archived fold's title has no emoji (no emoji in the interface).
  *   v2.36.0 -- 2026-10-27 -- A refused create shows each field's message under that field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (js/input-limits.js) (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -118,11 +120,24 @@ import { FileDrop } from '/components/FileDrop.js';
 import { Row } from '/components/Layout.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
-import { fmtDate, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
+import { fmtDate, orgInitials, orgName, exportOrganismZip } from '/views/profile/organisms/helpers.js';
 import { IncomingInvitations } from '/views/profile/organisms/panels.js';
 import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
 import { swallowed } from '/js/swallowed.js';
+import { rememberTool } from '/components/SetupGuide.js';
+
+/** The AIs a newcomer picks from in the joined banner: the setup guide's tool id, and a label
+ *  (a product name, or a locale key for the two that are not one). */
+const JOIN_AI_CHOICES = [
+  ['claude-web', 'Claude'], ['chatgpt', 'ChatGPT'], ['copilot-studio', 'Copilot'], ['gemini-app', 'Gemini'],
+  ['claude-code', 'organisms.joinedBanner.codeTool'], ['', 'organisms.joinedBanner.other'],
+];
+/** Open the connect page on the chosen AI's one instruction (SetupGuide reads the remembered tool). */
+const openAiSetup = (id) => {
+  if (id) rememberTool(id);
+  window.location.href = '/v1/profile?tab=mcp';
+};
 import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
 import { INPUT_LIMITS } from '/js/input-limits.js';
 
@@ -512,8 +527,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         onDragLeave=${isMine ? (() => setDragOverId(d => (d === org.id ? null : d))) : undefined}
         onDrop=${isMine ? (() => onDropRow(org.id)) : undefined}
         onDragEnd=${isMine ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
-        <${Lead} text=${orgInitials(org.name)} />
-        <${Name} onOpen=${activate} clip meta=${org.description || null}>${(org.name)}<//>
+        <${Lead} text=${orgInitials(orgName(org))} />
+        <${Name} onOpen=${activate} clip meta=${org.description || null}>${orgName(org)}<//>
         <${Cell} line>
           <${Mark} title=${typeLabel}>${typeLabel}<//>
           ${org.visibility !== 'public' ? html`<span title=${visLabel}>${LockMark}</span>` : null}
@@ -557,13 +572,18 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         <${Note} kind="aside" size="small">
           <${Row} wrap justify="between" gap="medium">
             <div>
-              <strong>${(tOr('organisms.joinedBanner.title', 'You are now a member of {name}.')).replace('{name}', org.name || '')}</strong>
+              <strong>${(tOr('organisms.joinedBanner.title', 'You are now a member of {name}.')).replace('{name}', orgName(org))}</strong>
               <${Note} kind="meta">${tOr('organisms.joinedBanner.body', 'Connect your own AI to this team and you can use everything here straight from the chat you already use.')}<//>
             </div>
             <${Row}>
               <${Loud} control href="/v1/profile?tab=mcp">${tOr('organisms.joinedBanner.connect', 'Connect your AI')}<//>
               <${Action} tone="text" onClick=${() => setJustJoinedOrg(null)}>${tOr('organisms.joinedBanner.dismiss', 'Browse first')}<//>
             <//>
+          <//>
+          <${Row} wrap gap="small">
+            <${Note} kind="meta">${tOr('organisms.joinedBanner.which', 'Which AI do you use?')}<//>
+            ${JOIN_AI_CHOICES.map(([id, label]) => html`
+              <${Action} key=${id} control onClick=${() => openAiSetup(id)}>${label.startsWith('organisms.') ? tOr(label, id) : label}<//>`)}
           <//>
         <//>` : null}
       <${OrganismHome} org=${org} ghii=${ghii} showToast=${showToast}

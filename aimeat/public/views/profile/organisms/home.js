@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.11.1 -- 2026-11-14 -- A team's title and crumb are its name in the reader's language (orgName, team setup T24).
  *   v3.11.0 -- 2026-10-31 -- "Show in the overview" under the map: the Overview page opened on this organism (views/home/overview.js).
  *   v3.10.0 -- 2026-10-03 -- The question mark that explains a workspace, concept.workspace, after the line under the workspace list (components/HelpTip.js; guidance part B).
  *   v3.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the page is the SettingsPage (crumb, title, the tags as data, the description, the For your AI slab and the two ways, the FigureStrip, the rail as data whose folds open before they scroll), the sections the Section (open and folded), the hints the Note. The join policy and the creation date are the dim tag again, as main drew them (og-chip--dim). The page writes no class.
@@ -49,7 +50,7 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { recordRecent } from '/js/recents.js';
-import { fmtDate, exportOrganismZip } from '/views/profile/organisms/helpers.js';
+import { fmtDate, orgName, exportOrganismZip } from '/views/profile/organisms/helpers.js';
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
@@ -146,8 +147,9 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
 
   // Feed the home page's "Continue" list (only once the real name is known, not the {id} stub).
   useEffect(() => {
-    if (org.name) recordRecent({ type: 'organism', id: org.id, label: org.name, data: { orgId: org.id } });
-  }, [org.id, org.name]);
+    const label = orgName(org);
+    if (org.name) recordRecent({ type: 'organism', id: org.id, label, data: { orgId: org.id } });
+  }, [org]);
 
   if (view === 'settings') {
     return html`
@@ -188,8 +190,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
 
   return html`
     <${SettingsPage}
-      crumb=${[{ label: tr('organisms.title', 'Organisms'), onClick: onBack }, org.name || org.id]}
-      title=${org.name || org.id}
+      crumb=${[{ label: tr('organisms.title', 'Organisms'), onClick: onBack }, orgName(org)]}
+      title=${orgName(org)}
       marks=${[
         { label: typeLabel },
         { label: visWord },

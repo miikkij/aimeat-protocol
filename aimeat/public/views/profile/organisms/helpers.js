@@ -9,12 +9,25 @@
  * @structure fmtDate, relTime, orgInitials, exportOrganismZip
  * @usage import { fmtDate, relTime, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
  * @version-history
+ *   2026-11-14 — orgName(): a team's name in the reader's language (team setup T24).
  *   v1.0.1 — 2026-07-10 — exportOrganismZip surfaces the server's error message (e.g. the access
  *     denial reason) in the toast instead of a bare "Export failed".
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
 import { date as fmtDate, ago } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
+import { getLocale } from '/js/i18n.js';
+
+/**
+ * An organism's name for this reader: a team's name in the reader's language when the server sent
+ * its names (`team_names`, services/team/record.ts), then the team's working language, then the
+ * organism's own name.
+ */
+export function orgName(org, teamNames) {
+  const tn = teamNames ?? org?.team_names;
+  const lang = String(getLocale() || 'en').slice(0, 2);
+  return (tn && (tn.names?.[lang] || tn.names?.[tn.language])) || org?.name || org?.id || '';
+}
 import { authHeaders } from '/js/services/auth.js';
 
 /** Date-only, in the reader's own format and clock. → /js/format.js */

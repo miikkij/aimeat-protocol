@@ -160,6 +160,10 @@ await test('t08 the lead sees Aino\'s AI as connected once it has opened a sessi
     assert(kaisa?.ai.connected === false, 'a member with no AI is not counted');
     // The lead's own AI opened a session in t01 too, so two members have their AI connected.
     assert(team.ai_connected === 2, `two connected: ${team.ai_connected}`);
+    // The organism roster says the same, for the page's "own AI connected" line.
+    const roster = await json(`/v1/organisms/${salesId}/members`, { headers: auth(lead.token) });
+    const ainoAgents = roster.body.data.members.find((m: any) => m.ghii === aino.name)?.agents ?? [];
+    assert(ainoAgents.some((a: any) => typeof a.mcp_last_seen === 'string'), `roster mcp_last_seen: ${JSON.stringify(ainoAgents)}`);
 });
 
 await test('t09 an outsider gets no status, no skill and no team line', async () => {
@@ -231,6 +235,10 @@ await test('t14 one person in several teams: Aino joins two more and her AI is t
     const { instructions } = await sessionWithInstructions(ainoAgentToken, 'claude-again');
     for (const n of ['AI strategy', 'Design', 'Sales team']) assert(instructions.includes(n), `instructions name ${n}`);
     assert(!instructions.includes('Johtoryhmä') && !instructions.includes('Management team'), 'a team she is not in is not named');
+    // The organism list carries every team's names, so the page names each team in the reader's language.
+    const list = await json(`/v1/organisms?member=${aino.name}`, { headers: auth(aino.token) });
+    const sales = list.body.data.organisms.find((o: any) => o.id === salesId);
+    assert(sales?.team_names?.names?.en === 'Sales team' && sales.team_names.language === 'fi', `list team_names: ${JSON.stringify(sales?.team_names)}`);
 });
 
 await test('t15 the names can be corrected; the language and the workspaces stay', async () => {

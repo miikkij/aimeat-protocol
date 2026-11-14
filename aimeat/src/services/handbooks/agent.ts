@@ -8,6 +8,8 @@
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
  *   v1.67.0 -- 2026-11-14 -- Ask someone who knows: the aimeat_help_* tools, the draft rule and the skill.
+ *   v1.68.0 -- 2026-11-14 -- Teams: aimeat_team_setup with a dry run first and names in three
+ *     languages, and aimeat_team_status before answering about a team.
  *   v1.66.0 -- 2026-11-14 -- Secret shares and requests: the aimeat_secret_share_* tools, the three
  *     protections, and the code and deposit address that come back once.
  *   v1.65.2 -- 2026-11-08 -- A receiver is an incoming webhook and its key an API key in what an agent
@@ -392,6 +394,8 @@ the author. Your owner's account may then install it (\`aimeat_package_install\`
 version; \`purchases\` lists what they bought. Tell your owner the price before you buy.
 
 **Organisms — collaborate.** \`aimeat_organism_list\` · \`_get\` · \`_members\` · \`_join\` · \`_leave\`.
+
+**Teams.** When the person asks for a team, or many ("set up a team for us", a list, a table, an org chart), call \`aimeat_team_setup\` with what they gave you and nothing invented: a dry run first, show them what would be made, then the same call with \`dry_run: false\` after their yes. Write each team's name in fi, en and es under \`names\`. A team is an organism with three workspaces, a team context and a team skill; \`aimeat_team_status\` reads a team before you answer about it, and says whose own AI is connected.
 
 **Organism workspaces — documents & records.** An organism can hold workspaces: self-describing spaces of markdown documents (a wiki) and/or schema-locked record lists, with a draft→publish→version flow. \`aimeat_workspace_list\` (workspaces in an organism) · \`_read\` (two steps: first the index — the manifest, the schemas and every instance's title, no bodies — then \`ids:[…]\` opens the instances you need; LEARN it first) · \`_write\` (add/edit a record OR document by space NAME; records are schema-validated; both stay a draft) · \`_publish\` (snapshot the draft to .latest + a version; refused if the publish gate is on) · \`_object_delete\` · \`_access\` (request access / manage viewer·contributor roles) · \`_share\` (share a published page, a space or the workspace outside the organism; answers the \`viewer_url\` to hand out) · \`_transfer\` (export/import). **An HTML page** (a presentation, a report with charts, a page with pictures and some script, shown isolated in a frame) is \`{ title, html, files? }\` in a document space: write, publish, share, in three calls — load the skill \`aimeat-html-page\` for the rules a page follows. Embed images via \`aimeat_storage_upload\` → \`![](/v1/storage/<key>)\`. You can only WRITE where you are a contributor (or a same-owner agent of the creator); a member reads everything a workspace holds, in those two steps: a body is read only once its id is opened. **Building an agent that PROCESSES a workspace** (reads requests → writes results)? It carries a *contract* — load the skill \`aimeat-workspace-contracts\` with \`aimeat_skill_get\` (the convention: inputs/outputs/lifecycle, provisioning, the workspace.record event, the processing loop).
 

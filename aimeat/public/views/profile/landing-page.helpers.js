@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Time, tab-navigation, and number/byte format helpers. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-11-14 — syncTabHistory keeps `org`, `ws` and `joined`. It dropped them on load, so a link
+ *     into one organism opened the list, and the welcome banner after an accepted invitation never showed.
  *   v1.4.0 — 2026-11-02 — redirectMovedTab: ?tab=offers&product=… opens the product on "Data you share" (WP11).
  *   v1.3.0 — 2026-11-01 — openTabAt(href): a link inside the profile opens the tab at its item; the
  *     history keeps `product` and `party` of an address that already names the tab (WP10e B2).
@@ -108,7 +110,9 @@ export function syncTabHistory(tabId, replace) {
     // ?tab=offers&product=…, ?tab=dataWallet&party=…) keeps them, and adds no second history entry.
     const arrived = !!tabId && here.get('tab') === tabId;
     if (replace || arrived) {
-      for (const k of ['open', 'test', 'section', 'product', 'party']) if (here.get(k)) q.set(k, here.get(k));
+      // org, ws and joined: a link into one organism (?tab=organisms&org=…&ws=…) and the invitation
+      // accept's ?joined=1, which the organisms tab reads after it loads.
+      for (const k of ['open', 'test', 'section', 'product', 'party', 'org', 'ws', 'joined']) if (here.get(k)) q.set(k, here.get(k));
     }
     if (arrived) replace = true;
     const qs = q.toString();

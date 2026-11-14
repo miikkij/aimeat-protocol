@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-14 — aimeat_organism_members gives each member's agent `mcp_last_seen`, as the members
+ *     route does, so an AI can say whose own AI is connected.
  *   2026-11-14 — Registers the team tools (mcp/teams.ts): aimeat_team_setup and aimeat_team_status.
  *   2026-11-14 — aimeat_organism_list's member half calls listedOrganisms (services/organism-read/
  *     list.ts), the member list GET /v1/organisms?member=<owner> serves; the parity section MEMBER-LIST
@@ -431,8 +433,8 @@ export function registerOrganismsTools(
             // names none (structure programme 2026-11, unit 7).
             const admitted = await rosterAgentsFor(storage, organism, caller, canSeeRoster, members.map(m => localAccountName(m.ghii)));
             const canSeeAgents = admitted !== null;
-            const agentsByOwner = new Map<string, { gaii: string; name: string }[]>();
-            for (const [name, agents] of admitted ?? []) agentsByOwner.set(name, agents.map(a => ({ gaii: a.gaii, name: a.name })));
+            const agentsByOwner = new Map<string, { gaii: string; name: string; mcp_last_seen: string | null }[]>();
+            for (const [name, agents] of admitted ?? []) agentsByOwner.set(name, agents.map(a => ({ gaii: a.gaii, name: a.name, mcp_last_seen: a.mcpLastSeen ?? null })));
 
             return {
                 content: [{

@@ -9,6 +9,8 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-11-14 — An organism invitation says the person brings the AI they already use, and that the
+ *     page after joining shows the one step for it (inviteAiLine, en/fi/es).
  *   2026-11-01 — textNotificationEmailHtml(): a `[Label](https://…)` line is a button and a bare https line a link
  *     (email-text-links.ts); the rest of the body stays escaped text.
  *   2026-10-27 — operator.email_footer: the operator's own line replaces "Sent by AIMEAT Protocol" and the profile
@@ -77,6 +79,7 @@ const i18n: Record<string, Record<string, string>> = {
     inviteHeading: "You're invited to AIMEAT",
     inviteSentence: '{inviter} invited you to join {org} on AIMEAT.',
     inviteNewAccount: "You don't need an account yet — the link below lets you register and join in a single step.",
+    inviteAiLine: 'Bring the AI you already use, such as Claude, ChatGPT, Copilot or Gemini. After you join, the page shows the one step for your AI, and it then reads the same material as everyone else.',
     inviteWorkspacesLabel: "You'll get access to:",
     inviteButton: 'Accept invitation',
     inviteExpiryPrefix: 'This invitation expires on',
@@ -145,6 +148,7 @@ const i18n: Record<string, Record<string, string>> = {
     inviteHeading: 'Sinut on kutsuttu AIMEAT-palveluun',
     inviteSentence: '{inviter} kutsui sinut liittymään: {org}.',
     inviteNewAccount: 'Et tarvitse vielä tiliä — alla oleva linkki antaa sinun rekisteröityä ja liittyä yhdellä kertaa.',
+    inviteAiLine: 'Ota mukaan tekoäly, jota jo käytät, esimerkiksi Claude, ChatGPT, Copilot tai Gemini. Kun olet liittynyt, sivu näyttää tekoälyllesi yhden ohjeen, ja sen jälkeen se lukee samaa materiaalia kuin muutkin.',
     inviteWorkspacesLabel: 'Saat käyttöoikeuden:',
     inviteButton: 'Hyväksy kutsu',
     inviteExpiryPrefix: 'Tämä kutsu vanhenee',
@@ -213,6 +217,7 @@ const i18n: Record<string, Record<string, string>> = {
     inviteHeading: 'Tienes una invitación a AIMEAT',
     inviteSentence: '{inviter} te invitó a unirte a {org} en AIMEAT.',
     inviteNewAccount: 'Todavía no necesitas una cuenta: el enlace de abajo te deja registrarte y unirte en un solo paso.',
+    inviteAiLine: 'Trae la IA que ya usas, como Claude, ChatGPT, Copilot o Gemini. Cuando te unas, la página muestra el único paso para tu IA, y entonces lee el mismo material que todos los demás.',
     inviteWorkspacesLabel: 'Tendrás acceso a:',
     inviteButton: 'Aceptar la invitación',
     inviteExpiryPrefix: 'Esta invitación caduca el',
@@ -420,6 +425,7 @@ export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html:
   const html = wrapHtml(t(locale, 'inviteHeading'), `
     <p>${sentence}</p>
     <p>${t(locale, 'inviteNewAccount')}</p>
+    <p>${t(locale, 'inviteAiLine')}</p>
     ${wsHtml}
     ${messageHtml}
     <p style="text-align: center;">
@@ -437,6 +443,8 @@ export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html:
     t(locale, 'inviteSentence').replace('{inviter}', args.inviterName).replace('{org}', args.orgName),
     '',
     t(locale, 'inviteNewAccount'),
+    '',
+    t(locale, 'inviteAiLine'),
     '',
     ...(args.workspaces.length ? [t(locale, 'inviteWorkspacesLabel'), ...args.workspaces.map(w => `  - ${w.name || w.ws} (${roleLabel(w.role)})`), ''] : []),
     ...(args.message ? [`${t(locale, 'inviteMessageLabel')} ${args.message}`, ''] : []),

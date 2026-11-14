@@ -7,6 +7,8 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — Each member's agents on GET /v1/organisms/:id/members carry `mcp_last_seen`, so the
+ *     roster can say whether the member's own AI is connected (team setup T13).
  *   2026-11-14 — GET /v1/organisms/:id/members reads through services/organism-read/member.ts
  *     organismRosterFor: a private organism's member list is for its active members only; the
  *     operator's agent is refused there as on GET /v1/organisms/:id and aimeat_organism_members
@@ -135,7 +137,9 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       const avatars = await readAvatarsOrEmpty(storage, admitted.flat().map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/organisms/:id/members');
       const enriched = members.map((m, i) => ({
         ...m,
-        agents: admitted[i].map(a => ({ gaii: a.gaii, name: a.name, avatar: avatars.get(a.gaii) ?? null })),
+        // mcp_last_seen: when the agent last opened an MCP session, the node's test for "this member's
+        // own AI is connected" (services/agent/mcp-touch.ts); null for one that never did.
+        agents: admitted[i].map(a => ({ gaii: a.gaii, name: a.name, avatar: avatars.get(a.gaii) ?? null, mcp_last_seen: a.mcpLastSeen ?? null })),
       }));
       res.json(success(config.nodeId, { members: enriched, total: enriched.length, agents_included: true, agent_access: agentAccessOf(organism) }));
       return;

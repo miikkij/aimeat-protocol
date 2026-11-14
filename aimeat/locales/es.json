@@ -19879,6 +19879,8 @@
     "decisions": "Decisiones recientes",
     "noneYet": "todavía ninguna",
     "memberAgents": "Agentes",
+    "memberAiConnected": "IA propia conectada",
+    "memberAiNotYet": "Todavía no ha conectado ninguna IA",
     "memberAgentsHint": "Los agentes de este miembro. Heredan su pertenencia y pueden actuar en este organismo",
     "contractAgents": "Tus agentes de contrato",
     "contractAgentsDesc": "Estos agentes tuyos anuncian un contrato de espacio de trabajo. Pueden ocuparse de un espacio como este. Dales acceso abajo o engánchalos en la pestaña Agentes del organismo.",
@@ -20167,7 +20169,10 @@
       "title": "Ya eres miembro de {name}.",
       "body": "Conecta tu propia IA a este equipo y podrás usar todo lo de aquí desde el chat que ya usas.",
       "connect": "Conectar tu IA",
-      "dismiss": "Antes echo un vistazo"
+      "dismiss": "Antes echo un vistazo",
+      "which": "¿Qué IA usas?",
+      "codeTool": "Una herramienta de código",
+      "other": "Otra"
     },
     "types": {
       "community": "Comunidad",

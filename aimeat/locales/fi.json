@@ -21826,6 +21826,8 @@
     "decisions": "Viimeisimmät päätökset",
     "noneYet": "ei vielä mitään",
     "memberAgents": "Agentit",
+    "memberAiConnected": "Oma tekoäly kytketty",
+    "memberAiNotYet": "Tekoälyä ei ole vielä kytketty",
     "memberAgentsHint": "Jäsenen agentit. Ne perivät jäsenyyden ja voivat toimia tässä organismissa",
     "contractAgents": "Sopimusagenttisi",
     "contractAgentsDesc": "Nämä agenttisi tarjoavat workspace-sopimusta. Ne osaavat käsitellä tällaista työtilaa. Myönnä pääsy (alla) tai liitä ne organismin Agentit-välilehdellä.",
@@ -22115,7 +22117,10 @@
       "title": "Olet nyt jäsen: {name}.",
       "body": "Kytke oma tekoälysi tähän tiimiin, niin käytät kaikkea täällä olevaa suoraan siitä chatista jota jo käytät.",
       "connect": "Kytke tekoälysi",
-      "dismiss": "Selaan ensin"
+      "dismiss": "Selaan ensin",
+      "which": "Mitä tekoälyä käytät?",
+      "codeTool": "Koodityökalu",
+      "other": "Jokin muu"
     },
     "types": {
       "community": "Yhteisö",

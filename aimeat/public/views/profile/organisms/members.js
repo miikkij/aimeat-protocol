@@ -10,6 +10,9 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   2026-11-14 — Each active member's row says whether their own AI is connected (an agent of theirs
+ *     with mcp_last_seen), where the roster names agents (team setup T13). The agents line loses its
+ *     emoji (no emoji in the interface).
  *   2026-10-19 — A member's agents are named by their shown name, in alphabetical order.
  *   2026-09-28 — The agents tooltip says when the organism admits only listed agents (the list then names only those).
  *   v2.14.1 -- 2026-09-26 -- The owner tag in the roster and the workspace creator in the access
@@ -117,6 +120,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
   const [requests, setRequests] = useState(null);
   const [members, setMembers] = useState(null);
   const [agentAccess, setAgentAccess] = useState('all'); // which agents the organism admits (the server lists only those)
+  const [agentsIncluded, setAgentsIncluded] = useState(false); // the roster names each member's agents
   const [banned, setBanned] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [showInvite, setShowInvite] = useState(false);
@@ -139,6 +143,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
     const [mb, rq, bn, inv, eminv] = await Promise.all(tasks);
     setMembers(mb?.data?.members || []);
     setAgentAccess(mb?.data?.agent_access === 'listed' ? 'listed' : 'all');
+    setAgentsIncluded(mb?.data?.agents_included === true);
     if (canManage) {
       setRequests(rq?.data?.join_requests || []);
       setBanned(bn?.data?.members || []);
@@ -304,7 +309,14 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
           const agentsLine = (m.agents || []).length
             ? html`<span title=${agentAccess === 'listed'
               ? (t('organisms.memberAgentsHintListed') || "This member's agents that the organism admits. They act with the member's rights.")
-              : (t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism")}>${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${sortAgents(m.agents).map(agentLabel).join(', ')}</span>`
+              : (t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism")}>${t('organisms.memberAgents') || 'Agents'}: ${sortAgents(m.agents).map(agentLabel).join(', ')}</span>`
+            : null;
+          // Whether the member's own AI is connected: an agent of theirs that has opened an MCP
+          // session (mcp_last_seen). Shown only where the roster names agents at all.
+          const aiLine = agentsIncluded && m.status === 'active'
+            ? ((m.agents || []).some(a => a.mcp_last_seen)
+              ? (t('organisms.memberAiConnected') || 'Own AI connected')
+              : (t('organisms.memberAiNotYet') || 'No AI connected yet'))
             : null;
           const accessOpen = canManage && accessEditFor === bare;
           return html`
@@ -316,7 +328,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
                    the badge says what it means: owner. Two rows both reading "creator" asks
                    the viewer which one really made the organism. -->
               <${Name} after=${html` <${PresenceDot} ghii=${toGhii(m.ghii)} /> <${Mark} tone=${isOwnerRow ? 'fine' : undefined}>${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : (m.role || 'member')}<//>`}
-                meta=${line || agentsLine ? html`${line}${line && agentsLine ? html`<br />` : null}${agentsLine}` : null}>${(m.ghii)}<//>
+                meta=${line || agentsLine || aiLine ? html`${line}${line && (agentsLine || aiLine) ? html`<br />` : null}${aiLine}${aiLine && agentsLine ? ' · ' : null}${agentsLine}` : null}>${(m.ghii)}<//>
               <${Doors} menu=${menuItems.length ? menuItems : null} menuLabel=${t('organisms.moreActions') || 'More actions'} />
             <//>`;
         })}

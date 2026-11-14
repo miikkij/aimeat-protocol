@@ -99,6 +99,23 @@ export async function writeTeamRecord(
     return (await storage.setMemoryIfVersion(record, prev.version)) !== null;
 }
 
+/** The organism types a team setup writes (setup.ts); only these are read for a team record. */
+export const TEAM_ORGANISM_TYPES = new Set(['team', 'virtual team']);
+
+/**
+ * The team names of the listed organisms that are teams, by organism id: what a page needs to show a
+ * team in its reader's language. Organisms of other types cost no read.
+ */
+export async function teamNamesFor(storage: Storage, organisms: readonly { id: string; type?: string | null }[]): Promise<Map<string, Pick<TeamRecord, 'names' | 'language'>>> {
+    const out = new Map<string, Pick<TeamRecord, 'names' | 'language'>>();
+    for (const o of organisms) {
+        if (!TEAM_ORGANISM_TYPES.has(String(o.type ?? ''))) continue;
+        const team = await readTeamRecord(storage, o.id);
+        if (team) out.set(o.id, { names: team.names, language: team.language });
+    }
+    return out;
+}
+
 /** The team's name in the reader's language, then the working language, then the organism's name. */
 export function teamDisplayName(team: Pick<TeamRecord, 'names' | 'language'> | null, lang: string | null | undefined, fallback: string): string {
     if (!team) return fallback;

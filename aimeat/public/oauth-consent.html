@@ -9,6 +9,9 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.13.0 — 2026-11-14 — A new agent's name and shown name are filled in from the connecting service
+      (unique among the person's agents), so creating it is one press, and it is made in the
+      workstation mode, so an AI connected over MCP does not stay "onboarding" (team setup T4).
     v1.12.0 — 2026-11-04 — The page signs nobody in. An owner with no session goes to the front page,
       which signs in or registers the way the node is configured and returns here with the request
       in its address. The form here could not register anyone, and a person with no account waited
@@ -553,7 +556,9 @@
       const r = await fetch('/v1/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
-        body: JSON.stringify({ name, owner: ownerName, display_name: displayName || name }),
+        // An AI that connects over MCP visits the node from the person's own client: the workstation
+        // flow (5 steps, 4 required), so it does not stay "onboarding" for steps a chat client never takes.
+        body: JSON.stringify({ name, owner: ownerName, display_name: displayName || name, mode: 'workstation' }),
       });
       const d = await r.json();
       if (!d.ok) throw httpError(r.status, d.error?.message || 'Failed to create agent');
@@ -609,18 +614,27 @@
     function renderCreateForm(container, onCreated) {
       // The name given at home is filled in rather than asked again — unless an agent already
       // carries it, in which case the list above is where that name lives.
-      const prefill = homeAgentName && !agents.some((a) => a.name === homeAgentName) ? homeAgentName : '';
       // The example name follows the connecting service ("goose" → "goose-work"), never a fixed vendor.
       const slug = declaredName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
       const exampleName = `${slug.length >= 2 ? slug : 'my-ai'}-work`;
+      // Without a name from home, the field is filled with the connecting service's own name, made
+      // unique among the person's agents, so creating it is one press (team setup T4).
+      const suggested = (() => {
+        const base = slug.length >= 3 ? slug : `${slug || 'my'}-ai`;
+        let name = base;
+        for (let i = 2; agents.some((a) => a.name === name); i++) name = `${base}-${i}`;
+        return name;
+      })();
+      const fromHome = homeAgentName && !agents.some((a) => a.name === homeAgentName) ? homeAgentName : '';
+      const prefill = fromHome || suggested;
       container.innerHTML = `
         <div class="create-agent-form">
           <label>${escHtml(t('newAgentName'))}</label>
           <input type="text" id="newAgentName" placeholder="${escHtml(t('newAgentNamePlaceholder', { example: exampleName }))}" minlength="3" maxlength="64" required value="${escHtml(prefill)}" />
-          ${prefill ? `<p class="name-identity-hint name-from-home">${escHtml(t('homeNamed'))}</p>` : ''}
+          ${fromHome ? `<p class="name-identity-hint name-from-home">${escHtml(t('homeNamed'))}</p>` : ''}
           <p class="name-identity-hint">${escHtml(t('newAgentNameHint'))}</p>
           <label>${escHtml(t('newAgentDisplayName'))}</label>
-          <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint', { client: aiInline }))}" maxlength="200" /><!-- js/input-limits.js name -->
+          <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint', { client: aiInline }))}" maxlength="200" value="${escHtml(declaredName.slice(0, 200))}" /><!-- js/input-limits.js name -->
           <div id="createError" class="error-msg"></div>
           <div class="btn-row">
             <button type="button" class="btn-sm btn-sm-muted" id="cancelCreate">${escHtml(t('cancelBtn'))}</button>

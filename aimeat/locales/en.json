@@ -21059,6 +21059,8 @@
     "decisions": "Recent decisions",
     "noneYet": "none yet",
     "memberAgents": "Agents",
+    "memberAiConnected": "Own AI connected",
+    "memberAiNotYet": "No AI connected yet",
     "memberAgentsHint": "This member's agents. They inherit the membership and can act in this organism",
     "contractAgents": "Your contract agents",
     "contractAgentsDesc": "These agents of yours advertise a workspace contract. They can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.",
@@ -21348,7 +21350,10 @@
       "title": "You are now a member of {name}.",
       "body": "Connect your own AI to this team and you can use everything here straight from the chat you already use.",
       "connect": "Connect your AI",
-      "dismiss": "Browse first"
+      "dismiss": "Browse first",
+      "which": "Which AI do you use?",
+      "codeTool": "A code tool",
+      "other": "Something else"
     },
     "types": {
       "community": "Community",
