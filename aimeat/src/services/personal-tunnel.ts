@@ -13,6 +13,10 @@
  *   - setNotificationService(): wires optional mailbox-notification delivery
  *
  * @version-history
+ *   v1.4.0 — 2026-11-14 — The heartbeat monitor checks at least as often as the degraded window is
+ *     wide, so a late node is marked degraded before it is closed. A 10 s floor on the check
+ *     interval let a node pass from online to offline unseen when the threshold was short, and the
+ *     guard tier's degraded case failed whenever its heartbeat fell between two checks.
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.0 — 2026-10-12 — mailbox_ack deletes only the items of the node that sends it
  *     (ackMailboxItems); an id of another node's item is left in place and logged
@@ -390,8 +394,11 @@ export class TunnelManager {
   }
 
   startHeartbeatMonitor(): void {
-    const checkInterval = Math.max(this.config.personalNodeHeartbeatIntervalMs, 10000);
     const offlineThreshold = this.config.personalNodeOfflineThresholdMs;
+    // A node is degraded between 60 % and 100 % of the threshold. A check spaced wider than half that
+    // window can step over it, from online straight to offline, so the interval is capped at a fifth of
+    // the threshold (half the 40 % window). The default (30 s beat, 300 s threshold) keeps its 30 s.
+    const checkInterval = Math.max(1000, Math.min(Math.max(this.config.personalNodeHeartbeatIntervalMs, 10000), Math.floor(offlineThreshold * 0.2)));
 
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
