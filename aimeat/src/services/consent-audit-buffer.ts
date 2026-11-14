@@ -20,15 +20,21 @@
  *   - flushConsentAudit()            -- write the queued entries to storage
  *   - initConsentAuditBuffer(storage)-- wire storage + start the flush interval
  *   - shutdownConsentAuditBuffer()   -- stop the interval + final flush (graceful exit)
+ *   - holdConsentAuditForErasure(a)  -- an account erasure: drop its rows, keep none until released
  * @usage
  *   import { bufferConsentAudit } from './consent-audit-buffer.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-14 -- holdConsentAuditForErasure: the erasure drops the account's waiting entries
+ *     and waits for a write in progress before its cascade, and no entry of the account is kept until
+ *     it ends. An entry that waited was stored after the cascade had deleted the account's audit rows
+ *     (register finding f-2026-11-13-write-buffers-and-erasure).
  *   v1.1.0 -- 2026-11-04 -- An entry is written within a second (flushSoon), not up to 60 s later, so a
  *     crash loses at most that second (codebase analysis 2026-11-03, HA stage 1 item 1.6).
  *   v1.0.0 -- 2026-06-21 -- Initial: batched off-request-path consent-audit writes.
  */
 import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { ErasureHolds, type ErasedAccount } from './erasure/holds.js';
 
 /** The safety net: retries a failed write and catches anything the soon-flush missed. */
 const FLUSH_INTERVAL_MS = 60_000;
@@ -45,6 +51,9 @@ let soonTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
 let queue: ConsentAuditEntry[] = [];
 let dropped = 0;
+/** The accounts whose erasure runs now, whose entries are not kept, and the write in progress
+ *  an erasure waits for (holdConsentAuditForErasure). */
+const erasing = new ErasureHolds();
 
 /** Write what waits within FLUSH_SOON_MS, once: entries arriving meanwhile join that flush. */
 function flushSoon(): void {
@@ -55,6 +64,8 @@ function flushSoon(): void {
 
 /** Enqueue a consent-audit entry. In-memory only — never blocks the request, never throws. */
 export function bufferConsentAudit(entry: ConsentAuditEntry): void {
+  // The audit trail of an account being erased: the cascade deletes it, so it is not started again.
+  if (erasing.covers(entry.ownerGaii)) return;
   flushSoon();
   queue.push(entry);
   if (queue.length > MAX_QUEUE) {
@@ -103,20 +114,36 @@ export async function flushConsentAudit(): Promise<void> {
 
   const failed: ConsentAuditEntry[] = [];
   try {
-    for (const entry of batch) {
-      try {
-        await storage.addConsentAuditEntry(entry);
-      } catch (err) {
-        failed.push(entry);
-        if (failed.length === 1) logger.warn('consent-audit flush: write failed, will retry next window', { error: String(err) });
+    await erasing.track((async () => {
+      for (const entry of batch) {
+        try {
+          await storage.addConsentAuditEntry(entry);
+        } catch (err) {
+          failed.push(entry);
+          if (failed.length === 1) logger.warn('consent-audit flush: write failed, will retry next window', { error: String(err) });
+        }
       }
-    }
+    })());
   } finally {
     if (failed.length > 0) queue.unshift(...failed);
     flushing = false;
     // What arrived during this flush goes soon too; a failed write waits for the interval.
     if (failed.length === 0 && queue.length > 0) flushSoon();
   }
+}
+
+/**
+ * An account erasure (services/owner-erasure.ts), before its cascade: no entry of the account is
+ * kept from now on, a write in progress answers first so the cascade reaches what it stored, and the
+ * account's waiting entries, a failed write's included, are dropped. The returned function ends the
+ * hold, after the cascade. Entries whose owner is someone else stay, the erased person as accessor
+ * included, as the cascade keeps those stored rows.
+ */
+export async function holdConsentAuditForErasure(account: ErasedAccount): Promise<() => void> {
+  const release = erasing.hold(account);
+  await erasing.writesSettled();
+  queue = queue.filter(e => !ErasureHolds.isOf(e.ownerGaii, account));
+  return release;
 }
 
 /** Wire storage and start the flush interval. Idempotent. */
