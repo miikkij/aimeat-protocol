@@ -34,6 +34,8 @@
  *   const convo = await createGroupConversation(ctx, { createdBy, participants, subject });
  *   await sendGroupMessage(ctx, { conversationId: convo.id, senderGhii, body });
  * @version-history
+ *   v1.6.1 -- 2026-11-14 -- notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.group_message, direct_message).
  *   v1.6.0 -- 2026-10-22 -- sendGroupMessage stamps each of this node's attachments with the version
  *     that is sent (stampSentVersions), as a direct send does, so a participant's copy is made of that
  *     version or of nothing (secaudit 2026-10 wave 3, v82).
@@ -418,6 +420,10 @@ export async function fanOutToParticipants(
         body: messagePreviewWithAttachments(msg.body, msg.attachments),
         link: `/v1/profile#inbox/${convo.id}`,
         actions: [{ id: 'reply', label: 'Reply', kind: 'reply', to: msg.recipientGhii, conversationId: convo.id, subject: convo.subject, replyTo: msg.id }],
+        i18n: {
+          key: convo.subject ? 'group_message' : 'direct_message',
+          vars: { who: msg.senderGhii, subject: convo.subject ?? '', preview: messagePreviewWithAttachments(msg.body, msg.attachments) },
+        },
       });
     }
 

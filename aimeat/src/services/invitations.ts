@@ -21,6 +21,9 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
+ *     (notiftext.organism_invitation, organism_invitation_cancelled, organism_invitation_accepted,
+ *     organism_member_added_<role>); the invitation email names a team in the email's language.
  *   2026-11-14 — acceptNameInvitation makes the accepter an owner when the invitation was sent to make
  *     a team lead (services/team/leads.ts promotePendingLead).
  *   2026-11-12 — addOrganismMember and acceptNameInvitation close the new member's open join
@@ -100,6 +103,7 @@ import { emailTemplateLang } from './email-templates.js';
 import { takeInviteEmailOnNode } from './account-limits.js';
 import { sendMail, type ThirdPartyCount } from './mail-gate.js';
 import { promotePendingLead } from './team/leads.js';
+import { readTeamRecord, teamDisplayName } from './team/record.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
@@ -361,6 +365,7 @@ export async function createEmailInvitation(
       type: 'organism_invitation',
       title: `${inviterName} invited you to join "${input.organism.name}"`,
       link: `/v1/invite?token=${invitation.id}`,
+      i18n: { key: 'organism_invitation', vars: { who: inviterName }, orgVars: { org: input.organism.id } },
     });
     emitChange('notifications');
   }
@@ -369,8 +374,10 @@ export async function createEmailInvitation(
   const emailSvc = nodeContext().email;
   let emailSent = false;
   if (emailSvc?.enabled) {
+    // A team is named in the email's language (services/team/record.ts); another organism by its name.
+    const orgName = teamDisplayName(await readTeamRecord(storage, input.organism.id), locale, input.organism.name);
     emailSent = await sendMail(emailSvc, { kind: 'third-party', to: cleanEmail, count }, { form: 'invite', args: {
-      orgName: input.organism.name,
+      orgName,
       inviterName,
       acceptUrl,
       // By name: the id (ws-...) means nothing to the person reading the email.
@@ -593,6 +600,7 @@ export async function createNameInvitation(
       { id: 'accept', label: 'Accept', kind: 'api', method: 'POST', endpoint: `/v1/organisms/${input.organism.id}/invitations/accept`, style: 'primary' },
       { id: 'decline', label: 'Decline', kind: 'api', method: 'POST', endpoint: `/v1/organisms/${input.organism.id}/invitations/decline`, style: 'default', confirm: true },
     ],
+    i18n: { key: 'organism_invitation', vars: { who: input.inviterGhii }, orgVars: { org: input.organism.id } },
   });
   emitChange('notifications', `${invitee}@${config.nodeId}`);
   emitChange('organisms');
@@ -639,6 +647,7 @@ export async function cancelNameInvitation(
     type: 'organism_invitation_cancelled',
     title: `Your invitation to "${input.organism.name}" was withdrawn`,
     link: '/v1/profile#organisms',
+    i18n: { key: 'organism_invitation_cancelled', orgVars: { org: input.organism.id } },
   });
   emitChange('notifications', target);
   emitChange('organisms');
@@ -686,6 +695,7 @@ export async function acceptNameInvitation(
       type: 'organism_invitation_accepted',
       title: `${invitee} accepted your invitation to "${organism.name}"`,
       link: '/v1/profile#organisms',
+      i18n: { key: 'organism_invitation_accepted', vars: { who: invitee }, orgVars: { org: organism.id } },
     });
     emitChange('notifications');
   }
@@ -775,6 +785,7 @@ export async function addOrganismMember(
     type: 'organism_member_added',
     title: `${input.inviterGhii} added you to "${input.organism.name}" as ${role}`,
     link: '/v1/profile#organisms',
+    i18n: { key: `organism_member_added_${role}`, vars: { who: input.inviterGhii }, orgVars: { org: input.organism.id } },
   });
   emitChange('notifications', `${invitee}@${config.nodeId}`);
   emitChange('organisms');

@@ -34,6 +34,8 @@
  * @structure ForeignA2AHandler
  * @usage new ForeignA2AHandler(storage, config, agent, peer, card, payment)
  * @version-history
+ *   2026-11-14 -- notify() passes i18n so the notification is written in its recipient's language
+ *     (notiftext.a2a_foreign_work_paid, a2a_foreign_work_paid_key).
  *   2026-11-08 -- A paid turn claims the work before it collects, so two turns for one quote collect
  *     once; a payment collected whose paid record cannot be written is refunded or kept as undelivered
  *     for the seller and the operator, and the caller is told not to pay again; a cancel is written on
@@ -399,6 +401,10 @@ export class ForeignA2AHandler implements A2ARequestHandler {
         body: `${this.peer.displayName} paid for "${work.taskType}" from your agent ${this.agent.name}. It is waiting in your work inbox.`
           + (this.peer.keyHost && !this.peer.hostIsNode ? ` Its key is published at ${this.peer.keyHost}.` : ''),
         link: '/v1/profile#exchange',
+        i18n: {
+          key: this.peer.keyHost && !this.peer.hostIsNode ? 'a2a_foreign_work_paid_key' : 'a2a_foreign_work_paid',
+          vars: { peer: this.peer.displayName, task: work.taskType, agent: this.agent.name, host: this.peer.keyHost ?? '' },
+        },
       }).catch(err => logger.warn('a2a: could not notify the provider', { error: String(err) }));
 
       logger.info('a2a: foreign work paid and opened', {

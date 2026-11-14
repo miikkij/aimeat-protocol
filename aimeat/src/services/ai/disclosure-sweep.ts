@@ -26,6 +26,8 @@
  *   - sweepUndisclosedPublicContent(storage, config) → { scanned, owners, notified }
  * @usage started from server-bootstrap/service-init.ts on a low-frequency timer
  * @version-history
+ *   v1.0.4 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.ai_disclosure_gap, ai_disclosure_gap_many).
  *   v1.0.3 — 2026-11-05 — Moved unchanged from src/services/ai-disclosure-sweep.ts to src/services/ai/disclosure-sweep.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.2 — 2026-10-16 — The sweep's population includes content an open workspace share serves to anyone.
  *   v1.0.1 — 2026-10-08 — The sweep decides each label under the node's label posture, for the content as it is now.
@@ -105,6 +107,7 @@ export async function sweepUndisclosedPublicContent(
           + 'anyone. Under Article 50(4) that combination owes a label.\n\n' + examples
           + '\n\nIf a person did read and approve it, record that — the label stops being owed.',
         link: '/v1/profile#ai',
+        i18n: { key: rows.length === 1 ? 'ai_disclosure_gap' : 'ai_disclosure_gap_many', vars: { count: rows.length, examples } },
         // `navigate` only: this notification asks a person to LOOK, and an action that carried the
         // clicker's authority would be a way to change a compliance statement by tapping a bell.
         actions: [

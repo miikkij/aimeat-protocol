@@ -16,6 +16,8 @@
  * @structure sweepLapsedMemberships(storage, config) → { swept, revoked, failed }
  * @usage started from server-bootstrap/service-init.ts on a low-frequency timer
  * @version-history
+ *   v1.0.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.app_member_expired, app_member_expired_self_serve).
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055): the expiry axis.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -92,6 +94,10 @@ export async function sweepLapsedMemberships(
             ? 'The term ran out. You can take another one whenever you like.'
             : 'The term ran out. Ask the owner if you need it back.',
           link: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(rec.appId.split('/')[1] ?? '')}?mode=inline`,
+          i18n: {
+            key: rec.renewal === 'self-serve' ? 'app_member_expired_self_serve' : 'app_member_expired',
+            vars: { app: rec.appId.split('/')[1]?.replace(/\.html?$/i, '') ?? rec.appId },
+          },
         });
       } catch (err) {
         // The membership ended whether or not a bell rang.

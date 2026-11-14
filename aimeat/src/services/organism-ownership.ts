@@ -30,6 +30,8 @@
  *   if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
  *
  * @version-history
+ *   v2.0.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.organism_owner_added*, organism_owner_removed_you*).
  *   v2.0.0 — 2026-08-15 — Ownership is plural: owners[] + createdBy, add/remove as first-class
  *     operations, and the handover expressed as add-then-remove. creatorGhii becomes a mirror.
  *   v1.0.0 — 2026-08-15 — Extracted from the transfer route so the operator break-glass shares it.
@@ -143,6 +145,7 @@ export async function addOrganismOwner(
     type: 'organism_ownership_transferred',
     title: `You are now an owner of "${organism.name}"`,
     link: '/v1/profile#organisms',
+    i18n: { key: 'organism_owner_added_you', orgVars: { org: organism.id } },
   });
   // Everyone who already held it is told, because gaining a co-owner is not a private event.
   for (const existing of owners) {
@@ -150,6 +153,7 @@ export async function addOrganismOwner(
       type: 'organism_ownership_transferred',
       title: `${name} is now an owner of "${organism.name}"${opts.performedBy ? ` (${opts.performedBy})` : ''}`,
       link: '/v1/profile#organisms',
+      i18n: { key: opts.performedBy ? 'organism_owner_added_by' : 'organism_owner_added', vars: { who: name, by: opts.performedBy ?? '' }, orgVars: { org: organism.id } },
     });
   }
 
@@ -196,6 +200,7 @@ export async function removeOrganismOwner(
     type: 'organism_ownership_transferred',
     title: `You are no longer an owner of "${organism.name}"${opts.performedBy ? ` (${opts.performedBy})` : ''}`,
     link: '/v1/profile#organisms',
+    i18n: { key: opts.performedBy ? 'organism_owner_removed_you_by' : 'organism_owner_removed_you', vars: { by: opts.performedBy ?? '' }, orgVars: { org: organism.id } },
   });
 
   return { ok: true, owners: next, removed: name, membershipCreated: false };

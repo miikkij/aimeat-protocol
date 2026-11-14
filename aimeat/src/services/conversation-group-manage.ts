@@ -34,6 +34,8 @@
  * @usage
  *   const r = await startGroupConversation(ctx, { actor, members: ['bob', 'carol'], subject, body });
  * @version-history
+ *   v1.1.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.group_invitation, group_added and their _untitled forms).
  *   v1.1.0 — 2026-10-26 — classifyMember adds a colleague directly on a node with members see each other
  *     on (areColleagues, services/colleagues.ts); a block still refuses first.
  *   v1.0.0 — 2026-10-21 — Initial: user-created group chat on the Messages page.
@@ -163,12 +165,14 @@ async function tellMembers(ctx: DeliveryCtx, convo: ConversationRecord, actor: s
         title: `${actor} invites you to the group "${subject}"`,
         body: 'You see the group and its messages once you accept.',
         link: '/v1/profile#inbox',
+        i18n: { key: convo.subject ? 'group_invitation' : 'group_invitation_untitled', vars: { who: actor, subject } },
       }
       : {
         type: 'group_added',
         title: `${actor} added you to the group "${subject}"`,
         body: 'You see the messages written from now on.',
         link: `/v1/profile#inbox/${convo.id}`,
+        i18n: { key: convo.subject ? 'group_added' : 'group_added_untitled', vars: { who: actor, subject } },
       });
   }
 }

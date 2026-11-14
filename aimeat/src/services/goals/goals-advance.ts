@@ -15,6 +15,8 @@
  * @structure OFFER_GRACE_MS · NOBODY_MS · computeAdvance() · advanceGoal()
  * @usage await advanceGoal(deps, ownerGhii, goalId);
  * @version-history
+ *   v1.2.2 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.goal_work_limit, goal_work_nobody*, goal_step_waiting*).
  *   v1.2.1 — 2026-10-29 — A model work waiting for the owner's answer on its spending (spendAsk) stays
  *     waiting until it is answered (goals-model-spend.ts; secaudit2026oct26 round 8c).
  *   v1.2.0 — 2026-10-27 — A model work waiting for the owner's answer on a record (readAsk) stays
@@ -25,7 +27,7 @@
  */
 import { logger } from '../../utils/logger.js';
 import { emitDelivery } from '../event-bus.js';
-import { notify } from '../notify.js';
+import { notify, type NotifText } from '../notify.js';
 import { materialiseAgentTask } from '../scheduler-agent-task.js';
 import { UNCHANGED } from '../record-cas.js';
 import { LIVE_TASK_STATUSES } from '../../storage/types/agents-messaging.js';
@@ -48,7 +50,8 @@ export interface AdvanceEffects {
   /** Works the node's model starts (goals-model.ts runModelWork). */
   run: string[];
   offer: Array<{ workId: string; agents: GoalAgent[] }>;
-  notify: Array<{ title: string; body: string; workId?: string }>;
+  /** `i18n` names the notiftext key the owner's notification is written from in their language. */
+  notify: Array<{ title: string; body: string; workId?: string; i18n?: NotifText }>;
   wake: boolean;
 }
 
@@ -109,7 +112,8 @@ export function computeAdvance(goal: GoalRecord, agents: GoalAgent[], free: Set<
         if (!w.limitAt) {
           w.limitAt = nowIso;
           g.log.push(logEntry('node', 'limit', `"${w.title}" waits: the goal has spent ${g.spent.usd.toFixed(2)} $ of its ${g.limits.usd} $.`, { workId: w.id }));
-          effects.notify.push({ title: `"${w.title}" waits for a higher spending limit`, body: `The goal has spent ${g.spent.usd.toFixed(2)} $ of its ${g.limits.usd} $. Raise the limit to let the model do it.`, workId: w.id });
+          effects.notify.push({ title: `"${w.title}" waits for a higher spending limit`, body: `The goal has spent ${g.spent.usd.toFixed(2)} $ of its ${g.limits.usd} $. Raise the limit to let the model do it.`, workId: w.id,
+            i18n: { key: 'goal_work_limit', vars: { work: w.title, spent: g.spent.usd.toFixed(2), limit: g.limits.usd } } });
         }
         continue;
       }
@@ -136,7 +140,10 @@ export function computeAdvance(goal: GoalRecord, agents: GoalAgent[], free: Set<
     }
     if (waited >= NOBODY_MS && !w.nobodyAt) {
       w.nobodyAt = nowIso;
-      effects.notify.push({ title: `No agent took "${w.title}"`, body: candidates.length ? 'Your agents that could take it are busy.' : `None of your agents ${w.wants?.length ? `knows ${w.wants.join(' or ')}` : 'may take it'}. Open the goal to choose how it gets done.`, workId: w.id });
+      effects.notify.push({ title: `No agent took "${w.title}"`, body: candidates.length ? 'Your agents that could take it are busy.' : `None of your agents ${w.wants?.length ? `knows ${w.wants.join(' or ')}` : 'may take it'}. Open the goal to choose how it gets done.`, workId: w.id,
+        i18n: candidates.length ? { key: 'goal_work_nobody_busy', vars: { work: w.title } }
+          : w.wants?.length ? { key: 'goal_work_nobody_skills', vars: { work: w.title, skills: w.wants.join(' / ') } }
+          : { key: 'goal_work_nobody', vars: { work: w.title } } });
     }
   }
 
@@ -144,7 +151,8 @@ export function computeAdvance(goal: GoalRecord, agents: GoalAgent[], free: Set<
   for (const w of g.works) {
     if (w.kind === 'human' && w.status === 'open' && !w.notifiedAt) {
       w.notifiedAt = nowIso;
-      effects.notify.push({ title: w.title, body: w.description || 'A step in your goal waits for you.', workId: w.id });
+      effects.notify.push({ title: w.title, body: w.description || 'A step in your goal waits for you.', workId: w.id,
+        i18n: w.description ? { key: 'goal_step_waiting', vars: { work: w.title, description: w.description } } : { key: 'goal_step_waiting_default', vars: { work: w.title } } });
       g.log.push(logEntry('node', 'asked', `"${w.title}" waits for the owner.`, { workId: w.id }));
     }
   }
@@ -205,7 +213,7 @@ export async function advanceGoal(deps: GoalDeps, ownerGhii: string, goalId: str
     }
   }
   for (const n of effects.notify) {
-    await notify(deps.storage, ownerGhii, { type: 'goal_waiting', title: n.title.slice(0, 200), body: n.body.slice(0, 500), link: `/v1/home?goal=${goalId}` })
+    await notify(deps.storage, ownerGhii, { type: 'goal_waiting', title: n.title.slice(0, 200), body: n.body.slice(0, 500), link: `/v1/home?goal=${goalId}`, ...(n.i18n ? { i18n: n.i18n } : {}) })
       .catch(err => logger.warn('goal: telling the owner failed', { goalId, error: String(err) }));
   }
   if (effects.wake && goal.coordinator && !(await wakeLive(deps, goal))) {

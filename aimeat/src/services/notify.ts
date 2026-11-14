@@ -26,6 +26,9 @@
  * @usage import { notify } from '../services/notify.js';
  *   await notify(storage, `${creatorOwner}@${nodeId}`, { type: 'workspace_access_request', title, link });
  * @version-history
+ *   2026-11-14 — A notification is written in its recipient's language: notify() resolves the
+ *     recipient's locale and stores the title and body from `notiftext.<key>` filled for them, and an
+ *     organism named through `i18n.orgVars` by its team name in that language (services/notify-text.ts).
  *   2026-11-04 — No per-key loop for a storage without bulkDeleteMemory: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-25 -- NotifyInput.ref: the question a notice asks, so the flow that decides it can mark
@@ -68,6 +71,7 @@ import { logger } from '../utils/logger.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
 import { localAccountName } from '../utils/gaii.js';
 import { readNotificationSettings, prefsFor, quietState, senderKey, type NotifSource } from './notification-settings.js';
+import { notifWords } from './notify-text.js';
 
 export const NOTIF_PREFIX = 'notif.';
 const NOTIF_TTL_HOURS = 24 * 90;   // 90 days
@@ -94,7 +98,13 @@ export type NotifAction =
  * Words the page says in the reader's language: a locale key under `notiftext.` and its variables.
  * `label`, `title` and `body` stay the English fallback and what a push carries.
  */
-export interface NotifText { key: string; vars?: Record<string, string | number> }
+export interface NotifText {
+  key: string;
+  vars?: Record<string, string | number>;
+  /** Variables that name an organism, by its id: notify() fills each with the organism's name in the
+   *  recipient's language (a team's translated name), and stores the filled value in `vars`. */
+  orgVars?: Record<string, string>;
+}
 
 /** Where the node's own API lives. Every `api` button the node emits calls a door under it. */
 const NODE_API_ROOT = '/v1/';
@@ -235,7 +245,8 @@ export function notifLinkToUrl(link?: string): string {
  * triggered it. Also mirrors the notification to the recipient's web-push subscription (if any);
  * the push click opens the same deep link as the bell entry.
  */
-export async function notify(storage: Storage, recipientGhii: string, input: NotifyInput): Promise<NotifyResult> {
+export async function notify(storage: Storage, recipientGhii: string, given: NotifyInput): Promise<NotifyResult> {
+  let input: NotifyInput = given;
   const result: NotifyResult = { stored: false, pushed: false, held: false, muted: false };
   try {
     const source: NotifSource = input.source ?? { kind: 'aimeat', name: 'AIMEAT' };
@@ -247,6 +258,10 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
       result.muted = true;
       return result;
     }
+    // The words in the recipient's own language, decided now (services/notify-text.ts): what is stored,
+    // shown in the bell and pushed is what this person reads.
+    const words = await notifWords(storage, recipientGhii, input.i18n, { title: input.title, body: input.body ?? '' });
+    input = { ...input, title: words.title, body: words.body, ...(words.i18n ? { i18n: words.i18n } : {}) };
     const id = randomUUID();
     const now = new Date().toISOString();
     // The same rule the route serves by, applied before anything is stored or pushed: a button the

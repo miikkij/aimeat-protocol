@@ -6,6 +6,8 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
+ *   v1.1.0 — 2026-11-14 — One added sentence: the manifest carries "i18n" labels in en, fi and es
+ *     (summary, spaces, fields, choices), which the workspace page shows in the reader's language.
  */
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
@@ -88,7 +90,7 @@ Echo back a compact summary and get a yes before emitting.
 ═══ OUTPUT ═══
 Produce, in this order:
 A) The CSM YAML for each NEW object type.
-B) The manifest JSON (fill id once the organism exists; use placeholders otherwise). Ensure: every required field present; status/backing/writeRole/cardinality use only the allowed enum values; every stage.type is a declared objectType; flow is acyclic; gate.after / branch.from/into/join reference real stage ids.
+B) The manifest JSON (fill id once the organism exists; use placeholders otherwise). Ensure: every required field present; status/backing/writeRole/cardinality use only the allowed enum values; every stage.type is a declared objectType; flow is acyclic; gate.after / branch.from/into/join reference real stage ids. Add "i18n" to the manifest with "en", "fi" and "es", each a flat object of labels: "summary", "type.<objectType name>", "<namespace>.<field>" for every field, and "<namespace>.<field>.<value>" for every enum choice, so every member reads the workspace in their own language.
 C) The APPLY steps using EXISTING endpoints (no special routes):
    1. Owner registers each object type's organism-scoped schema:
       PUT /v1/memory/{organism.{id}.<namespace>}/schema  body { "schema": <compiled JSON Schema>, "apply_to": "prefix", "schema_mode": "strict" }

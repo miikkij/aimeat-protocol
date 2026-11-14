@@ -25,6 +25,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2): membership decisions reach the member.
  *   v1.0.1 — 2026-09-26 — ownerOfPrincipal takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.0.2 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.app_member_approved*, app_member_revoked*).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -87,6 +89,10 @@ export async function notifyGrantIssued(
       title: input.appId ? `You were approved for ${input.appId.split('/').pop()}` : `${input.providerOwner} is carrying your calls`,
       body: `${input.providerOwner} approved you, so ${input.capabilityLabel} is free for you. They carry the cost.`,
       link: targetLink(input.appId),
+      i18n: {
+        key: input.appId ? 'app_member_approved' : 'app_member_approved_provider',
+        vars: { app: input.appId?.split('/').pop() ?? '', provider: input.providerOwner, capability: input.capabilityLabel },
+      },
     });
     return true;
   } catch (err) {
@@ -134,6 +140,10 @@ export async function notifyGrantsRevoked(
         title: m.appId ? `Your free access to ${m.appId.split('/').pop()} ended` : `${input.providerOwner} stopped carrying your calls`,
         body: `${input.providerOwner} withdrew the free access they were carrying${m.count > 1 ? ` (${m.count} capabilities)` : ''}. You can still call, at list price.`,
         link: targetLink(m.appId),
+        i18n: {
+          key: `${m.appId ? 'app_member_revoked' : 'app_member_revoked_provider'}${m.count > 1 ? '_many' : ''}`,
+          vars: { app: m.appId?.split('/').pop() ?? '', provider: input.providerOwner, count: m.count },
+        },
       });
       sent += 1;
     } catch (err) {

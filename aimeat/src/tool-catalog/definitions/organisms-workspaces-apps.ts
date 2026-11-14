@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-14 — aimeat_workspace_create asks for the manifest's "i18n" labels in en, fi and es.
  *   2026-11-13 — aimeat_workspace_read takes archived ('only') (unit 3b).
  *   2026-11-13 — aimeat_organism_list takes visibility (unit 3b).
  *   2026-11-13 — aimeat_organism_update takes location, max_members and member_visibility (unit 3b).
@@ -677,7 +678,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_create',
-        description: 'Create a new WORKSPACE inside an organism from a CUSTOM MANIFEST you supply — its objectTypes (each a records space with a JSON schema, or a document/wiki space) plus the per-namespace schemas. Registers it, locks the schemas, writes the manifest + readme. This is how an agent bootstraps a structured space; then fill it with aimeat_workspace_write (records and documents alike) and publish with aimeat_workspace_publish. Member-only.',
+        description: 'Create a new WORKSPACE inside an organism from a CUSTOM MANIFEST you supply — its objectTypes (each a records space with a JSON schema, or a document/wiki space) plus the per-namespace schemas. Registers it, locks the schemas, writes the manifest + readme. This is how an agent bootstraps a structured space; then fill it with aimeat_workspace_write (records and documents alike) and publish with aimeat_workspace_publish. Member-only. Put "i18n" in the manifest with "en", "fi" and "es", each a flat object of labels ("summary", "type.<objectType name>", "<namespace>.<field>", "<namespace>.<field>.<value>" for each enum choice), so every member reads the workspace in their own language.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Create Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

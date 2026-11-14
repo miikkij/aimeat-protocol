@@ -21,6 +21,8 @@
  *     raised ceiling safe.
  *   v1.0.1 — 2026-09-26 — The recipient's account comes from localAccountOf, so the alarm for a
  *     visitor's namespace never goes to the local namesake (secaudit 2026-09, F-1).
+ *   v1.0.2 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.quota_warning_<keys|bytes>_<account|agent|extension>).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -79,6 +81,13 @@ function describePrincipal(gaii: string): string {
   return 'Your account';
 }
 
+/** The same principal as describePrincipal, as the notiftext key part and the name it fills. */
+function principalWords(gaii: string): { kind: 'extension' | 'agent' | 'account'; name: string } {
+  if (gaii.startsWith('ext:')) return { kind: 'extension', name: gaii.slice(4).split('.')[0] ?? '' };
+  if (gaii.includes('#')) return { kind: 'agent', name: gaii.split('#')[0] ?? '' };
+  return { kind: 'account', name: '' };
+}
+
 /**
  * Raise a bell notification when `gaii` crosses a quota band. Both inputs are optional because the
  * caller only has the ones it already computed: the write path counts keys just for new keys, and
@@ -95,12 +104,13 @@ export async function checkMemoryQuotaAlarm(
     const maxKeys = config.memoryMaxKeysPerAgent;
     const maxBytes = config.memoryQuotaMb * 1024 * 1024;
 
-    const dims: Array<{ dim: 'keys' | 'bytes'; percent: number; detail: string }> = [];
+    const dims: Array<{ dim: 'keys' | 'bytes'; percent: number; detail: string; used: string | number; max: number }> = [];
     if (typeof usage.keyCount === 'number' && maxKeys > 0) {
       dims.push({
         dim: 'keys',
         percent: (usage.keyCount / maxKeys) * 100,
         detail: `${usage.keyCount} of ${maxKeys} memory keys`,
+        used: usage.keyCount, max: maxKeys,
       });
     }
     if (typeof usage.usedBytes === 'number' && maxBytes > 0) {
@@ -108,6 +118,7 @@ export async function checkMemoryQuotaAlarm(
         dim: 'bytes',
         percent: (usage.usedBytes / maxBytes) * 100,
         detail: `${(usage.usedBytes / (1024 * 1024)).toFixed(1)} MB of ${config.memoryQuotaMb} MB`,
+        used: (usage.usedBytes / (1024 * 1024)).toFixed(1), max: config.memoryQuotaMb,
       });
     }
 
@@ -141,6 +152,10 @@ export async function checkMemoryQuotaAlarm(
         title: `${describePrincipal(gaii)} is at ${Math.floor(d.percent)}% of its memory ${d.dim === 'keys' ? 'key limit' : 'quota'}`,
         body: `${d.detail}. ${remedy}`,
         link: '/v1/profile#memory',
+        i18n: {
+          key: `quota_warning_${d.dim}_${principalWords(gaii).kind}`,
+          vars: { name: principalWords(gaii).name, percent: Math.floor(d.percent), used: d.used, max: d.max, valueKb: config.memoryMaxValueSizeKb },
+        },
       });
     }
   } catch (err) {

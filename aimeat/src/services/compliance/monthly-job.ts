@@ -34,6 +34,8 @@
  *   - saveComplianceSnapshot(config, storage, opts) — keep the report as it stands right now
  * @usage registered as the core handler `compliance-report-monthly` in services/core-jobs.ts
  * @version-history
+ *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
+ *     (notiftext.compliance_report, compliance_report_clear).
  *   2026-11-05 — Moved unchanged from src/services/compliance-monthly-job.ts to src/services/compliance/monthly-job.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-16 — The months to write are decided by the newest stored monthly report: a late run
  *     makes up the month it owes (at most three), a month already stored is not written or
@@ -126,6 +128,7 @@ export async function runComplianceMonthlyReport(
           : 'Nothing in it needs a decision. It also names what it does not cover — read that part.',
         // The admin page is the SPA route /v1/admin; /admin is no route and opens the front page.
         link: `/v1/admin?tab=compliance&month=${m}`,
+        i18n: { key: report.gaps.length ? 'compliance_report' : 'compliance_report_clear', vars: { month: m, count: report.gaps.length } },
       });
     }
     last = { gaps: report.gaps.length, usecases: report.register.usecases.length };

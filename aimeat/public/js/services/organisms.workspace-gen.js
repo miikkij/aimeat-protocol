@@ -7,6 +7,7 @@
  *   pipeline that turns an AI response into a locked workspace. Extracted from organisms.js.
  * @usage import { buildGeneratorPrompt, parseGenerated, validateGenerated, applyGeneratedWorkspace } from './organisms.workspace-gen.js';
  * @version-history
+ *   v1.2.0 — 2026-11-14 — The generator asks for the i18n labels in en, fi and es always, with the summary and each enum choice, so every member reads the workspace in their own language.
  *   v1.1.0 — 2026-10-01 — The project template's spaces, schemas and policy moved to the server
  *     (src/data/organism-shapes.ts); applyProjectTemplate reads them from GET /v1/organisms/shapes
  *     and writes through PUT /v1/organisms/:id/workspace instead of the memory API.
@@ -73,8 +74,10 @@ Also, for each property:
 - Result fields that an agent or automation fills later (e.g. result_ref, output links, error details) get "readOnly": true — the form hides them from humans. Never list a readOnly field in "required".
 - Fields that should default to the acting user's identity (e.g. requested_by, created_by, author) get "x-default": "currentUser".
 
-Inside "manifest", add an "i18n" object with UI labels: one entry per language — always "en", plus the language of the user's request if different. Keys are flat strings:
+Inside "manifest", add an "i18n" object with UI labels: one entry per language — always "en", "fi" and "es", because the people who read the workspace may read any of the three. Keys are flat strings:
+- "summary": the workspace's summary in that language
 - "<namespace>.<field>": a short human label for that field
+- "<namespace>.<field>.<value>": a short label for each choice of a field that has an "enum"
 - "<namespace>.<field>.hint": one short sentence telling the user what to enter
 - "type.<objectType name>": a short plural label for that type's tab
 - "type.<objectType name>.desc": one short sentence on what this space is for (the localized form of the objectType "description")

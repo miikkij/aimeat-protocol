@@ -22,6 +22,8 @@
  * @usage
  *   const out = await removeOrganismMember(storage, config, { organism, callerOwner, targetRaw, ban });
  * @version-history
+ *   v1.0.1 -- 2026-11-14 -- notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.organism_member_banned, organism_member_removed).
  *   v1.0.0 -- 2026-08-25 -- Extracted from routes/organisms/membership.ts so the MCP surfaces can
  *     remove a member through the same rules the web door has always used.
  */
@@ -105,6 +107,7 @@ export async function removeOrganismMember(
       ? `You were blocked from "${organism.name}"`
       : `Your access to "${organism.name}" was revoked`,
     link: '/v1/profile#organisms',
+    i18n: { key: ban ? 'organism_member_banned' : 'organism_member_removed', orgVars: { org: organism.id } },
   });
   emitChange('notifications');
   emitChange('organisms');

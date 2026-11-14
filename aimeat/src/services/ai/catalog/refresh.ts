@@ -16,6 +16,8 @@
  *   it (plan 06, section 6); the node never changes anybody's model itself.
  * @structure parsePriceOverrides · refreshDue · refreshCatalog · keepPaidPrices · buildCatalog
  * @version-history
+ *   v1.1.2 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.ai_model_retired).
  *   v1.1.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-10-05 — keepPaidPrices: a refresh never makes a paid model free; the operator's
  *     override still can (secaudit 2026-10, AI-5).
@@ -146,6 +148,7 @@ async function tellOperatorsOfRetired(storage: Storage, config: AimeatConfig, pr
       title: 'A model you recommend is no longer offered',
       body: `The model catalogue marks ${refs} as retired. Owners who chose the recommended models no longer get it; replace it in the recommended models on the Config tab (AI).`,
       link: '/v1/admin?tab=config',
+      i18n: { key: 'ai_model_retired', vars: { models: refs } },
     }).catch(err => logger.warn('[ai-catalog] could not tell an operator about a retired model', { operator: o.name, error: String(err) }));
   }
 }

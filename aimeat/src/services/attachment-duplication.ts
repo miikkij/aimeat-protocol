@@ -12,6 +12,8 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.6.1 -- 2026-11-14 -- notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.direct_message_attachment_quota, _changed, _expired).
  *   v1.6.0 -- 2026-10-22 -- A copy is made only of the file version the message sent (isSentVersion:
  *     the stamped version, or for an older attachment a file not written after the send), on the
  *     same-node read, the own-agents fallback and the cross-node pull; a changed or removed file ends
@@ -310,6 +312,7 @@ export async function duplicateMessageAttachments(
           title: 'Attachment held — storage full',
           body: `Free up space to receive: ${att.name ?? att.storageKey}`,
           link: '/v1/profile#inbox',
+          i18n: { key: 'direct_message_attachment_quota', vars: { file: att.name ?? att.storageKey } },
         });
       }
       continue;
@@ -328,6 +331,7 @@ export async function duplicateMessageAttachments(
           title: 'An attachment was not received',
           body: `${att.name ?? att.storageKey}: ${bytes.changed}`,
           link: `/v1/profile#inbox/${message.conversationId}`,
+          i18n: { key: 'direct_message_attachment_changed', vars: { file: att.name ?? att.storageKey } },
         });
       }
       continue;
@@ -381,6 +385,7 @@ export async function sweepReferenceAttachments(ctx: AttachmentCtx): Promise<{ r
         title: 'An attachment expired',
         body: `An attachment from ${m.senderGhii} could not be received in time and was dropped.`,
         link: `/v1/profile#inbox/${m.conversationId}`,
+        i18n: { key: 'direct_message_attachment_expired', vars: { from: m.senderGhii } },
       });
       continue;
     }

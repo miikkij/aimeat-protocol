@@ -25,6 +25,8 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
+ *     (notiftext.organism_invitation_accepted).
  *   2026-11-14 — An accepted invitation that was sent to make a team lead makes the accepter an owner
  *     of the team (services/team/leads.ts promotePendingLead).
  *   2026-11-12 — An account made here gets `email_verification` { verification_id, sent } in the answer:
@@ -446,6 +448,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       type: 'organism_invitation_accepted',
       title: `${ownerName} accepted your invitation to "${organism.name}"`,
       link: '/v1/profile#organisms',
+      i18n: { key: 'organism_invitation_accepted', vars: { who: ownerName }, orgVars: { org: organism.id } },
     });
     emitChange('notifications');
     emitChange('organisms');

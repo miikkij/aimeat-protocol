@@ -12,6 +12,8 @@
  * @structure DEV_RUNGS · listAppBuilders · setAppBuilder · removeAppBuilder
  * @usage const out = await setAppBuilder(storage, config, caller, { owner, filename }, account, body);
  * @version-history
+ *   v1.0.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.app_dev_grant_<rung>).
  *   v1.0.0 — 2026-10-05 — Moved out of the dev-grants handlers of routes/app-members.ts by extraction;
  *     aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
  */
@@ -111,6 +113,7 @@ export async function setAppBuilder(
       title: `${c.owner} invited you to build ${appStem(c.filename)}`,
       body: `You may ${actsFor(level).join(', ')} on this app. Your agents are covered by the same invitation.`,
       link: appDeepLink(c.appId),
+      i18n: { key: `app_dev_grant_${levelName(level)}`, vars: { who: c.owner, app: appStem(c.filename) } },
     });
   } catch (err) {
     logger.warn('app-members: dev-grant notification failed, the grant stands', { error: String(err) });

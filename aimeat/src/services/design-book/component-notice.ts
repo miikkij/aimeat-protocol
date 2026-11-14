@@ -22,6 +22,8 @@
  * @structure COMPONENT_FAILING_NOTICE · noticeFailingComponents(storage, config)
  * @usage await noticeFailingComponents(storage, config);   // lifecycle.ts: the nightly round; service-init.ts: boot
  * @version-history
+ *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
+ *     (notiftext.designbook_component_failing).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-18 — The notice record is a claim written on its version before the notice (check:atomic-writes).
@@ -105,6 +107,7 @@ export async function noticeFailingComponents(storage: Storage, config: AimeatCo
           + 'Fix it as the bench says and propose it again under the same id (aimeat_designbook_propose). '
           + 'aimeat_designbook_get shows you its markup and stylesheet as stored.',
         link: `/v1/designbook/${encodeURIComponent(part.id)}/preview`,
+        i18n: { key: 'designbook_component_failing', vars: { id: part.id, why: bench.why } },
       });
     } catch (err) {
       await putBack(storage, notice, prior);

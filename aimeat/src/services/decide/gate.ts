@@ -29,6 +29,8 @@
  * @usage
  *   const on = gateApplies(await gateSettingOf(storage, ownerGhii, agent), rule);
  * @version-history
+ *   v1.2.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.decision_gate_stopped).
  *   v1.2.0 — 2026-10-18 — writeAgentGate writes `decide.agents` on its version (record-cas.ts
  *     updateRecord), so two agents' switches set at the same moment are both kept.
  *   v1.1.0 — 2026-09-20 — A stop tells the owner (notify): the open item alone is silent until they
@@ -122,6 +124,7 @@ export async function openGateItem(
         title: `${agentName} is waiting for you`,
         body: `${what.rule.decides} (${read}). It has not acted.`,
         link: '/v1/profile',
+        i18n: { key: 'decision_gate_stopped', vars: { agent: agentName, decides: what.rule.decides, read } },
       }).catch(err => logger.warn('[decide] the gate stopped an action and could not say so', {
         owner: ownerGhii, decision: what.decisionId, error: String(err),
       }));

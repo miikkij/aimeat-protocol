@@ -116,6 +116,17 @@ await test('t03 the same call for real makes the team, its three workspaces, con
     assert(team.invitations.length === 3 && team.invitations.filter((i: any) => i.lead).length === 2, `invitations ${JSON.stringify(team.invitations)}`);
 });
 
+await test('t03b each invitation notice is written in its recipient\'s language, with the team named in it', async () => {
+    const titles = async (o: RegisteredOwner) => {
+        const r = await json('/v1/notifications', { headers: auth(o.token) });
+        return ((r.body.data?.notifications ?? r.body.data?.items ?? []) as any[]).filter(n => n.type === 'organism_invitation').map(n => String(n.title));
+    };
+    const fi = await titles(liisa);
+    const en = await titles(aino);
+    assert(fi.some(t => t.includes('kutsui sinut jäseneksi') && t.includes('Myyntitiimi')), `Liisa (fi): ${JSON.stringify(fi)}`);
+    assert(en.some(t => t.includes('invited you to join') && t.includes('Sales team')), `Aino (en): ${JSON.stringify(en)}`);
+});
+
 await test('t04 a name invitation to a lead makes Liisa a lead when she accepts; the first lead stays', async () => {
     const r = await json(`/v1/organisms/${salesId}/invitations/accept`, { method: 'POST', headers: auth(liisa.token) });
     assert(r.status === 200, `accept ${r.status}: ${JSON.stringify(r.body.error)}`);

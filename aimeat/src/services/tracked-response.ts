@@ -19,6 +19,8 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.6.1 -- 2026-11-14 -- notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.tracked_response_ready).
  *   v1.6.0 -- 2026-11-04 -- The reconciler runs in one node process per round (process-lease.ts claimedSweep;
  *     codebase analysis 2026-11-03, item HA 2.7).
  *   v1.5.1 — 2026-10-25 — listTrackedResponses and evaluateOwnerTrackedResponses read under the contract key prefix. Each read every
@@ -305,6 +307,7 @@ async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse, storedOwne
         title: 'Reply ready to send',
         body: `"${c.title}" — the linked work is done; a suggested reply is ready.`,
         link: `/v1/profile#inbox/${c.source.conversationId}`,
+        i18n: { key: 'tracked_response_ready', vars: { title: c.title } },
       }).catch(err => { logger.warn('evaluateContract: notify best-effort', { error: String(err) }); });
       return;
     }

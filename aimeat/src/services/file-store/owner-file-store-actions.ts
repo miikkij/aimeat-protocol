@@ -16,6 +16,9 @@
  *   removeOwnerFileStore · moveOwnerFiles · decideOwnerFileStore · FILE_STORE_DOMAIN · placeOf (re-export)
  * @usage const r = await connectOwnerFileStore(ctx, { account: 'alice', actor: principal, operator: false }, body);
  * @version-history
+ *   v1.3.1 — 2026-11-14 — notify() passes i18n so the notification is written in its recipient's
+ *     language (notiftext.file_store_request, file_store_request_reason, file_store_approved,
+ *     file_store_declined).
  *   v1.3.0 — 2026-11-08 — A store keeps which files it takes (`takes: { min_mb, kinds }`), set when it is
  *     connected or on its own, and the view shows it; a move home sends a file the node's store does not
  *     take to the database (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
@@ -135,6 +138,7 @@ async function tellOperators(ctx: FileStoreCtx, account: string, reason: string)
     title: `${account} asks to keep their files in their own storage`,
     body: reason ? `Their reason: ${reason}` : undefined,
     link: ADMIN_PAGE,
+    i18n: { key: reason ? 'file_store_request_reason' : 'file_store_request', vars: { account, reason } },
   })));
 }
 
@@ -332,6 +336,8 @@ export async function decideOwnerFileStore(ctx: FileStoreCtx, operator: string, 
     title: state === 'approved' ? 'Your own storage is approved: new files go there now' : 'Your own storage was not approved: new files stay on the node',
     body: note || undefined,
     link: PROFILE_PAGE,
+    // The title only: the body is the operator's own note, in the words they wrote.
+    i18n: { key: state === 'approved' ? 'file_store_approved' : 'file_store_declined' },
   });
   emitChange(FILE_STORE_DOMAIN);
   return { ok: true, data: { owner: input.owner, state } };

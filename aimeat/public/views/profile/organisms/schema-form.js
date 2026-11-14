@@ -8,6 +8,7 @@
  * @structure SchemaForm
  * @usage import { SchemaForm } from '/views/profile/organisms/schema-form.js';
  * @version-history
+ *   v1.12.0 -- 2026-11-14 -- A choice's options show their labels in the reader's language from the manifest's i18n ("<namespace>.<field>.<value>"), not the raw values.
  *   v1.11.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the form is the Fields with the TextField, TextArea, Select and Check, each with its row label, its hint under the control, and `invalid` for a required field left empty; the refusal is the Note's message, the foot the FormActions. The heavy rule of the create form goes: the form stands in the record's opened panel or box, which frames it. The page writes no class.
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -113,7 +114,9 @@ export function SchemaForm({ schema, busy, onSave, onCancel, initial, idPrefix, 
     const value = vals[k] ?? '';
     const put = (v) => set(k, v);
     if (def.type === 'string' && Array.isArray(def.enum)) {
-      return html`<${Select} ...${words} value=${value} onChange=${put} placeholder="—" options=${def.enum.map(o => [o, o])} />`;
+      // A choice is shown by its label in the reader's language ("<namespace>.<field>.<value>" in the
+      // manifest's i18n), and stored as the value itself.
+      return html`<${Select} ...${words} value=${value} onChange=${put} placeholder="—" options=${def.enum.map(o => [o, (wsT && wsT(`${namespace}.${k}.${o}`)) || o])} />`;
     }
     // Date / datetime fields → native pickers (by schema format, or a name ending in _date).
     if (def.format === 'date-time') return html`<${TextField} ...${words} type="datetime-local" value=${value} onInput=${put} />`;

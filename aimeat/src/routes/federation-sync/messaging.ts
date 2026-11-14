@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-14 — notify() passes i18n so the notification is written in its recipient's language
+ *     (notiftext.direct_message, direct_message_request, direct_message_announcement).
  *   2026-11-05 — The replicate, message, broadcast, receipt and storage grant doors declare the
  *     'federation-peer' credential strategy (peerDoor): the body's fields, the peer and its signature
  *     are verified in the auth layer in the same order with the same refusals (codebase analysis
@@ -535,6 +537,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 type: isRequest ? 'direct_message_request' : 'direct_message',
                 title: isRequest ? `${message.senderGhii} wants to message you` : `New message from ${message.senderGhii}`,
                 body: messagePreview(message.body ?? ''),
+                i18n: { key: isRequest ? 'direct_message_request' : 'direct_message', vars: { who: message.senderGhii, preview: messagePreview(message.body ?? '') } },
                 // Request → 'req:<conversationId>': lands on the requests list while pending, opens the
                 // thread once accepted (see inbox-tab consumeDeepLink). Delivered DM → its conversation.
                 link: isRequest ? `/v1/profile#inbox/req:${message.conversationId}` : `/v1/profile#inbox/${message.conversationId}`,
@@ -633,6 +636,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                     title: `Announcement from ${senderGhii}`,
                     body: messagePreview(broadcast.body ?? ''),
                     link: `/v1/profile#inbox/${conversationId}`,
+                    i18n: { key: 'direct_message_announcement', vars: { who: senderGhii, preview: messagePreview(broadcast.body ?? '') } },
                 });
                 delivered++;
             } catch (err) {

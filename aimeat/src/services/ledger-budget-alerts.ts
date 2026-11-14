@@ -16,6 +16,8 @@
  * @usage
  *   import { evaluateBudgetAlerts } from '../services/ledger-budget-alerts.js';
  * @version-history
+ *   2026-11-14 -- notify() passes i18n so the notification is written in its recipient's language
+ *     (notiftext.budget_alert, budget_alert_top).
  *   2026-10-18 -- The threshold is marked fired with updateRecord (on the version read) before the
  *     alert is sent, and unmarked again when the send fails.
  *   v1.0.0 -- 2026-07-11 -- Initial creation for LEDGER TARGET-017
@@ -75,6 +77,10 @@ export async function evaluateBudgetAlerts(storage: Storage, ownerGhii: string):
       body: `Today's LLM spend reached ${pct} of the daily budget.`
         + (top ? ` Top consumers: ${top}.` : ''),
       link: '/v1/profile?tab=agents',
+      i18n: {
+        key: top ? 'budget_alert_top' : 'budget_alert',
+        vars: { pct, spent: status.spentUsd.toFixed(4), budget: status.dailyBudgetUsd, top },
+      },
     });
   } catch (err) {
     // The alert did not go out, so the level is unmarked again and the next usage event tries again.

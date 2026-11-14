@@ -9,6 +9,7 @@
  * @structure recordAiLabel (internal), recordFields (internal), renderRecordSpace
  * @usage import { renderRecordSpace } from '/views/profile/organisms/workspace/record-space.js';
  * @version-history
+ *   v1.13.1 -- 2026-11-14 -- A field whose value is one of its choices shows the choice's label in the reader's language (manifest i18n "<namespace>.<field>.<value>").
  *   v1.13.0 -- 2026-09-30 -- The comment thread is told whether the viewer is the organism's creator or
  *     an admin (canModerate), so it offers Delete on every comment for them.
  *   v1.12.0 -- 2026-09-26 -- The records are the List (mark-name-doors): the colour picker as the row's
@@ -79,7 +80,10 @@ function recordFields(ctx, ot, rec) {
   const rows = Object.entries(rec || {}).filter(([k, v]) =>
     !k.startsWith('_') && v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
   if (!rows.length) return html`<${Note} kind="quiet">${t('organisms.noFields') || 'No fields'}<//>`;
-  return html`<${Facts} rows=${rows.map(([k, v]) => ({ key: k, k: wsT(`${ot.namespace}.${k}`) || k, v: renderFieldVal(v) }))} />`;
+  // A value one of the field's choices is shown by its label in the reader's language, when the
+  // manifest's i18n has one ("<namespace>.<field>.<value>").
+  const shown = (k, v) => (typeof v === 'string' && wsT(`${ot.namespace}.${k}.${v}`)) || renderFieldVal(v);
+  return html`<${Facts} rows=${rows.map(([k, v]) => ({ key: k, k: wsT(`${ot.namespace}.${k}`) || k, v: shown(k, v) }))} />`;
 }
 
 // A record-space tab: schema-form add/edit + draft and published record lists (with comments).
