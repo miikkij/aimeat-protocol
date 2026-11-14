@@ -78150,7 +78150,11 @@ paths:
               type: object
               properties:
                 name: { type: string }
-                reasoningLlm: { type: string, nullable: true }
+                reasoningLlm:
+                  type: [object, 'null']
+                  description: >-
+                    The model that analyses, reflects and synthesises, stored as sent:
+                    { id, label, provider, modelId, apiKeyRef, baseUrl? }. Null takes it off.
                 analysisPromptTemplate: { type: string }
                 reflectionPromptTemplate: { type: string }
                 selfReflectionPromptTemplate: { type: string }
