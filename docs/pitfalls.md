@@ -25,7 +25,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 enforces it, and remove its index row and its number from the shape lists in the same commit. A
 number is never reused.
 
-> Related: `CLAUDE.md` (mandatory rules + architecture), `docs/known_gaps.md` (deferred gaps, developer-approved only), `docs/coding-guidelines/` (the full guides). The gatekeeper agent reads a diff against the five shapes (`.claude/agents/gatekeeper.md`).
+> Related: `CLAUDE.md` (the rules every session holds; `.claude/rules/` has the rules by path), `docs/known_gaps.md` (deferred gaps, developer-approved only), `docs/coding-guidelines/` (the full guides). The gatekeeper agent reads a diff against the five shapes (`.claude/agents/gatekeeper.md`).
 
 ## The five shapes
 
@@ -277,7 +277,7 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 
 *Symptoms: a caller hits a size or rate wall and the parameter that exists to make the request smaller changes nothing; `limit=1` and no limit at all return byte-identical responses; the obvious fix looks like a fix and is a no-op. Seen 2026-09-04: `aimeat_memory_list` refused with `TUNNEL_RESPONSE_TOO_LARGE` at every value of `limit`.*
 
-- **Declared on one surface, enforced on none.** `limit` was published in the connector MCP tool's parameter list, forwarded by the CLI dispatch as a query string, and `GET /v1/memory` never read `req.query.limit` — the word appeared in that file only in the SEARCH handler below. Nothing errored: an unread query parameter is silently discarded, so the call succeeded having done less than it was asked. → CLAUDE.md, "A tool has THREE surfaces", which is the same failure one layer up.
+- **Declared on one surface, enforced on none.** `limit` was published in the connector MCP tool's parameter list, forwarded by the CLI dispatch as a query string, and `GET /v1/memory` never read `req.query.limit` — the word appeared in that file only in the SEARCH handler below. Nothing errored: an unread query parameter is silently discarded, so the call succeeded having done less than it was asked. → `.claude/rules/tool-surfaces.md`, "A tool has THREE surfaces", which is the same failure one layer up.
 - **A wall with no smaller thing to ask for is a blocker, not a limit.** The tunnel refuses a response over `connect_tunnel.max_response_bytes` and that cap is right — one identity's enormous answer sits on a socket sixty-one others are waiting on. What made it fatal is that the caller had no way to comply. Whenever you add a size refusal, name in the same commit what a caller does about it, and check that thing works.
 - **Check whether the expensive half is even wanted.** The listing shipped every record's value; the tool reads `key`, `gaii` and `visibility` and prints eighty rows. 25 MB of article bodies crossed a shared socket so that eighty names could be printed, and every byte was discarded on arrival. `?include=meta` had existed since 2026-07-14 and the node's own MCP surface had always answered metadata-only — the connector door was the one out of three that did not.
 - **The published schema is the tie-breaker.** `memoryListOutput` says the listing "carries no values (always the case)". One door disagreed with the contract, so aligning it is a fix and not a behaviour change. When two surfaces differ, read what was promised before deciding which one is right.
@@ -453,7 +453,7 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 
 *Symptoms: a new table's provider method file turns `check:deps` red with an import cycle the eleven method files beside it do not trigger.*
 
-- **The import cycle.** A provider method file that writes `import type { SqliteStorage } from '../index.js'` (or `PostgresKyselyStorage`) creates `index.ts -> methods/x.ts -> index.ts`. Every older method file does exactly that, and dependency-cruiser is right to call it a cycle; those are grandfathered in its known list. A NEW one is not, and `pnpm check:deps` refuses it. **Re-seeding the known list to admit yours forgives every entry at once (262 on 2026-11-15)**, which is a decision to be asked about and never maintenance (CLAUDE.md, ratchets).
+- **The import cycle.** A provider method file that writes `import type { SqliteStorage } from '../index.js'` (or `PostgresKyselyStorage`) creates `index.ts -> methods/x.ts -> index.ts`. Every older method file does exactly that, and dependency-cruiser is right to call it a cycle; those are grandfathered in its known list. A NEW one is not, and `pnpm check:deps` refuses it. **Re-seeding the known list to admit yours forgives every entry at once (262 on 2026-11-15)**, which is a decision to be asked about and never maintenance (`.claude/rules/gates-ratchets.md`).
 - **The fix, and it is better than what it replaces.** These methods only ever touch `this.db`, so say so: `interface HasDb { db: Database.Database }` on SQLite, `interface HasDb { db: Kysely<DB> }` on Postgres, and `this: HasDb` on each method. The arrow then points one way. On Postgres this keeps the ambient transaction intact, because `db` there is a getter that returns the open transaction when one is bound.
 
 ## 90. `check:field-reach` can only judge a pairing it can read

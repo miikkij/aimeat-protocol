@@ -1,7 +1,7 @@
 # Identity model: GHII, GAII and GEAI
 
 > This doc is the identity reference: the principal types, how each one arrives, the worked patterns
-> and the morsel-pacing detail. `CLAUDE.md` keeps two sentences of it. The rules for code (ask the
+> and the morsel-pacing detail. `CLAUDE.md` keeps a short summary of it. The rules for code (ask the
 > caller object, `resolveIdentity()`, visitors from another node, key files) are in
 > `.claude/rules/security.md`, which Claude Code loads when a file under `aimeat/src/` is read.
 

@@ -16,13 +16,13 @@
       "digest": "sha256:b873fed8b935f2b7871070b5"
     },
     "01-overview.md": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-15",
       "watches": [
         ".github/SECURITY.md",
         "docs/coding-guidelines/environment-configs.md",
         "LICENSE"
       ],
-      "digest": "sha256:cb4f360a6f0187b8e72b5aff"
+      "digest": "sha256:c62aee7cd720b2be37df70a6"
     },
     "02-architecture.md": {
       "reviewedOn": "2026-11-14",
@@ -145,7 +145,7 @@
       "digest": "sha256:0a728d40e3e78d9f9e16fa6a"
     },
     "13-apps-agents-endpoints.md": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/cli/connect/command-trust.ts",
         "aimeat/src/routes/connect-install.ts",
@@ -157,11 +157,9 @@
         "aimeat/src/services/organism-join-requests/requests.ts",
         "aimeat/src/static/app-sw-offline.js",
         "aimeat/src/static/sdk-libs/auth/last-identity.js",
-        "aimeat/src/static/sdk-libs/offline/store.js",
-        "aimeat/src/services/invoke/route-capabilities.ts",
-        "aimeat/src/services/invoke/route-invoke.ts"
+        "aimeat/src/static/sdk-libs/offline/store.js"
       ],
-      "digest": "sha256:fa07aa079b8fe4f8804cc9d0"
+      "digest": "sha256:1ba30b4f81d8b369210a745c"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-14",
@@ -199,7 +197,7 @@
       "digest": "sha256:6ba931491ddd23513d6dce92"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-14",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -226,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:347aa942c80da4d925063141"
+      "digest": "sha256:cdebe81a15d1d0738e2d4424"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -292,7 +290,7 @@
     },
     "01-overview.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
-      "docs/coding-guidelines/environment-configs.md": "37b7a80399fc0f06",
+      "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
       "LICENSE": "125eb0733ed6fbb1"
     },
     "02-architecture.md": {
@@ -382,9 +380,7 @@
       "aimeat/src/services/organism-join-requests/requests.ts": "57e5b00c78bfe8e5",
       "aimeat/src/static/app-sw-offline.js": "a2d64d1dd7bfa006",
       "aimeat/src/static/sdk-libs/auth/last-identity.js": "5bf2640a302bc906",
-      "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407",
-      "aimeat/src/services/invoke/route-capabilities.ts": "2298a4a32b00b5f3",
-      "aimeat/src/services/invoke/route-invoke.ts": "412b395808dbbdde"
+      "aimeat/src/static/sdk-libs/offline/store.js": "ba14118fe69ad407"
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
@@ -440,7 +436,7 @@
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
-      "docs/coding-guidelines/environment-configs.md": "37b7a80399fc0f06",
+      "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
       "aimeat/security/process-local-baseline.json": "ba70f472ea8cb811",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",

@@ -54,7 +54,10 @@ The full list, from `GET /v1/connections/providers`:
 | `microsoft-mail-send` | sends through it | `send-mail` |
 | `microsoft-files` | reads SharePoint and OneDrive: sites, libraries, files, lists | `read-files` |
 | `microsoft-files-write` | writes there too: files, folders, list rows | `read-files`, `write-files` |
-| `linkedin`, `x`, `mastodon`, `bluesky`, `youtube` | publishing | `publish` |
+| `linkedin` | publishing | `publish-post` |
+| `x`, `bluesky` | publishing, metrics and the replies to a post | `publish-post`, `read-metrics`, `read-replies` |
+| `mastodon` | publishing, metrics and the replies to a post | `publish-post`, `publish-video`, `read-metrics`, `read-replies` |
+| `youtube` | publishing a video, metrics and the replies to it | `publish-video`, `read-metrics`, `read-replies` |
 | `facebook` (a Facebook Page), `instagram`, `reddit` | publishing, metrics and the replies to a post | `publish-post` or `publish-image`, `publish-video`, `read-metrics`, `read-replies` |
 
 Every entry says whether **this node** holds an application for it. When it does not, somebody who
