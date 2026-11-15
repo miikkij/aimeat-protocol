@@ -1,5 +1,5 @@
 /**
- * @file src/services/task-start-notice.ts
+ * @file src/services/task/start-notice.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How a person learns that a task waits for them, in words: the answer a create call
@@ -30,11 +30,11 @@
  *   v1.1.0 — 2026-10-02 — The reason for an agent held by `*` alone names the narrowing.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
-import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import type { TaskStartDecision } from './agent/task-rules.js';
-import { TASK_START_FLOOR } from './agent/task-rules.js';
-import { notify } from './notify.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
+import type { TaskStartDecision } from '../agent/task-rules.js';
+import { TASK_START_FLOOR } from '../agent/task-rules.js';
+import { notify } from '../notify.js';
+import { logger } from '../../utils/logger.js';
 
 /** What the floor and the declared effects mean, as a person would say it. */
 const KIND_WORDS: Record<string, string> = {

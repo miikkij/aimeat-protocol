@@ -1,5 +1,5 @@
 /**
- * @file src/services/task-files.ts
+ * @file src/services/task/files.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Task attachments: the create-time check and the read-time handle enrichment for
@@ -21,9 +21,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-26 — Initial: attachments on agent tasks, riding the existing resources JSON.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskFileRef } from '../storage/interface.js';
-import { resolveFileRef, fileHandleFor, type FileRefAccessor, type FileHandle } from './file-refs.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentTaskRecord, AgentTaskFileRef } from '../../storage/interface.js';
+import { resolveFileRef, fileHandleFor, type FileRefAccessor, type FileHandle } from '../file-refs.js';
 
 export interface TaskFileInput {
     ref: string;

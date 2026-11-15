@@ -155,7 +155,7 @@ import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/packages/compose/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
-import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
+import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task/start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { runOnceOnlyKeepSteps } from './once-only-keep-steps.js';
 import { flagOrphanPeerApprovalsOnce } from '../services/federation/orphan-approvals.js';
@@ -408,7 +408,7 @@ export async function initializeServices(
   bootSeeds.track(migrateMailReadConsent(storage, config)
     .catch(err => logger.error('Failed to send the mail read notice', { error: String(err) })));
 
-  // The task-start rulings of 2026-10-02, once per node each (services/task-start-migrations.ts): the
+  // The task-start rulings of 2026-10-02, once per node each (services/task/start-migrations.ts): the
   // basic agents nobody has set start their tasks by themselves, and each owner is told once; an app
   // grant that held memory:delete keeps deleting its records now that that takes memory:purge.
   bootSeeds.track(migrateBasicAgentsTaskStartOnce(storage, config)

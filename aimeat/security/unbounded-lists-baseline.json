@@ -397,10 +397,10 @@
     "src/services/subdomain-sites.ts": {
       "listSubdomainSites": 1
     },
-    "src/services/task-stall-detector.ts": {
+    "src/services/task/stall-detector.ts": {
       "listAgents": 1
     },
-    "src/services/task-start-migrations.ts": {
+    "src/services/task/start-migrations.ts": {
       "listAgents": 1,
       "listAppGrants": 1
     },

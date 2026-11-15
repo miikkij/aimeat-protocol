@@ -37,7 +37,7 @@ import { emitChange, emitDelivery } from '../event-bus.js';
 import { decideTaskStart, taskWakeId, AUTO_START_MARK } from '../agent/task-rules.js';
 import { isStopped } from '../agent/stop-rules.js';
 import { scheduleFireRefusal } from './fire-refusal.js';
-import { deliveryScopeEntry } from '../task-result-delivery.js';
+import { deliveryScopeEntry } from '../task/result-delivery.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import type { JobTrigger, JobRunResult } from './types.js';
@@ -135,7 +135,7 @@ export async function runAgentTaskJob(
   const scheduleScope: AgentTaskScope = {
     name: 'schedule', value: job.cron, type: 'cron', description: job.displayName || job.name,
   };
-  // The node hands the result to the owner when the task is done (services/task-result-delivery.ts).
+  // The node hands the result to the owner when the task is done (services/task/result-delivery.ts).
   const delivery = tmpl.deliver === 'owner' ? [deliveryScopeEntry(job.timezone)] : [];
   const record: AgentTaskRecord = {
     id: randomUUID(),

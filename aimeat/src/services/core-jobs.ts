@@ -310,7 +310,7 @@ export function registerCoreHandlers(
   });
   // Agent task stall detection + agent connectivity checks
   scheduler.registerCoreHandler('task-stall-detection', async () => {
-    const { detectStalledTasks, detectAgentStallConditions } = await import('./task-stall-detector.js');
+    const { detectStalledTasks, detectAgentStallConditions } = await import('./task/stall-detector.js');
     await detectStalledTasks(storage, config);
     await detectAgentStallConditions(storage);
   });

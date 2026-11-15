@@ -1,5 +1,5 @@
 /**
- * @file src/services/task-result-delivery.ts
+ * @file src/services/task/result-delivery.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node hands a finished task's result to its owner itself, for a task made by an
@@ -46,16 +46,16 @@
  *   v1.0.0 — 2026-11-02 — Initial. The agent's notify tool is taken out when a schedule asks for
  *     delivery (services/delivery-crew.ts).
  */
-import type { Storage, AgentTaskRecord, AgentTaskScope, MemoryRecord, ScheduledJobRecord } from '../storage/interface.js';
-import { systemReader } from './classification/reader.js';
-import { memoryTarget } from './classification/labels.js';
-import type { AimeatConfig } from '../config.js';
-import { notify } from './notify.js';
-import { nodeContext } from './node/context.js';
-import { mailOwnerFrom, ownerMailLimitReached } from './notification-create.js';
-import { notificationEmailUnverified } from './owner/mail-address.js';
-import { displayPrefsFor, formatForPerson, type DisplayPrefs } from './display-prefs.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, AgentTaskRecord, AgentTaskScope, MemoryRecord, ScheduledJobRecord } from '../../storage/interface.js';
+import { systemReader } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
+import type { AimeatConfig } from '../../config.js';
+import { notify } from '../notify.js';
+import { nodeContext } from '../node/context.js';
+import { mailOwnerFrom, ownerMailLimitReached } from '../notification-create.js';
+import { notificationEmailUnverified } from '../owner/mail-address.js';
+import { displayPrefsFor, formatForPerson, type DisplayPrefs } from '../display-prefs.js';
+import { logger } from '../../utils/logger.js';
 
 /** The scope entry's name that marks a task whose result the node delivers to the owner. */
 export const DELIVERY_SCOPE = 'deliver';

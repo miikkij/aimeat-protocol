@@ -1,5 +1,5 @@
 /**
- * @file src/services/task-resume.ts
+ * @file src/services/task/resume.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Bringing a stalled task back when its agent shows up again.
@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-08-11 — Extracted from routes/agent-tasks/completion.ts so the MCP tools get it too.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, AgentTaskRecord } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 
 /**
  * Resume `task` if it is stalled. Mutates `task.status` in place so the caller's own status check

@@ -2,7 +2,7 @@
  * @file test/unit/task-result-delivery-guard.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The node's delivery of a scheduled task's result (services/task-result-delivery.ts) and
+ * @description The node's delivery of a scheduled task's result (services/task/result-delivery.ts) and
  *   the other node mails that carry a principal's words to an owner (secaudit2026nov02d round 13,
  *   delivery group):
  *   - the delivery is decided by the schedule's own record, not by a `deliver` entry in the task's
@@ -25,7 +25,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AgentTaskRecord, ScheduledJobRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { deliverTaskResult } from '../../src/services/task-result-delivery.js';
+import { deliverTaskResult } from '../../src/services/task/result-delivery.js';
 import { createPrincipalNotification } from '../../src/services/notification-create.js';
 import { notifyAutomationTaskComplete } from '../../src/services/ecosystem-automation-notify.js';
 import { pulseInstanceServer } from '../../src/services/living-pulse.js';

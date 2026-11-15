@@ -3088,14 +3088,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the node's layout records and their earlier versions."
     },
-    "src/services/task-outcome.ts": {
+    "src/services/task/outcome.ts": {
       "reads": {
         "getMemory": 1,
         "listMemory": 1
       },
       "why": "Reviewed 2026-10-11, the node's own read: a finished task's result record, of which only `visibility` and `workspaceRef` are used, to say which workspaces the result is shared with. The value is never returned from here; the deliverable itself is read through the memory routes."
     },
-    "src/services/task-result-delivery.ts": {
+    "src/services/task/result-delivery.ts": {
       "reads": {
         "getMemory": 1
       },

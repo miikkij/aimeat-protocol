@@ -118,7 +118,7 @@ import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './
 import type { Scheduler, JobOutcome } from '../scheduler.js';
 import { nodeContext } from '../node/context.js';
 import { withSchedulePrompt } from './prompt.js';
-import { withDeliver } from '../task-result-delivery.js';
+import { withDeliver } from '../task/result-delivery.js';
 import { dropNotifyOfAgent } from '../delivery-crew.js';
 import { agentTaskInput } from './agent-task-input.js';
 import { checkRefineryScheduleInput, refineryRunAs } from '../refinery/schedule-input.js';
@@ -260,7 +260,7 @@ function foreignNamespace(ownerIdentity: string, raw: unknown): string | null {
  * `maker` is null for the owner in person and the accessor otherwise. The named file is read from
  * the OWNER's storage when the schedule fires and sent to an outside account, so a schedule made by
  * an agent, an app or an ecosystem app may name only a file that maker can read itself — the rule a
- * task attachment already follows (services/task-files.ts). Without it an agent that GET /v1/pub
+ * task attachment already follows (services/task/files.ts). Without it an agent that GET /v1/pub
  * answers 403 to published the owner's private file (secaudit 2026-10).
  */
 async function checkConnectionsPublishInput(
@@ -693,7 +693,7 @@ export async function updateScheduleRecord(
         if (!next.ok) return next;
         updates.input = next.input;
     }
-    // Who gets an agent_task's result (services/task-result-delivery.ts).
+    // Who gets an agent_task's result (services/task/result-delivery.ts).
     if (patch.deliver !== undefined) {
         const next = withDeliver(job.type, updates.input ?? job.input, patch.deliver);
         if (!next.ok) return { ok: false, status: 400, code: 'INVALID_INPUT', message: next.message };

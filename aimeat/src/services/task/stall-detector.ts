@@ -1,5 +1,5 @@
 /**
- * @file task-stall-detector.ts
+ * @file src/services/task/stall-detector.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Background job that detects stalled agent tasks and agent-level
@@ -12,9 +12,9 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
 
 const UNREACHABLE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 const WEBHOOK_DOWN_THRESHOLD = 10;

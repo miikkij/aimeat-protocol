@@ -1,5 +1,5 @@
 /**
- * @file src/services/task-start-migrations.ts
+ * @file src/services/task/start-migrations.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Two one-time changes that follow the task-start rulings of 2026-10-02 (Jouni), each
@@ -32,13 +32,13 @@
  *     is read again just before its setting is written (check:atomic-writes).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { BASIC_AGENTS } from '../data/basic-agents.js';
-import { notify, type NotifyInput } from './notify.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
-import { changeScopeList } from './scope-list-swap.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { BASIC_AGENTS } from '../../data/basic-agents.js';
+import { notify, type NotifyInput } from '../notify.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
+import { changeScopeList } from '../scope-list-swap.js';
 
 export const BASIC_AGENTS_START_KEY = 'migrations.basic-agents-task-start';
 export const PURGE_WORD_KEY = 'migrations.memory-purge-app-grants';

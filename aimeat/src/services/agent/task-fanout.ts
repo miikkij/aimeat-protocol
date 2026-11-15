@@ -80,7 +80,7 @@ import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import { recordTaskCompleted, recordTaskFailed } from '../activity-recorder.js';
 import { nodeContext } from '../node/context.js';
 import { notifyAutomationTaskComplete } from '../ecosystem-automation-notify.js';
-import { deliverTaskResult } from '../task-result-delivery.js';
+import { deliverTaskResult } from '../task/result-delivery.js';
 import { processAutomationAdvisories } from '../ecosystem-automation-advisories.js';
 import { closeItemsForTask } from '../open-items.js';
 import { reclaimTaskLiveTrace } from '../agent-tasks/live-trace.js';
@@ -481,7 +481,7 @@ export const DECLINE_REASON_MAX = 2000;
  * Measured on a hosted place, 2026-10-03: a CRM agent given an off-topic task refused it properly,
  * could only end the task with /fail, and the customer's task list showed "failed".
  *
- * The reason is the 'declined' event's message, where taskOutcome reads it (services/task-outcome.ts).
+ * The reason is the 'declined' event's message, where taskOutcome reads it (services/task/outcome.ts).
  */
 export async function declineTask(
     deps: Deps,

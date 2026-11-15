@@ -102,8 +102,8 @@ import { readinessRefusal } from '../middleware/readiness-gate.js';
 import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent/task-write.js';
 import { mayLoosenStart, type StartCaller } from '../services/agent/task-rules.js';
 import { listSiblingTasks } from '../services/agents/sibling-tasks.js';
-import { startAnswer } from '../services/task-start-notice.js';
-import { startWaitingTask } from '../services/task-start-op.js';
+import { startAnswer } from '../services/task/start-notice.js';
+import { startWaitingTask } from '../services/task/start-op.js';
 import { removeTask } from '../services/agents/remove-task.js';
 import { removeAgent } from '../services/agents/remove-agent.js';
 import { closeMcpSessionsForGaii } from './session-registry.js';
@@ -115,8 +115,8 @@ import { toolError } from './tool-error.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGAII, buildGAII, localAccountName } from '../utils/gaii.js';
-import { taskWithFileHandles } from '../services/task-files.js';
-import { taskOutcome } from '../services/task-outcome.js';
+import { taskWithFileHandles } from '../services/task/files.js';
+import { taskOutcome } from '../services/task/outcome.js';
 import { setWorkplace, clearWorkplace, workplaceView } from '../services/agent/workplace.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { taskToActOn, taskCreateTarget } from '../services/agent/task-access.js';
@@ -461,7 +461,7 @@ export function registerAgentTaskTools(
     // ── Tool 3a: aimeat_task_start ──
     // The owner's own AI starting a task that waits for their OK, on their word. The same rule as
     // POST /v1/agents/:name/tasks/:id/start for an agent caller: never your own task, never one the
-    // permission floor or a declared effect holds. services/task-start-op.ts is the one implementation.
+    // permission floor or a declared effect holds. services/task/start-op.ts is the one implementation.
     mcp.registerTool(
         'aimeat_task_start',
         {

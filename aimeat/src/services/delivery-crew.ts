@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description When an agent_task schedule says `deliver: "owner"` (services/schedule/write.ts, on create
- *   and on edit), the node hands each result to the owner itself (services/task-result-delivery.ts), so
+ *   and on edit), the node hands each result to the owner itself (services/task/result-delivery.ts), so
  *   the target agent's own notify tool goes out of its live crew definition. With it, a model that calls
  *   notify either sends the result twice or, without notifications:send, has the call refused, and the
  *   runtime then fails the whole run, so the node's delivery, which comes on completion, never comes

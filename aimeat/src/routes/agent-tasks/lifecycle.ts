@@ -53,9 +53,9 @@ import { AgentTaskUpdateSchema, AgentTaskRequestChangesSchema } from '../../mode
 import {
   resolveAutoActivation, autoStartEvent, decideTaskStart, taskWakeId,
 } from '../../services/agent/task-rules.js';
-import { startWaitingTask } from '../../services/task-start-op.js';
+import { startWaitingTask } from '../../services/task/start-op.js';
 import { removeTask } from '../../services/agents/remove-task.js';
-import { resolveTaskFileInputs } from '../../services/task-files.js';
+import { resolveTaskFileInputs } from '../../services/task/files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import { startCallerOf, refuseTaskAccess, type TaskRouteHelpers } from './helpers.js';
 import { taskToActOn } from '../../services/agent/task-access.js';
@@ -300,7 +300,7 @@ export function registerTaskLifecycleRoutes(
    *
    * The owner in person, a same-owner app grant holding task:write, or (since 2026-10-02) another of
    * the owner's agents holding task:write: the person's own chat AI starting a waiting task on their
-   * word. The rules and the wake are services/task-start-op.ts, shared with aimeat_task_start.
+   * word. The rules and the wake are services/task/start-op.ts, shared with aimeat_task_start.
    */
   router.post('/v1/agents/:name/tasks/:id/start', requireAuth(), async (req, res) => {
     const startRoles = req.auth!.roles;

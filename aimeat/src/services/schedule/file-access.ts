@@ -12,7 +12,7 @@
  *   answered the same agent 403 (secaudit 2026-10,
  *   checkConnectionsPublishInput:owner-storage-file-for-non-owner-maker). A task attachment has
  *   followed the opposite rule since it was written: an attachment must be one the creator can
- *   read (services/task-files.ts). Both now ask the same function, resolveFileRef.
+ *   read (services/task/files.ts). Both now ask the same function, resolveFileRef.
  *
  *   WHY IT IS ITS OWN FILE. The create and edit doors ask it from services/schedule/write.ts, and
  *   the fire asks it from services/scheduler.ts. schedule-write.ts imports the Scheduler for the

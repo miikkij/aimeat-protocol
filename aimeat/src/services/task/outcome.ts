@@ -1,5 +1,5 @@
 /**
- * @file src/services/task-outcome.ts
+ * @file src/services/task/outcome.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a finished task actually produced, in one place, for every door that reports a
@@ -23,7 +23,7 @@
  *   expensive as its largest output.
  * @structure taskOutcome() — the terminal event plus the deliverable pointer, or null while running
  * @usage
- *   import { taskOutcome } from '../services/task-outcome.js';
+ *   import { taskOutcome } from './outcome.js';
  *   const outcome = await taskOutcome(storage, task);   // null unless done/failed/declined
  * @version-history
  *   v1.2.0 — 2026-10-11 — `shared_with` on the read of one task (`withPlace`): the workspaces the
@@ -33,8 +33,8 @@
  *   v1.0.0 — 2026-08-16 — Initial. Reported by crewaimeat-dev against aimeat-crewai 0.20.0: a
  *     completed task-runner leaves its output where the caller cannot read it.
  */
-import type { Storage, AgentTaskRecord } from '../storage/interface.js';
-import { placeNames } from './agent/ties.js';
+import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
+import { placeNames } from '../agent/ties.js';
 
 /** What a finished task produced. Null while it is still running — an unfinished task has no
  *  outcome, and reporting an empty one would read as "finished with nothing". */

@@ -20,7 +20,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AgentRecord, AppGrantRecord } from '../../src/storage/interface.js';
-import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce, BASIC_AGENTS_START_TYPE } from '../../src/services/task-start-migrations.js';
+import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce, BASIC_AGENTS_START_TYPE } from '../../src/services/task/start-migrations.js';
 import {
     noteScopeUse, flushScopeUse, readScopeUse, wildcardStatus, OBSERVE_DAYS,
 } from '../../src/services/scope-use.js';

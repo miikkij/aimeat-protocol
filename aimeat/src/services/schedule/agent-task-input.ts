@@ -36,7 +36,7 @@ export function agentTaskInput(body: Record<string, unknown>):
           technicalChecks: Array.isArray(v.technical_checks) ? v.technical_checks : [],
         },
         resources: tmpl?.resources,
-        // The node hands each finished task's result to the owner (services/task-result-delivery.ts).
+        // The node hands each finished task's result to the owner (services/task/result-delivery.ts).
         ...(body.deliver === 'owner' ? { deliver: 'owner' } : {}),
       },
     },

@@ -1,5 +1,5 @@
 /**
- * @file src/services/task-start-op.ts
+ * @file src/services/task/start-op.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Starting a task: one implementation behind POST /v1/agents/:name/tasks/:id/start and
@@ -29,15 +29,15 @@
  *     the per-transition wake id added.
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
-import type { createWebhookDispatcher } from './webhook-dispatcher.js';
-import { decideTaskStart, mayStartWaitingTask, taskWakeId, type StartCaller } from './agent/task-rules.js';
-import { waitReason } from './task-start-notice.js';
-import { recordTaskStarted } from './activity-recorder.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { emitResourceUpdated } from './resource-events.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../../storage/interface.js';
+import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
+import { decideTaskStart, mayStartWaitingTask, taskWakeId, type StartCaller } from '../agent/task-rules.js';
+import { waitReason } from './start-notice.js';
+import { recordTaskStarted } from '../activity-recorder.js';
+import { emitChange, emitDelivery } from '../event-bus.js';
+import { emitResourceUpdated } from '../resource-events.js';
+import { logger } from '../../utils/logger.js';
 
 export interface TaskStartDeps {
     storage: Storage;

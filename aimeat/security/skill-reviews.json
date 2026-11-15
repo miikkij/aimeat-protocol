@@ -22,7 +22,7 @@
         "aimeat/src/services/app-agents/app-agent-link.ts",
         "aimeat/src/data/crew-runtime-scopes.ts"
       ],
-      "digest": "sha256:cc21d85de8e918050f2e8a82"
+      "digest": "sha256:18f36b41b79ab6b28d1619bc"
     },
     "node:agent-avatar": {
       "reviewedOn": "2026-11-15",
@@ -103,7 +103,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule/write.ts"
       ],
-      "digest": "sha256:64d707067cf7451ef1ab5d91"
+      "digest": "sha256:05d2e98761289c52713ad1a6"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-11-08",
@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:0581af7d68e8c3f31fd20503",
+      "digest": "sha256:5f03f241caf4fe2f8393d626",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -835,7 +835,7 @@
       "aimeat/src/services/app/publish.ts": "4cbd097437afec35",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
-      "aimeat/src/services/app/agent-deploy.ts": "c2d77a813f8aa9b9",
+      "aimeat/src/services/app/agent-deploy.ts": "b80667e85ea3b914",
       "aimeat/src/services/builder/data-map-step.ts": "481b3d008d189fcd"
     },
     "project:aimeat-design-language": {
@@ -883,7 +883,7 @@
       "aimeat/src/services/schedule/gate.ts": "4071f6e834a03cff",
       "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "8e11e1fc9a2dd2e4",
-      "aimeat/src/services/schedule/write.ts": "919506333d6c9ec7"
+      "aimeat/src/services/schedule/write.ts": "a3326a4e82dcf1ac"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
@@ -1020,7 +1020,7 @@
       "aimeat/src/models/crew-def-schemas.ts": "d0eb1d777a146bf8",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
-      "aimeat/src/services/app/agent-deploy.ts": "c2d77a813f8aa9b9",
+      "aimeat/src/services/app/agent-deploy.ts": "b80667e85ea3b914",
       "aimeat/src/services/app-agents/app-agent-link.ts": "94ca2ec0bc9457d7",
       "aimeat/src/data/crew-runtime-scopes.ts": "d902c274174d0005"
     },

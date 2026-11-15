@@ -78,10 +78,10 @@ import {
     resolveAutoActivation, canProposeTodos, todoProposeRefusal, statusAfterProposal,
     decideTaskStart, taskWakeId, autoStartEvent, startedOnItsOwn, TASK_EFFECTS, type TaskStartDecision, type TaskEffect,
 } from './task-rules.js';
-import { notifyTaskWaiting, alreadyWaitingWithPlan } from '../task-start-notice.js';
+import { notifyTaskWaiting, alreadyWaitingWithPlan } from '../task/start-notice.js';
 import { commissionFingerprint, isUniqueViolation } from '../agent-tasks/commission-dedupe.js';
-import { resumeIfStalled } from '../task-resume.js';
-import { resolveTaskFileInputs } from '../task-files.js';
+import { resumeIfStalled } from '../task/resume.js';
+import { resolveTaskFileInputs } from '../task/files.js';
 import type { FileRefAccessor } from '../file-refs.js';
 import { recordTaskStarted } from '../activity-recorder.js';
 import { emitChange, emitDelivery } from '../event-bus.js';

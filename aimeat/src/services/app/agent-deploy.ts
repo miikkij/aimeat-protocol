@@ -75,7 +75,7 @@ import { crewPublish, type CrewCaller } from '../crew-ops.js';
 import { withDefaultOffer } from '../agent/default-offer.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { decideTaskStart, resolveAutoActivation, autoStartEvent, taskWakeId, type TaskStartDecision } from '../agent/task-rules.js';
-import { notifyTaskWaiting, waitReason } from '../task-start-notice.js';
+import { notifyTaskWaiting, waitReason } from '../task/start-notice.js';
 
 /** Default runner-agent name: crewaimeat's crew-forge daemon registers under this name. */
 export const DEFAULT_APP_AGENT_RUNNER = 'crew-forge';
