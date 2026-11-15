@@ -11,7 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { deflateRawSync, crc32 } from 'node:zlib';
-import { parseExtensionZip, DEFAULT_ZIP_MAX_FILES } from '../../src/services/upload-zip.js';
+import { parseExtensionZip, DEFAULT_ZIP_MAX_FILES } from '../../src/services/upload/zip.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const baseConfig = {

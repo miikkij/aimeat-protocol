@@ -126,7 +126,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { checkStorageQuota, chargeOverage } from '../quota.js';
-import { generateUploadToken, buildUploadMeta } from '../upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../upload/token.js';
 import { emitRecordChange, emitRecordChangePriorUnknown } from '../event-bus.js';
 import { isAnonymousGaii } from '../../utils/visibility-words.js';
 import { storeHeldProvenance } from '../ai/provenance.js';

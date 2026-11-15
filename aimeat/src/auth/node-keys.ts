@@ -79,7 +79,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from './keypair.js';
 import { initNodeKeys, getNodeCryptoKeys } from './jwt.js';
-import { initUploadTokenKeys } from '../services/upload-token.js';
+import { initUploadTokenKeys } from '../services/upload/token.js';
 import { initConfirmTokenKeys } from '../services/operator/confirm.js';
 import { initDownloadTokenKeys } from '../services/download-token.js';
 import { initShareTokenKeys } from '../services/share-token.js';

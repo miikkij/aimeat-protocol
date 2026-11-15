@@ -1513,11 +1513,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/upload-token.ts :: let :: _privateKey": {
+    "src/services/upload/token.ts :: let :: _privateKey": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/upload-token.ts :: let :: _publicKey": {
+    "src/services/upload/token.ts :: let :: _publicKey": {
       "count": 1,
       "reason": "DEBT"
     },

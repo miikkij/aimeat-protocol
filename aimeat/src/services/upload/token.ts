@@ -1,5 +1,5 @@
 /**
- * @file upload-token.ts
+ * @file src/services/upload/token.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Presigned upload token generation and verification. Tokens are single-use,
@@ -10,7 +10,7 @@
  *   - verifyUploadToken() — validates signature, expiry, and single-use
  *   - UploadTokenError — typed error with code field
  * @usage
- *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
+ *   import { generateUploadToken, verifyUploadToken } from './token.js';
  * @version-history
  *   v1.15.0 — 2026-11-04 — Signed with the upload purpose's own key (auth/node-signer.ts); a token
  *     signed before, with the node key, verifies as before until it expires (codebase analysis
@@ -61,12 +61,12 @@
  */
 
 import { SignJWT } from 'jose';
-import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
+import { signFor, verifyFor, TokenPurposeError } from '../../auth/node-signer.js';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import { sessionStorage } from '../auth/node-auth.js';
-import { isGEAI } from '../utils/gaii.js';
-import { oneTimeStore } from './ephemeral-claims.js';
+import type { Storage } from '../../storage/interface.js';
+import { sessionStorage } from '../../auth/node-auth.js';
+import { isGEAI } from '../../utils/gaii.js';
+import { oneTimeStore } from '../ephemeral-claims.js';
 
 // ── Key management (initialized from jwt.ts node keys) ──
 
@@ -152,7 +152,7 @@ export interface VerifiedUploadToken {
     iatMs?: number;
     /**
      * True when `actor` named an agent record at the mint. The PUT then refuses the upload once that
-     * agent is gone (services/upload-principal.ts). A scoped personal access token's GAII, an app's
+     * agent is gone (services/upload/principal.ts). A scoped personal access token's GAII, an app's
      * `app#owner@node` and an ecosystem app name no agent record, so they never carry it.
      */
     actorIsAgent: boolean;
@@ -250,7 +250,7 @@ export async function generateUploadToken(payload: UploadTokenPayload, ttlSecond
 /**
  * Does the principal that asks for the URL name an agent record now? Asked once at the mint, of the
  * node's own storage, so the PUT can tell a deleted agent (refused) from a principal that never had
- * an agent record (a scoped personal access token, an app; services/upload-principal.ts). Only a
+ * an agent record (a scoped personal access token, an app; services/upload/principal.ts). Only a
  * `name#owner@node` that is not an ecosystem app is looked up. No storage registered (a unit test)
  * answers no, which leaves the PUT with the checks it had before.
  */

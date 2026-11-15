@@ -92,7 +92,7 @@ import { versionedAddress } from '../../utils/http-range.js';
 import { emitRecordChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
-import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../../services/upload/token.js';
 import {
   removeStorageFile, appOwnedKeyRefusal, groupBindingRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
 } from '../../services/stored-files/write.js';

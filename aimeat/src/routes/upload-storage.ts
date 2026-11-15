@@ -46,8 +46,8 @@ import { choiceIdOf } from '../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../storage/blob/blob-types.js';
 import { directDownloadUrl, discardStorageObject, storedObjectFacts } from '../storage/blob/file-store-wrap.js';
 import { DIRECT_DOWNLOAD_TTL_SECONDS } from '../utils/http-range.js';
-import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
-import { uploadPrincipalRefusal } from '../services/upload-principal.js';
+import { verifyUploadToken, UploadTokenError } from '../services/upload/token.js';
+import { uploadPrincipalRefusal } from '../services/upload/principal.js';
 
 /** The signed address a download door redirects a large stored file to (serveStoredFile), named with
  *  the last part of its key. */

@@ -1,5 +1,5 @@
 /**
- * @file upload-zip.ts
+ * @file src/services/upload/zip.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description ZIP parsing for extension and cortex uploads via presigned URL.
@@ -10,7 +10,7 @@
  *   - parseCortexZip() — ZIP buffer -> CortexExtensionRecord + libs
  *   - extractZipEntries() — internal secure ZIP extraction
  * @usage
- *   import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
+ *   import { parseExtensionZip, parseCortexZip } from './zip.js';
  * @version-history
  *   v1.4.0 — 2026-11-06 — The file cap is config.extensionZipMaxFiles (AIMEAT_EXT_ZIP_MAX_FILES,
  *     default 1000) instead of a fixed 50. An extension built from a route table has one script per
@@ -32,11 +32,11 @@
  */
 
 import yauzl from 'yauzl';
-import type { AimeatConfig } from '../config.js';
-import type { ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
-import { parseCortexManifest } from './cortex/manifest.js';
-import { isUnsafeName } from './safe-zip.js';
-import { buildExtensionRecordFromManifest } from './extension/manifest.js';
+import type { AimeatConfig } from '../../config.js';
+import type { ExtensionRecord, CortexExtensionRecord } from '../../storage/interface.js';
+import { parseCortexManifest } from '../cortex/manifest.js';
+import { isUnsafeName } from '../safe-zip.js';
+import { buildExtensionRecordFromManifest } from '../extension/manifest.js';
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 /** Files one extension or cortex ZIP may hold when config.extensionZipMaxFiles is unset (tests). */

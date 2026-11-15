@@ -171,8 +171,8 @@
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
-import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
-import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
+import { verifyUploadToken, UploadTokenError } from '../services/upload/token.js';
+import { parseExtensionZip, parseCortexZip } from '../services/upload/zip.js';
 import { installCortex } from '../services/cortex/lifecycle.js';
 import { upsertCortex } from '../services/cortex/upsert.js';
 import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component/versions.js';
@@ -197,7 +197,7 @@ import { managedChangeRefusal } from '../services/packages/install/package-manag
 import { receiveFontUpload } from '../services/themes/fonts.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 import { publishAskOf, type PublishAsk } from '../services/publish-requests/ask.js';
-import { uploadPrincipalRefusal } from '../services/upload-principal.js';
+import { uploadPrincipalRefusal } from '../services/upload/principal.js';
 import { cortexAskedFields } from '../services/cortex/visibility.js';
 import { carryFirstUseKeep } from '../services/extension/first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
@@ -234,7 +234,7 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
         // The token is a credential this route verifies itself, so it asks here what every bearer is
         // asked per request: is the agent (or ecosystem app) it was minted for still there and not
         // replaced, and does its account still stand? Asked before a byte is read, so a URL kept by a
-        // deleted agent stores nothing (services/upload-principal.ts).
+        // deleted agent stores nothing (services/upload/principal.ts).
         const principalRefused = await uploadPrincipalRefusal(storage, verified);
         if (principalRefused) {
             res.status(401).json({ success: false, error: 'TOKEN_INVALID', message: principalRefused });

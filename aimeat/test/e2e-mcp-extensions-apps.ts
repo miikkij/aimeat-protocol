@@ -274,7 +274,7 @@ limits:
 `.trim();
 
 /**
- * The ZIP road names its scripts by FILE, not by the inline key: services/upload-zip.ts maps
+ * The ZIP road names its scripts by FILE, not by the inline key: services/upload/zip.ts maps
  * `scripts/<file>` verbatim, so a manifest inside a ZIP references `echo.js` where an inline one
  * references `echo`. Getting that wrong answers MISSING_SCRIPT, which is what this spelling avoids.
  */

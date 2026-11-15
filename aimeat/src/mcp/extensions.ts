@@ -120,7 +120,7 @@ import {
 } from '../services/extension/lifecycle.js';
 import { nodeContext } from '../services/node/context.js';
 import { logger } from '../utils/logger.js';
-import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../services/upload/token.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, dependentsOf, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from '../tool-catalog/shape.js';

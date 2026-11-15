@@ -66,7 +66,7 @@ beforeAll(async () => {
   await jwt.initNodeKeys(nodeKeys.publicKey, nodeKeys.privateKey);
   const { privateKey, publicKey } = jwt.getNodeCryptoKeys();
   const download = await import('../../src/services/download-token.js');
-  const upload = await import('../../src/services/upload-token.js');
+  const upload = await import('../../src/services/upload/token.js');
   const share = await import('../../src/services/share-token.js');
   const draft = await import('../../src/services/draft-token.js');
   const confirm = await import('../../src/services/operator/confirm.js');
@@ -87,7 +87,7 @@ beforeAll(async () => {
 
   fresh.session = await jwt.issueJWT({ sub: OWNER, owner: OWNER, node: NODE, roles: ['owner'], scopes: [] }, 3600, 'sid-purpose');
   fresh.download = await download.generateDownloadToken({ sub: GHII, key: 'files/a.txt', mimeType: 'text/plain', size: 1, version: '2026-11-04T00:00:00.000Z' });
-  // As services/upload-token.ts signs one (its mint answers a handle, not the token).
+  // As services/upload/token.ts signs one (its mint answers a handle, not the token).
   fresh.upload = await signer.signFor('upload', new SignJWT({ typ: 'upload', utype: 'storage', meta: {}, maxBytes: 1, contentType: 'text/plain', iat_ms: Date.now() })
     .setJti(randomUUID()).setSubject(GHII).setIssuedAt().setExpirationTime('3600s'), privateKey);
   fresh.share = await share.generateShareToken({ org: 'org-1', ws: 'ws-1', pwv: 'pwv-1' });

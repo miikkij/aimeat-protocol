@@ -24,8 +24,8 @@ vi.mock('../../src/services/push.js', () => ({}));
 /** The mint needs signing keys it cannot have in a unit test, so the token itself is stubbed and the
  *  meta builder stays real: the meta is the thing under test. */
 const generateUploadToken = vi.fn(async () => 'u_stub-handle');
-vi.mock('../../src/services/upload-token.js', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../../src/services/upload-token.js')>();
+vi.mock('../../src/services/upload/token.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../src/services/upload/token.js')>();
     return { ...actual, generateUploadToken };
 });
 

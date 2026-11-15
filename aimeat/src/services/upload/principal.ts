@@ -1,5 +1,5 @@
 /**
- * @file src/services/upload-principal.ts
+ * @file src/services/upload/principal.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Is the principal a presigned upload URL was minted for still there? Asked at
@@ -21,7 +21,7 @@
  *   WHO IS NOT ASKED. A visitor from another node names no account of this node, so the account
  *   question is not asked of it (its home node answers for it). A principal with a `#` that named no
  *   agent record at the mint (a scoped personal access token, an app) is asked only the account
- *   question; the token says which it was (`actor_agent`, services/upload-token.ts). A token minted
+ *   question; the token says which it was (`actor_agent`, services/upload/token.ts). A token minted
  *   before 2026-10-20 carries no `actor_agent`, so a missing agent record passes for it, but a record
  *   newer than it is still refused; such a token lives an hour at most.
  *
@@ -35,10 +35,10 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck).
  */
-import type { Storage } from '../storage/interface.js';
-import type { VerifiedUploadToken } from './upload-token.js';
-import { isGEAI, localAccountOf } from '../utils/gaii.js';
-import { madeAfter, ownerRefuses, tokenIssuedAt, type IssuedAt } from '../auth/credential-age.js';
+import type { Storage } from '../../storage/interface.js';
+import type { VerifiedUploadToken } from './token.js';
+import { isGEAI, localAccountOf } from '../../utils/gaii.js';
+import { madeAfter, ownerRefuses, tokenIssuedAt, type IssuedAt } from '../../auth/credential-age.js';
 
 /** The answer a refused upload carries: what happened and what to do, in plain words. */
 const GONE = 'The agent or app this upload URL was made for no longer exists, or was replaced. Nothing was stored.';

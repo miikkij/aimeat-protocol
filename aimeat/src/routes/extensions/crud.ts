@@ -93,7 +93,7 @@ import { managedChangeRefusal } from '../../services/packages/install/package-ma
 import { hasExtWritePermission, mayManageInstalledExt, extWriteRefusalText, codeWriteRefusalText } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator/override.js';
 import { codeHoldRefusal, takeHoldOff } from '../../services/extension/code-hold.js';
-import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../../services/upload/token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension/workspace-declaration.js';
 import {

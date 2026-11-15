@@ -37,7 +37,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
-import { generateUploadToken } from '../upload-token.js';
+import { generateUploadToken } from '../upload/token.js';
 import { THEME_FACES, FACE_SLOTS, type FaceSlot } from './tokens.js';
 import { FONT_KINDS, setAddedFaces, addedFaces, stackFor, fontsSheet, type FontKind, type FontFile, type FontRecord } from './font-registry.js';
 import { baseFaces, type BaseFace } from './fonts-base.js';

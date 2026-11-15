@@ -65,7 +65,7 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/op
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
-import { generateUploadToken } from '../services/upload-token.js';
+import { generateUploadToken } from '../services/upload/token.js';
 import {
   publishSkill, listSkills, listSkillLibrary, resolveSkillRef, setSkillVisibility, deleteSkill,
   listSkillsByBinding, SkillAccessError, type SkillAccessor, type SkillScope,

@@ -17,7 +17,7 @@
  *   v1.0.0 — 2026-10-05 — Moved out of src/mcp/cortex.ts (secaudit 2026-10, M3).
  */
 import type { AimeatConfig } from '../../config.js';
-import { generateUploadToken } from '../upload-token.js';
+import { generateUploadToken } from '../upload/token.js';
 
 export interface CortexUploadOffer {
     mode: 'upload';

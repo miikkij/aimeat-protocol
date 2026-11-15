@@ -67,7 +67,7 @@ async function bootProcess(storage: Storage) {
   jwt.initRevocationStorage(storage, NODE_ID);
   (await import('../../src/auth/middleware.js')).initSessionAuth(storage, config);
   await (await import('../../src/services/stats.js')).initStats();
-  const upload = await import('../../src/services/upload-token.js');
+  const upload = await import('../../src/services/upload/token.js');
   upload.initUploadTokenKeys(uploadKeys.privateKey, uploadKeys.publicKey);
   const { registerOAuthRoutes } = await import('../../src/mcp/oauth.js');
   const { loginTarpit } = await import('../../src/middleware/login-tarpit.js');

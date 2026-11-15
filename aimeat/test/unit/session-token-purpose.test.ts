@@ -90,7 +90,7 @@ beforeAll(async () => {
         provider: 'google', providerSub: 'g-1', email: 'p@example.com', emailVerified: true,
         displayName: 'Pia', suggested: OWNER, redirect: '/', mode: 'signup',
     } as never)]);
-    // As services/upload-token.ts signs one (its mint returns only a handle).
+    // As services/upload/token.ts signs one (its mint returns only a handle).
     kinds.push(['upload', await new SignJWT({ typ: 'upload', utype: 'storage', meta: {}, maxBytes: 1, contentType: 'text/plain' })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' }).setJti('u-1').setSubject(ghii).setIssuedAt().setExpirationTime('1h').sign(privateKey)]);
     // As services/vc-issuer.ts signs one: a 365-day credential under the header type vc+ld+jwt.

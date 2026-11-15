@@ -71,7 +71,7 @@ beforeAll(async () => {
   await jwt.initNodeKeys(pub.toString('base64'), seed.toString('base64'));
   const { privateKey, publicKey } = jwt.getNodeCryptoKeys();
   (await import('../../src/services/download-token.js')).initDownloadTokenKeys(privateKey, publicKey);
-  (await import('../../src/services/upload-token.js')).initUploadTokenKeys(privateKey, publicKey);
+  (await import('../../src/services/upload/token.js')).initUploadTokenKeys(privateKey, publicKey);
   (await import('../../src/services/share-token.js')).initShareTokenKeys(privateKey, publicKey);
   (await import('../../src/services/draft-token.js')).initDraftTokenKeys(privateKey, publicKey);
   (await import('../../src/services/operator/confirm.js')).initConfirmTokenKeys(privateKey, publicKey);
@@ -140,7 +140,7 @@ describe('share links and signed addresses still open', () => {
   });
 
   it('an upload address: the stored handle opens and the token behind it verifies', async () => {
-    const { verifyUploadToken } = await import('../../src/services/upload-token.js');
+    const { verifyUploadToken } = await import('../../src/services/upload/token.js');
     const v = await verifyUploadToken(T.uploadHandle, { revokeTokenIfAbsent: async () => true } as never);
     expect(v).toMatchObject({ sub: GHII, utype: 'storage', maxBytes: 100, contentType: 'text/plain' });
   });

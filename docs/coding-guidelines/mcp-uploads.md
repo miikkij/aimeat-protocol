@@ -92,7 +92,7 @@ assets/             (optional)
 
 ## Adding Upload Support to New Tools
 
-1. Add the new type to `utype` in `UploadTokenPayload` and `VerifiedUploadToken` (`src/services/upload-token.ts`), and list the options it must carry in `PRESIGNED_META_KEYS`.
+1. Add the new type to `utype` in `UploadTokenPayload` and `VerifiedUploadToken` (`src/services/upload/token.ts`), and list the options it must carry in `PRESIGNED_META_KEYS`.
 2. Make the content parameters optional in the tool's catalog schema (`src/tool-catalog/definitions/`).
 3. If content is omitted, mint the token with `generateUploadToken({ sub, actor, utype, meta: buildUploadMeta(utype, input), maxBytes, contentType })`. Use `buildUploadMeta` rather than a hand-written `meta`, so an option the tool accepts is not dropped on the way to the upload.
 4. Add a `case` for the type in the switch in `src/routes/upload.ts`, with its handler.
@@ -102,8 +102,8 @@ assets/             (optional)
 
 | File | Purpose |
 |------|---------|
-| `src/services/upload-token.ts` | Token mint and verify, the handle map, the durable single-use spend, `PRESIGNED_META_KEYS` |
-| `src/services/upload-zip.ts` | ZIP parsing for extension and cortex uploads (a skill ZIP is unpacked in `upload-skill.ts` through `src/services/safe-zip.ts`) |
+| `src/services/upload/token.ts` | Token mint and verify, the handle map, the durable single-use spend, `PRESIGNED_META_KEYS` |
+| `src/services/upload/zip.ts` | ZIP parsing for extension and cortex uploads (a skill ZIP is unpacked in `upload-skill.ts` through `src/services/safe-zip.ts`) |
 | `src/routes/upload.ts` | `PUT /v1/upload/:token`; the app, extension and cortex handlers |
 | `src/routes/upload-storage.ts` | The storage upload handler |
 | `src/routes/upload-skill.ts` | The skill upload handler |

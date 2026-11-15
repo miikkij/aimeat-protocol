@@ -43,7 +43,7 @@
         "aimeat/src/config/posture.ts",
         "aimeat/src/auth/node-keys.ts"
       ],
-      "digest": "sha256:08824fc9a8dc1dbe9062b122"
+      "digest": "sha256:c274defa2178bb2ed030293c"
     },
     "04-identity-access.md": {
       "reviewedOn": "2026-11-15",
@@ -134,7 +134,7 @@
         "aimeat/src/storage/providers/postgres-kysely/read-retry.ts",
         "aimeat/src/server-bootstrap/bus-relay-start.ts"
       ],
-      "digest": "sha256:ab1bef4bbc9e29969c295625"
+      "digest": "sha256:dbf6b1c98072fee9f9b59348"
     },
     "12-updates-releases.md": {
       "reviewedOn": "2026-11-15",
@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:ca9c346062e6e9644bc68fb2"
+      "digest": "sha256:45c4b184db4c23aebc6af746"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -304,7 +304,7 @@
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
-      "aimeat/src/auth/node-keys.ts": "d3f6fd5c64256800"
+      "aimeat/src/auth/node-keys.ts": "95903bbbbbc5b7ee"
     },
     "04-identity-access.md": {
       "aimeat/src/services/external-login.ts": "699b02d54907389e",
@@ -359,7 +359,7 @@
     },
     "11-backup-recovery.md": {
       "docs/operations/backup-and-restore.md": "a0eead9e2df11d96",
-      "aimeat/src/auth/node-keys.ts": "d3f6fd5c64256800",
+      "aimeat/src/auth/node-keys.ts": "95903bbbbbc5b7ee",
       "aimeat/src/services/encryption.ts": "b0a16df9e1d5c2cb",
       "docs/operations/database-high-availability.md": "7343bad9bc41c61b",
       "aimeat/src/storage/providers/postgres-kysely/read-retry.ts": "9c1d34ab26d00182",
@@ -437,7 +437,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "ecfeb5307cde6aa2",
+      "aimeat/security/process-local-baseline.json": "5f8d0d545d6479f3",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",

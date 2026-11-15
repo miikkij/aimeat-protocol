@@ -20,7 +20,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { SignJWT, generateKeyPair } from 'jose';
 import type { Storage } from '../../src/storage/interface.js';
 
-type UploadTokens = typeof import('../../src/services/upload-token.js');
+type UploadTokens = typeof import('../../src/services/upload/token.js');
 
 /** The revoked-token table in miniature, shared by every "process" as one database is. */
 const rows = new Map<string, number>();
@@ -38,12 +38,12 @@ let publicKey: CryptoKey;
 
 async function aProcess(): Promise<UploadTokens> {
     vi.resetModules();
-    const mod = await import('../../src/services/upload-token.js');
+    const mod = await import('../../src/services/upload/token.js');
     mod.initUploadTokenKeys(privateKey, publicKey);
     return mod;
 }
 
-/** A raw upload JWT, as services/upload-token.ts signs one. */
+/** A raw upload JWT, as services/upload/token.ts signs one. */
 const mint = (jti: string) => new SignJWT({ typ: 'upload', utype: 'storage', meta: {}, maxBytes: 10, contentType: 'text/plain' })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' }).setJti(jti).setSubject('ada@node').setIssuedAt().setExpirationTime('1h')
     .sign(privateKey);

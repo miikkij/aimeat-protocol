@@ -86,7 +86,7 @@
         "aimeat/src/services/usage/usage-read.ts",
         "aimeat/public/views/appcat.js"
       ],
-      "digest": "sha256:82fdfbe57dadde9e3b481c37"
+      "digest": "sha256:46cf6e730e9cde449b9521a6"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-15",
@@ -390,7 +390,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension/schedules.ts"
       ],
-      "digest": "sha256:fd09bf8c3528a239aa6b3e07"
+      "digest": "sha256:a3bb9c010d8da889c0ff81b4"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-15",
@@ -933,7 +933,7 @@
       "aimeat/src/services/extension/ctx-contract.ts": "363c847bf469f1d6",
       "aimeat/src/services/extension/manifest.ts": "60cfff445da22fc9",
       "aimeat/src/services/extension-access/paywall.ts": "ddb37b18233efe74",
-      "aimeat/src/routes/extensions/crud.ts": "5457b8c1db6686a7",
+      "aimeat/src/routes/extensions/crud.ts": "0d4388533918bd2e",
       "aimeat/src/routes/extensions/instances.ts": "605862fb1d9f8a42",
       "aimeat/src/services/extension/schedules.ts": "94948c01d41b79b4"
     },
@@ -1032,7 +1032,7 @@
       "aimeat/src/data/compliance-lia.ts": "3b1e5d64573f5bd6"
     },
     "node:aimeat-find-my-app": {
-      "aimeat/src/mcp/apps.ts": "050fc28e0333e90c",
+      "aimeat/src/mcp/apps.ts": "093f6afaa82a75c1",
       "aimeat/src/tool-catalog/definitions/apps-publish.ts": "3e6fffbf576765ea",
       "aimeat/src/services/usage/usage-read.ts": "7e2062c63eacffc3",
       "aimeat/public/views/appcat.js": "325750f08208eb54"

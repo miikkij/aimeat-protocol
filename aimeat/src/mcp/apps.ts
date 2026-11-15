@@ -139,7 +139,7 @@ import type { Storage } from '../storage/interface.js';
 import { appListingOf } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../services/upload/token.js';
 import { mintDraftPreview } from '../services/app/draft-preview.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
