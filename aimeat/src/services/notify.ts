@@ -26,6 +26,7 @@
  * @usage import { notify } from '../services/notify.js';
  *   await notify(storage, `${creatorOwner}@${nodeId}`, { type: 'workspace_access_request', title, link });
  * @version-history
+ *   2026-11-15 — The dropped-button log line says "an endpoint of this node", not "a door".
  *   2026-11-14 — A notification is written in its recipient's language: notify() resolves the
  *     recipient's locale and stores the title and body from `notiftext.<key>` filled for them, and an
  *     organism named through `i18n.orgVars` by its team name in that language (services/notifications/recipient-words.ts).
@@ -143,7 +144,7 @@ export function servableNotifActions(actions: unknown, where: { recipient: strin
       kept.push(raw as NotifAction);
       continue;
     }
-    logger.warn('notifications: a button that does not call a door of this node was dropped', {
+    logger.warn('notifications: a button that does not call an endpoint of this node was dropped', {
       recipient: where.recipient, notif: where.notif, action: typeof a.id === 'string' ? a.id : null,
       kind: typeof a.kind === 'string' ? a.kind : null, endpoint: String(a.endpoint ?? '').slice(0, 200),
     });

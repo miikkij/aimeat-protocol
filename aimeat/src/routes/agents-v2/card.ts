@@ -35,6 +35,7 @@
  * @structure registerAgentCardRoutes(router, config, storage)
  * @usage registerAgentCardRoutes(router, config, storage);
  * @version-history
+ *   2026-11-15 — The NOT_ENROLLED refusal says "this call", not "this door".
  *   2026-11-13 — cardUri, jwksUri and nodeKeyUri moved to services/agent-card.ts, so the enrolment
  *     offer service no longer imports a route file (structure programme 2026-11, unit 4).
  *   2026-10-21 — isSameOwnerReader asks isAnonymousPrincipal, so the minted anonymous token (which
@@ -172,7 +173,7 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
     }
     if (!agent.cardJws || !agent.publicKey) {
       res.status(409).json(error(config.nodeId, 'NOT_ENROLLED',
-        'This agent has no card yet. Enrol it first — that is where a key is admitted, and this door only replaces what a card says.',
+        'This agent has no card yet. Enrol it first: enrolment admits a key, and this call only replaces what a card says.',
         undefined, undefined,
         [{ description: 'Enrol this agent, which admits its key', method: 'POST', url: '/v1/agents/v2/enrol' }]));
       return;

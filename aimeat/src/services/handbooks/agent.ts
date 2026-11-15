@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.71.1 -- 2026-11-15 -- Content moderation "has its own route", not "is a different door".
  *   v1.71.0 -- 2026-11-15 -- Teams: a decision shared with other teams (aimeat_team_decision_share, T19),
  *     the team approval gate's two answers (T7), and the AI onboarding record (T11).
  *   v1.70.0 -- 2026-11-14 -- Discover names route capabilities: a REST route found by type capability
@@ -627,8 +628,8 @@ reaches the people who run this node in ONE thread they answer in, and the send 
 pass it back as \`conversation_id\` to continue rather than opening a second thread.
 
 Write there rather than working around it silently. An unreported wall stays a wall for the next
-agent, and what you report is how this node improves. Content moderation is a different
-door: flag the content itself with POST /v1/flags, which goes to the moderators.
+agent, and what you report is how this node improves. Content moderation has its own
+route: flag the content itself with POST /v1/flags, which goes to the moderators.
 
 ## Boot sequence
 1. \`aimeat_onboarding_status\` → follow next_step.

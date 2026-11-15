@@ -2,14 +2,14 @@
 <!-- AIMEAT App Manifest
 name: aimeat-cortex-showroom
 version: 0.2.0
-description: Comprehensive live showroom of every bundled AIMEAT cortex UI component, styled with self-hosted Tailwind + daisyUI.
+description: Comprehensive live demo of every bundled AIMEAT cortex UI component, styled with self-hosted Tailwind + daisyUI.
 entry: index.html
 -->
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AIMEAT Cortex Library Showroom</title>
+  <title>AIMEAT Cortex Library Demo</title>
   <!-- Self-hosted (vendored) — served from our own node /lib/, not a CDN -->
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <!-- Bridge: makes the cortex UI libs follow daisyUI's data-theme (maps --text/--bg-card/… → --color-*) -->
@@ -24,7 +24,7 @@ entry: index.html
   <nav class="navbar bg-base-200 shadow-sm px-4 sticky top-0 z-50">
     <div class="flex-1 gap-3">
       <span class="text-lg font-bold">AIME<span style="color:#E8564A">&#9829;</span>AT</span>
-      <span class="opacity-70 hidden sm:inline">Cortex Library Showroom</span>
+      <span class="opacity-70 hidden sm:inline">Cortex Library Demo</span>
     </div>
     <div class="flex-none gap-2">
       <span class="badge badge-soft badge-success" id="vendor-badge">self-hosted Tailwind + daisyUI</span>
@@ -98,7 +98,7 @@ entry: index.html
   </main>
 
   <footer class="footer footer-center p-4 text-sm opacity-60">
-    <span>AIMEAT Cortex Library Showroom — vendored Tailwind v4 · daisyUI 5 · Chart.js 4</span>
+    <span>AIMEAT Cortex Library Demo: vendored Tailwind v4 · daisyUI 5 · Chart.js 4</span>
   </footer>
 </body>
 </html>

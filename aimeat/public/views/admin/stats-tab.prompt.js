@@ -14,6 +14,7 @@
  *   English, like every prompt here, while the page around it follows the reader's language.
  * @structure buildStatsPrompt({ url, from, to })
  * @version-history
+ *   v1.0.1 — 2026-11-15 — The prompt says sign-in and endpoint, not door.
  *   v1.0.0 — 2026-09-12 — Initial (the Statistics page in the poster face).
  */
 
@@ -33,7 +34,7 @@ Read it twice more: once for the stretch immediately before, so you have somethi
 (aimeat_admin_stats is a different tool and answers a different question: how many agents, actions and boards this node holds. It carries none of the counters below.)
 
 == 2. Judge ==
-Lead with anything that looks like somebody trying to get in. auth_failures_total is the count of people and machines refused at the door, and its SHAPE matters more than its total: a number that is flat across a weekend is a script working through credentials, not people mistyping a password. scope_denials_total is a named principal reaching for a door it may not open, which is either a misconfigured integration or somebody testing the fence.
+Lead with anything that looks like somebody trying to get in. auth_failures_total is the count of people and machines refused at sign-in, and its SHAPE matters more than its total: a number that is flat across a weekend is a script working through credentials, not people mistyping a password. scope_denials_total is a named principal calling an endpoint its scopes do not allow, which is either a misconfigured integration or somebody testing the limits.
 
 Then say which of the ordinary counters moved and which did not. memory_reads and memory_writes are what people and their agents actually did here. requests_total is every request the node served.
 

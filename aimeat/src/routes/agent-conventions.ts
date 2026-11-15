@@ -25,6 +25,7 @@
  *   - GET /.well-known/x402.json    — machine-payment discovery, derived from the network registry
  * @usage app.use(agentConventionsRouter(config, storage));
  * @version-history
+ *   2026-11-15 — The installation section says "How you connect", not "Which road is yours".
  *   2026-10-15 — /.well-known/webmcp.json names the tools as the library registers them
  *     (`aimeat-node-info`, `aimeat-commerce-feed`), not `node_info` / `commerce_feed` (feature-list audit #190).
  *   2026-09-28 — openapi.yaml is found by services/openapi-file.ts, which knows the packaged location.
@@ -72,7 +73,7 @@ material. It is the wrong tool for a one-shot script that needs no state.
 
 ## Installation
 
-Nothing to install. Which road is yours depends on what you can do:
+Nothing to install. How you connect depends on what you can do:
 
 ${firstStepsMarkdown(config)}
 

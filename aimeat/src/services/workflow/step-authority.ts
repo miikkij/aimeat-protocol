@@ -23,6 +23,7 @@
  *   const missing = missingStepScopes(def, caller, 'full');
  *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
  * @version-history
+ *   v1.5.1 — 2026-11-15 — The SCOPE_DENIED message says "its own endpoint", not "its own door".
  *   v1.5.0 — 2026-10-20 — A step that reads owner records costs memory:read-as-owner too, for every
  *     caller but the owner in person and an app grant: the step reads the whole owner scope, which
  *     the memory route shows only to a caller that reads as the owner (services/owner-scope-read.ts,
@@ -240,6 +241,6 @@ export function stepScopeRefusal(missing: MissingStepScope[]): { status: 403; co
         status: 403, code: 'SCOPE_DENIED',
         needed: missing.map(m => m.scope),
         message: `This workflow needs ${why.join(', ')}, and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. `
-            + 'A step does what its own door does, so it costs the same permission. The owner grants it in the permissions of this agent or app.',
+            + 'A step does what its own endpoint does, so it costs the same permission. The owner grants it in the permissions of this agent or app.',
     };
 }

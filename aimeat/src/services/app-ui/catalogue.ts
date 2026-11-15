@@ -16,6 +16,7 @@
  * @usage
  *   import { buildUiCatalogue } from './catalogue.js';
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The tokens summary says "the one colour you set" (as build-atelier-prompt.ts does), not "the one colour door".
  *   v1.1.0 — 2026-09-05 — THE EFFECTS SHELF (wish-atelier-post-process-effects, stage 4): the
  *     nine effects with their knobs' bounds, the hosts a prop or zone effect may land on, the
  *     post passes, and a summary teaching still, moment and living; the ambient summary names
@@ -110,7 +111,7 @@ export function buildUiCatalogue(): {
       values: SIGNATURE_TOKENS,
       summary: 'Optional top-level `tokens`: the app\'s SIGNATURE — bounded overrides of colour, '
         + 'shape, typography, density and motion, applied on top of the look. Only the names '
-        + 'listed here are legal. The one colour door is --ak-accent as a light/dark pair '
+        + 'listed here are legal. The one colour you set is --ak-accent, as a light/dark pair '
         + '"#hex/#hex", proven by the full contrast matrix at validation — every other colour '
         + 'derives from it. The design pass: propose two or three token-sets as whole layouts, '
         + 'dry-run each, show the owner, store the one they pick.',

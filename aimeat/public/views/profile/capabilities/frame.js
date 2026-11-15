@@ -10,6 +10,7 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, groupCapabilities, agentRule } from './frame.js';
  * @version-history
+ *   v1.2.1 — 2026-11-15 — The prompt says "the contract MCP tools", not "the contract door".
  *   v1.2.0 — 2026-10-11 — costWord says the money price (or free) and the pacing amount (cost.morsels, the pacing per use); "priced" means a money price only (ruling "morseli on tahdistus, ei hinta").
  *   v1.1.0 — 2026-09-26 — crumb() and pageLinks() return data (the steps, the sibling pages) for the
  *     SettingsPage component; openTab is the rail's own (components/Rail.js) (page group G7).
@@ -76,7 +77,7 @@ export function agentRule(nodeUrl) {
   return [
     `Capabilities on this AIMEAT node: find first with aimeat_capabilities_list (search by word; callable=true for what runs here), read one with aimeat_capabilities_get (input and output shape), then call with aimeat_capabilities_invoke by id, e.g. "ext:tinki:listings".`,
     `Without MCP: GET ${nodeUrl}/v1/capabilities and POST ${nodeUrl}/v1/capabilities/<id>/invoke.`,
-    'source app-tool and offering entries are discovery only: their usage names the contract door (aimeat_exchange_offerings → aimeat_exchange_accept, then aimeat_app_tool_invoke or aimeat_exchange_work). A cortex is a browser library the app loads; it is on the Libraries page, not callable here.',
+    'source app-tool and offering entries are discovery only: their usage names the contract MCP tools (aimeat_exchange_offerings → aimeat_exchange_accept, then aimeat_app_tool_invoke or aimeat_exchange_work). A cortex is a browser library the app loads; it is on the Libraries page, not callable here.',
     `The node's own tools (memory, apps, organisms, ...) are a different catalogue: aimeat_discover.`,
   ].join('\n');
 }

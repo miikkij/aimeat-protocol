@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-11-15 — The three login tarpit limits say "the node" and sso.enabled says "endpoints", not door.
  *   2026-11-15 — site.front_page calls "demo" the static demo page, not the static showroom.
  *   2026-11-15 — security.request_body_check says a body is refused after the route's own sign-in,
  *     permission and rate-limit checks.
@@ -516,10 +517,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'loginTarpitEnabled', dotPath: 'security.login_tarpit_enabled', envVar: 'AIMEAT_LOGIN_TARPIT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Delay repeated credential failures from one address' },
   { key: 'loginTarpitFreeFailures', dotPath: 'security.login_tarpit_free', envVar: 'AIMEAT_LOGIN_TARPIT_FREE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100, immutable: false, description: 'Refusals that cost nothing, so a mistyped password is not punished', range: '0-100' },
   { key: 'loginTarpitStepMs', dotPath: 'security.login_tarpit_step_ms', envVar: 'AIMEAT_LOGIN_TARPIT_STEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 60_000, immutable: false, description: 'Delay added per refusal beyond the free ones', range: '0-60000' },
-  { key: 'loginTarpitMaxDelayMs', dotPath: 'security.login_tarpit_max_delay_ms', envVar: 'AIMEAT_LOGIN_TARPIT_MAX_DELAY_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 120_000, immutable: false, description: 'Longest any single request is held before the door refuses instead', range: '0-120000' },
-  { key: 'loginTarpitBlockAfter', dotPath: 'security.login_tarpit_block_after', envVar: 'AIMEAT_LOGIN_TARPIT_BLOCK_AFTER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Refusals after which the door answers 429 without holding the connection', range: '1-1000' },
+  { key: 'loginTarpitMaxDelayMs', dotPath: 'security.login_tarpit_max_delay_ms', envVar: 'AIMEAT_LOGIN_TARPIT_MAX_DELAY_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 120_000, immutable: false, description: 'Longest any single request is held before the node refuses it instead', range: '0-120000' },
+  { key: 'loginTarpitBlockAfter', dotPath: 'security.login_tarpit_block_after', envVar: 'AIMEAT_LOGIN_TARPIT_BLOCK_AFTER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Refusals after which the node answers 429 without holding the connection', range: '1-1000' },
   { key: 'loginTarpitWindowMs', dotPath: 'security.login_tarpit_window_ms', envVar: 'AIMEAT_LOGIN_TARPIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60_000 && (v as number) <= 86_400_000, immutable: false, description: 'How long a penalty takes to decay if nothing else arrives', range: '60000-86400000' },
-  { key: 'loginTarpitMaxConcurrent', dotPath: 'security.login_tarpit_max_concurrent', envVar: 'AIMEAT_LOGIN_TARPIT_MAX_CONCURRENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10_000, immutable: false, description: 'Requests that may be delayed at once before the door sheds instead of holding', range: '1-10000' },
+  { key: 'loginTarpitMaxConcurrent', dotPath: 'security.login_tarpit_max_concurrent', envVar: 'AIMEAT_LOGIN_TARPIT_MAX_CONCURRENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10_000, immutable: false, description: 'Requests that may be delayed at once before the node refuses new ones instead of holding them', range: '1-10000' },
   // Immutable: the setup register route reads it on every request, but turning it on is a decision
   // about what kind of node this is, so it takes a restart and never a live write.
   // Immutable for the same reason: which sign-in methods a node accepts is decided at start.
@@ -571,7 +572,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'The most scopes an agent can be given, one per line (comma-separated in the environment; * = all)' },
 
   // ── Enterprise SSO (BR-04; mutable — an organisation node's host seals these) ──
-  { key: 'ssoEnabled', dotPath: 'sso.enabled', envVar: 'AIMEAT_SSO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable organisation sign-in (SAML) and provisioning (SCIM) doors' },
+  { key: 'ssoEnabled', dotPath: 'sso.enabled', envVar: 'AIMEAT_SSO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable organisation sign-in (SAML) and provisioning (SCIM) endpoints' },
   { key: 'ssoConnectionsLocked', dotPath: 'sso.connections_locked', envVar: 'AIMEAT_SSO_CONNECTIONS_LOCKED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Freeze SSO connection management (every admin write answers 403)' },
 
   // ── Cortex Extensions (mutable) ──

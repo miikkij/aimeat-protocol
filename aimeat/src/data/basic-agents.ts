@@ -48,6 +48,7 @@
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v2.5.1 — 2026-11-15 — The concierge's description and readme say "the first point of contact", not "the front door".
  *   v2.5.0 — 2026-10-12 — Both basic agents hold agent:read: they route work to the owner's other agents,
  *     and the agent list asks the word from 4.0.0. A basic agent created before this gets it once from
  *     services/rest-scope-gates-migration.ts migrateAgentReadGrantOnce.
@@ -181,7 +182,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
   {
     name: 'concierge',
     displayName: 'Concierge',
-    description: 'The front door. Takes what arrives, works out what it is about, answers what it can, and hands the rest to whoever should have it.',
+    description: 'The first point of contact. Takes what arrives, works out what it is about, answers what it can, and hands the rest to whoever should have it.',
     scopes: withCrewRuntimeScopes([
       'memory:read', 'memory:write',
       'messages:read', 'messages:send',
@@ -204,7 +205,7 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
     runMode: 'resident',
     tags: ['crew.basic', 'role.concierge'],
     crewDef: {
-      readme_md: '# Concierge\\n\\nThe front door.\\n\\nIt reads what arrives, works out what it is about, answers what it can from what you already keep, and hands the rest to whoever should have it. It says who it passed something to, so nothing disappears into a queue you cannot see.\\n\\n**It answers and it routes. It does not decide anything on your behalf** — a request that needs a person waits for you, named.',
+      readme_md: '# Concierge\\n\\nThe first point of contact.\\n\\nIt reads what arrives, works out what it is about, answers what it can from what you already keep, and hands the rest to whoever should have it. It says who it passed something to, so nothing disappears into a queue you cannot see.\\n\\n**It answers and it routes. It does not decide anything on your behalf** — a request that needs a person waits for you, named.',
       tags: ['crew.basic', 'role.concierge'],
       process: 'sequential',
       // Messages and DMs, as a front door. And tasks: its tasks start on their own

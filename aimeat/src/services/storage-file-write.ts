@@ -40,6 +40,7 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-15 — The app-owned key refusal says "the app's own endpoint", not "the app's own door".
  *   2026-11-13 — isAnonymousGaii is imported from utils/visibility-words.ts, where it lives, and not
  *     through the re-export in routes/memory/shared.ts (structure programme 2026-11, unit 4).
  *   2026-11-08 — A direct upload the store does not take moves to the database only within the
@@ -311,7 +312,7 @@ export function appOwnedKeyRefusal(key: string): KeyRefusal | null {
     if (!owned) return null;
     return {
         ok: false, status: 403, code: 'FORBIDDEN',
-        message: `Keys under "${owned.prefix}" hold an app's ${owned.holds}. Only the app's own door writes `
+        message: `Keys under "${owned.prefix}" hold an app's ${owned.holds}. Only the app's own endpoint writes `
             + `them, because it checks that the bytes are a picture: POST /v1/apps/{owner}/{filename}/${owned.door}.`,
     };
 }

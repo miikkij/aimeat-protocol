@@ -31,6 +31,7 @@
  *   secretRecordBinRefusal · secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.6.1 — 2026-11-15 — The SECRET_RECORD refusals say "the general memory routes and tools", not doors.
  *   v1.6.0 — 2026-10-20 — The workspace share record's `icsKeyHash` is shown as `has_ics_key`, as the
  *     share routes have always shown it. The workspace export now passes its records through this
  *     mask, and the bundle carried both hashes (secaudit 2026-10,
@@ -138,7 +139,7 @@ export function secretRecordBinRefusal(key: string, act: 'delete' | 'restore'): 
         : 'DELETE /v1/commerce/payout/stripe (Wallet, Selling and payments)';
   return {
     code: 'SECRET_RECORD',
-    message: `"${key}" holds a credential, so it is not removed through the general memory doors. Use ${door}.`,
+    message: `"${key}" holds a credential, so it is not removed through the general memory routes and tools. Use ${door}.`,
   };
 }
 
@@ -159,6 +160,6 @@ export function secretRecordWriteRefusal(key: string): { code: string; message: 
         : 'PUT /v1/commerce/payout/stripe (Wallet, Selling and payments) or aimeat_commerce_psp_set';
   return {
     code: 'SECRET_RECORD',
-    message: `"${key}" holds a credential, so it is not written through the general memory doors. Use ${door}.`,
+    message: `"${key}" holds a credential, so it is not written through the general memory routes and tools. Use ${door}.`,
   };
 }

@@ -15,6 +15,7 @@
  * @structure CREDENTIAL_KINDS · CredentialKind
  * @usage import { CREDENTIAL_KINDS, type CredentialKind } from './credential-kinds.js';
  * @version-history
+ *   v1.3.1 — 2026-11-15 — The 'party-optional' and 'federation-peer' texts say endpoint, not door.
  *   v1.3.0 — 2026-11-14 — 'secret-share-code' and 'secret-share-deposit': a secret share's pickup code
  *     and a secret request's deposit token.
  *   v1.2.1 — 2026-11-08 — The 'receiver' kind's text says incoming webhook and API key; the kind keeps
@@ -76,12 +77,12 @@ export const CREDENTIAL_KINDS = {
     'party-optional': {
         credential: 'An outside party buying again, when it presents its credential (the same as \'party\'): a credential '
             + 'that names no live party is refused as there, and a request with none is taken, because buying with '
-            + 'no account is what the door is for.',
+            + 'no account is what the endpoint is for.',
         admitsNoCredential: true,
     },
     'federation-peer': {
-        credential: 'A peer node of this node: active, entitled to the door\'s capability, its key on file '
-            + '(services/federation-peer-gate.ts), and an Ed25519 signature by that key over the exact text the door '
+        credential: 'A peer node of this node: active, entitled to the endpoint\'s capability, its key on file '
+            + '(services/federation-peer-gate.ts), and an Ed25519 signature by that key over the exact text the endpoint '
             + 'signs, always verified. A missing or unknown peer is 403, a missing or forged signature 401.',
         admitsNoCredential: false,
     },

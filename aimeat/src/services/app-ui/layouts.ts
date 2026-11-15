@@ -19,6 +19,7 @@
  * @usage
  *   import { UI_LAYOUT_PRESETS } from './layouts.js';
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The story shape's timeline placeholder title is "<The milestones>", not "<The road>".
  *   v1.1.0 — 2026-09-05 — THE FIRST SCREEN IS COMPOSED. Measured at 1440x900, four of the six
  *     shapes opened on a mostly bare desktop — guided-flow and work-queue at 84 % bare, dashboard
  *     64 %, browse 48 %, cover 40 % — because three of them projected ONE unit at a time (tabs,
@@ -120,7 +121,7 @@ export const UI_LAYOUT_PRESETS: readonly AppUiLayoutPreset[] = [
         { id: 'top', component: 'hero', props: { title: '<the story’s name>' } },
         { id: 'lead', component: 'mediaCard', props: { title: '<the first idea>', sub: '<one line on it>' } },
         { id: 'proof', component: 'statRow', props: { source: '<your numbers source>', title: '<The numbers>' } },
-        { id: 'trail', component: 'timeline', props: { source: '<your milestones source>', title: '<The road>' } },
+        { id: 'trail', component: 'timeline', props: { source: '<your milestones source>', title: '<The milestones>' } },
       ],
     },
   },

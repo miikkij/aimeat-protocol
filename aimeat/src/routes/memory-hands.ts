@@ -20,6 +20,7 @@
  * @structure memoryHandsRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-11-15 — The coverage note says "the writes a person, an agent or an app made", not a door.
  *   2026-10-22 — The answer comes from handsOnKey, the function MCP aimeat_memory_hands calls, and follows the owner-scope read rule: an agent without memory:read-as-owner gets no row for a record of the owner or a sibling agent that GET /v1/memory/:key answers as absent, and an ecosystem app or a visitor gets its own namespace only. A `note` says what such an answer leaves out (secaudit 2026-10, v88).
  *   2026-10-15 — The hands from all the caller's namespaces are sorted by last_at, newest first, as openapi.yaml states (feature-list audit #50).
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 10.
@@ -36,7 +37,7 @@ import { handsOnKey } from '../services/data-map/data-map-access.js';
 /** Said the same way wherever a tally number is rendered, so the number is never read as complete. */
 const NOT_COVERED = [
   'Counting started when this was switched on. A key written before that and never written since has no hands here, and never will.',
-  'It counts what came in through a door somebody was behind. AIMEAT also writes to your store on its own, and that is not a hand.',
+  'It counts the writes a person, an agent or an app made. AIMEAT also writes to your store on its own, and that is not a hand.',
 ];
 
 export function memoryHandsRouter(config: AimeatConfig, storage: Storage): Router {

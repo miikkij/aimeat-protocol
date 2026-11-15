@@ -34,6 +34,7 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.6.1 — 2026-11-15 — The journey summary line says "How their AI connects", not "Their road in".
  *   v1.6.0 — 2026-11-14 — `share` is the fourth stage, and a solved question of Ask someone who knows
  *     (asked or answered) counts as having shared with someone (Jouni, 2026-11-14).
  *   v1.5.2 — 2026-11-09 — countWorkersRun counts a worker with two or more finished tasks without
@@ -366,7 +367,7 @@ export function journeyHandbookSection(journey: Journey): string | null {
         '',
         `Next by default: ${STAGE_LINE[journey.next]}.`
         + (journey.want ? ` They said they want: "${journey.want}".` : '')
-        + (journey.road ? ` Their road in: ${journey.road}.` : ''),
+        + (journey.road ? ` How their AI connects: ${journey.road}.` : ''),
         ...profileLines(journey.profile),
         `Their own words live at \`${JOURNEY_KEY}\` in their memory (owner scope).`,
     ].join('\n');

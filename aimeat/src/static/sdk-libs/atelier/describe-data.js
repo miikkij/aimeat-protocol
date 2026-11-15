@@ -65,7 +65,7 @@ export const PARTS = {
     slots: ["title(item)","sub(item)","extra(item)","badge(item)","aside(item)","art(item)"],
     variants: ["dense","wide","plain"],
     tokens: ["--ak-card-min","--ak-card-gap","--ak-card-aspect","--ak-card-pad"],
-    fork: "Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the wall re-entering on every change.",
+    fork: "Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the grid re-entering on every change.",
     file: "grid.js",
   },
   "checkGrid": {

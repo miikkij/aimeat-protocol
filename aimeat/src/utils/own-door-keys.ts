@@ -29,6 +29,7 @@
  *   serviceRecordRefusal(namespace)
  * @usage const refusal = ownDoorRefusal(ownerGaii, key, config.nodeId); if (refusal) … refusal.code, refusal.message
  * @version-history
+ *   2026-11-15 — The DESIGN_BOOK_PART message says "only the Design Book reads it", not "the one door".
  *   2026-11-04 — Every record in a service namespace is refused, with SERVICE_RECORD and the data
  *     export as the route that carries it (codebase analysis 2026-11-03, item B6).
  *   v1.0.0 — 2026-09-26 — Initial: a Design Book part.
@@ -55,7 +56,7 @@ export function ownDoorRefusal(ownerGaii: unknown, key: unknown, nodeId: string)
   const door = `/v1/designbook/${encodeURIComponent(id)}`;
   return {
     code: 'DESIGN_BOOK_PART',
-    message: `"${key}" is a Design Book part, and the Design Book is the one door that reads it: GET ${door}, or aimeat_designbook_get with id "${id}".`,
+    message: `"${key}" is a Design Book part, and only the Design Book reads it: GET ${door}, or aimeat_designbook_get with id "${id}".`,
     door,
   };
 }

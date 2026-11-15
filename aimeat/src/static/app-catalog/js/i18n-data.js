@@ -5,6 +5,7 @@
  *   stay in main.js and import this table. Keep en + fi keys in lockstep (Rule 4).
  * @usage import { I18N } from './i18n-data.js'
  * @version-history
+ *   v1.7.3 — 2026-11-15 — list.foot says a row's buttons (fi: painikkeet), not its doors (en, fi).
  *   v1.7.2 — 2026-11-11 — agents.deployDesc says what a deploy with no runner does, and
  *     agents.saidProposed is the notice for an agent that waits for approval (en, fi).
  *   v1.7.1 — 2026-11-08 — pb.atelierFailed, pb.atelierRetry and pb.atelierAbsent (en, fi): the prompt
@@ -312,7 +313,7 @@ export const I18N = {
       'row.lineLocal': 'Not published yet. Only this browser has it.',
       'row.lineBy': 'Published by {owner} on {date}.',
       'mast.line': '{owner} · {n} apps published on {host}',
-      'list.foot': 'One row per app. The number is its place in the order above; press a row for its doors and a line about where the work is.',
+      'list.foot': 'One row per app. The number is its place in the order above; press a row for its buttons and a line about where the work is.',
       'foot.empty': 'You have no apps yet. When you publish your first one, it shows here.',
       'foot.p1': 'Every one of your {n} apps is one HTML file you own. Publishing puts it on this node under your name; listing puts it in the public catalogue. Unlisting keeps it usable by link.',
       'foot.p2': 'An app that generates content with an AI model says so on its own page.',
@@ -1421,7 +1422,7 @@ export const I18N = {
       'row.lineLocal': 'Ei vielä julkaistu. Vain tämä selain tuntee sen.',
       'row.lineBy': 'Julkaissut {owner}, {date}.',
       'mast.line': '{owner} · {n} sovellusta julkaistu nodella {host}',
-      'list.foot': 'Yksi rivi per sovellus. Numero on sen paikka yllä olevassa järjestyksessä; paina riviä, niin näet ovet ja rivin siitä, missä työ on.',
+      'list.foot': 'Yksi rivi per sovellus. Numero on sen paikka yllä olevassa järjestyksessä; paina riviä, niin näet sen painikkeet ja yhden lauseen siitä, missä työ on.',
       'foot.empty': 'Sinulla ei ole vielä sovelluksia. Kun julkaiset ensimmäisen, se näkyy tässä.',
       'foot.p1': 'Jokainen {n} sovelluksestasi on yksi HTML-tiedosto, jonka omistat. Julkaisu vie sen tälle nodelle sinun nimissäsi; listaus vie sen julkiseen katalogiin. Listalta poisto pitää sen käytössä linkillä.',
       'foot.p2': 'Sovellus, joka tuottaa sisältöä tekoälymallilla, kertoo sen omalla sivullaan.',

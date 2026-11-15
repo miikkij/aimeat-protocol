@@ -37,6 +37,7 @@
  *   const datapackage = makeExtensionDataPackage({ storage, config, ownerGhii, producedBy, publishers });
  *   const ctx = buildExtensionCtx({ …, datapackage });
  * @version-history
+ *   v1.4.1 -- 2026-11-15 -- The payload-size error says "a code path", not "a road".
  *   v1.4.0 -- 2026-11-08 -- `trail`: publish() records the labels of what the run read through ctx as
  *     the version's label source, so a reader those labels keep out reads no row of it; rows() adds the
  *     version it read (secaudit2026nov08b round 15,
@@ -95,7 +96,7 @@ function guardSize(what: string, value: unknown): void {
         throw new Error(
             `${what} is ${Math.round(bytes / 1024)} kB, over the ${MAX_DATAPACKAGE_PAYLOAD_BYTES / 1024 / 1024} MB sandbox `
             + 'bridge limit. Publish the table in periods (one package version per window) rather than one '
-            + 'unbounded version, or produce it from a road with no sandbox between it and the data.');
+            + 'unbounded version, or produce it from a code path with no sandbox between it and the data.');
     }
 }
 

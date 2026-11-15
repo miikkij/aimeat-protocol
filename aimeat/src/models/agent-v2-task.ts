@@ -18,6 +18,7 @@
  *   validateTaskInput() · validateStatusInput() · publicTask()
  * @usage const { ok, defects, task } = validateTaskInput(req.body);
  * @version-history
+ *   v1.1.1 — 2026-11-15 — The status refusal names the cancel endpoint, not "the cancel door".
  *   v1.1.0 — 2026-10-08 — publicTask() names the task's provenance record (aiProvenanceId, aiprov D8).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
@@ -175,7 +176,7 @@ export function validateStatusInput(value: unknown): { ok: boolean; defects: Mes
   if (!(settable as readonly unknown[]).includes(status)) {
     defects.push({
       field: 'status',
-      reason: `Must be one of ${settable.join(', ')}. To cancel, use the cancel door — a different party is allowed to.`,
+      reason: `Must be one of ${settable.join(', ')}. To cancel, use POST /v1/agents/v2/tasks/{taskId}/cancel or the MCP tool aimeat_v2_task_cancel. A different party may cancel: the caller, not the worker.`,
     });
   }
 

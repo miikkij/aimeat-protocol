@@ -20,6 +20,7 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-11-15 -- The two RESERVED_KEY messages say "No memory route or tool accepts it", not door.
  *   2026-11-04 -- SERVICE_OWNED_KEY_PREFIXES and SERVICE_OWNED_KEYS may only shrink: a new service record
  *     goes to serviceRecords() (codebase analysis 2026-11-03, item B6).
  *   2026-11-02 -- `mcp-capability-consents.` is service-owned: which capabilities of other accounts the
@@ -566,13 +567,13 @@ export function serverWrittenKeyRefusal(key: string): { code: 'RESERVED_KEY'; me
   if (key.startsWith('notif.')) {
     return {
       code: 'RESERVED_KEY',
-      message: `"${key}" is a notification, and only this node writes those. No memory door accepts it. `
+      message: `"${key}" is a notification, and only this node writes those. No memory route or tool accepts it. `
         + 'To tell the account owner something, send a notification with POST /v1/notifications.',
     };
   }
   return {
     code: 'RESERVED_KEY',
-    message: `"${key}" is written only by this node, when an agent moves to another node. No memory door accepts it.`,
+    message: `"${key}" is written only by this node, when an agent moves to another node. No memory route or tool accepts it.`,
   };
 }
 

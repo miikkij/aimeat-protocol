@@ -34,6 +34,7 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   2026-11-15 — The ACCESS_DENIED refusal says "The connector daemon makes this call", not door.
  *   2026-11-13 — cardUri and jwksUri come from services/agent-card.ts, where they moved from ./card.ts
  *     (structure programme 2026-11, unit 4).
  *   2026-11-05 — The enrolled credential copies the record and adds nothing: a store place's default is given at
@@ -95,7 +96,7 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
     // with its own onboarding. Neither populates the account with agents.
     if (roles.includes('app') || roles.includes('ecosystem') || !roles.includes('agent')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
-        'Only a connected agent of this account can enrol agents. This is the connector daemon\'s door.'));
+        'Only a connected agent of this account can enrol agents. The connector daemon makes this call.'));
       return;
     }
 

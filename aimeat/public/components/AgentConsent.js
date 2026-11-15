@@ -21,6 +21,7 @@
  *   import { AgentConsent } from '/components/AgentConsent.js';
  *   html`<${AgentConsent} requests=${pending} onApprove=${fn} onDeny=${fn} />`
  * @version-history
+ *   v1.5.1 — 2026-11-15 — The step title's fallback says "Your agent is asking to connect", as en.json does.
  *   v1.5.0 — 2026-10-25 — A request for an existing agent that did not prove it is the agent coming back
  *     (`return_proven: false`) says plainly that a new device is taking the agent over, before the
  *     first press, and the approval offers to sign the agent's other sessions out (on by default;
@@ -216,7 +217,7 @@ export function AgentConsent({ requests, onApprove, onDeny, busyCode = null, var
   return html`
     <div class=${step ? 'agent-consent agent-consent--step' : 'agent-consent agent-consent--inline poster-row--thing'}>
       <div class=${step ? 'section-title' : 'poster-section-title'}>
-        ${step ? tr('agentConsent.stepTitle', 'Your agent is at the door')
+        ${step ? tr('agentConsent.stepTitle', 'Your agent is asking to connect')
                : t('profile.agents.pendingRequests.title')}
       </div>
       <p>

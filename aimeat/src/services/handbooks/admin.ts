@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.36.6 -- 2026-11-15 -- The SSO and offboarding paragraphs say connection, sign-in and action, not door.
  *   v1.36.5 -- 2026-11-15 -- The usage paragraph says "this server's own key", not "the house key".
  *   v1.36.4 -- 2026-11-15 -- consent.app_party_max: the most people one app holds (10 000), in place of the fixed 1000.
  *   v1.36.3 -- 2026-11-14 -- aimeat_admin_usage reads a node usage report with report (tool, day, model and the rest).
@@ -372,14 +373,14 @@ existing accounts the organisation may adopt; optional organism its people join 
 \`aimeat_admin_sso_idp_metadata\` (the SAML half, from a metadata URL or pasted XML) ·
 \`aimeat_admin_sso_scim_token\` (the provisioning bearer — returned ONCE, tell the operator to
 paste it into the IdP now) · \`aimeat_admin_sso_update\` (domains, visibility in the sign-in modal,
-IdP-initiated acceptance, organism binding) · \`aimeat_admin_sso_delete\` (removes the door only;
+IdP-initiated acceptance, organism binding) · \`aimeat_admin_sso_delete\` (removes the connection only;
 accounts and their knowledge remain). The setup order that works, in SIX steps and not five: create
 → hand the SP values to the IdP console → read the metadata back → decide listed or hidden → mint
 the SCIM token → **have the operator turn on sso.enabled**, which is a node setting and none of
 your tools. Only then can a sign-in happen, so only then do last-login and last-SCIM-call turn real
 in \`aimeat_admin_sso_get\`. Read \`node.enabled\` and each connection's \`state\` from
-\`aimeat_admin_sso_list\` and report them: \`blocked_by_switch\` means the work is finished and the
-door is shut, and telling an operator the setup is complete in that state sends them to find out
+\`aimeat_admin_sso_list\` and report them: \`blocked_by_switch\` means the work is finished and
+sign-in is switched off, and telling an operator the setup is complete in that state sends them to find out
 from a colleague who could not sign in. \`node.locked\` (sso.connections_locked) means every write
 above is refused with SEALED_CONFIG.
 
@@ -387,7 +388,7 @@ above is refused with SEALED_CONFIG.
 credential acting in its name (sessions, its agents' tokens, access keys, app permissions) stops
 immediately, the account and its knowledge remain, and \`aimeat_admin_owner_enable\` lets the
 person back in without resurrecting the old credentials. Never works on your own account. This is
-the manual offboarding door; a connected directory does the same automatically over SCIM. While the
+the manual offboarding action; a connected directory does the same automatically over SCIM. While the
 account is deactivated, its schedules, workflow triggers and unattended extension runs are skipped
 with a log line that names the deactivation; nothing is deleted, and they run again after enable.
 

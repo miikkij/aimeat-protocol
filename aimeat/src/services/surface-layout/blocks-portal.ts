@@ -24,6 +24,8 @@
  *   and falls back to this one. A new block, or a rewritten sentence, moves both: the locale key is
  *   what a Finnish operator actually reads.
  * @version-history
+ *   2026-11-15 - The block summaries and prop descriptions say option, link, the public app list and the
+ *     full-width picture, in place of doors, the wall and the showroom picture.
  *   2026-11-15 - portal.welcome-door's summary names the three ways to start, as en.json does.
  *   2026-09-29 - portal.frame-signage shows only when the node names a signage screen
  *     (signageEnabled); its addresses default to the node's own settings, not aimeat.io's.
@@ -99,7 +101,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
         liveDomains: [],
         props: {},
         maxPerSurface: 1,
-        summary: 'The second door: connect the AI they already use, and run all of this from that chat.',
+        summary: 'The second option: connect the AI they already use, and run all of this from that chat.',
     },
     {
         id: 'portal.changelog',
@@ -123,13 +125,13 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
                 default: 12,
                 min: 3,
                 max: 60,
-                description: 'How many apps the wall shows before the button that reveals the rest.',
+                description: 'How many apps the public app list shows before the button that reveals the rest.',
             },
             sort: {
                 type: 'enum',
                 values: ['newest', 'popular'],
                 default: 'newest',
-                description: 'Which order the wall opens in. Newest says the place is alive; most-opened says what is good.',
+                description: 'Which order the public app list opens in. Newest says the place is alive; most-opened says what is good.',
             },
         },
         maxPerSurface: 1,
@@ -247,7 +249,7 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
             picture: {
                 type: 'boolean',
                 default: true,
-                description: 'Whether the full-width showroom picture renders under the headline. Off gives a text-only hero.',
+                description: 'Whether the full-width picture renders under the headline. Off gives a text-only hero.',
             },
         },
         maxPerSurface: 1,
@@ -336,11 +338,11 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
             picture: {
                 type: 'boolean',
                 default: true,
-                description: 'Whether the full-width showroom picture renders under the headline. Off gives a text-only hero.',
+                description: 'Whether the full-width picture renders under the headline. Off gives a text-only hero.',
             },
         },
         maxPerSurface: 1,
-        summary: 'The claim at the top: say what you want, then make sure it happens. The box a visitor types a wish into, "plug in the AI you already use" as the first door and "get your own" as the second, and the showroom picture.',
+        summary: 'The claim at the top: say what you want, then make sure it happens. The box a visitor types a wish into, "plug in the AI you already use" as the first link and "get your own" as the second, and the full-width picture.',
     },
     {
         id: 'portal.frame-ten',
@@ -381,11 +383,11 @@ export const PORTAL_BLOCKS: readonly SurfaceBlockDef[] = [
                 type: 'string',
                 default: '',
                 maxLength: 400,
-                description: 'The address of the admin panel the screen was made in, behind the second door. Empty uses the node\'s AIMEAT_SITE_SIGNAGE_ADMIN_URL.',
+                description: 'The address of the admin panel the screen was made in, which the second link opens. Empty uses the node\'s AIMEAT_SITE_SIGNAGE_ADMIN_URL.',
             },
         },
         maxPerSurface: 1,
-        summary: 'The digital signage example as one app: the live screen framed on the page, with doors to the full-size screen and to the admin panel it was made in.',
+        summary: 'The digital signage example as one app: the live screen framed on the page, with links to the full-size screen and to the admin panel it was made in.',
     },
     {
         id: 'portal.frame-cards',

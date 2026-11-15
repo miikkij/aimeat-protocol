@@ -19,6 +19,7 @@
  * @structure StoreSection · parseTiers · Star · TrustList · Rooms
  * @usage import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
  * @version-history
+ *   2026-11-15 -- The private-AIMEAT card's fallbacks match en.json: no clubhouse, house rules or door.
  *   2026-10-06 -- The store section says when the marketplace opens soon (site.store_status "soon")
  *     and its door says "Opens soon" instead of leading in (components/StoreDoor.js); the prices stay.
  *   2026-09-17 - TARGET-078: qualify ownership and data-location statements.
@@ -187,11 +188,11 @@ export function Rooms() {
           alt=${tr('landing.roomClubAlt', 'A warm treehouse clubhouse at dusk where a friendly robot doorman lifts a velvet rope for a group of friends')} />
         <h3 class="ld-sh-h3">${tr('landing.roomClubTitle', 'Nobody in it but you')}</h3>
         <p class="ld-sh-text">
-          ${tr('landing.roomClubText', 'This demo is a public square. Your own AIMEAT is the opposite: a clubhouse with one name on the deed. Invite people in when you feel like company, or build alone in peace.')}
+          ${tr('landing.roomClubText', 'This demo is public. Your own AIMEAT is private: one owner, you. Invite people in when you feel like it. Or don’t.')}
         </p>
         <div class="ld-sh-box poster-aside">
-          <span class="ld-sh-box-label">${tr('landing.roomClubRulesLabel', 'The house rules, all two of them:')}</span>
-          ${' '}${tr('landing.roomClubRules', 'what you make there is yours, and the door opens only from the inside. Everything else you decide as you go.')}
+          <span class="ld-sh-box-label">${tr('landing.roomClubRulesLabel', 'Two rules here:')}</span>
+          ${' '}${tr('landing.roomClubRules', 'what you make in your own AIMEAT is yours, and nobody gets in unless you let them. Everything else is your call.')}
         </div>
       </div>
     </section>`;

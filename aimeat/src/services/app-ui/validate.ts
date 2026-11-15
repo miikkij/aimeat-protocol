@@ -18,6 +18,7 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.8.1 — 2026-11-15 — The colour-token refusal says "the one colour you set", not "the one colour door".
  *   v1.8.0 — 2026-10-03 — The face refusal names the faces the operator added as well (servedFontFamilies).
  *   v1.7.0 — 2026-09-28 — The three spring tokens are signature tokens, each a plain number inside
  *     SPRING_BOUNDS, refused in words otherwise.
@@ -192,7 +193,7 @@ export function validateSignatureTokens(raw: unknown, look?: string): Record<str
         // Colour is open, but through ONE door: measurement proved a single hex cannot satisfy
         // the mode-tuned derivations, so the signature colour is `--ak-accent` as a light/dark
         // pair and every other colour token stays derived from it by the sheet.
-        fail(`"${name}" is a colour token the signature does not take directly — the one colour door is --ak-accent as a light/dark pair "#hex/#hex" (both halves are proven by the contrast matrix); every other colour derives from it. The signature covers: ${legal.join(', ')}.`);
+        fail(`"${name}" is a colour token the signature does not take directly. The one colour you set is --ak-accent, as a light/dark pair "#hex/#hex" (both halves are proven by the contrast matrix); every other colour derives from it. The signature covers: ${legal.join(', ')}.`);
       }
       unknownName('signature token', name, legal);
     }

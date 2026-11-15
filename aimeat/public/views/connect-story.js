@@ -15,6 +15,8 @@
  * @structure BEATS · BeatRail · default export ConnectStory({ navigate })
  * @usage routed at /v1/connect-your-ai by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.1 -- 2026-11-15 -- The fallbacks say steps, a connection and "Your account", as en.json does,
+ *     in place of a road and a door.
  *   v1.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.0 — 2026-08-29 — Initial, on the build-story page's shapes (build-story.css, bs- prefix).
@@ -110,8 +112,8 @@ export default function ConnectStory({ navigate }) {
             <span>${tr('connectStory.title2', 'you already use')}</span>
           </h1>
           <p class="ld-sh-position">${tr('connectStory.position', 'After this, you run all of it from your own chat.')}</p>
-          <p class="bs-lead">${tr('connectStory.lead', 'Here is the whole road, shown once, before you make an account. Read it through, or skip to the door at the bottom.')}</p>
-          <a class="ld-sh-door showroom-door" href="#cs-door" onClick=${toDoor}>${tr('connectStory.skip', 'Skip to the door ↓')}</a>
+          <p class="bs-lead">${tr('connectStory.lead', 'These are all the steps, shown once, before you make an account. Read them through, or skip to the end.')}</p>
+          <a class="ld-sh-door showroom-door" href="#cs-door" onClick=${toDoor}>${tr('connectStory.skip', 'Skip to making an account ↓')}</a>
         </div>
         <${BeatRail} current=${current} />
       </section>
@@ -120,7 +122,7 @@ export default function ConnectStory({ navigate }) {
         <div class="bs-beat-copy">
           <span class="bs-num">1</span>
           <h2 class="ld-sh-h2"><span>${tr('connectStory.b1Title1', 'Pick the AI')}</span><span class="ld-sh-accent">${tr('connectStory.b1Title2', 'you already use')}</span></h2>
-          <p class="ld-sh-text">${tr('connectStory.b1Text', 'No new subscription and no new app to learn. The chat you already have gets a door into this place; you keep talking to it the way you always do.')}</p>
+          <p class="ld-sh-text">${tr('connectStory.b1Text', 'No new subscription and no new app to learn. The chat you already have gets a connection to this place; you keep talking to it the way you always do.')}</p>
           <div class="cs-platforms" role="list">
             ${PLATFORMS.map(p => html`
               <span key=${p.id} class="cs-platform" role="listitem">
@@ -172,7 +174,7 @@ export default function ConnectStory({ navigate }) {
       </section>
 
       <section class="bs-builder cs-door" id="cs-door">
-        <h2 class="ld-sh-h2">${tr('connectStory.doorTitle', 'The door')}</h2>
+        <h2 class="ld-sh-h2">${tr('connectStory.doorTitle', 'Your account')}</h2>
         <p class="ld-sh-text bs-builder-lead">${signedIn
           ? tr('connectStory.doorSignedIn', 'You are signed in, so the guided path is one click away.')
           : tr('connectStory.doorLead', 'The connection is to YOUR space, so there has to be one: an account takes a minute, and the guided path opens right after.')}</p>

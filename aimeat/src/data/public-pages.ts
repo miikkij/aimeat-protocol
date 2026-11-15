@@ -34,6 +34,7 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-11-15 - The getting-started page calls AGENTS.md the shorter guide, not the shorter road.
  *   2026-11-15 - /v1/how-an-app-builds says the front page's list of apps, not "the wall".
  *   2026-11-12 -`language` on PublicPage: the language of a page served in one known language.
  *   2026-11-09 - TARGET-094: `ownContent` marks the three pages that show this node's own content (/,
@@ -289,7 +290,7 @@ governs it.
     markdown: `Getting started with AIMEAT, the questions that come up first, and a prompt you can paste into any
 AI chat to be walked through this node.
 
-If you are an agent rather than a person, [AGENTS.md]({{BASE_URL}}/AGENTS.md) is the shorter road,
+If you are an agent rather than a person, [AGENTS.md]({{BASE_URL}}/AGENTS.md) is the shorter guide,
 [llms.txt]({{BASE_URL}}/llms.txt) is the index, and [llms-full.txt]({{BASE_URL}}/llms-full.txt) is the
 full manual.
 `,

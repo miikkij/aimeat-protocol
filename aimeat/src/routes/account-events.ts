@@ -29,6 +29,7 @@
  *   import { accountEventsRouter } from './routes/account-events.js';
  *   app.use(accountEventsRouter(config, storage));
  * @version-history
+ *   v1.3.2 — 2026-11-15 — The APP_ONLY refusal says "Only an app acting under a grant records events here", not "This door".
  *   v1.3.1 — 2026-10-22 — The two reads project for accountEventReader: an app grant that existed before v1.3.0, held memory:read and not task:read, keeps the title and reason while its token covers what it held then (services/account-event-task-keep.ts; the developer's ruling, 2026-10-22).
  *   v1.3.0 — 2026-10-22 — The two reads project each row for the caller (services/account-event-view.ts): a task row's title and decline reason reach only the owner in person, an app grant holding task:read and the task's own agent, as on GET /v1/agents/:name/tasks. Every other reader keeps the row with its kind, time, link and agent name, its `withheld` fields named, and a `note` on the answer (secaudit 2026-10, v89).
  *   v1.2.0 — 2026-09-24 — An app's event link is checked by safeRedirectPath, so a link a browser
@@ -113,7 +114,7 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
     const appId = typeof req.auth!.app === 'string' && req.auth!.app ? req.auth!.app : '';
     if (!appId) {
       return res.status(403).json(error(config.nodeId, 'APP_ONLY',
-        'This door is for an app acting under a grant. A person or an agent records events by doing the thing that is worth recording.'));
+        'Only an app acting under a grant records events here. A person or an agent records events by doing the thing that is worth recording.'));
     }
 
     const kind = `app:${appId}:${rawKind}` as AccountEventKind;

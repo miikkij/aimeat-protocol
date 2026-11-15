@@ -9,6 +9,7 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-11-15 — The login-details email opens with "Your access code worked", in en, fi and es, not an opened door.
  *   2026-11-15 — The key template's footer says who sent it ("Sent by AIMEAT"), in place of "the AIMEAT
  *     machine room", in en, fi and es.
  *   2026-11-14 —An organism invitation says the person brings the AI they already use, and that the
@@ -101,7 +102,7 @@ const i18n: Record<string, Record<string, string>> = {
     keyFooter: 'Sent by AIMEAT',
     credSubject: 'Your login to {org} on AIMEAT',
     credHeading: "You're in. Here is your login.",
-    credIntro: 'Your access code opened the door. These are your durable login details for AIMEAT. Use them to sign in again on any device, and to reach the linked apps in read only mode.',
+    credIntro: 'Your access code worked. These are your durable login details for AIMEAT. Use them to sign in again on any device, and to reach the linked apps in read only mode.',
     credUserLabel: 'Username',
     credPwLabel: 'Password',
     credInstructions: 'Sign in with these at the address below:',
@@ -170,7 +171,7 @@ const i18n: Record<string, Record<string, string>> = {
     keyFooter: 'Lähettäjä: AIMEAT',
     credSubject: 'Kirjautumistietosi: {org} (AIMEAT)',
     credHeading: 'Olet sisällä. Tässä kirjautumistietosi.',
-    credIntro: 'Pääsykoodisi avasi oven. Nämä ovat pysyvät AIMEAT-kirjautumistietosi. Käytä niitä kirjautuaksesi uudelleen millä tahansa laitteella ja päästäksesi liitettyihin appeihin lukutilassa.',
+    credIntro: 'Pääsykoodisi toimi. Nämä ovat pysyvät AIMEAT-kirjautumistietosi. Käytä niitä kirjautuaksesi uudelleen millä tahansa laitteella ja päästäksesi liitettyihin appeihin lukutilassa.',
     credUserLabel: 'Käyttäjätunnus',
     credPwLabel: 'Salasana',
     credInstructions: 'Kirjaudu näillä alla olevassa osoitteessa:',
@@ -239,7 +240,7 @@ const i18n: Record<string, Record<string, string>> = {
     keyFooter: 'Enviado por AIMEAT',
     credSubject: 'Tu acceso a {org} en AIMEAT',
     credHeading: 'Ya estás dentro. Estos son tus datos de acceso.',
-    credIntro: 'Tu código de acceso abrió la puerta. Estos son tus datos de acceso permanentes a AIMEAT. Úsalos para iniciar sesión de nuevo desde cualquier dispositivo y para abrir las aplicaciones enlazadas en modo de solo lectura.',
+    credIntro: 'Tu código de acceso funcionó. Estos son tus datos de acceso permanentes a AIMEAT. Úsalos para iniciar sesión de nuevo desde cualquier dispositivo y para abrir las aplicaciones enlazadas en modo de solo lectura.',
     credUserLabel: 'Nombre de usuario',
     credPwLabel: 'Contraseña',
     credInstructions: 'Inicia sesión con estos datos en la dirección de abajo:',

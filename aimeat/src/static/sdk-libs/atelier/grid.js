@@ -13,13 +13,14 @@
  * @slots cardGrid title(item) · sub(item) · extra(item) · badge(item) · aside(item) · art(item)
  * @variants cardGrid dense · wide · plain
  * @tokens cardGrid --ak-card-min · --ak-card-gap · --ak-card-aspect · --ak-card-pad
- * @fork cardGrid Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the wall re-entering on every change.
+ * @fork cardGrid Copy .ak-grid and .ak-card* out of content.css; you keep the monogram washes and lose the keyed reconcile that stops the grid re-entering on every change.
  * @parts mediaCard root · card · art · monogram · badge · body · title · sub · extra · actions
  * @slots mediaCard title(item) · sub(item) · extra(item) · badge(item) · art(item)
  * @variants mediaCard dense · plain
  * @tokens mediaCard --ak-card-aspect · --ak-card-pad
  * @fork mediaCard Same as cardGrid; this is one card and its action row.
  * @version-history
+ *   v0.51.1 — 2026-11-15 — The @fork sentence says "the grid", not "the wall".
  *   v0.51.0 — 2026-09-05 — THE CARD TAKES WHAT THE APP GIVES IT: ten named parts, each stamped
  *     `data-ak-part`; `extra` and `aside` are the two the kit leaves empty; `art` takes the app's
  *     own mark in place of the monogram; three variants (dense, wide, plain) and four tokens.

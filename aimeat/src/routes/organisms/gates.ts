@@ -6,6 +6,7 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.1 — 2026-11-15 — The member-change refusal says "member change routes", not doors.
  *   v1.9.0 — 2026-11-15 — The team gate's actions (team:delete, team:send, team:pay) are filed by the
  *     node only, and are approved or declined as asked, never edited (services/team/action-gate.ts, T7).
  *   v1.8.0 — 2026-11-14 — POST /approvals refuses action "publish" with 400 INVALID_INPUT and names
@@ -165,7 +166,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     // approving one RUNS the change it carries, so one filed here with arguments of the caller's
     // choosing would be a change nobody's rule allowed.
     if (isMemberChangeAction(action)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `${action} is filed by the workspace's member change doors: POST /v1/organisms/${id}/workspace/spaces or PUT /v1/organisms/${id}/workspace/sections/{space}.`));
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `${action} is filed by the workspace's member change routes: POST /v1/organisms/${id}/workspace/spaces or PUT /v1/organisms/${id}/workspace/sections/{space}.`));
       return;
     }
     // The same for a publish: approving one publishes the draft its arguments name, and the publish

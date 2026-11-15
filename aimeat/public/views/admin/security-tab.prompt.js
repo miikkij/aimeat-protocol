@@ -9,6 +9,7 @@
  *   read by a model, and the tool names inside it are the node's own.
  * @structure buildSecurityPrompt({ url })
  * @version-history
+ *  - 2026-11-15: the prompt says endpoint and sign-in protection settings, not door.
  *  - 2026-09-26: the incident resolve tool also decides one name of the incident whose records the
  *    update at start did not move (name, resolution).
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
@@ -24,11 +25,11 @@ export function buildSecurityPrompt({ url = '' } = {}) {
   return `I run an AIMEAT node${where} and I am its operator. Read its security page for me and tell me what needs a decision.
 
 == 1. Read ==
-  aimeat_admin_security_overview {}   a sample of up to 1000 log lines filtered to the last 24 hours (daily total unknown), grouped by door, source and credential fingerprint, the newest lines, the refused-and-kept incidents, the accounts and roles, and the door settings
+  aimeat_admin_security_overview {}   a sample of up to 1000 log lines filtered to the last 24 hours (daily total unknown), grouped by endpoint, source and credential fingerprint, the newest lines, the refused-and-kept incidents, the accounts and roles, and the sign-in protection settings
   aimeat_admin_stats {}               the counters since the restart
 
 == 2. Tell them apart ==
-One fingerprint repeated is a dead token being retried; many fingerprints from one source is guessing; many sources with one try each is a scan passing through. Name the doors tried most and say which of the three each pattern is. A "walled" line means the tarpit answered without trying: say which address and when it started.
+One fingerprint repeated is a dead token being retried; many fingerprints from one source is guessing; many sources with one try each is a scan passing through. Name the endpoints tried most and say which of the three each pattern is. A "walled" line means the tarpit answered without trying: say which address and when it started.
 
 == 3. Propose, then wait ==
   aimeat_admin_incident_resolve { id }      close an incident I have looked at

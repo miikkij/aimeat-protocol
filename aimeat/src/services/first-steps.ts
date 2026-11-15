@@ -24,6 +24,7 @@
  * @usage
  *   import { buildFirstSteps, firstStepsMarkdown } from '../services/first-steps.js';
  * @version-history
+ *   v1.0.2 — 2026-11-15 — The MCP entry says "the preferred way to connect", not "the preferred road".
  *   v1.0.1 — 2026-10-11 — The prompt-driven entry names the Gemini app outside the United States:
  *     it connects over MCP in the United States (Jouni's ruling, 2026-10-11).
  *   v1.0.0 — 2026-09-18 — Initial.
@@ -48,7 +49,7 @@ export function buildFirstSteps(config: AimeatConfig): FirstStep[] {
         {
             id: 'mcp',
             when: 'Your app can connect to an MCP server (Claude, Claude Code, ChatGPT with developer mode, Codex, Cursor, VS Code, Grok, goose).',
-            how: `Add ${b}/v1/mcp as a remote MCP server and sign in with OAuth 2.1; the person approves you and picks what you may do. Then call aimeat_handbook_get. This is the preferred road: you get the node's tools natively, and nothing to install.`,
+            how: `Add ${b}/v1/mcp as a remote MCP server and sign in with OAuth 2.1; the person approves you and picks what you may do. Then call aimeat_handbook_get. This is the preferred way to connect: you get the node's tools natively, and nothing to install.`,
             read: `${b}/.well-known/mcp.json`,
         },
         {

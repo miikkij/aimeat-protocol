@@ -12,6 +12,7 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-11-15 — The hands coverage note says "the writes a person, an agent or an app made", not a door.
  *   2026-11-13 — stateProgramMap answers `balancingTest` when the written map makes the app need a
  *     balancing test it has no approved one of (services/compliance/lia-write.ts).
  *   2026-11-01 — The map carries the optional `registers` statement, and an app whose party signup is open
@@ -425,7 +426,7 @@ export interface HandsAnswer {
 /** Said the same way wherever a tally number is rendered. */
 export const HANDS_NOT_COVERED = [
   'Counting started when this was switched on. A key written before that and never written since has no hands here, and never will.',
-  'It counts what came in through a door somebody was behind. AIMEAT also writes to your store on its own, and that is not a hand.',
+  'It counts the writes a person, an agent or an app made. AIMEAT also writes to your store on its own, and that is not a hand.',
 ];
 
 /** The note of an answer that covers only the caller's own records: an ecosystem app or a visitor. */

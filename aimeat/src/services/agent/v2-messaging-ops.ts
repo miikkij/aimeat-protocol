@@ -21,6 +21,7 @@
  *   · listPushTargets() · deletePushTarget()
  * @usage const out = await sendTurn(storage, config, req.auth!, req.body);
  * @version-history
+ *   v1.0.1 — 2026-11-15 — The cross-account refusal says "Agent messages carry turns", not "This road carries turns".
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  *   v1.0.1 — 2026-09-26 — resolveRecipient names the recipient's account with localAccountName, so a
  *     principal of another node that shares the owner's name is cross-owner (secaudit 2026-09, F-1).
@@ -72,7 +73,7 @@ export async function resolveRecipient(
   if (account !== owner) {
     return {
       ok: false, status: 403, code: 'ACCESS_DENIED',
-      message: 'This road carries turns between principals of one account. To reach another person use a direct message.',
+      message: 'Agent messages carry turns between principals of one account. To reach another person, use a direct message.',
     };
   }
   const exists = principal === `${owner}@${nodeId}`

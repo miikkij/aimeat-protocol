@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-11-15 — track-drift says "the Atelier track", not "the Atelier road".
  *   2026-11-11 — +bundled-agent-block, +bundled-agent-permissions: how an app declares the agent it
  *     brings, and which permissions that agent gets (services/app-bundled-crews.ts names both in the publish hints).
  *   (2026-11-08) hand-rolled names 390×844 and 1280×900, the skill's size matrix, where it said 390 and 1440.
@@ -231,7 +232,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'track-drift',
     title: 'A new app that ended up on the Classic track',
-    symptom: 'A new app is published on Classic, or a build that read the Atelier specification publishes an app with no Atelier kit in it. It works and it looks like every hand-built page: a header written by hand, a sign-in bar that breaks at phone width, states nobody designed. Publishing warns (`app_hints`, pitfall `track-drift`). It happens because the Classic shell can be started from at once and the Atelier road asks for a genre and its own specification first.',
+    symptom: 'A new app is published on Classic, or a build that read the Atelier specification publishes an app with no Atelier kit in it. It works and it looks like every hand-built page: a header written by hand, a sign-in bar that breaks at phone width, states nobody designed. Publishing warns (`app_hints`, pitfall `track-drift`). It happens because the Classic shell can be started from at once and the Atelier track asks for a genre and its own specification first.',
     fix: 'A new app is built on the Atelier track: load `node:aimeat-app-builder-atelier`, read its specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts; over HTTP `GET /v1/prompts/build-app-atelier`), fork a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`) and keep its shell. Classic is for improving an app that is already Classic, or when the owner asks for it by name, and then you say so to the owner. Never change track in the middle of a build: stop and tell the owner what you found.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',

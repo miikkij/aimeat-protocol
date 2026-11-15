@@ -19,6 +19,7 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.8.6 -- 2026-11-15 -- inward.lead ends "You choose which one." (fi "Sinä valitset, mitä niistä käytät."), not a road.
  *   v0.8.5 -- 2026-11-08 -- inward.keyPlaceholder and inward.tokenPlaceholder: the call's placeholders
  *     in the dialog's language; secret.unavailable and secret.see: the picker on a page whose sign-in
  *     cannot list the vault (secaudit2026nov08b round 15c).
@@ -47,7 +48,7 @@ export const WORDS = {
     'gear.in': 'Tämä arvo voi tulla ulkoa',
     'gear.out': 'Kun tämä muuttuu, kerro jollekin',
     'inward.title': 'Tämä arvo voi tulla ulkoa',
-    'inward.lead': 'Arvon voi asettaa käsin, lukea osoitteesta tai kirjoittaa muistiin. Sinä valitset kumpaa tietä.',
+    'inward.lead': 'Arvon voi asettaa käsin, lukea osoitteesta tai kirjoittaa muistiin. Sinä valitset, mitä niistä käytät.',
     'inward.road': 'Mistä arvo tulee',
     'inward.road.hand': 'Käsin, tältä sivulta',
     'inward.road.url': 'Osoitteesta',
@@ -125,7 +126,7 @@ export const WORDS = {
     'gear.in': 'This value can come from outside',
     'gear.out': 'When this changes, tell someone',
     'inward.title': 'This value can come from outside',
-    'inward.lead': 'The value can be set by hand, read from an address, or written into memory. You choose which road.',
+    'inward.lead': 'The value can be set by hand, read from an address, or written into memory. You choose which one.',
     'inward.road': 'Where the value comes from',
     'inward.road.hand': 'By hand, on this page',
     'inward.road.url': 'From an address',

@@ -11,6 +11,7 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · shownLine · shownAmount · isBookkeeping · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-11-15: The agent-request line's fallback says "Your agent is asking to connect.", as en.json does.
  *   2026-11-02: On a node the store sold, an amount or a day the server wrote as text is shown in the
  *     place's own format ("12,50 €", "1.11.2026"), through money() and date() (CoS 04.12). An app
  *     tool's charge reads "Maksoit 0,50 $ (sovellustyökalu)" in its own currency (CoS 04.40).
@@ -115,7 +116,7 @@ export function line(item) {
     case 'welcome_mat':
       return tr('home.feed.welcomeMat', 'You made your welcome mat. Look at it.');
     case 'agent_knocking':
-      return tr('home.feed.agentKnocking', 'Your agent is knocking at the door.');
+      return tr('home.feed.agentKnocking', 'Your agent is asking to connect.');
     case 'agent_connected':
       return d.name
         ? tr('home.feed.agentConnectedNamed', '{name} is home.').replace('{name}', d.name)

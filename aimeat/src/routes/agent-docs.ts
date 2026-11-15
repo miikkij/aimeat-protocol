@@ -18,6 +18,7 @@
  *   - GET /AGENTS.md, /agents.md — orientation for a coding agent meeting this node
  * @usage app.use(agentDocsRouter(config));
  * @version-history
+ *   (2026-11-15) The installation section says "How you connect" and "however you connect", not road.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.2.0 — 2026-09-18 — AGENTS.md: Installation is the shared first steps (services/first-steps.ts),
  *     MCP first. It led with device authorization and gave MCP one closing paragraph. The response
@@ -125,11 +126,11 @@ the wrong tool for a one-shot script.
 
 ## Installation
 
-Nothing to install. Which road is yours depends on what you can do:
+Nothing to install. How you connect depends on what you can do:
 
 ${firstStepsMarkdown(config)}
 
-**Agents are never created implicitly**: on every road, the person approves you and decides what
+**Agents are never created implicitly**: however you connect, the person approves you and decides what
 you may do.
 
 ## Configuration

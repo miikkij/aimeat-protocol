@@ -19,6 +19,8 @@
  * @structure BEATS · BeatRail · Beat · default export BuildStory({ navigate })
  * @usage routed at /v1/how-an-app-builds by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.2 -- 2026-11-15 -- The fallbacks say steps, ways, choice and the front page, as en.json does,
+ *     in place of a road, two doors and the wall.
  *   v1.1.1 -- 2026-09-28 -- No escHtml() on the prompt preview: preact escapes text itself, so the
  *     preview showed every quote, ampersand and angle bracket in the build prompt as &quot; / &amp; / &lt;.
  *   v1.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
@@ -44,7 +46,7 @@ const BEATS = [
   { id: 'say', label: () => tr('story.beat1', 'Say what you need') },
   { id: 'carry', label: () => tr('story.beat2', 'Carry the prompt to any AI') },
   { id: 'bring', label: () => tr('story.beat3', 'Bring the file back') },
-  { id: 'wall', label: () => tr('story.beat4', 'It lands on the wall') },
+  { id: 'wall', label: () => tr('story.beat4', 'It goes on the front page') },
 ];
 
 /** The four beats, stuck to the side; the one on screen is lit. */
@@ -115,10 +117,10 @@ export default function BuildStory({ navigate }) {
           <span class="ld-sh-kicker">${tr('story.kicker', 'No coding. No connector needed.')}</span>
           <h1 class="bs-title">
             <span>${tr('story.title1', 'From a sentence')}</span>
-            <span>${tr('story.title2', 'to an app on the wall')}</span>
+            <span>${tr('story.title2', 'to an app on the front page')}</span>
           </h1>
           <p class="ld-sh-position">${tr('story.position', 'Four beats. Ten minutes. Any AI chat you already have.')}</p>
-          <p class="bs-lead">${tr('story.lead', 'This is the whole road, shown once, with the real pieces. Read it through, or skip to the bottom where the builder is open and waiting.')}</p>
+          <p class="bs-lead">${tr('story.lead', 'These are all the steps, shown once, with the real pieces. Read them through, or skip to the bottom where the builder is open and waiting.')}</p>
           <a class="ld-sh-door showroom-door" href="#bs-builder" onClick=${toBuilder}>${tr('story.skip', 'Skip to the builder ↓')}</a>
         </div>
         <${BeatRail} current=${current} />
@@ -175,7 +177,7 @@ export default function BuildStory({ navigate }) {
         <div class="bs-beat-copy">
           <span class="bs-num">3</span>
           <h2 class="ld-sh-h2"><span>${tr('story.b3Title1', 'Bring the')}</span><span class="ld-sh-accent">${tr('story.b3Title2', 'file back')}</span></h2>
-          <p class="ld-sh-text">${tr('story.b3Text', 'Got the HTML back? Two doors, and you take the one you have.')}</p>
+          <p class="ld-sh-text">${tr('story.b3Text', 'Got the HTML back? There are two ways to bring it in. Use the one that fits.')}</p>
           <div class="bs-doors">
             <div class="bs-door bs-door--coral">
               <span class="bs-door-title">${tr('story.b3ByHand', 'By hand')}</span>
@@ -184,7 +186,7 @@ export default function BuildStory({ navigate }) {
             </div>
             <div class="bs-door bs-door--ink">
               <span class="bs-door-title">${tr('story.b3ByAi', 'By your AI')}</span>
-              <span class="bs-door-text">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')} ${tr('story.b3Connect', 'Connecting takes five minutes and is the better road for everything after this.')}</span>
+              <span class="bs-door-text">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')} ${tr('story.b3Connect', 'Connecting takes five minutes and is the better choice for everything after this.')}</span>
               <a class="ld-sh-door showroom-door" href="/v1/connect-your-ai" onClick=${(e) => { e.preventDefault(); navigate('/v1/connect-your-ai'); }}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
             </div>
           </div>
@@ -205,7 +207,7 @@ export default function BuildStory({ navigate }) {
         </div>
         <div class="bs-beat-copy">
           <span class="bs-num">4</span>
-          <h2 class="ld-sh-h2"><span>${tr('story.b4Title1', 'It lands')}</span><span class="ld-sh-accent">${tr('story.b4Title2', 'on the wall')}</span></h2>
+          <h2 class="ld-sh-h2"><span>${tr('story.b4Title1', 'It goes')}</span><span class="ld-sh-accent">${tr('story.b4Title2', 'on the front page')}</span></h2>
           <p class="ld-sh-text">${tr('story.b4Text', 'Your card appears among the others, with your name, the date and a live count of opens. Anyone can open it; anyone who likes it can copy it and make it their own, the same way you can copy theirs. From here on your AI can keep it running, and when it is good, you can sell it.')}</p>
           <div class="ld-sh-box poster-aside"><span class="ld-sh-box-label">${tr('story.b4ThenLabel', 'And then:')}</span> ${tr('story.b4Then', 'connect the AI you already use, and the next app, the next change and the publishing itself all happen from your own chat.')}</div>
           <img class="bs-picture bs-picture--small" src="/img/build-story/beat4-wall.jpg" width="1200" height="900" loading="lazy"

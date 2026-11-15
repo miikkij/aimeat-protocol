@@ -22,6 +22,7 @@
  *   OtherAi · BuildAppPrompt · BuildInvite
  * @usage import { BuildInvite } from './landing-builder.js';
  * @version-history
+ *   v2.1.2 — 2026-11-15 — The other-AI hint's fallback says "This prompt builds the app", as en.json does.
  *   v2.1.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.1.0 — 2026-10-25 — No "Connect your AI" step, in the steps or the loop line, for a signed-in
  *     person whose AI has connected (Jouni); on the prompt road the long prompt's fold starts open.
@@ -162,7 +163,7 @@ function OtherAi({ idea }) {
 
   return html`
     <div class="ld-gen-other">
-      <p class="ld-gen-hint">${tr('landing.genOtherHint', 'Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself. This road builds on the Classic track, not on Atelier.')}</p>
+      <p class="ld-gen-hint">${tr('landing.genOtherHint', 'Microsoft 365 Copilot, for one, cannot connect. Then copy this longer prompt: it carries the build instructions with it, the AI hands you one HTML file, and you add that file here yourself. This prompt builds the app on the Classic track, not on Atelier.')}</p>
       ${selected.length ? html`<p class="ld-gen-contains">${tr('landing.genOtherPacks', 'Included for your idea')}: ${selected.map(pk => pk.title || pk.id).join(' · ')}.</p>` : ''}
       <div class="ld-gen-preview-label">${tr('landing.genPreview', 'Prompt preview')}</div>
       <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this node…')}</div>
