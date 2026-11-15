@@ -15,6 +15,8 @@
  *   An ES module (type="module", deferred by the browser) for its one import, showLoginModal from
  *   /js/services/auth.js, which itself imports nothing; the page has no importmap and needs none.
  * @version-history
+ *   v2.1.1 - 2026-11-15 - One slogan says "One owner. The help of a team." / "Yksi omistaja. Tiimin
+ *     verran apua." in place of a name on the door (Jouni).
  *   v2.1.0 - 2026-11-06 - "Sign in" opens the sign-in dialog on this page instead of going to
  *     /v1/portal (Jouni: the dialog opens at once). A finished sign-in goes to /v1/home.
  *   v2.0.0 - 2026-11-06 - The etusivu-mock v1.4.0 design: slogans, chat demo and audience tabs
@@ -83,7 +85,7 @@ import { showLoginModal } from '/js/services/auth.js';
       "Toinen käsipari. Ilman toista kahvikuppia.",
       "Lisää apua työpöydälle. Lisäämättä tuoleja.",
       "Firman ainoa ihminen. Ei enää sen ainoa tekijä.",
-      "Yksi nimi ovessa. Enemmän apua sen takana.",
+      "Yksi omistaja. Tiimin verran apua.",
       "Tekoäly auttaa työssä. Sinä keskityt olennaiseen.",
       "Vähemmän hoidettavaa. Enemmän tilaa ajatella.",
       "Anna tekoälylle lista. Anna ajatuksille tilaa.",
@@ -169,7 +171,7 @@ import { showLoginModal } from '/js/services/auth.js';
       "An extra pair of hands. Without an extra coffee cup.",
       "More help at the desk. Without more chairs.",
       "The only person in the firm. No longer its only maker.",
-      "One name on the door. More help behind it.",
+      "One owner. The help of a team.",
       "AI helps with the work. You focus on what matters.",
       "Less to juggle. More room to think.",
       "Give AI the list. Give your thoughts space.",
