@@ -89,14 +89,14 @@ import { success, error } from '../../middleware/envelope.js';
 import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { cached, TTL } from '../../services/cache.js';
-import { writeMemoryRecord } from '../../services/memory-write.js';
+import { writeMemoryRecord } from '../../services/memory/write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from '../../services/write-target.js';
 import { resolveIdentity, isForeignPrincipal, isOwnerInPerson, localAccountName } from '../../utils/gaii.js';
 import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
-import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
+import { isVersionKey, searchHitShape, matchesType } from '../../services/memory/search-shape.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
@@ -106,9 +106,9 @@ import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
 import { readsAsOwner, ownerScopeView, ownerScopeViewAdmitting } from '../../services/owner-scope-read.js';
 import { organismReadableRecords } from '../../services/organism/namespace-access.js';
 import { callerOf } from '../../middleware/caller.js';
-import { listMemoryMetaFor, listMemoryMetaPage, searchMemoryRecords } from '../../services/memory-query.js';
+import { listMemoryMetaFor, listMemoryMetaPage, searchMemoryRecords } from '../../services/memory/query.js';
 import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
-import { memoryPageWithValues, shownMemoryBytes } from '../../services/memory-list-page.js';
+import { memoryPageWithValues, shownMemoryBytes } from '../../services/memory/list-page.js';
 import { sortMetaRows } from '../../services/db/memory-tab-summary.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 
@@ -218,11 +218,11 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const existing = await storage.getMemory(gaii, key);
 
     // Ownership on overwrite, the archive guard and all three memory ceilings moved to
-    // services/memory-write.ts on 2026-08-11. They lived here, so a write over MCP had none of
+    // services/memory/write.ts on 2026-08-11. They lived here, so a write over MCP had none of
     // them: no size limit, no key limit, no byte budget, and archiving held on one surface only.
     // The service reads  itself, so this route no longer fetches it twice either.
 
-    // ONE implementation. services/memory-write.ts owns the schema lock, the version check, the
+    // ONE implementation. services/memory/write.ts owns the schema lock, the version check, the
     // provenance stamp, the record shape and the change event — the same sequence the MCP tool runs,
     // because it is the same capability. What stays here is this door's own business: the quota
     // alarm and workspace pre-checks above, the replication enqueue and the envelope below.
@@ -249,7 +249,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       key,
       value,
       visibility: vis as MemoryRecord['visibility'],
-      // Left out: the record keeps its tags (services/memory-write.ts); `[]` clears them.
+      // Left out: the record keeps its tags (services/memory/write.ts); `[]` clears them.
       ...(Array.isArray(tags) ? { tags } : {}),
       ttlHours: ttl_hours ?? null,
       ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
@@ -446,7 +446,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     });
     if (metaOnly) {
       // ?cursor with ?limit: one page in key order, read in SQL batches after the cursor through the
-      // same filters, instead of every matching row (services/memory-query.ts listMemoryMetaPage).
+      // same filters, instead of every matching row (services/memory/query.ts listMemoryMetaPage).
       // The answer carries `next_cursor` and no total or quota, which only a whole read can say.
       if (typeof req.query.cursor === 'string' && limit !== undefined && req.query.count !== 'true') {
         const page = await listMemoryMetaPage({ storage, config }, {
@@ -458,7 +458,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         res.json(success(config.nodeId, { items: page.rows.map(listedMetaItem), next_cursor: page.nextCursor, limit }));
         return;
       }
-      // The listing aimeat_memory_list reads too (services/memory-query.ts).
+      // The listing aimeat_memory_list reads too (services/memory/query.ts).
       const allMeta = await organismView(await ownerScopeViewAdmitting(storage, await reader.show(
         await listMemoryMetaFor({ storage, config }, {
           ownerScopeOf: (ownerScope && !agentParam) ? req.auth!.owner : null, gaii,
@@ -517,7 +517,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (limit !== undefined) {
       // A bounded listing decides what matches from the meta rows, through the same filters in the
       // same order as the unbounded path below, and reads the values of its page only; used_bytes
-      // is the same sum of the shown values (services/memory-list-page.ts). Before 2026-11-04 every
+      // is the same sum of the shown values (services/memory/list-page.ts). Before 2026-11-04 every
       // matching value was read and serialised twice to return N of them (codebase analysis
       // 2026-11-03, item C1).
       const meta = await listMemoryMetaFor({ storage, config }, {
@@ -649,7 +649,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // ONE indexed query across the identity set via the librarian's searchText primitive (SQLite FTS5 /
     // Mongo searchBlob), ranked best-first. Owner sessions cover GHII + every agent + every ecosystem app
     // (resolved by the service); an agent/eco session (or ?agent=) searches just that one identity.
-    // The search aimeat_memory_search runs too (services/memory-query.ts).
+    // The search aimeat_memory_search runs too (services/memory/query.ts).
     const found = await searchMemoryRecords({ storage, config }, {
       ownerScopeOf: (isOwnerSession && !agentParam) ? req.auth!.owner as string : null, gaii,
       q, keyPrefix: prefix, visibility, maxFlags, limit,

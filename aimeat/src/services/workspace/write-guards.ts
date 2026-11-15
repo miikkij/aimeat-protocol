@@ -13,7 +13,7 @@
  *
  *   They live in services/ rather than beside the tools because they are a decision, not protocol
  *   surface — which is what aimeat/no-storage-in-mcp says, and it caught this file on its first run.
- *   They are not part of services/memory-write.ts because that function owns a whole write,
+ *   They are not part of services/memory/write.ts because that function owns a whole write,
  *   and this path deliberately does not use it: the workspace write has its own owner-collapse rule
  *   (one owner per key, see services/workspace/write.ts) that a generic write would undo.
  * @structure
@@ -34,7 +34,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { isKeyArchived } from '../archive.js';
-import { memoryCeilings } from '../memory-ceilings.js';
+import { memoryCeilings } from '../memory/ceilings.js';
 
 /**
  * Is this key inside something the owner archived? Archived is read-only, and it means it on every
@@ -44,7 +44,7 @@ import { memoryCeilings } from '../memory-ceilings.js';
  * `ownerGhii` and `recordKey` add the third level the HTTP door also checks: a SINGLE record the
  * owner archived, not only the workspace and the organism around it. isKeyArchived resolves the
  * organism column and the workspace registry marker; the row's own `archived` flag is a separate
- * fact, and services/memory-write.ts refuses on it. Without it, "this document is finished" held
+ * fact, and services/memory/write.ts refuses on it. Without it, "this document is finished" held
  * for /v1/memory and not for a workspace draft written through a tool.
  */
 export async function archivedRefusal(
@@ -75,7 +75,7 @@ export async function checkWorkspaceWriteLimits(
     planned: { key: string; v: unknown }[],
     label: (i: number) => string,
 ): Promise<string | null> {
-    // The ceilings themselves are services/memory-ceilings.ts, the same function the single-record
+    // The ceilings themselves are services/memory/ceilings.ts, the same function the single-record
     // write calls. This wrapper exists for the batch's own reporting: it names WHICH item of up to
     // fifty was too big, which the generic refusal cannot phrase.
     const out = await memoryCeilings({ storage, config }, ownerGhii, planned.map(p => ({ key: p.key, value: p.v })));

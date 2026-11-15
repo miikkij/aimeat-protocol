@@ -20,7 +20,7 @@
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 6.
  */
 import type { Storage } from '../../storage/interface.js';
-import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from '../memory-write.js';
+import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from '../memory/write.js';
 import { stampFor } from './data-map-check.js';
 import {
   appDataMapKey, publicDataMap, DATA_MAP_SPEC, type DataMap, type DataMapStamp,

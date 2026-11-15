@@ -73,7 +73,7 @@ import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../serv
 import { logger } from '../utils/logger.js';
 import { checkScopeAddition, recordScopeAddition } from '../services/agent/scope-add.js';
 import { resolveMcpWriteTarget } from '../services/write-target.js';
-import { writeMemoryRecord } from '../services/memory-write.js';
+import { writeMemoryRecord } from '../services/memory/write.js';
 import { CAS_ATTEMPTS } from '../services/record-cas.js';
 import { recommendedModelsOf } from '../services/ai/policy-store.js';
 import {
@@ -374,7 +374,7 @@ export function registerOperatorConfigTools(
                 throw e;
             }
 
-            // ONE implementation. services/memory-write.ts owns the record shape, the ceilings, the
+            // ONE implementation. services/memory/write.ts owns the record shape, the ceilings, the
             // archive guard, the provenance stamp and everything a write sets off, the same way
             // POST /v1/memory does — this door used to reach storage itself, so a change to the
             // owner's AI settings landed with none of it and nothing else on the node heard about it.

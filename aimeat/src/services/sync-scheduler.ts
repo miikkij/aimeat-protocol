@@ -25,7 +25,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { syncCatalogueToPeer, enqueueCatalogueSync } from './catalogue-sync.js';
-import { replicateMemoryToAllPeers, sendQueuedMemoryEntries, onMemoryReplicationEnqueued } from './memory-replication.js';
+import { replicateMemoryToAllPeers, sendQueuedMemoryEntries, onMemoryReplicationEnqueued } from './memory/replication.js';
 import {
   computePeerPriorities,
   getSyncHealthMetrics,

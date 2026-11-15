@@ -1,7 +1,7 @@
 /**
  * @file test/unit/template-proposal-ceilings.test.ts
  * @description A template proposal is a memory record, so it answers to the memory ceilings every
- *   other memory write answers to (services/memory-ceilings.ts): an owner at the key ceiling is
+ *   other memory write answers to (services/memory/ceilings.ts): an owner at the key ceiling is
  *   refused with 413 QUOTA_EXCEEDED and nothing is written. proposeTemplate wrote with
  *   storage.setMemory directly, past the key count and the byte budget, on POST /v1/appdev/templates
  *   and on the node MCP tool alike (secaudit 2026-10 last items, F3).

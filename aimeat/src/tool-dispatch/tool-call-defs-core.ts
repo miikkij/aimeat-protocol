@@ -167,7 +167,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_memory_delete',
         // A THIN PROXY, deliberately. Who may remove what is decided once, in
-        // services/memory-bin.ts behind DELETE /v1/memory/:key, and this door brings parameters
+        // services/memory/bin.ts behind DELETE /v1/memory/:key, and this door brings parameters
         // rather than a second opinion. `owner_scope` reaches the owner's other principals exactly
         // as it does on the read and write doors beside it.
         handler: ({ client }, input) => client.delete(

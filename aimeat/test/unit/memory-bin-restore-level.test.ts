@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The level a record comes back at from the memory bin (restoreMemoryRecord,
- *   services/memory-bin.ts):
+ *   services/memory/bin.ts):
  *   - on a node that shows its content to signed-in accounts only, a public record comes back at
  *     'members', also when every versioned write of the record loses to another write meanwhile
  *     (the level is stored with the restore itself, not by a later versioned write);
@@ -20,7 +20,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { restoreMemoryRecord } from '../../src/services/memory-bin.js';
+import { restoreMemoryRecord } from '../../src/services/memory/bin.js';
 
 requirePostgresWhenAsked('memory-bin-restore-level');
 

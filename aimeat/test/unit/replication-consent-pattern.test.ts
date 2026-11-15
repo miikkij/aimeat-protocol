@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
-import { federationConsentCovers } from '../../src/services/memory-replication.js';
+import { federationConsentCovers } from '../../src/services/memory/replication.js';
 
 const covers = (pattern: string, key: string) =>
   federationConsentCovers([{ status: 'active', scope: 'federation', dataPattern: pattern }], key);

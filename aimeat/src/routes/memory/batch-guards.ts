@@ -29,7 +29,7 @@ import type { AimeatConfig } from '../../config.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism/namespace-access.js';
 import type { ManifestWrite } from '../../services/fenced-space.js';
-import type { BatchPublishRequest } from '../../services/memory-batch-write.js';
+import type { BatchPublishRequest } from '../../services/memory/batch-write.js';
 import { publishAskOf, type PublishAsk } from '../../services/publish-requests/ask.js';
 import { callerOf } from '../../middleware/caller.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
@@ -37,10 +37,10 @@ import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secr
 import { isAnonymousGaii } from './shared.js';
 import { MemoryWriteSchema } from '../../models/schemas.js';
 import { MEMORY_WRITE_VISIBILITIES } from '../../utils/visibility-words.js';
-import { memoryCapRefusal } from '../../services/memory-publish-gate.js';
+import { memoryCapRefusal } from '../../services/memory/publish-gate.js';
 import { memoryTarget } from '../../services/classification/label-rows.js';
 import { audienceOfVisibility } from '../../services/classification/audience-cap.js';
-import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../../services/memory-write-asks.js';
+import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../../services/memory/write-asks.js';
 
 export function batchKeyRefusal(roles: string[], gaii: string, key: string): string | null {
   if (isServerWrittenKey(key)) return serverWrittenKeyRefusal(key).message;
@@ -76,7 +76,7 @@ export function visibilityRefusal(visibility: unknown): string | null {
 
 /**
  * The organism rule (services/organism/namespace-access.ts) for a key a batch route or the copy writes
- * under `principal`, the identity the record lands under, as services/memory-write.ts asks it for
+ * under `principal`, the identity the record lands under, as services/memory/write.ts asks it for
  * POST /v1/memory and the MCP write. Null for a key outside `organism.`.
  *
  * The session's scopes and `write` ride along for the fenced-space rule (services/fenced-space.ts):
@@ -96,7 +96,7 @@ export function organismWriteRefusalFor(ctx: { storage: Storage; config: AimeatC
 
 /**
  * The publish gate for a memory route (services/publish-requests/ask.ts publishAskOf, the gate
- * POST /v1/memory asks through services/memory-publish-gate.ts): allowed, refused (nobody on this node
+ * POST /v1/memory asks through services/memory/publish-gate.ts): allowed, refused (nobody on this node
  * to ask), or ask the owner. Asked once per request; whether a given entry RAISES its record to public
  * is decided where the stored level is known.
  */
@@ -124,7 +124,7 @@ export function batchCapRefusalFor(ctx: { storage: Storage; config: AimeatConfig
  * What a batch route adds to its answer for the publish gate: the requests per entry (and 202 when any
  * was filed), and a warning per entry whose request could not be filed.
  */
-/** A batch entry's questions held back for the owner (services/memory-write-asks.ts). */
+/** A batch entry's questions held back for the owner (services/memory/write-asks.ts). */
 export type BatchWriteAsks = { key: string; asks: MemoryWriteAsk[] };
 
 /**

@@ -53,7 +53,7 @@ import { isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism/visibility.js';
 import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
-import { keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from '../../services/memory-publish-gate.js';
+import { keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from '../../services/memory/publish-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 import { organismWriteRefusalFor, routePublishAsk } from './batch-guards.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';

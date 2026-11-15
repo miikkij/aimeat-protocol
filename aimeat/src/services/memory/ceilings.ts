@@ -1,5 +1,5 @@
 /**
- * @file src/services/memory-ceilings.ts
+ * @file src/services/memory/ceilings.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The three limits a memory write answers to, in one place.
@@ -8,7 +8,7 @@
  *   `memoryMaxKeysPerAgent` keys. And the bytes together must fit the owner's paid budget, with the
  *   excess charged as overage.
  *
- *   They were written out twice: once in services/memory-write.ts for a single record, and once in
+ *   They were written out twice: once in services/memory/write.ts for a single record, and once in
  *   services/workspace/write-guards.ts for a workspace batch. The workspace path deliberately does
  *   NOT go through writeMemoryRecord — it has its own owner-collapse rule, one owner per key — but
  *   that is a reason to share the CEILINGS, not a reason to copy them. Two copies of a limit agree
@@ -44,10 +44,10 @@
  *   v1.0.0 — 2026-08-11 — Extracted after the audit's own diff was checked for duplication: the same
  *     three ceilings existed in memory-write.ts and workspace-write-guards.ts.
  */
-import type { AimeatConfig } from '../config.js';
-import type { MemoryRecord, Storage } from '../storage/interface.js';
-import { checkMemoryQuota, chargeOverage } from './quota.js';
-import { MEMORY_COUNT_EXCLUDED_PREFIXES } from '../storage/memory-totals.js';
+import type { AimeatConfig } from '../../config.js';
+import type { MemoryRecord, Storage } from '../../storage/interface.js';
+import { checkMemoryQuota, chargeOverage } from '../quota.js';
+import { MEMORY_COUNT_EXCLUDED_PREFIXES } from '../../storage/memory-totals.js';
 
 export interface CeilingRefusal {
     status: number;

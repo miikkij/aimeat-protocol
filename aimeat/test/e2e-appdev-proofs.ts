@@ -224,7 +224,7 @@ await test('/v1/library-packs surfaces proofs on the community entry (status sta
 });
 
 await test('the proofs ledger is one versioned memory record, appended not replaced', async () => {
-    // The attach goes through services/memory-write.ts now (services/contribution-proofs.ts). Two
+    // The attach goes through services/memory/write.ts now (services/contribution-proofs.ts). Two
     // attaches must be two versions of ONE record carrying both proofs: the connector's copy of
     // this tool SETS a single-proof array, and that is the shape this pins against.
     const { status, body } = await json(`/v1/memory/${encodeURIComponent(`libpack.proofs.${extName}`)}`, {

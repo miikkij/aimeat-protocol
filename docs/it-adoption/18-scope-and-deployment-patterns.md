@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit e3799239f) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit e830ca496) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -19,7 +19,7 @@ A node is the place where people and their agents keep the knowledge they have r
 
 ### What a node is not built for
 
-High-volume data processing, high-throughput transactions, bulk data lakes and analytics over large raw data sets. The storage limits show the intended size of what one identity keeps: by default 1024 kB per value (`AIMEAT_MEMORY_MAX_VALUE_SIZE_KB`), 1000 keys (`AIMEAT_MEMORY_MAX_KEYS`), 10 000 archived keys (`AIMEAT_MEMORY_MAX_ARCHIVED_KEYS`; an archive takes keys out of the first limit and counts them in this one) and 10 MB (`AIMEAT_MEMORY_QUOTA_MB`) per identity (on PostgreSQL archived values do not count toward the 10 MB, so the archived keys limit times the value limit bounds them; `aimeat/src/services/memory-ceilings.ts`), and 50 000 rows per workspace (`AIMEAT_WS_ROWS_MAX_PER_WORKSPACE`) (`aimeat/src/config.ts`, `aimeat/.env.example`). There is no message queue, no search cluster and no shared cache; the cache is a map in the process (`aimeat/src/services/cache.ts`).
+High-volume data processing, high-throughput transactions, bulk data lakes and analytics over large raw data sets. The storage limits show the intended size of what one identity keeps: by default 1024 kB per value (`AIMEAT_MEMORY_MAX_VALUE_SIZE_KB`), 1000 keys (`AIMEAT_MEMORY_MAX_KEYS`), 10 000 archived keys (`AIMEAT_MEMORY_MAX_ARCHIVED_KEYS`; an archive takes keys out of the first limit and counts them in this one) and 10 MB (`AIMEAT_MEMORY_QUOTA_MB`) per identity (on PostgreSQL archived values do not count toward the 10 MB, so the archived keys limit times the value limit bounds them; `aimeat/src/services/memory/ceilings.ts`), and 50 000 rows per workspace (`AIMEAT_WS_ROWS_MAX_PER_WORKSPACE`) (`aimeat/src/config.ts`, `aimeat/.env.example`). There is no message queue, no search cluster and no shared cache; the cache is a map in the process (`aimeat/src/services/cache.ts`).
 
 Heavy work runs as separate services that read from and write to the node: model inference at an AI provider or on the organisation's own model servers, and the organisation's own processing as its own APIs, agents or extensions. The section [Services around a node](#services-around-a-node) lists the ways in.
 

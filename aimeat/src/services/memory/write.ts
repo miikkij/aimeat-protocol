@@ -1,5 +1,5 @@
 /**
- * @file src/services/memory-write.ts
+ * @file src/services/memory/write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Writing one memory record, once, for every surface that can write one.
@@ -148,58 +148,58 @@
  *     door instead of writing to storage itself.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
-import type { MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
-import { validateMemoryWrite } from './schema-validator.js';
-import { writerAudienceAuth } from './csm/readers.js';
-import { memoryCeilings } from './memory-ceilings.js';
-import { checkMemoryQuotaAlarm } from './quota-alarm.js';
-import { isKeyArchived } from './archive.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance } from './ai/provenance.js';
-import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
-import { memoryContentBytes } from '../utils/memory-content.js';
-import { isAnonymousGaii } from '../utils/visibility-words.js';
-import { emitChange, emitRecordChange } from './event-bus.js';
-import { enqueueMemoryReplication } from './memory-replication.js';
-import { emitMemoryWritten } from './event-bus.js';
-import { reconcileAfterSourceWrite } from './exchange-projection.js';
-import { nodeContext } from './node-context.js';
-import { emitEcosystemMemoryWrite } from './ecosystem-events.js';
-import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
-import { logger } from '../utils/logger.js';
-import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
-import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
-import { misdirectedCrewKey, crewSitesWriteRefusal } from './crews/def-envelope.js';
-import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
-import { undeclaredSpaceForKey } from './workspace/write-items.js';
-import { odpsWriteRefusal } from './exchange-odps-write.js';
-import { legacyPacingWriteRefusal } from './legacy-pacing-write.js';
-import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
-import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
-import { agentKeyRefusal } from '../utils/agent-key-address.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { canonicalAppToolsKey } from './app/tools-key.js';
-import { classifyAfterWrite } from './classify-on-write.js';
-import { organismVisibilityRefusal } from './organism/visibility.js';
-import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../storage/memory-sharing.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js';
-import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from './memory-publish-gate.js';
-import { memoryTarget } from './classification/label-rows.js';
-import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
-import { shadowWarning } from './memory-write-shadow.js';
-import { memoryWriteAsks, fileMemoryWriteAsks } from './memory-write-asks.js';
-import { tallyWriterOf } from './data-map/tally-writer.js';
-import { keepsHistory, HISTORY_KEEP } from './context/history-keys.js';
+import type { MemoryRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
+import { validateMemoryWrite } from '../schema-validator.js';
+import { writerAudienceAuth } from '../csm/readers.js';
+import { memoryCeilings } from './ceilings.js';
+import { checkMemoryQuotaAlarm } from '../quota-alarm.js';
+import { isKeyArchived } from '../archive.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance } from '../ai/provenance.js';
+import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';
+import { memoryContentBytes } from '../../utils/memory-content.js';
+import { isAnonymousGaii } from '../../utils/visibility-words.js';
+import { emitChange, emitRecordChange } from '../event-bus.js';
+import { enqueueMemoryReplication } from './replication.js';
+import { emitMemoryWritten } from '../event-bus.js';
+import { reconcileAfterSourceWrite } from '../exchange-projection.js';
+import { nodeContext } from '../node-context.js';
+import { emitEcosystemMemoryWrite } from '../ecosystem-events.js';
+import { runAutomationRecipesForWrite } from '../ecosystem-automation.js';
+import { logger } from '../../utils/logger.js';
+import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
+import { misdirectedCrewKey, crewSitesWriteRefusal } from '../crews/def-envelope.js';
+import { parseGAII, isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
+import { undeclaredSpaceForKey } from '../workspace/write-items.js';
+import { odpsWriteRefusal } from '../exchange-odps-write.js';
+import { legacyPacingWriteRefusal } from '../legacy-pacing-write.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret-records.js';
+import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { agentKeyRefusal } from '../../utils/agent-key-address.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { canonicalAppToolsKey } from '../app/tools-key.js';
+import { classifyAfterWrite } from '../classify-on-write.js';
+import { organismVisibilityRefusal } from '../organism/visibility.js';
+import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../../storage/memory-sharing.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import type { PublishAsk, publishRequestedBody } from '../publish-requests/ask.js';
+import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from './publish-gate.js';
+import { memoryTarget } from '../classification/label-rows.js';
+import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
+import { shadowWarning } from './write-shadow.js';
+import { memoryWriteAsks, fileMemoryWriteAsks } from './write-asks.js';
+import { tallyWriterOf } from '../data-map/tally-writer.js';
+import { keepsHistory, HISTORY_KEEP } from '../context/history-keys.js';
 import type {
     MemoryWriteFanout, MemoryWriteCaller, MemoryWriteInput, MemoryWriteWarning, AfterMemoryWriteReport, MemoryWriteResult,
     ExchangeReconcileReport,
-} from './memory-write-types.js';
+} from './write-types.js';
 export { shadowWarning };
 // The contract moved to memory-write-types.ts unchanged; every name is still exported from here.
 export type {
     MemoryWriteFanout, MemoryWriteCaller, MemoryWriteInput, ExchangeReconcileReport, MemoryWriteWarning,
     AfterMemoryWriteReport, MemoryWriteResult,
-} from './memory-write-types.js';
+} from './write-types.js';
 
 /**
  * Write one memory record. The order matters and is the same order the REST route has always used:
@@ -388,7 +388,7 @@ export async function writeMemoryRecord(
             input = { ...input, ...keptMemoryLevel(existing) };
         }
     }
-    // 3b. The owner's other questions (services/memory-write-asks.ts; secaudit2026oct26): the welcome
+    // 3b. The owner's other questions (services/memory/write-asks.ts; secaudit2026oct26): the welcome
     //     page's switch and a mail refinery's destination store all but the change asked about.
     const asks = input.gatePublic ? await memoryWriteAsks({ storage, config }, caller, input.key, input.value) : null;
     if (asks && 'refused' in asks) return { ok: false, status: asks.refused.status, code: 'PUBLISH_NOT_ALLOWED', message: asks.refused.message };
@@ -428,7 +428,7 @@ export async function writeMemoryRecord(
     if (legacyPacing) return legacyPacing;
 
     // The three memory ceilings — value size, key count, byte budget — from the one place that
-    // holds them (services/memory-ceilings.ts). A single write is a set of one; the workspace batch
+    // holds them (services/memory/ceilings.ts). A single write is a set of one; the workspace batch
     // path passes its whole set to the same function, which is what stops fifty small records each
     // passing on their own while the batch lands over the byte line.
     // The record read above is handed in, so the ceilings do not read it a second time (item C3).
@@ -694,7 +694,7 @@ export async function afterMemoryWrite(
     // through the connection. Owner-session and onboarding-marker writes are excluded — the first is
     // the person's own hand, the second is the funnel measuring itself.
     if (deps.fromAgent && deps.ownerName && !key.startsWith('onboarding.')) {
-        void import('./onboarding-funnel.js')
+        void import('../onboarding-funnel.js')
             .then(m => m.recordActivation(storage, config, deps.ownerName!, 'agent'))
             .catch(e => logger.warn('memory write: activation marker is best-effort', { error: String(e) }));
     }

@@ -61,7 +61,7 @@ import { completeForOwner } from '../ai/completion.js';
 import { readAiFile } from '../ai/inputs.js';
 import { aiFileRefusal, AiInputHiddenError, type AiReadViewer } from '../ai/read-viewer.js';
 import { jobReader, jobCaller, jobWriter, jobReadViewer } from './starter.js';
-import { memoryWriterAsk } from '../memory-publish-gate.js';
+import { memoryWriterAsk } from '../memory/publish-gate.js';
 import { warningsNote } from '../classification/reader.js';
 import { generateForOwner, type GenerateForOwnerResult } from '../ai/image.js';
 import { transcribeForOwner } from '../ai/transcription.js';

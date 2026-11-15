@@ -554,7 +554,7 @@ async function run() {
         // this codebase's own receiving door (federation-sync/messaging.ts, P1-11) answers 401
         // "Missing signature on replication request" to exactly that, so push-home could never land
         // on a real node. Fixed in memory/federation.ts v1.2.0, signing the same seven fields
-        // services/memory-replication.ts signs.
+        // services/memory/replication.ts signs.
         const sent = replicateBodies[0];
         assert(typeof sent.signature === 'string' && sent.signature.length > 0,
             `push-home must sign what it sends, got ${JSON.stringify(sent.signature)}`);
@@ -832,7 +832,7 @@ async function run() {
 
     await test('the visitor\'s scope list is enforced: memory:read does not write', async () => {
         // Asserted as a hole first, 2026-09-08: the mint hands the session roles:['owner'], and
-        // requireScope (auth/middleware.ts) and services/memory-write.ts both waved an owner role
+        // requireScope (auth/middleware.ts) and services/memory/write.ts both waved an owner role
         // past every scope check, so a visitor holding memory:read and catalogue:read wrote memory
         // into a namespace on this node. Invariant 15: a permission word is enforced on every door or
         // it does not exist. Both gates now exclude a federated session from the owner bypass.

@@ -17,7 +17,7 @@
  *   `derivatives` off adds a node sentence to the same 255-character field, and that can push an unchanged
  *   note past the cap.
  *
- *   ONE decision for every door: the memory write (services/memory-write.ts: POST /v1/memory, the MCP
+ *   ONE decision for every door: the memory write (services/memory/write.ts: POST /v1/memory, the MCP
  *   memory tool, aimeat_app_tools_publish, aimeat_offer_price_set), PUT /v1/memory/:key and PATCH
  *   /v1/memory/:key, PUT /v1/agents/:name/offers, and the extension install and redeploy paths. Each calls
  *   odpsWriteRefusal() with the key, the value it is about to store and the value stored now.

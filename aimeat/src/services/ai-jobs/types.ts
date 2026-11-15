@@ -102,7 +102,7 @@ export interface AiJobRecord {
 
     result_key: string;
     /** The level asked for until the answer is written, then the level it was STORED at: the shared
-     *  memory write (services/memory-write.ts) keeps a raise to public at the level the record had
+     *  memory write (services/memory/write.ts) keeps a raise to public at the level the record had
      *  (a new one: private) while the owner is asked, and stores 'members' on a node that shows its
      *  content to signed-in accounts only. */
     result_visibility: MemoryRecord['visibility'];

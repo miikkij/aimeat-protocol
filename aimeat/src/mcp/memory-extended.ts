@@ -49,14 +49,14 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
+import { isVersionKey, searchHitShape, matchesType } from '../services/memory/search-shape.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { shareCarriesKey } from '../services/group-shares-classification.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { readProvenance } from '../services/ai/provenance-result.js';
-import { searchMemoryRecords } from '../services/memory-query.js';
+import { searchMemoryRecords } from '../services/memory/query.js';
 import { toolsManifestHiddenFrom } from '../services/app/tools-manifest-reach.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
@@ -78,7 +78,7 @@ export function registerMemoryExtendedTools(
     // `.version.N` workspace snapshots (owned by the agent GAII), blowing past a sane MCP payload. So:
     // cap the count (`limit`, default 50), skip version history unless asked, and hand back a short
     // window around the match. The agent reads a specific hit's full value via aimeat_memory_read(key).
-    // The snippet window and the version-key test moved to services/memory-search-shape.ts on
+    // The snippet window and the version-key test moved to services/memory/search-shape.ts on
     // 2026-09-06. They were closures here, which is why GET /v1/memory/search could not answer this
     // way and both connector doors returned whole records instead — the same tool name meaning two
     // different searches (review item 6.4). One shape, one place, every door.
@@ -111,7 +111,7 @@ export function registerMemoryExtendedTools(
             }
             // Pull a bounded candidate set from storage (safety net over a pathological store), then drop
             // version history in-tool and cap to `cap` non-version hits.
-            // The search GET /v1/memory/search runs for an agent session (services/memory-query.ts):
+            // The search GET /v1/memory/search runs for an agent session (services/memory/query.ts):
             // the word-start match over the indexed values, this agent's own records.
             const candidates = await searchMemoryRecords({ storage, config }, {
                 ownerScopeOf: null, gaii: agentGaii, q: effectiveQuery, visibility, limit: cap * 4,

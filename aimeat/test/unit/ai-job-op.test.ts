@@ -102,7 +102,7 @@ function watchedStorage(files: Record<string, { size: number; mime?: string }> =
     w.storage = {
         getMemory: async (owner: string, key: string) => rows.get(`${owner}::${key}`) ?? null,
         setMemory: async (r: MemoryRecord) => land(r),
-        // The answer is written through services/memory-write.ts on the version read, as both
+        // The answer is written through services/memory/write.ts on the version read, as both
         // storage providers support: create-if-absent for a new key, set-if-version for an update.
         createMemoryIfAbsent: async (r: MemoryRecord) => (rows.has(`${r.ownerGaii}::${r.key}`) ? null : land(r)),
         setMemoryIfVersion: async (r: MemoryRecord, v: number) => (rows.get(`${r.ownerGaii}::${r.key}`)?.version === v ? land(r) : null),

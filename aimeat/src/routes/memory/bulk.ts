@@ -127,7 +127,7 @@ import { storedFileShownTo } from '../../services/datapackage/source-labels.js';
 import { leaveMemories } from '../../services/classification-exits.js';
 import { undeclaredSpaceForKey } from '../../services/workspace/write-items.js';
 import { fencedKeysRefusal } from '../../services/fenced-space.js';
-import { bulkDeleteKeyRefusal } from '../../services/memory-bin.js';
+import { bulkDeleteKeyRefusal } from '../../services/memory/bin.js';
 import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
@@ -140,12 +140,12 @@ import {
   batchCapRefusalFor, batchWriteAsks, fileBatchWriteAsks, type BatchWriteAsks,
 } from './batch-guards.js';
 import { registerCopyRoute } from './copy.js';
-import { writeMemoryBatch } from '../../services/memory-batch-write.js';
+import { writeMemoryBatch } from '../../services/memory/batch-write.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism/visibility.js';
 import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../../storage/memory-sharing.js';
-import { discoverMemory } from '../../services/memory-discover.js';
+import { discoverMemory } from '../../services/memory/discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 import { signedInOnly } from '../../config/visibility.js';
@@ -253,7 +253,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const unknownGroup = await unknownGroupRefusal(batchGroups, e.visibility, e.group_id);
       if (unknownGroup) { preFailed.push({ key, status: 'failed', reason: `${unknownGroup.code}: ${unknownGroup.message}` }); continue; }
       // Making a record public, by a caller with nobody on this node to ask: that entry is refused.
-      // A closed node stores it at 'members' instead (services/memory-batch-write.ts), so it asks nothing.
+      // A closed node stores it at 'members' instead (services/memory/batch-write.ts), so it asks nothing.
       if (publishAsk.kind === 'refused' && e.visibility === 'public' && !signedInOnly(config) && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
         preFailed.push({ key, status: 'failed', reason: `${publishAsk.code}: ${publishAsk.message}` }); continue;
       }
@@ -595,7 +595,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // The bin's per-key rules, as DELETE /v1/memory/:key asks them (services/memory-bin.ts
+    // The bin's per-key rules, as DELETE /v1/memory/:key asks them (services/memory/bin.ts
     // bulkDeleteKeyRefusal): a credential record, a reserved owner key for an app grant, an event of an
     // append-only space. A key named outright refuses the request before anything is removed; a key a
     // prefix matched stays in place (secaudit2026oct26, bulk-delete-skips-bin-refusals). Decided for

@@ -1,5 +1,5 @@
 /**
- * @file src/services/memory-write-asks.ts
+ * @file src/services/memory/write-asks.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner's one-press questions a generic memory write can raise beside the publish
@@ -18,12 +18,12 @@
  * @version-history
  *   2026-10-27 — Initial (secaudit2026oct26).
  */
-import type { MemoryPublishWriter } from './memory-publish-gate.js';
-import type { PublishStoreCtx } from './publish-requests/store.js';
-import type { publishRequestedBody } from './publish-requests/ask.js';
-import { portfolioMemoryWriteGate, type PortfolioMemoryGate } from './portfolio-memory-gate.js';
-import { filePortfolioAsk } from './portfolio-publish-gate.js';
-import { refineryDefinitionGate, fileRefineryDefinitionAsk, type RefineryDefinitionAsk } from './refinery/definition-ask.js';
+import type { MemoryPublishWriter } from './publish-gate.js';
+import type { PublishStoreCtx } from '../publish-requests/store.js';
+import type { publishRequestedBody } from '../publish-requests/ask.js';
+import { portfolioMemoryWriteGate, type PortfolioMemoryGate } from '../portfolio-memory-gate.js';
+import { filePortfolioAsk } from '../portfolio-publish-gate.js';
+import { refineryDefinitionGate, fileRefineryDefinitionAsk, type RefineryDefinitionAsk } from '../refinery/definition-ask.js';
 
 export type MemoryWriteAsk =
   | { kind: 'portfolio'; ask: Extract<PortfolioMemoryGate, { kind: 'ask' }> }

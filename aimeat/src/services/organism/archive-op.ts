@@ -36,7 +36,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { archiveTarget, unarchiveTarget, archiveRoleOf, archivedOwnersUnder, liveOwnersUnder, type ArchiveLevel, type ArchiveTarget } from '../archive.js';
-import { archiveWithinCeiling, flipWithinCeilings } from '../memory-ceilings.js';
+import { archiveWithinCeiling, flipWithinCeilings } from '../memory/ceilings.js';
 import { archiveFenceTarget, fencedSpaceRefusal } from '../fenced-space.js';
 import { updateOrganismStructure } from '../structure-snapshot.js';
 import { emitChange } from '../event-bus.js';

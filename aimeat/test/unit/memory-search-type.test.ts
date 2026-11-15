@@ -8,7 +8,7 @@
  * of half-working that looks like an empty store.
  */
 import { describe, it, expect } from 'vitest';
-import { matchesType, typeOfRecord } from '../../src/services/memory-search-shape.js';
+import { matchesType, typeOfRecord } from '../../src/services/memory/search-shape.js';
 
 describe('typeOfRecord', () => {
   it('reads a string type', () => {

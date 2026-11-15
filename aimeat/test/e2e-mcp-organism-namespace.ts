@@ -3,7 +3,7 @@
  * @description Proof that the organism namespace rule reaches the MCP door.
  *
  *   WHAT WAS OPEN. The rule that decides who may write an `organism.{id}.*` key lived entirely in
- *   middleware/workspace-access.ts, which is Express-shaped. services/memory-write.ts — the shared
+ *   middleware/workspace-access.ts, which is Express-shaped. services/memory/write.ts — the shared
  *   write every MCP tool calls — could therefore carry only the FLOOR of it (an active membership),
  *   and three doors above that floor were open on the agent surface and shut on the web one:
  *

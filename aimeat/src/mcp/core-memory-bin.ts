@@ -8,7 +8,7 @@
  *   coherent pair — one capability read two ways — and separating them from the read/write tools
  *   keeps the delete's grace window explainable in one place.
  *
- *   THEY CALL services/memory-bin.ts, the same one behind DELETE /v1/memory/:key. The connector MCP
+ *   THEY CALL services/memory/bin.ts, the same one behind DELETE /v1/memory/:key. The connector MCP
  *   and the CLI dispatch are HTTP proxies onto that route; this surface runs inside the node and
  *   reaches the service directly. Three doors, one answer to who may remove what.
  * @structure registerMemoryBinTools(mcp, deps, caller)
@@ -31,7 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory/bin.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
@@ -48,7 +48,7 @@ const binCaller = () => {
 };
 // ── The bin: delete, and take it back ──
 //
-// These call services/memory-bin.ts, the same one behind DELETE /v1/memory/:key, because who may
+// These call services/memory/bin.ts, the same one behind DELETE /v1/memory/:key, because who may
 // remove what is a rule and not a parameter. The other two surfaces are HTTP proxies onto that
 // route; this one runs inside the node and reaches the service directly. Three doors, one answer.
 mcp.registerTool(

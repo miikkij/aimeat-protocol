@@ -101,7 +101,7 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * so a new direct call inside a file already counted passed unseen.
  *
  * 44 when the number was first taken (the diagram the developer asked for, commit 846f21f4).
- * 43 after aimeat_memory_write moved onto services/memory-write.ts — the capability whose same
+ * 43 after aimeat_memory_write moved onto services/memory/write.ts — the capability whose same
  * defect had been fixed three separate times. Lower this line with every tool that follows.
  *
  * 44 on 2026-08-11 after mcp/apps-fork.ts moved its quota onto services/install-quotas.ts.

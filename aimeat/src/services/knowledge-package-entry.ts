@@ -17,7 +17,7 @@
  *   `content` in the body, which that route answers 400 MISSING_FIELDS. Putting the work here is what
  *   lets a second door be a door rather than a third implementation.
  *
- *   THE MANIFEST IS A MEMORY RECORD TOO. The entry already went through services/memory-write.ts; the
+ *   THE MANIFEST IS A MEMORY RECORD TOO. The entry already went through services/memory/write.ts; the
  *   manifest did not. It was `storage.setMemory` straight from the tool, so the index line an agent
  *   appends carried no schema lock, no archive guard, no value-size or key ceiling, no byte budget,
  *   and nothing announced it. The knowledge views read the MANIFEST, so the one write the screen
@@ -45,7 +45,7 @@
  */
 import type { MemoryRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
-import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from './memory-write.js';
+import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from './memory/write.js';
 import type { DeclaredProvenance } from './ai/provenance.js';
 import { PITFALL_PACKAGE_ID } from './appdev-kb.js';
 import { CAS_ATTEMPTS } from './record-cas.js';

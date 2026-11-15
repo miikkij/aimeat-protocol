@@ -167,7 +167,7 @@
       "count": 1,
       "why": "Attached MCP calls go to an active peer with allowRouting; a packages-only peer has it off."
     },
-    "src/services/memory-replication.ts": {
+    "src/services/memory/replication.ts": {
       "count": 4,
       "why": "Replication goes to active peers with replicateMemory, validateOutboundUrl first. The retraction send (retractMemoryFromPeer) reads the same two: it refuses a peer whose replicateMemory is off and runs validateOutboundUrl on the url before the post, and it signs the message with this node's key plus an audience proof naming the target peer, so a captured retraction cannot be replayed at a third node (secaudit 2026-10, replica retention)."
     },

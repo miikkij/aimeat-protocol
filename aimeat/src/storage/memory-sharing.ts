@@ -75,7 +75,7 @@ export async function unknownGroupRefusal(
  * Asked with the same inputs resolveGroupId reads, so a rewrite of a record that has a group passes.
  *
  * A row that is already `group` with no group, which an older node stored, passes too: the rewrite
- * takes no reader away, and a refusal would stop a running writer. services/memory-write.ts warns it.
+ * takes no reader away, and a refusal would stop a running writer. services/memory/write.ts warns it.
  */
 export function memoryGroupRefusal(
   visibility: unknown, groupId: unknown, existing?: { visibility?: unknown; groupId?: string | null } | null,

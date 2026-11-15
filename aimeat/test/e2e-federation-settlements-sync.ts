@@ -102,7 +102,7 @@ import {
 } from '../src/services/catalogue-sync.js';
 import {
     replicateMemoryToPeer, replicateMemoryToAllPeers, enqueueMemoryReplication, isEligibleForReplication,
-} from '../src/services/memory-replication.js';
+} from '../src/services/memory/replication.js';
 import { drainSyncQueue, startSyncScheduler, notifyCatalogueChange } from '../src/services/sync-scheduler.js';
 import {
     bootNode, setupOperator, addPeer, startFakePeer, modes, seen, auth, sleep,

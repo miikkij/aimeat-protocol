@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for a memory record: the record becomes public, as the
- *   owner, through services/memory-write.ts like any visibility change (plan doc-mvcn6c7e4e5q, V4.3).
+ *   owner, through services/memory/write.ts like any visibility change (plan doc-mvcn6c7e4e5q, V4.3).
  *
  *   THE OWNER APPROVED WHAT THEY SAW. The request carries the record's version when it was asked.
  *   A record that was deleted, written again or given another level since is not made public: the
@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import { memoryValueDigest, type PublishApplyResult, type PublishRequest, type PublishStoreCtx } from './store.js';
-import { writeMemoryRecord } from '../memory-write.js';
+import { writeMemoryRecord } from '../memory/write.js';
 
 /** The owner's own namespace, or one of their agents' (`name#owner@node`). */
 export function namespaceOfOwner(ns: string, ownerGhii: string): boolean {

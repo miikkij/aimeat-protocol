@@ -182,7 +182,7 @@ await test('aimeat_memory_restore: owner_scope on the owner\'s own binned record
     const d = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(A) });
     assert(d.status === 200, `owner delete: ${d.status}`);
     // The bin answers the same refusal for "never deleted", "not yours to reach" and "gone for good"
-    // (services/memory-bin.ts restoreMemoryRecord), as POST /v1/memory/:key/restore answers 404.
+    // (services/memory/bin.ts restoreMemoryRecord), as POST /v1/memory/:key/restore answers 404.
     const refused = await callTool(aS, 'aimeat_memory_restore', { key, owner_scope: true });
     assert(refused.isError && refused.data.error === 'NOT_RESTORABLE', `the agent restored the owner's record without the word: ${refused.text}`);
     const still = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(A) });

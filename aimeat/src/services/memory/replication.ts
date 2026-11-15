@@ -1,5 +1,5 @@
 /**
- * @file src/services/memory-replication.ts
+ * @file src/services/memory/replication.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Memory Replication Service — consent-based replication of public memory
@@ -47,15 +47,15 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PeerInfo } from '../services/federation.js';
-import { sign } from '../auth/keypair.js';
-import { deliveryProof, audienceProof } from './signed-node-request.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
-import { peerFetch } from '../utils/peer-fetch.js';
-import { logger } from '../utils/logger.js';
-import { leaveMemoriesToPeer, WITHHELD_REASON } from './classification-exits.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PeerInfo } from '../federation.js';
+import { sign } from '../../auth/keypair.js';
+import { deliveryProof, audienceProof } from '../signed-node-request.js';
+import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
+import { logger } from '../../utils/logger.js';
+import { leaveMemoriesToPeer, WITHHELD_REASON } from '../classification-exits.js';
 
 export interface ReplicationResult {
   peer_node_id: string;

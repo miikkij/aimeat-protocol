@@ -14,7 +14,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig } from '../../src/config.js';
 import { createMemoryDbService } from '../../src/services/db/index.js';
-import { writeMemoryBatch } from '../../src/services/memory-batch-write.js';
+import { writeMemoryBatch } from '../../src/services/memory/batch-write.js';
 
 requirePostgresWhenAsked('memory-batch-write');
 

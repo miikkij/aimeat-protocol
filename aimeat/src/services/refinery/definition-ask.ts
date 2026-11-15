@@ -34,7 +34,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { callerFromAuth } from '../caller-context.js';
 import { fileAsk, requesterOf, publishRequestedBody } from '../publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
-import type { MemoryPublishWriter } from '../memory-publish-gate.js';
+import type { MemoryPublishWriter } from '../memory/publish-gate.js';
 import { REFINERY_PREFIX_RE, REFINERY_RUN_SCOPES } from './schedule-input.js';
 import { logger } from '../../utils/logger.js';
 

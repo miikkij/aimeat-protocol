@@ -18,7 +18,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory-bin.js';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory/bin.js';
 import { DEFAULT_CAPS_KEY } from '../../src/services/classification/default-caps-state.js';
 import type { AimeatConfig } from '../../src/config.js';
 

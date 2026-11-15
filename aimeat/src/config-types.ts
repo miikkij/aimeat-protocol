@@ -348,7 +348,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   memoryMaxValueSizeKb: number;
   memoryMaxKeysPerAgent: number;
   /**
-   * The most archived memory keys each owner and each agent may hold (services/memory-ceilings.ts
+   * The most archived memory keys each owner and each agent may hold (services/memory/ceilings.ts
    * archiveWithinCeiling). Archived rows are outside memoryMaxKeysPerAgent, so archiving frees room
    * among live rows; this is their own ceiling, asked when an archive would add to it. 0 = no limit.
    */

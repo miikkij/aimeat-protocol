@@ -54,7 +54,7 @@ const KNOWLEDGE_PACKAGE_PREFIX = 'packages/';
  * which the entry visibility route changes behind the publish gate. A consent whose recipient is `*`
  * names no reader, so it does not widen that visibility: the package page's Federation switch grants
  * `packages/<id>/*` to `*` with the reach `federation`, and what that consent is for (replicating the
- * PUBLIC entries to peers, services/memory-replication.ts, and listing the owner in the directory,
+ * PUBLIC entries to peers, services/memory/replication.ts, and listing the owner in the directory,
  * services/directory.ts) reads the consent itself and never this check. A named recipient (an
  * organism, a person, an agent, a party) still opens what it names.
  */

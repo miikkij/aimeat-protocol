@@ -15,7 +15,7 @@
  *   lowercase letters, digits and hyphens, utils/gaii.ts), so no memory route writes there, the
  *   owner-scope reads (services/owner-memory.ts: the GHII, the agents, the ecosystem apps) never
  *   include it, and the routes that take a namespace from the caller refuse it
- *   (utils/own-door-keys.ts ownDoorRefusal, services/memory-bin.ts).
+ *   (utils/own-door-keys.ts ownDoorRefusal, services/memory/bin.ts).
  *
  *   OWNERSHIP. The records are the account's. The account holder's data export
  *   (GET /v1/owners/:name/export) carries them beside the records of their own identity, and the

@@ -10,12 +10,12 @@
  *   minute and day limits, the address naming the receiver's own target and nothing else, the CSM
  *   shape the receiver was made with, and only then the write. A dry run stops after the shape.
  *
- *   ONE WRITE PATH. A memory record is written with writeMemoryRecord (services/memory-write.ts) under
+ *   ONE WRITE PATH. A memory record is written with writeMemoryRecord (services/memory/write.ts) under
  *   the owner's identity with the receiver as the principal, so the archive guard, the value and key
  *   ceilings, the byte quota, the schema lock on the key, the organism and visibility rules, the
  *   provenance record (level `machine`, services/ai/provenance.ts) and every event a write sets off
  *   happen exactly as for any other writer. A record is removed with deleteMemoryRecord
- *   (services/memory-bin.ts), so it goes to the bin for the grace period. A row goes through
+ *   (services/memory/bin.ts), so it goes to the bin for the grace period. A row goes through
  *   appendRows, readRows and deleteRow (services/workspace-rows/row-service.ts), whose gate admits a
  *   receiver as its owner's membership and never more, and whose space schema binds it as every writer.
  *
@@ -30,9 +30,9 @@
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { createHash } from 'node:crypto';
-import type { MemoryWriteFanout } from '../memory-write-types.js';
-import { writeMemoryRecord } from '../memory-write.js';
-import { deleteMemoryRecord } from '../memory-bin.js';
+import type { MemoryWriteFanout } from '../memory/write-types.js';
+import { writeMemoryRecord } from '../memory/write.js';
+import { deleteMemoryRecord } from '../memory/bin.js';
 import { validateValueAgainstSchema } from '../schema-validator.js';
 import { appendRows, readRows, deleteRow, WorkspaceRowError, type RowCaller } from '../workspace-rows/row-service.js';
 import { readerForCaller } from '../classification/reader.js';

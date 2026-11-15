@@ -34,7 +34,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { writeMemoryRecord } from '../memory-write.js';
+import { writeMemoryRecord } from '../memory/write.js';
 import { CAS_ATTEMPTS, UNCHANGED } from '../record-cas.js';
 import { DEFAULT_CONTEXT } from '../../utils/onto-context.js';
 import { BUILTIN_CLASSES, builtinClass } from '../../data/content-classes.js';

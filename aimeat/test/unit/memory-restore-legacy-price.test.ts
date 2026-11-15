@@ -10,7 +10,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory-bin.js';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory/bin.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const N = 'test-node';

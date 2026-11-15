@@ -35,7 +35,7 @@
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { archiveWithinCeiling } from './memory-ceilings.js';
+import { archiveWithinCeiling } from './memory/ceilings.js';
 import { isSameOwner } from '../utils/gaii.js';
 
 /** What level a target sits at. The level fixes the key prefix archived and the `archivedRoot` stamp. */
@@ -163,7 +163,7 @@ export async function archivedOwnersUnder(storage: Storage, t: ArchiveTarget): P
 
 /**
  * The principals holding rows not yet archived under a target's key scope: every principal an archive
- * of it can add archived keys to, and possibly more (archiveWithinCeiling in services/memory-ceilings.ts
+ * of it can add archived keys to, and possibly more (archiveWithinCeiling in services/memory/ceilings.ts
  * asks their archived-key ceiling around the flip).
  */
 export async function liveOwnersUnder(storage: Storage, t: ArchiveTarget): Promise<string[]> {

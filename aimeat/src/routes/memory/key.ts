@@ -79,13 +79,13 @@
  */
 
 import type { Router } from 'express';
-import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory-bin.js';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory/bin.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryUpdateSchema, validateBody } from '../../models/schemas.js';
-import { writeMemoryRecord } from '../../services/memory-write.js';
+import { writeMemoryRecord } from '../../services/memory/write.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
-import { enqueueMemoryReplication } from '../../services/memory-replication.js';
+import { enqueueMemoryReplication } from '../../services/memory/replication.js';
 import { emitRecordChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
@@ -276,7 +276,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // WHO MAY REMOVE WHAT lives in services/memory-bin.ts, because the tool surfaces ask the same
+    // WHO MAY REMOVE WHAT lives in services/memory/bin.ts, because the tool surfaces ask the same
     // question and a second copy here is the drift this codebase keeps paying for. What stays in
     // the route is what belongs to the route: the operator's ?owner= override (a ROLE check, and
     // roles are the door's business), the owner-scope opt-in, and the workspace guard below.
@@ -476,7 +476,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // From here the write is the shared one (services/memory-write.ts), the same sequence POST
+    // From here the write is the shared one (services/memory/write.ts), the same sequence POST
     // /v1/memory and aimeat_memory_write run: the archive guard (record, workspace, organism), the
     // undeclared-space refusal, the schema lock, the ODPS and legacy-pacing refusals, the three
     // ceilings with the overage charge, the provenance statement, the version-checked write and

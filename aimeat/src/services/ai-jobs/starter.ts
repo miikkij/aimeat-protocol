@@ -13,7 +13,7 @@
  *   job anything: whose key pays and whose namespace it reads is still the job's `owner`.
  *
  *   The same starter is who the job WRITES its answer as (jobWriter, through the shared memory write
- *   in services/memory-write.ts) and decides whether the job may name an extension action as its
+ *   in services/memory/write.ts) and decides whether the job may name an extension action as its
  *   `on_done` (starterMayInvokeExtensions).
  * @structure startedByOf(auth, principal) · jobReader(deps, job) · jobCaller(job) · unattendedReader(deps, ownerGaii) ·
  *   jobWriter(job) · starterMayInvokeExtensions(startedBy) · onDoneScopeRefusal(startedBy) · jobReadViewer(job)
@@ -45,7 +45,7 @@ import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { readerForCaller, type ContentReader } from '../classification/reader.js';
 import { aiCallerFromCredential, aiCallerOfPrincipal, type AiCallerContext } from '../ai/caller-context.js';
-import type { MemoryWriteCaller } from '../memory-write.js';
+import type { MemoryWriteCaller } from '../memory/write.js';
 import { aiReadViewerOf, type AiReadViewer } from '../ai/read-viewer.js';
 import type { AiJobRecord, AiJobStartedBy } from './types.js';
 
@@ -80,7 +80,7 @@ export function startedByOf(auth: StarterCredential, principal: string): AiJobSt
 }
 
 /**
- * Who the job's answer is written as (services/memory-write.ts): the starter, with the roles and
+ * Who the job's answer is written as (services/memory/write.ts): the starter, with the roles and
  * scopes its credential carried, into the job owner's namespace. So a raise to public by an agent
  * without publish:public stays private and files a request for the owner, the closed-node level and
  * the label audience cap apply, and an `organism.*` result key is held to the organism namespace

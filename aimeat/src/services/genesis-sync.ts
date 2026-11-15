@@ -47,7 +47,7 @@ import { deliveryProof } from './signed-node-request.js';
 import { logger } from '../utils/logger.js';
 import { leaveToPeer } from './classification/egress.js';
 import { presentActionPricing } from './action-pacing.js';
-import { federationConsentCovers } from './memory-replication.js';
+import { federationConsentCovers } from './memory/replication.js';
 import { csmMayReadAs } from './csm/readers.js';
 import {
   GENESIS_CACHE_TAG, GENESIS_SUBSCRIPTION_TAG, genesisPeerKey, genesisSubscriptionKey, isGenesisSubscriptionRecord,

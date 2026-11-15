@@ -18,7 +18,7 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { memoryGroupRefusal } from '../../src/storage/memory-sharing.js';
-import { writeMemoryRecord, type MemoryWriteInput } from '../../src/services/memory-write.js';
+import { writeMemoryRecord, type MemoryWriteInput } from '../../src/services/memory/write.js';
 
 const NODE = 'aimeat-memory-group-binding-test';
 const ALICE = `alice@${NODE}`;

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an AI job's start can tell about where its answer will land, before the model is
- *   paid for. The answer is written through the shared memory write (services/memory-write.ts), as
+ *   paid for. The answer is written through the shared memory write (services/memory/write.ts), as
  *   the job's starter (starter.ts jobWriter), and that write refuses what any memory write refuses.
  *   A refusal there comes after the provider was paid, so every part of it that does not depend on
  *   the answer itself is asked here first, at the start, and refused with the same code:
@@ -14,7 +14,7 @@
  *     answer is a string, an image record and a JSON transcription are objects); a lock that could
  *     take it is checked against the real answer at the write;
  *   - a new key on an account at its key ceiling, and an account already over its byte quota with no
- *     balance for the overage (services/memory-ceilings.ts, services/quota.ts).
+ *     balance for the overage (services/memory/ceilings.ts, services/quota.ts).
  *
  *   The size of the answer cannot be known before the model answers, so the per-value ceiling stays
  *   at the write.

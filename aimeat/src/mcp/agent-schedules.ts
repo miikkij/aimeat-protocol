@@ -65,7 +65,7 @@ import { emitChange } from '../services/event-bus.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord, canManageSchedule } from '../services/schedule-write.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
-import { writeMemoryRecord } from '../services/memory-write.js';
+import { writeMemoryRecord } from '../services/memory/write.js';
 import { schedulePromptOf } from '../services/schedule-prompt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';

@@ -13,7 +13,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { CAS_ATTEMPTS } from '../record-cas.js';
-import { writeMemoryRecord } from '../memory-write.js';
+import { writeMemoryRecord } from '../memory/write.js';
 import { jobWriter } from './starter.js';
 import { AiJobError, type AiJobRecord } from './types.js';
 

@@ -25,7 +25,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { writeMemoryRecord } from '../../src/services/memory-write.js';
+import { writeMemoryRecord } from '../../src/services/memory/write.js';
 import { workspaceCallerOf, writeWorkspaceDraftsOp } from '../../src/services/workspace/tool-ops.js';
 import { appendToDocument, WorkspaceDocError } from '../../src/services/workspace/doc-edit.js';
 import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';

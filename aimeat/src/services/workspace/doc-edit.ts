@@ -60,7 +60,7 @@ import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 import { readWorkspaceManifest } from './meta.js';
 import { resolveSpace, type WriteObjectType } from './write-items.js';
 import { archivedRefusal } from './write-guards.js';
-import { memoryCeilings } from '../memory-ceilings.js';
+import { memoryCeilings } from '../memory/ceilings.js';
 import { validateMemoryWrite } from '../schema-validator.js';
 import { isHtmlPageValue } from '../html-page.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './write.js';

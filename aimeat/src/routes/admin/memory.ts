@@ -51,7 +51,7 @@ import type { MemoryMetaRow } from '../../storage/repositories/memory.repository
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
-import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory-bin.js';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory/bin.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { recordOperatorAccess, type OperatorAccess } from '../../services/operator-access-audit.js';

@@ -10,7 +10,7 @@
  *   - a many-owner listing pages by key and then owner, and `afterOwner` continues inside one key;
  *   - without limit and after, a listing returns what it returned before, every match;
  *   - on SQLite the LIMIT is in the statement (the rows never reach JavaScript);
- *   - GET /v1/memory's bounded listing (services/memory-list-page.ts) reads the values of its page
+ *   - GET /v1/memory's bounded listing (services/memory/list-page.ts) reads the values of its page
  *     only, and its byte sum equals the sum of JSON.stringify of each shown value, the credential
  *     mask included.
  * @usage cd aimeat && DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/memory-list-page.test.ts
@@ -23,7 +23,7 @@ import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { memoryPageWithValues, shownMemoryBytes } from '../../src/services/memory-list-page.js';
+import { memoryPageWithValues, shownMemoryBytes } from '../../src/services/memory/list-page.js';
 import { shownMemoryValue } from '../../src/services/secret-records.js';
 
 const SQLITE_PATH = `./test/.memory-list-page-${process.pid}.db`;

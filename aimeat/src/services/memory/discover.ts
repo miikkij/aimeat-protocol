@@ -1,5 +1,5 @@
 /**
- * @file memory-discover.ts
+ * @file src/services/memory/discover.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Public cross-owner memory discovery; keeps the page-count response contract.
@@ -11,10 +11,10 @@
  *     record itself (organismKeysCarried). The listing named those keys (secaudit 2026-10, DATA-3).
  *   1.0.0 2026-09-27 Extract the discovery query for provider contract tests.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { organismKeysCarried } from './group-shares-classification.js';
-import { withoutHiddenToolManifests } from './app/tools-manifest-reach.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { organismKeysCarried } from '../group-shares-classification.js';
+import { withoutHiddenToolManifests } from '../app/tools-manifest-reach.js';
 
 export async function discoverMemory(storage: Storage, config: AimeatConfig, caller: string, opts: {
   prefix?: string; owner?: string; q?: string; limit: number; offset: number;

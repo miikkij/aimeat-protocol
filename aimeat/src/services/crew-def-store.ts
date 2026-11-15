@@ -46,7 +46,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
-import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
+import { writeMemoryRecord, type MemoryWriteResult } from './memory/write.js';
 import { listVersionRefs, versionNumberOf } from './workspace/versions.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { logger } from '../utils/logger.js';

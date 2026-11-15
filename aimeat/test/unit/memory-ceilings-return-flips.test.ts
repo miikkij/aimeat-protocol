@@ -23,7 +23,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory-bin.js';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory/bin.js';
 import { organismArchiveOp } from '../../src/services/organism/archive-op.js';
 import { archiveTarget } from '../../src/services/archive.js';
 

@@ -6,7 +6,7 @@
  *
  *   A pull WRITES a record here, into the caller's own namespace, so both pull doors write the way
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
- *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
+ *   door, and then services/memory/write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
  *   v1.12.1 — 2026-10-21 — livePeerUrl takes the peer record's URL in every status the heartbeat sets and
  *     clears on its own (active, degraded, offline, unreachable: LIVENESS_RECOVERABLE), the same set the
@@ -48,7 +48,7 @@ import { peerFetch, type PeerAnswer } from '../../utils/peer-fetch.js';
 import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { logger } from '../../utils/logger.js';
-import { writeMemoryRecord } from '../../services/memory-write.js';
+import { writeMemoryRecord } from '../../services/memory/write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { sign } from '../../auth/keypair.js';
@@ -321,7 +321,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
         tags: record.tags ?? [],
       };
       // Signed over the same seven fields the receiving door verifies (federation-sync/messaging.ts,
-      // P1-11) and services/memory-replication.ts signs. Until 2026-09-08 this door sent no
+      // P1-11) and services/memory/replication.ts signs. Until 2026-09-08 this door sent no
       // signature at all, so a push-home could never land on a real node; the receiving door's
       // answer is 401 "Missing signature on replication request". Found by e2e-federated-session.
       const nodeKey = await storage.getNodeKey();

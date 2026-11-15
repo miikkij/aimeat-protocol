@@ -35,7 +35,7 @@ import { defaultPolicy } from '../../src/services/classification/defaults.js';
 import { resetClassificationAudit } from '../../src/services/classification/audit.js';
 import { appMayWriteKey, isServerWrittenKey } from '../../src/utils/reserved-keys.js';
 import { batchKeyRefusal } from '../../src/routes/memory/batch-guards.js';
-import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory-bin.js';
+import { deleteMemoryRecord, restoreMemoryRecord } from '../../src/services/memory/bin.js';
 import { logger } from '../../src/utils/logger.js';
 
 const N = 'test-node';

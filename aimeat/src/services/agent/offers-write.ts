@@ -16,7 +16,7 @@
  *   no byte quota, no archive guard, and none of the fan-out a write sets off — a Tracked Response
  *   watching the key never evaluated, an event-triggered workflow never started, a federated peer
  *   waited for the next scheduled sync. An offers document is a memory record, and going through
- *   services/memory-write.ts is what makes it behave like one on whichever door it arrived at.
+ *   services/memory/write.ts is what makes it behave like one on whichever door it arrived at.
  *
  *   WHAT IS SHARED AND WHAT IS NOT. Shared here: target resolution, the same-owner refusal, the
  *   OffersDocSchema validation of the whole document, the version bump, the write and the change
@@ -42,7 +42,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { MemoryRecord, Storage } from '../../storage/interface.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
-import { writeMemoryRecord, type MemoryWriteResult } from '../memory-write.js';
+import { writeMemoryRecord, type MemoryWriteResult } from '../memory/write.js';
 import { emitChange } from '../event-bus.js';
 
 export interface OffersWriteDeps {
@@ -68,7 +68,7 @@ export interface OffersWriteCaller {
     authorisingScope?: string;
 }
 
-/** The refusals services/memory-write.ts can return, so callers can switch on one set of codes. */
+/** The refusals services/memory/write.ts can return, so callers can switch on one set of codes. */
 type MemoryWriteRefusal = Extract<MemoryWriteResult, { ok: false }>;
 
 export interface OffersWriteRefusal {

@@ -2,7 +2,7 @@
  * @file test/unit/memory-meta-page.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A cursor page of the metadata listing (services/memory-query.ts listMemoryMetaPage)
+ * @description A cursor page of the metadata listing (services/memory/query.ts listMemoryMetaPage)
  *   gives, page after page, exactly the rows the whole listing gives, in key order: an owner and an
  *   agent holding the same keys across several SQL batches, so a key's two rows meet at a batch's
  *   edge and must still come out once, as the owner's (GHII first), with the agent's copy named in
@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
-import { listMemoryMetaFor, listMemoryMetaPage } from '../../src/services/memory-query.js';
+import { listMemoryMetaFor, listMemoryMetaPage } from '../../src/services/memory/query.js';
 import type { MemoryMetaRow } from '../../src/storage/repositories/memory.repository.js';
 
 const NODE = 'node-mp';

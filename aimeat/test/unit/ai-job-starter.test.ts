@@ -76,7 +76,7 @@ function memoryStorage(): { storage: Storage; rows: Map<string, MemoryRecord> } 
             .filter(r => r.ownerGaii === owner && r.key.startsWith(opts.prefix ?? '')),
         getStorageFileMeta: async (owner: string, key: string) => owner === OWNER && key === 'voice/a.webm'
             ? { key, ownerGaii: owner, mimeType: 'audio/webm', size: 16 } : null,
-        // The scheduled ai job writes its answer through services/memory-write.ts since 2026-10-20,
+        // The scheduled ai job writes its answer through services/memory/write.ts since 2026-10-20,
         // so the stub answers the few lookups that write makes beyond the rows above.
         findApplicableSchema: async () => null,
         countMemory: async () => rows.size,

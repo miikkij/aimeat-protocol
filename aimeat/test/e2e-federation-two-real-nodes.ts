@@ -62,7 +62,7 @@ import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { runHeartbeatCycle } from '../src/services/federation.js';
 import { syncCatalogueToPeer } from '../src/services/catalogue-sync.js';
-import { replicateMemoryToPeer, retractMemoryFromPeer } from '../src/services/memory-replication.js';
+import { replicateMemoryToPeer, retractMemoryFromPeer } from '../src/services/memory/replication.js';
 import { runCleanupCycle } from '../src/services/cache-cleanup.js';
 import { bootNode, setupOperator, addPeer, auth, type NodeState } from './helpers/federation-two-node.js';
 import { suitePort } from './helpers/free-port.js';

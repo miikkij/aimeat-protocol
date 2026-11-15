@@ -8,7 +8,7 @@
  *
  *   One function because the same eight lines had been written out in three places, and a version
  *   bump or a createdAt kept on update is exactly the detail that drifts when it lives in three.
- *   Not for anything a person or an agent writes: that goes through services/memory-write.ts, which
+ *   Not for anything a person or an agent writes: that goes through services/memory/write.ts, which
  *   applies the ceilings, the archive guard and provenance.
  *
  *   upsertPrivateRecord replaces the value. updatePrivateRecord changes the stored value on its

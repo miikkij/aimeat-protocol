@@ -1,22 +1,22 @@
 /**
- * @file src/services/memory-write-types.ts
+ * @file src/services/memory/write-types.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The contract of services/memory-write.ts: what a caller supplies for a memory write
+ * @description The contract of services/memory/write.ts: what a caller supplies for a memory write
  *   (MemoryWriteFanout, MemoryWriteCaller, MemoryWriteInput) and what it gets back (MemoryWriteResult,
  *   MemoryWriteWarning, AfterMemoryWriteReport). Moved out of memory-write.ts unchanged, which
  *   re-exports every name, so the service file stays under the line limit.
  * @structure MemoryWriteFanout · MemoryWriteCaller · MemoryWriteInput · ExchangeReconcileReport ·
  *   MemoryWriteWarning · AfterMemoryWriteReport · MemoryWriteResult
- * @usage import type { MemoryWriteCaller, MemoryWriteResult } from './memory-write.js';
+ * @usage import type { MemoryWriteCaller, MemoryWriteResult } from './write.js';
  * @version-history
  *   2026-11-04 — Moved verbatim from services/memory-write.ts (codebase analysis 2026-11-03, item C3).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { provenanceForWrite } from './ai/provenance.js';
-import type { reconcileAfterSourceWrite } from './exchange-projection.js';
-import type { publishRequestedBody } from './publish-requests/ask.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { provenanceForWrite } from '../ai/provenance.js';
+import type { reconcileAfterSourceWrite } from '../exchange-projection.js';
+import type { publishRequestedBody } from '../publish-requests/ask.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {

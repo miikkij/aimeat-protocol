@@ -17,7 +17,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { notify, isSafeNotifActionEndpoint, type NotifAction } from '../../src/services/notify.js';
-import { writeMemoryRecord } from '../../src/services/memory-write.js';
+import { writeMemoryRecord } from '../../src/services/memory/write.js';
 import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
 
 let storage: Storage;

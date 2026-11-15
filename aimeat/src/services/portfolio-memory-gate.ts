@@ -28,7 +28,7 @@
  *   2026-10-27 — Initial (secaudit2026oct26).
  */
 import { localAccountName, ownerGhiiOf } from '../utils/gaii.js';
-import { memoryWriterAsk, type MemoryPublishWriter } from './memory-publish-gate.js';
+import { memoryWriterAsk, type MemoryPublishWriter } from './memory/publish-gate.js';
 import { PORTFOLIO_CONFIG_KEY, portfolioReadGaiis } from './portfolio-config.js';
 import { pageAccessOf } from './page-access.js';
 import type { PortfolioChange } from './portfolio-publish-gate.js';

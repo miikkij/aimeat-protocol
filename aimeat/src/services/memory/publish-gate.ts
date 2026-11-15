@@ -1,10 +1,10 @@
 /**
- * @file src/services/memory-publish-gate.ts
+ * @file src/services/memory/publish-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The publish gate for a memory write, as one set of functions every memory write path
- *   calls (plan doc-mvcn6c7e4e5q, V4): the single write (services/memory-write.ts), the batch write
- *   (services/memory-batch-write.ts, behind POST /v1/memory/bulk and POST /v1/memory/import) and the
+ *   calls (plan doc-mvcn6c7e4e5q, V4): the single write (services/memory/write.ts), the batch write
+ *   (services/memory/batch-write.ts, behind POST /v1/memory/bulk and POST /v1/memory/import) and the
  *   copy (POST /v1/memory/copy). The decision itself is services/publish-gate.ts; this file maps a
  *   memory writer onto it, keeps a record at the level it had, and files the request after the write.
  *
@@ -23,13 +23,13 @@
  *   v1.0.0 — 2026-10-18 — Initial: extracted from services/memory-write.ts so the batch write and the
  *     copy ask the same gate (plan doc-mvcn6c7e4e5q, V4).
  */
-import type { MemoryRecord } from '../storage/interface.js';
-import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
-import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from './publish-requests/ask.js';
-import { callerFromAuth } from './caller-context.js';
-import { localAccountName, ownerGhiiOf } from '../utils/gaii.js';
-import type { ContentLabelTarget } from '../storage/types/content-labels.js';
-import { audienceCapOf, audienceOfVisibility, type LABEL_CAPS_AUDIENCE } from './classification/audience-cap.js';
+import type { MemoryRecord } from '../../storage/interface.js';
+import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
+import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from '../publish-requests/ask.js';
+import { callerFromAuth } from '../caller-context.js';
+import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
+import type { ContentLabelTarget } from '../../storage/types/content-labels.js';
+import { audienceCapOf, audienceOfVisibility, type LABEL_CAPS_AUDIENCE } from '../classification/audience-cap.js';
 
 /** The token facts a memory write path has about its writer. */
 export interface MemoryPublishWriter {

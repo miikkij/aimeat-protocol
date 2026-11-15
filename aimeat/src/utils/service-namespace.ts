@@ -7,7 +7,7 @@
  *   to it, because an owner name and an agent name are lowercase letters, digits and hyphens
  *   (utils/gaii.ts), so the `svc:` form can never be a caller's own identity, and localAccountName
  *   reads it as no account (`svc:alice`). The memory routes that take a namespace from the caller ask
- *   isServiceNamespace and refuse it (utils/own-door-keys.ts, services/memory-bin.ts).
+ *   isServiceNamespace and refuse it (utils/own-door-keys.ts, services/memory/bin.ts).
  * @structure SERVICE_NAMESPACE_PREFIX · serviceNamespaceOf(ownerGhii) · isServiceNamespace(id) ·
  *   ownerOfServiceNamespace(id)
  * @usage import { isServiceNamespace } from '../utils/service-namespace.js';

@@ -27,7 +27,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { isGEAI, localAccountOf } from '../../utils/gaii.js';
-import { memoryCeilings } from '../memory-ceilings.js';
+import { memoryCeilings } from '../memory/ceilings.js';
 import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 import type { ContributionProof } from '../../models/contribution-proof.js';
 

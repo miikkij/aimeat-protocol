@@ -1,5 +1,5 @@
 /**
- * @file memory-batch-write.ts
+ * @file src/services/memory/batch-write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Commit accepted batch rows with their provenance; restores retain source attribution.
@@ -21,18 +21,18 @@
  *     (services/classify-on-write.ts, TARGET-082 V3).
  *   1.0.0 2026-09-27 Share the existing batch storage and provenance services.
  */
-import type { Storage, AiProvenanceRecordRow, MemoryRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import type { MemoryDbService, BulkWriteItem, BulkWriteOptions } from './db/memory-db-service.js';
-import { provenanceForWrite, storeHeldProvenance } from './ai/provenance.js';
-import { memoryContentBytes, memoryContentHashes } from '../utils/memory-content.js';
-import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { classifyAfterWrite } from './classify-on-write.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import type { PublishRequester } from './publish-requests/store.js';
-import { keptMemoryLevel, fileMemoryPublishRequest, type MemoryPublishFiled } from './memory-publish-gate.js';
-import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
+import type { Storage, AiProvenanceRecordRow, MemoryRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import type { MemoryDbService, BulkWriteItem, BulkWriteOptions } from '../db/memory-db-service.js';
+import { provenanceForWrite, storeHeldProvenance } from '../ai/provenance.js';
+import { memoryContentBytes, memoryContentHashes } from '../../utils/memory-content.js';
+import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { classifyAfterWrite } from '../classify-on-write.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import type { PublishRequester } from '../publish-requests/store.js';
+import { keptMemoryLevel, fileMemoryPublishRequest, type MemoryPublishFiled } from './publish-gate.js';
+import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
 
 /** One request the batch filed: the key it is about, and the body a door answers for it. */
 export type BatchPublishRequest = { key: string } & Extract<MemoryPublishFiled, { ok: true }>['publishRequest'];

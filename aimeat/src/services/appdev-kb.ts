@@ -68,7 +68,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { emitRecordChangePriorUnknown } from './event-bus.js';
-import { writeMemoryRecord } from './memory-write.js';
+import { writeMemoryRecord } from './memory/write.js';
 import type { ContentReader } from './classification/reader.js';
 import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';

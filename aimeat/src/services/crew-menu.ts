@@ -66,7 +66,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { askCrew, resolveCrewAgent, type CrewCaller, type CrewRefusal } from './crew-ops.js';
-import { writeMemoryRecord } from './memory-write.js';
+import { writeMemoryRecord } from './memory/write.js';
 import { logger } from '../utils/logger.js';
 import { loadPolicyDecision } from './ai/policy-gate.js';
 import { isAllowed, parseModelRef } from './ai/policy.js';

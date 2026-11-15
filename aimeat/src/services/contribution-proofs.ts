@@ -22,7 +22,7 @@
  *   answered to none of memory's rules: no archive guard, no value-size ceiling, no key ceiling,
  *   no byte quota and no overage charge. A proofs record grows by one entry per run on a tool
  *   built to be called after every run, and it is public, so it was an unbounded public record
- *   nobody paid for. Going through services/memory-write.ts fixes all of that in one place, and
+ *   nobody paid for. Going through services/memory/write.ts fixes all of that in one place, and
  *   brings the write's fan-out (live update, replication, provenance) with it.
  *
  *   WHAT STAYS AT THE DOOR. How the answer is rendered: the MCP tool prints text, a route would
@@ -49,7 +49,7 @@ import type { Storage } from '../storage/interface.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { namespacedName } from './component-address.js';
-import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
+import { writeMemoryRecord, type MemoryWriteResult } from './memory/write.js';
 import { getTemplateProposal, templateProposalKey } from './app/template-proposals.js';
 import { CAS_ATTEMPTS } from './record-cas.js';
 

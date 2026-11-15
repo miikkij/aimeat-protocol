@@ -8,7 +8,7 @@
  *   WHY THIS FILE EXISTS. The three writers stored the value with a raw storage write under the
  *   workflow owner, whatever the key was. For a key of the owner's own that is the design: the engine
  *   is the owner's automation, and the next step's signal reads it back. For an `organism.*` key it
- *   skipped the organism namespace rule that every other writer asks (services/memory-write.ts,
+ *   skipped the organism namespace rule that every other writer asks (services/memory/write.ts,
  *   ai-jobs/service.ts since wave 2): an owner who is not a member of an organism saved a workflow
  *   whose answer_to_key named a published record of that organism's workspace, answered it, and the
  *   members' workspace read served that value in place of the record (secaudit 2026-10, r66).
@@ -43,7 +43,7 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { WorkflowRun } from '../../models/workflow-schemas.js';
 import { saverAuthority } from './trigger-authority.js';
 
-/** The writer, in the shape services/memory-write.ts MemoryWriteCaller takes. */
+/** The writer, in the shape services/memory/write.ts MemoryWriteCaller takes. */
 export interface StepWriter {
   principal: string;
   targetGaii: string;
@@ -53,7 +53,7 @@ export interface StepWriter {
 }
 
 /**
- * services/memory-write.ts writeMemoryRecord, in the part of its shape this file uses. SET AT BOOT
+ * services/memory/write.ts writeMemoryRecord, in the part of its shape this file uses. SET AT BOOT
  * (setStepMemoryWrite, server-bootstrap/service-init.ts), as the workflow engine is: memory-write.ts
  * imports the engine, so a static import from here would close an import cycle.
  */

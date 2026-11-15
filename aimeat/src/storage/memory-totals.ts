@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a principal's kept memory totals count (storage.getMemoryTotals; codebase
- *   analysis 2026-11-03, item C3), in one place for both providers and for services/memory-ceilings.ts.
+ *   analysis 2026-11-03, item C3), in one place for both providers and for services/memory/ceilings.ts.
  *
  *   The totals are kept by the database itself, by triggers on the memory table: PostgreSQL migration
  *   0125_memory_totals.sql and SQLite schema-memory-totals.ts. A trigger sees every statement that

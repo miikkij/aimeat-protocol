@@ -18,7 +18,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { crewSeed, type CrewCaller } from '../../src/services/crew-ops.js';
-import { writeMemoryRecord } from '../../src/services/memory-write.js';
+import { writeMemoryRecord } from '../../src/services/memory/write.js';
 
 const NODE = 'aimeat-unit-crewsites-001';
 let deps: { storage: Storage; config: AimeatConfig };

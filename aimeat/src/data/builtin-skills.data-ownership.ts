@@ -18,7 +18,7 @@
  *   wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app- asks for the tools.
  *
  *   WHAT IT MUST AGREE WITH. routes/memory/bulk.ts (export, import, bulk, bulk-delete, bundle, copy),
- *   routes/memory/key.ts (delete, restore, the deleted list, TTL on read), services/memory-bin.ts and
+ *   routes/memory/key.ts (delete, restore, the deleted list, TTL on read), services/memory/bin.ts and
  *   memory-bin-sweep.ts (the bin and its window), routes/memory-hands.ts (who wrote it),
  *   routes/owners/export.ts (the account export), routes/owners.ts and services/owner-erasure.ts
  *   (erasure), routes/agents/management.ts (agent export, import, port), services/archive.ts and

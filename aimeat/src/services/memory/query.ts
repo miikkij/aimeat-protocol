@@ -1,5 +1,5 @@
 /**
- * @file src/services/memory-query.ts
+ * @file src/services/memory/query.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two memory reads that GET /v1/memory/search, GET /v1/memory and the node MCP tools
@@ -28,13 +28,13 @@
  *     (performance work, architecture item 4); GET /v1/memory and aimeat_memory_list take `cursor`.
  *   v1.0.0 — 2026-10-16 — Initial, out of routes/memory/crud.ts, mcp/memory-extended.ts and mcp/core.ts (QA audit D2-06).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { ListOpts, MemoryMetaRow } from '../storage/adapter/memory-adapter.js';
-import { LegacyMemoryAdapter } from '../storage/adapter/legacy-memory-adapter.js';
-import { MemoryRepository } from '../storage/repositories-impl/memory-repository.js';
-import { MemoryDbService } from './db/memory-db-service.js';
-import { resolveOwnerIdentities } from './db/owner-identity.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { ListOpts, MemoryMetaRow } from '../../storage/adapter/memory-adapter.js';
+import { LegacyMemoryAdapter } from '../../storage/adapter/legacy-memory-adapter.js';
+import { MemoryRepository } from '../../storage/repositories-impl/memory-repository.js';
+import { MemoryDbService } from '../db/memory-db-service.js';
+import { resolveOwnerIdentities } from '../db/owner-identity.js';
 
 interface Deps { storage: Storage; config: Pick<AimeatConfig, 'nodeId'> }
 

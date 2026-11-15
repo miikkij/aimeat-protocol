@@ -17,7 +17,7 @@
  *   WHAT IT DOES. `restoredLevel()` is the one place a restore decides what level an archived item
  *   is stored at: the organism-membership audience rule (services/organism/visibility.ts), the
  *   closed node (services/closed-node-level.ts), the label's audience cap and the publish gate
- *   (services/memory-publish-gate.ts), in the order every write door asks them. A level the caller
+ *   (services/memory/publish-gate.ts), in the order every write door asks them. A level the caller
  *   may not set is NARROWED to private rather than refused, and the narrowing is named in the
  *   import result: a backup whose one stray record cannot be restored is a backup nobody can use,
  *   and the same reasoning already governs `skipped_undeclared`.
@@ -41,7 +41,7 @@ import type { CallerContext } from '../caller-context.js';
 import { callerFromAuth } from '../caller-context.js';
 import { isStoredVisibility, organismVisibilityRefusal } from '../organism/visibility.js';
 import { closedNodeLevel } from '../closed-node-level.js';
-import { memoryCapRefusal, memoryWriterAsk } from '../memory-publish-gate.js';
+import { memoryCapRefusal, memoryWriterAsk } from '../memory/publish-gate.js';
 import { isRaiseToPublic } from '../publish-gate.js';
 import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 
@@ -90,7 +90,7 @@ export interface RestoreSkip {
 
 /**
  * The caller object the publish gate and the organism create read, built from the facts every
- * import door has. The same construction services/memory-publish-gate.ts makes for a memory write.
+ * import door has. The same construction services/memory/publish-gate.ts makes for a memory write.
  */
 export function importCallerContext(
     ctx: { storage: Storage; config: AimeatConfig }, caller: ImportCaller,

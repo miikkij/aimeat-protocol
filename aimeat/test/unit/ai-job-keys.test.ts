@@ -91,7 +91,7 @@ function watchedStorage(seed: Record<string, unknown> = {}, schedules: Scheduled
     w.storage = {
         getMemory: async (owner: string, key: string) => { w.reads.push(`${owner}::${key}`); return rows.get(`${owner}::${key}`) ?? null; },
         setMemory: async (r: MemoryRecord) => { w.writes.push(`${r.ownerGaii}::${r.key}`); rows.set(`${r.ownerGaii}::${r.key}`, r); return r; },
-        // An AI job writes its answer through services/memory-write.ts on the version it read, as
+        // An AI job writes its answer through services/memory/write.ts on the version it read, as
         // both storage providers support: create-if-absent for a new key, set-if-version otherwise.
         createMemoryIfAbsent: async (r: MemoryRecord) => {
             if (rows.has(`${r.ownerGaii}::${r.key}`)) return null;
@@ -106,7 +106,7 @@ function watchedStorage(seed: Record<string, unknown> = {}, schedules: Scheduled
         listMemory: async (owner: string, opts: { prefix?: string } = {}) => [...rows.values()]
             .filter(r => r.ownerGaii === owner && r.key.startsWith(opts.prefix ?? '')),
         listMemoryForOwners: async () => [],
-        // The scheduled ai job writes its answer through services/memory-write.ts since 2026-10-20,
+        // The scheduled ai job writes its answer through services/memory/write.ts since 2026-10-20,
         // so the stub answers the few lookups that write makes beyond the rows above.
         findApplicableSchema: async () => null,
         countMemory: async () => rows.size,

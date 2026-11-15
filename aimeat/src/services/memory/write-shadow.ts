@@ -1,9 +1,9 @@
 /**
- * @file src/services/memory-write-shadow.ts
+ * @file src/services/memory/write-shadow.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The SHADOWED_BY_OWNER_COPY warning a memory write carries. Moved unchanged out of
- *   services/memory-write.ts (max-file-lines), which re-exports it for its importers.
+ *   services/memory/write.ts (max-file-lines), which re-exports it for its importers.
  * @structure shadowWarning
  * @usage if (shadowedBy) warnings.push(shadowWarning(key, targetGaii, shadowedBy));
  * @version-history

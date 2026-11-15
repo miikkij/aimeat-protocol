@@ -33,7 +33,7 @@
  *   (getMemory, listAllMemoryMeta, listApps, the share and organism reads) skips a deleted row by
  *   design, so a record binned at the moment of a raise keeps the level it went in with. Nothing
  *   reads it there, so its level shows nobody anything; what matters is the level it comes back at,
- *   and services/memory-bin.ts restoreMemoryRecord asks the cap before it clears the tombstone
+ *   and services/memory/bin.ts restoreMemoryRecord asks the cap before it clears the tombstone
  *   (secaudit 2026-10). Lowering binned rows here as well would write the level of content no reader
  *   can reach and would have to be undone by the same check anyway.
  *

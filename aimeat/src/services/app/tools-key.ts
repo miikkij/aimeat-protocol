@@ -17,7 +17,7 @@
  *   Otherwise the id stands as given: a manifest may be written before its app is published, and a
  *   seller may list tools that no app carries (happydude500001/company-brief on aimeat.io).
  *
- *   WHERE IT RUNS. In the shared memory write (services/memory-write.ts), which every door that writes
+ *   WHERE IT RUNS. In the shared memory write (services/memory/write.ts), which every door that writes
  *   a manifest goes through: POST /v1/memory, the node MCP's aimeat_app_tools_publish, and the
  *   connector and CLI surfaces, which post to /v1/memory. And once per node on boot, for the manifests
  *   written before the rule (migrateAppToolsKeysOnce).

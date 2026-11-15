@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../../src/config.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { writeMemoryRecord } from '../../src/services/memory-write.js';
+import { writeMemoryRecord } from '../../src/services/memory/write.js';
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 

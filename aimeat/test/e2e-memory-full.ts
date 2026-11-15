@@ -349,7 +349,7 @@ await test('POST with a stale expected_version returns 409 VERSION_CONFLICT and 
         body: JSON.stringify({ key: 'test.create', value: { fresh: 'post' }, expected_version: current }),
     });
     assert(fresh.status === 200 || fresh.status === 201, `current: ${fresh.status} ${JSON.stringify(fresh.body.error)}`);
-    // services/memory-write.ts names it currentVersion, as the node's MCP tool answers it.
+    // services/memory/write.ts names it currentVersion, as the node's MCP tool answers it.
     assert(stale.body.error?.details?.currentVersion === current, `the refusal names the current version: ${JSON.stringify(stale.body.error?.details)}`);
 });
 

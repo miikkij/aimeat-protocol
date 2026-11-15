@@ -1,5 +1,5 @@
 /**
- * @file services/memory-bin.ts
+ * @file src/services/memory/bin.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Deleting a memory record, and taking it back — the one implementation, so the HTTP
@@ -82,27 +82,27 @@
  *     became append-only could be put back past the space's write path.
  *   v1.0.0 — 2026-09-03 — Initial, with the delete and restore it exists to hold.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { emitRecordChange } from './event-bus.js';
-import { checkDeleteGuard, getNamespacePolicy, parseWorkspaceRecordKey } from './write-guards.js';
-import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
-import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, serverWrittenKeyRefusal, appMayWriteKey } from '../utils/reserved-keys.js';
-import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
-import { settleRequestsForBinnedRecord } from './publish-requests/store.js';
-import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
-import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
-import { legacyPacingWriteRefusal, type LegacyPacingWriteRefusal } from './legacy-pacing-write.js';
-import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
-import { memoryCapRefusal, memoryWriterAsk } from './memory-publish-gate.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import { memoryTarget } from './classification/label-rows.js';
-import { closedNodeLevel } from './closed-node-level.js';
-import type { MemoryRecord } from '../storage/interface.js';
-import { isServiceNamespace } from '../utils/service-namespace.js';
-import { serviceRecordRefusal } from '../utils/own-door-keys.js';
-import { flipWithinCeilings } from './memory-ceilings.js';
-import { teamDeleteGate, type TeamGateRefusal } from './team/action-gate.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { emitRecordChange } from '../event-bus.js';
+import { checkDeleteGuard, getNamespacePolicy, parseWorkspaceRecordKey } from '../write-guards.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
+import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, serverWrittenKeyRefusal, appMayWriteKey } from '../../utils/reserved-keys.js';
+import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
+import { settleRequestsForBinnedRecord } from '../publish-requests/store.js';
+import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
+import { isSecretRecordKey, secretRecordBinRefusal } from '../secret-records.js';
+import { legacyPacingWriteRefusal, type LegacyPacingWriteRefusal } from '../legacy-pacing-write.js';
+import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
+import { memoryCapRefusal, memoryWriterAsk } from './publish-gate.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import { memoryTarget } from '../classification/label-rows.js';
+import { closedNodeLevel } from '../closed-node-level.js';
+import type { MemoryRecord } from '../../storage/interface.js';
+import { isServiceNamespace } from '../../utils/service-namespace.js';
+import { serviceRecordRefusal } from '../../utils/own-door-keys.js';
+import { flipWithinCeilings } from './ceilings.js';
+import { teamDeleteGate, type TeamGateRefusal } from '../team/action-gate.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
@@ -393,7 +393,7 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
  *
  * A RESTORE IS A WRITE, and this is the half that was missing. The bin is invisible to getMemory, so
  * writing the same content at the same key counts as a raise from nothing to the level the record
- * held, and the write path asks three things of such a raise (services/memory-write.ts): the closed
+ * held, and the write path asks three things of such a raise (services/memory/write.ts): the closed
  * node's level, the label's audience cap, and the publish gate. The restore asked none of them, so an
  * agent holding memory:write put a public record its owner had binned back in front of anonymous
  * readers, which the same agent's write of that content would have had held for the owner to approve

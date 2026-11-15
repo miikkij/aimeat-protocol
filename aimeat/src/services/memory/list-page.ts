@@ -1,5 +1,5 @@
 /**
- * @file src/services/memory-list-page.ts
+ * @file src/services/memory/list-page.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The values of one page of a memory listing, read after the listing itself.
@@ -26,9 +26,9 @@
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — Initial (codebase analysis 2026-11-03, item C1).
  */
-import type { MemoryRecord, Storage } from '../storage/interface.js';
-import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
-import { isSecretRecordKey, isWorkspaceShareKey, shownMemoryValue } from './secret-records.js';
+import type { MemoryRecord, Storage } from '../../storage/interface.js';
+import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
+import { isSecretRecordKey, isWorkspaceShareKey, shownMemoryValue } from '../secret-records.js';
 
 /** What a listing row carries besides its columns: the owner-scope shadow list and the classification warning. */
 type ListedMeta = MemoryMetaRow & { alsoUnder?: string[]; classificationWarning?: unknown };

@@ -7,7 +7,7 @@
  *   a crew key lands only in the namespace of the agent it names, and the rule that only the owner in
  *   person changes the browser site list of the live definition.
  *
- *   WHY A MODULE OF ITS OWN. services/memory-write.ts applies the two rules to every memory write,
+ *   WHY A MODULE OF ITS OWN. services/memory/write.ts applies the two rules to every memory write,
  *   and services/crew-def-store.ts publishes through memory-write.ts. While the rules lived in
  *   crew-def-store.ts the two files imported each other, a run-time import cycle. They moved here
  *   unchanged; crew-def-store.ts imports the envelope from here and re-exports the rules, so no

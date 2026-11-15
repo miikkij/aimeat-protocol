@@ -212,7 +212,7 @@ export class AiJobService implements AiJobStarter {
         }
 
         // Where the answer lands, asked as the shared memory write will ask it when the answer is
-        // written (services/memory-write.ts): an `organism.*` key the starter may not write, an
+        // written (services/memory/write.ts): an `organism.*` key the starter may not write, an
         // archived record, a schema lock that cannot take this op's answer, the key ceiling and the
         // byte quota are refused here, before any money is spent, rather than failing the job after
         // the model call (result-precheck.ts).

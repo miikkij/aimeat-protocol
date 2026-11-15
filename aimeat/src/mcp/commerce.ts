@@ -9,7 +9,7 @@
  *   the sellable resolvers read, the agents.{name}.offers document (published through
  *   services/agent/offers-write.ts, the same function the REST route's publish uses), and
  *   src/commerce/session-service.ts — no new business logic, and no write of its own: every record
- *   this file stores goes through services/memory-write.ts. Ownership is always the CALLER's own
+ *   this file stores goes through services/memory/write.ts. Ownership is always the CALLER's own
  *   owner (derived from the session GAII, never from
  *   input). Money = integer 6-decimal micro-units through money.ts. Scope gates (commerce:sell /
  *   commerce:buy) are enforced by the per-session registration filter (catalog/scopes.ts).
@@ -123,7 +123,7 @@ import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/ben
 import { listOpenPayoutHoldsOnNode, markPayoutHoldArrived, possiblePayoutView } from '../commerce/beneficiary-payout-hold.js';
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
-import { writeMemoryRecord } from '../services/memory-write.js';
+import { writeMemoryRecord } from '../services/memory/write.js';
 import { exchangeOutcome, type ReconcileReport } from '../services/exchange-projection.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';

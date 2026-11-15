@@ -83,7 +83,7 @@
  *   agent of the creator is the copy that counts when it is the newest (workspace-meta-read.ts
  *   pickWorkspaceMetaCopy). So that record is a TARGET of fencedSpaceRefusal() as well: a write-mode
  *   operation that names it is compared by value where the code path hands the value over
- *   (services/memory-write.ts) and is read as the removal of every fence where it does not (PUT,
+ *   (services/memory/write.ts) and is read as the removal of every fence where it does not (PUT,
  *   PATCH and DELETE /v1/memory/:key, the bin, the batch delete, the bulk delete, the MCP record
  *   delete). No request reaches the manifest record without passing one of the two.
  * @structure

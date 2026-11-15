@@ -14,7 +14,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
-import { discoverMemory } from '../../src/services/memory-discover.js';
+import { discoverMemory } from '../../src/services/memory/discover.js';
 
 requirePostgresWhenAsked('memory-read-contract');
 

@@ -6,7 +6,7 @@
  *   model as whoever made the schedule, and store the answer in the owner's namespace.
  *
  *   WHY IT IS ITS OWN FILE AND A REGISTERED KIND. The answer is written through the shared memory
- *   write service (services/memory-write.ts), so the organism audience check, the publish gate, the
+ *   write service (services/memory/write.ts), so the organism audience check, the publish gate, the
  *   label audience cap and the organism namespace rule run on every fire. That service reaches the
  *   Scheduler through the workflow engine and the ecosystem automation, so a module the Scheduler
  *   imports cannot import it back without a cycle. The `refinery` kind solved the same problem the
@@ -50,7 +50,7 @@ import { aiJobKeyRefusal } from './ai/job-keys.js';
 import { readAiRecords } from './ai/inputs.js';
 import { unattendedReader } from './ai-jobs/starter.js';
 import { scheduleActor } from './schedule-actor.js';
-import { writeMemoryRecord } from './memory-write.js';
+import { writeMemoryRecord } from './memory/write.js';
 import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
 import { AiInputHiddenError } from './ai/read-viewer.js';
 import { aiScheduleFireViewer } from './schedule-ai-read.js';
@@ -65,7 +65,7 @@ import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
 const MANIFEST_KEY = /^organism\.[^.]+\.w\.[^.]+\.meta\.manifest$/;
 
 /**
- * The refusal the memory write (services/memory-write.ts) gives this answer's writer, key and
+ * The refusal the memory write (services/memory/write.ts) gives this answer's writer, key and
  * visibility whatever the answer is, or null. The same two calls, with the same arguments, as its
  * steps 1b' (an organism audience) and 1c (the organism namespace rule); the write asks both again.
  * The publish gate is not asked here: it refuses only an anonymous or visiting writer

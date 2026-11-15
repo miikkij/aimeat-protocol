@@ -305,7 +305,7 @@ export interface MemoryRepository {
   /** Out of the bin, whole. False when nothing of that key is in it — including after the sweeper
    *  has been past, which is the honest answer to "can I have it back". With `visibility`, the record
    *  comes back at that level in the same UPDATE (version + 1, groupId cleared), so it is never
-   *  readable at the level it went in at (services/memory-bin.ts, a closed node's lowering). */
+   *  readable at the level it went in at (services/memory/bin.ts, a closed node's lowering). */
   restoreMemory(ownerGaii: string, key: string, visibility?: string): Promise<boolean>;
   /** What is in this owner's bin, newest first. The one read allowed to see it: every other memory
    *  read hides deleted rows, by key and in bulk alike. */

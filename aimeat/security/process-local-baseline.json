@@ -1085,11 +1085,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/memory-replication.ts :: map :: enqueueListeners": {
+    "src/services/memory/replication.ts :: map :: enqueueListeners": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/memory-replication.ts :: map :: replicationState": {
+    "src/services/memory/replication.ts :: map :: replicationState": {
       "count": 1,
       "reason": "DEBT"
     },

@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F05a-02).
  */
 import { describe, it, expect } from 'vitest';
-import { pastGraceWindow } from '../../src/services/memory-bin.js';
+import { pastGraceWindow } from '../../src/services/memory/bin.js';
 import { sweepMemoryBin } from '../../src/services/memory-bin-sweep.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';

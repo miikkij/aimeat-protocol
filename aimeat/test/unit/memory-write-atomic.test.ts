@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig } from '../../src/config.js';
-import { writeMemoryRecord } from '../../src/services/memory-write.js';
+import { writeMemoryRecord } from '../../src/services/memory/write.js';
 import { onChangeEvent, offChangeEvent, type ChangeEvent } from '../../src/services/event-bus.js';
 
 type TestStorage = Storage & { close(): void | Promise<void> };

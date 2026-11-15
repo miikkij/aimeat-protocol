@@ -330,7 +330,7 @@
     "src/services/mcp-client/transport.ts": {
       "listFederationPeers": 1
     },
-    "src/services/memory-replication.ts": {
+    "src/services/memory/replication.ts": {
       "listAgents": 1
     },
     "src/services/morsel.ts": {

@@ -61,7 +61,7 @@ import { pdfReadLimits } from '../file-text/pdf-bounded.js';
 import { appendRows, readRow, type RowCaller } from '../workspace-rows/row-service.js';
 import { WorkspaceRowError } from '../workspace-rows/row-space.js';
 import { logger } from '../../utils/logger.js';
-import { writeMemoryRecord } from '../memory-write.js';
+import { writeMemoryRecord } from '../memory/write.js';
 import { CAS_ATTEMPTS } from '../record-cas.js';
 import { systemReader, readerForCaller } from '../classification/reader.js';
 import { ClassificationError } from '../classification/labels.js';

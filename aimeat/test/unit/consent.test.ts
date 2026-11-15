@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { consentMatchPattern } from '../../src/storage/pattern-utils.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkConsentForRead } from '../../src/services/consent.js';
-import { isEligibleForReplication } from '../../src/services/memory-replication.js';
+import { isEligibleForReplication } from '../../src/services/memory/replication.js';
 
 describe('consentMatchPattern', () => {
   it('matches exact keys', () => {

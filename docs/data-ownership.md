@@ -55,7 +55,7 @@ account export. Moving to another node is export there and import here, by hand.
 **Promise.** A record a person deletes by mistake can be brought back, for a window the operator sets
 and the person is told.
 
-**How.** `aimeat/src/services/memory-bin.ts` is the one place every delete of a memory record goes
+**How.** `aimeat/src/services/memory/bin.ts` is the one place every delete of a memory record goes
 through (`DELETE /v1/memory/{key}`, `aimeat_memory_delete`). It marks the record deleted, records who
 deleted it, and answers with `restorable_until`. `POST /v1/memory/{key}/restore` and
 `aimeat_memory_restore` put it back; `GET /v1/memory/deleted` lists what is waiting.

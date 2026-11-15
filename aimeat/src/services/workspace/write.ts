@@ -6,7 +6,7 @@
  *
  *   WHY THIS FILE EXISTS. A workspace draft is a memory record, and it was written two ways. The
  *   browser and the `aimeat connect` bridge write it through POST /v1/memory, which is
- *   services/memory-write.ts. The node's own MCP tools wrote it with a private helper inside
+ *   services/memory/write.ts. The node's own MCP tools wrote it with a private helper inside
  *   src/mcp/workspaces.ts that called storage.setMemory itself. The two copies agreed on the schema
  *   lock and the provenance stamp and on almost nothing after that: the browser's write fired
  *   Tracked Response evaluation, event-triggered workflows, ecosystem push, automation recipes,
@@ -16,13 +16,13 @@
  *   contract watching a draft key never fired when an agent wrote the draft, and an open memory view
  *   did not show the agent's work until a reload.
  *
- *   WHY IT IS NOT services/memory-write.ts. A workspace record obeys a rule a general memory write
+ *   WHY IT IS NOT services/memory/write.ts. A workspace record obeys a rule a general memory write
  *   must not: ONE owner per key. Current state (`.draft`, `.latest`, the meta records) belongs to the
  *   member's GHII whoever wrote it, and a copy of the same key left under a second identity is
  *   collapsed away, because the workspace read path resolves a key across owners and a forked key
  *   makes it pick between two answers. writeMemoryRecord deliberately leaves both copies standing and
  *   reports the second as `shadowedBy`, so routing this path through it would undo the rule.
- *   services/memory-ceilings.ts and services/workspace/write-guards.ts both say so already; this file
+ *   services/memory/ceilings.ts and services/workspace/write-guards.ts both say so already; this file
  *   is where the write those two guard actually lives, so the fan-out can be shared even though the
  *   record shape cannot.
  *
@@ -56,7 +56,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { fresherRec, collapseKeyTo } from '../organism/record-helpers.js';
-import { afterMemoryWrite } from '../memory-write.js';
+import { afterMemoryWrite } from '../memory/write.js';
 import { emitChange } from '../event-bus.js';
 import { isSameOwner } from '../../utils/gaii.js';
 import { classifyAfterWrite } from '../classify-on-write.js';

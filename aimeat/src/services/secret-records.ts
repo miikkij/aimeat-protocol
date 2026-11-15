@@ -112,7 +112,7 @@ export function shownMemoryValue(key: string, value: unknown): unknown {
 }
 
 /**
- * The refusal the generic delete and restore give for these keys (services/memory-bin.ts), with the
+ * The refusal the generic delete and restore give for these keys (services/memory/bin.ts), with the
  * record's own route. Delete names the route that removes the credential; restore names the route
  * that stores it, because an old credential is never put back from the bin: the owner stores the one
  * they mean to use. Every principal is refused here, the owner in person included; the owner acts on

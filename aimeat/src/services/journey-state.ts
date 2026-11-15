@@ -68,7 +68,7 @@ import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { isNodeResidentAgent } from './node-resident-agent.js';
 import { getOwnerUsageSummary } from './usage-summary.js';
 import { loadOwnerAgents, loadOwnerOnboardings } from './db/owner-identity.js';
-import { writeMemoryRecord } from './memory-write.js';
+import { writeMemoryRecord } from './memory/write.js';
 import { logger } from '../utils/logger.js';
 
 /** The one record the person's own words live in. */

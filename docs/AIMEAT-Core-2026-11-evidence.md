@@ -151,18 +151,18 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 |---|---|---|---|
 | DATA-01 | met | `aimeat/src/storage/providers/sqlite/methods/memory.ts:222` (key per `ownerGaii`) | |
 | DATA-02 | met | `aimeat/src/routes/memory/key.ts:453-456` | |
-| DATA-03 | met | `aimeat/src/services/memory-write.ts:520`; `aimeat/src/routes/memory/key.ts:489` | |
-| DATA-04 | met | `aimeat/src/models/schemas.ts:178`; `aimeat/src/routes/memory/key.ts:459-464`; `aimeat/src/services/memory-write.ts:447-456` | |
-| DATA-05 | met | `aimeat/src/services/memory-write.ts:533-541` (`setMemoryIfVersion`) | |
-| DATA-06 | **gap** | The words in one place: `aimeat/src/utils/visibility-words.ts` (`STORED_VISIBILITY_WORDS`, six, for files and the stored column; `MEMORY_WRITE_VISIBILITIES`, five, for record writes) | Files are met: an upload, a chunked upload and `PATCH /v1/storage/{key}/visibility` take all six (`storedVisibilitySchema`). A write at `group` that names no group and finds none on the record is refused (`aimeat/src/services/memory-write.ts`, 2026-11-05). The bulk write refuses `workspace` as the single write does (2026-10-16). Still open: a record write (`POST /v1/memory`, `PATCH`, the bulk write, `aimeat_memory_write`) does not take `workspace` (`memoryWriteVisibilitySchema`). Ruling of 2026-10-12 (Q10): one vocabulary of six on records and files. |
-| DATA-07 | met | `aimeat/src/utils/visibility-words.ts:52-63`; `aimeat/src/services/memory-replication.ts:413-414` | |
+| DATA-03 | met | `aimeat/src/services/memory/write.ts:520`; `aimeat/src/routes/memory/key.ts:489` | |
+| DATA-04 | met | `aimeat/src/models/schemas.ts:178`; `aimeat/src/routes/memory/key.ts:459-464`; `aimeat/src/services/memory/write.ts:447-456` | |
+| DATA-05 | met | `aimeat/src/services/memory/write.ts:533-541` (`setMemoryIfVersion`) | |
+| DATA-06 | **gap** | The words in one place: `aimeat/src/utils/visibility-words.ts` (`STORED_VISIBILITY_WORDS`, six, for files and the stored column; `MEMORY_WRITE_VISIBILITIES`, five, for record writes) | Files are met: an upload, a chunked upload and `PATCH /v1/storage/{key}/visibility` take all six (`storedVisibilitySchema`). A write at `group` that names no group and finds none on the record is refused (`aimeat/src/services/memory/write.ts`, 2026-11-05). The bulk write refuses `workspace` as the single write does (2026-10-16). Still open: a record write (`POST /v1/memory`, `PATCH`, the bulk write, `aimeat_memory_write`) does not take `workspace` (`memoryWriteVisibilitySchema`). Ruling of 2026-10-12 (Q10): one vocabulary of six on records and files. |
+| DATA-07 | met | `aimeat/src/utils/visibility-words.ts:52-63`; `aimeat/src/services/memory/replication.ts:413-414` | |
 | DATA-08 | met | `aimeat/src/routes/organisms/workspace-rows.ts:148` | |
 | DATA-09 | met | `aimeat/src/routes/organisms/workspace-rows.ts:205-227` | |
 | DATA-10 | met | `aimeat/src/services/workspace-rows/row-service.ts:553-574` | Retention runs after an append only; no timer calls the sweep (`row-service.ts:341`). |
 | DATA-11 | met | `aimeat/src/routes/storage-files-chunked.ts:113,216,284,388`; `aimeat/src/services/storage-file-write.ts:413-419` | |
 | DATA-12 | met | `aimeat/src/utils/http-range.ts:362` | |
 | DATA-13 | partial | `aimeat/src/routes/storage-files.ts:477,549,655` | With the consent layer off, a non-public file answers 404 even to a member who could read it. |
-| DATA-14 | met | `aimeat/src/routes/memory/key.ts:479-489`; `aimeat/src/services/memory-write.ts:329` | |
+| DATA-14 | met | `aimeat/src/routes/memory/key.ts:479-489`; `aimeat/src/services/memory/write.ts:329` | |
 | DATA-15 | met | `aimeat/src/routes/schemas.ts:80,137,203` (`SCHEMA_LOCKED_BY_OTHER`) | |
 | DATA-16 | met | `aimeat/src/routes/spec.ts:64-84`; `aimeat/src/services/contract-docs.ts:30`; `openapi.yaml` `/v1/specs/{name}` | `openapi.yaml` lists three names, the code serves five. |
 | DATA-17 | n/a | Where the node reads its own records it checks `spec`: `aimeat/src/services/data-map/data-map-access.ts:116`, `aimeat/src/services/agent/ties.ts:95` | |
@@ -171,10 +171,10 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | DATA-20 | met | `aimeat/src/storage/providers/sqlite/methods/memory.ts:218-228` (`deletedAt IS NULL`) | |
 | DATA-21 | met | `aimeat/src/routes/memory/key.ts:127-140,331-355`; `aimeat/src/config.ts:370` | |
 | DATA-22 | met | `aimeat/src/services/memory-bin-sweep.ts`; started at `aimeat/src/server-bootstrap/service-init.ts:576-580` | |
-| DATA-23 | met | `aimeat/src/services/memory-bin.ts:311-320` | |
+| DATA-23 | met | `aimeat/src/services/memory/bin.ts:311-320` | |
 | DATA-24 | met | `aimeat/src/storage/types/commerce.ts:72-80`; `aimeat/src/routes/memory/crud.ts:382` | |
 | DATA-25 | met | `aimeat/src/services/archive.ts:120,123,142` (`archivedRoot`) | |
-| DATA-26 | met | 413 `QUOTA_EXCEEDED` at `aimeat/src/services/memory-ceilings.ts:102,133,144`, and at memory copy (`aimeat/src/routes/memory/bulk.ts`) since 2026-10-12 | Memory copy answered 429 until 2026-10-12. Not covered by a test that fills a quota. |
+| DATA-26 | met | 413 `QUOTA_EXCEEDED` at `aimeat/src/services/memory/ceilings.ts:102,133,144`, and at memory copy (`aimeat/src/routes/memory/bulk.ts`) since 2026-10-12 | Memory copy answered 429 until 2026-10-12. Not covered by a test that fills a quota. |
 | DATA-27 | partial | Deleted list uses the classification reader (`aimeat/src/routes/memory/key.ts:130-131`) | Not verified that search applies classification to every result. |
 | DATA-28 | met | `aimeat/src/services/event-bus.ts:144-237`; `aimeat/src/routes/sse.ts:172,249,367` | |
 
@@ -189,7 +189,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | COL-05 | met | `aimeat/src/services/organism/export.ts` (header); `aimeat/src/routes/organisms/workspace-transfer.ts:136,170` | |
 | COL-06 | met | `aimeat/src/services/organism/gate.ts` (publish, about 285-300); `aimeat/src/config.ts:332` (20 versions) | |
 | COL-07 | met | `aimeat/src/services/write-guards.ts:189-209` | |
-| COL-08 | met | `aimeat/src/services/write-guards.ts:183-187`; `aimeat/src/routes/organisms/gates.ts:333-337`; `aimeat/src/services/memory-bin.ts:311-320` | |
+| COL-08 | met | `aimeat/src/services/write-guards.ts:183-187`; `aimeat/src/routes/organisms/gates.ts:333-337`; `aimeat/src/services/memory/bin.ts:311-320` | |
 | COL-09 | partial | `aimeat/src/routes/organisms/workspace-access.ts:395-416` (`organism:invite`); `aimeat/src/services/workspace/roles.ts:46,86` | Not verified that an owner who is a plain member is refused. |
 | COL-10 | partial | `aimeat/src/routes/organisms/workspace-read.ts:552-692` | Read-gate inheritance not verified. |
 | COL-11 | met | `aimeat/src/routes/organisms/gates.ts` (schema failure 422) | |
@@ -237,7 +237,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | FED-01 | met | `aimeat/src/services/federation-peer-gate.ts:111-149` (403 `POLICY_DENIED`) | |
 | FED-02 | met | `aimeat/src/services/federation-tiers.ts:164-194`; `aimeat/src/routes/federation-peer/peers.ts:554` | |
 | FED-03 | met | `aimeat/src/routes/federation-sync/catalogue-trust.ts:278` | |
-| FED-04 | met | `aimeat/src/services/federation-peer-gate.ts:169-171`; `aimeat/src/services/memory-replication.ts:212`; `aimeat/src/routes/federation-sync/routing.ts:237,321,538` | |
+| FED-04 | met | `aimeat/src/services/federation-peer-gate.ts:169-171`; `aimeat/src/services/memory/replication.ts:212`; `aimeat/src/routes/federation-sync/routing.ts:237,321,538` | |
 | FED-05 | met | `aimeat/src/routes/federation-peer/link-invites.ts:33-44`; `aimeat/src/routes/federation-peer/introduce.ts:357-414` | |
 | FED-06 | met | Hash `aimeat/src/services/link-invites.ts` (`hashToken`, SHA-256; the key is the hash); expiry (`expiresAt`, refused once past); single use: the used invite is written on the version that was read (`setMemoryIfVersion` in `consumeAtKey`), so of two introductions with one token one is admitted and the other is answered as a used invite | `aimeat/test/unit/atomic-once-limits.test.ts` runs two introductions with one token at once on both providers. Met since 2026-10-18. |
 | FED-07 | met | `aimeat/src/routes/federation-peer/introduce.ts:482-501` | |
@@ -253,9 +253,9 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | FED-17 | met | `aimeat/src/auth/account-security.ts:95-101`; `aimeat/src/auth/jwt.ts:250-254` | |
 | FED-18 | met | Same read decision path (`aimeat/src/services/access-guard.ts:134-238`) | |
 | FED-19 | met | `aimeat/src/services/a2a-foreign.ts:5-35` | |
-| FED-20 | met | `aimeat/src/services/memory-replication.ts:103-126,203,212`; `aimeat/src/services/classification-exits.ts:68-79` | |
-| FED-21 | met | `aimeat/src/utils/visibility-words.ts:52-63`; `aimeat/src/services/memory-replication.ts:413-414` | |
-| FED-22 | met | `aimeat/src/services/memory-replication.ts:230` | The SHOULD is not met: the reference is outside the signed payload (`:166-174`) and the receiver does not check it (`aimeat/src/routes/federation-sync/messaging.ts:215-331`). |
+| FED-20 | met | `aimeat/src/services/memory/replication.ts:103-126,203,212`; `aimeat/src/services/classification-exits.ts:68-79` | |
+| FED-21 | met | `aimeat/src/utils/visibility-words.ts:52-63`; `aimeat/src/services/memory/replication.ts:413-414` | |
+| FED-22 | met | `aimeat/src/services/memory/replication.ts:230` | The SHOULD is not met: the reference is outside the signed payload (`:166-174`) and the receiver does not check it (`aimeat/src/routes/federation-sync/messaging.ts:215-331`). |
 | FED-23 | met | `aimeat/src/services/personal-tunnel.ts:140-141,305-342` | `sendRequest` (`:317`) has no caller: no live forwarding, as Core says. |
 | FED-24 | met | `aimeat/src/auth/ws-upgrade.ts:46` (personal and connect tunnels) | Accepts `?token=` before node 4.0.0 (AUTH-24). |
 | FED-25 | met | `aimeat/src/services/connect-tunnel.ts:4-17,138`; `aimeat/src/services/connect-tunnel-forward.ts:8-15,55-63,70-90` | Opt-in, `aimeat/src/config.ts:479`. |

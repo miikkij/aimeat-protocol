@@ -39,7 +39,7 @@ Regulation (EU) 2016/679 ([EUR-Lex](https://eur-lex.europa.eu/eli/reg/2016/679/o
 | Art. 16 rectification | yes | the person edits their own records and profile | handle requests for data the person cannot edit |
 | Art. 17 erasure | yes | `DELETE /v1/owners/:name`, immediate (`aimeat/src/services/owner-erasure.ts`) | backups; shared records kept under a pseudonym; outside file store sweep |
 | Art. 18 restriction | partial | an operator can disable an account (`aimeat_admin_owner_disable`) | a finer restriction per processing is manual |
-| Art. 19 notification of recipients | partial | a delete or an erasure of a record replicated to federation peers sends a signed retraction to each peer that holds it (`POST /v1/federation/retract`, `aimeat/src/services/memory-replication.ts`). No mechanism was found that tells a peer about a rectification, or that tells the people a record was shared with | notify recipients of rectifications, and of erasures outside federation |
+| Art. 19 notification of recipients | partial | a delete or an erasure of a record replicated to federation peers sends a signed retraction to each peer that holds it (`POST /v1/federation/retract`, `aimeat/src/services/memory/replication.ts`). No mechanism was found that tells a peer about a rectification, or that tells the people a record was shared with | notify recipients of rectifications, and of erasures outside federation |
 | Art. 20 portability | yes | the export is JSON; `aimeat_organism_export` for an organism | |
 | Art. 21 objection | no | no objection mechanism found | handle objections |
 | Art. 22 automated decisions | partial | decision runs are recorded and reviewable (`aimeat_decision_review`, `aimeat/src/services/decide/service.ts`); the AI use questionnaire asks whether a use decides about a person | decide whether any use falls under Art. 22 and provide human review |
@@ -116,7 +116,7 @@ Directive (EU) 2022/2555, Article 21(2) ([EUR-Lex](https://eur-lex.europa.eu/eli
 - AIMEAT is not certified against any standard and the repository holds no external audit or attestation.
 - The node checks compliance documents against its own records only; it cannot check them against the world, and every verdict says it is not legal advice.
 - The risk questionnaire and framework sets are engineering aids; the classification is the organisation's own determination.
-- No mechanism was found for GDPR Art. 21 (objection). For Art. 19, the node takes erased or deleted records back from federation peers, but no notice for a rectification was found (`aimeat/src/services/memory-replication.ts`).
+- No mechanism was found for GDPR Art. 21 (objection). For Art. 19, the node takes erased or deleted records back from federation peers, but no notice for a rectification was found (`aimeat/src/services/memory/replication.ts`).
 - Restriction of processing (Art. 18) is limited to an operator disabling the whole account.
 - Nothing in the node covers AI literacy (AI Act Art. 4) or staff training (NIS2 21(2)(g)).
 - The node makes no backups, so ISO 8.13 and NIS2 21(2)(c) are entirely the organisation's.

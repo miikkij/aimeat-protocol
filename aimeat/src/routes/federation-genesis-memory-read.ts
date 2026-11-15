@@ -18,7 +18,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { error, success } from '../middleware/envelope.js';
 import { checkNodeRequest } from '../services/signed-node-request.js';
-import { federationConsentCovers } from '../services/memory-replication.js';
+import { federationConsentCovers } from '../services/memory/replication.js';
 import { leaveMemoriesToPeer } from '../services/classification-exits.js';
 import { logger } from '../utils/logger.js';
 

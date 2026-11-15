@@ -28,7 +28,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { callerOf } from '../../middleware/caller.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
-import { writeMemoryRecord } from '../../services/memory-write.js';
+import { writeMemoryRecord } from '../../services/memory/write.js';
 import { emitChange, emitRecordChange } from '../../services/event-bus.js';
 import {
   AVATAR_KEY, AVATAR_SVG_HEADERS, avatarView, emojiAsSvg, parseAvatarValue, readAvatar,
@@ -115,7 +115,7 @@ export function registerAvatarRoutes(router: Router, config: AimeatConfig, stora
     const target = await targetFor(req, config, storage);
     if (!target.ok) { res.status(target.status).json(error(config.nodeId, target.code, target.message)); return; }
     // A direct storage delete: the key is fixed and not a server-owned, secret or workspace key, so
-    // none of the memory bin's refusals (services/memory-bin.ts binRefusal) can apply to it, and the
+    // none of the memory bin's refusals (services/memory/bin.ts binRefusal) can apply to it, and the
     // caller was decided above. The record goes to the bin like any other, restorable in its window.
     const existing = await storage.getMemory(target.agent.gaii, AVATAR_KEY);
     const removed = existing ? await storage.deleteMemory(target.agent.gaii, AVATAR_KEY, target.principal) : false;

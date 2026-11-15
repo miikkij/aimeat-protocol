@@ -7,7 +7,7 @@
  *
  *   A schedule stored before the create and edit doors checked output_visibility (2026-10-20) can name
  *   an organism its maker is not a member of, or an organism.* output key the maker may not write. The
- *   fire wrote through services/memory-write.ts, which refused it, but only after completeForOwner had
+ *   fire wrote through services/memory/write.ts, which refused it, but only after completeForOwner had
  *   spent the owner's key on the answer. With the real SQLite store and the provider mocked:
  *   - refused before the call: an organism the maker is not a member of, an organism.* output key of
  *     an organism that does not exist; no completion is asked and the run fails with the reason;

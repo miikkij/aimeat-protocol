@@ -99,7 +99,7 @@ import { putPortRedirect } from '../../services/agent/port-redirect.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { removeAgent } from '../../services/agents/remove-agent.js';
-import { writeMemoryRecord } from '../../services/memory-write.js';
+import { writeMemoryRecord } from '../../services/memory/write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { checkScopeAddition, recordScopeAddition } from '../../services/agent/scope-add.js';

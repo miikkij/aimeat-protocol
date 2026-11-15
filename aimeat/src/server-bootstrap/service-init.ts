@@ -171,7 +171,7 @@ import { MailboxNotificationService } from '../services/mailbox-notification.js'
 import { Scheduler } from '../services/scheduler.js';
 import { WorkflowEngine } from '../services/workflow/engine.js';
 import { setStepMemoryWrite } from '../services/workflow/step-write.js';
-import { writeMemoryRecord } from '../services/memory-write.js';
+import { writeMemoryRecord } from '../services/memory/write.js';
 import { AiJobService } from '../services/ai-jobs/index.js';
 import { createEmailService } from '../services/email.js';
 import { provideNodeService } from '../services/node-context.js';

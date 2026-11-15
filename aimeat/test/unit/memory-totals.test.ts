@@ -28,8 +28,8 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { MEMORY_COUNT_EXCLUDED_PREFIXES } from '../../src/storage/memory-totals.js';
 import { loadConfig } from '../../src/config.js';
-import { writeMemoryRecord } from '../../src/services/memory-write.js';
-import { memoryCeilings } from '../../src/services/memory-ceilings.js';
+import { writeMemoryRecord } from '../../src/services/memory/write.js';
+import { memoryCeilings } from '../../src/services/memory/ceilings.js';
 
 const SQLITE_PATH = `./test/.memory-totals-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

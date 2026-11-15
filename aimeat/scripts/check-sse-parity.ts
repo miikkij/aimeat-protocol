@@ -149,7 +149,7 @@ const DELEGATES: Record<string, string> = {
         + '127.0.0.1 and the real Express stack.',
     'src/mcp/agent-crew.ts': "services/crew-ops.ts → services/crew-def-store.ts, which emits 'agents' "
         + 'after a publish (publishCrewDef, the same call the Crew tab\'s route makes) and writes the '
-        + 'draft and every version copy through services/memory-write.ts, whose afterMemoryWrite fires '
+        + 'draft and every version copy through services/memory/write.ts, whose afterMemoryWrite fires '
         + 'the memory events the profile listens on. The trial runs never touch storage and have '
         + 'nothing to announce. Verified by reading the domain out of publishCrewDef.',
     // Step 8 (2026-08-11) moved each of these writes into the service its REST twin already called,
@@ -174,9 +174,9 @@ const DELEGATES: Record<string, string> = {
         + 'domain out of the service rather than trusting the delegation.',
     'src/mcp/agent-capabilities.ts': "services/agent/profile-write.ts, which emits 'agent-capabilities'",
     'src/mcp/agent-management.ts': "services/agent/profile-write.ts, which emits 'agents'",
-    'src/mcp/appdev-pitfalls.ts': "services/memory-write.ts and services/appdev-kb.ts, both emitting 'memory'",
+    'src/mcp/appdev-pitfalls.ts': "services/memory/write.ts and services/appdev-kb.ts, both emitting 'memory'",
     'src/mcp/appdev-proofs.ts': "services/contribution-proofs.ts, which writes through "
-        + "services/memory-write.ts and emits 'memory' there. No REST twin exists for this one: the "
+        + "services/memory/write.ts and emits 'memory' there. No REST twin exists for this one: the "
         + 'proof is attached from the appdev tool surface only.',
     'src/mcp/apps.ts': "services/app/publish.ts and services/app/lifecycle.ts, both emitting 'apps'",
     'src/mcp/seo.ts': "services/app/seo.ts, whose applyOwnerSeoUpdate() emits 'apps' right after "
@@ -190,8 +190,8 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/compliance.ts': "services/compliance/register.ts, whose one write helper emits "
         + "'compliance' — so the HTTP route, this tool surface and the scheduled monthly job all "
         + 'emit the same domain from the same line, and none of them can be the door that forgets.',
-    'src/mcp/commerce.ts': "services/memory-write.ts ('memory') and services/agent/offers-write.ts ('agents')",
-    'src/mcp/operator-config.ts': "services/memory-write.ts ('memory') and services/agent/profile-write.ts ('agents')",
+    'src/mcp/commerce.ts': "services/memory/write.ts ('memory') and services/agent/offers-write.ts ('agents')",
+    'src/mcp/operator-config.ts': "services/memory/write.ts ('memory') and services/agent/profile-write.ts ('agents')",
     'src/mcp/packages.ts': "services/packages/install/package-install.ts, which emits 'instances' where it creates "
         + 'the instance record — the same line POST /v1/packages/:groupId/install reaches, since '
         + 'that route is a door onto the same function. Verified by reading the emit out of the '
@@ -214,7 +214,7 @@ const DELEGATES: Record<string, string> = {
         + "services/agent/task-fanout.ts (completion and failure), both emitting 'agent-tasks' scoped to the owner",
     'src/mcp/agent-telemetry.ts': "services/telemetry-buffer.ts ('agents') and usage-metering.ts ('agent-usage')",
     'src/mcp/core.ts': "services/work-lifecycle.ts ('work' on accept and deliver), routes/work.ts "
-        + "createWorkItem ('work'), services/memory-write.ts ('memory') and services/board-post.ts ('boards')",
+        + "createWorkItem ('work'), services/memory/write.ts ('memory') and services/board-post.ts ('boards')",
     'src/mcp/core-admin.ts': "services/morsel.ts mintMorsels, which emits 'config' and 'wallet'",
     'src/mcp/core-storage.ts': "services/storage-file-write.ts, which emits 'files' and 'memory'",
     'src/mcp/classification.ts': "services/classification/labels.ts, whose setLabel and reviewLabel "

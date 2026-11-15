@@ -1,5 +1,5 @@
 /**
- * @file src/services/memory-search-shape.ts
+ * @file src/services/memory/search-shape.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a memory search ANSWERS WITH, in one place, for every door that performs one.
@@ -22,7 +22,7 @@
  *   - searchHitShape(record, query) — the meta-only hit: key, snippet, bytes, visibility, tags, updated_at
  *   - typeOfRecord(value) / matchesType(value, wanted) — the semantic `@type` filter, one place
  * @usage
- *   import { isVersionKey, searchHitShape, matchesType } from '../services/memory-search-shape.js';
+ *   import { isVersionKey, searchHitShape, matchesType } from './search-shape.js';
  * @version-history
  *   v1.4.0 — 2026-09-30 — A hit carries classification_warning, as a read does (TARGET-082 review).
  *   v1.3.0 — 2026-09-29 — searchHitShape takes a presented record (presentMemories, TARGET-082),
@@ -34,9 +34,9 @@
  *   v1.0.0 — 2026-09-06 — Extracted from mcp/memory-extended.ts so the REST door can answer the same
  *     way (review item 6.4).
  */
-import type { MemoryRecord } from '../storage/interface.js';
-import { contextOf, expandTerm } from '../utils/onto-context.js';
-import { classificationWarningOf } from './classification/present-memory.js';
+import type { MemoryRecord } from '../../storage/interface.js';
+import { contextOf, expandTerm } from '../../utils/onto-context.js';
+import { classificationWarningOf } from '../classification/present-memory.js';
 
 /** Characters kept either side of the match. Enough to read the sentence, not the record. */
 export const SNIPPET_RADIUS = 120;

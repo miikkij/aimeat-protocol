@@ -202,7 +202,7 @@ import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeViewAdmitting } from '../services/owner-scope-read.js';
 import { organismReadableRecords } from '../services/organism/namespace-access.js';
-import { listMemoryMetaFor, listMemoryMetaPage } from '../services/memory-query.js';
+import { listMemoryMetaFor, listMemoryMetaPage } from '../services/memory/query.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { scopeDeniedText } from './scope-denied-answer.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
@@ -222,7 +222,7 @@ import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
 import { resolveMcpWriteTarget } from '../services/write-target.js';
 import { versionConflict } from './memory-version-lock.js';
-import { writeMemoryRecord } from '../services/memory-write.js';
+import { writeMemoryRecord } from '../services/memory/write.js';
 import { presentMemory, classificationWarningOf } from '../services/classification/present-memory.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { memoryTarget } from '../services/classification/labels.js';
@@ -565,9 +565,9 @@ export function registerCoreTools(
             }
             // No visibility named: the node's starting level (plan V5.1), as POST /v1/memory.
             const visibility = givenVisibility ?? memoryVisibilityDefault(config);
-            // Left out: the record keeps its tags (services/memory-write.ts); `[]` clears them.
+            // Left out: the record keeps its tags (services/memory/write.ts); `[]` clears them.
             const tags = givenTags;
-            // ONE implementation, and it is not this one. services/memory-write.ts owns the scope
+            // ONE implementation, and it is not this one. services/memory/write.ts owns the scope
             // gate, the schema lock, the version check, the shadowing warning, the provenance stamp,
             // the record shape and the change event — because every one of those had to be fixed
             // here separately after it was already right on the REST side.
@@ -665,7 +665,7 @@ export function registerCoreTools(
                 };
             }
             // A cursor page: the rows after it in key order, read in SQL batches through the same
-            // filters as the whole listing below (services/memory-query.ts listMemoryMetaPage).
+            // filters as the whole listing below (services/memory/query.ts listMemoryMetaPage).
             if (typeof cursor === 'string') {
                 const page = await listMemoryMetaPage({ storage, config }, {
                     ownerScopeOf: owner_scope ? localAccountName(agentGaii) : null, gaii: agentGaii,
@@ -687,7 +687,7 @@ export function registerCoreTools(
                 });
             }
             if (owner_scope) {
-                // The owner-scope listing GET /v1/memory?owner_scope=true reads (services/memory-query.ts):
+                // The owner-scope listing GET /v1/memory?owner_scope=true reads (services/memory/query.ts):
                 // the owner's GHII, every agent and every ecosystem app in one query, one row per key.
                 // The organism rule too, as GET /v1/memory?owner_scope=true (secaudit 2026-10, v57).
                 entries = await organismReadableRecords({ storage, config }, caller(), await ownerScopeViewAdmitting(storage,

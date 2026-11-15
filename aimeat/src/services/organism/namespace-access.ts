@@ -9,7 +9,7 @@
  *   that takes a caller rather than an Express request.
  *
  *   WHY IT MOVED HERE. This rule lived entirely inside middleware/workspace-access.ts, which is
- *   RequestHandler-shaped, so only a road with a `req` could reach it. services/memory-write.ts —
+ *   RequestHandler-shaped, so only a road with a `req` could reach it. services/memory/write.ts —
  *   the shared write the MCP tools call — could therefore carry the FLOOR of the rule and nothing
  *   above it, and the August 2026 re-measurement found what that cost:
  *
