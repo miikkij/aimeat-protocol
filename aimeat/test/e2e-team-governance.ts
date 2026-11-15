@@ -254,5 +254,58 @@ await test('t15 a declined ask is told back; refusals: filed by hand, edited, de
     assert(forged.status === 400, `filed by hand: ${forged.status}`);
 });
 
+// ── T12: a team moved with its people ──
+let bundle = '';
+
+await test('t16 the export names the people and the team; a preview says what would come back and makes nothing', async () => {
+    // The member joins the first team, so the bundle has a member as well as the lead.
+    const joined = await json(`/v1/organisms/${teamId}/invitations/accept`, { method: 'POST', headers: auth(member.token), body: '{}' });
+    assert(joined.status < 300, `member accepts ${joined.status} ${JSON.stringify(joined.body.error ?? '')}`);
+    const ex = await json(`/v1/organisms/${teamId}/export?format=base64`, { headers: auth(lead.token) });
+    assert(ex.status === 200 && ex.body.data.zip_base64, `export ${ex.status} ${JSON.stringify(ex.body.error ?? '')}`);
+    bundle = ex.body.data.zip_base64;
+    const before = (await json('/v1/organisms', { headers: auth(lead.token) })).body.data;
+    const pv = await json('/v1/organisms/import', { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ zip_base64: bundle, preview: true }) });
+    assert(pv.status === 200 && pv.body.data.preview === true, `preview ${pv.status} ${JSON.stringify(pv.body.error ?? '')}`);
+    const people = pv.body.data.people;
+    assert(people.some((p: any) => p.identity.startsWith(`${member.name}@`) && p.role === 'member' && p.this_node === true), `member in the bundle: ${JSON.stringify(people)}`);
+    assert(people.some((p: any) => p.identity.startsWith(`${lead.name}@`) && p.lead === true), 'the lead in the bundle');
+    assert(pv.body.data.team?.approval_gate === true && pv.body.data.considerations.length > 0, `team and considerations: ${JSON.stringify(pv.body.data.team)}`);
+    const after = (await json('/v1/organisms', { headers: auth(lead.token) })).body.data;
+    assert(JSON.stringify(after).length === JSON.stringify(before).length || (after.organisms ?? after).length === (before.organisms ?? before).length, 'the preview made nothing');
+});
+
+await test('t17 people "none": the team comes back with its gate and skill, and nobody is invited', async () => {
+    const r = await json('/v1/organisms/import', { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ zip_base64: bundle }) });
+    assert(r.status === 201, `import ${r.status} ${JSON.stringify(r.body.error ?? '')}`);
+    const d = r.body.data;
+    assert(d.team?.restored === true && d.team.skill, `team ${JSON.stringify(d.team)}`);
+    assert(d.people.find((p: any) => p.identity.startsWith(`${member.name}@`))?.result === 'not_invited', `member: ${JSON.stringify(d.people)}`);
+    const st = await json(`/v1/teams/status?organism_id=${d.organism_id}`, { headers: auth(lead.token) });
+    assert(st.status === 200 && st.body.data.teams[0].approval_gate === true && st.body.data.teams[0].members.length === 1, `restored team: ${JSON.stringify(st.body.data?.teams?.[0]?.members)}`);
+    const inv = await json('/v1/organisms/invitations/mine', { headers: auth(member.token) });
+    assert(!JSON.stringify(inv.body).includes(d.organism_id), 'no invitation for the member');
+});
+
+await test('t18 people "invite": the member is invited with their role and joins with one accept', async () => {
+    const r = await json('/v1/organisms/import', { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ zip_base64: bundle, people: 'invite' }) });
+    assert(r.status === 201, `import ${r.status}`);
+    const d = r.body.data;
+    assert(d.people.find((p: any) => p.identity.startsWith(`${member.name}@`))?.result === 'invited', `invited: ${JSON.stringify(d.people)}`);
+    assert(d.people.find((p: any) => p.identity.startsWith(`${lead.name}@`))?.result === 'you', 'the importer is you');
+    const acc = await json(`/v1/organisms/${d.organism_id}/invitations/accept`, { method: 'POST', headers: auth(member.token), body: '{}' });
+    assert(acc.status < 300, `accept ${acc.status} ${JSON.stringify(acc.body.error ?? '')}`);
+    const st = await json(`/v1/teams/status?organism_id=${d.organism_id}`, { headers: auth(member.token) });
+    assert(st.status === 200 && st.body.data.teams[0].members.some((m: any) => m.account === member.name), 'the member is in the moved team');
+});
+
+await test('t19 refusals: an outsider\'s export, an agent without organism:write imports', async () => {
+    const out = await json(`/v1/organisms/${teamId}/export?format=base64`, { headers: auth(operator.token) });
+    assert(out.status === 403 || out.status === 404, `outsider export ${out.status}`);
+    const reader = await makeAgent(BASE, lead, ['organism:read']);
+    const imp = await json('/v1/organisms/import', { method: 'POST', headers: auth(reader.token), body: JSON.stringify({ zip_base64: bundle, preview: true }) });
+    assert(imp.status === 403, `without organism:write ${imp.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

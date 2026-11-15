@@ -52929,8 +52929,20 @@ paths:
         cap and the publish gate: by a caller the node asks the owner about, it is created private
         and the answer carries `publish_request`. An unrecognised visibility or join policy in the
         bundle falls back to private and invite_only.
+
+        A bundle names its people (identity, role, lead) and, for a team, the team's setup. They come
+        back as the importer chooses: `people` "none" (the default) invites nobody, "invite" invites a
+        person of this node by name with their role (a lead becomes a lead on accepting) and lists a
+        person of another node `by_address`; `team` true (the default) writes the team record and
+        publishes the team skill again. `preview` true reads organism.json and answers who and what
+        would come back, with `considerations`, and makes nothing. The choices are query parameters
+        beside a raw ZIP, or fields beside `zip_base64`.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: preview, in: query, required: false, schema: { type: boolean } }
+        - { name: people, in: query, required: false, schema: { type: string, enum: [none, invite] } }
+        - { name: team, in: query, required: false, schema: { type: boolean } }
       requestBody:
         required: true
         content:
@@ -52942,11 +52954,17 @@ paths:
               required: [zip_base64]
               properties:
                 zip_base64: { type: string, description: The organism export ZIP, base64-encoded }
+                preview: { type: boolean, default: false }
+                people: { type: string, enum: [none, invite], default: none }
+                team: { type: boolean, default: true }
       responses:
+        '200': { description: 'preview: the people, the team and the considerations; nothing was made' }
         '201':
           description: >-
-            Imported — returns the new organism id, the restored workspaces, and publish_request
-            when making the organism public waits for the owner.
+            Imported — returns the new organism id, the restored workspaces, publish_request when
+            making the organism public waits for the owner, `team`, `people` (each person and what
+            became of them: invited, already, by_address, not_invited, you, refused) and
+            `considerations`.
         '400': { $ref: '#/components/responses/BadRequest' }
 
   /v1/presence/me:

@@ -195,7 +195,8 @@ async function personPlan(storage: Storage, org: OrganismRecord | null, p: Perso
     return { ...base, result: 'invite' };
 }
 
-function grantsOf(team: TeamRecord) {
+/** A team member's workspace grants: contributor in the three team workspaces. */
+export function grantsOf(team: Pick<TeamRecord, 'workspaces'>) {
     return [team.workspaces.shared, team.workspaces.decisions, team.workspaces.waiting].map(ws => ({ ws, role: 'contributor' as const }));
 }
 
@@ -237,6 +238,28 @@ function slug(s: string): string {
     return (base || 'team').slice(0, 40).replace(/-+$/, '');
 }
 
+/**
+ * Publish the team skill every member's AI reads, readable by the organism's members. The setup and
+ * the organism import (services/team/transfer.ts) both publish it here.
+ */
+export async function publishTeamSkill(
+    deps: Deps, caller: { owner: string; principal: string },
+    t: { orgId: string; teamName: string; lang: TeamLang; ws: TeamRecord['workspaces']; teamType: string },
+): Promise<{ ok: true; skill: NonNullable<TeamRecord['skill']> } | { ok: false; message: string }> {
+    const skillName = `team-${slug(t.teamName)}-${t.orgId.replace(/[^a-z0-9]/gi, '').slice(0, 6).toLowerCase()}`;
+    const type = teamTypeOf(t.teamType);
+    try {
+        await publishSkill(deps.storage, deps.config, {
+            scope: 'user', owner: caller.owner, publisher: caller.principal, visibility: `organism:${t.orgId}`,
+            files: new Map([['SKILL.md', teamSkillMarkdown({ lang: t.lang, skillName, teamName: t.teamName, orgId: t.orgId, ws: t.ws, typeLine: type.skillLine[t.lang] })]]),
+        });
+        return { ok: true, skill: { name: skillName, ref: `user:${caller.owner}/${skillName}` } };
+    } catch (err) {
+        logger.warn('team: the team skill was not published', { orgId: t.orgId, error: String(err) });
+        return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
+}
+
 /** Make the organism, its workspaces, the context, the skill and the team record. */
 async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOutcome): Promise<{ orgId: string; team: TeamRecord; version: number; ownerGaii: string } | null> {
     const { storage, config } = deps;
@@ -265,19 +288,10 @@ async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOut
         visibility: 'private', tags: ['team-context'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
     out.context_key = contextKey;
-    let skill: TeamRecord['skill'] = null;
-    const skillName = `team-${slug(teamName)}-${orgId.replace(/[^a-z0-9]/gi, '').slice(0, 6).toLowerCase()}`;
-    try {
-        await publishSkill(storage, config, {
-            scope: 'user', owner: caller.owner, publisher: caller.principal, visibility: `organism:${orgId}`,
-            files: new Map([['SKILL.md', teamSkillMarkdown({ lang: t.language, skillName, teamName, orgId, ws, typeLine: type.skillLine[t.language] })]]),
-        });
-        skill = { name: skillName, ref: `user:${caller.owner}/${skillName}` };
-        out.skill = skill.ref;
-    } catch (err) {
-        logger.warn('team: the team skill was not published', { orgId, error: String(err) });
-        out.problems.push(`the team skill was not published: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    const published = await publishTeamSkill(deps, caller, { orgId, teamName, lang: t.language, ws, teamType: type.id });
+    const skill: TeamRecord['skill'] = published.ok ? published.skill : null;
+    if (published.ok) out.skill = published.skill.ref;
+    else out.problems.push(`the team skill was not published: ${published.message}`);
     const workspaceNames = {
         [ws.shared]: TEAM_KIT.workspaces[TEAM_WS.shared].name,
         [ws.decisions]: TEAM_KIT.workspaces[TEAM_WS.decisions].name,

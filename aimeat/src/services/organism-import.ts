@@ -4,11 +4,16 @@
  * SPDX-License-Identifier: MIT
  * @description Import an organism bundle ZIP: create a NEW organism (settings from organism.json; the
  *   importer becomes creator/admin/member, with a fresh discussion board) and restore every workspace
- *   under it via restoreWorkspace(). Membership/board from the source are NOT restored — only the
- *   organism's settings + its workspace content.
- * @structure importOrganism(storage, config, { importerGaii, importerOwner, caller, zip }) ·
- *   restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, caller, files })
+ *   under it via restoreWorkspace(). The board is not restored. The people of the bundle come back
+ *   as invitations, and a team's setup as its team record and skill, only as the importer chooses
+ *   (services/team/transfer.ts).
+ * @structure importOrganism(storage, config, { importerGaii, importerOwner, caller, zip, options }) ·
+ *   restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, caller, files, options }) ·
+ *   previewOrganismImport(config, zip, options)
  * @version-history
+ *   v1.5.0 -- 2026-11-15 -- The bundle's people and a team's setup come back as the importer chooses
+ *     (`options`: people "none" or "invite", team true or false; services/team/transfer.ts, team setup
+ *     T12), and previewOrganismImport() says what a bundle would bring back without making anything.
  *   v1.4.0 -- 2026-10-20 -- The organism is created through createOrganismRecord, so an imported
  *     bundle meets the label's audience cap and the publish gate that POST /v1/organisms meets: a
  *     bundle naming a public organism, restored by a caller the node asks the owner about, is created
@@ -32,11 +37,15 @@ import { logger } from '../utils/logger.js';
 import { createOrganismRecord } from './organism-lifecycle.js';
 import { importCallerContext, type ImportCaller } from './workspace/import-gates.js';
 import type { PublishRequestedBody } from './publish-requests/door.js';
+import { restoreTeamAndPeople, parseTransferOptions, previewTransfer, type TransferOptions, type TransferPerson } from './team/transfer.js';
 
 interface OrgJson {
   aimeatOrganismExport: string;
   organism: { name?: string; description?: string; type?: string; joinPolicy?: string; visibility?: string; interests?: unknown[] };
   workspaces?: Array<{ ws: string; name?: string; folder?: string }>;
+  /** Who was in it and a team's setup (services/team/transfer.ts); absent in a bundle made before 2026-11-15. */
+  people?: unknown;
+  team?: unknown;
 }
 
 export interface OrganismImportResult {
@@ -45,6 +54,12 @@ export interface OrganismImportResult {
   workspaces: Array<{ from: string; ws: string }>;
   /** The bundle named a public organism and making it public waits for the owner (publish gate). */
   publish_request?: PublishRequestedBody;
+  /** The team's setup when the bundle had one and the importer kept `team` (T12). */
+  team?: Awaited<ReturnType<typeof restoreTeamAndPeople>>['team'];
+  /** Each person of the bundle and what became of them. */
+  people?: TransferPerson[];
+  /** What to keep in mind, in sentences to hand the person. */
+  considerations?: string[];
 }
 
 /** Allowed entry layout for an organism bundle ZIP — anything else is rejected as a bad format. */
@@ -56,11 +71,11 @@ const ORGANISM_ALLOW = (n: string) =>
 export async function importOrganism(
   storage: Storage,
   config: AimeatConfig,
-  opts: { importerGaii: string; importerOwner: string; caller: ImportCaller; zip: Buffer },
+  opts: { importerGaii: string; importerOwner: string; caller: ImportCaller; zip: Buffer; options?: TransferOptions },
 ): Promise<OrganismImportResult> {
-  const { importerGaii, importerOwner, caller, zip } = opts;
+  const { importerGaii, importerOwner, caller, zip, options } = opts;
   const files = await unzipBuffer(zip, ORGANISM_ALLOW);
-  return restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, caller, files });
+  return restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, caller, files, options });
 }
 
 /**
@@ -76,7 +91,7 @@ export async function importOrganism(
 export async function restoreOrganismFromFiles(
   storage: Storage,
   config: AimeatConfig,
-  opts: { importerGaii: string; importerOwner: string; caller: ImportCaller; files: Map<string, Buffer> },
+  opts: { importerGaii: string; importerOwner: string; caller: ImportCaller; files: Map<string, Buffer>; options?: TransferOptions },
 ): Promise<OrganismImportResult> {
   const { importerGaii, importerOwner, caller, files } = opts;
   const ojBuf = files.get('organism.json');
@@ -123,8 +138,29 @@ export async function restoreOrganismFromFiles(
     } catch (err) { logger.warn('name: skip a workspace that fails to restore', { error: String(err) }); }
   }
 
+  // The team's setup and its people, as the importer chose (services/team/transfer.ts, T12).
+  const transfer = await restoreTeamAndPeople({ storage, config }, { owner: importerOwner, principal: importerGaii }, {
+    orgId: id, bundle: oj, restored, options: opts.options ?? parseTransferOptions({}),
+  });
+
   return {
     organism_id: id, name, workspaces: restored,
     ...(created.publishRequest ? { publish_request: created.publishRequest } : {}),
+    team: transfer.team, people: transfer.people, considerations: transfer.considerations,
+  };
+}
+
+/** What a bundle would bring back, from its organism.json alone; nothing is made. */
+export async function previewOrganismImport(config: AimeatConfig, zip: Buffer, options: TransferOptions) {
+  const files = await unzipBuffer(zip, ORGANISM_ALLOW);
+  const ojBuf = files.get('organism.json');
+  if (!ojBuf) throw new Error('organism.json missing from the ZIP');
+  let oj: OrgJson;
+  try { oj = JSON.parse(ojBuf.toString('utf8')); } catch { throw new Error('organism.json is not valid JSON'); }
+  if (!oj || oj.aimeatOrganismExport !== ORG_EXPORT_VERSION || !oj.organism) throw new Error('Unrecognised organism export (wrong format/version)');
+  return {
+    preview: true, name: (oj.organism.name && String(oj.organism.name).trim()) || 'Imported organism',
+    workspaces: (oj.workspaces ?? []).map(w => ({ from: w.ws, name: w.name ?? '' })),
+    ...previewTransfer(oj, options, config.nodeId),
   };
 }

@@ -5,10 +5,12 @@
  * @description Export a whole organism as one ZIP — its settings + every workspace the exporter can
  *   read, each under workspaces/{ws}/ (workspace.json + images/), plus a top-level organism.json.
  *   Reuses collectWorkspace() so a workspace is captured identically whether exported alone or in a
- *   bundle. Membership (members/board) is NOT exported — only the organism's settings; on import the
- *   importer becomes the new organism's creator.
+ *   bundle. organism.json names the people (identity, role, lead) and a team's setup
+ *   (services/team/transfer.ts); the board is not exported. On import the importer becomes the new
+ *   organism's creator and chooses whether the people are invited.
  * @structure ORG_EXPORT_VERSION; exportOrganism(storage, config, { orgId, exporterGaii, callerSub, exportedAt })
  * @version-history
+ *   2026-11-15 -- organism.json carries `people` and, for a team, `team` (team setup T12).
  *   2026-10-20 -- `callerSub`, the caller's resolved principal, goes to every workspace's collection.
  *     The bundle reads as the member's owner GHII, so without it an ecosystem app's workspace read
  *     gate never ran and a GEAI exported workspaces outside its owner-granted read data-areas
@@ -37,6 +39,7 @@ import { collectWorkspace, type ExportTruncation } from './workspace/export.js';
 import { listOrganismWorkspaceEntries } from './workspace/meta.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { teamTransferOf } from './team/transfer.js';
 import type { ContentReader } from './classification/reader.js';
 import type { LeftOut } from './classification-exits.js';
 
@@ -78,6 +81,10 @@ export async function exportOrganism(
       joinPolicy: org.joinPolicy, visibility: org.visibility, interests: org.interests,
     },
     workspaces: [] as Array<{ ws: string; name: string; folder: string }>,
+    // Who was in it, in which role, and a team's setup (services/team/transfer.ts, team setup T12).
+    // The import invites people only when the importer chooses so; the roster is the members'
+    // own view of the organism, which every active member reads.
+    ...(membership?.status === 'active' ? await teamTransferOf(storage, config, org) : {}),
   };
 
   const archive = new ZipArchive({ zlib: { level: 6 } });

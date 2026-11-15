@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — aimeat_organism_import forwards preview, people and team (team setup T12).
  *   2026-11-13 — aimeat_workspace_read forwards archived=only to .../workspace/index (unit 3b).
  *   2026-11-13 — aimeat_organism_list forwards visibility on both of its reads (unit 3b).
  *   2026-11-13 — aimeat_organism_update forwards location, max_members and member_visibility (unit 3b).
@@ -190,7 +191,13 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_import',
-        handler: ({ client }, input) => client.post('/v1/organisms/import', { zip_base64: requiredString(input, 'zip_base64') }),
+        handler: ({ client }, input) => {
+            const body: JsonObject = { zip_base64: requiredString(input, 'zip_base64') };
+            const preview = optionalBoolean(input, 'preview'); if (preview !== undefined) body.preview = preview;
+            const people = optionalString(input, 'people'); if (people) body.people = people;
+            const team = optionalBoolean(input, 'team'); if (team !== undefined) body.team = team;
+            return client.post('/v1/organisms/import', body);
+        },
     },
     {
         name: 'aimeat_organism_invite',

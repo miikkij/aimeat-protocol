@@ -11,6 +11,8 @@
  *   import { registerOrganismWorkspaceTransferRoutes } from './organisms/workspace-transfer.js';
  *   registerOrganismWorkspaceTransferRoutes(router, config, storage, H);
  * @version-history
+ *   2026-11-15 -- POST /v1/organisms/import takes `people` (none | invite), `team` and `preview`
+ *     (services/team/transfer.ts, team setup T12).
  *   2026-11-13 -- GET /v1/organisms/:id/export asks services/organism-read/member.ts
  *     organismForActiveMember, the read and the rule aimeat_organism_export asks; the answers are
  *     unchanged (structure programme 2026-11, unit 2b).
@@ -38,7 +40,8 @@ import { exportWorkspace } from '../../services/workspace/export.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { importWorkspace } from '../../services/workspace/import.js';
 import { exportOrganism } from '../../services/organism-export.js';
-import { importOrganism } from '../../services/organism-import.js';
+import { importOrganism, previewOrganismImport } from '../../services/organism-import.js';
+import { parseTransferOptions } from '../../services/team/transfer.js';
 import { ZipSecurityError } from '../../services/safe-zip.js';
 import { recordSecurityIncident } from '../../services/security-incident.js';
 import type { ImportCaller } from '../../services/workspace/import-gates.js';
@@ -173,8 +176,18 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
     const b64 = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) ? (req.body as { zip_base64?: string }).zip_base64 : undefined;
     const buf = Buffer.isBuffer(req.body) ? req.body : (typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null);
     if (!buf || buf.length === 0) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send the organism ZIP as the raw body (Content-Type: application/zip) or JSON { zip_base64 }')); return; }
+    // The importer's choices (services/team/transfer.ts, team setup T12): from the query with a raw
+    // ZIP, or beside zip_base64 in a JSON body. `preview` reads organism.json and makes nothing.
+    const jsonBody = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) ? req.body as Record<string, unknown> : {};
+    const pick = (k: string) => jsonBody[k] ?? req.query[k];
+    const options = parseTransferOptions({ people: pick('people'), team: pick('team') });
+    const preview = pick('preview') === true || pick('preview') === 'true';
     try {
-      const result = await importOrganism(storage, config, { importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, caller: importCaller(req.auth!), zip: buf });
+      if (preview) {
+        res.json(success(config.nodeId, await previewOrganismImport(config, buf, options)));
+        return;
+      }
+      const result = await importOrganism(storage, config, { importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, caller: importCaller(req.auth!), zip: buf, options });
       emitChange('organisms');
       res.status(201).json(success(config.nodeId, result));
     } catch (e) {

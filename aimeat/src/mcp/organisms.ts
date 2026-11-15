@@ -11,6 +11,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-15 — aimeat_organism_import takes preview, people and team (services/team/transfer.ts, T12).
  *   2026-11-14 — aimeat_organism_members gives each member's agent `mcp_last_seen`, as the members
  *     route does, so an AI can say whose own AI is connected.
  *   2026-11-14 — Registers the team tools (mcp/teams.ts): aimeat_team_setup and aimeat_team_status.
@@ -120,7 +121,8 @@ import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { exportOrganism } from '../services/organism-export.js';
-import { importOrganism } from '../services/organism-import.js';
+import { importOrganism, previewOrganismImport } from '../services/organism-import.js';
+import { parseTransferOptions } from '../services/team/transfer.js';
 import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism-search.js';
@@ -696,11 +698,16 @@ export function registerOrganismsTools(
     mcp.registerTool('aimeat_organism_import', { description: descriptionFor('aimeat_organism_import'),
         inputSchema: zodShapeFor('aimeat_organism_import'),
         annotations: annotationsFor('aimeat_organism_import') },
-        async ({ zip_base64 }) => {
+        async ({ zip_base64, preview, people, team }) => {
             const ownerName = ownerOf();
             const buf = Buffer.from(zip_base64, 'base64');
             if (!buf.length) return { content: [{ type: 'text' as const, text: 'zip_base64 is empty or invalid.' }], isError: true };
+            // The importer's choices, read as POST /v1/organisms/import reads them (services/team/transfer.ts, T12).
+            const options = parseTransferOptions({ people, team });
             try {
+                if (preview === true) {
+                    return { content: [{ type: 'text' as const, text: JSON.stringify(await previewOrganismImport(config, buf, options), null, 2) }] };
+                }
                 const session = caller();
                 const result = await importOrganism(storage, config, {
                     importerGaii: `${ownerName}@${config.nodeId}`, importerOwner: ownerName,
@@ -710,7 +717,7 @@ export function registerOrganismsTools(
                         principal: session.principal, targetGaii: `${ownerName}@${config.nodeId}`,
                         owner: session.owner, roles: [...session.roles], scopes: [...session.scopes],
                     },
-                    zip: buf,
+                    zip: buf, options,
                 });
                 emitResourceListChanged(agentGaii);
                 return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };

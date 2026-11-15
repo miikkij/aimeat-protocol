@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-15 — aimeat_organism_import takes preview, people and team (team setup T12).
  *   2026-11-14 — aimeat_workspace_create asks for the manifest's "i18n" labels in en, fi and es.
  *   2026-11-13 — aimeat_workspace_read takes archived ('only') (unit 3b).
  *   2026-11-13 — aimeat_organism_list takes visibility (unit 3b).
@@ -787,7 +788,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_organism_import',
-        description: 'Import an organism bundle (base64 ZIP from aimeat_organism_export) as a NEW organism — you become its creator, and every workspace inside is restored (ids remapped, schemas re-locked, images re-created). Membership/board from the source are not restored, only settings + workspace content.',
+        description: 'Import an organism bundle (base64 ZIP from aimeat_organism_export) as a NEW organism — you become its creator, and every workspace inside is restored (ids remapped, schemas re-locked, images re-created). The board is not restored. A bundle names its people and, for a team, the team\'s setup: call first with preview true, tell the person who was in it and the `considerations`, and ask whether to invite the people and whether to restore the team; then import with `people` and `team` as they chose. People come back only as invitations: a person of this node by name with their role, a person of another node listed `by_address` for you to invite by email.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Import Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -795,6 +796,9 @@ export const organismsWorkspacesAppsTools = [
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             zip_base64: { type: 'string', required: true, description: 'The organism export ZIP, base64-encoded (from aimeat_organism_export).' },
+            preview: { type: 'boolean', description: 'True reads the bundle and says what it would bring back (people, team, considerations); nothing is made.' },
+            people: { type: 'string', enum: ['none', 'invite'], description: '"none" (the default) invites nobody; "invite" sends invitations with each person\'s role.' },
+            team: { type: 'boolean', description: 'True (the default) restores a team\'s setup: the team record, the team skill and the approval gate.' },
         },
     },
     {
