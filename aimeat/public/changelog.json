@@ -4,6 +4,49 @@
     {
       "date": "2026-11-15",
       "kind": "feature",
+      "id": "2026-11-15-a-notice-opens-what-it-is-about",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "A notice opens what it is about",
+        "fi": "Ilmoitus avaa sen, mistä se kertoo"
+      },
+      "body": {
+        "en": "A press on a notice in the bell opens the thing it is about: the organism you joined, the workspace you were added to, the agent whose mode changed. You can select and copy a notice's text, and the Notifications page shows it in full.",
+        "fi": "Kun painat kellon ilmoitusta, se avaa asian, josta ilmoitus kertoo: organismin, johon liityit, työtilan, johon sinut lisättiin, tai agentin, jonka tila muuttui. Voit valita ja kopioida ilmoituksen tekstin, ja Ilmoitukset-sivu näyttää sen kokonaan."
+      },
+      "summary": {
+        "en": "A press on a notice opens its place, and you can copy its text.",
+        "fi": "Ilmoitus avaa sen, mistä se kertoo, ja sen tekstin voi kopioida."
+      }
+    },
+    {
+      "date": "2026-11-15",
+      "kind": "feature",
+      "id": "2026-11-15-a-clear-page-for-a-wrong-address",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "A clear page for a wrong address",
+        "fi": "Selkeä sivu väärälle osoitteelle"
+      },
+      "body": {
+        "en": "An address where no page or app answers now shows a page in your language. It says what may have gone wrong and has a link to the front page. An AI or a program that calls the same address still gets the answer it reads.",
+        "fi": "Osoite, jossa ei ole sivua eikä sovellusta, näyttää nyt sivun omalla kielelläsi. Sivu kertoo, mikä voi olla vialla, ja siinä on linkki etusivulle. Tekoäly tai ohjelma, joka kutsuu samaa osoitetta, saa yhä vastauksen, jonka se osaa lukea."
+      },
+      "summary": {
+        "en": "A wrong address shows a page in your language with a link to the front page.",
+        "fi": "Väärä osoite näyttää sivun omalla kielelläsi ja linkin etusivulle."
+      }
+    },
+    {
+      "date": "2026-11-15",
+      "kind": "feature",
       "id": "2026-11-15-teams-that-run-themselves",
       "highlight": false,
       "audience": [
