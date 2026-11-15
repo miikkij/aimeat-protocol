@@ -21,6 +21,7 @@
  *     second port and database while the current suite runs. RUNNER_NODE_FREE suites get no runner
  *     node. `--results-out=<file>` writes every result as JSON for the job that merges the shards, and
  *     AIMEAT_E2E_NO_ANNOTATIONS leaves the GitHub annotations to that job. e2e-llm-proxy is deleted.
+ *     run-e2e-plan.ts is on NOT_SUITES, so the summary no longer reports it as a file that ran nowhere.
  *   2026-11-14 -- e2e-mcp-admin-usage-reports.ts joins the list (not the guard tier): aimeat_admin_usage reads the node usage reports GET /v1/admin/usage/summary reads.
  *   2026-11-14 -- e2e-help.ts joins the list (not the guard tier): Ask someone who knows.
  *   2026-11-14 -- e2e-secret-shares.ts joins the list (not the guard tier): secret shares and secret requests (wish-holvi-salaisuuksien-talletus-jako-ja-nouto-ihmisille-ja-agen).
@@ -2264,7 +2265,8 @@ const NOT_SUITES = new Map<string, string>([
     ['run-e2e-ci.ts', 'this runner'],
     ['run-e2e-server.ts', "the runner's server lifecycle, environment pins and database cleanup: imported, never spawned"],
     ['run-e2e-lane.ts', "the runner's lane loop (restart, run one suite under its time limit, read its result): imported, never spawned"],
-    ['run-e2e-production-lane.ts', 'the production-settings lane: the settings and the per-suite exceptions, imported by run-e2e-server.ts'],
+    ['run-e2e-plan.ts', "the runner's lane plan (which suites need a node, measured weights, port groups, shards): imported, never spawned"],
+    ['run-e2e-production-lane.ts','the production-settings lane: the settings and the per-suite exceptions, imported by run-e2e-server.ts'],
     ['run-playwright-ci.ts', 'the Playwright runner; that suite is not run here, frontend changes are verified by driving a real browser'],
     ['manual-dm-helper.ts', 'manual helper for browser verification: it needs a person watching the Inbox tab, and it writes to whichever node DM_BASE names'],
     ['pg-kysely-memory.ts', 'storage-provider integration test: it drives a live Postgres over AIMEAT_TEST_PG_URL with no HTTP server, so it has nothing to say to BASE_URL'],
