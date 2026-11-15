@@ -5,12 +5,13 @@
  *   and limitations), and variable substitution in prompt templates.
  * @version-history
  *   v1.0.0 -- 2026-05-22 -- Initial test suite for tier1 prompt modules
+ *   v1.1.0 -- 2026-11-15 -- Audit M192, M193, L111: sibling agent refused on capabilities, module identity filled, modules_loaded replaced
  */
 
 // E2E Tests for Tier1 Prompt Module System
 // Run: cd aimeat && pnpm exec tsx test/e2e-prompt-modules.ts
 
-import { registerOwner } from './helpers/owner-login.js';
+import { registerOwner, setupOperator } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -113,6 +114,18 @@ await test('Register agent', async () => {
 await test('Agent auth token', async () => {
     agentToken = await getToken(agentGaii, agentPrivKey);
     assert(typeof agentToken === 'string' && agentToken.length > 0, 'got agent token');
+});
+
+// A sibling agent of the same owner: the capabilities route must tell it apart from modbot (M192).
+let siblingToken = '';
+await test('Register sibling agent', async () => {
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'modsib', owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    siblingToken = await getToken(body.data.agent.gaii, body.data.private_key);
 });
 
 // ── Phase 1: Module Routes ──
@@ -248,7 +261,23 @@ await test('GET capabilities returns modules_loaded and limitations', async () =
     assert(Array.isArray(body.data.limitations), 'has limitations');
 });
 
-await test('PUT capabilities accumulates modules', async () => {
+await test('A sibling agent of the same owner can neither rewrite nor read modbot capabilities', async () => {
+    const put = await json(`/v1/agents/${agentName}/capabilities`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${siblingToken}` },
+        body: JSON.stringify({ technical: [{ name: 'forged', type: 'skill' }], domain: ['forged'], modules_loaded: ['social'] }),
+    });
+    assert(put.status === 403 && put.body?.error?.code === 'ACCESS_DENIED', `sibling PUT: ${put.status} ${JSON.stringify(put.body?.error)}`);
+    const get = await json(`/v1/agents/${agentName}/capabilities`, { headers: { Authorization: `Bearer ${siblingToken}` } });
+    assert(get.status === 403 && get.body?.error?.code === 'ACCESS_DENIED', `sibling GET: ${get.status} ${JSON.stringify(get.body?.error)}`);
+    // Read back with the owner: the forged report did not land.
+    const back = await json(`/v1/agents/${agentName}/capabilities`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(back.status === 200, `owner GET: ${back.status}`);
+    assert(JSON.stringify(back.body.data.modules_loaded) === JSON.stringify(['tasks', 'messages']), `modules_loaded changed: ${JSON.stringify(back.body.data.modules_loaded)}`);
+    assert(!back.body.data.technical_capabilities.some((c: any) => c.name === 'forged'), 'forged technical capability landed');
+});
+
+await test('PUT capabilities replaces modules_loaded (it does not accumulate)', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/capabilities`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${agentToken}` },
@@ -268,6 +297,15 @@ await test('PUT capabilities accumulates modules', async () => {
     assert(status === 200, `status ${status}`);
     assert(body.data.modules_loaded.length === 3, `expected 3 modules, got ${body.data.modules_loaded.length}`);
     assert(body.data.modules_loaded.includes('work'), 'has work module');
+    // A PUT naming one module leaves exactly that one: the stored list is replaced, never merged (L111).
+    const one = await json(`/v1/agents/${agentName}/capabilities`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ technical: [{ name: 'aimeat-work-exchange', type: 'skill' }], domain: ['work exchange'], modules_loaded: ['work'] }),
+    });
+    assert(one.status === 200, `single-module PUT: ${one.status}`);
+    const back = await json(`/v1/agents/${agentName}/capabilities`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(JSON.stringify(back.body.data.modules_loaded) === JSON.stringify(['work']), `expected exactly ['work'], got ${JSON.stringify(back.body.data.modules_loaded)}`);
 });
 
 // ── Phase 5: Variable Substitution ──
@@ -282,6 +320,28 @@ await test('Module prompts substitute agent-specific variables', async () => {
     assert(!prompt.includes('{{gaii}}'), 'no unresolved {{gaii}}');
     assert(!prompt.includes('{{node_id}}'), 'no unresolved {{node_id}}');
     assert(!prompt.includes('{{agent_name}}'), 'no unresolved {{agent_name}}');
+});
+
+// No shipped tier-1 module carries a variable, so the absence checks above cannot fail. An operator
+// adds one line of placeholders to the stored tasks module, the agent reads its own identity back
+// in it, and the original content is restored (M193).
+await test('Module route fills {{gaii}}, {{agent_name}} and {{node_id}} with the caller\'s identity', async () => {
+    const op = await setupOperator(BASE, process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!', `modop${Date.now()}`);
+    const opH = { Authorization: `Bearer ${op.token}` };
+    const orig = await json('/v1/admin/prompts/tier-1-tasks', { headers: opH });
+    assert(orig.status === 200 && typeof orig.body.data?.prompt?.content === 'string', `read tier-1-tasks: ${orig.status}`);
+    const content: string = orig.body.data.prompt.content;
+    const patch = await json('/v1/admin/prompts/tier-1-tasks', { method: 'PATCH', headers: opH,
+        body: JSON.stringify({ content: `${content}\nIDCHECK [{{gaii}}] [{{agent_name}}] [{{node_id}}]` }) });
+    assert(patch.status === 200, `patch: ${patch.status}`);
+    try {
+        const { body } = await json('/v1/agents/me/handbook/tasks', { headers: { Authorization: `Bearer ${agentToken}` } });
+        const nodeId = agentGaii.split('@')[1];
+        assert(body.data.system_prompt.includes(`IDCHECK [${agentGaii}] [${agentName}] [${nodeId}]`),
+            `identity not filled: ${String(body.data.system_prompt).split('\n').find((l: string) => l.startsWith('IDCHECK'))}`);
+    } finally {
+        await json('/v1/admin/prompts/tier-1-tasks', { method: 'PATCH', headers: opH, body: JSON.stringify({ content }) });
+    }
 });
 
 // ── Cleanup ──

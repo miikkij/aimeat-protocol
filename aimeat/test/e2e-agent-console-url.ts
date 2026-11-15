@@ -13,6 +13,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-console-url
  * @version-history
  *   v1.0.0 — 2026-08-13 — Initial, with the field itself.
+ *   v1.1.0 — 2026-11-15 — Audit M081, M082, L007: a sibling without agent:write is refused, non-http
+ *     schemes are refused, and a clear is read back from the list.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -51,10 +53,10 @@ async function setupOwner(label: string) {
     return { owner, ownerToken: tok.body.data.token as string };
 }
 
-async function addAgent(owner: string, ownerToken: string, name: string) {
+async function addAgent(owner: string, ownerToken: string, name: string, scopes: string[] = ['*']) {
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name, owner, capabilities: [], mode: 'interactive', scopes: ['*'] }),
+        body: JSON.stringify({ name, owner, capabilities: [], mode: 'interactive', scopes }),
     });
     assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body?.error)}`);
     const gaii = ag.body.data.agent.gaii as string;
@@ -76,7 +78,9 @@ async function run() {
 
     const newsbot = await addAgent(a.owner, a.ownerToken, 'newsbot');
     const concierge = await addAgent(a.owner, a.ownerToken, 'concierge');
+    const reader = await addAgent(a.owner, a.ownerToken, 'reader', ['memory:read']);
     await addAgent(b.owner, b.ownerToken, 'stranger');
+    const rowOf = async (name: string) => ((await json('/v1/agents', { headers: authA })).body.data.agents ?? []).find((x: any) => x.name === name);
 
     const CONSOLE = 'https://hatchery.example.com/agents/newsbot/settings';
 
@@ -94,6 +98,25 @@ async function run() {
         const rec = (body.data.agents ?? []).find((x: any) => x.name === newsbot.name);
         assert(!!rec, 'agent present in the list');
         assert(rec.console_url === CONSOLE, `expected the console url on the list row, got ${rec.console_url}`);
+    });
+
+    await test('a sibling without agent:write is refused, and the stored address stays (M081)', async () => {
+        const res = await json(`/v1/agents/${newsbot.name}/console-url`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${reader.token}` },
+            body: JSON.stringify({ console_url: 'https://evil.example.com/' }),
+        });
+        assert(res.status === 403 && res.body?.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${res.status} ${res.body?.error?.code}`);
+        assert((await rowOf(newsbot.name)).console_url === CONSOLE, 'a refused sibling write changed the address');
+    });
+
+    await test('only http(s) is stored: data:, vbscript: and file: are refused (M082)', async () => {
+        for (const url of ['data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)', 'file:///etc/passwd']) {
+            const res = await json(`/v1/agents/${newsbot.name}/console-url`, {
+                method: 'PATCH', headers: authA, body: JSON.stringify({ console_url: url }),
+            });
+            assert(res.status === 400 && res.body?.error?.code === 'INVALID_INPUT', `${url}: expected 400 INVALID_INPUT, got ${res.status} ${res.body?.error?.code}`);
+        }
+        assert((await rowOf(newsbot.name)).console_url === CONSOLE, 'a refused scheme overwrote the address');
     });
 
     await test('a javascript: URL is refused — this is a link the owner clicks', async () => {
@@ -136,6 +159,9 @@ async function run() {
         });
         assert(status === 200, `status ${status}`);
         assert(body.data.console_url === null, `expected null, got ${body.data.console_url}`);
+        // Read back through the list: the clear was stored, not only echoed (L007).
+        const rec = await rowOf(newsbot.name);
+        assert(rec.console_url === null || rec.console_url === undefined, `list row still has ${rec.console_url}`);
     });
 
     console.log('\nCleanup');

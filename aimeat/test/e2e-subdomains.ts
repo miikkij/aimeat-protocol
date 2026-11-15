@@ -8,6 +8,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=subdomains
  * @version-history
+ *   v1.3.2 — 2026-11-15 — Audit M171, L119: PATCH refuses a non-operator and changes nothing; the apex
+ *     JSON answer is held to 200 and the envelope without a condition.
  *   v1.3.1 — 2026-11-15 — Audit M228: DELETE /v1/admin/subdomains/:subdomain refuses a non-operator.
  *   v1.3.0 — 2026-11-15 — The not-found page: an unknown subdomain and an address no route answers give
  *     a browser's navigation the page in its language, a client that asks for JSON the envelope, and
@@ -280,11 +282,10 @@ await test('X-Subdomain header is case-insensitive', async () => {
 });
 
 await test('Apex GET / behaves exactly as before (no subdomain)', async () => {
+    // A JSON client on the apex gets the bootstrap envelope, never a redirect or an empty page (L119).
     const { status, body } = await json('/', { headers: { 'Accept': 'application/json' } });
-    assert(status === 200 || status === 302, `status ${status}`);
-    if (status === 200 && !body._raw) {
-        assert(body.ok === true, `apex envelope: ${JSON.stringify(body.error)}`);
-    }
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true && !body._raw, `apex envelope: ${JSON.stringify(body).slice(0, 200)}`);
 });
 
 await test('Unknown subdomain → 404', async () => {
@@ -365,6 +366,17 @@ await test('Reserved subdomain www → 301 to apex', async () => {
 await test('Reserved subdomain (non-www) → 404', async () => {
     const { status } = await onSub('/', 'admin');
     assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('PATCH mapping with a non-operator token → 403, and the mapping stays enabled (M171)', async () => {
+    const { status, body } = await json(`/v1/admin/subdomains/${SUB}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${nonOpToken}` },
+        body: JSON.stringify({ enabled: false }),
+    });
+    assert(status === 403 && body.error?.code === 'ACCESS_DENIED', `expected 403 ACCESS_DENIED, got ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    const list = await json('/v1/admin/subdomains', authed());
+    const site = (list.body.data?.sites ?? []).find((s: any) => s.subdomain === SUB);
+    assert(site?.enabled === true, `the mapping changed after a refused PATCH: ${JSON.stringify(site)}`);
 });
 
 await test('Disable mapping → subdomain 404s', async () => {

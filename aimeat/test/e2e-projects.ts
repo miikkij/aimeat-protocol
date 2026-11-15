@@ -8,6 +8,8 @@
  *   consent access (403 paths), and GENERICITY — a second `kind:'research-study'` manifest
  *   with different object types reads through the SAME engine.
  * @version-history
+ *   2026-11-15 -- Audit M086, L110: a member cannot publish into meta.*; the always-gate approval is
+ *     read back as pending from the approval inbox.
  *   2026-10-25 -- The publish gate follows the newest meta.config copy of a current creator or admin;
  *     an admin whose id sorts first, and a removed admin, decide nothing (secaudit2026oct22).
  *   v1.1.0 -- 2026-10-02 -- Workspace autonomy: a workspace at L5 auto-runs what the organism's L3
@@ -400,6 +402,15 @@ await test('Publishing with no draft → 404', async () => {
   assert(p.status === 404, `expected 404, got ${p.status}`);
 });
 
+// writeRole 'owner' on meta.* holds on the publish route as it does on the memory route (M086).
+await test('A member cannot publish into meta.* → 403, and no .latest appears', async () => {
+  await writeMemory(u1.ownerToken, `organism.${orgId}.meta.goals.mv1.draft`, { id: 'mv1', title: 'Admin-only goal', status: 'open' });
+  const p = await publish(u2.ownerToken, 'meta.goals', 'mv1');
+  assert(p.status === 403 && p.body?.error?.code === 'ACCESS_DENIED', `member publish: ${p.status} ${JSON.stringify(p.body?.error ?? p.body?.data)}`);
+  const latest = await json(`/v1/memory/${encodeURIComponent(`organism.${orgId}.meta.goals.mv1.latest`)}`, { headers: bearer(u1.ownerToken) });
+  assert(latest.status === 404, `a refused publish wrote .latest: ${latest.status}`);
+});
+
 // ─── Publish gate (configurable via meta.config; default off) ───
 console.log('\nPublish gate (opt-in via meta.config)');
 
@@ -479,6 +490,10 @@ await test('Always-gate action pauses even at low risk', async () => {
   const r = await json(`/v1/organisms/${orgId}/approvals`, { method: 'POST', headers: bearer(u1.ownerToken), body: JSON.stringify({ action: 'external-release', risk: 'low' }) });
   assert(r.status === 201, `create ${r.status}`);
   assert(r.body.data.gated === true && r.body.data.approval.status === 'pending', 'always-gate floor held');
+  // Read back from the approval inbox: stored as pending, not only answered as pending (L110).
+  const inbox = await json(`/v1/organisms/${orgId}/approvals?status=pending`, { headers: bearer(u1.ownerToken) });
+  assert(inbox.body.data.approvals.some((a: any) => a.id === r.body.data.approval.id && a.action === 'external-release' && a.status === 'pending'),
+    `external-release approval not pending in the inbox: ${JSON.stringify(inbox.body.data.approvals.map((a: any) => [a.id, a.action, a.status]))}`);
 });
 
 // ─── Workspace autonomy (the workspace manifest's policy decides for an action in that workspace) ───

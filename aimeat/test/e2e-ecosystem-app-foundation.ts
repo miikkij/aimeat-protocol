@@ -11,6 +11,8 @@
  *     the organism area, and the app still writes and reads its own namespace (audit 2026-11 L045).
  *     Phase 9's ticked area is an organism area: the memory area it ticked is no longer shown, a
  *     behaviour change the developer approved on 2026-11-15.
+ *   2026-11-15 — Audit M262, M263: another owner cannot approve a hello, a second approve is 409, and
+ *     a denied hello polls to access_denied with no app record.
  *   2026-10-25 — Phase 9: the Outside apps row's approval sends the data areas left ticked, and an
  *     unticked organisms-wide area is not granted (secaudit2026oct22, lead 2378, the portal part).
  *   2026-10-25 — owner_scope on PUT and restore stays inside the ecosystem app's own namespace, and a
@@ -503,6 +505,34 @@ await test('Polling token before approval → authorization_pending', async () =
   });
   assert(status === 400, `expected 400, got ${status}`);
   assert(body.error === 'authorization_pending', `expected authorization_pending, got ${body.error}`);
+});
+
+const helloAs = (app: string) => json('/v1/ecosystem-apps/hello', { method: 'POST', body: JSON.stringify({ owner: ownerName, app, public_key: APP_PUBKEY, scopes: ['memory:read'] }) });
+const decide = (code: string, token: string, action: string) => json(`/v1/ecosystem-apps/${code}/approve`, {
+  method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ action, scopes: ['memory:read'] }),
+});
+
+await test('Only the named account approves a hello, and a processed request answers 409 ALREADY_PROCESSED (M262)', async () => {
+  const other = await registerOwner(BASE, `ecoother${Date.now()}`);
+  const hello = await helloAs('claimdesk');
+  assert(hello.status === 200, `hello: ${hello.status}`);
+  const theirs = await decide(hello.body.data.user_code, other.token, 'approve');
+  assert(theirs.status === 403 && theirs.body?.error?.code === 'ACCESS_DENIED', `another owner's approve: ${theirs.status} ${JSON.stringify(theirs.body?.error)}`);
+  const mine = await decide(hello.body.data.user_code, ownerToken, 'approve');
+  assert(mine.status === 200 && mine.body.data.geai === `eco:claimdesk#${ownerName}@${NODE_ID}`, `rightful approve: ${mine.status} ${JSON.stringify(mine.body?.data ?? mine.body?.error)}`);
+  const again = await decide(hello.body.data.user_code, ownerToken, 'approve');
+  assert(again.status === 409 && again.body?.error?.code === 'ALREADY_PROCESSED', `second approve: ${again.status} ${JSON.stringify(again.body?.error)}`);
+  await json(`/v1/owners/${encodeURIComponent(other.name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${other.token}` } });
+});
+
+await test('A denied hello polls to access_denied with no credential, and no app record is made (M263)', async () => {
+  const hello = await helloAs('denydesk');
+  const denied = await decide(hello.body.data.user_code, ownerToken, 'deny');
+  assert(denied.status === 200 && denied.body.data.status === 'denied', `deny: ${denied.status} ${JSON.stringify(denied.body)}`);
+  const tok = await json('/v1/ecosystem-apps/token', { method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: GRANT }) });
+  assert(tok.status === 400 && tok.body.error === 'access_denied' && !tok.body.access_token, `poll after deny: ${tok.status} ${JSON.stringify(tok.body)}`);
+  const apps = (await json('/v1/ecosystem-apps', { headers: { Authorization: `Bearer ${ownerToken}` } })).body.data.ecosystem_apps as any[];
+  assert(!apps.some(a => String(a.geai).startsWith('eco:denydesk#')), 'a denied app is listed');
 });
 
 // ─── Phase 5: owner lists the memory the app wrote (GET /:app/data) ───

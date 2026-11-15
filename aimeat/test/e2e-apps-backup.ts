@@ -5,6 +5,8 @@
  * @description E2E tests for app-catalog backup export + selective import.
  *   Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-apps-backup
  * @version-history
+ *   2026-11-15 — Audit M274, M275: an installed cortex is exported and counted; an agent and an
+ *     anonymous caller are refused on inspect and restore.
  *   2026-10-27 — A restored app keeps the intake forms its owner manages and leaves out the others,
  *     naming them in errors (secaudit2026oct26).
  *   2026-10-16 — Hand-made backups: a new app keeps no operator's search approval, an appended version
@@ -46,6 +48,7 @@ import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import yauzl from 'yauzl';
 import { registerOwner } from './helpers/owner-login.js';
+import { connectAgentByDevice } from './helpers/agent-device.js';
 
 function sha256(buf: Buffer | string): string {
     return createHash('sha256').update(buf).digest('hex');
@@ -164,6 +167,18 @@ console.log('\nExport');
 
 let exportZip: Buffer = Buffer.alloc(0);
 
+// A cortex with one lib, so the extension half of export and inspect runs on real state (M274).
+const bkCx = `bkcx${Date.now() % 100000}`;
+await test('Install and activate a cortex with a lib before the export', async () => {
+    const manifest = ['apiVersion: cortex.aimeat.org/v1', 'kind: Extension', 'metadata:', `  name: ${bkCx}`, `  namespace: ${owner}`,
+        'spec:', '  version: "1.0.0"', '  description: "Backup fixture"', '  components:',
+        '    - type: lib', '      name: greeter', '      filename: greeter.js', '      exports: [hello]', '      api_surface: hello()'].join('\n') + '\n';
+    const inst = await json('/v1/cortex', authed({ method: 'POST', body: JSON.stringify({ manifest, libs: { 'greeter.js': 'export function hello() { return 1; }' } }) }));
+    assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body.error)}`);
+    const act = await json(`/v1/cortex/${bkCx}/activate`, authed({ method: 'POST' }));
+    assert(act.status === 200, `activate: ${act.status} ${JSON.stringify(act.body.error)}`);
+});
+
 await test('GET /v1/apps/backup without auth → 401', async () => {
     const res = await fetch(`${BASE}/v1/apps/backup`);
     assert(res.status === 401, `expected 401, got ${res.status}`);
@@ -191,6 +206,10 @@ await test('ZIP is plainly openable and contains every version + metadata', asyn
     assert(manifest.aimeatAppsBackup === '1.0', 'format version 1.0');
     assert(manifest.source?.owner === owner, 'manifest owner');
     assert(Array.isArray(manifest.apps) && manifest.apps.length === 3, `3 apps in manifest, got ${manifest.apps?.length}`);
+    // The installed cortex travels with its manifest and its lib (M274).
+    assert(names.includes(`extensions/${bkCx}/manifest.yaml`), `no extensions/${bkCx}/manifest.yaml in ${JSON.stringify(names.filter(n => n.startsWith('extensions/')))}`);
+    assert((await readZipEntry(exportZip, `extensions/${bkCx}/libs/greeter.js`)).toString().includes('hello'), 'the lib file content');
+    assert(manifest.extensions?.some((x: any) => x.name === bkCx), `manifest.extensions: ${JSON.stringify(manifest.extensions)}`);
 
     const v2 = (await readZipEntry(exportZip, 'apps/bk-app-a.html/versions/v2.html')).toString();
     assert(v2 === html('A v2'), 'version content matches exactly');
@@ -224,7 +243,7 @@ await test('Inspect reports contents without writing anything', async () => {
     assert(res.status === 200, `status ${res.status}: ${JSON.stringify(body.error)}`);
     backupToken = body.data.backup_token;
     assert(typeof backupToken === 'string' && backupToken.length > 0, 'got backup_token');
-    assert(body.data.totals.apps === 3 && body.data.totals.versions === 9, `totals: ${JSON.stringify(body.data.totals)}`);
+    assert(body.data.totals.apps === 3 && body.data.totals.versions === 9 && body.data.totals.extensions === 1, `totals: ${JSON.stringify(body.data.totals)}`);
     const a = body.data.apps.find((x: any) => x.filename === 'bk-app-a.html');
     assert(a && a.exists === false, 'A reported as new (not conflicting)');
     // Nothing was written
@@ -527,10 +546,28 @@ await test('A restored cortex extension in another owner\'s namespace is refused
     await json(`/v1/cortex/${encodeURIComponent(own)}`, authed({ method: 'DELETE' }, token2));
 });
 
+// Inspect and restore are owner-only (requireRole('owner')): an agent of the owner, even with every
+// scope, and an anonymous caller are refused, and nothing reaches the catalogue (M275).
+await test('An agent and an anonymous caller are refused on inspect and restore, and the catalogue is unchanged', async () => {
+    const agent = await connectAgentByDevice(BASE, { owner, ownerToken: token, name: `bkagent${Date.now() % 100000}`, scopes: ['*'] });
+    const zip = await forgedZip({ apps: [{ filename: 'bk-agentprobe.html', manifest: { ...baseManifest, name: 'Probe' } }] });
+    const insp = await json('/v1/apps/backup/inspect', authed({ method: 'POST', body: JSON.stringify({ zip_base64: zip }) }, agent.token));
+    assert(insp.status === 403 && insp.body?.error?.code === 'ACCESS_DENIED', `agent inspect: ${insp.status} ${JSON.stringify(insp.body?.error)}`);
+    const rest = await restoreAs(agent.token, zip, { selections: [{ filename: 'bk-agentprobe.html' }] });
+    assert(rest.status === 403 && rest.body?.error?.code === 'ACCESS_DENIED', `agent restore: ${rest.status} ${JSON.stringify(rest.body?.error)}`);
+    for (const path of ['/v1/apps/backup/inspect', '/v1/apps/backup/restore']) {
+        const anon = await json(path, { method: 'POST', body: JSON.stringify({ zip_base64: zip, selections: [{ filename: 'bk-agentprobe.html' }] }) });
+        assert(anon.status === 401 && anon.body?.error?.code === 'AUTH_REQUIRED', `anonymous ${path}: ${anon.status} ${JSON.stringify(anon.body?.error)}`);
+    }
+    const list = await json('/v1/apps?own=true&limit=200', authed());
+    assert(!(list.body.data.apps as any[]).some(a => a.filename === 'bk-agentprobe.html'), 'a refused restore wrote an app');
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 
 await test('Delete test owners (cascade)', async () => {
+    await json(`/v1/cortex/${bkCx}`, authed({ method: 'DELETE' }));
     const d1 = await json(`/v1/owners/${owner}`, authed({ method: 'DELETE' }));
     assert(d1.body.ok === true, `delete owner1: ${JSON.stringify(d1.body.error)}`);
     const d2 = await json(`/v1/owners/${owner2}`, authed({ method: 'DELETE' }, token2));
