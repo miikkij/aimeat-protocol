@@ -19,6 +19,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-home
  * @version-history
+ *   2026-11-15 — Audit M060, M061: an agent token is refused ai-client, room and both ui-track routes; a fresh account's feed holds only its own account_created row.
  *   v1.4.0 — 2026-10-17 — The stored page is read at html.url with the owner's session, and an
  *     anonymous read is refused. The old assertion read it anonymously, which was the hole itself
  *     (plan doc-mvcn6c7e4e5q, V0.3).
@@ -384,6 +385,19 @@ await test('An AGENT token cannot paste the mat on the person\'s behalf (403)', 
     const { status } = await json('/v1/home/welcome-mat',
         auth(agentToken, { method: 'POST', body: JSON.stringify({ paste: page('claude.ai') }) }));
     assert(status === 403, `an agent token must be refused, got ${status}`);
+});
+
+await test('An AGENT token is refused the other owner-session routes of the home (403 each)', async () => {
+    const calls: Array<[string, string, unknown]> = [
+        ['POST', '/v1/home/ai-client', { client: 'claude', paid: true }],
+        ['POST', '/v1/home/room', { room: 'learn' }],
+        ['GET', '/v1/home/ui-track', undefined],
+        ['PUT', '/v1/home/ui-track', { track: 'simple' }],
+    ];
+    for (const [method, path, body] of calls) {
+        const r = await json(path, auth(agentToken, { method, ...(body ? { body: JSON.stringify(body) } : {}) }));
+        assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `${method} ${path} with an agent token: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
 });
 
 await test('PUT /v1/portfolio/upload works for an owner with NO agent (was 400 NO_AGENT)', async () => {
@@ -759,6 +773,10 @@ await test('A BRAND-NEW account has a feed row before it has done anything', asy
     const t = await registerOwner(`hmfd${stamp}`);
     const items = await feedOf(t);
     assert(items.length >= 1, `a new account must already have a row, got ${items.length}`);
+    // Its OWN rows only: the token owner's mat, agent and room rows exist by now and must not show.
+    assert(items.length === 1 && items.every(i => i.kind === 'account_created'),
+        `a fresh account's feed carries another account's rows: ${JSON.stringify(items.map(i => i.kind)).slice(0, 200)}`);
+    assert(!items.some(i => (i.link ?? '').includes(ownerAgent)), `a row links to another owner: ${JSON.stringify(items)}`);
     assert(items[items.length - 1].kind === 'account_created',
         `the oldest row is the account being created, got ${items[items.length - 1].kind}`);
 });

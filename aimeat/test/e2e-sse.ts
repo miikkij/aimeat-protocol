@@ -11,6 +11,7 @@
  *     3. An app-grant stream does NOT mark the owner present. Only a real owner session may.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sse.ts
  * @version-history
+ *   2026-11-15 — Audit M016: the :open comment must arrive within 1 s, inside a 5 s wait.
  *   v1.5.0 — 2026-11-09 — Phase 8: an extension's ctx.changed sends its own domain to named owners,
  *     to principals holding ext:invoke, and to nobody else.
  *   v1.4.0 — 2026-10-25 — Phase 1: the 15 s keepalive is `event: alive`, which the shared-stream
@@ -184,8 +185,9 @@ async function main() {
         let owner: Stream | null = null;
         await test('owner stream sends its first bytes in well under a second', async () => {
             owner = await openStream(A.token);
-            const at = await owner.waitFor(t => t.includes(':open'), 3_000, 'the :open comment');
-            assert(at < 3_000, `first bytes took ${at}ms`);
+            // The window is wider than the bound, so a slow :open fails on the bound with its time.
+            const at = await owner.waitFor(t => t.includes(':open'), 5_000, 'the :open comment');
+            assert(at < 1_000, `first bytes took ${at}ms`);
             assert(owner.text().includes('retry:'), 'a retry hint must be sent so the browser knows the backoff');
         });
 
