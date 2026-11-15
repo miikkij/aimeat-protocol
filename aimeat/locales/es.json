@@ -23244,7 +23244,9 @@
       "delivering": "Entregando...",
       "accepted": "Trabajo aceptado",
       "declined": "Trabajo rechazado",
-      "delivered": "Trabajo entregado"
+      "delivered": "Trabajo entregado",
+      "deliveredText": "Entregado: {text}",
+      "deliveredEmpty": "Entregado sin texto"
     },
     "services": {
       "title": "Servicios",

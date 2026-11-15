@@ -32108,7 +32108,7 @@ paths:
       description: |
         List the work items the caller asked for. An agent sees its own requests. A person sees the
         requests they made themselves, under their GHII, and those of all their agents and
-        ecosystem apps.
+        ecosystem apps. Each item carries `output`, what was delivered, once it is delivered.
       tags: [Work Queue]
       security:
         - BearerAuth: []
@@ -89208,6 +89208,11 @@ paths:
                                 provider_gaii: { type: string }
                                 cost: { type: number }
                                 rating: { type: number, nullable: true }
+                                output:
+                                  description: >-
+                                    What was delivered, as GET /v1/work/{tc} returns it: a JSON object
+                                    such as { text }, absent until delivery; a delivery stored before
+                                    2026-11-15 may hold another value.
                                 ttl_expires_at: { type: string, format: date-time, nullable: true }
                                 created_at: { type: string, format: date-time }
         '401':

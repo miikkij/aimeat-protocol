@@ -12,6 +12,8 @@
  * @structure WorkTabService.overview(isOwnerSession, ownerName, caller) → { inbox, sent }
  * @usage const ov = await createWorkTabService(storage).overview(isOwner, ownerName, resolveIdentity(req.auth, nodeId));
  * @version-history
+ *   v1.3.0 — 2026-11-15 — A sent item carries the delivered `output`, as GET /v1/work/sent does, so the
+ *     Work tab shows what was delivered.
  *   v1.2.0 — 2026-09-26 — An owner session's tab reads the person's ecosystem apps' identities beside
  *     their agents' (owner-identity.ts identitiesActingFor), as the inbox and the sent list do.
  *   v1.1.0 — 2026-09-26 — The caller is the resolved identity, and an owner session's tab reads the
@@ -66,7 +68,7 @@ export class WorkTabService {
         })),
         sent: requesterItems.map(w => ({
           tracking_code: w.trackingCode, status: w.status, action_id: w.actionId,
-          provider_gaii: w.providerGaii, cost: w.cost, rating: w.rating, ttl_expires_at: w.ttlExpiresAt, created_at: w.createdAt,
+          provider_gaii: w.providerGaii, cost: w.cost, rating: w.rating, output: w.output, ttl_expires_at: w.ttlExpiresAt, created_at: w.createdAt,
         })),
       };
     });

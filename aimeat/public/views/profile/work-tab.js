@@ -8,6 +8,7 @@
  *   (.claude/rules/page-guidance.md): PageStart "work" under the head and the title's question mark
  *   concept.work_request.
  * @version-history
+ *   v1.19.0 -- 2026-11-15 -- A row reads its tracking code from `tracking_code`, the name the work routes answer with, so accept, decline, deliver and rate reach the right item, and names the row by its `action_id` when it has no description. A sent item shows what was delivered, "Delivered with no text" for an empty one; an empty text area delivers { text: "" }.
  *   v1.18.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a work item is listed) and the title's question mark concept.work_request; the head's paragraph is two sentences.
  *   v1.17.1 -- 2026-10-11 -- The pacing amount is read where the work routes put it, `cost.toll` (then `cost.base_price`, then the flat fields), so a work item in the inbox and in the sent list shows "pacing N morsels" again.
  *   v1.17.0 -- 2026-10-11 -- A work item's morsels read "pacing N morsels" (toll, then the 3.x base_price mirror, then toll_morsels / price_morsels), not "Cost: N ❤️": a morsel is pacing, not a price.
@@ -67,6 +68,7 @@ import { Stack } from '/components/Layout.js';
 import { Stars } from '/components/Stars.js';
 import { listInbox, listSent, getWorkOverview, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
 import { swallowed } from '/js/swallowed.js';
+import { deliveredText } from './work-delivered.js';
 
 /**
  * A work item's pacing amount. The work routes nest it under `cost` (presentWorkCost: `cost.toll`,
@@ -192,7 +194,9 @@ export default function WorkTab({ session, showToast, onStats }) {
   function renderList(items, type) {
     if (!items) return html`<${List} loading=${t('profile.work.loading')} />`;
     return html`<${List} cols="name-desc-doors" empty=${t(type === 'sent' ? 'profile.work.sentEmpty' : 'profile.work.empty')}>${items.map(w => {
-      const tc = w.tc || w.id || w.work_id;
+      // The work routes name the item `tracking_code`; the other names are older shapes.
+      const tc = w.tracking_code || w.tc || w.id || w.work_id;
+      const said = type === 'sent' ? deliveredText(w.output) : null;
       const isLoading = actionLoading === tc;
       const status = w.status || '-';
       const isPending = status === 'pending' || status === 'offered';
@@ -200,11 +204,12 @@ export default function WorkTab({ session, showToast, onStats }) {
 
       return html`
         <${Row} key=${tc}>
-          <${Name}>${w.description || w.action_name || '-'}<//>
+          <${Name}>${w.description || w.action_name || w.action_id || '-'}<//>
           <${Desc}>
             ${type === 'sent' ? t('profile.work.provider') + ': ' + (w.provider_gaii || '-') : t('profile.work.from') + ': ' + (w.requester_gaii || '-')}
             ${workToll(w) > 0 ? ' \u2502 ' + t('pacing.amount', { n: workToll(w) }) : ''}
             ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
+            ${said ? ' \u2502 ' + (said.empty ? t('profile.work.deliveredEmpty') : t('profile.work.deliveredText', { text: said.text })) : ''}
           <//>
           <${Doors}>
           <${Mark} kind="status" tone=${statusTone(status)}>${status}<//>
@@ -218,13 +223,13 @@ export default function WorkTab({ session, showToast, onStats }) {
           `}
 
           ${type === 'inbox' && isActive && html`
-              <${Loud} control disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
+              <${Loud} control disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name || w.action_id })}>
                 ${t('profile.work.deliver')}
               <//>
           `}
 
           ${type === 'sent' && w.status === 'delivered' && html`
-            <${Action} small row onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}<//>
+            <${Action} small row onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name || w.action_id })}>${t('profile.work.rateBtn')}<//>
           `}
           <//>
         <//>
@@ -279,7 +284,7 @@ function DeliverModal({ desc, loading, onSubmit, onCancel }) {
     <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.deliver')}
       footer=${html`
         <${Action} disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}<//>
-        <${Loud} control disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
+        <${Loud} control disabled=${loading} onClick=${() => onSubmit(result)}>
           ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
         <//>`}>
       <${Stack} gap="large">

@@ -12,6 +12,8 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-11-15 — GET /v1/work/sent carries each item's delivered `output`, as the overview's sent list
+ *     does, so the Work tab shows what was delivered.
  *   2026-11-13 — createWorkItem and workErrorText moved unchanged to services/work/create-work-item.ts,
  *     so aimeat_action_execute no longer imports a route file (structure programme unit 2).
  *   2026-10-27 — The provider node's answer is read under OUTBOUND_READ_MAX_BYTES (secaudit2026oct26,
@@ -240,6 +242,8 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         provider_gaii: w.providerGaii,
         cost: presentWorkCost(w.cost, 'camel'),
         rating: w.rating,
+        // What was delivered, as GET /v1/work/:tc returns it, so the requester's list can say it.
+        output: w.output,
         ttl_expires_at: w.ttlExpiresAt,
         created_at: w.createdAt,
       })),

@@ -24605,7 +24605,9 @@
       "delivering": "Delivering...",
       "accepted": "Work accepted",
       "declined": "Work declined",
-      "delivered": "Work delivered"
+      "delivered": "Work delivered",
+      "deliveredText": "Delivered: {text}",
+      "deliveredEmpty": "Delivered with no text"
     },
     "services": {
       "title": "Services",

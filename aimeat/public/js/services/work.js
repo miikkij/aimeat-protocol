@@ -11,6 +11,8 @@
  *   - submitRating: rate a completed work item
  *
  * @version-history
+ *   v1.3.0 — 2026-11-15 — deliverWork sends the text as output { text }, the JSON object the route
+ *     takes; an empty text area sends { text: "" }, which is a valid delivery.
  *   v1.2.1 — 2026-11-15 — deliverWork sends the delivery text as `output`, the field POST
  *     /v1/work/:tc/deliver reads; it sent `result`, which the route refused for a missing output.
  *   v1.2.0 — 2026-11-15 — submitRating sends rating 'positive' (four or five stars) or 'negative' (one
@@ -69,11 +71,14 @@ export async function rejectWork(tc) {
   return api(`/v1/work/${encodeURIComponent(tc)}/reject`, { method: 'POST' });
 }
 
-/** Deliver completed work. POST /v1/work/:tc/deliver reads the delivered result as `output`. */
-export async function deliverWork(tc, result) {
+/**
+ * Deliver completed work. POST /v1/work/:tc/deliver reads the delivered result as `output`, a JSON
+ * object, so the text goes as { text }; an empty text is a valid delivery ({ text: "" }).
+ */
+export async function deliverWork(tc, text) {
   return api(`/v1/work/${encodeURIComponent(tc)}/deliver`, {
     method: 'POST',
-    body: JSON.stringify({ output: result }),
+    body: JSON.stringify({ output: { text: typeof text === 'string' ? text : '' } }),
   });
 }
 

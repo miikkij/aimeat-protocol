@@ -25368,7 +25368,9 @@
       "delivering": "Toimitetaan...",
       "accepted": "Työ hyväksytty",
       "declined": "Työ hylätty",
-      "delivered": "Työ toimitettu"
+      "delivered": "Työ toimitettu",
+      "deliveredText": "Toimitettu: {text}",
+      "deliveredEmpty": "Toimitettu ilman tekstiä"
     },
     "services": {
       "title": "Palvelut",
