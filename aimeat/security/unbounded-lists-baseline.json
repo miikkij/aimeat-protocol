@@ -407,7 +407,7 @@
     "src/services/tool-scope-words-migration.ts": {
       "listAgents": 1
     },
-    "src/services/usage-page.ts": {
+    "src/services/usage/page.ts": {
       "listOwners": 1
     },
     "src/services/visibility/visibility-counter.ts": {

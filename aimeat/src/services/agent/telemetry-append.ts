@@ -24,7 +24,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, TelemetryEvent, AgentRecord } from '../../storage/interface.js';
 import { mayActOnAgent } from '../../utils/gaii.js';
 import { pushTelemetry, recordTelemetryActivity } from '../telemetry-buffer.js';
-import { recordTelemetryUsage } from '../usage-metering.js';
+import { recordTelemetryUsage } from '../usage/metering.js';
 
 export interface TelemetryInput {
     type: TelemetryEvent['type'];
@@ -65,7 +65,7 @@ export async function appendAgentTelemetry(deps: Deps, agent: Pick<AgentRecord, 
     pushTelemetry(event);
     recordTelemetryActivity(agentGaii, { type: input.type, data });
     // LEDGER (TARGET-016): an llm_call carrying a model becomes a priced, append-only usage event
-    // (services/usage-metering.ts decides which).
+    // (services/usage/metering.ts decides which).
     await recordTelemetryUsage(deps.storage,
         { agentGaii, ownerGhii: `${agent.owner}@${deps.config.nodeId}`, taskId: input.task_id },
         input.type, data);

@@ -21,7 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { getOwnerUsageSummary } from '../services/usage-summary.js';
+import { getOwnerUsageSummary } from '../services/usage/summary.js';
 import { createHomeDashboardService } from '../services/db/index.js';
 
 export function usageRouter(config: AimeatConfig, storage: Storage): Router {

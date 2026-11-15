@@ -1,5 +1,5 @@
 /**
- * @file usage-summary.ts
+ * @file src/services/usage/summary.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Owner-scoped usage + quota + count summary for the profile Home dashboard.
@@ -15,7 +15,7 @@
  *   - getOwnerUsageSummary(config, storage, ownerName) — cached summary (computes on miss/expiry)
  *   - invalidateOwnerUsage(ownerName) — drop one owner's cache entry (e.g. after a big delete)
  *   - USAGE_CACHE_TTL_MS — cache lifetime (60s; staleness up to a minute is acceptable here)
- * @usage import { getOwnerUsageSummary } from '../services/usage-summary.js';
+ * @usage import { getOwnerUsageSummary } from './summary.js';
  * @version-history
  *   v1.1.0 — 2026-10-29 — The AI allowance left is the node's key's own limit when that is smaller.
  *   v1.0.0 — 2026-06-22 — Initial: quota usage (memory/storage/micro-memory) + counts + morsels,
@@ -29,14 +29,14 @@
  *     (own-key-coverage.ts hasOwnAiKey), not only the legacy openrouter.apikey record, which node
  *     4.0.0 no longer writes.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { cached, invalidateKey, TTL } from './cache.js';
-import { readAllowance, remainingOf } from './ai/allowance.js';
-import { allowanceShown } from './ai/node-key-balance.js';
-import { hasOwnAiKey } from './own-key-coverage.js';
-import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
-import { runInReadScope } from '../storage/read-scope/read-scope.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { cached, invalidateKey, TTL } from '../cache.js';
+import { readAllowance, remainingOf } from '../ai/allowance.js';
+import { allowanceShown } from '../ai/node-key-balance.js';
+import { hasOwnAiKey } from '../own-key-coverage.js';
+import { loadOwnerAgents, loadOwnerEcoApps } from '../db/owner-identity.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 /** How long a computed summary stays fresh. A minute of staleness is fine for a dashboard and keeps
  *  the full-scan byte computations off the request hot path on repeated visits. */

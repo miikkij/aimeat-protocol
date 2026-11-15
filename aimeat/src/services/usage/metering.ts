@@ -1,5 +1,5 @@
 /**
- * @file usage-metering.ts
+ * @file src/services/usage/metering.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Records one agent LLM call into the usage ledger (LEDGER / TARGET-016):
@@ -11,7 +11,7 @@
  *   - recordUsageEvent(storage, input) -- price + persist + rollup + emit; returns the event
  *   - extractUsageFields(data)          -- pull ledger fields from a telemetry llm_call payload
  * @usage
- *   import { recordUsageEvent } from '../services/usage-metering.js';
+ *   import { recordUsageEvent } from './metering.js';
  * @version-history
  *   v1.3.0 -- 2026-09-28 -- `priceRef` on the input: a caller that priced the cost itself (the model
  *     catalogue, System 2 V4) says where the number came from, and the event cites that.
@@ -22,11 +22,11 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { Storage, AgentUsageEvent } from '../storage/interface.js';
-import { priceUsd } from './llm-pricing.js';
-import { emitChange } from './event-bus.js';
-import { evaluateBudgetAlerts } from './ledger/budget-alerts.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, AgentUsageEvent } from '../../storage/interface.js';
+import { priceUsd } from '../llm-pricing.js';
+import { emitChange } from '../event-bus.js';
+import { evaluateBudgetAlerts } from '../ledger/budget-alerts.js';
+import { logger } from '../../utils/logger.js';
 
 export interface UsageEventInput {
   /** Who consumed — full GAII (or GHII for owner-direct calls). */

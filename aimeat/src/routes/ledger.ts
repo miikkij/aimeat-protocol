@@ -10,7 +10,7 @@
  *   accessible (mirrors GET /v1/agents); the sensitive billing export stays owner-only.
  *   Backs the AGENCY FLEET COST/USAGE tab.
  *
- *   This router is read-only. Usage is written by the ingest path (services/usage-metering.ts
+ *   This router is read-only. Usage is written by the ingest path (services/usage/metering.ts
  *   via the telemetry llm_call event); the backend never renders UI (protocol-only rule).
  * @structure
  *   - GET /v1/ledger/usage       — daily aggregates grouped by day|agent|model|provider|organism|workspace|scope

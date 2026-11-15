@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator's Usage page says whether the chat is in its figures
- *   (services/usage-page.ts keys.chat.metered_here): not on the shared chat key, yes on the node route.
+ *   (services/usage/page.ts keys.chat.metered_here): not on the shared chat key, yes on the node route.
  *   Hosted places moved off the shared key on 2026-10-02, and the page said "not measured" on every
  *   node with a chat until then.
  * @version-history
@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { buildUsagePage } from '../../src/services/usage-page.js';
+import { buildUsagePage } from '../../src/services/usage/page.js';
 
 const cfg = (gooseProviderApiKey: string) => ({
   nodeId: 'node-test', gooseBin: '/usr/local/bin/goose', gooseModel: '', gooseProviderApiKey,

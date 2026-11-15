@@ -32,7 +32,7 @@ import type { Storage, MemoryRecord, AgentRecord } from '../../src/storage/inter
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { traceOperation, formatTrace, instrumentStorage } from '../../src/services/perf-trace.js';
 import { listOwnerScopeMemory, listOwnerScopeMemoryMeta, getOwnerScopeMemory } from '../../src/services/owner/memory.js';
-import { getOwnerUsageSummary, invalidateOwnerUsage } from '../../src/services/usage-summary.js';
+import { getOwnerUsageSummary, invalidateOwnerUsage } from '../../src/services/usage/summary.js';
 import { checkMemoryQuota } from '../../src/services/quota.js';
 import { validateMemoryWrite } from '../../src/services/schema-validator.js';
 import { createMemoryDbService, createHomeDashboardService } from '../../src/services/db/index.js';

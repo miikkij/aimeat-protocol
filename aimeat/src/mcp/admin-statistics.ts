@@ -46,7 +46,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import { buildStatsSnapshot } from '../services/stats-page.js';
-import { buildUsagePage } from '../services/usage-page.js';
+import { buildUsagePage } from '../services/usage/page.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { readUsageSummary } from '../services/usage/usage-summary.js';
 import { USAGE_REPORT_PARAMS } from '../models/tool-input-vocabulary.js';

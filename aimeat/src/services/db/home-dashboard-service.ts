@@ -22,7 +22,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { getOwnerUsageSummary, type OwnerUsageSummary } from '../usage-summary.js';
+import { getOwnerUsageSummary, type OwnerUsageSummary } from '../usage/summary.js';
 import { AgentDbService, createAgentDbService, type HomeAgent } from './agent-db-service.js';
 
 /** The stats-bar counts (the 8 figures the profile shell shows for every authenticated user). Every one

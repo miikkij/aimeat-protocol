@@ -1,5 +1,5 @@
 /**
- * @file src/services/usage-page.ts
+ * @file src/services/usage/page.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one read behind the operator's Usage page: whose money paid for the AI on this
@@ -29,7 +29,7 @@
  *   - UsagePage and its parts
  *   - buildUsagePage(config, storage, opts) — the whole payload
  * @usage
- *   import { buildUsagePage } from '../services/usage-page.js';
+ *   import { buildUsagePage } from './page.js';
  *   const data = await buildUsagePage(config, storage, { from, to, includeKeySpend: false });
  * @version-history
  *   v1.2.1 — 2026-11-01 — The house key is nodeOpenRouterKey: not configured on the own-key choice (ai.region_mode own).
@@ -41,12 +41,12 @@
  *     node, so a hosted place moved off the shared key would read "one key you cannot see".
  *   v1.0.0 — 2026-09-12 — Initial, with the Usage page's rebuild.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { chatUsesSharedKey } from './goose-env.js';
-import { getAdminLedger } from './ledger/admin.js';
-import { readKeySpend, type KeySpend } from './openrouter-key.js';
-import { nodeOpenRouterKey } from './ai/node-openrouter-key.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { chatUsesSharedKey } from '../goose-env.js';
+import { getAdminLedger } from '../ledger/admin.js';
+import { readKeySpend, type KeySpend } from '../openrouter-key.js';
+import { nodeOpenRouterKey } from '../ai/node-openrouter-key.js';
 
 /** How many models get a row of their own before the rest fold into one. */
 const TOP_MODELS = 8;

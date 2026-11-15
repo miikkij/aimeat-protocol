@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operator's Usage page asks OpenRouter what the shared chat key has spent only
- *   when that key is an OpenRouter key (services/usage-page.ts). Secrets audit 2026-10-09, finding
+ *   when that key is an OpenRouter key (services/usage/page.ts). Secrets audit 2026-10-09, finding
  *   1.6: the key was sent as a bearer to openrouter.ai whatever AIMEAT_GOOSE_PROVIDER said, so an
  *   Anthropic key went to OpenRouter.
  * @version-history
@@ -22,7 +22,7 @@ vi.mock('../../src/services/openrouter-key.js', () => ({
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { buildUsagePage } from '../../src/services/usage-page.js';
+import { buildUsagePage } from '../../src/services/usage/page.js';
 
 const cfg = (gooseProvider: string, gooseProviderApiKey: string) => ({
   nodeId: 'node-test', gooseBin: '/usr/local/bin/goose', gooseModel: '', gooseProvider, gooseProviderApiKey,

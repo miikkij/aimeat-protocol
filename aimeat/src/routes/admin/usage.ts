@@ -53,7 +53,7 @@ import {
 import { readUsageSummary } from '../../services/usage/usage-summary.js';
 import { rebuildUsageRollup } from '../../services/usage/rollup-engine.js';
 import { recordUsageCall, pendingUsageCalls } from '../../services/usage/usage-buffer.js';
-import { buildUsagePage } from '../../services/usage-page.js';
+import { buildUsagePage } from '../../services/usage/page.js';
 import { chatUsesSharedKey } from '../../services/goose-env.js';
 import { freeModelOf } from '../../services/ai/openrouter-region.js';
 import { nodeOpenRouterKey } from '../../services/ai/node-openrouter-key.js';

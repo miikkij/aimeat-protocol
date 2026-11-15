@@ -26,7 +26,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { recordUsageEvent } from '../usage-metering.js';
+import { recordUsageEvent } from '../usage/metering.js';
 import { recordAccountEvent } from '../account/events.js';
 import { canonicalAiAppId, mergePerApp } from './app-id.js';
 import { addAgentSpend, aiAskerOf } from '../agent/ai-keys.js';
