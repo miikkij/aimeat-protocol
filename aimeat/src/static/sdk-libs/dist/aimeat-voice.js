@@ -898,8 +898,8 @@ registerProcessor('aimeat-voice-capture', AimeatVoiceCapture);
         const response = await request({
           input: text,
           app_id: config.appId,
-          model: config.tts.model,
-          voice: config.tts.voice,
+          model: config.tts.model || void 0,
+          voice: config.tts.voice || void 0,
           response_format: config.tts.format,
           speed: config.tts.speed,
           instructions: config.tts.instructions

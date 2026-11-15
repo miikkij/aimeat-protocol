@@ -4,6 +4,8 @@
  * @structure request, events, nodeAdapters
  * @usage nodeAdapters(config, emit).complete(messages, { signal })
  * @version-history
+ *   v1.1.1 - 2026-11-15 - speak() leaves an empty tts.model or tts.voice out of the request: POST
+ *     /v1/ai/speak refuses an empty string for either, and the defaults hold model ''.
  *   v1.1.0 - 2026-10-08 - speak() follows the start frame's audio.sample_rate and channels for PCM, and
  *     a refused request keeps the node's details on the error.
  *   v1.0.0 - 2026-09-19 - STT plus NDJSON completion and speech streaming.
@@ -70,8 +72,10 @@ export function nodeAdapters(config, emit) {
       for await (const event of events(response, e => emit({ ...e, stage: 'llm' }))) if (event.type === 'text') yield event.text;
     },
     async *speak(text, { signal }) {
-      const response = await request({ input: text, app_id: config.appId, model: config.tts.model,
-        voice: config.tts.voice, response_format: config.tts.format, speed: config.tts.speed,
+      // An empty model or voice is left out, as transcribe and complete do for their model: the route
+      // takes each as an optional string of at least one character, and the speech role fills in the rest.
+      const response = await request({ input: text, app_id: config.appId, model: config.tts.model || undefined,
+        voice: config.tts.voice || undefined, response_format: config.tts.format, speed: config.tts.speed,
         instructions: config.tts.instructions }, '/v1/ai/speak', signal);
       for await (const event of events(response, e => emit({ ...e, stage: 'tts' }))) {
         // The node's start frame says the PCM layout when the provider is known (24000 Hz mono for
