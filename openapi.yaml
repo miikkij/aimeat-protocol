@@ -69937,8 +69937,8 @@ paths:
               properties:
                 contact_id: { type: string, description: "An identity: bare local owner name, owner@node, agent#owner@node, or eco:app#owner@node. Omit when saving a person." }
                 name: { type: string, maxLength: 140, description: "A person's name, as the owner would write it. Required with email." }
-                email: { type: string, format: email, description: "A person's email address. Required with name, and what links them to an account if they join later." }
-                note: { type: string, maxLength: 1000 }
+                email: { type: string, maxLength: 254, pattern: '^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*$', description: "A person's email address, checked only for its shape (something@something.something; letters outside ASCII are taken). Required with name, and what links them to an account if they join later." }
+                note: { type: [string, 'null'], maxLength: 1000, description: Null or absent - no note. }
                 tags: { type: array, items: { type: string } }
                 links:
                   type: array
@@ -69949,7 +69949,7 @@ paths:
                     properties:
                       label: { type: string }
                       url: { type: string }
-                relation: { type: string, maxLength: 40, description: "The owner's own word for the relationship." }
+                relation: { type: [string, 'null'], maxLength: 40, description: "The owner's own word for the relationship. Null or absent: none." }
       responses:
         '201':
           description: Saved

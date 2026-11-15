@@ -228,3 +228,18 @@ describe('POST /v1/compliance/agreements (portal agreements.js createAgreement)'
         await refused('POST', '/v1/compliance/agreements', [body('carol at example'), body('carol@example'), body('a@b c.fi'), body(`${'x'.repeat(250)}@e.fi`)]);
     });
 });
+
+describe('POST /v1/contacts (portal contacts.js savePerson)', () => {
+    // views/profile/contacts-tab.js cardOf sends note and relation as null when the field is empty.
+    // ContactAddBody (models/write-body-schemas.ts) reads both as nullable, and the address is checked
+    // with isValidEmail (services/outbound/outbound-service.ts ensureContact), as on the agreements route.
+    const person = { name: 'Carol', email: 'carol@example.com', tags: [], links: [] };
+
+    it('takes note and relation as null, and an address with letters outside ASCII', async () => {
+        await taken('POST', '/v1/contacts', [{ ...person, note: null, relation: null }, { ...person, email: 'jöns@äiti.fi', note: 'met at the fair', relation: 'colleague' }]);
+    });
+
+    it('still refuses a note over 1000 characters and an address isValidEmail refuses', async () => {
+        await refused('POST', '/v1/contacts', [{ ...person, note: 'x'.repeat(1001) }, { ...person, email: 'carol at example' }]);
+    });
+});
