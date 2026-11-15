@@ -24,6 +24,7 @@
  *     broadcast from a person of M who is not its operator lands as a request; B4: one from an agent
  *     of M's operator lands in the inbox; B5: a block on a person of M holds back that person's agent
  *     (E2E audit M181, M075). B2 is unchanged and passes because its sender is on the card.
+ *   2026-11-15 — Audit M128: R5b sends an older replicate (incoming_older) and reads the newer value back.
  *   2026-10-22 — R2 gives the person's sign-in consent for M before the push-home replicate, and R2a
  *     shows the same replicate without it is 403 CONSENT_REQUIRED with nothing stored (secaudit
  *     2026-10 wave 3, v71; test change approved by the developer on 2026-10-22).
@@ -195,6 +196,18 @@ await test('R5. A newer replicate keeps the earlier value under the replica pref
     assert(conflicts.length === 1 && conflicts[0].key.startsWith(`replica:${M_NODE}:${key}._conflict_`),
         `the conflict copy stays under the replica prefix: ${JSON.stringify(conflicts.map(m => m.key))}`);
     assert(!all.some(m => m.key.startsWith('tracked-response.')), `no key of the tracked-response family exists: ${JSON.stringify(all.map(m => m.key))}`);
+});
+
+await test('R5b. An OLDER replicate of the same key is refused as incoming_older, and the newer value stays', async () => {
+    const gaii = `bot#someone@${M_NODE}`;
+    const key = `tracked-response.probe-${ts}`;
+    const stale = { ...replicateBody(gaii, key, new Date(Date.now() - 120_000).toISOString()), value: { from: 'stale' } };
+    const r = await asM('/v1/federation/replicate', stale);
+    assert(r.status === 200 && r.body.data?.conflict_resolution === 'incoming_older', `older replicate: ${r.status} ${JSON.stringify(r.body)}`);
+    const stored = await V.storage.getMemory(gaii, `replica:${M_NODE}:${key}`);
+    assert(JSON.stringify(stored?.value) === JSON.stringify({ from: 'peer M' }), `the older replicate overwrote the newer value: ${JSON.stringify(stored?.value)}`);
+    const conflicts = (await V.storage.listMemory(gaii, {})).filter(m => m.key.includes('._conflict_'));
+    assert(conflicts.length === 1, `a refused older replicate wrote a conflict copy: ${JSON.stringify(conflicts.map(m => m.key))}`);
 });
 
 // ── 2. Broadcast sender (S6-03) ──

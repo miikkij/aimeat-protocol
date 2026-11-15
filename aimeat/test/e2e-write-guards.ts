@@ -6,6 +6,7 @@
  *   backward-compat invariant: an unguarded namespace behaves exactly as before.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=write-guards
  * @version-history
+ *   v1.2.1 — 2026-11-15 — Audit M236: the batch publish route refuses an update without expected_version.
  *   v1.2.0 — 2026-09-24 — Restore asks what delete asks (A6-12): a record binned while its space was
  *     free is not put back once the space is append-only (409), and a member who left the organism
  *     puts nothing back into it (403). Both failed on the old code first (200).
@@ -169,6 +170,20 @@ async function run() {
     assert(p.status === 200 && p.body.data.version === 2, `rec update: ${p.status} ${JSON.stringify(p.body)}`);
     const read = await json(`/v1/memory/${encodeURIComponent(`${root()}.rec.r1.latest`)}`, { headers: auth(A.token) });
     assert(read.body?.data?.value?.title === 'second', 'the update must have landed');
+  });
+
+  // The batch publish route (POST /v1/organisms/:id/workspace/records/publish) carries its own copy
+  // of the guard in organism-gate.ts, so it is asked the same question as the single publish.
+  await test('requires_expected_version: the batch publish route refuses an update without expected_version', async () => {
+    await draft('rec', 'r1', { id: 'r1', title: 'via-batch' });
+    const b = await json(`/v1/organisms/${orgId}/workspace/records/publish`, {
+      method: 'POST', headers: auth(A.token), body: JSON.stringify({ ws: WS, namespace: 'rec', instances: ['r1'] }),
+    });
+    assert(b.status === 200 && b.body.data?.failed === 1, `batch: ${b.status} ${JSON.stringify(b.body.data ?? b.body.error)}`);
+    const rule = b.body.data.results?.[0]?.violations?.[0]?.schema_rule;
+    assert(rule === 'write_guard_version_required', `rule: ${rule}`);
+    const read = await json(`/v1/memory/${encodeURIComponent(`${root()}.rec.r1.latest`)}`, { headers: auth(A.token) });
+    assert(read.body?.data?.value?.title === 'second', `the batch overwrote the record: ${JSON.stringify(read.body?.data?.value)}`);
   });
 
   await test('requires_expected_version: direct .latest write is refused too', async () => {

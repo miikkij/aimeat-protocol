@@ -19,6 +19,8 @@
  *      as proof of a new deployment. Phase 3 therefore reads the server back and INVOKES the action
  *      after every upsert — the response is exactly the thing that was lying.
  * @version-history
+ *   v1.1.1 — 2026-11-15 — Audit M103: the fixture writes ext memory, read back after the update:true
+ *     upsert. Audit L108: activate:true is read back from GET /v1/extensions/:name.
  *   v1.1.0 — 2026-07-26 — Prove the upsert by read-back + invoke (not by the response); Phase 4 adds
  *     malformed-manifest, non-ZIP and cross-owner cases.
  *   v1.0.0 — 2026-07-26 — Initial.
@@ -94,6 +96,7 @@ actions:
     output: { type: object }
 `;
 const PING_JS = `export default async function (ctx, input) {
+  if (input && input.remember) await ctx.memory.set('state', input.remember);
   return { hash: ctx.hash(String(input && input.s || '')), now: ctx.now(), twice: ctx.hash('x') === ctx.hash('x'), build: 'v1' };
 }`;
 /**
@@ -236,6 +239,19 @@ async function main() {
 
     console.log('\nPhase 3: the presigned token carries update / activate');
 
+    // The extension's ext:<name> memory, written by its own action before the upsert, is read back
+    // after it: preserving that state is the reason an upsert beats delete + reinstall.
+    const STATE = { n: 7, note: 'kept across the upsert' };
+    await test('the v1 action writes ext memory before the upsert', async () => {
+        const r = await json(`/v1/ext/${EXT}/ping`, {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ s: 'x', remember: STATE }),
+        });
+        assert(r.status === 200 && r.body.ok, `invoke: ${r.status} ${JSON.stringify(r.body)}`);
+        const m = await json(`/v1/memory/ext:${EXT}/state`);
+        assert(m.status === 200 && JSON.stringify(m.body.data?.value) === JSON.stringify(STATE), `ext memory before: ${m.status} ${JSON.stringify(m.body.data?.value ?? m.body.error)}`);
+    });
+
     await test('presigned upload WITHOUT update still refuses an existing name (409)', async () => {
         const url = await presignedExtensionUrl({});
         const r = await putZip(url, makeZip({ 'manifest.yaml': manifest('2.0.0'), 'scripts/ping.js': PING_JS }));
@@ -275,6 +291,11 @@ async function main() {
         assert(g.body.data.extension.status === 'active', `expected still active, got ${g.body.data.extension.status}`);
     });
 
+    await test('the upsert PRESERVED the ext memory the v1 action wrote', async () => {
+        const m = await json(`/v1/memory/ext:${EXT}/state`);
+        assert(m.status === 200 && JSON.stringify(m.body.data?.value) === JSON.stringify(STATE), `ext memory after the upsert: ${m.status} ${JSON.stringify(m.body.data?.value ?? m.body.error)}`);
+    });
+
     await test('presigned upload with activate:true activates a fresh install', async () => {
         const name = `${EXT}act`;
         const url = await presignedExtensionUrl({ activate: true });
@@ -284,6 +305,8 @@ async function main() {
         }));
         assert(r.status === 200 && r.body.success, `install: ${r.status} ${JSON.stringify(r.body)}`);
         assert(r.body.status === 'active', `expected active on arrival, got ${r.body.status}`);
+        const g = await json(`/v1/extensions/${name}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(g.status === 200 && g.body.data?.extension?.status === 'active', `stored status is ${g.body.data?.extension?.status ?? g.status}, not active`);
     });
 
     await test('a ZIP upload surfaces the same sandbox warnings as the inline path', async () => {

@@ -6,6 +6,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-disputes
  * @version-history
+ *   2026-11-15 — Audit M004: the wrong party is refused offer-partial, accept-fault, accept-partial and
+ *     withdraw-dispute (403, wallets unchanged). Audit M005: a non-operator and an anonymous caller
+ *     are refused the admin audit-log and rule routes.
  *   2026-10-16 — Every dispute outcome conserves morsels: the two wallets end exactly the network fee
  *     (and a ruling's burn) below where they were before the work was created (assertConserved). Tests
  *     11, 18 and 19 asserted the second payment the audit found (accept-fault returning the whole
@@ -128,8 +131,7 @@ async function createDeliveredWork(): Promise<string> {
     const startingPair = await pairSum();
     // Provider publishes action (idempotent)
     await json('/v1/actions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({
             id: 'dispute-test-action',
             display_name: 'Dispute Test Action',
@@ -142,8 +144,7 @@ async function createDeliveredWork(): Promise<string> {
 
     // Requester submits work
     const { body: subBody } = await json('/v1/work', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({
             action_id: 'dispute-test-action',
             provider_gaii: providerGaii,
@@ -155,15 +156,13 @@ async function createDeliveredWork(): Promise<string> {
 
     // Provider accepts
     const { body: accBody } = await json(`/v1/work/${tc}/accept`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
     });
     assert(accBody.ok === true, `work accept: ${JSON.stringify(accBody.error)}`);
 
     // Provider delivers
     const { body: delBody } = await json(`/v1/work/${tc}/deliver`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ output: { result: 'original output' } }),
     });
     assert(delBody.ok === true, `work deliver: ${JSON.stringify(delBody.error)}`);
@@ -189,8 +188,7 @@ await test('Owner auth token', async () => {
 
 await test('Register requester agent', async () => {
     const { status, body } = await json('/v1/agents', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
             name: 'requester',
             owner: ownerName,
@@ -227,8 +225,7 @@ await test('Provider owner auth token', async () => {
 
 await test('Register provider agent', async () => {
     const { status, body } = await json('/v1/agents', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${provOwnerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${provOwnerToken}` },
         body: JSON.stringify({
             name: 'provider',
             owner: provOwnerName,
@@ -299,8 +296,7 @@ console.log('\nPhase 1 — Dispute Opening & Viewing');
 await test('1. Open dispute (requester)', async () => {
     const tc = trackingCodes[0];
     const { status, body } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'Output quality is unacceptable' }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -325,8 +321,7 @@ await test('2. View dispute thread', async () => {
 await test('3. Open duplicate dispute → 409', async () => {
     const tc = trackingCodes[0];
     const { status } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'duplicate attempt' }),
     });
     assert(status === 409, `status ${status}`);
@@ -335,8 +330,7 @@ await test('3. Open duplicate dispute → 409', async () => {
 await test('4. Open dispute as non-requester → 403', async () => {
     const tc = trackingCodes[0];
     const { status } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ reason: 'I am the provider' }),
     });
     assert(status === 403, `status ${status}`);
@@ -348,8 +342,7 @@ console.log('\nPhase 2 — Counter-Dispute');
 await test('5. Provider counters', async () => {
     const tc = trackingCodes[0];
     const { status, body } = await json(`/v1/work/${tc}/counter-dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ reason: 'Output was excellent, requester is wrong' }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -359,8 +352,7 @@ await test('5. Provider counters', async () => {
 await test('6. Requester cannot counter own dispute → 403', async () => {
     const tc = trackingCodes[0];
     const { status } = await json(`/v1/work/${tc}/counter-dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'I opened this dispute' }),
     });
     assert(status === 403, `status ${status}`);
@@ -384,8 +376,7 @@ console.log('\nPhase 3 — Resolution: Redelivery');
 await test('8. Provider offers redelivery', async () => {
     const tc = trackingCodes[0];
     const { status, body } = await json(`/v1/work/${tc}/redeliver`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ output: { result: 'improved output with more detail' } }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -395,8 +386,7 @@ await test('8. Provider offers redelivery', async () => {
 await test('9. Requester accepts redelivery', async () => {
     const tc = trackingCodes[0];
     const { status, body } = await json(`/v1/work/${tc}/accept-redelivery`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
@@ -416,8 +406,7 @@ await test('Setup: Create delivered work for Phase 4', async () => {
 await test('Setup: Open dispute for Phase 4', async () => {
     const tc = trackingCodes[1];
     const { status, body } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'Work not delivered as promised' }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -434,8 +423,7 @@ await test('10. Provider accepts fault', async () => {
 
     const tc = trackingCodes[1];
     const { status, body } = await json(`/v1/work/${tc}/accept-fault`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
@@ -468,19 +456,30 @@ await test('Setup: Create delivered work for Phase 5a', async () => {
 await test('Setup: Open dispute for Phase 5a', async () => {
     const tc = trackingCodes[2];
     const { status, body } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'Partial output, want partial refund' }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     disputeIds.push(body.data.dispute_id); // disputeIds[2]
 });
 
+/** A money route called by the party it does not allow: 403 ACCESS_DENIED, and neither wallet moves. */
+async function assertWrongParty(tc: string, path: string, token: string, body: unknown = {}): Promise<void> {
+    const [reqBefore, provBefore] = [await walletOf(requesterToken), await walletOf(providerToken)];
+    const r = await json(`/v1/work/${tc}/${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+    assert(r.status === 403 && r.body.error?.code === 'ACCESS_DENIED', `${path} by the wrong party: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    assert(await walletOf(requesterToken) === reqBefore && await walletOf(providerToken) === provBefore, `${path} by the wrong party moved money`);
+}
+
+await test('11b. The requester cannot offer itself a partial refund or accept fault for the provider (403)', async () => {
+    await assertWrongParty(trackingCodes[2], 'offer-partial', requesterToken, { refund_morsels: 5, message: 'to myself' });
+    await assertWrongParty(trackingCodes[2], 'accept-fault', requesterToken);
+});
+
 await test('12. Provider offers partial refund', async () => {
     const tc = trackingCodes[2];
     const { status, body } = await json(`/v1/work/${tc}/offer-partial`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ refund_morsels: 5, message: 'Fair split' }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -499,8 +498,7 @@ await test('12b. Partial refund above the escrow is refused and mints nothing (C
     const before = Number(beforeWallet.data.balance);
 
     const { status, body } = await json(`/v1/work/${tc}/offer-partial`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ refund_morsels: 1_000_000, message: 'mint attempt' }),
     });
     assert(status === 400, `status ${status}: ${JSON.stringify(body)}`);
@@ -515,21 +513,21 @@ await test('12b. Partial refund above the escrow is refused and mints nothing (C
     // QA audit S8-02: the ceiling read cost.inEscrow, the whole escrow (11), after delivery had paid
     // the provider the toll (10). One morsel over the toll is refused now.
     const overToll = await json(`/v1/work/${tc}/offer-partial`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ refund_morsels: 11, message: 'the whole escrow' }),
     });
     assert(overToll.status === 400 && overToll.body.error?.code === 'REFUND_EXCEEDS_ESCROW',
         `an offer of the toll plus the fee: ${overToll.status} ${JSON.stringify(overToll.body.error)}`);
 });
 
+await test('12c. The provider cannot accept its own partial offer (403)', () => assertWrongParty(trackingCodes[2], 'accept-partial', providerToken));
+
 await test('13. Requester accepts partial: 5 move from the provider to the requester, and nothing is created', async () => {
     const tc = trackingCodes[2];
     const reqBefore = await walletOf(requesterToken);
     const provBefore = await walletOf(providerToken);
     const { status, body } = await json(`/v1/work/${tc}/accept-partial`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
@@ -548,8 +546,7 @@ await test('Setup: Create delivered work for Phase 5b', async () => {
 await test('Setup: Open dispute for Phase 5b', async () => {
     const tc = trackingCodes[3];
     const { status, body } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'Output was wrong' }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -559,8 +556,7 @@ await test('Setup: Open dispute for Phase 5b', async () => {
 await test('Setup: Provider offers partial for reject test', async () => {
     const tc = trackingCodes[3];
     const { body } = await json(`/v1/work/${tc}/offer-partial`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ refund_morsels: 3, message: 'Small refund' }),
     });
     assert(body.ok === true, `offer: ${JSON.stringify(body.error)}`);
@@ -569,8 +565,7 @@ await test('Setup: Provider offers partial for reject test', async () => {
 await test('14. Requester rejects partial', async () => {
     const tc = trackingCodes[3];
     const { status, body } = await json(`/v1/work/${tc}/reject-partial`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.partial_rejected === true, 'partial_rejected');
@@ -582,11 +577,12 @@ await test('14. Requester rejects partial', async () => {
 console.log('\nPhase 6 — Withdraw');
 
 // Use the Phase 5b work item (dispute still open after reject-partial)
+await test('14b. The provider cannot withdraw the requester\'s dispute (403)', () => assertWrongParty(trackingCodes[3], 'withdraw-dispute', providerToken));
+
 await test('15. Requester withdraws dispute', async () => {
     const tc = trackingCodes[3];
     const { status, body } = await json(`/v1/work/${tc}/withdraw-dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
@@ -607,16 +603,14 @@ await test('Setup: Create delivered work for escalation (requester ruling)', asy
 await test('Setup: Open + counter dispute for escalation', async () => {
     const tc = trackingCodes[4];
     const { body: dBody } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'Needs operator ruling' }),
     });
     assert(dBody.ok === true, `open: ${JSON.stringify(dBody.error)}`);
     disputeIds.push(dBody.data.dispute_id); // disputeIds[4]
 
     const { body: cBody } = await json(`/v1/work/${tc}/counter-dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${providerToken}` },
         body: JSON.stringify({ reason: 'I disagree with requester' }),
     });
     assert(cBody.ok === true, `counter: ${JSON.stringify(cBody.error)}`);
@@ -625,8 +619,7 @@ await test('Setup: Open + counter dispute for escalation', async () => {
 await test('16. Requester escalates to operator', async () => {
     const tc = trackingCodes[4];
     const { status, body } = await json(`/v1/work/${tc}/escalate`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'escalated', `status: ${body.data.status}`);
@@ -653,14 +646,26 @@ async function walletOf(token: string): Promise<number> {
     return Number(body.data.balance);
 }
 
+// ownerToken is the operator only because it registered first; the provider's owner is not the operator.
+await test('17b. A non-operator and an anonymous caller are refused the admin dispute routes; no money moves', async () => {
+    const disputeId = disputeIds[4], [reqBefore, provBefore] = [await walletOf(requesterToken), await walletOf(providerToken)];
+    const ruling = JSON.stringify({ ruling: 'provider_wins', distribution: { to_requester: 0, to_provider: 10, burned: 0 }, reason: 'not mine to rule' });
+    for (const [who, headers, status, code] of [['provider owner', { Authorization: `Bearer ${provOwnerToken}` }, 403, 'ACCESS_DENIED'], ['anonymous', {}, 401, 'AUTH_REQUIRED']] as const) {
+        const log = await json(`/v1/admin/disputes/${disputeId}/audit-log`, { headers });
+        assert(log.status === status && log.body.error?.code === code, `${who} audit-log: ${log.status} ${JSON.stringify(log.body.error ?? 'entries returned')}`);
+        const rule = await json(`/v1/admin/disputes/${disputeId}/rule`, { method: 'POST', headers, body: ruling });
+        assert(rule.status === status && rule.body.error?.code === code, `${who} rule: ${rule.status} ${JSON.stringify(rule.body.error ?? rule.body.data)}`);
+    }
+    assert(await walletOf(requesterToken) === reqBefore && await walletOf(providerToken) === provBefore, 'a refused ruling moved money');
+});
+
 // Feature-list audit #143: openapi.yaml allows three verdicts and the route stored any text. Refuse
 // before you write: the refused ruling moves no money and leaves the dispute open for test 18.
 await test('18a. A verdict outside requester_wins, provider_wins and split is refused', async () => {
     const disputeId = disputeIds[4];
     const reqBefore = await walletOf(requesterToken);
     const { status, body } = await json(`/v1/admin/disputes/${disputeId}/rule`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
             ruling: 'Requester wins — full refund',
             distribution: { to_requester: 10, to_provider: 0, burned: 0 },
@@ -683,8 +688,7 @@ await test('18. Operator rules in favor of requester', async () => {
     const provBefore = await walletOf(providerToken);
 
     const { status, body } = await json(`/v1/admin/disputes/${disputeId}/rule`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
             ruling: 'requester_wins',
             distribution: { to_requester: 10, to_provider: 0, burned: 0 },
@@ -715,16 +719,14 @@ await test('Setup: Create work for provider-favorable ruling', async () => {
 await test('Setup: Open + escalate for provider ruling', async () => {
     const tc = trackingCodes[5];
     const { body: dBody } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
         body: JSON.stringify({ reason: 'Requesting operator ruling #2' }),
     });
     assert(dBody.ok === true, `open: ${JSON.stringify(dBody.error)}`);
     disputeIds.push(dBody.data.dispute_id); // disputeIds[5]
 
     const { body: eBody } = await json(`/v1/work/${tc}/escalate`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(eBody.ok === true, `escalate: ${JSON.stringify(eBody.error)}`);
 });
@@ -735,8 +737,7 @@ await test('19. Operator rules in favor of provider', async () => {
     const provBefore = await walletOf(providerToken);
 
     const { status, body } = await json(`/v1/admin/disputes/${disputeId}/rule`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
             ruling: 'provider_wins',
             distribution: { to_requester: 0, to_provider: 10, burned: 0 },
@@ -873,16 +874,14 @@ console.log('\nCleanup');
 
 await test('Cascade delete owner', async () => {
     const { status } = await json(`/v1/owners/${ownerName}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${ownerToken}` },
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200 || status === 204, `status ${status}`);
 });
 
 await test('Cascade delete provider owner', async () => {
     const { status } = await json(`/v1/owners/${provOwnerName}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${provOwnerToken}` },
+        method: 'DELETE', headers: { Authorization: `Bearer ${provOwnerToken}` },
     });
     assert(status === 200 || status === 204, `status ${status}`);
 });

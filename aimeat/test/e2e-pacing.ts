@@ -11,6 +11,7 @@
  *   provider (chargePacing).
  * @usage cd aimeat && pnpm exec tsx test/e2e-pacing.ts
  * @version-history
+ *   2026-11-15 — Audit M220: the runaway-loop test asserts the money budget fell by calls x 20000.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-11 — Pacing is charged through chargePacing (decision-morseli-on-tahdistus-ei-
  *     hinta-tarjouksen-kaksi-arvoa): the "toll is a burn" case reads a share burned and the rest, at
@@ -152,6 +153,13 @@ await test('The toll is PACING: a share burns, and the provider is credited at m
 await test('Pacing stops a runaway loop before the money budget does', async () => {
   // The scenario the developer described: a repeat-call bug against a money contract. The morsel
   // balance is the ceiling now, so the loop ends in 402 while the EUR budget is nowhere near spent.
+  const remainingOf = async () => {
+    const contracts = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+    const list = (contracts.body.data.entitlements ?? contracts.body.data.contracts ?? []) as any[];
+    const ent = list.find(c => c.ext === EXT);
+    return { ent, remaining: Number(ent?.budget?.remainingUnits ?? ent?.budget?.remaining_units) };
+  };
+  const startBudget = (await remainingOf()).remaining;
   let calls = 0, blocked = false;
   for (let i = 0; i < 400; i++) {
     const r = await json(`/v1/ext/${EXT}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'loop' }) });
@@ -160,10 +168,11 @@ await test('Pacing stops a runaway loop before the money budget does', async () 
     break;
   }
   assert(blocked, `the loop hit the morsel ceiling, not an open till (made ${calls} calls)`);
-  const contracts = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
-  const list = (contracts.body.data.entitlements ?? contracts.body.data.contracts ?? []) as any[];
-  const ent = list.find(c => c.ext === EXT);
-  assert(ent && (ent.budget.remainingUnits ?? ent.budget.remaining_units) > 0, `and the money budget still had room: ${JSON.stringify(ent?.budget)}`);
+  const { ent, remaining } = await remainingOf();
+  assert(ent && remaining > 0, `and the money budget still had room: ${JSON.stringify(ent?.budget)}`);
+  // The money leg was charged too: the budget fell by exactly the calls made times the 20000 price,
+  // so "the morsel ceiling came first" is not a budget that was never debited.
+  assert(startBudget - remaining === calls * 20000, `the money budget fell ${startBudget - remaining} over ${calls} calls, expected ${calls * 20000}`);
 });
 
 await test('The provider calling their own capability is never paced', async () => {

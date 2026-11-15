@@ -41,8 +41,9 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-11-15 — Audit M153: a repeat registration invite for the same address mails nothing more.
  *   2026-11-15 — The key template's footer reads "Sent by AIMEAT"; the assertion follows the text.
- *   2026-11-08 —An address proven before a code key's first sign-in gets no credentials mail; the
+ *   2026-11-08 — An address proven before a code key's first sign-in gets no credentials mail; the
  *     first sign-in's answer carries them (ruling 1, secaudit2026nov08 round 14b).
  *   2026-11-05 — The first sign-in's credentials mail waits for a verified address: the first sign-in
  *     sends nothing and says so, and verifying the address sends it (Jouni 2026-11-05, decision 14a).
@@ -401,9 +402,7 @@ async function run(): Promise<void> {
         assert(signIn.status === 200 && signIn.body?.data?.token, `sign-in ${recName}: ${signIn.status} ${short(signIn.body)}`);
         recToken = signIn.body.data.token as string;
 
-        const ask = await json('/v1/ghii/email/verify', {
-            method: 'POST', headers: bearer(recToken), body: JSON.stringify({ email: recEmail }),
-        });
+        const ask = await json('/v1/ghii/email/verify', { method: 'POST', headers: bearer(recToken), body: JSON.stringify({ email: recEmail }) });
         assert(ask.status === 200, `email/verify ${ask.status}: ${short(ask.body)}`);
         const mail = await smtp!.waitForMail(recEmail, /\b\d{6}\b/);
         assert(mail.subject === 'Your AIMEAT Verification Code', `subject: ${mail.subject}`);
@@ -457,14 +456,10 @@ async function run(): Promise<void> {
         await json('/v1/ghii/password/reset-request', { method: 'POST', body: JSON.stringify({ username: recName.toUpperCase() }) });
         const second = sixDigits(await smtp!.waitForMail(recEmail, /\b\d{6}\b/));
         const newPassword = 'NewestWins9x';
-        const old = await json('/v1/ghii/password/reset', {
-            method: 'POST', body: JSON.stringify({ username: recName, code: first, newPassword }),
-        });
+        const old = await json('/v1/ghii/password/reset', { method: 'POST', body: JSON.stringify({ username: recName, code: first, newPassword }) });
         assert(first === second || (old.status === 400 && old.body.error?.code === 'INVALID_CODE'),
             `the earlier code must be refused: ${old.status} ${short(old.body)}`);
-        const reset = await json('/v1/ghii/password/reset', {
-            method: 'POST', body: JSON.stringify({ username: recName, code: second, newPassword }),
-        });
+        const reset = await json('/v1/ghii/password/reset', { method: 'POST', body: JSON.stringify({ username: recName, code: second, newPassword }) });
         assert(reset.status === 200, `the newest mail's code must work: ${reset.status} ${short(reset.body)}`);
         const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recName, password: newPassword }) });
         assert(login.status === 200, `the new password must sign in: ${login.status} ${short(login.body)}`);
@@ -720,9 +715,7 @@ async function run(): Promise<void> {
         await sleep(500);
         assert(!smtp!.mailTo(keyEmail).some(m => m.text.includes(issued)), 'no credentials mail may reach an unverified address');
 
-        const ask = await json('/v1/ghii/email/verify', {
-            method: 'POST', headers: bearer(login.body.data.token), body: JSON.stringify({ email: keyEmail }),
-        });
+        const ask = await json('/v1/ghii/email/verify', { method: 'POST', headers: bearer(login.body.data.token), body: JSON.stringify({ email: keyEmail }) });
         assert(ask.status === 200, `email/verify ${ask.status}: ${short(ask.body)}`);
         const code = await smtp!.waitForMail(keyEmail, /\b\d{6}\b/);
         const confirm = await json('/v1/ghii/email/confirm', {
@@ -786,8 +779,7 @@ async function run(): Promise<void> {
     await test('the agent registration door mails a traceable invitation naming the model that asked', async () => {
         smtp!.clear();
         const r = await json('/v1/registration-invites', {
-            method: 'POST',
-            headers: { 'User-Agent': 'aimeat-e2e-email/1.0' },
+            method: 'POST', headers: { 'User-Agent': 'aimeat-e2e-email/1.0' },
             body: JSON.stringify({ email: regInviteEmail, agent: { model: 'claude-opus-5', vendor: 'Anthropic', client: 'Claude Code' } }),
         });
         assert(r.status === 202, `registration-invites ${r.status}: ${short(r.body)}`);
@@ -807,6 +799,16 @@ async function run(): Promise<void> {
         const lookup = await json(`/v1/invitations/${token}`);
         assert(lookup.status === 200, `the emailed link must resolve: ${lookup.status} ${short(lookup.body)}`);
         regInviteToken = token;
+    });
+
+    // A repeat mails nothing: once a control address asked after it has its mail, a second mail would be here too.
+    await test('a repeat for the same address mails nothing more (one live invitation per address)', async () => {
+        smtp!.clear();
+        const ask = (email: string) => json('/v1/registration-invites', { method: 'POST', body: JSON.stringify({ email, agent: { model: 'claude-opus-5', vendor: 'Anthropic' } }) });
+        const repeat = await ask(regInviteEmail), control = `edregc${STAMP}@aimeat.test`;
+        assert(repeat.status === 202 && repeat.body.data.status === 'sent' && (await ask(control)).status === 202, `repeat ${repeat.status}: ${short(repeat.body)}`);
+        await smtp!.waitForMail(control, /v1\/invite\?token=/);
+        assert(smtp!.mailTo(regInviteEmail).length === 0, `the repeat mailed the address again: ${smtp!.mailTo(regInviteEmail).length} message(s)`);
     });
 
     // QA audit F02a-04: no test accepted a registration invitation, so the node-level branch of the
@@ -1134,9 +1136,7 @@ async function run(): Promise<void> {
 
     await test('the test door refuses a request with no recipient, and sends nothing', async () => {
         smtp!.clear();
-        const r = await json('/v1/admin/email/test', {
-            method: 'POST', headers: bearer(opToken), body: JSON.stringify({ template: 'notification' }),
-        });
+        const r = await json('/v1/admin/email/test', { method: 'POST', headers: bearer(opToken), body: JSON.stringify({ template: 'notification' }) });
         assert(r.status === 400, `expected 400, got ${r.status}: ${short(r.body)}`);
         await sleep(500);
         assert(smtp!.inbox.length === 0, `a refused request must send nothing, got ${smtp!.inbox.length} message(s)`);

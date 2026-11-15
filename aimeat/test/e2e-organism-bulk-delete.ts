@@ -9,6 +9,7 @@
  *   v1.1.0 — 2026-11-15 — M073: contributor B deletes its own records over aimeat_workspace_object_delete
  *     and this route; once the creator revokes the role, both refuse B with CONSENT_REQUIRED and the
  *     records stay (both deleted them before the fix, E2E audit M073).
+ *   v1.0.2 — 2026-11-15 — Audit L095: the cleanup asserts each owner delete and reads it back (404).
  *   v1.0.1 — 2026-10-20 — The cross-owner case grants B the contributor role before B writes: a
  *     workspace role is the member's own permission, so membership alone no longer carries a
  *     content write in person (Core 2026-11 COL-09; secaudit 2026-10, defect 1). The setup changed,
@@ -164,8 +165,14 @@ await test('M073 attack: revoked B is refused the batch delete (403 CONSENT_REQU
 });
 
 await test('Cleanup owners', async () => {
-    await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: authA() });
-    await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: authB() });
+    // Each delete is read back through the public GET /v1/owners/:name, so a delete route that
+    // answers 200 without erasing the account fails here.
+    for (const [o, auth] of [[A, authA()], [B, authB()]] as const) {
+        const d = await json(`/v1/owners/${o.name}`, { method: 'DELETE', headers: auth });
+        assert(d.status === 200 && d.body.data?.deleted === true, `delete ${o.name}: ${d.status} ${JSON.stringify(d.body?.error)}`);
+        const gone = await json(`/v1/owners/${o.name}`);
+        assert(gone.status === 404 && gone.body?.error?.code === 'NOT_FOUND', `${o.name} still readable after delete: ${gone.status}`);
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

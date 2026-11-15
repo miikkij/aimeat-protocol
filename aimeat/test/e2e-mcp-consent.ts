@@ -3,6 +3,8 @@
  * @description E2E tests for MCP consent module — 3 tools + 1 resource.
  *   Tests consent grant, list, revoke, and the consent resource template.
  * @version-history
+ *   v1.2.1 — 2026-11-15 — Audit L072: a second owner's consent exists before 2 and 4, which assert
+ *     the list holds the caller's consents only (0, then exactly 1).
  *   v1.2.0 — 2026-11-08 — 10-12: aimeat_consent_grant takes role read; role write from an agent is
  *     refused with WRITE_NOT_SUPPORTED naming aimeat_workspace_member_grant and stores nothing; a role
  *     that is neither is refused.
@@ -244,6 +246,22 @@ await test('1. Consent tools appear in tools/list', async () => {
 // ─── Phase 2: Consent CRUD ───
 console.log('\nPhase 2 — Consent CRUD');
 
+// A second owner's consent exists on the node before the list is read, so an empty list proves the
+// MCP tool lists the caller's consents only, not every consent on the node.
+let otherConsentId = '';
+await test('2a. a second owner grants a consent of their own', async () => {
+    const other = `mcpcnt2${Date.now()}`;
+    const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'Other', password: 'McpCnt1234' }) });
+    assert(reg.status === 201, `second owner ${reg.status}`);
+    const { body } = await ownerSignIn(BASE, other, 'McpCnt1234');
+    const granted = await json('/v1/consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${body.data.token}` },
+        body: JSON.stringify({ data_pattern: 'otherowner.*', recipient: `someone@${NODE_ID}`, purpose: 'another owner' }),
+    });
+    assert(granted.status === 201, `second owner grant ${granted.status}: ${JSON.stringify(granted.body?.error)}`);
+    otherConsentId = granted.body.data.id;
+});
+
 await test('2. aimeat_consent_list returns empty array initially', async () => {
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_consent_list',
@@ -252,6 +270,7 @@ await test('2. aimeat_consent_list returns empty array initially', async () => {
     assert(body.result?.content?.[0]?.text !== undefined, 'has content');
     const consents = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(consents), 'result is array');
+    assert(consents.length === 0, `expected no consents, got ${JSON.stringify(consents.map((c: any) => c.id))} (another owner's is ${otherConsentId})`);
 });
 
 await test('3. aimeat_consent_grant creates a consent record', async () => {
@@ -281,7 +300,8 @@ await test('4. aimeat_consent_list includes the newly created consent', async ()
     }, 103);
     const consents = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(consents), 'result is array');
-    assert(consents.length >= 1, `expected at least 1 consent, got ${consents.length}`);
+    assert(consents.length === 1, `expected exactly the caller's consent, got ${JSON.stringify(consents.map((c: any) => c.id))}`);
+    assert(!consents.some((c: any) => c.id === otherConsentId), 'the list shows another owner\'s consent');
     const found = consents.find((c: any) => c.id === consentId);
     assert(found !== undefined, `consent ${consentId} not found in list`);
     assert(found.status === 'active', `expected active status, got ${found.status}`);

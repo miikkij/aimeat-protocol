@@ -9,6 +9,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=intake
  * @version-history
+ *   v1.2.2 — 2026-11-15 — Audit L061: the BEL case reads the stored record back (BEL gone, tab kept).
  *   v1.2.1 — 2026-10-28 — Setup no longer matched production: the NUL case expected the route to strip
  *     it, and the input-junk middleware (7da750c31) now refuses it with 400 nul_byte first. The NUL
  *     case asserts that refusal; a BEL case keeps the stripping proof.
@@ -226,6 +227,11 @@ async function main() {
         assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body.error)}`);
         const id = (r.body.data as { id?: string }).id;
         assert(!!id, 'the record is still written');
+        // Read the stored record back: the BEL is gone, the rest of the value and the tab survive.
+        const read = await json(`/v1/memory/${encodeURIComponent(`organism.${orgId}.w.${ws}.crm.leads.${id}.latest`)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const v = (read.body.data as { value?: Record<string, unknown> } | undefined)?.value ?? {};
+        assert(v.nimi === 'BELbyte', `stored nimi: ${JSON.stringify(v.nimi)}`);
+        assert(v.email === 'keeps\ttab@ex.fi', `stored email: ${JSON.stringify(v.email)}`);
     });
     // ── A form whose destination schema cannot hold its records is refused when it is DEFINED ──
     //

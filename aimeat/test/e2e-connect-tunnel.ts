@@ -10,6 +10,8 @@
 // 2026-10-09: Phase 1b, the single-use socket ticket (POST /v1/ws/ticket): it opens the
 // tunnel once as the agent that minted it, with that agent's scopes, and a realtime or
 // owner ticket does not open it (secrets audit 2026-10-09, d3).
+// 2026-11-15: Audit M182, test 7b: the stats route refuses a non-operator owner and the operator's
+// '*' agent. Audit L041: tests 9 and 13 poll the stats route instead of a fixed 150 ms sleep.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -220,6 +222,27 @@ async function activeConnections(): Promise<number> {
   return body.data.stats.activeConnections;
 }
 
+/** Poll the stats route until the count equals `want` or a 3 s deadline passes; the last count is returned. */
+async function activeConnectionsSettled(want: number): Promise<number> {
+  const until = Date.now() + 3000;
+  let n = await activeConnections();
+  while (n !== want && Date.now() < until) {
+    await sleep(50);
+    n = await activeConnections();
+  }
+  return n;
+}
+
+// ownerToken reads the stats only because it registered first and so became the operator. A second
+// owner, and the operator's own agent (whose '*' does not carry operator:admin), are refused.
+await test('7b. The tunnel stats route refuses a non-operator owner and an agent without operator:admin', async () => {
+  const other = await registerOwner(BASE, `tunother${Date.now()}`);
+  const asOwner = await json('/v1/connect/tunnel/stats', { headers: { Authorization: `Bearer ${other.token}` } });
+  assert(asOwner.status === 403 && asOwner.body.error?.code === 'ACCESS_DENIED', `second owner read the stats: ${asOwner.status} ${JSON.stringify(asOwner.body.error ?? asOwner.body.data)}`);
+  const asAgent = await json('/v1/connect/tunnel/stats', { headers: { Authorization: `Bearer ${fullAgentToken}` } });
+  assert(asAgent.status === 403 && asAgent.body.error?.code === 'SCOPE_DENIED', `the '*' agent read the stats: ${asAgent.status} ${JSON.stringify(asAgent.body.error ?? asAgent.body.data)}`);
+});
+
 await test('8. Exactly one active connection after N forwarded calls', async () => {
   const t = await TunnelClient.connect(BASE, fullAgentToken);
   for (let i = 0; i < 8; i++) {
@@ -236,8 +259,7 @@ await test('9. A second socket for the same agent replaces the first (still one)
   await a.request('GET', '/v1/memory');
   const b = await TunnelClient.connect(BASE, fullAgentToken);  // replaces a
   await b.request('GET', '/v1/memory');
-  await sleep(150);  // let the replaced socket's close propagate
-  const active = await activeConnections();
+  const active = await activeConnectionsSettled(1);  // the replaced socket's close propagates
   assert(active === 1, `expected 1 after replacement, got ${active}`);
   await b.close();
 });
@@ -308,7 +330,7 @@ await test('13. Reconnect after an abrupt drop; forward still works', async () =
   assert(t2.welcome !== null, 'reconnect received welcome');
   const r = await t2.request('GET', '/v1/memory');
   assert(r.status === 200, `post-reconnect forward status ${r.status}`);
-  const active = await activeConnections();
+  const active = await activeConnectionsSettled(1);
   assert(active === 1, `expected 1 active after reconnect, got ${active}`);
   await t2.close();
 });

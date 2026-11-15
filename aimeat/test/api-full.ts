@@ -5,6 +5,8 @@
  *   broad happy-path sweep across the core API surface.
  * @usage cd aimeat && pnpm exec tsx test/api-full.ts
  * @version-history
+ *   v1.3.3 — 2026-11-15 — Audit M241: a third owner and its agent are denied a ghii: consent named
+ *     for owner2. Audit L001: the read-only branch of the field-type test asserts READONLY_CONFIG.
  *   v1.3.2 — 2026-10-23 — The admin-registered owner gets a password and signs in with it; POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.3.1 — 2026-10-15 — GET /v1/permissions/check refuses a repeated accessor parameter.
@@ -90,6 +92,16 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     const privKey = Buffer.from(privateKeyB64, 'base64');
     const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
     return Buffer.from(sig).toString('base64');
+}
+
+/** Register an agent under an owner (POST /v1/agents) and sign it in (POST /v1/auth/token). */
+async function agentWithToken(ownerTok: string, agent: Record<string, unknown>): Promise<{ gaii: string; token: string }> {
+    const { body } = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerTok}` }, body: JSON.stringify(agent) });
+    assert(body.ok === true, `register agent ${agent.name}: ${JSON.stringify(body.error)}`);
+    const gaii = body.data.agent.gaii as string, ts = new Date().toISOString();
+    const { body: tk } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(body.data.private_key, gaii + ts) }) });
+    assert(typeof tk.data?.token === 'string', `agent ${agent.name} token: ${JSON.stringify(tk.error)}`);
+    return { gaii, token: tk.data.token };
 }
 
 // ─── State ───
@@ -879,20 +891,7 @@ await test('Validate endpoint', async () => {
 await test('Work batch + reject', async () => {
     // Register another agent for batch test
     const batchAgent = `batchagent${Date.now()}`;
-    const { body: regBody } = await json('/v1/agents', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: batchAgent, owner: ownerName }),
-    });
-    const bGaii = regBody.data.agent.gaii;
-    const bPriv = regBody.data.private_key;
-    const bTs = new Date().toISOString();
-    const bSig = await signMsg(bPriv, bGaii + bTs);
-    const { body: bTk } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ gaii: bGaii, timestamp: bTs, signature: bSig }),
-    });
-    const bToken = bTk.data?.token;
+    const { token: bToken } = await agentWithToken(ownerToken, { name: batchAgent, owner: ownerName });
 
     // Batch submit
     const { body: batchBody } = await json('/v1/work/batch', {
@@ -2176,25 +2175,8 @@ await test('Setup — register second owner for consent tests', async () => {
     owner2Token = owner2.token;
     assert(typeof owner2Token === 'string', 'got owner2 token');
 
-    // Register agent under owner2
-    const { body: agBody } = await json('/v1/agents', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${owner2Token}` },
-        body: JSON.stringify({ name: 'consent-tester', owner: owner2Name, capabilities: ['memory'], model: 'test' }),
-    });
-    assert(agBody.ok === true, `register agent2b: ${JSON.stringify(agBody.error)}`);
-    agent2bGaii = agBody.data.agent.gaii;
-    const ag2PrivKey = agBody.data.private_key;
-
-    // Get agent token
-    const ts2 = new Date().toISOString();
-    const sig2 = await signMsg(ag2PrivKey, agent2bGaii + ts2);
-    const { body: tk2Body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ gaii: agent2bGaii, timestamp: ts2, signature: sig2 }),
-    });
-    agent2bToken = tk2Body.data?.token;
-    assert(typeof agent2bToken === 'string', 'got agent2b token');
+    // Register agent under owner2, then get its token
+    ({ gaii: agent2bGaii, token: agent2bToken } = await agentWithToken(owner2Token, { name: 'consent-tester', owner: owner2Name, capabilities: ['memory'], model: 'test' }));
 });
 
 await test('Consent — ghii: recipient creates successfully', async () => {
@@ -2279,6 +2261,17 @@ await test('Consent — ghii: wrong user is denied', async () => {
     const { status } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/consent-test.ghii.data`);
     // No auth = anonymous → no matching consent → 403 or 404
     assert(status === 403 || status === 404, `expected 403/404 for unauthenticated, got ${status}`);
+});
+
+// The anonymous probe above never asks the ghii: matcher about a signed-in reader. A third owner
+// and its agent hold no consent, so the consent named for owner2 must not admit either of them.
+await test('Consent — ghii: a signed-in owner and agent the consent does not name are denied', async () => {
+    const owner3Name = `testowner3-${Date.now()}`, owner3 = await registerOwner(BASE, owner3Name);
+    const agent3 = await agentWithToken(owner3.token, { name: 'consent-outsider', owner: owner3Name, capabilities: ['memory'], model: 'test' });
+    for (const [who, token] of [['owner3', owner3.token], ['agent3', agent3.token]]) {
+        const { status, body } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/consent-test.ghii.data`, { headers: { Authorization: `Bearer ${token}` } });
+        assert(status === 403 && body.error?.code === 'CONSENT_DENIED', `${who} read a ghii: consent named for owner2: ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    }
 });
 
 await test('Consent — node: recipient grants access to agents on matching node', async () => {
@@ -2641,7 +2634,7 @@ await test('PUT /v1/admin/config validates field types', async () => {
     });
     if (status === 403) {
         // In-memory guard
-        assert(true, 'in-memory guard');
+        assert(body.error?.code === 'READONLY_CONFIG', `in-memory guard: ${JSON.stringify(body.error)}`);
     } else if (status === 400) {
         // Invalid value rejected
         assert(body.error?.code === 'INVALID_INPUT', 'invalid value rejected');

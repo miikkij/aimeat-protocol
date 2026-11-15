@@ -4,6 +4,8 @@
  *   federate flag, policy update persistence, and network directory (service summary,
  *   ping hash, cross-catalogue filtering).
  * @version-history
+ *   2026-11-15 — Audit L133: the wildcard auth consent id is asserted, the revoke always runs, and
+ *     auth verify is refused after it.
  *   2026-10-23 — The admin-registered owner gets a password, and both owners sign in with the
  *     password; POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 —The service summary is read as the peer signs it (signedGetHeaders), and an active
@@ -217,9 +219,7 @@ await test('POST /v1/federation/peers -- add peer', async () => {
 });
 
 await test('GET /v1/federation/peers -- default policy values', async () => {
-    const { body } = await json('/v1/federation/peers', {
-        headers: { Authorization: `Bearer ${ownerToken}` },
-    });
+    const { body } = await json('/v1/federation/peers', { headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(body.ok === true, 'ok');
     assert(Array.isArray(body.data.peers), 'peers is array');
     const peer = body.data.peers.find((p: any) => p.node_id === fakePeerNodeId);
@@ -758,12 +758,13 @@ await test('Wildcard auth consent grants access to any node', async () => {
     });
     assert(consentStatus === 201, `wildcard consent status ${consentStatus}: ${JSON.stringify(consentBody)}`);
     wildcardConsentId = consentBody.data?.id || consentBody.data?.consent_id || '';
+    assert(wildcardConsentId.length > 0, `POST /v1/consent returned no id, so the revoke below cannot run: ${JSON.stringify(consentBody.data)}`);
     const { status, body } = await verifyAuth({ username: fedLoginUser, password: fedLoginPassword });
     assert(status === 200 && body.data?.verified === true, `wildcard verify status ${status}: ${JSON.stringify(body)}`);
-    if (wildcardConsentId) {
-        const { body: revokeBody } = await json(`/v1/consent/${wildcardConsentId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${fedLoginToken}` } });
-        assert(revokeBody.ok === true, `wildcard consent revoked: ${JSON.stringify(revokeBody.error)}`);
-    }
+    const { body: revokeBody } = await json(`/v1/consent/${wildcardConsentId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${fedLoginToken}` } });
+    assert(revokeBody.ok === true, `wildcard consent revoked: ${JSON.stringify(revokeBody.error)}`);
+    const after = await verifyAuth({ username: fedLoginUser, password: fedLoginPassword });  // only the data consent is left
+    assert(after.status === 401 && after.body.error?.code === 'FEDERATION_AUTH_FAILED', `verify after the revoke: ${after.status} ${JSON.stringify(after.body.error ?? after.body.data)}`);
 });
 
 await test('Create auth consent for the requesting peer', async () => {

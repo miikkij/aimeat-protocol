@@ -6,6 +6,8 @@
  *   steps via simulated task completion (the onTaskTerminal hook). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows
  * @version-history
+ *   2026-11-15 — Audit M189: the memory.write trigger test asserts a fetch task was dispatched, with
+ *     no status fallback. Audit L126: the inline signals-only verdicts are exact and match the run record.
  *   2026-11-14 — The finish notifications are read in the recipient's own words (notiftext), which
  *     notify() now stores: the setup no longer matched production, where the bell showed those words.
  *   2026-10-20 — Three cases from the October security audit. "Run as me" on a refusal whose
@@ -372,15 +374,16 @@ async function run() {
     // every other test in this file has to do above and below. The connector is a thin proxy over
     // this route, so a crew pre-flighting a pipeline saw the empty version and had to invent a
     // two-call workaround (reported 2026-08-01).
-    const { status, body } = await json('/v1/workflows/news/run', {
-      method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }),
-    });
+    const { status, body } = await json('/v1/workflows/news/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }) });
     assert(status === 200, `status ${status}`);
     const d = body.data;
     assert(!!d.steps, `no step verdicts in the run response: ${JSON.stringify(d)}`);
     assert(typeof d.status === 'string', 'the run status belongs in the same answer');
-    assert(d.steps.fetch?.state === 'green' || d.steps.fetch?.state === 'output-red',
-      `fetch verdict missing or nonsense: ${JSON.stringify(d.steps.fetch)}`);
+    // Memory is still empty (the next test writes it): one verdict per step is right, and it matches GET /runs/:runId.
+    assert(d.steps.fetch?.state === 'output-red' && d.steps.write?.state === 'input-red', `inline verdicts: ${JSON.stringify(d.steps)}`);
+    const { body: rec } = await json(`/v1/workflows/news/runs/${d.runId}`, { headers: auth });
+    const recStates = Object.fromEntries(Object.entries(rec.data.steps).map(([k, s]: [string, any]) => [k, s.state]));
+    assert(JSON.stringify(Object.fromEntries(Object.entries(d.steps).map(([k, s]: [string, any]) => [k, s.state]))) === JSON.stringify(recStates) && d.status === rec.data.status, `inline ${d.status} ${JSON.stringify(d.steps)} vs run record ${rec.data.status} ${JSON.stringify(recStates)}`);
     // The resolved vars: where <run-date> became a concrete date. A pre-flight check cannot see
     // this any other way, and a wrong date here is the difference between a run that publishes and
     // one that greens every step against yesterday's output.
@@ -479,11 +482,14 @@ async function run() {
 
     // Writing the matching owner-memory key should fire the event trigger → start a run.
     await writeMem('evt.trigger', 'go');
-    await sleep(800);
 
-    const after = await json('/v1/workflows/evt-wf/runs', { headers: auth });
+    // Poll (5 s) until the run dispatched fetch to a task: a run with no task started no work.
+    let after = await json('/v1/workflows/evt-wf/runs', { headers: auth });
+    for (const until = Date.now() + 5000; !(after.body.data.runs?.[0]?.steps?.fetch?.taskIds?.length >= 1) && Date.now() < until;) {
+      await sleep(200); after = await json('/v1/workflows/evt-wf/runs', { headers: auth });
+    }
     assert((after.body.data.count ?? 0) >= 1, `expected a run after the trigger, got ${after.body.data.count}`);
-    assert(after.body.data.runs[0].steps.fetch.taskIds?.length >= 1 || after.body.data.runs[0].status, 'run dispatched the step');
+    assert(after.body.data.runs[0].steps.fetch.taskIds?.length >= 1, `the triggered run dispatched no task for fetch: ${JSON.stringify(after.body.data.runs[0].steps.fetch)} (run status ${after.body.data.runs[0].status})`);
   });
 
   // ── event trigger: ordering an offer starts a matching workflow ──
@@ -1119,18 +1125,14 @@ async function run() {
     const scoped = await mint('wf-scoped', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner', 'work:request']);
 
     // WRITE: refused for the narrow agent, and nothing is written.
-    const denied = await json('/v1/workflows/agent-denied-wf', {
-      method: 'PUT', headers: narrow, body: JSON.stringify(WORKFLOW),
-    });
+    const denied = await json('/v1/workflows/agent-denied-wf', { method: 'PUT', headers: narrow, body: JSON.stringify(WORKFLOW) });
     assert(denied.status === 403, `PUT without workflow:write: expected 403, got ${denied.status}: ${JSON.stringify(denied.body.error)}`);
     assert(denied.body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${denied.body.error?.code}`);
     const absent = await json('/v1/workflows/agent-denied-wf', { headers: auth });
     assert(absent.status === 404, `the refused PUT must have written nothing, got ${absent.status}`);
 
     // POSITIVE CONTROL: same door, same body, one scope word more.
-    const allowed = await json('/v1/workflows/agent-denied-wf', {
-      method: 'PUT', headers: scoped, body: JSON.stringify(WORKFLOW),
-    });
+    const allowed = await json('/v1/workflows/agent-denied-wf', { method: 'PUT', headers: scoped, body: JSON.stringify(WORKFLOW) });
     assert(allowed.status === 200, `PUT with workflow:write: expected 200, got ${allowed.status}: ${JSON.stringify(allowed.body.error)}`);
     const present = await json('/v1/workflows/agent-denied-wf', { headers: auth });
     assert(present.status === 200, `the allowed PUT must have written it, got ${present.status}`);

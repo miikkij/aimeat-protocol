@@ -22,6 +22,7 @@
  *   Accept negotiation on the JSON route · the openapi and namespace decisions
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=transparency-page
  * @version-history
+ *   v1.3.1 — 2026-11-15 — Audit L120: the operator-name mirror check runs unconditionally.
  *   v1.3.0 — 2026-09-04 — The private siblings. Everything here drives routes meant to answer
  *     everybody, and the same router carries /mine and /logging-policy, which must not. A page
  *     whose job is openness sitting beside two doors that must stay shut is where a requireAuth
@@ -180,11 +181,13 @@ const FORBIDDEN: Array<[string, RegExp]> = [
     const stmt = (await (await fetch(`${BASE}/v1/ai-transparency`)).json() as any).data;
 
     await test('the mirror does not restate the operator, it points at the live statement', async () => {
+        // The E2E server always configures an operator name, so the mirror check below runs on
+        // every pass; a payload that drops or renames legal_name fails here instead of skipping it.
         const legalName = stmt.operator?.legal_name;
-        if (legalName) {
-            assert(!mirror.body.includes(legalName),
-                `the mirror hardcodes the operator name "${legalName}" — it would be false on every other node`);
-        }
+        assert(typeof legalName === 'string' && legalName.length > 0,
+            `GET /v1/ai-transparency has no operator.legal_name (got ${JSON.stringify(legalName)})`);
+        assert(!mirror.body.includes(legalName),
+            `the mirror hardcodes the operator name "${legalName}" — it would be false on every other node`);
         assert(mirror.body.includes('/v1/ai-transparency'), 'the mirror does not point at the live statement');
     });
 

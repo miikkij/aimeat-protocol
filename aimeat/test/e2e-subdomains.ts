@@ -8,6 +8,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=subdomains
  * @version-history
+ *   v1.3.1 — 2026-11-15 — Audit M228: DELETE /v1/admin/subdomains/:subdomain refuses a non-operator.
  *   v1.3.0 — 2026-11-15 — The not-found page: an unknown subdomain and an address no route answers give
  *     a browser's navigation the page in its language, a client that asks for JSON the envelope, and
  *     a direct request for /not-found.html a 301 to the front page. The same for a missing app at
@@ -422,6 +423,15 @@ await test('PATCH unknown subdomain → 404', async () => {
         body: JSON.stringify({ enabled: false }),
     }));
     assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('DELETE mapping with a non-operator token → 403, and the mapping still serves', async () => {
+    const { status, body } = await json(`/v1/admin/subdomains/${SUB}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${nonOpToken}` },
+    });
+    assert(status === 403 && body.error?.code === 'ACCESS_DENIED', `expected 403 ACCESS_DENIED, got ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    const served = await onSub('/', SUB);
+    assert(served.status === 200, `the mapping stopped serving after a refused delete: ${served.status}`);
 });
 
 await test('DELETE mapping → subdomain 404s', async () => {

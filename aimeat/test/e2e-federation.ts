@@ -8,6 +8,7 @@
  *     'deadbeef1234567890abcdef'. Its assertion that this text was accepted as a peer key encoded the
  *     hole audit 2026-11 L056 names, so that one input changes; the assertions stay. The refusals and
  *     the provenance rule for catalogue sync (M130) are in test/e2e-federation-peer-proofs.ts.
+ *   2026-11-15 — Audit M129: 14b reads the updated federated action back from the catalogue (name, pacing).
  *   2026-10-22 — Tests 12 and 12e give the agent's owner's sign-in consent for the direct peer before
  *     the replicate into the agent; 12-0 and 12e-0 show the same replicate without it (none yet, then
  *     taken back) is 403 CONSENT_REQUIRED with nothing stored (secaudit 2026-10 wave 3, v71; test
@@ -179,9 +180,7 @@ await test('2. Check request status (pending)', async () => {
 });
 
 await test('3. Admin lists pending requests', async () => {
-    const { body } = await json('/v1/admin/peering/requests', {
-        headers: { Authorization: `Bearer ${ownerToken}` },
-    });
+    const { body } = await json('/v1/admin/peering/requests', { headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(body.ok === true, 'ok');
     assert(Array.isArray(body.data.requests), 'is array');
     const found = body.data.requests.find((r: any) => r.id === peeringRequestId);
@@ -303,9 +302,7 @@ await test('8. Register peer manually', async () => {
 });
 
 await test('9. List peers', async () => {
-    const { body } = await json('/v1/federation/peers', {
-        headers: { Authorization: `Bearer ${ownerToken}` },
-    });
+    const { body } = await json('/v1/federation/peers', { headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(body.ok === true, 'ok');
     assert(Array.isArray(body.data.peers), 'is array');
     const found = body.data.peers.find((p: any) => p.node_id === directPeerNodeId);
@@ -536,6 +533,9 @@ await test('14b. Catalogue sync (update existing)', async () => {
     assert(body.ok === true, `update sync: ${JSON.stringify(body.error)}`);
     assert(body.data.updated === 1, `updated: ${body.data.updated}`);
     assert(body.data.synced === 0, `synced (new): ${body.data.synced}`);
+    // The catalogue read back (a search skips the cached list): the stored action has the new name and pacing.
+    const row = ((await json('/v1/catalogue?search=Remote%20Summarize&per_page=50')).body.data?.actions as any[] ?? []).find(a => a.id === `${directPeerNodeId}:remote-action-1`);
+    assert(row?.display_name === `[${directPeerNodeId}] Remote Summarize v2` && row?.pricing?.toll_morsels === 8, `stored action: ${JSON.stringify(row)}`);
 });
 
 // ─── Phase 3b: the signature is the authentication ───

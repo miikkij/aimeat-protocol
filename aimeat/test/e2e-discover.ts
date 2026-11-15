@@ -7,6 +7,7 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   v0.4.2 — 2026-11-15 — Audit L044: after approval the shared facet counts the document.
  *   v0.4.1 — 2026-10-30 — The public-scope isolation test finds A's public note and package and misses
  *     the private note by their words: the 23 seeded ornaments landed after them and filled the
  *     no-query listing.
@@ -548,6 +549,11 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
         const r = await discover('scope=shared&per_page=100', sB.token);
         assert(hasId(r.body.data.entries, SHARED_KEY), 'post-approval: member must now see the shared content');
         assert(byId(r.body.data.entries, SHARED_KEY)?.type === 'document', 'classified as document');
+        // The facet count follows the same gate in the other direction: an endpoint that never
+        // counts shared content would also pass the pre-approval check above.
+        const f = await json('/v1/discover/facets?scope=shared', { headers: auth(sB.token) });
+        const doc = (f.body.data?.types as any[] ?? []).find(x => x.value === 'document');
+        assert(f.status === 200 && (doc?.count ?? 0) >= 1, `post-approval: the shared facet must count the document: ${JSON.stringify(f.body.data?.types ?? f.body.error)}`);
     });
 
     // secaudit2026oct22 (discover-shared-scope-skips-organism-read). Every other door that returns

@@ -11,6 +11,9 @@
 //   3. Every human registration door, not just one. Three doors bypassed provisionOwner and the
 //      onboarding track marker was missing from one of them for exactly that reason.
 //
+// v1.2.0 -- 2026-11-15 -- Audit M068: the negatives are proven after a later welcome has landed
+//   (polled), not after a fixed sleep. Audit L092: test 11 refuses a plain owner GET, versions and
+//   reset on the prompt; test 10 asserts 403 ACCESS_DENIED exactly.
 // v1.1.0 -- 2026-10-12 -- POST /v1/owners: the answer's next action is POST /v1/ghii/login, not the
 //   owner-key sign-in that node 4.0.0 removes (src/routes/owners.ts v1.8.0).
 // v1.0.0 -- 2026-08-07 -- Initial.
@@ -85,6 +88,17 @@ async function inboxOf(token: string): Promise<any[]> {
     return body.data.messages ?? [];
 }
 
+/** Poll an inbox until it holds `n` messages or the deadline passes; the last read is returned. */
+async function waitForInbox(token: string, n: number, deadlineMs = 10_000): Promise<any[]> {
+    const until = Date.now() + deadlineMs;
+    let inbox = await inboxOf(token);
+    while (inbox.length < n && Date.now() < until) {
+        await sleep(100);
+        inbox = await inboxOf(token);
+    }
+    return inbox;
+}
+
 async function requestsOf(token: string): Promise<any[]> {
     const { status, body } = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${token}` } });
     assert(status === 200, `requests status ${status}`);
@@ -113,11 +127,14 @@ await test('1. The first owner registers and gets NO welcome (would be a self-se
 console.log('\nPhase 1 — a newcomer finds the operator\'s message waiting');
 await test('2. A second account receives exactly one message, from the operator', async () => {
     newcomer = await registerViaOwners(newcomerName);
-    await sleep(600);
-    const inbox = await inboxOf(newcomer.token);
+    const inbox = await waitForInbox(newcomer.token, 1);
     assert(inbox.length === 1, `expected 1 message, got ${inbox.length}`);
     assert(inbox[0].senderGhii === operator.ghii, `sender should be the operator, got ${inbox[0].senderGhii}`);
     assert(inbox[0].direction === 'inbound', `direction: ${inbox[0].direction}`);
+    // Test 1's negative, asked again once a later welcome has landed: a self-send to the operator
+    // that is only slower than test 1's wait would be in the operator's inbox by now.
+    const opInbox = await inboxOf(operator.token);
+    assert(opInbox.length === 0, `operator inbox should still be empty, got ${JSON.stringify(opInbox.map((m: any) => m.subject))}`);
 });
 
 await test('3. It is IN the mailbox, not stuck in the first-contact requests bucket', async () => {
@@ -150,8 +167,7 @@ await test('5. The reply goes back to a real account (the operator), not a synth
 console.log('\nPhase 2 — every human door, not just one');
 await test('6. The /v1/ghii door produces the welcome too', async () => {
     const g = await registerViaGhii(ghiiDoorName);
-    await sleep(600);
-    const inbox = await inboxOf(g.token);
+    const inbox = await waitForInbox(g.token, 1);
     assert(inbox.length === 1, `expected 1 message via /v1/ghii, got ${inbox.length}`);
     assert(inbox[0].senderGhii === operator.ghii, `sender: ${inbox[0].senderGhii}`);
 });
@@ -175,8 +191,7 @@ await test('8. Editing it changes what the next account receives', async () => {
     assert(patch.status === 200, `patch status ${patch.status}: ${JSON.stringify(patch.body)}`);
 
     const later = await registerViaOwners(`edited${stamp}`);
-    await sleep(600);
-    const inbox = await inboxOf(later.token);
+    const inbox = await waitForInbox(later.token, 1);
     assert(inbox.length === 1, `expected 1 message, got ${inbox.length}`);
     assert(inbox[0].subject === `A subject line ${stamp}`, `subject: ${inbox[0].subject}`);
     assert(inbox[0].body === marker, `body: ${inbox[0].body}`);
@@ -190,17 +205,40 @@ await test('9. FAILURE MODE — deactivating the prompt stops it, and registrati
     assert(off.status === 200, `deactivate status ${off.status}: ${JSON.stringify(off.body)}`);
 
     const quiet = await registerViaOwners(afterOffName);
-    await sleep(600);
+    // No fixed wait proves a negative. The prompt goes back on and a control account registers; once
+    // the control's welcome has landed, a welcome sent for the quiet account (late, or reading the
+    // prompt after it went back on) would have landed too.
+    const on = await json('/v1/admin/prompts/operator-welcome', {
+        method: 'PATCH', headers: { Authorization: `Bearer ${operator.token}` },
+        body: JSON.stringify({ active: true, change_note: 'e2e on again' }),
+    });
+    assert(on.status === 200, `reactivate status ${on.status}: ${JSON.stringify(on.body)}`);
+    const control = await registerViaOwners(`control${stamp}`);
+    const controlInbox = await waitForInbox(control.token, 1);
+    assert(controlInbox.length === 1, `the control account got ${controlInbox.length} welcomes, expected 1`);
     const inbox = await inboxOf(quiet.token);
     assert(inbox.length === 0, `expected no message when the prompt is off, got ${inbox.length}`);
 });
 
 await test('10. FAILURE MODE — a non-operator cannot edit the welcome text', async () => {
-    const { status } = await json('/v1/admin/prompts/operator-welcome', {
+    const { status, body } = await json('/v1/admin/prompts/operator-welcome', {
         method: 'PATCH', headers: { Authorization: `Bearer ${newcomer.token}` },
         body: JSON.stringify({ content: 'hijacked', change_note: 'nope' }),
     });
-    assert(status === 403 || status === 401, `expected 401/403 for a plain owner, got ${status}`);
+    assert(status === 403 && body.error?.code === 'ACCESS_DENIED', `expected 403 ACCESS_DENIED for a plain owner, got ${status} ${JSON.stringify(body.error)}`);
+});
+
+await test('11. FAILURE MODE — a non-operator cannot read the prompt, its versions, or reset it', async () => {
+    const P = '/v1/admin/prompts/operator-welcome';
+    for (const [method, path] of [['GET', P], ['GET', `${P}/versions`], ['GET', `${P}/versions/1`], ['POST', `${P}/reset`]] as const) {
+        const { status, body } = await json(path, {
+            method, headers: { Authorization: `Bearer ${newcomer.token}` }, ...(method === 'POST' ? { body: '{}' } : {}),
+        });
+        assert(status === 403 && body.error?.code === 'ACCESS_DENIED', `${method} ${path} as a plain owner: ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    }
+    // The prompt is unchanged by the refused reset: the operator's edit from test 8 is still there.
+    const read = await json(P, { headers: { Authorization: `Bearer ${operator.token}` } });
+    assert(read.status === 200 && String(read.body.data?.prompt?.content).includes(`Edited by the operator ${stamp}`), `the operator's text changed: ${JSON.stringify(read.body.data?.prompt?.content)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
