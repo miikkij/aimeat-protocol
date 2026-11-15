@@ -24,6 +24,7 @@
  *   return { ...securityDoorDefaults(), … };
  *   if (!ownerKeyLoginAllowed(config)) refuse();
  * @version-history
+ *   v1.7.1 — 2026-11-15 — requestBodyCheck's comment: the refusal comes after the route's own middleware.
  *   v1.7.0 — 2026-11-14 — requestBodyCheck (AIMEAT_REQUEST_BODY_CHECK: observe, enforce; default
  *     enforce): whether a request body that does not match openapi.yaml is refused (structure
  *     programme 2026-11, unit 1).
@@ -146,8 +147,8 @@ export interface SecurityDoorConfig {
   /**
    * Whether a request body that does not match openapi.yaml is refused (middleware/openapi-body-guard.ts,
    * data/openapi-body-modes.ts). enforce: every route with a JSON body schema in the contract answers
-   * such a body 400 VALIDATION_ERROR naming the field, before the route runs, for a caller with a
-   * session; the exempt routes are observed. observe: nothing is refused, a mismatch is logged and
+   * such a body 400 VALIDATION_ERROR naming the field, just before the route's handler and after its
+   * own middleware, for a caller with a session; the exempt routes are observed. observe: nothing is refused, a mismatch is logged and
    * counted. Read on every request, so a live change applies at once. AIMEAT_REQUEST_BODY_CHECK,
    * default enforce.
    */

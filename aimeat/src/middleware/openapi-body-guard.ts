@@ -14,12 +14,17 @@
  *     the route accepted the body (the contract disagrees with a working client) or refused it too.
  *   - enforce: the same mismatch is answered
  *     400 VALIDATION_ERROR with the field named, as validateBody answers (models/validation-issues.ts).
- *     Only a caller with a session is refused. The guard runs before the route, so before the route's
- *     sign-in check: a caller without a session is passed on and gets the route's own answer (401),
- *     as before the route was enforced, and the mismatch is observed. What a session is comes from
- *     the option `hasSession`, which server.ts sets to the question requireAuth() asks
- *     (auth/middleware.ts). A route that admits a caller without a session therefore has that
- *     caller's body unchecked, and is not a candidate for the mode table.
+ *     WHERE IT IS REFUSED. The middleware only compares the body and leaves the refusal pending on the
+ *     request; the refusal runs just before the route's handler, after every middleware in the route's
+ *     own chain (installHandlerCheck patches Express's Route dispatch, so it holds for every route,
+ *     whenever and wherever it was registered). A caller the route refuses for sign-in, role, scope,
+ *     readiness, ownership checked in middleware, or a rate limit gets the route's own answer as before,
+ *     and its mismatch is observed. Authorization done inside a handler cannot come first this way.
+ *     Only a caller with a session is refused: a caller without one that the route admits is passed on
+ *     and the mismatch is observed. What a session is comes from the option `hasSession`, which
+ *     server.ts sets to the question requireAuth() asks (auth/middleware.ts). A request answered
+ *     without reaching a route handler (a terminal handler mounted with use()) is observed, and its
+ *     line says `unchecked`.
  *
  *   WHY OBSERVE FIRST. 612 writing routes read their body without a schema, and the contract that
  *   describes most of them was never held against a real request (codebase analysis 2026-11-03,
@@ -45,9 +50,13 @@
  *   observations()), up to LOG_LINES_PER_MINUTE lines a minute;
  *   past that the lines of the minute are counted and one line says how many were left out. The
  *   counts in observations() are exact either way.
- * @structure openapiBodyGuard(nodeId, opts) → middleware with observations() and ready()
+ * @structure pendingChecks · wrapHandler(route, method) · installHandlerCheck() ·
+ *   openapiBodyGuard(nodeId, opts) → middleware with observations() and ready()
  * @usage app.use(openapiBodyGuard(config.nodeId));
  * @version-history
+ *   v1.3.0 — 2026-11-15 — The refusal runs just before the route's handler, after the route's own
+ *     middleware, so a caller the route refuses keeps the route's answer (structure programme 2026-11,
+ *     unit 1). An enforced mismatch answered without reaching a route handler is logged as unchecked.
  *   v1.2.0 — 2026-11-14 — Options `mode` and `exempt`: the node setting security.request_body_check
  *     enforces every route except the exempt ones, or observes every route; `enforced` no longer
  *     defaults to a list in data/ (structure programme 2026-11, unit 1). A refusal is logged too.
@@ -55,7 +64,7 @@
  *     a session, so a caller without one keeps the route's 401 (structure programme 2026-11, unit 1).
  *   v1.0.0 — 2026-11-04 — Initial, observe mode only (codebase analysis 2026-11-03, item B5).
  */
-import type { Request, Response, NextFunction } from 'express';
+import express, { type Request, type Response, type NextFunction } from 'express';
 import { createT } from '../i18n.js';
 import { logger } from '../utils/logger.js';
 import { requestLocale, validationFailure, type ValidationDetail } from '../models/validation-issues.js';
@@ -138,7 +147,65 @@ function detailOf(issue: BodyIssue, t: ReturnType<typeof createT>): ValidationDe
     return d;
 }
 
+/**
+ * A request whose body an enforced route may refuse, with the refusal to run at that route's handler:
+ * it answers the request and returns true, or returns false to let the handler run. Set by the guard,
+ * taken by the first route handler the request reaches.
+ */
+type PendingCheck = (req: Request, res: Response) => boolean;
+const pendingChecks = new WeakMap<Request, PendingCheck>();
+
+interface RouteLayer { method?: string; handle: ((...args: unknown[]) => unknown) & { [HANDLER_CHECKED]?: true } }
+interface RouteInternals { stack: RouteLayer[]; dispatch(req: Request, res: Response, done: NextFunction): unknown }
+const HANDLER_CHECKED = Symbol('openapiBodyHandlerChecked');
+const DISPATCH_PATCHED = Symbol('openapiBodyDispatchPatched');
+
+/**
+ * The handler a route runs for this method: the last function registered for it (or for all
+ * methods), which is not an error handler. Everything registered before it in the same route is the
+ * route's own middleware (requireAuth, requireRole, requireScope, a rate limit, validateBody).
+ */
+function wrapHandler(route: RouteInternals, method: string): void {
+    const m = method.toLowerCase();
+    for (let i = route.stack.length - 1; i >= 0; i--) {
+        const layer = route.stack[i];
+        if (layer.method !== undefined && layer.method !== m) continue;
+        if (typeof layer.handle !== 'function' || layer.handle.length > 3) continue;
+        if (layer.handle[HANDLER_CHECKED]) return;
+        const handler = layer.handle;
+        const checked = function (this: unknown, req: Request, res: Response, next: NextFunction): unknown {
+            const refuse = pendingChecks.get(req);
+            if (refuse) {
+                pendingChecks.delete(req);
+                if (refuse(req, res)) return undefined;
+            }
+            return handler.call(this, req, res, next);
+        } as RouteLayer['handle'];
+        checked[HANDLER_CHECKED] = true;
+        layer.handle = checked;
+        return;
+    }
+}
+
+/**
+ * Makes every Express route run a pending body refusal just before its handler, whenever and
+ * wherever the route was registered (a router built at import time, a sub-router, app.post): the
+ * route's dispatch wraps its handler the first time a request with a pending refusal reaches it. One
+ * patch per process; a request without a pending refusal costs one WeakMap lookup per route it reaches.
+ */
+function installHandlerCheck(): void {
+    const proto = (express as unknown as { Route: { prototype: RouteInternals & { [DISPATCH_PATCHED]?: true } } }).Route.prototype;
+    if (proto[DISPATCH_PATCHED]) return;
+    const dispatch = proto.dispatch;
+    proto.dispatch = function (this: RouteInternals, req: Request, res: Response, done: NextFunction): unknown {
+        if (pendingChecks.has(req)) wrapHandler(this, req.method);
+        return dispatch.call(this, req, res, done);
+    };
+    proto[DISPATCH_PATCHED] = true;
+}
+
 export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions = {}): OpenApiBodyGuard {
+    installHandlerCheck();
     const load = opts.load ?? sharedBodyContract;
     const keysOf = (list: readonly string[]): Set<string> => new Set(list.map(r => {
         const [method, path] = r.split(' ');
@@ -171,8 +238,12 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
     let linesThisMinute = 0;
     let leftOut = 0;
 
-    /** Count and log one mismatch with the status the route answered (0: no answer was finished). */
-    const record = (route: string, issue: BodyIssue, status: number): void => {
+    /**
+     * Count and log one mismatch with the status the route answered (0: no answer was finished).
+     * `unchecked`: the route was enforced, but the request was answered below 400 without reaching
+     * a route handler, so nothing refused it (a terminal handler mounted with use()).
+     */
+    const record = (route: string, issue: BodyIssue, status: number, unchecked = false): void => {
         let key = `${route}\n${issue.field}\n${issue.reason}`;
         let field = issue.field;
         if (!counters.has(key) && counters.size >= MAX_COUNTERS) { field = '*'; key = `${route}\n*\n${issue.reason}`; }
@@ -180,7 +251,7 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
         if (!c) { c = { route, field, reason: issue.reason, count: 0, accepted: 0, refused: 0 }; counters.set(key, c); }
         c.count++;
         if (status > 0 && status < 400) c.accepted++; else c.refused++;
-        line('openapi body mismatch', { mode: 'observe', route, field: c.field, reason: issue.reason, status, count: c.count, accepted: c.accepted });
+        line('openapi body mismatch', { mode: 'observe', route, field: c.field, reason: issue.reason, status, count: c.count, accepted: c.accepted, ...(unchecked ? { unchecked: true } : {}) });
     };
 
     /** One log line within the minute's budget; past it the line is only counted. */
@@ -205,16 +276,19 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
         });
     };
 
-    /** The issue to refuse with, or undefined to pass the request on. Never throws. */
-    const check = (req: Request, res: Response): BodyIssue | undefined => {
+    /**
+     * Compares the body with the contract. A mismatch on a route enforced now is left for the route's
+     * handler to refuse (pendingChecks); every mismatch it does not refuse is observed. Never throws.
+     */
+    const check = (req: Request, res: Response): void => {
         try {
-            if (!CHECKED_METHODS.has(req.method)) return undefined;
+            if (!CHECKED_METHODS.has(req.method)) return;
             // Switched to enforce before the deferred read ran: read now, so no request of an
             // enforced route is passed unchecked.
             if (!loaded && enforcing()) read();
-            if (!contract) return undefined;
+            if (!contract) return;
             const op = contract.match(req.method, req.path);
-            if (!op) return undefined;
+            if (!op) return;
 
             let issue: BodyIssue | undefined;
             const body: unknown = req.body;
@@ -224,29 +298,50 @@ export function openapiBodyGuard(nodeId: string, opts: OpenApiBodyGuardOptions =
                 const validate = op.validator();
                 if (validate && !validate(body)) issue = firstIssue(validate.errors);
             }
-            if (!issue) return undefined;
-            // A caller without a session is the route's to answer (401), whatever its body: refusing
-            // the body first would change that answer to 400. Its mismatch is observed instead.
-            if (isEnforced(op.key) && (!opts.hasSession || opts.hasSession(req))) {
+            if (!issue) return;
+            const found = issue;
+            if (!isEnforced(op.key)) { observe(op.route, found, res); return; }
+
+            // Enforced: refused just before the route's handler runs, after the route's own
+            // middleware admitted the caller. A caller the route refuses first (sign-in, role,
+            // scope, readiness, a rate limit) gets that answer, and the mismatch is observed.
+            let refused = false;
+            pendingChecks.set(req, (r, s) => {
+                // Asked again at the handler: the mode may have changed, and the route's own
+                // middleware may have read the session.
+                if (!isEnforced(op.key)) return false;
+                // A caller without a session that the route admits is the route's to answer.
+                if (opts.hasSession && !opts.hasSession(r)) return false;
+                refused = true;
                 // The same line budget as the observed mismatches, so an operator sees which route
                 // refuses which field, and when to switch the setting back.
-                line('openapi body mismatch refused', { mode: 'enforce', route: op.route, field: issue.field, reason: issue.reason, status: 400 });
-                return issue;
-            }
-            observe(op.route, issue, res);
+                line('openapi body mismatch refused', { mode: 'enforce', route: op.route, field: found.field, reason: found.reason, status: 400 });
+                const locale = requestLocale(r);
+                s.status(400).json(validationFailure(nodeId, [detailOf(found, createT(locale))], locale));
+                return true;
+            });
+            res.once('close', () => {
+                try {
+                    if (refused) return;
+                    // Still pending: no route handler was reached, so the request was answered by
+                    // middleware (a refusal) or by a handler that is not a route's (unchecked).
+                    const unreached = pendingChecks.delete(req);
+                    const status = res.writableFinished ? res.statusCode : 0;
+                    record(op.route, found, status, unreached && status > 0 && status < 400);
+                } catch (err) { logger.warn('openapi body guard: could not record a mismatch', { error: String(err) }); }
+            });
         } catch (err) {
             logger.warn('openapi body guard: check failed; the request goes on unchecked', { error: String(err) });
         }
-        return undefined;
     };
 
     // next() is called outside check(), so an error thrown further down the chain is not taken for
-    // one of this middleware's own.
+    // one of this middleware's own. The refusal itself is made where the route's own middleware
+    // chain hands over to its handler (installHandlerCheck), so a caller the route refuses gets the
+    // route's own answer.
     const guard = ((req: Request, res: Response, next: NextFunction): void => {
-        const issue = check(req, res);
-        if (!issue) { next(); return; }
-        const locale = requestLocale(req);
-        res.status(400).json(validationFailure(nodeId, [detailOf(issue, createT(locale))], locale));
+        check(req, res);
+        next();
     }) as OpenApiBodyGuard;
 
     guard.observations = () => [...counters.values()].sort((a, b) => b.count - a.count).map(o => ({ ...o }));

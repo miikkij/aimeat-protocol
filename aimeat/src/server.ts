@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-15 — The comment on openapiBodyGuard(): its refusal runs after the route's own middleware.
  *   2026-11-14 — openapiBodyGuard() is given mode, config.requestBodyCheck (security.request_body_check,
  *     default enforce): every route with a JSON body schema is enforced but the exempt ones.
  *   2026-11-14 — /v1/secret-shares is parsed at the large JSON limit: a secret share carries a file inline.
@@ -356,7 +357,8 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // observe logs and counts it and the request goes on unchanged (middleware/openapi-body-guard.ts).
   // After the junk guard, so the body it reads is one the node keeps as sent. After optionalAuth(),
   // whose reading of the session it takes: an enforced route refuses a body only from a caller with
-  // a session, and a caller without one goes on to the route's own sign-in check.
+  // a session. The refusal runs just before the route's handler, after the route's own middleware,
+  // so a caller the route refuses (sign-in, role, scope, rate limit) gets that answer.
   app.use(openapiBodyGuard(config.nodeId, { hasSession, mode: () => config.requestBodyCheck }));
 
   // Idempotency-Key support for POST/PUT
