@@ -8,6 +8,7 @@
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial.
  *   v1.1.0 — 2026-06-23 — Cover direct-write visibility + the no-double-count invariant.
+ *   2026-11-15 — Audit M156, L127: another member's private records stay out of the feed; Setup asserts each write.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-activity
 
@@ -25,6 +26,11 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import { ownerSignIn } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+/** A private memory write that must land; a refusal fails the calling test with its code. */
+async function put(tok: string, key: string, value: unknown) {
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(tok), body: JSON.stringify({ key, value, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `write ${key.split('.').slice(-3).join('.')} ${w.status}: ${JSON.stringify(w.body?.error)}`);
+}
 
 console.log('\n=== AIMEAT Workspace Activity E2E ===\n');
 let token = '', ownerName = '', orgId = '';
@@ -33,20 +39,22 @@ const WS = 'ws-act1', root = () => `organism.${orgId}.w.${WS}`;
 await test('Setup owner + org + workspace + history (a draft + a published version)', async () => {
     ownerName = `wsact${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Act', password: 'Act12345' }) });
+    assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
     const tk = await ownerSignIn(BASE, ownerName, 'Act12345');
     token = tk.body.data.token;
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Act Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
+    assert(o.status === 201, `organism create ${o.status}: ${JSON.stringify(o.body?.error)}`);
     orgId = o.body.data.organism.id;
     const manifest = { manifestVersion: '1.0', id: orgId, name: 'Act', kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
-    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: manifest, visibility: 'private' }) });
+    await put(token, `${root()}.meta.manifest`, manifest);
     // a draft (edit) + a published instance (t2: a publish creates BOTH .version.1 AND .latest)
-    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t1.draft`, value: { id: 't1', title: 'WIP' }, visibility: 'private' }) });
-    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t2.version.1`, value: { id: 't2', title: 'Done' }, visibility: 'private' }) });
-    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t2.latest`, value: { id: 't2', title: 'Done' }, visibility: 'private' }) });
+    await put(token, `${root()}.shared.tasks.t1.draft`, { id: 't1', title: 'WIP' });
+    await put(token, `${root()}.shared.tasks.t2.version.1`, { id: 't2', title: 'Done' });
+    await put(token, `${root()}.shared.tasks.t2.latest`, { id: 't2', title: 'Done' });
     // DIRECT WRITES that skip draft→publish: a `.latest`-only write (t3) and a bare-key write (t4).
     // These have no .version.N, so they must still surface as events (nothing goes unnoticed).
-    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t3.latest`, value: { id: 't3', title: 'Direct latest' }, visibility: 'private' }) });
-    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `${root()}.shared.tasks.t4`, value: { id: 't4', title: 'Direct bare' }, visibility: 'private' }) });
+    await put(token, `${root()}.shared.tasks.t3.latest`, { id: 't3', title: 'Direct latest' });
+    await put(token, `${root()}.shared.tasks.t4`, { id: 't4', title: 'Direct bare' });
 });
 
 await test('1. activity reports a publish + a draft event with actor/space/instance', async () => {
@@ -83,6 +91,40 @@ await test('4. non-member is denied', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace/activity?ws=${WS}`, { headers: auth(tk2.body.data.token) });
     assert(r.status === 403, `expected 403, got ${r.status}`);
     await json(`/v1/owners/${ownerName}x`, { method: 'DELETE', headers: auth(tk2.body.data.token) });
+});
+
+await test('5. another member\'s private draft and version stay out of the first owner\'s feed', async () => {
+    // The route read-authorizes each record of another owner (workspace-ops.ts). Every record above is
+    // the reader's own, so this is the only case where that per-record check decides anything.
+    const bName = ownerName + 'b';
+    const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: bName, display_name: 'B', password: 'Act12345' }) });
+    assert(reg.status === 201, `register B ${reg.status}`);
+    const bTok = (await ownerSignIn(BASE, bName, 'Act12345')).body.data.token;
+    try {
+        const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(bTok), body: '{}' });
+        assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body?.error)}`);
+        // A registered workspace (the grant route needs one) that B may write as a contributor.
+        const w = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Shared', manifest: { manifestVersion: '1', name: 'Shared', kind: 'project', objectTypes: [{ name: 'task', namespace: 'shared.tasks', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:task@1' }] } }) });
+        assert(w.status === 201 && typeof w.body?.data?.ws === 'string', `workspace ${w.status}: ${JSON.stringify(w.body?.error)}`);
+        const ws2 = w.body.data.ws as string, root2 = `organism.${orgId}.w.${ws2}`;
+        const g = await json(`/v1/organisms/${orgId}/workspace-access/grant`, { method: 'POST', headers: auth(token), body: JSON.stringify({ ws: ws2, grantee: bName, role: 'contributor' }) });
+        assert(g.status === 200, `grant ${g.status}: ${JSON.stringify(g.body?.error)}`);
+        await put(token, `${root2}.shared.tasks.ta.version.1`, { id: 'ta', title: 'A own version' });
+        await put(bTok, `${root2}.shared.tasks.tb.draft`, { id: 'tb', title: 'B private draft' });
+        await put(bTok, `${root2}.shared.tasks.tb.version.1`, { id: 'tb', title: 'B private version' });
+        const a = await json(`/v1/organisms/${orgId}/workspace/activity?ws=${ws2}`, { headers: auth(token) });
+        assert(a.status === 200, `A activity ${a.status}`);
+        const aEv = a.body.data.events || [];
+        assert(aEv.some((e: any) => e.instance === 'ta'), `A's own record is in A's feed: ${JSON.stringify(aEv)}`);
+        const leaked = aEv.filter((e: any) => e.instance === 'tb');
+        assert(leaked.length === 0, `A reads B's private records in the feed: ${JSON.stringify(leaked)}`);
+        const b = await json(`/v1/organisms/${orgId}/workspace/activity?ws=${ws2}`, { headers: auth(bTok) });
+        assert(b.status === 200, `B activity ${b.status}`);
+        const own = (b.body.data.events || []).filter((e: any) => e.instance === 'tb');
+        assert(own.length >= 1 && own.every((e: any) => e.actor === bName), `B sees its own records: ${JSON.stringify(own)}`);
+    } finally {
+        await json(`/v1/owners/${bName}`, { method: 'DELETE', headers: auth(bTok) });
+    }
 });
 
 await test('Cleanup', async () => { await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(token) }); });
