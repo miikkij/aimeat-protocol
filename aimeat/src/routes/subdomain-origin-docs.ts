@@ -23,6 +23,10 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.6.0 — 2026-11-15 — A restricted app (sign-in, access code, pacing) answers its manifest and its
+ *     two icons to a request with the app's access grant cookie, so a person the app opens for can
+ *     install it; every other request keeps the uniform 404, and the answer is cached privately
+ *     (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
  *   v1.5.0 — 2026-11-06 — An app with no description of its own serves no sitemap.xml and its
  *     robots.txt names none (appSeoListable, TARGET-089 Y2).
  *   v1.4.0 — 2026-10-20 — The app's MCP server card states 2026-07-28 and lists every revision the
@@ -61,6 +65,8 @@ import { escapeHtml } from '../utils/html-escape.js';
 import { countVisit } from '../services/visibility/visibility-counter.js';
 import { visitSignals } from '../utils/visit-signals.js';
 import type { VisibilityDoc } from '../models/visibility-schemas.js';
+import { originGrant, APP_ACCESS_COOKIE } from './origin-grant-cookie.js';
+import { appAccessGranted } from '../services/app/access-token.js';
 
 export interface AppOriginDocDeps {
   resolveApp: (target: string) => Promise<AppRecord | null>;
@@ -96,6 +102,29 @@ export function registerAppOriginDocs(
     const app = await deps.resolveApp(site.target);
     if (!app || deps.isRestricted(app)) return null;
     return app;
+  }
+
+  /**
+   * The app behind the request for the three files a browser needs to INSTALL it: the manifest and
+   * the two icons. A restricted app (a sign-in, an access code or a pacing amount) answers them to a
+   * request that carries the app's access grant, the same grant cookie the page itself is served
+   * with (routes/origin-grant-cookie.ts), and the uniform 404 to everybody else. Before this the
+   * three files answered 404 to every request for a restricted app, so nobody, the owner included,
+   * could install one. `restricted` tells the caller to keep its answer out of shared caches.
+   */
+  async function installableAppForOrigin(req: Request, res: Response): Promise<{ app: AppRecord; restricted: boolean } | null> {
+    const sub = req.subdomain;
+    if (!req.appOrigin || !sub || !config.appOriginEnabled) return null;
+    const site = await storage.getSubdomainSite(sub);
+    if (!site || !site.enabled || site.kind !== 'app') return null;
+    const app = await deps.resolveApp(site.target);
+    if (!app) return null;
+    if (!deps.isRestricted(app)) return { app, restricted: false };
+    // moveToCookie false: these are subresource requests, never a navigation to redirect.
+    const grant = await originGrant(req, res, config, {
+      cookie: APP_ACCESS_COOKIE, path: '/', verify: t => appAccessGranted(t, app.ownerName, app.filename),
+    }, { moveToCookie: false });
+    return grant === 'granted' ? { app, restricted: true } : null;
   }
 
   /** Count a fetch of one of the app's discovery files for its owner (services/visibility/). */
@@ -250,13 +279,15 @@ export function registerAppOriginDocs(
   // into "put the app behind its own button": a browser that reads it offers to install the app
   // under its OWN name and icon, scoped to its own origin, with no author work — the manifest
   // link is injected at serve time (app-head-meta.ts) the same way every other missing head tag
-  // is. Restricted apps fall through appForOrigin and keep the uniform 404.
+  // is. A restricted app answers it to a request with the app's access grant (installableAppForOrigin)
+  // and the uniform 404 to every other request.
   router.get('/manifest.webmanifest', async (req: Request, res: Response, next) => {
-    const app = await appForOrigin(req);
-    if (!app) return next();
+    const found = await installableAppForOrigin(req, res);
+    if (!found) return next();
+    const { app } = found;
     const apex = config.baseUrl.replace(/\/$/, '');
     const name = app.manifest?.name?.trim() || app.filename.replace(/\.[^.]+$/, '');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', found.restricted ? 'private, no-cache' : 'no-cache');
     res.type('application/manifest+json').send(JSON.stringify({
       id: '/',
       name,
@@ -288,11 +319,12 @@ export function registerAppOriginDocs(
   // surrogate pair in half, which is invalid XML) and entity-escaped; with text/svg served under
   // a no-script CSP, the worst a hostile value can be is a strange-looking icon.
   router.get('/icon.svg', async (req: Request, res: Response, next) => {
-    const app = await appForOrigin(req);
-    if (!app) return next();
+    const found = await installableAppForOrigin(req, res);
+    if (!found) return next();
+    const { app } = found;
     const raw = Array.from((app.manifest?.icon ?? '').trim()).slice(0, 8).join('') || '♥';
     const safe = escapeHtml(raw);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', found.restricted ? 'private, max-age=3600' : 'public, max-age=86400');
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
     res.type('image/svg+xml').send(
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">`
@@ -312,16 +344,18 @@ export function registerAppOriginDocs(
   // iPhone wore the apex heart. An author who uploads an icon image gets their own; one who has not
   // falls through to `next()`, and app-head-meta points them at the apex PNG exactly as before.
   //
-  // No auth: it is the icon of a page anyone with the link can open, and it is the same picture the
-  // apex serves at /v1/apps/:owner/:filename/icon.
+  // No auth for an app anyone with the link can open: it is the same picture the apex serves at
+  // /v1/apps/:owner/:filename/icon. A restricted app answers it with the app's access grant, like
+  // the manifest that names it.
   router.get('/apple-touch-icon.png', async (req: Request, res: Response, next) => {
-    const app = await appForOrigin(req);
-    if (!app) return next();
+    const found = await installableAppForOrigin(req, res);
+    if (!found) return next();
+    const { app } = found;
     const file = await storage.getStorageFile(app.ownerGaii, appIconKey(app.filename));
     if (!file) return next();
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Length', String(file.size));
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Cache-Control', found.restricted ? 'private, max-age=3600' : 'public, max-age=3600');
     // Owner-supplied bytes served from the app's own origin: name the type and refuse to let a
     // browser guess a different one, the same rule every stored-file download follows.
     res.setHeader('X-Content-Type-Options', 'nosniff');

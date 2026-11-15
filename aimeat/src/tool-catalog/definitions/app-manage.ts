@@ -21,6 +21,9 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-15 — icon_upload, with the icon and storage_key fields: the app's PNG icon over MCP, as
+ *     POST /v1/apps/:owner/:filename/icon sets it; marks also answers whether the app can be installed
+ *     and by whom (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
  *   2026-11-15 — parties takes limit and offset (a page of the people, 200 by default) and answers the
  *     app's cap: how many people it holds against the server's limit, and how many more it takes.
  *   2026-11-11 — The four agent_* actions say what they do since the approval path: a proposal, the
@@ -142,6 +145,9 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // screenshot_upload
     screenshot: { type: 'string', description: 'For screenshot_upload: the image as base64, at most 2 MB.' },
     screenshot_mime_type: { type: 'string', description: 'For screenshot_upload: image/png, image/jpeg or image/webp. Default image/png.' },
+    // icon_upload
+    icon: { type: 'string', description: 'For icon_upload: the PNG as base64, at most 1 MB, square, 512 x 512 is best. Over about 1 KB, upload it with aimeat_storage_upload and give storage_key instead.', zod: z.string().max(1_400_000) },
+    storage_key: { type: 'string', description: 'For icon_upload: the key of a PNG you stored with aimeat_storage_upload, in your own storage. Its bytes are copied to the app owner\'s icon; your file stays where it is.', zod: z.string().max(INPUT_LIMITS.name) },
     // subdomains
     subdomain: { type: 'string', description: 'For subdomain_set and subdomain_delete: the subdomain label (e.g. "shop").' },
     target: { type: 'string', description: 'For subdomain_set: what it serves, "owner/filename" for an app or an absolute URL for a redirect.' },
@@ -307,7 +313,7 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     seo: { fields: F(['filename'], ['index', 'title', 'description', 'keywords', 'image', 'lang']), scope: 'app:write',
         summary: 'decide whether the app can be found in search engines (off until you ask) and what it says there; naming nothing reports where it stands' },
     marks: { fields: F(['filename'], ['badge', 'install', 'aiUse', 'info', 'tucked']), scope: 'app:write',
-        summary: 'switch the "publish your own app" badge, the install offer, the "Use with your AI" mark and the app-info mark, and whether the marks start tucked away; naming nothing reports them. Naming the reviewer who lifts the AI label is the account holder\'s own act and is not here' },
+        summary: 'switch the "publish your own app" badge, the install offer, the "Use with your AI" mark and the app-info mark, and whether the marks start tucked away; naming nothing reports them. The answer\'s install block says who can install the app on a phone or a computer and whether it has its own PNG icon. Naming the reviewer who lifts the AI label is the account holder\'s own act and is not here' },
     legal: { fields: F(['filename'], ['kind', 'format', 'content', 'remove']), provenance: true, scope: 'app:write',
         summary: 'publish, replace or remove one of the app\'s legal pages (terms, privacy, imprint, refunds, accessibility, cookies, support), served under its address; no kind reports which pages it still ought to have' },
     audit: { fields: F(['filename'], ['limit', 'playtest', 'year']), scope: 'app:write',
@@ -326,6 +332,8 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'set your own image as the thumbnail' },
     screenshot_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'remove the thumbnail; the next scheduled run takes a new one' },
+    icon_upload: { fields: F(['filename'], ['owner', 'icon', 'storage_key']), oneOf: ['icon', 'storage_key'], scope: 'app:write',
+        summary: 'set the app\'s icon picture: the PNG a phone shows on its home screen when the app is installed (the emoji icon stays for the catalogue). Give icon (base64) or storage_key (a PNG you stored with aimeat_storage_upload). This is the only way to set it: a file you upload with aimeat_storage_upload stays in your own storage and never becomes the icon by itself, whatever its key. marks answers whether the app has one' },
     preview_link: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'a short-lived link that opens the app\'s unpublished draft' },
     visitors: { fields: F(['filename'], ['days']), scope: 'signals:read',

@@ -30,6 +30,10 @@
  * @usage
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.5.0 — 2026-11-15 — The manifest link carries crossorigin="use-credentials". A browser fetches
+ *     a manifest without cookies unless the link says so, and an app that needs a sign-in, a code or a
+ *     pacing amount answers its manifest only with the access grant cookie, so no browser offered to
+ *     install one (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
  *   v1.4.3 — 2026-10-11 — The JSON-LD lists only money-priced tools as Offers; a morsel-priced tool
  *     had been published as priceCurrency "MORSEL", a currency that does not exist (ruling D4).
  *   v1.4.2 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
@@ -251,8 +255,11 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   // Installable from its own origin: the manifest (served per-app by subdomains.ts) is what lets
   // a browser offer "install" for THIS app, with its own name and its own icon, without the
   // author writing a single tag. iOS reads the two tags after it instead of the manifest.
+  // use-credentials: a browser fetches a manifest WITHOUT cookies by default, and an app that needs a
+  // sign-in, a code or a pacing amount answers it only with its access grant cookie
+  // (routes/subdomain-origin-docs.ts). Same origin, so a public app loses nothing by it.
   if (!has(text, /<link rel="manifest"/i)) {
-    add.push(`<link rel="manifest" href="/manifest.webmanifest">`);
+    add.push(`<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">`);
   }
   if (!has(text, /<meta name="theme-color"/i)) {
     add.push(`<meta name="theme-color" content="#FAFAF8">`);

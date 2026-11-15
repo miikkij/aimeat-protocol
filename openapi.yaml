@@ -40244,6 +40244,18 @@ paths:
                               recommended: { type: array, items: { type: string } }
                               missing: { type: array, items: { type: string } }
                               reason: { type: string }
+                          install:
+                            type: object
+                            description: >
+                              Present when the request named `marks`. Who can install the app on a phone
+                              or a computer: a restricted app (a sign-in, an access code or a pacing
+                              amount) serves its web-app manifest and icons only to a request with its
+                              access grant, so only the people it opens for can install it.
+                            properties:
+                              offered: { type: boolean, description: The install-offer switch (marks.install) }
+                              installable_by: { type: string, enum: [anyone, people-it-opens-for] }
+                              own_icon: { type: boolean, description: Whether the app has its own PNG icon (POST .../icon) }
+                              note: { type: string }
                           download_url: { type: string }
                           note: { type: string }
         '400':
@@ -44480,7 +44492,12 @@ paths:
         image wears this node's own icon there. PNG only, checked by reading the bytes rather than
         the declared type, because an SVG stored here would be accepted and then silently ignored
         by the one surface it exists for. Max 1 MB. Idempotent. The app's owner, somebody they gave
-        a rung carrying `presentation`, or a node operator.
+        a rung carrying `presentation`, or a node operator. Give exactly one of `icon` (the bytes)
+        and `storage_key` (a PNG the caller already stored with POST /v1/storage or
+        aimeat_storage_upload, read from the CALLER's own namespace and copied into the app owner's
+        icon; this needs `storage:read` too). The icon is always stored in the app owner's
+        namespace, so an agent's own upload does not become the icon by itself. The MCP tool
+        aimeat_app_manage action icon_upload calls the same code.
       tags: [App Store]
       security:
         - BearerAuth: []
@@ -44490,11 +44507,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [icon]
               properties:
                 icon:
                   type: string
-                  description: Base64-encoded PNG image data.
+                  description: Base64-encoded PNG image data. Exclusive with storage_key.
+                storage_key:
+                  type: string
+                  description: Key of a PNG in the caller's own storage. Exclusive with icon.
       responses:
         '200':
           description: Icon stored
@@ -44502,12 +44521,18 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  filename: { type: string }
+                  owner: { type: string }
+                  icon_url: { type: string }
+                  source: { type: string, enum: [inline, storage] }
+                  size_bytes: { type: integer }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: Not the app's owner or a builder with presentation; storage_key without storage:read (SCOPE_DENIED); or the stored file's label keeps it from becoming public (CLASSIFIED)
         '404':
           $ref: '#/components/responses/NotFound'
         '413':

@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-15 -- icon_upload reaches POST /v1/apps/{owner}/{app}/icon with icon or storage_key.
  *   2026-11-15 -- parties forwards limit and offset to GET .../parties, a page of the registered people.
  *   2026-11-01 -- party_stop and party_resume reach POST .../parties/{name}/stop and /resume (WP9d).
  *   2026-11-01 -- member_set forwards `party`; parties, party_remove and party_registration_set reach
@@ -116,6 +117,8 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             return client.post(`${app}/screenshot`, pick(input, ['screenshot', 'screenshot_mime_type']));
         case 'screenshot_clear':
             return client.delete(`${app}/screenshot`);
+        case 'icon_upload':
+            return client.post(`/v1/apps/${enc(ownerName)}/${file}/icon`, pick(input, ['icon', 'storage_key']));
         case 'preview_link':
             return client.post(`${app}/draft/preview-token`, {});
         case 'visitors': {

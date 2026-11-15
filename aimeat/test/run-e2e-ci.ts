@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
  *   2026-11-15 -- The plan moves to test/run-e2e-plan.ts (E2E report of 2026-11-15, section 4):
  *     lanes are balanced by measured time (test/e2e-suite-times.json) instead of putting every suite
  *     with a port of its own into lane 0, which had made lane 0 the run's critical path; suites that
@@ -1957,6 +1958,9 @@ const ALL_SUITES = [
     // The screenshot of an app that opens for fewer people follows who may open it, unless its owner
     // shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
     'test/e2e-app-screenshot-access.ts',
+    // An agent sets its owner's app icon over MCP from a file it stored, and marks answers who can
+    // install the app (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
+    'test/e2e-app-icon-upload.ts',
     // An app's version list answers what the app's read answers for that caller, and carries no
     // content (codebase analysis 2026-11-03, item A1).
     'test/e2e-app-versions-access.ts',

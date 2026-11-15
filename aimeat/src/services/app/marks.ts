@@ -36,6 +36,8 @@
  *   const out = await applyOwnerMarksUpdate(storage, { ownerGaii, filename },
  *     { marks: body.marks, author: body.author, actor: { ghii, ownerPrincipal } });
  * @version-history
+ *   v1.6.0 — 2026-11-15 — ownerAppMarks answers `install` (services/app/install-readiness.ts): who can
+ *     install the app and whether it has its own PNG icon.
  *   v1.5.0 — 2026-10-18 — Two more: `info`, the app-info mark (absent = on), and `tucked`, whether the
  *     optional marks start tucked away for a visitor who has not chosen (absent = false, in view).
  *   v1.4.0 — 2026-10-09 — A third switch, `aiUse`: the "Use with your AI" mark (services/app-ai-use.ts). Absent = on.
@@ -57,6 +59,7 @@ import { emitChange } from '../event-bus.js';
 import { recordAppAudit, type AppAuditAction } from './audit.js';
 import { appAiUseOn } from '../../utils/app-ai-use-badge.js';
 import { appInfoMarkOn, appMarksTucked } from '../../utils/app-info-badge.js';
+import { appInstallReadiness, type AppInstallReadiness } from './install-readiness.js';
 
 export const AUTHOR_NAME_MAX = 120;
 
@@ -296,17 +299,21 @@ export async function ownerAppMarks(
   storage: Storage,
   config: AimeatConfig,
   args: { callerGaii: string; filename: string; marks?: Record<string, unknown> },
-): Promise<{ state: AppMarksState; note?: string } | { error: string }> {
+): Promise<{ state: AppMarksState; note?: string; install: AppInstallReadiness } | { error: string }> {
   const scope = await resolveAppOwnerScope(storage, config, args.callerGaii);
   if (!scope) return { error: 'This connection is not acting for an owner, so it has no app catalogue to change.' };
 
   const app = await storage.getApp(scope.ownerGhii, args.filename);
   if (!app) return { error: `No app named "${args.filename}" in your catalogue.` };
 
-  if (!args.marks || Object.keys(args.marks).length === 0) return { state: appMarksState(app) };
+  if (!args.marks || Object.keys(args.marks).length === 0) {
+    return { state: appMarksState(app), install: await appInstallReadiness(storage, config, app, appInstallChipOn(app.manifest)) };
+  }
 
   const out = await applyOwnerMarksUpdate(storage, { ownerGaii: scope.ownerGhii, filename: args.filename },
     { marks: args.marks, actor: { ghii: scope.ownerGhii, ownerPrincipal: false } });
   if ('error' in out) return { error: out.error };
-  return out;
+  const after = await storage.getApp(scope.ownerGhii, args.filename);
+  const current = after ?? app;
+  return { ...out, install: await appInstallReadiness(storage, config, current, appInstallChipOn(current.manifest)) };
 }

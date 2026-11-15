@@ -20,6 +20,10 @@
  * @structure registerAppIconRoutes() — GET and POST /v1/apps/:owner/:filename/icon
  * @usage registerAppIconRoutes(router, config, storage, appTarget); // from appsRouter
  * @version-history
+ *   v1.4.0 — 2026-11-15 — POST stores through services/app/icon-store.ts, shared with the
+ *     aimeat_app_manage action icon_upload, and takes `storage_key` in place of `icon`: a PNG the
+ *     caller already stored, copied from the caller's own namespace into the owner's icon key
+ *     (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti). Same refusals as before.
  *   v1.3.0 — 2026-11-15 — GET answers a browser's navigation to a missing app or icon with the
  *     not-found page (middleware/not-found-page.ts); an <img> and every other caller keep the JSON 404.
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -38,12 +42,13 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { sendNotFound } from '../../middleware/not-found-page.js';
-import { emitChange } from '../../services/event-bus.js';
-import { decodeStrictBase64 } from '../../utils/base64.js';
+import { callerOf } from '../../middleware/caller.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { appIconKey } from '../../services/app/seo.js';
+import { storeAppIcon } from '../../services/app/icon-store.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { appTargetOr, type AppTargetFor } from './helpers.js';
+import type { AppTargetFor } from './helpers.js';
 import { operatorOverride } from '../../services/operator-override.js';
 
 /** Defence in depth against a traversal in the filename segment, as every app route applies it. */
@@ -104,73 +109,38 @@ export function registerAppIconRoutes(
         res.send(file.data);
     });
 
-    // POST /v1/apps/:owner/:filename/icon — put one there, without republishing the app.
+    // POST /v1/apps/:owner/:filename/icon — put one there, without republishing the app. The body
+    // is `{ icon }` (the PNG as base64) or `{ storage_key }` (a PNG the caller already stored, read
+    // from the caller's own namespace). services/app/icon-store.ts does the work for this route and
+    // for the aimeat_app_manage action icon_upload.
     router.post('/v1/apps/:owner/:filename/icon', requireAuth(), requireScope('app:write'), async (req, res) => {
         const filename = req.params.filename as string;
         const owner = bareOwner(req.params.owner as string);
-        if (badFilename(filename)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_FILENAME', 'Filename contains invalid characters'));
+        // Reading a stored file is a storage read, so it asks that permission word as GET /v1/storage does.
+        const storageKey = req.body?.storage_key;
+        if (storageKey !== undefined && !callerOf(req, config.nodeId, storage).has('storage:read')) {
+            res.status(403).json(error(config.nodeId, 'SCOPE_DENIED', 'storage_key reads one of your stored files, which needs the storage:read permission.'));
             return;
         }
-
-        const app = await storage.getAppByOwnerName(owner, filename);
-        if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
-            return;
-        }
-
-        // The app's own owner, or somebody they gave a rung that carries `presentation` — the same
-        // test the screenshot uses, because this is the same kind of change to the same app. The
-        // operator passes too, and a change to another person's app writes the operator trail (an
-        // app of the operator's own account writes nothing).
-        const isOperator = await operatorOverride(storage, config, req.auth, {
-            ownerOf: app.ownerName, area: 'app', action: 'icon', subject: filename,
+        const out = await storeAppIcon({ storage, config }, {
+            owner, filename, icon: req.body?.icon, storageKey,
+            reader: readerFor({ storage, config }, req.auth),
+        }, async (app) => {
+            // The app's own owner, or somebody they gave a rung that carries `presentation` — the same
+            // test the screenshot uses, because this is the same kind of change to the same app. The
+            // operator passes too, and a change to another person's app writes the operator trail (an
+            // app of the operator's own account writes nothing).
+            const isOperator = await operatorOverride(storage, config, req.auth, {
+                ownerOf: app.ownerName, area: 'app', action: 'icon', subject: filename,
+            });
+            if (isOperator) return null;
+            const t = await appTarget(req, 'presentation');
+            return t.ok ? null : { ok: false, status: t.status, code: t.code, message: t.message };
         });
-        if (!isOperator && !(await appTargetOr(appTarget, config, req, res, 'presentation'))) return;
-
-        const { icon } = req.body ?? {};
-        if (!icon || typeof icon !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'icon (base64 image) is required'));
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
         }
-        const iconData = decodeStrictBase64(icon);
-        if (!iconData) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'icon must be base64-encoded image data'));
-            return;
-        }
-        // Smaller than the screenshot's cap on purpose: this is a square icon, 512 pixels at the very
-        // most, so a megabyte is already generous.
-        const MAX_ICON_SIZE = 1024 * 1024;
-        if (iconData.length > MAX_ICON_SIZE) {
-            res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Icon exceeds 1MB limit (${iconData.length} bytes)`));
-            return;
-        }
-        // PNG, CHECKED RATHER THAN BELIEVED. A caller's mime type is a claim about bytes the same
-        // caller supplied, and an SVG stored here would be accepted, served, and silently ignored by
-        // the one surface this exists for. The magic number is the test.
-        const isPng = iconData.length > 8 && iconData[0] === 0x89 && iconData[1] === 0x50
-            && iconData[2] === 0x4E && iconData[3] === 0x47;
-        if (!isPng) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                'The icon must be a PNG. An iPhone home screen ignores SVG, which is the one place this icon is for.'));
-            return;
-        }
-
-        await storage.createStorageFile({
-            key: appIconKey(filename),
-            ownerGaii: app.ownerGaii,   // the app row's bucket, so the GET above and the app origin find it
-            visibility: 'public',
-            mimeType: 'image/png',
-            size: iconData.length,
-            data: iconData,
-            createdAt: new Date().toISOString(),
-        });
-
-        emitChange('apps');
-        res.json(success(config.nodeId, {
-            filename,
-            owner: app.ownerName,
-            icon_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(filename)}/icon`,
-        }));
+        res.json(success(config.nodeId, out.data));
     });
 }

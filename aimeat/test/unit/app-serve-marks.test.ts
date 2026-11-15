@@ -12,6 +12,10 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.11.0 — 2026-11-15 — The eleven goldens that carry the injected manifest link were re-captured for
+ *     the eleventh intentional output change: the link carries crossorigin="use-credentials", so a
+ *     restricted app's manifest is fetched with its access grant cookie. Each was rewritten by
+ *     replacing that one tag in its decoded bytes and nothing else, and every case passes on it.
  *   v1.10.0 — 2026-11-06 — The nine goldens that carry the agent-discovery block were re-captured for
  *     the tenth intentional output change: the noscript block is one statement and four links
  *     (TARGET-092). Each differs from its old golden only inside `<noscript id="aimeat-agent-discovery">`

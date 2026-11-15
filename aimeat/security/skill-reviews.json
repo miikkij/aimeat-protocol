@@ -207,7 +207,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:c23590821ced206c79eca721"
+      "digest": "sha256:691560693433efae330ed020"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/build-data-map-step.ts"
       ],
-      "digest": "sha256:7af7d1d23672eb8ccd3116a3",
+      "digest": "sha256:1f32a7a5f3ce355351c6f429",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -567,7 +567,7 @@
         "aimeat/scripts/ui-compare.ts",
         "aimeat/src/services/build-app-prompt.ts"
       ],
-      "digest": "sha256:eabfc760309fa89f613b3218",
+      "digest": "sha256:8af4ee8b0e71c50a2e82e4bb",
       "note": "It sends the check to the sandbox node and to ui:compare; its measuring gate is served to app builders in build-app-prompt.ts and the two are kept in step."
     },
     "project:aimeat-imagery": {
@@ -631,7 +631,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:78e9c7d4637ba86b7bc283e9",
+      "digest": "sha256:958b61ec57372bd3078ce00c",
       "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); the AIMEAT purpose guard states the test order and the purpose tier that gate.ts and run-e2e-ci.ts implement."
     },
     "agent:browser-verifier": {
@@ -648,7 +648,7 @@
         "aimeat/scripts/gate.ts",
         "aimeat/test/run-e2e-ci.ts"
       ],
-      "digest": "sha256:78e9c7d4637ba86b7bc283e9",
+      "digest": "sha256:958b61ec57372bd3078ce00c",
       "note": "It runs pnpm gate and names the tiers and the E2E runner's command line."
     },
     "agent:module-builder": {
@@ -717,7 +717,7 @@
       "aimeat/src/services/app/spec-gate.ts": "832747b6e31d4403"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "d64f1e409d94fad4",
+      "aimeat/src/services/build-atelier-prompt.ts": "eb4cd90c2d1438eb",
       "aimeat/src/services/build-atelier-layers.ts": "44f4b6e45a9d8b9a",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "7cca5c1ee7fc64f9",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
@@ -830,8 +830,8 @@
     "project:aimeat-app-building": {
       "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85",
-      "aimeat/src/services/build-atelier-prompt.ts": "d64f1e409d94fad4",
-      "aimeat/src/services/build-app-prompt.ts": "d8a95f130a8e8bd7",
+      "aimeat/src/services/build-atelier-prompt.ts": "eb4cd90c2d1438eb",
+      "aimeat/src/services/build-app-prompt.ts": "f1112b0f2b80c2c8",
       "aimeat/src/services/app/publish.ts": "7a87b2d1057551f2",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
@@ -850,7 +850,7 @@
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8",
       "aimeat/scripts/sandbox-machines.ts": "86278db6896cce02",
       "aimeat/scripts/ui-compare.ts": "a9f4b0a0d091a9ee",
-      "aimeat/src/services/build-app-prompt.ts": "d8a95f130a8e8bd7"
+      "aimeat/src/services/build-app-prompt.ts": "f1112b0f2b80c2c8"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3",
@@ -1046,14 +1046,14 @@
     },
     "project:security-audit": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "6ed10fc7ce560674"
+      "aimeat/test/run-e2e-ci.ts": "c63fe7d0c52ccfb4"
     },
     "agent:browser-verifier": {
       "aimeat/scripts/sandbox.ts": "6ae479df37b0a6c8"
     },
     "agent:gatekeeper": {
       "aimeat/scripts/gate.ts": "db6436dad36fefa4",
-      "aimeat/test/run-e2e-ci.ts": "6ed10fc7ce560674"
+      "aimeat/test/run-e2e-ci.ts": "c63fe7d0c52ccfb4"
     },
     "agent:module-builder": {
       "aimeat/test/unit/phaser-stub.mjs": "92093f158d0eb222"

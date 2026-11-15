@@ -357,7 +357,7 @@ async function main() {
         await test('the served app HTML links that manifest (injected, author tags win)', async () => {
             const res = await onAppOrigin('/', SUB);
             assert(res.status === 200, `expected 200, got ${res.status}`);
-            assert(res.body.includes('rel="manifest"') && res.body.includes('/manifest.webmanifest'),
+            assert(res.body.includes('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">'),
                 'the manifest link is in the served head');
             assert(res.body.includes('/js/install-chip.js'),
                 'the install-suggestion chip rides the same injection');
@@ -990,12 +990,12 @@ async function main() {
             try { described = card.json<{ app?: { app_id?: string } }>().app?.app_id; }
             catch (err) { console.log(`     (mcp.json was not JSON, which is also not the app card: ${String(err).slice(0, 60)})`); }
             assert(described !== gatedFile, 'the MCP server card must not describe a gated app');
-            // The install surface follows the same rule: a gated app is not installable and its
-            // origin publishes no manifest or icon, grant or no grant.
-            const man = await onAppOrigin(`/manifest.webmanifest${grantQuery}`, GATED_SUB);
-            assert(man.status === 404, `a gated app must publish no manifest, got ${man.status}`);
-            const icon = await onAppOrigin(`/icon.svg${grantQuery}`, GATED_SUB);
-            assert(icon.status === 404, `a gated app must publish no icon, got ${icon.status}`);
+            // The install files follow who may open it (2026-11-15; this was red against the 404 for all):
+            // the grant cookie gets the manifest and icon, cached privately; no grant gets the uniform 404.
+            for (const p of ['/manifest.webmanifest', '/icon.svg']) {
+                const [bare, held] = [await onAppOrigin(p, GATED_SUB), await onAppOrigin(p, GATED_SUB, 'header', { Cookie: grantCookie(await onAppOrigin(`/${grantQuery}`, GATED_SUB)) })];
+                assert(bare.status === 404 && held.status === 200 && (held.header('cache-control') ?? '').startsWith('private'), `${p}: ${bare.status} / ${held.status} ${held.header('cache-control')}`);
+            }
         });
 
         // ── Phase 8: the marker is a claim, and the Host is what decides it ─────────────────

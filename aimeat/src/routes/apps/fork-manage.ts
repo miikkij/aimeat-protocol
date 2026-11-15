@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — PATCH /v1/apps/:filename answers `install` when the request names marks: who can install
+ *     the app and whether it has its own PNG icon (services/app/install-readiness.ts).
  *   2026-11-14 — POST .../fork reads the source and asks its gates through forkSourceFor
  *     (services/app/fork-gate.ts), which aimeat_app_fork now asks too (structure programme 2026-11, unit 2b, B9).
  *   2026-11-06 — `seo: { index: true }` on an app not yet in search is refused before the first write
@@ -82,8 +84,9 @@ import {
 } from '../../services/app/settings.js';
 import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput, appOwnWords, prospectiveApp, thinPageRefusal, APP_OWN_WORDS_MIN } from '../../services/app/seo.js';
 import {
-    applyOwnerMarksUpdate, appMarksState, parseMarksInput, parseAuthorInput, AUTHOR_NEEDS_OWNER_PRINCIPAL,
+    applyOwnerMarksUpdate, appMarksState, appInstallChipOn, parseMarksInput, parseAuthorInput, AUTHOR_NEEDS_OWNER_PRINCIPAL,
 } from '../../services/app/marks.js';
+import { appInstallReadiness } from '../../services/app/install-readiness.js';
 import {
     applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney, parseLegalInput, legalUpdateRefusal,
 } from '../../services/app/legal.js';
@@ -519,6 +522,10 @@ export function registerForkManageRoutes(
             seo: updated ? { state: appSeoState(updated, config), ...(updated.manifest?.seo ?? {}) } : null,
             // The chrome switches as they now stand, the reviewer, and the audit log of the latter.
             ...(updated ? appMarksState(updated) : {}),
+            // Who can install the app and with which icon, when the request touched the marks: the
+            // same block the aimeat_app_manage marks action answers.
+            ...(updated && 'marks' in body
+                ? { install: await appInstallReadiness(storage, config, updated, appInstallChipOn(updated.manifest)) } : {}),
             // The legal pages as their state (no content), and what the app still ought to have.
             ...(updated ? {
                 legal: appLegalState(updated),

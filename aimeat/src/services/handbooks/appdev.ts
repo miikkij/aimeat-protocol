@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-15 — "Installing the app, and its icon": who can install, action icon_upload, and that an
+ *     upload never becomes the icon by its key (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
  *   2026-11-11 — "An agent that comes with the app": the aimeat-crews block, the approval, and the
  *     skill aimeat-app-agents.
  *   2026-11-08 — Step 0 says the model rule by quality (MODEL_QUALITY_ADVICE), never by name, and
@@ -94,9 +96,16 @@ content, PUT the file to the returned URL; inline for tiny files) · \`aimeat_ap
 \`aimeat_app_get\` · \`aimeat_app_delete\`. All four take the app's OWNER and FILENAME, on every
 surface — MCP, the connector, and \`/local/call\`. Everything else about one app is
 \`aimeat_app_manage\` with an \`action\`: settings (hide it, forking, access code, copy protection,
-name), seo, marks, legal, audit, versions, lineage, screenshot, visitors, ui_get/ui_set, cost,
+name), seo, marks, legal, audit, versions, lineage, screenshot, icon_upload, visitors, ui_get/ui_set, cost,
 preview_link, bundled agents, members and backup_export. A call with a missing or foreign field is refused
 with every problem named at once.
+
+**Installing the app, and its icon.** The node serves every app's web-app manifest, so a browser
+offers to install it; an app that opens only for some people can be installed only by them. Action
+\`marks\` answers who can install it and whether it has its own PNG icon. Set the icon with action
+\`icon_upload\` (\`icon\` as base64, or \`storage_key\` of a PNG you stored with
+\`aimeat_storage_upload\`). A file you upload stays in your own storage and never becomes the icon by
+its key alone.
 
 **An agent that comes with the app.** An app whose work continues while nobody has it open brings
 its own agent: one \`aimeat-crews\` block in the page declares what the agent is for, the permissions

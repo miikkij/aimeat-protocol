@@ -23,6 +23,9 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-11-15 — action icon_upload calls services/app/icon-store.ts, as POST .../icon does; marks
+ *     answers `install`, who can install the app and whether it has its own PNG icon
+ *     (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
  *   2026-11-11 — action agent_status passes the caller's principal, so the permissions it answers for
  *     an agent that does not exist yet are what this caller's proposal would ask for.
  *   2026-11-06 — action seo answers own_words and own_words_min, and switching search on below 150 words
@@ -88,6 +91,8 @@ import { callerAppReader } from '../services/app/read-gate.js';
 import { collectAppLineage } from '../services/app/lineage.js';
 import { captureAppScreenshot } from '../services/screenshot-capture.js';
 import { storeAppScreenshot, clearAppScreenshot } from '../services/app/screenshot-store.js';
+import { storeAppIcon } from '../services/app/icon-store.js';
+import { readerFor } from '../services/classification/reader.js';
 import { mintDraftPreview } from '../services/app/draft-preview.js';
 import { AppVisitorsError, clampDays, readAppVisitors, setAppMeasurement } from '../services/app/visitors.js';
 import { buildUiCatalogueView } from '../services/app-ui/catalogue-index.js';
@@ -198,7 +203,7 @@ export function registerAppManageTool(
             case 'marks': {
                 const out = await ownerAppMarks(storage, config, { callerGaii, filename, marks: pick(args, ['badge', 'install', 'aiUse', 'info', 'tucked']) });
                 if ('error' in out) return plainRefusal(out.error);
-                return answer({ filename, ...(out.note ? { note: out.note } : {}), marks: out.state.marks, reviewer: out.state.authorship?.name ?? null });
+                return answer({ filename, ...(out.note ? { note: out.note } : {}), marks: out.state.marks, reviewer: out.state.authorship?.name ?? null, install: out.install });
             }
             case 'legal': {
                 // One page per call; naming no kind is a question.
@@ -255,6 +260,23 @@ export function registerAppManageTool(
                     owner: scope.ownerName, filename, screenshot: args.screenshot, screenshot_mime_type: args.screenshot_mime_type,
                 });
                 return out.ok ? answer(out.data) : refusalText(out);
+            }
+            case 'icon_upload': {
+                // Reading one of the caller's stored files is a storage read, as POST .../icon asks it.
+                if (args.storage_key !== undefined && args.storage_key !== null && !scopeIsCovered(scopes, 'storage:read')) {
+                    return toolError('SCOPE_DENIED', 'storage_key reads one of your stored files, which needs the "storage:read" permission. Send the PNG as icon instead, or ask the owner to grant it.');
+                }
+                const scope = await target('presentation');
+                if ('refusal' in scope) return toolError('FORBIDDEN', scope.refusal);
+                const out = await storeAppIcon({ storage, config }, {
+                    owner: scope.ownerName, filename, icon: args.icon, storageKey: args.storage_key,
+                    reader: readerFor({ storage, config }, caller().auth),
+                });
+                if (!out.ok) return toolError(out.code, out.message);
+                return answer({
+                    ...out.data,
+                    note: 'The PNG is now the app\'s icon in the owner\'s storage. A phone shows it when the app is installed; one that installed it before shows it after the app is installed again.',
+                });
             }
             case 'screenshot_clear': {
                 const scope = await target('presentation');

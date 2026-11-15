@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-11-15 — ADDITIVE: "Installing the app on a phone, and its home-screen icon" (icon_upload, who can install).
  *   2026-11-15 — Words only (Jouni's ruling): the platform enforces permissions "on every request", not "at the door".
  *   2026-10-21 — ADDITIVE: an outside key is stored "for host X", and the extension declares it in `uses_secrets`.
  *   2026-10-17 — The new-app publish walkthrough moved unchanged to build-app-publish-walkthrough.ts (line ceiling).
@@ -651,6 +652,12 @@ function composeAppPrompt(
   body += '.scroll-area { padding-bottom: calc(var(--aimeat-chrome-bottom, 46px) + 12px); }\n';
   body += '```\n';
   body += 'The same applies to full-screen focused views: give their bottom input row the same `padding-bottom`. When the node\'s chrome geometry changes, the served variable overrides your fallback automatically — that is the point of reading it.\n\n';
+
+  // Installing the app on a phone. An app's own agent made a PNG icon, stored it with
+  // aimeat_storage_upload (which writes to the agent's own namespace) and expected it to become the
+  // home-screen icon, which is read from the owner's (2026-11-14). The node serves the manifest itself.
+  body += '### Installing the app on a phone, and its home-screen icon\n';
+  body += 'The node makes every published app installable: it serves the web-app manifest and offers "Install this app". Do not write a manifest or a service worker of your own for that. An app that opens only for some people (signed in, an access code, a payment) can be installed only by them. The home-screen icon is a PNG set with `aimeat_app_manage` action `icon_upload` (`icon` as base64, or `storage_key` of a PNG you stored with `aimeat_storage_upload`); a file you upload never becomes the icon by its key alone. Action `marks` answers who can install the app and whether it has its own icon.\n\n';
 
   // Visual verification. The mobile checklist proved a machine-checkable rule beats good intentions
   // (scrollWidth === clientWidth). These are the same idea for appearance: an app can pass every

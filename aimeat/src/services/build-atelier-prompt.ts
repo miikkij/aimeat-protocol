@@ -28,6 +28,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.47.0 — 2026-11-15 — ADDITIVE: Finishing gains "Installing the app, and its home-screen icon"
+ *     (icon_upload, who can install), the same text as build-app-prompt.ts
+ *     (wish-kirjautumista-vaativa-sovellus-asentuu-puhelimeen-ja-agentti).
  *   v1.46.1 — 2026-11-15 — Words only (Jouni: the prompts work better when they explain the thing):
  *     "an admin or monitoring screen" for the machine room, "the log view" for the log vane, "the one
  *     colour you set" for the one colour door.
@@ -777,6 +780,16 @@ function composeBody(config: AimeatConfig): string {
     + 'of the skill). Report published, '
     + 'checked and accepted as three separate things: a check you could not run is said, never '
     + 'counted as passed.\n\n';
+  // An app's own agent stored a PNG with aimeat_storage_upload and expected it to become the
+  // home-screen icon, which is read from the owner's storage (2026-11-14). Same text as build-app-prompt.ts.
+  body += '**Installing the app, and its home-screen icon.** The node makes every published app '
+    + 'installable: it serves the web-app manifest and offers "Install this app", so write no '
+    + 'manifest or service worker of your own for that. An app that opens only for some people '
+    + '(signed in, an access code, a payment) can be installed only by them. The home-screen icon '
+    + 'is a PNG set with `aimeat_app_manage` action `icon_upload` (`icon` as base64, or '
+    + '`storage_key` of a PNG you stored with `aimeat_storage_upload`); a file you upload never '
+    + 'becomes the icon by its key alone. Action `marks` answers who can install the app and '
+    + 'whether it has its own icon.\n\n';
   body += '**Two checks a screenshot does not make.** Read the console with the browser\'s own '
     + 'warnings as well as its errors, for several seconds while the app does its work: a WebGL, '
     + 'deprecation or policy warning is written by the browser (`Log.entryAdded` over the DevTools '
