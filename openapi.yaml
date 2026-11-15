@@ -37004,13 +37004,28 @@ paths:
           application/json:
             schema:
               type: object
-              required: [node_id, public_key]
+              required: [node_id, node_public_key]
               properties:
                 node_id:
                   type: string
-                public_key:
+                node_url:
                   type: string
-                  description: Ed25519 public key (hex)
+                  description: The sender's base URL.
+                node_public_key:
+                  type: string
+                  description: The sender's Ed25519 node public key (hex).
+                timestamp:
+                  type: string
+                  description: When the request was made; part of the signed payload of a key rotation.
+                signature:
+                  type: string
+                  description: >-
+                    Needed only to change an established key: a signature by the current key over
+                    `node_id:node_public_key:timestamp`.
+                agent_keys:
+                  type: array
+                  description: Sent empty for peers on older versions; agent keys a peer sends are not kept.
+                  items: { type: object }
                 capabilities:
                   type: array
                   items:
