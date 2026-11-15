@@ -30296,7 +30296,7 @@
     "people.removedToast": "{name} on poistettu.",
     "people.roleToast": "Käyttäjällä {name} on nyt rooli {role}.",
     "people.personal": "Jokaisen ihmisen sähköpostiosoite on henkilötieto, jota sinä säilytät sovelluksen omistajana. Poista ihminen, joka ei enää käytä sovellusta.",
-    "people.capacity": "Paikkoja käytössä {used}/{max}. Tämä palvelin sallii yhteen sovellukseen {max} ihmistä. Määrään lasketaan myös ne, joiden linkki odottaa vielä avaamista.",
+    "people.capacity": "Paikkoja käytössä {used}/{max}. {max} on tämän palvelimen raja yhdelle sovellukselle. Rajaan lasketaan myös ne, joiden linkki odottaa vielä avaamista.",
     "people.capacityNear": "Sovellus on lähes täynnä: paikkoja on jäljellä {left}. Kun sovellus on täynnä, uusi rekisteröityminen hylätään. Poista ihmiset, jotka eivät enää käytä sovellusta, tai pyydä palvelimen ylläpitäjää nostamaan rajaa.",
     "people.capacityFull": "Sovellus on täynnä: uusi rekisteröityminen hylätään. Poista ihmiset, jotka eivät enää käytä sovellusta, tai pyydä palvelimen ylläpitäjää nostamaan rajaa {max}.",
     "people.showing": "Näkyvissä {n}/{total}.",

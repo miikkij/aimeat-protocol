@@ -27918,7 +27918,7 @@
     "people.removedToast": "Se quitó a {name}.",
     "people.roleToast": "{name} ahora tiene el rol {role}.",
     "people.personal": "El correo electrónico de cada persona es un dato personal que guardas porque la aplicación es tuya. Quita a quien ya no use la aplicación.",
-    "people.capacity": "{used} de {max} plazas ocupadas. Este servidor admite {max} personas por aplicación, contando los registros que aún esperan a que se abra su enlace.",
+    "people.capacity": "{used} de {max} plazas ocupadas. Es el límite de este servidor para una aplicación, y cuentan también los registros que aún esperan a que se abra su enlace.",
     "people.capacityNear": "La aplicación está casi llena: quedan {left} plazas. Cuando esté llena, se rechazará cada registro nuevo. Quita a quien ya no use la aplicación o pide al operador de este servidor que suba el límite.",
     "people.capacityFull": "La aplicación está llena: se rechaza cada registro nuevo. Quita a quien ya no use la aplicación o pide al operador de este servidor que suba el límite de {max}.",
     "people.showing": "Se ven {n} de {total}.",

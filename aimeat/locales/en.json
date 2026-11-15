@@ -29548,7 +29548,7 @@
     "people.removedToast": "{name} was removed.",
     "people.roleToast": "{name} now has the role {role}.",
     "people.personal": "The e-mail address of each person is personal data you hold as the app's owner. Remove a person who no longer uses the app.",
-    "people.capacity": "{used} of {max} places taken. This server lets one app hold {max} people, counting the signups still waiting for their link.",
+    "people.capacity": "{used} of {max} places taken. This is this server's limit for one app, and the signups still waiting for their link count toward it.",
     "people.capacityNear": "The app is close to full: {left} places are left. When it is full, a new signup is refused. Remove the people who no longer use the app, or ask the operator of this server to raise the limit.",
     "people.capacityFull": "The app is full: a new signup is refused. Remove the people who no longer use the app, or ask the operator of this server to raise the limit of {max}.",
     "people.showing": "Showing {n} of {total}.",

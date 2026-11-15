@@ -14,8 +14,8 @@
  *   with `party`, POST .../parties/{name}/stop and /resume, DELETE .../parties/{name}. The list reads
  *   again on the live event `app-parties` (the node sends it to the owner's streams), never on a timer.
  *   THE CAP. The list answers `limit` (max, used, left): the line under the setting says how many
- *   places are taken of the server's limit per app, and from 80 % on it says what to do before the app
- *   is full. The list comes a page of 200 at a time, with "Show more".
+ *   places are taken of the server's limit per app, and from 80 % on a state line (attention, then
+ *   danger when full) says what to do. The list comes a page of 200 at a time, with "Show more".
  *   Made of the component kit: the section passes data and never a class.
  * @structure meta · PAGE · PeopleSection({ d })
  * @usage const mod = await import('./sections/people.js'); html`<${mod.default} d=${d} />`
@@ -139,7 +139,7 @@ export default function PeopleSection({ d }) {
     <${Space} above="section">
       <${Note} kind="quiet">${registrationLine(reg)}<//>
       ${lim ? html`<${Note} kind="quiet">${x('people.capacity', { used: num(lim.used), max: num(lim.max) })}<//>` : null}
-      ${near ? html`<${Note} role=${lim.left > 0 ? 'status' : 'alert'}>${lim.left > 0
+      ${near ? html`<${Note} kind="state" tone=${lim.left > 0 ? 'attention' : 'danger'} role=${lim.left > 0 ? 'status' : 'alert'}>${lim.left > 0
         ? x('people.capacityNear', { left: num(lim.left) })
         : x('people.capacityFull', { max: num(lim.max) })}<//>` : null}
       ${off ? null : html`
