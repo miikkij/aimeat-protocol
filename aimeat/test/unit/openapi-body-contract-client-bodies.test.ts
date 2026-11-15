@@ -322,9 +322,8 @@ describe('POST /v1/federation/key-exchange (CLI federation join, the node\'s own
     });
 
     it('refuses a body without node_id or node_public_key, as the route does', async () => {
-        const { node_public_key: _key, ...noKey } = cli;
-        const { node_id: _id, ...noId } = cli;
-        await refused('POST', '/v1/federation/key-exchange', [noKey, noId]);
+        // A key left undefined is not written by JSON.stringify, so each body lacks that field.
+        await refused('POST', '/v1/federation/key-exchange', [{ ...cli, node_public_key: undefined }, { ...cli, node_id: undefined }]);
     });
 });
 
