@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Request } from 'express';
 import { aiCallerOf } from '../../src/routes/ai-policy.js';
-import { CHAT_AGENT_NAME } from '../../src/services/chat-agent.js';
+import { CHAT_AGENT_NAME } from '../../src/services/chat/agent.js';
 
 const NODE = 'aimeat-local-001-dev';
 

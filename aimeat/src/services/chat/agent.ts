@@ -1,5 +1,5 @@
 /**
- * @file chat-agent.ts
+ * @file src/services/chat/agent.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The person's built-in chat agent: `chat#<owner>@<node>`, a real GAII principal like
@@ -43,18 +43,18 @@
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { randomBytes } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { buildGAII } from '../utils/gaii.js';
-import { generateKeyPair } from '../auth/keypair.js';
-import { issueJWT } from '../auth/jwt.js';
-import { scopesForProfile } from '../tool-catalog/scopes.js';
-import { emitChange } from './event-bus.js';
-import { emitToolListChanged } from './resource-events.js';
-import { mcpResourceOf } from '../utils/mcp-resource.js';
-import { logger } from '../utils/logger.js';
-import { agentListingTags } from './content-defaults.js';
-import { newAgentClearance } from './agent/clearance.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { buildGAII } from '../../utils/gaii.js';
+import { generateKeyPair } from '../../auth/keypair.js';
+import { issueJWT } from '../../auth/jwt.js';
+import { scopesForProfile } from '../../tool-catalog/scopes.js';
+import { emitChange } from '../event-bus.js';
+import { emitToolListChanged } from '../resource-events.js';
+import { mcpResourceOf } from '../../utils/mcp-resource.js';
+import { logger } from '../../utils/logger.js';
+import { agentListingTags } from '../content-defaults.js';
+import { newAgentClearance } from '../agent/clearance.js';
 
 /** The agent's name component. One place, because it appears in a GAII, a UI and a log line. */
 export const CHAT_AGENT_NAME = 'chat';

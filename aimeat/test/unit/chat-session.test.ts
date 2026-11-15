@@ -26,9 +26,9 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { loadCatalog } from '../../src/services/ai/catalog/store.js';
-import { chatEnabled, runChatTurn } from '../../src/services/chat-session.js';
+import { chatEnabled, runChatTurn } from '../../src/services/chat/session.js';
 import { markNodeKeySpent, resetNodeKeyBalanceForTests } from '../../src/services/ai/node-key-balance.js';
-import { createThread, readThread } from '../../src/services/chat-threads.js';
+import { createThread, readThread } from '../../src/services/chat/threads.js';
 import { initNodeKeys } from '../../src/auth/jwt.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 

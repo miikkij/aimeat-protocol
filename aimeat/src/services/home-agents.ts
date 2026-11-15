@@ -41,7 +41,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { listProposals } from './agent/proposals.js';
 import { listConnectors, wantedInstalls } from './connector-registry.js';
 import { readCrewState } from './crew-def-store.js';
-import { CHAT_AGENT_NAME } from './chat-agent.js';
+import { CHAT_AGENT_NAME } from './chat/agent.js';
 import { nodeTimeZone } from './display-prefs.js';
 import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent/ties.js';
 import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';

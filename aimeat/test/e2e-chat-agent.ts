@@ -583,7 +583,7 @@ async function run(): Promise<void> {
         assert(idle.status === 200 && idle.body.data.stopped === false, `nothing running: ${JSON.stringify(idle.body)}`);
     });
 
-    // ── The turn ceiling (services/chat-turn-guard.ts) ──
+    // ── The turn ceiling (services/chat/turn-guard.ts) ──
     //
     // Measured 2026-10-02 on a real model (scripts/chat-turn-measure.ts): a request for a new agent
     // ran 149 s, 12 tool calls and six model rounds, with its first word at 141.8 s and no proposal.

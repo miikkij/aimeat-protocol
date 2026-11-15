@@ -33,7 +33,7 @@ import { loadConfig } from '../src/config.js';
 import type { MemoryRecord } from '../src/storage/interface.js';
 import { provisionWorkspace } from '../src/services/workspace/provision.js';
 import { restoreWorkspace } from '../src/services/workspace/import.js';
-import { archiveOverflow } from '../src/services/chat-threads.js';
+import { archiveOverflow } from '../src/services/chat/threads.js';
 import { createRequest, deleteRequest } from '../src/services/docsign/records.js';
 import { sha256Hex } from '../src/services/docsign/statement.js';
 import { publishCrewDef, crewKeysFor } from '../src/services/crew-def-store.js';

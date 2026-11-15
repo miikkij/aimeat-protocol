@@ -51,7 +51,7 @@ const POLICY_WRITE_SCOPE = 'memory:write-reserved';
  * Who is calling an AI route, in the words of the owner's policy switches. An app is identified from
  * its app grant (the token's own `app`), never from a body field; an agent from the principal.
  *
- * The owner's built-in chat agent (`chat#<owner>@<node>`, services/chat-agent.ts) is `chat`, so the
+ * The owner's built-in chat agent (`chat#<owner>@<node>`, services/chat/agent.ts) is `chat`, so the
  * switch "the node's chat" covers its model calls: on the node route they arrive at /v1/llm with that
  * agent's token (System 2 plan, V5). The name is read from the verified principal, never a body field.
  *

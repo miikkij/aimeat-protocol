@@ -1136,7 +1136,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool manifests and public offer declarations for the capability index."
     },
-    "src/services/chat-threads.ts": {
+    "src/services/chat/threads.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1

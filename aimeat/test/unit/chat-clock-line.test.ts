@@ -2,14 +2,14 @@
  * @file test/unit/chat-clock-line.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description clockLine (src/services/chat-turn-guard.ts): the turn note's local date and time is
+ * @description clockLine (src/services/chat/turn-guard.ts): the turn note's local date and time is
  *   written in the turn's language. On crew74 a fi account on an English page got "maanantai 2.
  *   marraskuuta 2026 klo 7.39" in the note, and the model answered the English question in Finnish.
  * @version-history
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { clockLine } from '../../src/services/chat-turn-guard.js';
+import { clockLine } from '../../src/services/chat/turn-guard.js';
 
 const at = '2026-11-02T05:39:00Z';
 const finnishAccount = { locale: 'fi', region: 'fi', timezone: null };

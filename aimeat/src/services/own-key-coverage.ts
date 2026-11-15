@@ -48,7 +48,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AgentRecord } from '../storage/types/identity.js';
 import { chatUsesSharedKey } from './goose-env.js';
 import { ownerKeyIds, PROVIDER_KEY_PREFIX } from './ai/provider-store.js';
-import { CHAT_AGENT_NAME } from './chat-agent.js';
+import { CHAT_AGENT_NAME } from './chat/agent.js';
 import { localAccountOf } from '../utils/gaii.js';
 
 /** A part of the node that can spend AI on the owner's behalf. */

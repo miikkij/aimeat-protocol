@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The chat's answer without the tool-call text a model writes instead of a call
- *   (services/chat-session.ts withoutToolMarkers), and the browser's copy of the same filter
+ *   (services/chat/session.ts withoutToolMarkers), and the browser's copy of the same filter
  *   (public/views/chat-text.js) giving the same result. The inputs are the lines grokkoe3110b showed a
  *   buyer on 2026-10-31 (v31 K36), from deepseek/deepseek-v4-pro through goose.
  * @version-history
@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { withoutToolMarkers } from '../../src/services/chat-session.js';
+import { withoutToolMarkers } from '../../src/services/chat/session.js';
 
 const CHAT_JS = readFileSync(join(__dirname, '..', '..', 'public', 'views', 'chat-text.js'), 'utf-8');
 const body = /export function withoutToolMarkers\(text\) \{([\s\S]*?)\n\}/.exec(CHAT_JS)?.[1] ?? '';

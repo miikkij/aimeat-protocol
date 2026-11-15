@@ -28,7 +28,7 @@
  */
 import type { CallerClass } from './policy.js';
 import { principalCaller } from '../caller-facts.js';
-import { CHAT_AGENT_NAME } from '../chat-agent.js';
+import { CHAT_AGENT_NAME } from '../chat/agent.js';
 
 /** Who asks, as the AI planner reads it. */
 export interface AiCallerContext {

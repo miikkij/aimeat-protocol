@@ -69,11 +69,11 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
     createThread, readThread, showThread, showThreads, deleteThread, chatToolCopy, CHAT_TOOL_COPY_NOTE,
-} from '../services/chat-threads.js';
+} from '../services/chat/threads.js';
 import { readerFor } from '../services/classification/reader.js';
-import { chatEnabled, runChatTurn, resetChatSession, endChatSession } from '../services/chat-session.js';
+import { chatEnabled, runChatTurn, resetChatSession, endChatSession } from '../services/chat/session.js';
 import { chatAiStatus } from '../services/chat/chat-status.js';
-import { ensureChatAgent } from '../services/chat-agent.js';
+import { ensureChatAgent } from '../services/chat/agent.js';
 import { readAllowance, remainingOf } from '../services/ai/allowance.js';
 import { allowanceShown } from '../services/ai/node-key-balance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
@@ -324,7 +324,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
 
         // A disconnect ends the STREAM, not the turn. The person who reloads, or opens another page
         // while the agent thinks, comes back to the answer: the turn runs to its end within its own
-        // limits (services/chat-turn-guard.ts) and is saved, and the page reads it back (c9's
+        // limits (services/chat/turn-guard.ts) and is saved, and the page reads it back (c9's
         // finding on crew64, 2.11: a question left mid-thought had no answer, no notice and no log
         // row after a reload). Until then a closed stream aborted the turn, so leaving cost the
         // answer. Stop is the person saying so: POST /v1/chat/threads/:id/stop aborts the turn.
@@ -344,7 +344,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, attachmentKeys, {
                 locale,
                 // The browser's own time zone, for the person's local time in the turn note; the
-                // service checks it and the person's chosen zone wins (services/chat-turn-guard.ts).
+                // service checks it and the person's chosen zone wins (services/chat/turn-guard.ts).
                 ...(typeof timezone === 'string' && timezone.length <= 64 ? { timezone } : {}),
             })) {
                 if (!finished) send(update);

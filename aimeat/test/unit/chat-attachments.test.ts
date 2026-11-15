@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { readAttachments as readAttachmentsWithReader } from '../../src/services/chat-attachments.js';
+import { readAttachments as readAttachmentsWithReader } from '../../src/services/chat/attachments.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { systemReader } from '../../src/services/classification/reader.js';
 

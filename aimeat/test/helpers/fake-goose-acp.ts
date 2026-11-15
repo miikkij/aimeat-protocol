@@ -167,7 +167,7 @@ async function runPeer(): Promise<void> {
 
     /**
      * A model that never stops reading: silence first, one sentence, then a tool call every 150 ms
-     * until it is cancelled. What the node's turn ceiling exists for (services/chat-turn-guard.ts).
+     * until it is cancelled. What the node's turn ceiling exists for (services/chat/turn-guard.ts).
      */
     async function loopTools(requestId: number | string, sessionId: string, opening: string): Promise<void> {
         let stopped = false;

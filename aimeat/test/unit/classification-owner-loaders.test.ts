@@ -23,7 +23,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import type { ContentLabelTarget } from '../../src/storage/interface.js';
 import { readerFor, type ReaderAuth } from '../../src/services/classification/reader.js';
 import { memoryTarget } from '../../src/services/classification/labels.js';
-import { createThread, showThread, showThreads, readThread } from '../../src/services/chat-threads.js';
+import { createThread, showThread, showThreads, readThread } from '../../src/services/chat/threads.js';
 import { addItem, showItems, listItems } from '../../src/services/open-items.js';
 import { addComment, listComments } from '../../src/services/organism/comments.js';
 import { setOrganismReadme, showOrganismReadme, getOrganismReadme } from '../../src/services/organism/readme.js';

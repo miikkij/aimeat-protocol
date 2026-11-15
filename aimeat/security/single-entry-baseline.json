@@ -449,7 +449,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/chat-agent.ts": {
+      "src/services/chat/agent.ts": {
         "count": 2,
         "why": "UNREVIEWED"
       },
@@ -531,7 +531,7 @@
         "count": 1,
         "why": "A presigned upload token carries no roles or scopes, so the operator question is asked of the principal it names, with the scopes its agent record holds now."
       },
-      "src/services/chat-agent.ts": {
+      "src/services/chat/agent.ts": {
         "count": 1,
         "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
       },
@@ -788,7 +788,7 @@
         "count": 1,
         "why": "The first owner's session at node setup: the owner record's own roles."
       },
-      "src/services/chat-agent.ts": {
+      "src/services/chat/agent.ts": {
         "count": 1,
         "why": "The node chat's own agent (mintChatAgentToken): role agent, the scopes of its identity, an MCP or REST audience."
       },

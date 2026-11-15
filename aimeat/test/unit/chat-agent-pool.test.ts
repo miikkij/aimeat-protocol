@@ -1,6 +1,6 @@
 /**
  * @file test/unit/chat-agent-pool.test.ts
- * @description Unit tests for the chat agent processes (src/services/chat-agent-pool.ts): one process
+ * @description Unit tests for the chat agent processes (src/services/chat/agent-pool.ts): one process
  *   per key, reused by the same key and never shared with another; closed when idle, never while a
  *   turn runs; a ceiling that closes the process idle longest and refuses when every one is busy; a
  *   dead process replaced; a process whose credential expires soon replaced after its last turn.
@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-09-28 — Initial. System 2 plan, V5.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { AgentPool, AgentPoolFullError, type PoolClient, type PoolStart } from '../../src/services/chat-agent-pool.js';
+import { AgentPool, AgentPoolFullError, type PoolClient, type PoolStart } from '../../src/services/chat/agent-pool.js';
 
 class FakeProcess implements PoolClient {
     closed = false;

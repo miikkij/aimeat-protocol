@@ -16,7 +16,7 @@
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, appReadyText, publishedAppUrl, TURN_LIMITS } from '../../src/services/chat-turn-guard.js';
+import { TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, appReadyText, publishedAppUrl, TURN_LIMITS } from '../../src/services/chat/turn-guard.js';
 import { nodeTemplateAnswer } from '../../src/services/node/templates.js';
 
 const call = (id: string, title: string, status = 'pending') => ({ kind: 'tool_call', id, title, status });

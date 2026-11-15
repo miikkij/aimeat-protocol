@@ -16,7 +16,7 @@
  *     outside AI was connected (aimeat-commercial-1c, test lane).
  */
 import type { Storage } from '../../storage/interface.js';
-import { CHAT_AGENT_NAME } from '../chat-agent.js';
+import { CHAT_AGENT_NAME } from '../chat/agent.js';
 import { basicAgentByName } from '../../data/basic-agents.js';
 import { getOwnerScopeMemory } from '../owner/memory.js';
 import { HELLO_MCP_KEY } from '../hello-mcp.js';
@@ -25,7 +25,7 @@ import { HELLO_MCP_KEY } from '../hello-mcp.js';
 const BASIC_AGENT_TAG = 'crew.basic';
 
 /**
- * The place's own chat (services/chat-agent.ts) or a basic agent, by its name in data/basic-agents.ts
+ * The place's own chat (services/chat/agent.ts) or a basic agent, by its name in data/basic-agents.ts
  * or by its tag. By name as well, because the agents' runtime rewrites the tags: on crew71 the concierge
  * of guestkoey3wfwk carried ["concierge","chat","vision","web-search",…] and no crew.basic (aimeat-protocol-bb).
  */

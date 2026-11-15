@@ -1,5 +1,5 @@
 /**
- * @file src/services/chat-attachments.ts
+ * @file src/services/chat/attachments.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the person attached to this turn, turned into the two things a model takes:
@@ -24,11 +24,11 @@
  *   v1.0.0 -- 2026-08-17 -- Initial: pure extraction out of chat-session, plus office and PDF files.
  *   v1.1.0 -- 2026-09-29 -- Files are read through readAiFile with a classification reader (TARGET-082).
  */
-import { readAiFile, type AiFileSource } from './ai/inputs.js';
-import type { ContentReader } from './classification/reader.js';
-import type { PromptImage } from './goose-acp.js';
-import { extractFileText, extractableKind, isLegacyOfficeFile, NAME, type ExtractOptions } from './file-text/index.js';
-import { logger } from '../utils/logger.js';
+import { readAiFile, type AiFileSource } from '../ai/inputs.js';
+import type { ContentReader } from '../classification/reader.js';
+import type { PromptImage } from '../goose-acp.js';
+import { extractFileText, extractableKind, isLegacyOfficeFile, NAME, type ExtractOptions } from '../file-text/index.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * How many files one turn may carry.

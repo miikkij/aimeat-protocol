@@ -1,5 +1,5 @@
 /**
- * @file chat-turn-guard.ts
+ * @file src/services/chat/turn-guard.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the node itself adds to a chat turn: a line the person sees within seconds,
@@ -84,8 +84,8 @@
  *     of rounds and asked the buyer to say "continue", and told them to sign in (v31 K35, K38).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
-import { createT, type Locale } from '../i18n.js';
-import { formatForPerson, isValidTimeZone, type DisplayPrefs } from './display-prefs.js';
+import { createT, type Locale } from '../../i18n.js';
+import { formatForPerson, isValidTimeZone, type DisplayPrefs } from '../display-prefs.js';
 
 /** The limits of one chat turn. */
 export const TURN_LIMITS = {

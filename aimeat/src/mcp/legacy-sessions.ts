@@ -37,7 +37,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
-import { touchChatInstance } from '../services/chat-instance-write.js';
+import { touchChatInstance } from '../services/chat/instance-write.js';
 import { markAgentMcpUse } from '../services/agent/mcp-touch.js';
 import { admitMcpAgent, recordMcpContact } from '../services/mcp-agent-admission.js';
 import { answerWithoutToken } from './unauthenticated-answer.js';

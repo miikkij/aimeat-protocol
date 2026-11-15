@@ -186,7 +186,7 @@ const DELEGATES: Record<string, string> = {
         + 'same function, so the two doors emit the same domain by construction rather than by '
         + 'agreement.',
     'src/mcp/boards.ts': "services/board-write.ts and services/board-post.ts, both emitting 'boards'",
-    'src/mcp/chat-instances.ts': "services/chat-instance-write.ts, which emits 'chat'",
+    'src/mcp/chat-instances.ts': "services/chat/instance-write.ts, which emits 'chat'",
     'src/mcp/compliance.ts': "services/compliance/register.ts, whose one write helper emits "
         + "'compliance' — so the HTTP route, this tool surface and the scheduled monthly job all "
         + 'emit the same domain from the same line, and none of them can be the door that forgets.',

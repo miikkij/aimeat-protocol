@@ -46,7 +46,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
-import { chatEnabled } from '../chat-session.js';
+import { chatEnabled } from '../chat/session.js';
 import { HOME_BLOCKS } from './blocks-home.js';
 import { PORTAL_BLOCKS } from './blocks-portal.js';
 import type { CapabilityName, SurfaceBlockDef } from './registry-types.js';

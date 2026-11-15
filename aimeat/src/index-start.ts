@@ -597,7 +597,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     await schedulerStopped;
     // The chat agent is a child of this process; it goes when we go, or it is orphaned. After the
     // drain, so a chat turn in flight could finish.
-    const { shutdownChat } = await import('./services/chat-session.js');
+    const { shutdownChat } = await import('./services/chat/session.js');
     shutdownChat();
     const statsInstance = getStatsInstance();
     if (statsInstance) await statsInstance.shutdown();

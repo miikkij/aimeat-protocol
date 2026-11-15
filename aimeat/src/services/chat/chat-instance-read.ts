@@ -41,7 +41,7 @@ export async function chatInstanceFor(
 ): Promise<ChatInstanceRead> {
     const record = await storage.getChatInstance(id);
     if (!record) return { status: 'missing' };
-    // registerChatInstance (services/chat-instance-write.ts) builds `ghii` from `ownerName`, so the two
+    // registerChatInstance (services/chat/instance-write.ts) builds `ghii` from `ownerName`, so the two
     // name one account; the route compared the first, the tool and the resource the second.
     const account = record.ownerName || localAccountName(record.ghii);
     if (account === caller.owner) return { status: 'ok', record };

@@ -1,5 +1,5 @@
 /**
- * @file chat-threads.ts
+ * @file src/services/chat/threads.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where a chat conversation lives: the person's own memory, under `chat.`.
@@ -35,12 +35,12 @@
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { randomBytes } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import type { ContentReader } from './classification/reader.js';
-import { presentMemories, presentMemory } from './classification/present-memory.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import type { ContentReader } from '../classification/reader.js';
+import { presentMemories, presentMemory } from '../classification/present-memory.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 /** One thing said, by either side, with whatever the agent did while saying it. */
 export interface ChatTurn {

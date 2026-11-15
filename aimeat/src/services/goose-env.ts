@@ -18,7 +18,7 @@
  *
  *   TWO ROUTES FOR THE MODEL CALLS (Jouni, 2026-09-28, plan 07 section 6, J6).
  *   - The node route, the default: AIMEAT_GOOSE_PROVIDER_API_KEY is empty. Each person's turns run in
- *     a goose child of their own (services/chat-agent-pool.ts), and that child's OpenAI provider
+ *     a goose child of their own (services/chat/agent-pool.ts), and that child's OpenAI provider
  *     points at this node's POST /v1/llm/chat/completions with that person's own chat agent token as
  *     the API key. Every model call then passes the gate: the owner's model policy (the "the node's
  *     chat" switch), their daily budget, their allowance and the usage record. The token is the only

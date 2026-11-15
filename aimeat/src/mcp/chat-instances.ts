@@ -38,7 +38,7 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { registerChatInstance } from '../services/chat-instance-write.js';
+import { registerChatInstance } from '../services/chat/instance-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { resourceRefusal } from './resource-refusal.js';
 import { chatInstanceFor } from '../services/chat/chat-instance-read.js';

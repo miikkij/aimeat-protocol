@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { cardFromToolResult } from '../../src/services/chat-cards.js';
+import { cardFromToolResult } from '../../src/services/chat/cards.js';
 
 /** A tool result as ACP delivers it: content blocks whose text happens to be JSON. */
 const acp = (payload: unknown) => ({

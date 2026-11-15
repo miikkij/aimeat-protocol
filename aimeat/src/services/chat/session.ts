@@ -1,11 +1,11 @@
 /**
- * @file chat-session.ts
+ * @file src/services/chat/session.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One turn of the chat, end to end: the person's identity, the agent process, the
  *   conversation record, and what came back.
  *
- *   WHICH PROCESS RUNS A TURN (services/goose-env.ts, services/chat-agent-pool.ts).
+ *   WHICH PROCESS RUNS A TURN (services/goose-env.ts, services/chat/agent-pool.ts).
  *   - The node route, the default (no AIMEAT_GOOSE_PROVIDER_API_KEY): each person has an agent
  *     process of their own, started on their first turn and closed when idle. Its model calls go to
  *     this node's /v1/llm with that person's chat token, so the owner's model policy, budget and
@@ -106,30 +106,30 @@
  *     browser against a real agent, where one completed call read as still running.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from './goose-acp.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from '../goose-acp.js';
 import {
     TURN_LIMITS, TurnWatch, stepForTool, turnNote, clockLine, wrapUpPrompt, withTicks, progressText, stoppedText, noAnswerText, appReadyText, publishedAppUrl,
     type GuardReason, type NodeUpdate, type ProgressStep,
-} from './chat-turn-guard.js';
-import { DEFAULT_LOCALE, createT, type Locale } from '../i18n.js';
-import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
-import { AgentPool, type AgentLease, type PoolStart } from './chat-agent-pool.js';
-import { chatUsesSharedKey } from './goose-env.js';
-import { ensureChatGooseConfig } from './goose-chat-config.js';
-import { prepareAiCall } from './ai/completion.js';
-import { AiCompletionError } from './ai/errors.js';
-import type { BalanceChoice } from './ai/ai-fix-words.js';
-import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
-import { resolveGhii } from '../utils/ghii-resolver.js';
-import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
-import { pdfReadLimits } from './file-text/pdf-bounded.js';
-import { systemReader } from './classification/reader.js';
-import { displayPrefsFor } from './display-prefs.js';
-import { notePersonZone } from './person-zone.js';
-import { logger } from '../utils/logger.js';
-import { chatAgentHealth, noteChatAgentDown, noteChatAgentUp } from './chat/agent-health.js';
+} from './turn-guard.js';
+import { DEFAULT_LOCALE, createT, type Locale } from '../../i18n.js';
+import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './agent.js';
+import { AgentPool, type AgentLease, type PoolStart } from './agent-pool.js';
+import { chatUsesSharedKey } from '../goose-env.js';
+import { ensureChatGooseConfig } from '../goose-chat-config.js';
+import { prepareAiCall } from '../ai/completion.js';
+import { AiCompletionError } from '../ai/errors.js';
+import type { BalanceChoice } from '../ai/ai-fix-words.js';
+import { appendTurn, readThread, setGooseSession, type ChatTurn } from './threads.js';
+import { resolveGhii } from '../../utils/ghii-resolver.js';
+import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './attachments.js';
+import { pdfReadLimits } from '../file-text/pdf-bounded.js';
+import { systemReader } from '../classification/reader.js';
+import { displayPrefsFor } from '../display-prefs.js';
+import { notePersonZone } from '../person-zone.js';
+import { logger } from '../../utils/logger.js';
+import { chatAgentHealth, noteChatAgentDown, noteChatAgentUp } from './agent-health.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
 
@@ -507,7 +507,7 @@ export async function* runChatTurn(
     /** The address of the app this turn published, from the publish call's own answer. */
     let publishedApp: string | undefined;
 
-    // WHAT THE PERSON SEES BEFORE THE AGENT SPEAKS (services/chat-turn-guard.ts). A reasoning model
+    // WHAT THE PERSON SEES BEFORE THE AGENT SPEAKS (services/chat/turn-guard.ts). A reasoning model
     // spends 15 to 35 s per round and writes its words at the end, so without these lines a turn of
     // several rounds is minutes of nothing. They are progress events, not words: the record keeps
     // only what the agent wrote.

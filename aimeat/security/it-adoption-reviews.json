@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:ffc116cf2598351c9d8a13a2"
+      "digest": "sha256:bd773642e463da037f728deb"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -428,7 +428,7 @@
       "aimeat/src/services/once-only-step.ts": "afaf629df6d5f1cc",
       "aimeat/src/services/event-bus.ts": "fa4303b35386f9f8",
       "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
-      "aimeat/src/mcp/legacy-sessions.ts": "d3e7dd1580854950",
+      "aimeat/src/mcp/legacy-sessions.ts": "ec67800b57c1065e",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
       "aimeat/src/services/ai-jobs/service.ts": "06340723df80d48f",
@@ -437,7 +437,7 @@
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "15c681d86fd6391b",
-      "aimeat/security/process-local-baseline.json": "21ca201c9ac4e80f",
+      "aimeat/security/process-local-baseline.json": "ef04c59b4a86394b",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "742832ec688b9b52",

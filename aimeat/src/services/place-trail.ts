@@ -67,7 +67,7 @@ const APP_PUBLISH_CODES = new Set([
 const AGENT_APPROVE_CODES = new Set(['POST /v1/agents', 'POST /v1/agents/v2/agent-proposals/:id/approve']);
 
 const MAX_LIMIT = 500;
-/** The place's own chat agent (services/chat-agent.ts): the person's chat, not an agent they made. */
+/** The place's own chat agent (services/chat/agent.ts): the person's chat, not an agent they made. */
 const CHAT_AGENT = 'chat';
 
 let toolInfo: Map<string, { title: string; readOnly: boolean }> | null = null;

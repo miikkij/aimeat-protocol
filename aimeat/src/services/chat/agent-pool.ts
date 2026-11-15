@@ -1,5 +1,5 @@
 /**
- * @file src/services/chat-agent-pool.ts
+ * @file src/services/chat/agent-pool.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The chat agent processes that are running, one per key: one per person on the node
@@ -22,7 +22,7 @@
  *   ends, and is then closed.
  *
  *   Every process gets a generation number that no other process in this node's lifetime has had.
- *   A goose session id is stamped with it (services/chat-session.ts), so a session a closed process
+ *   A goose session id is stamped with it (services/chat/session.ts), so a session a closed process
  *   issued is never sent to its replacement.
  * @structure
  *   - PoolClient — what the pool needs of a process: isClosed, close()
@@ -35,7 +35,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial. System 2 plan, V5.
  */
-import { logger } from '../utils/logger.js';
+import { logger } from '../../utils/logger.js';
 
 /** What the pool needs of a process. GooseAcpClient has both. */
 export interface PoolClient {

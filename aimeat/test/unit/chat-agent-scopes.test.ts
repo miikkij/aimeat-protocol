@@ -12,7 +12,7 @@
  *     registers in.
  */
 import { describe, it, expect } from 'vitest';
-import { ensureChatAgent, CHAT_AGENT_NAME } from '../../src/services/chat-agent.js';
+import { ensureChatAgent, CHAT_AGENT_NAME } from '../../src/services/chat/agent.js';
 import type { AgentRecord, Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 

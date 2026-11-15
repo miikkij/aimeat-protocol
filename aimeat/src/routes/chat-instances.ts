@@ -30,7 +30,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
+import { registerChatInstance, touchChatInstance } from '../services/chat/instance-write.js';
 import { localAccountName } from '../utils/gaii.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';

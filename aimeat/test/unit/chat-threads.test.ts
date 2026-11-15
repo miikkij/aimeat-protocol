@@ -18,7 +18,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import {
   createThread, appendTurn, readThread, listThreads, deleteThread,
   archiveOverflow, setGooseSession, MAX_TURNS_PER_THREAD,
-} from '../../src/services/chat-threads.js';
+} from '../../src/services/chat/threads.js';
 
 const NODE = 'node-test';
 const GAII = `alice@${NODE}`;

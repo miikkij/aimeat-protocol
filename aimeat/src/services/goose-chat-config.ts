@@ -17,7 +17,7 @@
  *
  *   WHAT IT DOES. The chat gets a goose root of its own (AIMEAT_GOOSE_PATH_ROOT, or a directory under
  *   the system temp directory named for this node) with a config.yaml that switches every goose
- *   extension off except `todo`, which the turn guard reads (services/chat-turn-guard.ts), and an
+ *   extension off except `todo`, which the turn guard reads (services/chat/turn-guard.ts), and an
  *   empty working directory, so goose finds no project hints and no skills to list. The node's own
  *   MCP server is given per session and is not affected.
  *

@@ -132,7 +132,7 @@
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:1c1177b39130e668cfc57dea",
+      "digest": "sha256:9f6f7a5bcaf3272968ea5e1d",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -361,13 +361,13 @@
       "digest": "sha256:3e63b43a8a04716c05720578"
     },
     "node:aimeat-ai-model-policy": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/ai/policy-gate.ts",
         "aimeat/src/services/ai/policy-store.ts",
         "aimeat/src/routes/ai-policy.ts"
       ],
-      "digest": "sha256:fdd56298c11d27bd2b029940"
+      "digest": "sha256:265db7692e58f9a968256426"
     },
     "node:aimeat-gen-rules": {
       "reviewedOn": "2026-11-05",
@@ -895,7 +895,7 @@
     "node:aimeat-ai-model-policy": {
       "aimeat/src/services/ai/policy-gate.ts": "795d3233c8fd1b5d",
       "aimeat/src/services/ai/policy-store.ts": "4625f923f5b833d8",
-      "aimeat/src/routes/ai-policy.ts": "d70db16573f26c4b"
+      "aimeat/src/routes/ai-policy.ts": "a592771569f0d7e4"
     },
     "node:aimeat-ai-capabilities": {
       "aimeat/src/services/ai/capabilities.ts": "5d18ac7bea68a6da",
@@ -911,7 +911,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "1aa0d882650ae52b",
+      "aimeat/src/services/journey-state.ts": "f2da51671726a897",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "24765a8656779b80"
     },

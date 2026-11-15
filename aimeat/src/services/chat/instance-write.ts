@@ -1,5 +1,5 @@
 /**
- * @file src/services/chat-instance-write.ts
+ * @file src/services/chat/instance-write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Registering a chat session and marking it alive, once, for every surface that can do it.
@@ -31,10 +31,10 @@
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 8): the write behind POST /v1/chat-instances,
  *     aimeat_instance_create and the MCP session upsert.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ChatInstanceRecord } from '../storage/interface.js';
-import { buildChatInstanceId } from '../utils/gaii.js';
-import { emitChange } from './event-bus.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ChatInstanceRecord } from '../../storage/interface.js';
+import { buildChatInstanceId } from '../../utils/gaii.js';
+import { emitChange } from '../event-bus.js';
 
 export interface ChatInstanceCaller {
     /**

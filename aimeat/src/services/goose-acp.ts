@@ -70,7 +70,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { cardFromToolResult, type ChatCard } from './chat-cards.js';
+import { cardFromToolResult, type ChatCard } from './chat/cards.js';
 import { chatUsesSharedKey, gooseChildEnv } from './goose-env.js';
 import { decideRegion, regionBaseUrl, regionChoiceFor } from './ai/openrouter-region.js';
 import { DEFAULT_RULES } from './ai/routing.js';

@@ -1,5 +1,5 @@
 /**
- * @file src/services/chat-cards.ts
+ * @file src/services/chat/cards.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Turning a finished tool call into something the person can OPEN.

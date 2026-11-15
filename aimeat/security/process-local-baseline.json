@@ -553,7 +553,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/chat-agent-pool.ts :: interval :: ensureTimer": {
+    "src/services/chat/agent-pool.ts :: interval :: ensureTimer": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -565,11 +565,11 @@
       "count": 1,
       "reason": "One probe at a time within this process; a second process runs its own probe, which costs one extra agent start and decides nothing for anybody else."
     },
-    "src/services/chat-session.ts :: map :: earlierRunsEnded": {
+    "src/services/chat/session.ts :: map :: earlierRunsEnded": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/chat-session.ts :: map :: sessionTokens": {
+    "src/services/chat/session.ts :: map :: sessionTokens": {
       "count": 1,
       "reason": "DEBT"
     },
