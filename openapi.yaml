@@ -29783,7 +29783,7 @@ paths:
                   type: array
                   maxItems: 2
                   items: { type: object, properties: { amount: { type: integer, minimum: 1 }, currency: { type: string, enum: [EUR, USD] } }, required: [amount, currency] }
-                toll_morsels: { type: integer, minimum: 0, maximum: 100 }
+                toll_morsels: { type: [integer, 'null'], minimum: 0, maximum: 100, description: 'Null or absent: no pacing, the money price alone.' }
                 usage_terms:
                   type: object
                   properties: { derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } }
@@ -29792,8 +29792,8 @@ paths:
                 title: { type: string }
                 description: { type: string }
                 tags: { type: array, items: { type: string } }
-                odps: { type: object, additionalProperties: true }
-                provenance: { type: object, additionalProperties: true }
+                odps: { type: [object, 'null'], additionalProperties: true, description: 'Null or absent: none.' }
+                provenance: { type: [object, 'null'], additionalProperties: true, description: 'Null or absent: none.' }
       responses:
         '200':
           description: '`{ exchange, listing }`: the stored terms and what the projection did (`listing.listed`, `skipped` with the reason, `delisted`, `warnings`).'

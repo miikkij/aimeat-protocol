@@ -176,3 +176,19 @@ describe('DELETE /v1/ghii/totp (portal security.js totpDisable)', () => {
         await refused('DELETE', '/v1/ghii/totp', [{}, { backupCode: 'a1b2c3d4' }]);
     });
 });
+
+describe('PUT /v1/datapackages/{owner}/{name}/exchange (portal dataproducts.js sellPackage)', () => {
+    // views/profile/offers/sell-dialog.js termsBody sends toll_morsels: null when the pacing field is
+    // empty, the usual money-only sale. DatapackageExchangeSchema reads toll_morsels, odps and provenance
+    // as nullable, and services/exchange-datapackage.ts treats null as not sent.
+    const path = '/v1/datapackages/alice/weather/exchange';
+    const terms = { exchange: true, model: 'per_month', prices_money: [{ amount: 4_900_000, currency: 'EUR' }], usage_terms: { derivatives: false, resale: false, attribution: true } };
+
+    it('takes toll_morsels, odps and provenance as null', async () => {
+        await taken('PUT', path, [{ ...terms, toll_morsels: null }, { ...terms, toll_morsels: 3, odps: null, provenance: null }]);
+    });
+
+    it('still refuses a toll_morsels over 100', async () => {
+        await refused('PUT', path, [{ ...terms, toll_morsels: 101 }]);
+    });
+});
