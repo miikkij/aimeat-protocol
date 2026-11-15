@@ -20,7 +20,7 @@
  *   WHAT IT MUST AGREE WITH. routes/memory/bulk.ts (export, import, bulk, bulk-delete, bundle, copy),
  *   routes/memory/key.ts (delete, restore, the deleted list, TTL on read), services/memory/bin.ts and
  *   memory-bin-sweep.ts (the bin and its window), routes/memory-hands.ts (who wrote it),
- *   routes/owners/export.ts (the account export), routes/owners.ts and services/owner-erasure.ts
+ *   routes/owners/export.ts (the account export), routes/owners.ts and services/owner/erasure.ts
  *   (erasure), routes/agents/management.ts (agent export, import, port), services/archive.ts and
  *   routes/organisms/workspace-transfer.ts (archive, organism and workspace export and import),
  *   services/workspace-rows/row-space.ts (row retention), services/core-jobs.ts (the TTL job).

@@ -56,7 +56,7 @@ import { pushLocaleOf, type PushService } from './push.js';
 import { NOTIF_PREFIX, notifLinkToUrl, pushSenderName } from './notify.js';
 import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './notification-settings.js';
 import { nodeContext } from './node-context.js';
-import { provenOwnerAddress } from './owner-mail-address.js';
+import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';
 import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email-templates-digest.js';
 import { formatForPerson, type DisplayPrefs } from './display-prefs.js';

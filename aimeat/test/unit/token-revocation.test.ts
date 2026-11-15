@@ -169,7 +169,7 @@ describe('a revoked token is refused by what it is, not by how its bytes are spe
 describe('a credential counts only while the account it acts for holds its name', () => {
     type Middleware = typeof import('../../src/auth/middleware.js');
     type Pats = typeof import('../../src/services/access-token.js');
-    type OwnerSessions = typeof import('../../src/services/owner-session.js');
+    type OwnerSessions = typeof import('../../src/services/owner/session.js');
 
     /** The owners, app grants, ecosystem apps and revoked sessions in miniature. */
     const owners = new Map<string, { name: string; roles: string[]; createdAt: string; disabledAt: string | null }>();
@@ -201,7 +201,7 @@ describe('a credential counts only while the account it acts for holds its name'
         mw = await import('../../src/auth/middleware.js');
         mw.initSessionAuth(accounts, { nodeId: NODE } as AimeatConfig);
         pats = await import('../../src/services/access-token.js');
-        sessions = await import('../../src/services/owner-session.js');
+        sessions = await import('../../src/services/owner/session.js');
     });
 
     const at = (ms: number) => new Date(ms).toISOString();

@@ -24,7 +24,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { openingDoor, actorOf } from '../services/internet-opening/opening-door.js';
 import { closeOpening, decideOpening, setTrustedOpener } from '../services/internet-opening/opening-service.js';
 import { operatorOpeningsList, ownerOpeningView, openingToApi } from '../services/internet-opening/opening-view.js';
-import { OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 

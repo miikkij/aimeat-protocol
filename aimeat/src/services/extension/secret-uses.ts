@@ -27,7 +27,7 @@
  *     manifest's `network:` hosts count as declared for every secret (declaredHostsFor).
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, v58 and v59 follow-up).
  */
-import { normalizeSecretHost, SECRET_NAME_RE } from '../owner-secrets.js';
+import { normalizeSecretHost, SECRET_NAME_RE } from '../owner/secrets.js';
 import { capabilitiesOfRecord } from './capability-declaration.js';
 import { withoutUnvettedHostValues } from './network-hosts.js';
 

@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 
 requirePostgresWhenAsked('owner-reuse-contract');
 

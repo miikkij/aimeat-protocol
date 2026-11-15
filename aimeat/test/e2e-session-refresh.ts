@@ -344,7 +344,7 @@ async function main() {
 
     console.log('\nPhase 8 — An https node uses __Host-aimeat_rt (secaudit2026oct22, refresh-cookie-unprefixed-first-match)');
     // X-Forwarded-Proto: https is how the node learns a request reached it over https behind nginx;
-    // the cookie name and its Secure flag follow it (services/owner-session.ts cookieSecure).
+    // the cookie name and its Secure flag follow it (services/owner/session.ts cookieSecure).
     const httpsCall = async (path: string, cookie: string | null, body?: any) => {
         const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Forwarded-Proto': 'https', 'X-AIMEAT-Refresh': '1' };
         if (cookie) headers['Cookie'] = cookie;

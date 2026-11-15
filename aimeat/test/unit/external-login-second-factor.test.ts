@@ -29,7 +29,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { initNodeKeys } from '../../src/auth/jwt.js';
-import { provisionOwner } from '../../src/services/owner-provisioning.js';
+import { provisionOwner } from '../../src/services/owner/provisioning.js';
 import { setupTotp, totpConfigOf } from '../../src/services/totp.js';
 
 const NODE_ID = 'aimeat-local-001-dev';

@@ -31,7 +31,7 @@ import { buildAppdevOverview } from '../services/appdev-overview.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
-import { readsAsOwner } from '../services/owner-scope-read.js';
+import { readsAsOwner } from '../services/owner/scope-read.js';
 
 export function registerAppdevResearchTools(
     mcp: McpServer,

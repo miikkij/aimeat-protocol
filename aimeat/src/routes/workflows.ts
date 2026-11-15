@@ -81,7 +81,7 @@ import type { WorkflowCaller } from '../services/workflow/step-authority.js';
 import { runRefusedAsOwner, clearRefusal } from '../services/workflow/trigger-authority.js';
 import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { callerOf as callerContextOf } from '../middleware/caller.js';
-import { readsAsOwner } from '../services/owner-scope-read.js';
+import { readsAsOwner } from '../services/owner/scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { emitChange } from '../services/event-bus.js';
@@ -159,7 +159,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     ...(req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
   });
 
-  /** True when this caller reads the owner's records as the owner (services/owner-scope-read.ts):
+  /** True when this caller reads the owner's records as the owner (services/owner/scope-read.ts):
    *  a run's observed values are the owner's record content, so everyone else is served without them. */
   const readsOwnerRecords = (req: Request): boolean => readsAsOwner(callerContextOf(req, config.nodeId, storage));
 

@@ -17,7 +17,7 @@
  *   into the route layer. This file imports the logger and the event bus (services/event-bus.ts,
  *   itself a leaf) and nothing else of the node's own.
  *
- *   AN ERASED ACCOUNT. services/owner-erasure.ts cannot import from src/mcp/ (the dependency rules
+ *   AN ERASED ACCOUNT. services/owner/erasure.ts cannot import from src/mcp/ (the dependency rules
  *   refuse a service that does), so it tells the `accountErased` event, which reaches every process
  *   of the node, and this file closes the sessions each process holds for that account.
  *

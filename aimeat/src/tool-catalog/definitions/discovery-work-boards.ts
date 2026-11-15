@@ -408,7 +408,7 @@ export const discoveryWorkBoardsTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Node Stats', readOnlyHint: true },
         // Node administration through an agent (security audit A8-1). Each handler asks the account role
-        // first and this word second, through services/owner-lifecycle.ts resolveOperatorAgentName(). No
+        // first and this word second, through services/owner/lifecycle.ts resolveOperatorAgentName(). No
         // wildcard carries it. The operator's agents that held `*` got it once per node, from
         // services/operator-admin-migration.ts; any other agent holds it only by an explicit tick.
         scope: 'operator:admin',

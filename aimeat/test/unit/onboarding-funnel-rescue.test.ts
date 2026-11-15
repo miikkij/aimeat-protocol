@@ -50,7 +50,7 @@ function ghii(username: string, over: Record<string, unknown> = {}) {
         ...over,
     } as any;
     // A verified account as the code-confirm paths write it (routes/ghii/web-verify.ts, recovery.ts,
-    // services/owner-provisioning.ts): level 1, the flag and the address's hash land together. A case
+    // services/owner/provisioning.ts): level 1, the flag and the address's hash land together. A case
     // that names the flag itself describes a record those paths did not write whole.
     if (rec.verificationLevel >= 1 && typeof rec.notificationEmail === 'string' && !('emailVerifiedAt' in over)) {
         rec.emailVerifiedAt = hoursAgo(30);

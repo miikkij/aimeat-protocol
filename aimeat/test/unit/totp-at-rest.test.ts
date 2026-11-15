@@ -21,7 +21,7 @@ import { TOTP, Secret } from 'otpauth';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { loadConfig } from '../../src/config.js';
-import { provisionOwner } from '../../src/services/owner-provisioning.js';
+import { provisionOwner } from '../../src/services/owner/provisioning.js';
 import {
   setupTotp, validateTotpCode, totpConfigOf, sealPlaintextTotpSecrets, TotpEncryptionUnavailableError,
 } from '../../src/services/totp.js';

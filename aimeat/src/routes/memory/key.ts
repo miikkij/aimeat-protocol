@@ -103,7 +103,7 @@ import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared
 import { logger } from '../../utils/logger.js';
 import { rolesWithOperator } from '../../services/operator-override.js';
 import { recordOperatorAccess } from '../../services/operator-access-audit.js';
-import { readsAsOwner, ownerScopeViewAdmitting, hiddenRecordRelabel, READ_AS_OWNER_SCOPE } from '../../services/owner-scope-read.js';
+import { readsAsOwner, ownerScopeViewAdmitting, hiddenRecordRelabel, READ_AS_OWNER_SCOPE } from '../../services/owner/scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
 import { denyScope403 } from '../../auth/deny.js';
 

@@ -48,7 +48,7 @@ import { logger } from '../../utils/logger.js';
 import { aiReadViewerOf, hiddenRecordError, type AiReadViewer } from '../ai/read-viewer.js';
 import { callerFromAuth } from '../caller-context.js';
 import { claimOnceOnlyStep, keptBefore, madeBefore } from '../once-only-step.js';
-import { visibleToSameOwnerReader } from '../owner-scope-read.js';
+import { visibleToSameOwnerReader } from '../owner/scope-read.js';
 import { agentPageUrl } from '../permission-ask.js';
 import { makerOf, type ScheduleActor } from './actor.js';
 

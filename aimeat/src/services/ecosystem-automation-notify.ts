@@ -57,7 +57,7 @@
 import type { Storage, AgentTaskRecord, MemoryRecord, GHIIRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { nodeContext } from './node-context.js';
-import { provenOwnerAddress, notificationEmailUnverified } from './owner-mail-address.js';
+import { provenOwnerAddress, notificationEmailUnverified } from './owner/mail-address.js';
 import { mailOwnerFrom } from './notification-create.js';
 import { readNotificationSettings, prefsFor, senderKey, type NotifSource } from './notification-settings.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';

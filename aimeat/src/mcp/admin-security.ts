@@ -42,7 +42,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import { buildSecurityOverview } from '../services/security-overview.js';
 import { resolveSecurityIncident } from '../services/security-incident.js';
 import { decideIncidentCase } from '../services/incident-decisions.js';

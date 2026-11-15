@@ -56,7 +56,7 @@ import { nodeContext } from '../services/node-context.js';
 import type { AiJobState, AiJobViewer } from '../services/ai-jobs/types.js';
 import { startedByOf } from '../services/ai-jobs/starter.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { readsAsOwner } from '../services/owner-scope-read.js';
+import { readsAsOwner } from '../services/owner/scope-read.js';
 import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAiJobTools(

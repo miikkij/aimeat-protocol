@@ -43,7 +43,7 @@ import type { EmailService, EmailAttachment } from './email.js';
 import type { GHIIRecord } from '../storage/interface.js';
 import type { AccountTurn } from './account-limits.js';
 import type { InviteEmailArgs, KeyInviteEmailArgs, KeyCredentialsEmailArgs } from './email-templates.js';
-import { provenOwnerAddress } from './owner-mail-address.js';
+import { provenOwnerAddress } from './owner/mail-address.js';
 
 /** What goes out: one form per EmailService send method, with that method's arguments. */
 export type MailMessage =

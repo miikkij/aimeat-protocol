@@ -23,7 +23,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { ClassificationAuditRow } from '../../src/storage/interface.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import { deleteOrganismRecords } from '../../src/services/organism/lifecycle.js';
 import {
   initClassificationAudit, recordClassificationAudit, flushClassificationAudit, shutdownClassificationAudit,

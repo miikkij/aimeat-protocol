@@ -54,7 +54,7 @@ const EXEMPT = new Set([
   // RFC 9728 protected-resource metadata: a response shape defined by the spec.
   'src/services/protected-resource.ts',
   // Mints and clears the owner session cookie, which only exists over HTTP.
-  'src/services/owner-session.ts',
+  'src/services/owner/session.ts',
   // The external-login pending-signup cookie machinery (BR-04): the capability IS carrying a
   // verified identity across an HTTP redirect in an httpOnly cookie, shared by the OIDC and SAML
   // doors — the same class as owner-session above, and its second caller is another HTTP door.

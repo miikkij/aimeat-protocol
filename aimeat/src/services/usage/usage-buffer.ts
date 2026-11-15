@@ -170,7 +170,7 @@ export async function flushUsageBuffer(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no call of the account is kept
+ * An account erasure (services/owner/erasure.ts), before its cascade: no call of the account is kept
  * from now on, a write in progress answers first so the cascade reaches what it stored, and the
  * account's waiting calls are dropped. The returned function ends the hold, after the cascade. The
  * calls are matched on their owner, the column the cascade deletes by; another owner's call made by

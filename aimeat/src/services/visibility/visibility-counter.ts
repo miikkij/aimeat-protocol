@@ -504,7 +504,7 @@ async function mergeTaken(storage: Storage, owner: string, days: Map<string, Vis
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: a merge in progress answers
+ * An account erasure (services/owner/erasure.ts), before its cascade: a merge in progress answers
  * first so the cascade deletes what it wrote, the owner's waiting counts are dropped on every storage,
  * and none of the owner's counts is kept or merged until the returned function ends the hold.
  */

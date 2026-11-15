@@ -152,7 +152,7 @@ import { notify } from '../notify.js';
 import { safeFetch, validateOutboundUrl } from '../../utils/url-validator.js';
 import { decodeBody, fetchResponseType, readBodyBytes } from './fetch-decode.js';
 import { parseGAII, localAccountName } from '../../utils/gaii.js';
-import { resolveSecretForHeaders, secretPlaceholderNames } from '../owner-secrets.js';
+import { resolveSecretForHeaders, secretPlaceholderNames } from '../owner/secrets.js';
 import { vaultOwnerForCall, decideFirstUse, decideSharedFirstUse, secretRefusalText } from './secret-authority.js';
 import { scrubBytes, scrubFormsOf, scrubResponse } from './fetch-scrub.js';
 import { logger } from '../../utils/logger.js';

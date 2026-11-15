@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The app-roster part of erasing an account: one step of eraseOwner
- *   (services/owner-erasure.ts).
+ *   (services/owner/erasure.ts).
  *
  *   WHY IT EXISTS. The roster records of services/app/members.ts and the blanket development rights
  *   of services/app/dev-grant.ts live in platform-owned namespaces (`app-member`, ...), keyed by the

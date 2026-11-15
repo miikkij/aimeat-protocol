@@ -7,7 +7,7 @@
  *   the person has to leave the conversation where the integration is being set up, find a page,
  *   and paste a credential into a form — which is the moment they paste it into the chat instead.
  *
- *   ONE IMPLEMENTATION. These call the same services/owner-secrets.ts functions the three REST
+ *   ONE IMPLEMENTATION. These call the same services/owner/secrets.ts functions the three REST
  *   routes call, so the name rule, the 4 kB ceiling, the encryption and the refusal words are
  *   written once. A tool reaching `storage.setSecret` itself would be a second credential store.
  *
@@ -36,7 +36,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner-secrets.js';
+import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner/secrets.js';
 import { withdrawSecretApproval, listOwnerSecretsWithUses } from '../services/secret-approvals.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 

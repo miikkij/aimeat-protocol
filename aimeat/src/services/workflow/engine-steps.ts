@@ -95,7 +95,7 @@ import { mailOwnerFrom } from '../notification-create.js';
 import { logger } from '../../utils/logger.js';
 import { globToRegExp } from './signal-eval.js';
 import { collectSignalKeys, type ResolvedStep } from './store.js';
-import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
+import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner/memory.js';
 import { nodeContext } from '../node-context.js';
 import { emitDelivery } from '../event-bus.js';
 import { runExtensionActionAsSystem } from '../extension/system-run.js';
@@ -358,7 +358,7 @@ export function dispatchExtensionStep(
         ? await runForEach(action.for_each, base, run.vars, (input, n) => runOnce(input, `wf:${workflowId}:${stepId}:i${n}`))
         : await runOnce(base, `wf:${workflowId}:${stepId}`);
     // THE BRIDGE BETWEEN TWO NAMESPACES. An extension's own memory lives under `ext:{name}`, and a
-    // workflow's signals read OWNER SCOPE (services/owner-memory.ts: the owner GHII plus their
+    // workflow's signals read OWNER SCOPE (services/owner/memory.ts: the owner GHII plus their
     // agents and ecosystem apps). Those never intersect, so without this the step's result would be
     // invisible to its own gate and every extension step would be permanently red. The engine
     // therefore lands the return value in the owner's namespace — the same move `answer_to_key`

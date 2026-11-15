@@ -673,7 +673,7 @@ await test('18. aimeat_memory_delete with owner_scope removes an entry of the ow
 // ─── Phase 7: the owner's and sibling agents' private packages (secaudit 2026-10, v56) ───
 // The knowledge tools read the owner's identity set with no visibility rule and no scope, so any
 // agent of the owner, with any scope, read their private manifests and entry values. They now apply
-// memory:read-as-owner (services/owner-scope-read.ts) before the GHII-first dedupe, and declare
+// memory:read-as-owner (services/owner/scope-read.ts) before the GHII-first dedupe, and declare
 // memory:read like aimeat_memory_read.
 console.log('\nPhase 7 — Private packages of the owner and of a sibling agent');
 {

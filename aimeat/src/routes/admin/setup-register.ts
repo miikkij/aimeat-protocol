@@ -42,7 +42,7 @@ import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { logger } from '../../utils/logger.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../../services/admin-setup-secret.js';
-import { claimOperatorSetupCode, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
+import { claimOperatorSetupCode, SetupCodeRefusedError } from '../../services/owner/provisioning.js';
 import { requestFromThisMachine } from '../../services/setup-code.js';
 
 export interface SetupRegisterDeps {

@@ -81,7 +81,7 @@ import type { CallerContext } from '../services/caller-context.js';
 import { choiceIdOf } from '../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../storage/blob/blob-types.js';
 import { directUploadFields } from '../services/direct-upload-answer.js';
-import { delegateReaderFor, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
+import { delegateReaderFor, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** The refusals of a named store (services/storage-file-write.ts StoreChoiceRefusalCode), answered as `CODE: message`. */

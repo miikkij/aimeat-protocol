@@ -1,5 +1,5 @@
 /**
- * @file src/services/owner-secrets.ts
+ * @file src/services/owner/secrets.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner's secrets vault, as ONE implementation. Every door — the three REST
@@ -71,13 +71,13 @@
  *     storing the value again clears them.
  *   v1.0.0 — 2026-09-06 — Initial. The owner's secrets vault.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { SecretApproval, SecretBinding, SecretRecord } from '../storage/types/secrets.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { SecretApproval, SecretBinding, SecretRecord } from '../../storage/types/secrets.js';
 import { createHmac } from 'node:crypto';
-import { encrypt, decrypt, getEncryptionKey, keyRingOf } from './encryption.js';
-import { logger } from '../utils/logger.js';
-import { answerNotifications } from './notification-answers.js';
+import { encrypt, decrypt, getEncryptionKey, keyRingOf } from '../encryption.js';
+import { logger } from '../../utils/logger.js';
+import { answerNotifications } from '../notification-answers.js';
 
 /**
  * A secret name is an ADDRESS, not a label: it is typed into a header inside a document

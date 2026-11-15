@@ -136,7 +136,7 @@ export const GUARD_EFFECTS: Record<string, { admits: Principal[] | null; note?: 
     requireExternalPrincipal: { admits: ['owner', 'operator', 'agent', 'ecosystem'] },
     /**
      * The four owner-mailbox reads: the owner in person, an app on messages:read, an agent or GEAI on
-     * messages:read-as-owner. Decided in services/owner-mailbox-reads.ts (mailboxReaderOf).
+     * messages:read-as-owner. Decided in services/owner/mailbox-reads.ts (mailboxReaderOf).
      */
     requireOwnerMailboxRead: { admits: ['owner', 'operator', 'app', 'agent', 'ecosystem'], note: 'app on messages:read; agent/GEAI on messages:read-as-owner; federated refused' },
     /** The owner's own browser session on the welcome mat, not a token acting in their name. */

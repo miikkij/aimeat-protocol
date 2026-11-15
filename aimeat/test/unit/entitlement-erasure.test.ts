@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Erasing an account revokes the exchange contracts and grants it is a party to, through
- *   eraseOwner (services/owner-erasure.ts), the whole of DELETE /v1/owners/:name below HTTP. Contracts
+ *   eraseOwner (services/owner/erasure.ts), the whole of DELETE /v1/owners/:name below HTTP. Contracts
  *   and grants are keyed by a hash of the consumer's owner GHII, and an erased account name is released
  *   for reuse, so a record that stays active authorises the next person to register the name.
  *   - Revoked: bob's own contract and grant on one coordinate, his agent's contract, a contract stored
@@ -26,7 +26,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import {
   authorizeAndCharge, entitlementKey, grantKey, issueGrant, persistEntitlement, readContractForCall,
   readEntitlementForCall, readGrantForCall, NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement,

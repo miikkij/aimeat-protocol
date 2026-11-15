@@ -76,7 +76,7 @@ import {
   listMcpGrants, putMcpGrant, removeMcpGrant, grantCannotNarrow, invalidGrantExpiry, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import {
   toPublicMcpServer, takesPersonalSignIn, type McpTransport, type McpServerCredential,
 } from '../models/mcp-server-schemas.js';
@@ -319,7 +319,7 @@ export function registerMcpProxyTools(
   // ── The operator's registry ──
   //
   // Asked at runtime of the OWNER record's operator role AND of the operator:admin word, the way
-  // every other operator tool asks it (services/owner-lifecycle.ts resolveOperatorAgentName). The
+  // every other operator tool asks it (services/owner/lifecycle.ts resolveOperatorAgentName). The
   // word is not mcp:manage: an operator's agent that may attach a server to its owner's account must
   // not thereby control what the whole node offers, and the role alone armed every agent the
   // operator connected (security audit A8-1).

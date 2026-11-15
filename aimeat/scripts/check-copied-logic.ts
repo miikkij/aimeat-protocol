@@ -63,7 +63,7 @@ const MIN_LINES = 6;
  *
  * 2026-09-14: 5 → 3, in two steps on the same day. The broadcast's AI-provenance stamp was written
  * once (ce0a967a5). Then the welcome bonus, which was written out at all three doors that create an
- * account (services/owner-provisioning.ts, routes/ghii/register-login.ts, routes/ghii/web-verify.ts)
+ * account (services/owner/provisioning.ts, routes/ghii/register-login.ts, routes/ghii/web-verify.ts)
  * so its amount, its condition and the transaction's shape lived in three places, became
  * creditWelcomeBonus() in owner-provisioning.ts, called from all three. Three pairs gone.
  */

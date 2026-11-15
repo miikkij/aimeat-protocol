@@ -48,7 +48,7 @@ import {
 } from '../services/appdev-kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerFor } from '../services/classification/reader.js';
-import { readsAsOwner } from '../services/owner-scope-read.js';
+import { readsAsOwner } from '../services/owner/scope-read.js';
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 25;

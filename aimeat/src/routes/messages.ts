@@ -138,7 +138,7 @@ import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
-import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner-mailbox-reads.js';
+import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner/mailbox-reads.js';
 import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';
 import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
 import { transcribeForOwner } from '../services/ai/transcription.js';
@@ -489,7 +489,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── The four mailbox READS. ──
-   * One door and one implementation for all four (services/owner-mailbox-reads.ts): the owner in
+   * One door and one implementation for all four (services/owner/mailbox-reads.ts): the owner in
    * person; a published app holding messages:read (an app grant resolves to the owner, and
    * messages:send already sends as the owner, so this is the read half of that pair); an agent holding
    * messages:read-as-owner (a delegation beside send-as-owner and delete-as-owner, outside every

@@ -34,7 +34,7 @@ import type { EmailService } from '../email.js';
 import addressparser from 'nodemailer/lib/addressparser';
 import { logger } from '../../utils/logger.js';
 import { extensionConsentHolds } from './consent.js';
-import { provenOwnerAddress } from '../owner-mail-address.js';
+import { provenOwnerAddress } from '../owner/mail-address.js';
 import { sendMail, type MailIntent } from '../mail-gate.js';
 import { rateBuckets } from '../rate-buckets.js';
 import { EXT_EMAIL_PER_HOUR_DEFAULT } from '../../config/extension-load.js';

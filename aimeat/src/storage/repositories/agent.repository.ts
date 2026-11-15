@@ -54,7 +54,7 @@ export interface AgentRepository {
    * this agent, so it is the grantor's standing decision and stays.
    *
    * `deleteAgent` already runs this inside its own transaction. Call it directly only where an agent
-   * goes some other way, as owner erasure does (services/owner-erasure.ts).
+   * goes some other way, as owner erasure does (services/owner/erasure.ts).
    */
   clearGrantsToIdentity(gaii: string): Promise<GrantsToIdentityCleared>;
   listAgents(): Promise<AgentRecord[]>;

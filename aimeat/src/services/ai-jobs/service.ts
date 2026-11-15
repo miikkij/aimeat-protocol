@@ -655,7 +655,7 @@ export class AiJobService implements AiJobStarter {
     }
 
     /**
-     * The account was erased (services/owner-erasure.ts, after its transaction): every live job of the
+     * The account was erased (services/owner/erasure.ts, after its transaction): every live job of the
      * account and of its agents is let go in this process, its provider call or its wait for a slot is
      * aborted, and its index entry goes. The runner's own steps then find the entry gone, so nothing is
      * paid after this, and no answer, record or day log is written under the erased identity. A job of

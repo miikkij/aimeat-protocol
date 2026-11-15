@@ -39,7 +39,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { buildAppdevOverview } from '../services/appdev-overview.js';
 import { readerFor } from '../services/classification/reader.js';
 import { callerOf } from '../middleware/caller.js';
-import { readsAsOwner } from '../services/owner-scope-read.js';
+import { readsAsOwner } from '../services/owner/scope-read.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate,
   type ProposeTemplateInput,

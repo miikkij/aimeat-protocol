@@ -154,7 +154,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isForeignPrincipal, setThisNodeId } from '../utils/gaii.js';
-import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
+import { setRefreshCookie, readRefreshCookie } from '../services/owner/session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

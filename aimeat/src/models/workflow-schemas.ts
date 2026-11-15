@@ -157,7 +157,7 @@ export type WorkflowStepAction =
   //
   // `result_to_key` IS HOW THE STEP IS GATED, and it is not optional decoration. An extension's own
   // memory lives in the `ext:{name}` namespace, and a workflow's signals read OWNER SCOPE (the owner
-  // GHII plus their agents and ecosystem apps — see services/owner-memory.ts). Those two never
+  // GHII plus their agents and ecosystem apps — see services/owner/memory.ts). Those two never
   // intersect, so a signal pointed at what the extension wrote for itself can only ever read
   // nothing. The engine therefore writes the action's RETURN VALUE to this key, in the owner's
   // namespace, templated and keyPrefix-honouring — exactly what `answer_to_key` does for a

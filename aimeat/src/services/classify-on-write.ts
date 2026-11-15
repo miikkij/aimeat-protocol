@@ -258,7 +258,7 @@ export async function flushWriteClassification(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no write in the account's own
+ * An account erasure (services/owner/erasure.ts), before its cascade: no write in the account's own
  * scope is queued from now on, its waiting writes are dropped (those held here and those on their way
  * to the persistent queue), and the judgement in progress answers first, so the cascade deletes a
  * label it stored. Only that one is waited for: the worker goes on with other accounts' writes, and

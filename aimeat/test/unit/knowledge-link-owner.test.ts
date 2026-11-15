@@ -26,7 +26,7 @@ import Database from 'better-sqlite3';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryLinkRecord } from '../../src/storage/interface.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import { placeKnowledgeLinkOwnersOnce } from '../../src/services/knowledge-link-owner-keep.js';
 import { listSecurityIncidents } from '../../src/services/security-incident.js';
 

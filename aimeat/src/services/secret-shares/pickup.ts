@@ -30,7 +30,7 @@ import type { CallerContext } from '../caller-context.js';
 import { decrypt, getEncryptionKey } from '../encryption.js';
 import { emitChange } from '../event-bus.js';
 import { windowCounter } from '../ephemeral-claims.js';
-import { normalizeSecretHost, putOwnerSecret, SECRET_MAX_BYTES, SECRET_NAME_RE, type SecretSummary } from '../owner-secrets.js';
+import { normalizeSecretHost, putOwnerSecret, SECRET_MAX_BYTES, SECRET_NAME_RE, type SecretSummary } from '../owner/secrets.js';
 import { hmacMatches, normalizeCode, refuse, SHARE_ID_RE, type ShareRefusal } from './rules.js';
 import { scopeRefusal, shareRolesOf } from './access.js';
 import { record } from './events.js';

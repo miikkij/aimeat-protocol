@@ -363,7 +363,7 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
 
     // Until 2026-10-20 this test required the owner's PRIVATE record to reach a `memory:read` agent.
     // That was the hole: reading another same-owner identity's private records costs its own word,
-    // memory:read-as-owner (the 2026-10-15 ruling, services/owner-scope-read.ts), which GET
+    // memory:read-as-owner (the 2026-10-15 ruling, services/owner/scope-read.ts), which GET
     // /v1/memory/:key, GET /v1/memory and GET /v1/memory/search have enforced since. Discovery, which
     // the MCP aimeat_discover tool shares, handed them over with a 240-character excerpt of the value.
     await test('agent WITH memory:read sees the full owner set, PRIVATE records excepted (2026-10-15 ruling)', async () => {

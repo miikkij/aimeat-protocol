@@ -34,7 +34,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
 import { loadOwnerAgents } from '../db/owner-identity.js';
-import { readsAsOwner } from '../owner-scope-read.js';
+import { readsAsOwner } from '../owner/scope-read.js';
 import { isNodeAccount, type AudienceAuth } from '../audience.js';
 import { packageAudienceOf, knowledgeAudienceAllows } from '../knowledge-audience.js';
 import { readerFor, type ReaderAuth } from '../classification/reader.js';

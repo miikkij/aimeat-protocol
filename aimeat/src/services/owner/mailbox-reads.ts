@@ -1,5 +1,5 @@
 /**
- * @file owner-mailbox-reads.ts
+ * @file src/services/owner/mailbox-reads.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Reading an owner's mailbox: WHO may, and WHAT each of them is shown. The one
@@ -53,18 +53,18 @@
  *   v1.0.0 — 2026-09-12 — Initial: messages:read-as-owner for agents, and the messages:read door for
  *     apps, on the four mailbox reads that were owner-session only.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, DirectMessageRecord, ConversationRecord } from '../storage/interface.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isForeignPrincipal, isSameOwner, localAccountName } from '../utils/gaii.js';
-import { createMessagingDbService, type OwnerConversation } from './db/messaging-db-service.js';
-import { createMessagesInboxService, type InboxOverview } from './db/messages-inbox-db-service.js';
-import type { AgentRecordView } from './agent/record-view.js';
-import { withMessageProvenance } from './message-provenance.js';
-import { readAgentDmThread } from './agent/dm-reads.js';
-import { withReactions } from './message-reactions.js';
-import { isParticipant } from './conversation-group.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, DirectMessageRecord, ConversationRecord } from '../../storage/interface.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { isForeignPrincipal, isSameOwner, localAccountName } from '../../utils/gaii.js';
+import { createMessagingDbService, type OwnerConversation } from '../db/messaging-db-service.js';
+import { createMessagesInboxService, type InboxOverview } from '../db/messages-inbox-db-service.js';
+import type { AgentRecordView } from '../agent/record-view.js';
+import { withMessageProvenance } from '../message-provenance.js';
+import { readAgentDmThread } from '../agent/dm-reads.js';
+import { withReactions } from '../message-reactions.js';
+import { isParticipant } from '../conversation-group.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Read the owner's mailbox as the owner. Outside every wildcard (utils/scope-coverage.ts): "Full

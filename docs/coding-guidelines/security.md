@@ -89,7 +89,7 @@ requireOperator(storage)               // from src/auth/operator-gate.ts
 requireOwnerPrincipal()                // src/auth/account-security.ts: the human in person, no agent, app or ecosystem token
 ```
 
-The first real owner on a node gets the `operator` role (`POST /v1/owners` in `src/routes/owners.ts`, and `provisionOwner` in `src/services/owner-provisioning.ts`).
+The first real owner on a node gets the `operator` role (`POST /v1/owners` in `src/routes/owners.ts`, and `provisionOwner` in `src/services/owner/provisioning.ts`).
 
 ---
 

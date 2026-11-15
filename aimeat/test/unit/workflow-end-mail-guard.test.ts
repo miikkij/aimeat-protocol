@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The workflow-end mail (services/workflow/engine-steps.ts onRunFinished) goes through the
  *   one path for a mail that carries a principal's words to the owner (notification-create.ts
- *   mailOwnerFrom): only to a proven address (services/owner-mail-address.ts provenOwnerAddress), and
+ *   mailOwnerFrom): only to a proven address (services/owner/mail-address.ts provenOwnerAddress), and
  *   within the per-sender daily limit (email.reports_per_sender_day). The workflow's name, the stop
  *   reason and the step ids are text an agent with workflow:write wrote, so before this an agent that
  *   changed the owner's notification address could have the report mailed to that address

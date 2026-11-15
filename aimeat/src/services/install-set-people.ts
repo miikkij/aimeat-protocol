@@ -39,7 +39,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord, GHIIRecord } from '../storage/interface.js';
 import { validateOwnerName } from '../utils/gaii.js';
-import { provisionOwner, emailHashOf, registrationRefusal, ProvisionEmailTakenError, RegistrationClosedError } from './owner-provisioning.js';
+import { provisionOwner, emailHashOf, registrationRefusal, ProvisionEmailTakenError, RegistrationClosedError } from './owner/provisioning.js';
 import { deriveUniqueUsername } from './external-login.js';
 import { addOrganismMember, createEmailInvitation, InvitationError } from './invitations.js';
 import { sendWelcomeLink } from './login-link.js';

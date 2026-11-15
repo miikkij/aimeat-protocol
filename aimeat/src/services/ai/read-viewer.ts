@@ -8,7 +8,7 @@
  *   WHY. A key without a namespace is read across the owner scope, the owner and every agent and
  *   ecosystem app of theirs, which is the owner's own reach. An agent reading its owner's or a
  *   sibling's private record that way rides the human's ownership, which every other owner-scope
- *   read on this node refuses without memory:read-as-owner (services/owner-scope-read.ts): the memory
+ *   read on this node refuses without memory:read-as-owner (services/owner/scope-read.ts): the memory
  *   route, the MCP memory tools, the librarian, discovery and the workflow ai step. An AI job did not,
  *   so an agent with ai:use got the record back in the model's answer (secaudit 2026-10, r49), and an
  *   extension's ctx.ai.start did the same past the owner's 'installer' setting (v75).
@@ -30,7 +30,7 @@ import type { Storage, StorageFileRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { READ_AS_OWNER_NOTE, READ_AS_OWNER_SCOPE } from '../owner-scope-read.js';
+import { READ_AS_OWNER_NOTE, READ_AS_OWNER_SCOPE } from '../owner/scope-read.js';
 import { authorizeRead } from '../access-guard.js';
 
 /**

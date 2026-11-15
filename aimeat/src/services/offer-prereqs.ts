@@ -29,7 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
 import type { Signal } from '../models/workflow-schemas.js';
 import { buildGAII } from '../utils/gaii.js';
-import { listOwnerScopeMemory, getOwnerScopeMemory } from './owner-memory.js';
+import { listOwnerScopeMemory, getOwnerScopeMemory } from './owner/memory.js';
 import { evaluateSignal, globToRegExp, type SignalEvalCtx } from './workflow/signal-eval.js';
 import { validateValueAgainstSchema } from './schema-validator.js';
 import type { ContentReader } from './classification/reader.js';

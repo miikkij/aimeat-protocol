@@ -28,7 +28,7 @@ import { explorerQueryOf, listLabels } from '../../src/services/classification/e
 import { readAuditLog } from '../../src/services/classification/policy-admin.js';
 import { makeException, readExceptions } from '../../src/services/classification/exception-admin.js';
 import { readQueue } from '../../src/services/classification-run/classifier.js';
-import { READ_AS_OWNER_NOTE } from '../../src/services/owner-scope-read.js';
+import { READ_AS_OWNER_NOTE } from '../../src/services/owner/scope-read.js';
 import { labelActorReadsAll } from '../../src/services/classification/owner-scope-labels.js';
 
 const N = 'test-node';

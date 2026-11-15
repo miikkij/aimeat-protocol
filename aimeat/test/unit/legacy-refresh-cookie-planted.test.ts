@@ -25,7 +25,7 @@ import { initNodeKeys } from '../../src/auth/jwt.js';
 import {
   establishOwnerSession, refreshOwnerSession, readRefreshCookie, hashToken, REFRESH_COOKIE, LEGACY_REFRESH_COOKIE,
   SESSION_HINT_COOKIE,
-} from '../../src/services/owner-session.js';
+} from '../../src/services/owner/session.js';
 
 const DAY = 86_400_000;
 let storage: Storage;

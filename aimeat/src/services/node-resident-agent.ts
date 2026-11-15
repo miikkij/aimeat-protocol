@@ -18,7 +18,7 @@
 import type { Storage } from '../storage/interface.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { basicAgentByName } from '../data/basic-agents.js';
-import { getOwnerScopeMemory } from './owner-memory.js';
+import { getOwnerScopeMemory } from './owner/memory.js';
 import { HELLO_MCP_KEY } from './hello-mcp.js';
 
 /** The tag of the basic agents created with the account (data/basic-agents.ts). */

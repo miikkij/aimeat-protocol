@@ -73,7 +73,7 @@ import {
   type RunItem,
 } from '../services/decide/runs.js';
 import { callerOf } from '../middleware/caller.js';
-import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner/scope-read.js';
 import {
   providersView, providerView, putOwnerProvider, deleteOwnerProvider,
 } from '../services/decide/providers.js';

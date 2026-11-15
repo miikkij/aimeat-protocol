@@ -64,7 +64,7 @@ import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret-records.j
 import { presentMemory } from '../classification/present-memory.js';
 import { classifyAfterWrite } from '../classify-on-write.js';
 import { resolveWriteTarget, type WriteTargetAuth } from '../write-target.js';
-import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OWNER_SCOPE, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
+import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OWNER_SCOPE, READ_AS_OWNER_NOTE } from '../owner/scope-read.js';
 import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../memory/write-asks.js';
 import { isKeyArchived } from '../archive.js';
 import { undeclaredSpaceForKey } from '../workspace/write-items.js';

@@ -20,7 +20,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import { beneficiaryEligibility, putApproval } from '../../src/commerce/beneficiary-release.js';
 import { grantAccountant, listAccountants, resolveFinanceOwner } from '../../src/services/finance/accountant-access.js';
 import { writeNewAgreement } from '../../src/services/compliance/agreements.js';

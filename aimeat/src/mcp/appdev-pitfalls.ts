@@ -55,7 +55,7 @@ import { getSoftwareVersion } from '../utils/version.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
-import { readsAsOwner } from '../services/owner-scope-read.js';
+import { readsAsOwner } from '../services/owner/scope-read.js';
 
 export { PITFALL_PACKAGE_ID };
 

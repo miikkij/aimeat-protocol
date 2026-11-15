@@ -29,7 +29,7 @@ vi.mock('../../src/services/hooks.js', () => ({
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
-import { provisionOwner, RegistrationClosedError, RegistrationHookRefusedError } from '../../src/services/owner-provisioning.js';
+import { provisionOwner, RegistrationClosedError, RegistrationHookRefusedError } from '../../src/services/owner/provisioning.js';
 
 const NODE = 'aimeat-unit-reghook-001';
 let storage: Storage;

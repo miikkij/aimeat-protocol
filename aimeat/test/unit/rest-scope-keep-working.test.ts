@@ -119,7 +119,7 @@ const INLINE_NOT_KEPT: Record<string, string> = {
 };
 const INLINE_CONSTANTS: Record<string, string> = {
     READ_THROUGH_SCOPE: 'connections:read-through',
-    // services/owner-scope-read.ts: reading the owner's and sibling agents' private records as the owner.
+    // services/owner/scope-read.ts: reading the owner's and sibling agents' private records as the owner.
     READ_AS_OWNER_SCOPE: 'memory:read-as-owner',
     // services/datapackage/audience.ts: the word a same-owner principal needs for a non-public package (ruling 2026-10-20).
     DATAPACKAGE_READ_SCOPE: 'storage:read',

@@ -133,7 +133,7 @@ export async function flushConsentAudit(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no entry of the account is
+ * An account erasure (services/owner/erasure.ts), before its cascade: no entry of the account is
  * kept from now on, a write in progress answers first so the cascade reaches what it stored, and the
  * account's waiting entries, a failed write's included, are dropped. The returned function ends the
  * hold, after the cascade. Entries whose owner is someone else stay, the erased person as accessor

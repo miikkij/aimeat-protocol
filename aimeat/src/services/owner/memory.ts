@@ -1,5 +1,5 @@
 /**
- * @file owner-memory.ts
+ * @file src/services/owner/memory.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Owner-scope memory aggregation: the union of an owner's GHII keyspace and every one
@@ -14,7 +14,7 @@
  *       (GHII-first); `skipAgent` leaves chosen agents' copies out
  *   - getOwnerScopePublicMemory(storage, nodeId, ownerName, key) — first PUBLIC record for a key across
  *       owner+agents (GHII-first); a non-public record never shadows a public one (anonymous serve paths)
- * @usage import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
+ * @usage import { listOwnerScopeMemory, getOwnerScopeMemory } from './memory.js';
  * @version-history
  *   v1.6.0 — 2026-11-09 — getOwnerScopeMemory reads the agents and ecosystem apps through the request's
  *     read scope (loadOwnerAgents, loadOwnerEcoApps): the home state asked for three keys and read the
@@ -35,10 +35,10 @@
  *     resolve a record an owner's AGENT published under its own GAII — a non-public record never shadows
  *     a public one on the same key.
  */
-import type { Storage, MemoryRecord, AgentRecord } from '../storage/interface.js';
-import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
-import { MemoryRepository } from '../storage/repositories-impl/memory-repository.js';
-import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
+import type { Storage, MemoryRecord, AgentRecord } from '../../storage/interface.js';
+import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
+import { MemoryRepository } from '../../storage/repositories-impl/memory-repository.js';
+import { loadOwnerAgents, loadOwnerEcoApps } from '../db/owner-identity.js';
 
 /**
  * A record from an owner-scope listing. `alsoUnder` names every OTHER same-owner identity holding
@@ -52,7 +52,7 @@ export interface OwnerScopeListOpts {
   visibility?: string;
   tags?: string[];
   maxFlags?: number;
-  archived?: import('../storage/interface.js').ArchiveFilter;
+  archived?: import('../../storage/interface.js').ArchiveFilter;
 }
 
 /**

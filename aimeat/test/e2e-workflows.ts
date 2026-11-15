@@ -1405,7 +1405,7 @@ async function run() {
     const direct = await json('/v1/memory/wfsig.private?owner_scope=true', { headers: noRead });
     assert(direct.status === 403, `the memory door refuses the agent: ${direct.status}`);
     // The same door refuses the agent that HAS memory:read, because reading the owner's private
-    // record as the owner costs memory:read-as-owner (services/owner-scope-read.ts).
+    // record as the owner costs memory:read-as-owner (services/owner/scope-read.ts).
     const directRead = await json('/v1/memory/wfsig.private?owner_scope=true', { headers: readOnly });
     assert(directRead.status === 404, `the memory door hides the owner's private record from memory:read alone: ${directRead.status}`);
 
@@ -1457,7 +1457,7 @@ async function run() {
   // a run the owner started in person: a json_field leaf keeps the field value of an owner record on
   // the run, and GET /v1/workflows/:id/runs/:runId served it to any caller holding workflow:read,
   // withholding only classified values. A caller that does not read the owner's records as the owner
-  // (services/owner-scope-read.ts) now gets the states without the values (secaudit 2026-10, the
+  // (services/owner/scope-read.ts) now gets the states without the values (secaudit 2026-10, the
   // run-read gap beside wf-preflight-skips-step-authority).
   await test('a run\'s observed values are served only to a caller that reads the owner\'s records as the owner', async () => {
     const w = await json('/v1/memory', {

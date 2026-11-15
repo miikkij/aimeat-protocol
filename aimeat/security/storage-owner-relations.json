@@ -6,7 +6,7 @@
       "current": "Deleted by the per-identity cascade, matching ownerGhii or agentGaii.",
       "reason": "These are this identity's usage rows; counterparty consumerGhii is deliberately not matched.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -19,7 +19,7 @@
       "current": "Deleted by the per-identity cascade, matching ownerGhii or agentGaii.",
       "reason": "These are this identity's usage rows; counterparty consumerGhii is deliberately not matched.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -32,7 +32,7 @@
       "current": "Deleted by the per-identity cascade, matching ownerGhii or agentGaii.",
       "reason": "These are this identity's usage rows; counterparty consumerGhii is deliberately not matched.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -45,7 +45,7 @@
       "current": "Deleted by the per-identity cascade.",
       "reason": "The decisions belong to the erased owner.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -58,7 +58,7 @@
       "current": "Owner and principal are replaced with the erasure pseudonym; statement remains.",
       "reason": "Content may outlive its author; a reused account name must not inherit provenance ownership.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts",
         "src/storage/erased-party.ts"
@@ -72,7 +72,7 @@
       "current": "eraseOwner calls deleteMcpServersByOwner; node and organism server ownership stays separate.",
       "reason": "Live credentials cannot pass to a new registrant of the same name.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -85,7 +85,7 @@
       "current": "eraseOwner calls deleteMcpUserCredentialsByOwner (step mcp_user_credentials); deleteMcpServer removes a server's personal sign-ins with it.",
       "reason": "Each row is one person's live sign-in to a shared server; it cannot pass to a new registrant of the same name, and the shared server itself is the node's or the organism's.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/mcp-servers.ts",
         "src/storage/providers/sqlite/methods/mcp-servers.ts"
       ],
@@ -98,7 +98,7 @@
       "current": "eraseOwner calls deleteHelpDataByOwner (step help_questions): the person's participant row goes, with their questions, the routes of those questions and the routes that sent questions to them.",
       "reason": "A participant row holds one person's choices (topics, status, what their AI may do); it cannot pass to a new registrant of the same name.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/help.ts",
         "src/storage/providers/sqlite/methods/help.ts"
       ],
@@ -111,7 +111,7 @@
       "current": "eraseOwner calls deleteAppPartiesByOwner (step app_parties): every person registered to the owner's apps goes with what they kept; deleteOwnedApp removes one app's people when the whole app is deleted.",
       "reason": "The rows are people who registered to this owner's apps, personal data the owner holds as controller; they cannot pass to a new registrant of the same name.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/services/app-parties/owner.ts",
         "src/storage/providers/postgres-kysely/methods/app-parties.ts",
         "src/storage/providers/sqlite/methods/app-parties.ts"
@@ -125,7 +125,7 @@
       "current": "eraseOwner calls deleteAppPartiesByOwner (step app_parties); a removed person's collections go with their row, and a deleted app's with the app.",
       "reason": "What a person kept in one of this owner's apps; it cannot pass to a new registrant of the same name.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/app-parties.ts",
         "src/storage/providers/sqlite/methods/app-parties.ts"
       ],
@@ -138,7 +138,7 @@
       "current": "eraseOwner calls deleteHelpDataByOwner (step help_questions): every question the person asked goes with its routes.",
       "reason": "A question is the asker's own text; it cannot pass to a new registrant of the same name.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/help.ts",
         "src/storage/providers/sqlite/methods/help.ts"
       ],
@@ -151,7 +151,7 @@
       "current": "eraseOwner calls deleteSecretSharesByOwner (step secret_shares): the person's shares and requests go with their content, events and member rows, and the person's member rows on others' shares go too.",
       "reason": "A share holds one person's secret and terms; it cannot pass to a new registrant of the same name.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/secret-shares.ts",
         "src/storage/providers/sqlite/methods/secret-shares.ts"
       ],
@@ -164,7 +164,7 @@
       "current": "Deleted with the share by deleteSecretSharesByOwner (step secret_shares): createdBy is always the maker or one of the maker's own agents, so the maker's erasure removes every row it names.",
       "reason": "The principal that made a share acts in the maker's name; it is never a different person.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/services/secret-shares/service.ts",
         "src/storage/providers/postgres-kysely/methods/secret-shares.ts",
         "src/storage/providers/sqlite/methods/secret-shares.ts"
@@ -178,7 +178,7 @@
       "current": "eraseOwner calls deleteVaultDeviceKeysByOwner (step vault_device_keys).",
       "reason": "A public key of one person's browser; a new registrant of the same name must not receive shares sealed for it.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/secret-shares.ts",
         "src/storage/providers/sqlite/methods/secret-shares.ts"
       ],
@@ -204,7 +204,7 @@
       "current": "Owner rows are deleted by eraseOwner through owner deletion methods; no creator-only sweep.",
       "reason": "The owning account and the creator are separate relations.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -217,7 +217,7 @@
       "current": "Owner rows are deleted by eraseOwner through owner deletion methods; no creator-only sweep.",
       "reason": "The owning account and the creator are separate relations.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -230,7 +230,7 @@
       "current": "Rows are deleted by agentGaii or ownerGaii/group, not by creator alone.",
       "reason": "Creation is attribution; a creator is not necessarily the data owner.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -243,7 +243,7 @@
       "current": "Rows are deleted by agentGaii or ownerGaii/group, not by creator alone.",
       "reason": "Creation is attribution; a creator is not necessarily the data owner.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -256,7 +256,7 @@
       "current": "eraseOwner deletes matches for both the bare owner name and GHII.",
       "reason": "These fields identify the account whose scheduled executions or instances must end.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -269,7 +269,7 @@
       "current": "eraseOwner deletes matches for both the bare owner name and GHII.",
       "reason": "These fields identify the account whose scheduled executions or instances must end.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],
@@ -516,7 +516,7 @@
       "current": "eraseOwner enumerates and deletes the owner's capabilities.",
       "reason": "An erased owner's published capability cannot stay executable as that account.",
       "evidence": [
-        "src/services/owner-erasure.ts",
+        "src/services/owner/erasure.ts",
         "src/storage/providers/postgres-kysely/methods/owner-cascade.ts",
         "src/storage/providers/sqlite/methods/owner-cascade.ts"
       ],

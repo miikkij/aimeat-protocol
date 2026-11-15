@@ -241,7 +241,7 @@ export async function flushAgentRefusals(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no refusal of the account's
+ * An account erasure (services/owner/erasure.ts), before its cascade: no refusal of the account's
  * agents is noted from now on, the refusals waiting in their windows are dropped, and the writes in
  * progress answer first, so the cascade deletes what they stored. A waiting refusal alone did no
  * harm, because the note reads the agent first and the cascade removes it; a note that had read the

@@ -1,5 +1,5 @@
 /**
- * @file src/services/owner-erasure.ts
+ * @file src/services/owner/erasure.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Erasing an owner, as ONE operation. This is the whole of `DELETE /v1/owners/:name`
@@ -137,37 +137,37 @@
  *   v1.0.0 — 2026-08-11 — Extracted from routes/owners.ts by pure move, then wrapped in one
  *     storage.transaction() (GAP-001's route half).
  */
-import type { Storage, OrganismRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { ERASED_PARTY_PREFIX, erasedPartyPseudonym } from '../storage/erased-party.js';
-import { inSavepoint } from './tolerant-step.js';
-import { evictAgentTelemetry, holdTelemetryForErasure } from './telemetry-buffer.js';
-import { removeWithClassificationAudit, flushClassificationAudit } from './classification/audit.js';
-import { holdConsentAuditForErasure } from './consent-audit-buffer.js';
-import { holdUsageForErasure } from './usage/usage-buffer.js';
-import { holdWriteTallyForErasure } from './data-map/write-tally-buffer.js';
-import { holdScopeUseForErasure } from './scope-use.js';
-import { holdAgentRefusalsForErasure } from './agent/refusals.js';
-import { holdCallTimingsForErasure } from './call-timing.js';
-import { holdPartyActivityForErasure } from './parties/activity.js';
-import { holdReceiverLogsForErasure } from './receivers/deliveries.js';
-import { holdWriteClassificationForErasure } from './classify-on-write.js';
-import { holdContentIntakeForErasure } from './content/intake.js';
-import { holdVisibilityForErasure } from './visibility/visibility-counter.js';
-import { holdBehaviourForErasure } from './visibility/behaviour-counter.js';
-import { purgeExceptions } from './classification/exceptions.js';
-import { eraseAppMembership } from './app/member-erasure.js';
-import { eraseAppDesignSpecsOf } from './app/design-spec.js';
-import { eraseAppPlansOf } from './app/plan.js';
-import { eraseAppRoadmapsOf } from './app/roadmap.js';
-import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
-import { uninstallExtension } from './extension/lifecycle.js';
-import { appendRequest, removeAppDocsOfOwner } from './compliance/docs.js';
-import { eraseNameBoundGrants } from './name-bound-grants-erasure.js';
-import { serviceNamespaceOf } from '../utils/service-namespace.js';
-import { isValidGHII } from '../utils/gaii.js';
-import { nodeContext } from './node-context.js';
-import { emitAccountErased } from './event-bus.js';
+import type { Storage, OrganismRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { ERASED_PARTY_PREFIX, erasedPartyPseudonym } from '../../storage/erased-party.js';
+import { inSavepoint } from '../tolerant-step.js';
+import { evictAgentTelemetry, holdTelemetryForErasure } from '../telemetry-buffer.js';
+import { removeWithClassificationAudit, flushClassificationAudit } from '../classification/audit.js';
+import { holdConsentAuditForErasure } from '../consent-audit-buffer.js';
+import { holdUsageForErasure } from '../usage/usage-buffer.js';
+import { holdWriteTallyForErasure } from '../data-map/write-tally-buffer.js';
+import { holdScopeUseForErasure } from '../scope-use.js';
+import { holdAgentRefusalsForErasure } from '../agent/refusals.js';
+import { holdCallTimingsForErasure } from '../call-timing.js';
+import { holdPartyActivityForErasure } from '../parties/activity.js';
+import { holdReceiverLogsForErasure } from '../receivers/deliveries.js';
+import { holdWriteClassificationForErasure } from '../classify-on-write.js';
+import { holdContentIntakeForErasure } from '../content/intake.js';
+import { holdVisibilityForErasure } from '../visibility/visibility-counter.js';
+import { holdBehaviourForErasure } from '../visibility/behaviour-counter.js';
+import { purgeExceptions } from '../classification/exceptions.js';
+import { eraseAppMembership } from '../app/member-erasure.js';
+import { eraseAppDesignSpecsOf } from '../app/design-spec.js';
+import { eraseAppPlansOf } from '../app/plan.js';
+import { eraseAppRoadmapsOf } from '../app/roadmap.js';
+import { revokeEntitlementsOfAccount } from '../entitlement-erasure.js';
+import { uninstallExtension } from '../extension/lifecycle.js';
+import { appendRequest, removeAppDocsOfOwner } from '../compliance/docs.js';
+import { eraseNameBoundGrants } from '../name-bound-grants-erasure.js';
+import { serviceNamespaceOf } from '../../utils/service-namespace.js';
+import { isValidGHII } from '../../utils/gaii.js';
+import { nodeContext } from '../node-context.js';
+import { emitAccountErased } from '../event-bus.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;

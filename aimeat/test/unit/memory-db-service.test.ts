@@ -2,7 +2,7 @@
  * @file test/unit/memory-db-service.test.ts
  * @description Phase 0 parity + framework tests for the data-access redesign scaffolding. Proves the new
  *   Service → Repository → Adapter stack returns byte-for-byte the same results as the current
- *   services/owner-memory.ts helpers over the SAME SqliteStorage (coexistence, zero behaviour change),
+ *   services/owner/memory.ts helpers over the SAME SqliteStorage (coexistence, zero behaviour change),
  *   and unit-tests the read-scope primitive (IdentityMap memoisation).
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 0 scaffolding tests.
@@ -18,7 +18,7 @@ import {
   listOwnerScopeMemory,
   listOwnerScopeMemoryMeta,
   getOwnerScopeMemory,
-} from '../../src/services/owner-memory.js';
+} from '../../src/services/owner/memory.js';
 
 const NODE = 'test-node';
 const OWNER = 'alice';

@@ -57,7 +57,7 @@ import {
 } from '../services/decide/runs.js';
 import type { JevQuestion } from '../services/decide/limits.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner/scope-read.js';
 import type { CallerContext } from '../services/caller-context.js';
 
 export function registerDecideTools(

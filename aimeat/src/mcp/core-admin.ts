@@ -69,7 +69,7 @@ import { nodeActivity } from '../services/node-admin/activity.js';
 import { addOrganismOwner } from '../services/organism/ownership.js';
 import { organismOwnershipView } from '../services/node-admin/organism-ownership-view.js';
 import { nodeTeamsView } from '../services/node-admin/teams-view.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { registerKeyReencryptTool } from './key-reencrypt.js';

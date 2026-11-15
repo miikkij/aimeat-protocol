@@ -51,7 +51,7 @@ import { presentMemories } from './classification/present-memory.js';
 import type { ContentReader } from './classification/reader.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { organismKeysCarried } from './group-shares-classification.js';
-import { ownerScopeView } from './owner-scope-read.js';
+import { ownerScopeView } from './owner/scope-read.js';
 import { organismReadableRecords, type OrganismListCaller } from './organism/namespace-access.js';
 import { withoutFlagHiddenMemory } from './moderation-flags.js';
 
@@ -221,7 +221,7 @@ export async function librarianSearch(
   // THE OWN SCOPE IS THE OWNER'S WHOLE IDENTITY SET, AND NOT EVERY CALLER READS ALL OF IT. The owner
   // in person, an app grant and an agent holding memory:read-as-owner read every record; any other
   // same-owner caller reads its own plus the owner-, members- and public-visibility ones
-  // (services/owner-scope-read.ts, 2026-10-15). Until 2026-10-20 the fan-out was chosen on
+  // (services/owner/scope-read.ts, 2026-10-15). Until 2026-10-20 the fan-out was chosen on
   // memory:read alone and nothing filtered the hits, so a default-approved agent read the owner's
   // and every sibling agent's private records as snippets (secaudit 2026-10).
   // THE ORGANISM RULE, AS GET /v1/memory/:key ASKS IT. An organism record in the own scope is read

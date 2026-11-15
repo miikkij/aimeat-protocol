@@ -20,7 +20,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { encrypt, decrypt, encryptBound, decryptBound, getEncryptionKey } from '../../src/services/encryption.js';
-import { putOwnerSecret, resolveSecretForHeaders } from '../../src/services/owner-secrets.js';
+import { putOwnerSecret, resolveSecretForHeaders } from '../../src/services/owner/secrets.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig } from '../../src/config.js';
 

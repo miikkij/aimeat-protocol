@@ -10,7 +10,7 @@
  * @structure GET /v1/librarian/search?q=&limit= — requireAuth; the `own` search fans across the
  *   owner's full read surface (GHII + agents + ecosystem apps) for an owner session OR any grant
  *   carrying `memory:read`, an ecosystem app excepted; otherwise it is scoped to the caller's own
- *   identity. What the fan-out then SHOWS is decided by services/owner-scope-read.ts.
+ *   identity. What the fan-out then SHOWS is decided by services/owner/scope-read.ts.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
  *   2026-10-20 — The `own` search passes the caller to the organism read rule (organismReadableRecords
@@ -65,7 +65,7 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { callerOf } from '../middleware/caller.js';
 import { denyScope403 } from '../auth/deny.js';
 import { librarianSearch } from '../services/librarian.js';
-import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner/scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
 import { aiCallerFromCredential, type AiCallerContext } from '../services/ai/caller-context.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
@@ -140,7 +140,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     // direct read of the same key answered 404 (secaudit 2026-10).
     const fanOutOwner = isOwnerSession || (scopeIsCovered(scopes, 'memory:read') && caller.kind !== 'ecosystem');
     // Who sees the private records of the OTHER identities in that set: the owner in person, an app
-    // grant, or an agent holding memory:read-as-owner (services/owner-scope-read.ts).
+    // grant, or an agent holding memory:read-as-owner (services/owner/scope-read.ts).
     const readsAll = isOwnerSession || readsAsOwner(caller);
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     // An app grant's own identity IS its owner's GHII, so "the caller's own records" are the owner's

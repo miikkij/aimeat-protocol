@@ -2,7 +2,7 @@
  * @file test/unit/operator-claim.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The operator claim of services/owner-provisioning.ts: claimOperatorSetupCode asks for
+ * @description The operator claim of services/owner/provisioning.ts: claimOperatorSetupCode asks for
  *   the setup code while a public node has no OPERATOR (an owner without the role does not end it),
  *   and rolesAtWrite drops a stale operator role unless the request took the code, reading with the
  *   claim form of operatorAccountState.
@@ -12,7 +12,7 @@
  *   2026-10-16 — Initial (Jouni, 2026-10-16: the no-operator self-heal needs the setup code too).
  */
 import { describe, it, expect } from 'vitest';
-import { claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../../src/services/owner-provisioning.js';
+import { claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../../src/services/owner/provisioning.js';
 import { setupCodeGateFor } from '../../src/services/setup-code.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';

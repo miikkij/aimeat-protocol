@@ -266,7 +266,7 @@ Six rules, and each one closes a way the value could leak back:
 inside a document, a config or a workflow and the vault can see none of those. It is the only answer
 this node has to "what breaks if I delete this".
 
-Full reference: `src/services/owner-secrets.ts` (the one implementation), `src/routes/secrets.ts`
+Full reference: `src/services/owner/secrets.ts` (the one implementation), `src/routes/secrets.ts`
 (the routes: list, set, change, delete, and the four approval routes), `src/services/extension/ctx.ts` (the resolution point).
 
 ---

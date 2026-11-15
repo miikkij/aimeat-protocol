@@ -93,7 +93,7 @@ export const RULES: Rule[] = [
   },
   {
     id: 'delete-owner',
-    label: 'An account is deleted only by eraseOwner (services/owner-erasure.ts), which also clears what the storage cascade does not reach: memory, consents, sessions, grants, audit rows (C7)',
+    label: 'An account is deleted only by eraseOwner (services/owner/erasure.ts), which also clears what the storage cascade does not reach: memory, consents, sessions, grants, audit rows (C7)',
     pattern: /\bstorage\.deleteOwner\(/,
   },
   {
@@ -172,7 +172,7 @@ export const RULES: Rule[] = [
   },
   {
     id: 'verification-level-gate',
-    label: 'Whether an owner\'s address is proven is asked with provenOwnerAddress (services/owner-mail-address.ts), which compares the flag and the hash; the account\'s verificationLevel stays when the address changes, so a mail gate that compares it mails an unproven address (codebase analysis 2026-11-03, A9)',
+    label: 'Whether an owner\'s address is proven is asked with provenOwnerAddress (services/owner/mail-address.ts), which compares the flag and the hash; the account\'s verificationLevel stays when the address changes, so a mail gate that compares it mails an unproven address (codebase analysis 2026-11-03, A9)',
     // A comparison of the level with a number: `g.verificationLevel<1`, `(r.verificationLevel??0)>=1`.
     pattern: /verificationLevel(\?\?\d+\))?(<|>|<=|>=|===|!==|==|!=)\d/,
   },

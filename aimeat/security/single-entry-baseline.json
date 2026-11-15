@@ -16,7 +16,7 @@
       }
     },
     "delete-owner": {
-      "src/services/owner-erasure.ts": {
+      "src/services/owner/erasure.ts": {
         "count": 1,
         "why": "eraseOwner, the one account deletion: it clears what the storage cascade does not reach, then runs the cascade."
       }
@@ -201,7 +201,7 @@
         "count": 2,
         "why": "askOperator itself: the operator in person is read off the session's roles."
       },
-      "src/services/owner-mailbox-reads.ts": {
+      "src/services/owner/mailbox-reads.ts": {
         "count": 1,
         "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
       }
@@ -293,7 +293,7 @@
         "count": 1,
         "why": "askOperator itself: whether a role list acts for someone."
       },
-      "src/services/owner-mailbox-reads.ts": {
+      "src/services/owner/mailbox-reads.ts": {
         "count": 1,
         "why": "(owner || operator) when nothing acts for someone: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
       }
@@ -399,7 +399,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/owner-mailbox-reads.ts": {
+      "src/services/owner/mailbox-reads.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -663,7 +663,7 @@
         "count": 5,
         "why": "The hooks.<name> rows hold the operator's hook lists, which are not Config rows (no row in config-schema.ts), so no setting rule applies. setHookActions is reached from PUT and DELETE /v1/admin/hooks/:hookName (requireOperator) and the MCP admin hooks tool (operator test); the other writes are start-up migrations."
       },
-      "src/services/owner-session.ts": {
+      "src/services/owner/session.ts": {
         "count": 1,
         "why": "settleRefreshCookieWindowAtStart stores auth.refresh_cookie_legacy_until once at start when no source set it: the node's own write, no caller, and the row has no tighten-only rule."
       }
@@ -792,7 +792,7 @@
         "count": 1,
         "why": "The node chat's own agent (mintChatAgentToken): role agent, the scopes of its identity, an MCP or REST audience."
       },
-      "src/services/owner-session.ts": {
+      "src/services/owner/session.ts": {
         "count": 3,
         "why": "The owner's access token at sign-in and at the two refresh-cookie steps: the owner's current roles, no scopes."
       }

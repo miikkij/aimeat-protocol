@@ -17,7 +17,7 @@
  * v1.0.0 - 2026-06-03 - Initial (plan 2026-06-03-agent-access-tokens).
  */
 import type { Storage } from '../storage/interface.js';
-import { hashToken } from './owner-session.js';
+import { hashToken } from './owner/session.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 

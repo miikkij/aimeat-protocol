@@ -147,7 +147,7 @@ in whose name an agent acts.
 - **Transactions:** Keyed to GHII identity (`owner@nodeId`)
 - **Wallet API:** Returns single GHII balance, no aggregation needed
 - **Per-agent spending limits:** `AgentRecord.dailySpendLimit` is used by schedule constraints when configured. It is not a universal limit on every debit path.
-- **Welcome bonus:** Granted to the GHII when the account is created, never when an agent is created. The new GHII record starts with `config.welcomeBonus` as its balance, and `creditWelcomeBonus()` in `src/services/owner-provisioning.ts` records the bonus transaction for `provisionOwner()` (OAuth, invitation, SCIM), `POST /v1/ghii` (`src/routes/ghii/register-login.ts`) and `POST /v1/ghii/register-web` (`src/routes/ghii/web-verify.ts`). `POST /v1/owners` (`src/routes/owners.ts`) still writes the same balance and transaction inline.
+- **Welcome bonus:** Granted to the GHII when the account is created, never when an agent is created. The new GHII record starts with `config.welcomeBonus` as its balance, and `creditWelcomeBonus()` in `src/services/owner/provisioning.ts` records the bonus transaction for `provisionOwner()` (OAuth, invitation, SCIM), `POST /v1/ghii` (`src/routes/ghii/register-login.ts`) and `POST /v1/ghii/register-web` (`src/routes/ghii/web-verify.ts`). `POST /v1/owners` (`src/routes/owners.ts`) still writes the same balance and transaction inline.
 
 ## Ownership checks
 

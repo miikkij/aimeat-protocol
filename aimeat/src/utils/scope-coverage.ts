@@ -153,7 +153,7 @@ export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
  * granted nothing but memory:read reset another person's two-step sign-in and rewrote a CORS list
  * (security audit A8-1). The account test stays the outer gate and is asked first; this word is the
  * operator's tick per agent, the same shape OPERATOR_ORGANISM_REPAIR_SCOPE already had for its two
- * tools. services/owner-lifecycle.ts resolveOperatorAgentName() asks both, for every such tool.
+ * tools. services/owner/lifecycle.ts resolveOperatorAgentName() asks both, for every such tool.
  *
  * One word for the block rather than one per page: every tool in it acts on the node rather than on
  * one account's data, and an operator deciding which of their agents helps run the node is deciding
@@ -370,7 +370,7 @@ const OWN_TICK_SCOPES = [
     // send-as-owner and delete-as-owner. Outside the wildcard because a read leaves nothing behind
     // for the owner to see: a send at least leaves the message. Not grandfathered, for the same
     // reason as the word above. (An APP needs none of this: an app grant already acts as the owner,
-    // and `messages:read` is its word for the same mailbox — services/owner-mailbox-reads.ts.)
+    // and `messages:read` is its word for the same mailbox — services/owner/mailbox-reads.ts.)
     'messages:read-as-owner',
     // Organise the OWNER's Messages list, as the owner: archive and restore conversations, and write
     // the rules that fold, group or archive them. Nothing is destroyed, but archiving is how a message

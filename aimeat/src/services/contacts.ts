@@ -75,7 +75,7 @@ import { ensureContact, updateContactCard, sendOutbound, OutboundError } from '.
 import { revokeContactHandles } from './contact-handles.js';
 import { parseGaiiLoose, localAccountName, ownerCoordinate } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { mailboxReaderOf, type MailboxPrincipal } from './owner-mailbox-reads.js';
+import { mailboxReaderOf, type MailboxPrincipal } from './owner/mailbox-reads.js';
 import {
   MAIL_PREFIX, identityKind, isIdentityShaped, localIdentityExists, type IdentityKind,
 } from './local-identity.js';
@@ -712,7 +712,7 @@ export async function resolveContactEmail(storage: Storage, asker: string, email
  *
  * Called from the three places a verified email binding is established, and from nowhere else:
  * routes/ghii/web-verify.ts (the code is confirmed), routes/ghii/recovery.ts (recovery proves the
- * address) and services/owner-provisioning.ts (an account created with an already-proven one).
+ * address) and services/owner/provisioning.ts (an account created with an already-proven one).
  *
  * The merge is ADDITIVE and one-way. Nothing the owner wrote is discarded — the projection keeps
  * showing their own name beside the profile name — and nothing about consent moves: if the owner

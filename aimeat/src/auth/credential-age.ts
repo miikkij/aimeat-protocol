@@ -18,7 +18,7 @@
  *   account keeps working.
  *
  *   Who calls it: auth/middleware.ts credentialRevoked (every JWT, with one read of the account),
- *   services/access-token.ts resolvePat, services/owner-session.ts refreshOwnerSession, and the app
+ *   services/access-token.ts resolvePat, services/owner/session.ts refreshOwnerSession, and the app
  *   grant refresh in routes/app-grants.ts, which mint from a stored credential.
  * @structure
  *   - IssuedAt: when a credential was issued, and whether that is exact to the millisecond

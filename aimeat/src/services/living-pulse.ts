@@ -22,7 +22,7 @@
  *   WHOSE READ AUTHORITY. The pulse gathers with the authority of the principal that holds the config
  *   (holderReadsAsOwner): the owner's GHII, or an agent whose stored scopes cover memory:read-as-owner,
  *   reads the owner's whole identity set; any other holder reads its own records plus the owner-,
- *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
+ *   members- and public-visibility ones (services/owner/scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
  *   2026-11-10 — The retire push names the document ('Your living document "<title>" stopped updating')
@@ -86,7 +86,7 @@ import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName, isGEAI, parseGAII } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { readsAsOwner, ownerScopeView } from './owner-scope-read.js';
+import { readsAsOwner, ownerScopeView } from './owner/scope-read.js';
 import { callerFromAuth, agentSessionCaller, type CallerContext } from './caller-context.js';
 import { completeForOwner, AiCompletionError } from './ai/completion.js';
 import { librarianSearch } from './librarian.js';
@@ -94,7 +94,7 @@ import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 import { inheritSourceLabels, type SourceCopy } from './living-source-labels.js';
 import type { PushService } from './push.js';
-import { provenOwnerAddress } from './owner-mail-address.js';
+import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
@@ -471,7 +471,7 @@ export async function pulseInstanceServer(
       try {
         const { hits } = await librarianSearch(storage, config, {
           // The pulse is the node's own work for the config's holder, so it reads the owner's
-          // identity set as that holder may (holderReadsAsOwner; services/owner-scope-read.ts): all of
+          // identity set as that holder may (holderReadsAsOwner; services/owner/scope-read.ts): all of
           // it for the owner, the visible part for an agent without memory:read-as-owner.
           ownerName, fanOutOwner: true, readsAll, viewerGaii: reader,
           query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',

@@ -87,8 +87,8 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ExtensionCtx } from './ctx-contract.js';
-import type { FirstUseDecision, ForeignExtension, SecretResolutionRefusal } from '../owner-secrets.js';
-import { secretForeignExtensionMessage, secretFirstUseMessage, secretHostMessage, secretUnknownMessage } from '../owner-secrets.js';
+import type { FirstUseDecision, ForeignExtension, SecretResolutionRefusal } from '../owner/secrets.js';
+import { secretForeignExtensionMessage, secretFirstUseMessage, secretHostMessage, secretUnknownMessage } from '../owner/secrets.js';
 import { requestSecretApproval } from '../secret-approvals.js';
 import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
 import { scopeIsCovered, SECRETS_MANAGE_SCOPE } from '../../utils/scope-coverage.js';

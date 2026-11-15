@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.3.1 (commit d76b3dac5) on 2026-11-13. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit 226c692d3) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -103,13 +103,13 @@ Incoming webhook API keys and outside party keys are not revoked: they are refus
 
 | What | On deactivation | Source |
 |---|---|---|
-| Browser sessions, agents' device tokens, ecosystem app tokens | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
-| Personal access tokens | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
-| App grants | Revoked | `aimeat/src/services/owner-lifecycle.ts` |
-| MCP OAuth tokens | Refused at every request; refresh tokens deleted | `aimeat/src/services/owner-lifecycle.ts` |
-| Live connector tunnels | Closed, on every process of the node | `aimeat/src/services/owner-lifecycle.ts`, `aimeat/src/services/connect-tunnel/cross-process.ts` |
+| Browser sessions, agents' device tokens, ecosystem app tokens | Revoked | `aimeat/src/services/owner/lifecycle.ts` |
+| Personal access tokens | Revoked | `aimeat/src/services/owner/lifecycle.ts` |
+| App grants | Revoked | `aimeat/src/services/owner/lifecycle.ts` |
+| MCP OAuth tokens | Refused at every request; refresh tokens deleted | `aimeat/src/services/owner/lifecycle.ts` |
+| Live connector tunnels | Closed, on every process of the node | `aimeat/src/services/owner/lifecycle.ts`, `aimeat/src/services/connect-tunnel/cross-process.ts` |
 | New sign-in | 403 `ACCOUNT_DISABLED` on every method, SAML included | `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/src/routes/saml-login.ts` |
-| Schedules, workflow triggers, unattended extension runs | Skipped with a log line, kept | `aimeat/src/services/owner-lifecycle.ts` |
+| Schedules, workflow triggers, unattended extension runs | Skipped with a log line, kept | `aimeat/src/services/owner/lifecycle.ts` |
 | AI jobs already queued, and jobs a restart or another process takes up | Wait in the queue with a sentence that names the deactivation; nothing is paid or written; they run after reactivation | `aimeat/src/services/ai-jobs/run-gate.ts` |
 | Incoming webhook API keys | Refused with 403 `ACCOUNT_DISABLED` on every call; nothing is written, read or deleted. The incoming webhook is kept and the API key works again on reactivation | `aimeat/src/services/receivers/verify.ts` |
 | Outside party keys and tokens, share links, app party sign-ins | Refused with 403 `ACCOUNT_DISABLED`; nothing shared can be read. The party is kept and its key works again on reactivation | `aimeat/src/services/parties/verify.ts`, `aimeat/src/services/parties/invite.ts`, `aimeat/src/services/app-parties/service.ts` |
@@ -117,16 +117,16 @@ Incoming webhook API keys and outside party keys are not revoked: they are refus
 | Data, organism memberships, history | Kept | [Organisation node sign-in](../organisation-node-sign-in.md), section 7 |
 | Other federated nodes | The federation attestation refuses the account | `aimeat/test/e2e-owner-deactivation.ts` |
 
-- Each deactivation and reactivation by an operator writes an operator trail: a usage row, a log line and a line on the person's feed (`aimeat/src/services/owner-lifecycle.ts`).
-- Erasure is a separate, final act. The person, or an operator, both in person, call `DELETE /v1/owners/:name` (`aimeat/src/routes/owners.ts`). An organism the person owned passes to an admin or member, or is left without a seated owner when there is nobody (`aimeat/src/services/owner-erasure.ts`).
+- Each deactivation and reactivation by an operator writes an operator trail: a usage row, a log line and a line on the person's feed (`aimeat/src/services/owner/lifecycle.ts`).
+- Erasure is a separate, final act. The person, or an operator, both in person, call `DELETE /v1/owners/:name` (`aimeat/src/routes/owners.ts`). An organism the person owned passes to an admin or member, or is left without a seated owner when there is nobody (`aimeat/src/services/owner/erasure.ts`).
 - AI jobs of the person and their agents that are still queued, running, or waiting for a deactivated account stop at the erasure. Nothing more is paid for them, and no job record, answer or job log is written for the erased account, so a later account with the same name finds none (`aimeat/src/services/ai-jobs/service.ts`, `aimeat/src/services/ai-jobs/run-gate.ts`).
 
 ## Organism code keys
 
-- An owner of an organism can make a code key: the node makes an account whose password is the code that owner chose, so that owner knows it until the holder signs in. The holder's first sign-in replaces the code with a new password, whichever method it is: password, passkey, sign-in link by email, or an identity provider (`aimeat/src/services/owner-session.ts`, `aimeat/src/services/key-credentials.ts`).
+- An owner of an organism can make a code key: the node makes an account whose password is the code that owner chose, so that owner knows it until the holder signs in. The holder's first sign-in replaces the code with a new password, whichever method it is: password, passkey, sign-in link by email, or an identity provider (`aimeat/src/services/owner/session.ts`, `aimeat/src/services/key-credentials.ts`).
 - The new password is shown to the browser that completed the first sign-in. After a password or passkey sign-in it is in the sign-in answer, and the node does not mail it at that sign-in. An address that was verified before the first sign-in never gets it, because the person who minted the key could have verified an address of their own. When the account had no verified address, the node keeps the password sealed and mails it once to the address the holder verifies later, with a code asked for after the first sign-in, unless the password has changed by then (`aimeat/src/services/key-credentials.ts`). After a sign-in link or an identity provider, the code stops working at once and the new password is shown once to that browser session, never mailed (`aimeat/src/routes/ghii/key-credentials-screen.ts`). On the same screen the holder can add a passkey and confirm an email address of their own (`aimeat/src/static/sdk-libs/auth/modal-key-credentials.js`).
 - Confirming an email address with the code before the first sign-in (`POST /v1/ghii/verify-email`, or `GET /v1/ghii/magic-link/verify` after it) gives out the account's app agent key without counting as the first sign-in. The first sign-in, by any method, rekeys that agent: the key and every token issued with it before stop working, and the screen and the sign-in answer say so (`agent_keys_ended`). The agent and its permissions stay (`aimeat/src/services/key-credentials.ts`).
-- A code key acts only on the account it made. Erasing that account closes the key, and an account registered later with the same name is not listed, cancelled or given a new password by the old key (`aimeat/src/services/owner-erasure.ts`, `aimeat/src/routes/organisms/workspace-access.ts`).
+- A code key acts only on the account it made. Erasing that account closes the key, and an account registered later with the same name is not listed, cancelled or given a new password by the old key (`aimeat/src/services/owner/erasure.ts`, `aimeat/src/routes/organisms/workspace-access.ts`).
 
 ## Passkeys and the domain
 
@@ -165,7 +165,7 @@ The sign-in dialog's headline and the line under it can be the operator's own wo
 - A covered account without TOTP that signs in with a password or an emailed link gets no session. The password route answers 403 `TWO_STEP_SETUP_REQUIRED` with a setup token; the emailed link opens the enrolment step of the sign-in dialog. The token lasts 10 minutes, is bound to one account and works once; only its SHA-256 hash is stored (`aimeat/src/services/two-step-setup.ts`).
 - The person enrols at `POST /v1/ghii/login/two-step/start` and `POST /v1/ghii/login/two-step/finish`. Finish checks the first code, arms TOTP, gives the backup codes once and signs the person in (`aimeat/src/routes/ghii/login-two-step.ts`).
 - A passkey sign-in and an identity provider sign-in (OIDC or SAML) satisfy the rule; on those paths the factor is the device or the identity provider's MFA (`aimeat/src/services/sign-in-policy.ts`).
-- A session refresh of a covered account with no TOTP, no passkey and no identity provider link is refused, so the person signs in again and enrols (`aimeat/src/services/owner-session.ts`).
+- A session refresh of a covered account with no TOTP, no passkey and no identity provider link is refused, so the person signs in again and enrols (`aimeat/src/services/owner/session.ts`).
 - Agents, ecosystem apps and visitors from another node are not covered (`aimeat/src/services/sign-in-policy.ts`). When this node is the home node of a federated sign-in, it refuses a covered account without TOTP (`aimeat/src/routes/federation-auth.ts`).
 - The rule needs TOTP on: a save that leaves it required while `AIMEAT_TOTP_ENABLED` is false is refused with 409 `TWO_STEP_NEEDS_TOTP`, whichever of the two settings the save changes. Set that way from the environment, the node starts and logs a `SECURITY` warning (`aimeat/src/services/config/admin-view.ts`, `aimeat/src/index-start.ts`).
 

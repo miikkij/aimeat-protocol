@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description readRefreshCookie, setRefreshCookie, clearRefreshCookie and the migration window
- *   (services/owner-session.ts) on the Cookie headers a browser can send. A malformed percent-encoding
+ *   (services/owner/session.ts) on the Cookie headers a browser can send. A malformed percent-encoding
  *   in an aimeat_rt value made decodeURIComponent throw inside every caller; and the cookie was not
  *   host-locked, so a same-site app origin could write a Domain cookie of the same name that the apex
  *   read first (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
@@ -20,7 +20,7 @@ import type { Request, Response } from 'express';
 import {
   readRefreshCookie, setRefreshCookie, clearRefreshCookie, legacyRefreshCookieAccepted,
   settleRefreshCookieWindowAtStart, restoreSessionHint, REFRESH_COOKIE, LEGACY_REFRESH_COOKIE, SESSION_HINT_COOKIE,
-} from '../../src/services/owner-session.js';
+} from '../../src/services/owner/session.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const OPEN = { refreshCookieLegacyUntil: '2999-12-31' };

@@ -112,8 +112,8 @@ import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonym
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { loginTarpit } from '../middleware/login-tarpit.js';
-import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
-import { tellOwnerTokensKept } from '../services/owner-tokens-kept-notice.js';
+import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner/session.js';
+import { tellOwnerTokensKept } from '../services/owner/tokens-kept-notice.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, isExternalPrincipal, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
@@ -603,7 +603,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     } else {
       // An owner session is renewed with its refresh cookie, which is rotated on every use and ends
-      // the whole session when an old one comes back (services/owner-session.ts; Core 2026-11
+      // the whole session when an old one comes back (services/owner/session.ts; Core 2026-11
       // AUTH-04). This branch minted from the OWNER RECORD's roles for whatever bearer reached it,
       // so an owner-level access token of an operator's account came back carrying 'operator', and
       // any owner access token renewed itself for ever with a fresh session row, outliving the
@@ -764,7 +764,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   // unreachable), so this call used to be inert for agents; enforcing it without scoping it would
   // turn "sign out of my other browser" into disconnecting every agent, each of which then needs the
   // owner to approve device authorization again. An agent is ended from the Agents surface, one at a
-  // time, deliberately. Erasing the account still takes everything (services/owner-erasure.ts).
+  // time, deliberately. Erasing the account still takes everything (services/owner/erasure.ts).
   // requireOwnerPrincipal since 2026-09-04 — the sharpest of the three: it signs the person out of
   // EVERY device they own, their current one included, and it did so for any principal carrying
   // their account name.

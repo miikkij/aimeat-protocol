@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { createdAccountIsOperator } from '../../src/services/owner-provisioning.js';
+import { createdAccountIsOperator } from '../../src/services/owner/provisioning.js';
 
 const owner = (name: string, roles: string[]) => ({ name, displayName: name, publicKey: 'pk', roles, createdAt: new Date().toISOString() }) as never;
 

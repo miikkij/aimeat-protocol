@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Erasing an account takes its app-roster records with it, through eraseOwner
- *   (services/owner-erasure.ts), the whole of DELETE /v1/owners/:name below HTTP. The roster rows
+ *   (services/owner/erasure.ts), the whole of DELETE /v1/owners/:name below HTTP. The roster rows
  *   are keyed by the bare account name and an erased name is released for reuse, so a row that
  *   survives is inherited by the next person to register the name.
  *   - What the erased person HELD on other people's apps goes: the member row (with a development
@@ -23,7 +23,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import {
   getCarryPlan, getMemberRow, listRequests, listVisits, noteVisit, putCarryPlan, putMember, putRequest, removeMember,
 } from '../../src/services/app/members.js';

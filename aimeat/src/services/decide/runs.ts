@@ -84,7 +84,7 @@ import { systemReader, readerForCaller, warningsNote, type ContentReader } from 
 import { localAccountName } from '../../utils/gaii.js';
 import { ClassificationError } from '../classification/labels.js';
 import { requireAiCallTurnOnNode } from '../account-limits.js';
-import { ownerScopeView, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
+import { ownerScopeView, READ_AS_OWNER_NOTE } from '../owner/scope-read.js';
 
 const RUN_PREFIX = 'decide.runs.';
 const RUNS_KEPT = 50;

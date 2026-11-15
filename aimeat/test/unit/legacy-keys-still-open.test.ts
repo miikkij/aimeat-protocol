@@ -122,7 +122,7 @@ describe('sessions and the credentials issueJWT minted at 0c741df55 still verify
   });
 
   it('a personal access token and a refresh token, kept as hashes', async () => {
-    const { hashToken } = await import('../../src/services/owner-session.js');
+    const { hashToken } = await import('../../src/services/owner/session.js');
     expect(hashToken(F.hashed.pat)).toBe(F.hashed.patHash);
     expect(hashToken(F.hashed.refresh)).toBe(F.hashed.refreshHash);
   });

@@ -31,7 +31,7 @@ process.env.AIMEAT_PERF_TRACE = '1';
 import type { Storage, MemoryRecord, AgentRecord } from '../../src/storage/interface.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { traceOperation, formatTrace, instrumentStorage } from '../../src/services/perf-trace.js';
-import { listOwnerScopeMemory, listOwnerScopeMemoryMeta, getOwnerScopeMemory } from '../../src/services/owner-memory.js';
+import { listOwnerScopeMemory, listOwnerScopeMemoryMeta, getOwnerScopeMemory } from '../../src/services/owner/memory.js';
 import { getOwnerUsageSummary, invalidateOwnerUsage } from '../../src/services/usage-summary.js';
 import { checkMemoryQuota } from '../../src/services/quota.js';
 import { validateMemoryWrite } from '../../src/services/schema-validator.js';

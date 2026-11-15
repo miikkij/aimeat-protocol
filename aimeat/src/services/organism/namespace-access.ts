@@ -329,7 +329,7 @@ export type OrganismListCaller = Pick<CallerContext, 'kind' | 'inPerson' | 'prin
  * 2026-10, v57). The owner-scope read and list paths ask this.
  *
  * WHO IS EXEMPT. The owner in person and an app grant of the owner: both read the owner's records as
- * the owner does (services/owner-scope-read.ts readsAsOwner), and an organism the owner left, or one
+ * the owner does (services/owner/scope-read.ts readsAsOwner), and an organism the owner left, or one
  * that was deleted, must not hide the owner's own records from their own listing.
  *
  * AN ORGANISM THAT NO LONGER EXISTS has no rule to apply, so its records stay in the listing, as they

@@ -81,7 +81,7 @@ import { findPublicPage, type PublicPage } from '../data/public-pages.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { injectPageBody } from '../utils/page-body.js';
 import { signedInOnly } from '../config/visibility.js';
-import { restoreSessionHint } from '../services/owner-session.js';
+import { restoreSessionHint } from '../services/owner/session.js';
 import { buildGlossaryBody } from './glossary.js';
 import { SIGN_IN_STEP_PATHS } from '../data/sign-in-steps.js';
 import { pageBuildId, runningBuild } from '../utils/build-stamp.js';

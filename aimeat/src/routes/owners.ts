@@ -63,9 +63,9 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { validateOwnerName, isForeignPrincipal } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
-import { registrationRefusal, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../services/owner-provisioning.js';
+import { registrationRefusal, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../services/owner/provisioning.js';
 import { emitChange } from '../services/event-bus.js';
-import { eraseOwner } from '../services/owner-erasure.js';
+import { eraseOwner } from '../services/owner/erasure.js';
 import { logger } from '../utils/logger.js';
 import { registerOwnerExportRoute } from './owners/export.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
@@ -116,7 +116,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // between them had left a taken name with no profile (QA audit E6-02).
     const ghii = `${name}@${config.nodeId}`;
     // An account that would become the operator of a node others can reach that has no operator needs
-    // the one-time setup code from the start log (`setupCode`), refused before any row (services/owner-provisioning.ts; Jouni, 2026-10-16).
+    // the one-time setup code from the start log (`setupCode`), refused before any row (services/owner/provisioning.ts; Jouni, 2026-10-16).
     let claim: OperatorClaim;
     try {
       claim = await claimOperatorSetupCode(storage, config, roles, req.body?.setupCode, fromNodeMachine(req));
@@ -132,7 +132,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
         name,
         displayName: display_name,
         publicKey: keyPair.publicKey,
-        // Decided again inside the transaction (services/owner-provisioning.ts rolesAtWrite).
+        // Decided again inside the transaction (services/owner/provisioning.ts rolesAtWrite).
         roles: await rolesAtWrite(storage, roles, claim),
         createdAt: new Date().toISOString(),
       });

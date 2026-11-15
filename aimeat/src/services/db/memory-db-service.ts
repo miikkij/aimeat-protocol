@@ -10,7 +10,7 @@
  *   Cross-domain identity resolution (an owner's agents + ecosystem apps) is INJECTED as
  *   `resolveOwnerIdentities`, so the memory service never reaches into the agent/eco domains itself.
  *
- *   Phase 0: this service re-homes the owner-scope aggregation (today in services/owner-memory.ts) and
+ *   Phase 0: this service re-homes the owner-scope aggregation (today in services/owner/memory.ts) and
  *   the core memory reads/writes onto the new stack, byte-for-byte equivalent (proven by the parity
  *   test). Routes are migrated onto it in Phase 1; until then it coexists unused by the request path.
  *

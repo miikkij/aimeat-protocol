@@ -16,7 +16,7 @@
  *   covered account without TOTP gets no session from a password or a link: it gets a setup token
  *   (services/two-step-setup.ts) and enrols at POST /v1/ghii/login/two-step/{start,finish}. A refresh
  *   of a covered session whose account has no TOTP, no passkey and no identity provider link is
- *   refused, so the person signs in again and enrols (services/owner-session.ts).
+ *   refused, so the person signs in again and enrols (services/owner/session.ts).
  *
  *   PASSWORD SIGN-IN. `off` refuses every password sign-in before the password is read, and every
  *   route that would give an account a new password. `operators` keeps the password for an operator

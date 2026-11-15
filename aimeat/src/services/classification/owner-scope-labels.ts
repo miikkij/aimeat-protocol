@@ -2,7 +2,7 @@
  * @file src/services/classification/owner-scope-labels.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The memory:read-as-owner rule (services/owner-scope-read.ts) applied to classification
+ * @description The memory:read-as-owner rule (services/owner/scope-read.ts) applied to classification
  *   metadata. The scan, the explorer, the owner-level audit log, the owner-level exceptions list and
  *   the single-key label read cover every identity of one owner: the owner's GHII, every agent and
  *   every ecosystem app. A label row names a record's key, its label, the person's justification and
@@ -34,7 +34,7 @@
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v76 and v77).
  */
 import type { Storage, ContentLabelKind } from '../../storage/interface.js';
-import { READ_AS_OWNER_NOTE, visibleToSameOwnerReader } from '../owner-scope-read.js';
+import { READ_AS_OWNER_NOTE, visibleToSameOwnerReader } from '../owner/scope-read.js';
 import { READ_AS_OWNER_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { rolesOf, type LabelActor } from './label-core.js';

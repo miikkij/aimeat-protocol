@@ -14,7 +14,7 @@
  *
  *   The second rule here is who may read an observation at all. A json_field leaf holds the field
  *   value of one of the owner's records, and an llm leaf's `reason` can quote what the model read.
- *   A caller that does not read the owner's records as the owner (services/owner-scope-read.ts) gets
+ *   A caller that does not read the owner's records as the owner (services/owner/scope-read.ts) gets
  *   those values withheld, and keeps every step's green or red state.
  * @structure shownRun(run) · withoutObservedValues(run)
  * @usage return shownRun(rec.value as WorkflowRun);

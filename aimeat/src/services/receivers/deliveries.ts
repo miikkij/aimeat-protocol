@@ -192,7 +192,7 @@ export async function flushAllReceiverLogs(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no delivery entry of the owner
+ * An account erasure (services/owner/erasure.ts), before its cascade: no delivery entry of the owner
  * is kept from now on, a write in progress answers first so the cascade deletes what it stored, and
  * the owner's waiting entries are dropped with their timer. The returned function ends the hold,
  * after the cascade.

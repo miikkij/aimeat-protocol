@@ -71,7 +71,7 @@ import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '
 import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
-import { ownerScopeView, readsAsOwner } from '../../owner-scope-read.js';
+import { ownerScopeView, readsAsOwner } from '../../owner/scope-read.js';
 import { organismReadableRecords } from '../../organism/namespace-access.js';
 import { readWorkspaceManifest } from '../../workspace/meta.js';
 import { shownMemoryValue } from '../../secret-records.js';
@@ -217,7 +217,7 @@ function toMemHit(rec: {
 /**
  * Does this caller read the owner's identity set as the owner does, private records of the other
  * identities included? The owner in person, an app grant, or an agent holding memory:read-as-owner
- * (services/owner-scope-read.ts readsAsOwner, which this asks rather than repeating its rule).
+ * (services/owner/scope-read.ts readsAsOwner, which this asks rather than repeating its rule).
  */
 function readsAllOf(ctx: DiscoveryContext): boolean {
   if (ctx.caller.isOwnerSession) return true;
@@ -370,7 +370,7 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
       // The owner's identity set holds more than this caller may read. The owner in person, an app
       // grant and an agent holding memory:read-as-owner see every record; any other same-owner
       // caller sees its own plus the owner-, members- and public-visibility ones
-      // (services/owner-scope-read.ts). Until 2026-10-20 nothing filtered these hits, so a
+      // (services/owner/scope-read.ts). Until 2026-10-20 nothing filtered these hits, so a
       // memory:read agent read the owner's and its siblings' private records as descriptions.
       if (ownerGaiis) candidates = ownerScopeView(candidates, ctx.caller.gaii, readsAllOf(ctx));
       // The organism rule GET /v1/memory/:key asks, on the own scope: an organism record reaches this

@@ -269,7 +269,7 @@ await test('Setup: agent G (owned by A) authors a private and an owner-visibilit
 
 // Until 2026-10-20 this test required the OPPOSITE: that a `memory:read` agent finds the sibling's
 // PRIVATE record. That was the hole. Reading another same-owner identity's private records costs its
-// own word, memory:read-as-owner (the 2026-10-15 ruling, services/owner-scope-read.ts), which every
+// own word, memory:read-as-owner (the 2026-10-15 ruling, services/owner/scope-read.ts), which every
 // direct memory read has enforced since; the librarian search handed them over anyway.
 await test('14. A memory:read grant fans across the owner\'s agents, and a sibling\'s PRIVATE record stays hidden (2026-10-15 ruling)', async () => {
     const H = await connectAgent(A.token, A.name, 'lib-reader', ['memory:read']);

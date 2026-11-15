@@ -113,7 +113,7 @@ async function starterNow(deps: GateDeps, s: AiJobStartedBy, kind: StarterKind):
 /**
  * Why the job's account no longer acts, or null while it does. Two kinds of positive evidence, never
  * the absence of a read alone: no account holds the name AND the job's own stored record is gone
- * (services/owner-erasure.ts deletes both), or the account that holds the name now was made after the
+ * (services/owner/erasure.ts deletes both), or the account that holds the name now was made after the
  * job was queued, so the job was left by a previous holder of the released name.
  */
 async function accountGone(deps: GateDeps, job: AiJobRecord): Promise<string | null> {

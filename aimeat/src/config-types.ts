@@ -321,7 +321,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   refreshAbsoluteDays: number;  // hard cap for the refresh cookie, never extended
   refreshGraceMs: number;       // previous token honored this long after rotation (concurrency)
   /** YYYY-MM-DD: the last day an https node reads the old refresh cookie name `aimeat_rt` (UTC).
-   *  Empty at first start = set to 30 days later and stored (services/owner-session.ts). */
+   *  Empty at first start = set to 30 days later and stored (services/owner/session.ts). */
   refreshCookieLegacyUntil: string;
   welcomeBonus: number;
   dailyAllowance: number;

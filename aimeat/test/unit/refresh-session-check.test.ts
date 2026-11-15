@@ -1,6 +1,6 @@
 /**
  * @file test/unit/refresh-session-check.test.ts
- * @description checkRefreshSession (services/owner-session.ts), the one read-only check of a refresh
+ * @description checkRefreshSession (services/owner/session.ts), the one read-only check of a refresh
  *   session that the refresh and the app-grant silent bridge share (secaudit 2026-10, AUTH-1). The
  *   bridge's own copy checked revocation and expiry only; these are the cases it let through.
  * @version-history
@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Storage } from '../../src/storage/interface.js';
-import { checkRefreshSession } from '../../src/services/owner-session.js';
+import { checkRefreshSession } from '../../src/services/owner/session.js';
 
 const NOW = Date.parse('2026-10-05T12:00:00.000Z');
 const iso = (ms: number) => new Date(ms).toISOString();

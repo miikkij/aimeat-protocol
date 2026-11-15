@@ -16,7 +16,7 @@
  *   (secaudit2026oct26). The entries an older erasure left are refused at the time of use instead
  *   (services/account-instance.ts heldSince).
  * @structure eraseNameBoundGrants(storage, nodeId, name)
- * @usage const c = await eraseNameBoundGrants(storage, nodeId, name);   // services/owner-erasure.ts
+ * @usage const c = await eraseNameBoundGrants(storage, nodeId, name);   // services/owner/erasure.ts
  * @version-history
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26: beneficiary-release, accountant-access and
  *     compliance-agreements counterparty name reuse).

@@ -139,7 +139,7 @@ async function main(): Promise<void> {
   out.ephemeralClaims = claims;
 
   // Random credentials kept as hashes: a personal access token and a refresh token.
-  const { hashToken } = await import('../../../src/services/owner-session.js');
+  const { hashToken } = await import('../../../src/services/owner/session.js');
   const { PAT_PREFIX } = await import('../../../src/services/access-token.js');
   const pat = `${PAT_PREFIX}legacyfixture0000000000000000000000`;
   out.hashed = { pat, patHash: hashToken(pat), refresh: 'rt-legacy-fixture', refreshHash: hashToken('rt-legacy-fixture') };

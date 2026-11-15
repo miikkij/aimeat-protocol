@@ -611,7 +611,7 @@ export const agentMessagingTools = [
         // Reading the owner's own mailbox, as the owner. `messages:read` on an agent is the agent's own
         // messages (aimeat_dm_inbox below), so this is its own word, and NOT part of the '*' bundle: a
         // read leaves nothing behind for the owner to see. Same doors as REST (GET /v1/messages/overview
-        // and /conversations/:id) through services/owner-mailbox-reads.ts.
+        // and /conversations/:id) through services/owner/mailbox-reads.ts.
         scope: 'messages:read-as-owner',
         surfaces: ['agent'],
         input: {

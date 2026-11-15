@@ -87,7 +87,7 @@ async function processModules() {
     enc: await import('../../src/services/encryption.js'),
     job: await import('../../src/services/key-reencrypt/job.js'),
     lease: await import('../../src/services/process-lease.js'),
-    secrets: await import('../../src/services/owner-secrets.js'),
+    secrets: await import('../../src/services/owner/secrets.js'),
     atRest: await import('../../src/services/config/at-rest.js'),
   };
 }

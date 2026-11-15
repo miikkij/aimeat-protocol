@@ -41,10 +41,10 @@ import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { fromNodeMachine } from '../../auth/loopback-pass.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
-import { claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../../services/owner-provisioning.js';
+import { claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../../services/owner/provisioning.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { establishOwnerSession } from '../../services/owner-session.js';
+import { establishOwnerSession } from '../../services/owner/session.js';
 
 /**
  * Turn a checked credential into an owner session, or refuse a deactivated account.
@@ -128,7 +128,7 @@ export async function completeOwnerLogin(
         const held = claim;
         let promoted: boolean;
         try {
-          // Decided again inside one transaction with the claim read (services/owner-provisioning.ts
+          // Decided again inside one transaction with the claim read (services/owner/provisioning.ts
           // rolesAtWrite), so two sign-ins at once do not both become the operator.
           promoted = await storage.transaction(async () => {
             const granted = await rolesAtWrite(storage, [...ownerRecord.roles, 'operator'], held);

@@ -2579,7 +2579,7 @@
       },
       "why": "Reviewed 2026-10-02, the node's own read: the owner's encrypted AI key records (openrouter.apikey, ai.apikey.provider.*), read only to answer whether a ciphertext is there. No content and no key leaves the function."
     },
-    "src/services/owner-memory.ts": {
+    "src/services/owner/memory.ts": {
       "reads": {
         "listMemoryForOwners": 3,
         "listMemoryMetaForOwners": 1,

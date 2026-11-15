@@ -1,5 +1,5 @@
 /**
- * @file owner-session.ts
+ * @file src/services/owner/session.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Owner (human) login sessions backed by rotating, server-side refresh
@@ -10,7 +10,7 @@
  * @structure REFRESH_COOKIE constant; cookie helpers (read/set/clear/secure);
  *   establishOwnerSession() for login; checkRefreshSession() the read-only check;
  *   refreshOwnerSession() for rotation.
- * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
+ * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from './session.js'
  * @version-history
  *   2026-11-08 — establishOwnerSession decides a code key's first sign-in for every sign-in road: the
  *     key stops being the password, and the new details go in the answer or wait for the session's
@@ -55,16 +55,16 @@
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { SessionRecord } from '../storage/repositories/session.repository.js';
-import { issueJWT, AccountDisabledError } from '../auth/jwt.js';
-import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
-import { recordAccountEvent } from './account-events.js';
-import { issueFirstLoginKeyCredentials, owePendingKeyCredentials, type IssuedKeyCredentials } from './key-credentials.js';
-import { logger } from '../utils/logger.js';
-import { isExternalPrincipal } from '../utils/gaii.js';
-import { twoStepCovers, hasStrongWayIn, TWO_STEP_SETUP_REQUIRED } from './sign-in-policy.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { SessionRecord } from '../../storage/repositories/session.repository.js';
+import { issueJWT, AccountDisabledError } from '../../auth/jwt.js';
+import { ownerRefuses, recordIssuedAt } from '../../auth/credential-age.js';
+import { recordAccountEvent } from '../account-events.js';
+import { issueFirstLoginKeyCredentials, owePendingKeyCredentials, type IssuedKeyCredentials } from '../key-credentials.js';
+import { logger } from '../../utils/logger.js';
+import { isExternalPrincipal } from '../../utils/gaii.js';
+import { twoStepCovers, hasStrongWayIn, TWO_STEP_SETUP_REQUIRED } from '../sign-in-policy.js';
 
 /**
  * Name of the httpOnly refresh-token cookie on an https node. The `__Host-` prefix makes the browser

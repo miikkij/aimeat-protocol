@@ -10,7 +10,7 @@
  *   (services/workflow/dispatch-authority.ts waits) and in the goal sweep (services/goals/goals-sweep.ts).
  *
  *   WHY. Deactivation (POST /v1/admin/owners/:name/disable, SCIM active:false) ends every credential
- *   in the request (services/owner-lifecycle.ts), and the per-request check is reached only from a
+ *   in the request (services/owner/lifecycle.ts), and the per-request check is reached only from a
  *   token. Background work carries no token, so until 2026-10-25 a deactivated account's schedules,
  *   event-triggered workflows and cron extension actions went on acting in its name (secaudit2026oct22,
  *   owner-deactivation:background-work-keeps-acting; developer decision 2026-10-25).

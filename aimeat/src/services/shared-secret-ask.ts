@@ -35,7 +35,7 @@ import type { Storage } from '../storage/interface.js';
 import type { SecretApproval } from '../storage/types/secrets.js';
 import { notify } from './notify.js';
 import { listOperatorGhiis } from './operators.js';
-import { sharedBindingOwner } from './owner-secrets.js';
+import { sharedBindingOwner } from './owner/secrets.js';
 import { logger } from '../utils/logger.js';
 
 export const SHARED_SECRET_ASK_TYPE = 'shared_secret_host_ask';

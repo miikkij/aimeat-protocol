@@ -60,7 +60,7 @@ import type { ContentReader } from './classification/reader.js';
 import { packageFileHiddenBySourceLabel } from './datapackage/source-labels.js';
 import { ownExtensionFileKey } from './component-address.js';
 import { localAccountName } from '../utils/gaii.js';
-import type { MailboxReader } from './owner-mailbox-reads.js';
+import type { MailboxReader } from './owner/mailbox-reads.js';
 import { mailboxAttachmentReadable } from './mailbox/attachment-read.js';
 
 /** A handle for one of the caller's OWN files may live an hour (parity with GET /v1/storage?mode=handle). */

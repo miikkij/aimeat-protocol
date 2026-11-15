@@ -85,10 +85,10 @@ import { recordAccountEvent } from '../../services/account-events.js';
 import { recordAuthFailure } from '../../services/auth-audit.js';
 import { auditContext } from '../../auth/deny.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
-import { endPersonSessionsAfterPasswordChange } from '../../services/owner-session.js';
+import { endPersonSessionsAfterPasswordChange } from '../../services/owner/session.js';
 import { recoveryAddressIs, provenRecoveryAddress, invitedRecoveryAddress, accountsInvitedAt, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
-import { emailHashOf } from '../../services/owner-provisioning.js';
-import { tellOwnerTokensKept } from '../../services/owner-tokens-kept-notice.js';
+import { emailHashOf } from '../../services/owner/provisioning.js';
+import { tellOwnerTokensKept } from '../../services/owner/tokens-kept-notice.js';
 import { passwordSignInRefusal, newPasswordRefusal } from '../../services/sign-in-policy.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 

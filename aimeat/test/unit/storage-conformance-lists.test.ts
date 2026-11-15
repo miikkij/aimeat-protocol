@@ -30,7 +30,7 @@ import { randomUUID } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
-import { createdAccountIsOperator } from '../../src/services/owner-provisioning.js';
+import { createdAccountIsOperator } from '../../src/services/owner/provisioning.js';
 
 const SQLITE_PATH = `./test/.conformance-lists-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

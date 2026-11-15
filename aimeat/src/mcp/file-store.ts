@@ -24,7 +24,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { localAccountName } from '../utils/gaii.js';
-import { OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import { moveFilesToNodeStore, nodeFileStoreStatus, testNodeFileStore, type FileStoreResult } from '../services/file-store/file-store-admin.js';
 import {
   connectOwnerFileStore, decideOwnerFileStore, moveOwnerFiles, ownerFileStoreView, removeOwnerFileStore,

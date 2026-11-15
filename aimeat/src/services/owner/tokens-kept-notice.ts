@@ -1,5 +1,5 @@
 /**
- * @file src/services/owner-tokens-kept-notice.ts
+ * @file src/services/owner/tokens-kept-notice.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description After a password reset, a password change or "sign out everywhere", the person is told
@@ -18,11 +18,11 @@
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { PatRecord } from '../storage/repositories/pat.repository.js';
-import { notify, type NotifyInput } from './notify.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { PatRecord } from '../../storage/repositories/pat.repository.js';
+import { notify, type NotifyInput } from '../notify.js';
+import { logger } from '../../utils/logger.js';
 
 export const OWNER_TOKENS_KEPT_TYPE = 'owner_tokens_kept';
 

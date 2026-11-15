@@ -26,7 +26,7 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
 import type { ContentReader } from '../classification/reader.js';
 import { presentMemories } from '../classification/present-memory.js';
-import { ownerScopeView, readsAsOwner, READ_AS_OWNER_SCOPE } from '../owner-scope-read.js';
+import { ownerScopeView, readsAsOwner, READ_AS_OWNER_SCOPE } from '../owner/scope-read.js';
 import { organismReadableRecords } from '../organism/namespace-access.js';
 import { diffJson, type JsonChange } from './diff.js';
 import { keepsHistory, HISTORY_KEEP } from '../context/history-keys.js';

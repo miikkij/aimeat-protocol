@@ -116,7 +116,7 @@ export async function flushCallTimings(storage: Storage): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no duration of the provider is
+ * An account erasure (services/owner/erasure.ts), before its cascade: no duration of the provider is
  * kept from now on, a write in progress answers first so the cascade deletes what it stored, and the
  * provider's waiting durations are dropped. The returned function ends the hold, after the cascade.
  */

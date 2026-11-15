@@ -33,7 +33,7 @@ import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { issueJWT } from '../auth/jwt.js';
 import { buildGAII } from '../utils/gaii.js';
-import { hashToken } from '../services/owner-session.js';
+import { hashToken } from '../services/owner/session.js';
 import { resolvePat } from '../services/access-token.js';
 import { createAccessTabService } from '../services/db/access-tab-db-service.js';
 import { ACCOUNT_SECURITY_SCOPE, exceedsCeiling } from '../utils/scope-coverage.js';

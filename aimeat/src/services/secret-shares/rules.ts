@@ -21,7 +21,7 @@
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { otherRingKeys } from '../owner-secrets.js';
+import { otherRingKeys } from '../owner/secrets.js';
 import type {
   SecretShareFormat, SecretShareProtection, SecretShareRecipients, SecretShareRetention,
 } from '../../storage/types/secret-shares.js';

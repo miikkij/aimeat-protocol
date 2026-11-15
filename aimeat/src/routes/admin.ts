@@ -90,7 +90,7 @@ import { issueJWT, generateSessionId } from '../auth/jwt.js';
 import type { ConfigProvenance } from '../services/config/provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
-import { deactivateOwnerByOperator, reactivateOwnerByOperator } from '../services/owner-lifecycle.js';
+import { deactivateOwnerByOperator, reactivateOwnerByOperator } from '../services/owner/lifecycle.js';
 import { resetTotpByOperator } from '../services/totp-recovery.js';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';

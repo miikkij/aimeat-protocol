@@ -44,7 +44,7 @@ import type { SecretApproval, SecretRecord } from '../storage/types/secrets.js';
 import { notify, type NotifyInput } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { declaredHostsFor, declaresHost, usesSecretsOf } from './extension/secret-uses.js';
-import { listOwnerSecrets, purposeText, type SecretSummary } from './owner-secrets.js';
+import { listOwnerSecrets, purposeText, type SecretSummary } from './owner/secrets.js';
 import { tellAsker, closeQuestion } from './approval-standard.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';

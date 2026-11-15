@@ -64,7 +64,7 @@ let mw: Middleware;
 
 beforeAll(async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    const { hashToken } = await import('../../src/services/owner-session.js');
+    const { hashToken } = await import('../../src/services/owner/session.js');
     hashes.owner = hashToken('aimeat_pat_owner');
     hashes.agent = hashToken('aimeat_pat_agent');
     const keys = await generateKeyPair();

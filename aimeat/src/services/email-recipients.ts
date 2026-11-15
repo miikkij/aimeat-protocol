@@ -26,7 +26,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
-import { provenOwnerAddress } from './owner-mail-address.js';
+import { provenOwnerAddress } from './owner/mail-address.js';
 
 export interface EmailReach {
     /** GHII records on the node, whether or not they carry an address. */

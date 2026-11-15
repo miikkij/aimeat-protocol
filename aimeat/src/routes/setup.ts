@@ -154,7 +154,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             const existingOwners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             if (existingOwners.length > 0) {
                 // The code stays: while the node has no operator, the self-heal that makes the next
-                // account or sign-in the operator still needs it (services/owner-provisioning.ts).
+                // account or sign-in the operator still needs it (services/owner/provisioning.ts).
                 res.status(403).json(error(config.nodeId, 'ALREADY_CONFIGURED', 'This node is already configured. Setup can only run once.'));
                 return;
             }
@@ -238,7 +238,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             const ghii = `${username}@${config.nodeId}`;
             const passwordHash = await hashPassword(password);
             // The code is used here, checked and taken in one synchronous step, so of two requests
-            // carrying it (this route or a registration route, services/owner-provisioning.ts) only
+            // carrying it (this route or a registration route, services/owner/provisioning.ts) only
             // one creates the first owner. Taken from the gate itself rather than through
             // claimOperatorSetupCode, because this route makes an operator whatever the owner count
             // says by now. It waits again if the owner cannot be created.

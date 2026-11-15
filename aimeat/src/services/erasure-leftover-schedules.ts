@@ -7,7 +7,7 @@
  *   and nothing is deleted or changed. The operator deletes each one, or keeps it, from the incident.
  *
  *   WHY. Until 2026-10-25 the erasure's schedule step deleted only the jobs whose createdBy was the
- *   person's own GHII or bare name (services/owner-erasure.ts). A schedule one of the person's agents
+ *   person's own GHII or bare name (services/owner/erasure.ts). A schedule one of the person's agents
  *   or ecosystem apps made carries the maker's identity as createdBy and the account as ownerScope, so
  *   it stayed: its definition (the AI prompt, the inputs, the task text) is listed to whoever
  *   registers the released name next, and it fires as that person's agent of the same name once they

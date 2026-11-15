@@ -33,7 +33,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import { recordCallDuration, flushCallTimings, timingKey } from '../../src/services/call-timing.js';
 import { logPartyRead, flushOwner, readLogKey } from '../../src/services/parties/activity.js';
 import { PARTY_READS_PREFIX } from '../../src/services/parties/contract.js';

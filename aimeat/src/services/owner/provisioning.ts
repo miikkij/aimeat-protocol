@@ -1,5 +1,5 @@
 /**
- * @file owner-provisioning.ts
+ * @file src/services/owner/provisioning.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Single source of truth for minting a brand-new owner + GHII account: generates the
@@ -55,15 +55,15 @@
  *     reuse by the email-invitation accept flow.
  */
 import { createHash, randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
-import { generateKeyPair } from '../auth/keypair.js';
-import { logger } from '../utils/logger.js';
-import { promoteContactsForVerifiedEmail } from './contacts.js';
-import { applyAppInvitesForVerifiedEmail } from './app/member-invites.js';
-import { executeHooks } from './hooks.js';
-import { fireHook } from '../utils/fire-hook.js';
-import { setupCodeGateFor, setupCodeRefusal, setupCodeRequired, SETUP_CODE_USED_MESSAGE } from './setup-code.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, GHIIRecord, OwnerRecord } from '../../storage/interface.js';
+import { generateKeyPair } from '../../auth/keypair.js';
+import { logger } from '../../utils/logger.js';
+import { promoteContactsForVerifiedEmail } from '../contacts.js';
+import { applyAppInvitesForVerifiedEmail } from '../app/member-invites.js';
+import { executeHooks } from '../hooks.js';
+import { fireHook } from '../../utils/fire-hook.js';
+import { setupCodeGateFor, setupCodeRefusal, setupCodeRequired, SETUP_CODE_USED_MESSAGE } from '../setup-code.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
 export function emailHashOf(email: string): string {
@@ -413,13 +413,13 @@ export async function provisionOwner(
   // code-key provisioning all land here — so the marker belongs here rather than at each door.
   // It was missing, and every account made through any of them read as `legacy`: created on the
   // new path, invisible to its numbers, and quietly padding the old path's instead.
-  void import('./onboarding-funnel.js')
+  void import('../onboarding-funnel.js')
     .then(m => m.recordTrack(storage, config, owner.name))
     .catch(err => logger.warn('provisionOwner: track marker failed', { error: String(err) }));
 
   // The operator's welcome, so the mailbox is not empty on day one. Fire-and-forget for the same
   // reason as the marker above: a greeting must never be able to turn a signup into a 500.
-  void import('./welcome-message.js')
+  void import('../welcome-message.js')
     .then(m => m.sendOperatorWelcome(storage, config, owner.name))
     .catch(err => logger.warn('provisionOwner: welcome message failed', { error: String(err) }));
 

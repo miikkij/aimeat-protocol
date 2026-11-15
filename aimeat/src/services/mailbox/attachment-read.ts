@@ -23,7 +23,7 @@
  *     to a reader of that mailbox.
  */
 import type { Storage } from '../../storage/interface.js';
-import type { MailboxReader } from '../owner-mailbox-reads.js';
+import type { MailboxReader } from '../owner/mailbox-reads.js';
 import { logger } from '../../utils/logger.js';
 
 /** `dm/<conversation>/<message>/<attachment>`, the key attachment-duplication.ts writes a received copy under. */

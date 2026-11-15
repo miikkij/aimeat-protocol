@@ -72,7 +72,7 @@ import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
-import { provisionOwner } from '../src/services/owner-provisioning.js';
+import { provisionOwner } from '../src/services/owner/provisioning.js';
 import { publishSkill } from '../src/services/skills.js';
 import { signedPackageHeaders } from '../src/services/packages/peer/package-node-auth.js';
 import { refreshInstalledPackages, UPDATES_ENDED_SENTENCE } from '../src/services/packages/peer/package-upstream-refresh.js';

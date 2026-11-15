@@ -43,7 +43,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import { buildFederationOverview } from '../services/federation/overview.js';
 import { setPeerRelayClaim, peerRelayClaimView } from '../services/relay-claim-policy.js';
 import { emitChange } from '../services/event-bus.js';

@@ -53,7 +53,7 @@ import { askedQuestions, effectiveQuestionnaire, type ComplianceQuestion } from 
 import { builtInQuestionIds } from '../../data/compliance-questionnaire.js';
 import { parseAppScopes } from '../protected-resource.js';
 import type { CallerContext } from '../caller-context.js';
-import { readsAsOwner, visibleToSameOwnerReader, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
+import { readsAsOwner, visibleToSameOwnerReader, READ_AS_OWNER_NOTE } from '../owner/scope-read.js';
 import { organismReadableRecords } from '../organism/namespace-access.js';
 import { ecoMayReadKey } from '../ecosystem-access.js';
 import { readDoc } from '../compliance/docs.js';

@@ -72,7 +72,7 @@ import { writeMemoryRecord } from './memory/write.js';
 import type { ContentReader } from './classification/reader.js';
 import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
-import { ownerScopeView } from './owner-scope-read.js';
+import { ownerScopeView } from './owner/scope-read.js';
 
 /** Who reads an owner-scope listing, for ownerScopeView: the principal and whether it reads as the owner. */
 export interface OwnerScopeViewer {

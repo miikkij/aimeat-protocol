@@ -9,7 +9,7 @@
  *
  *   ONE IMPLEMENTATION. The work is services/install-set-apply.ts, the same function
  *   POST /v1/install-sets/apply calls. The operator test is the one every admin tool here asks
- *   (services/owner-lifecycle.ts resolveOperatorAgentName): the agent's account is an operator
+ *   (services/owner/lifecycle.ts resolveOperatorAgentName): the agent's account is an operator
  *   account, and the agent holds the exact word operator:admin, which no wildcard carries.
  * @structure registerAdminInstallSetTools(mcp, storage, config, peers, getAgentGaii, scopes)
  * @usage registered from src/mcp/register-all.ts
@@ -33,7 +33,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import { applyInstallSet, listAppliedSets } from '../services/install-set-apply.js';
 import { nodeContext } from '../services/node-context.js';
 import { saleConfigNeeds, saleGrant, saleRevoke, saleOffer, saleClaim, claimPackageHere } from '../services/packages/sale/package-sale-client.js';

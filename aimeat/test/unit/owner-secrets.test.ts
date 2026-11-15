@@ -16,7 +16,7 @@
  *   word Bearer with nothing after it and let the owner read a 401 as "the service is down".
  *
  *   FIRST FAIL: against the tree before this vault existed, this file cannot import
- *   services/owner-secrets.js — the module is not there. Every assertion below is new behaviour.
+ *   services/owner/secrets.js — the module is not there. Every assertion below is new behaviour.
  * @usage pnpm test -- owner-secrets
  * @version-history
  *   v1.5.0 — 2026-10-24 — A refused first use of a shared-map value binds nothing, the vault secret in
@@ -35,7 +35,7 @@ import {
     SECRET_NAME_RE, SECRET_MAX_BYTES, USED_BY_WINDOW_DAYS,
     toSummary, secretPlaceholderNames, resolveHeaderSecrets, extensionConfigSecrets,
     secretUnknownMessage, putOwnerSecret, listOwnerSecrets, resolveSecretForHeaders,
-} from '../../src/services/owner-secrets.js';
+} from '../../src/services/owner/secrets.js';
 import { encrypt, decrypt, getEncryptionKey } from '../../src/services/encryption.js';
 import type { SecretRecord } from '../../src/storage/types/secrets.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';

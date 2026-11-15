@@ -21,7 +21,7 @@
  *   FIRST FAIL, measured 2026-10-21 on both backends: with the declared-host test in
  *   services/extension/secret-authority.ts accepting any host, 5 fails (delivered to the undeclared
  *   host); with the foreign-extension check removed, 7 fails; with the approval lookup in
- *   services/owner-secrets.ts removed, 10 fails (the approved call is refused).
+ *   services/owner/secrets.ts removed, 10 fails (the approved call is refused).
  *
  *   THE RECEIVER runs on 127.0.0.1 (the runner admits private egress) on E2E_SECRETS_APPROVALS_PORT,
  *   28675 by default.

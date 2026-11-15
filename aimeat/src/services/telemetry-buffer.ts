@@ -231,7 +231,7 @@ export async function flushTelemetryBuffer(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no signal of the account's
+ * An account erasure (services/owner/erasure.ts), before its cascade: no signal of the account's
  * agents is kept from now on, a write of the flush in progress answers first so the cascade deletes
  * what it stored, the rest of that flush skips them, and their waiting signals are dropped.
  * evictAgentTelemetry does the last part for one agent; this does it for every agent of the

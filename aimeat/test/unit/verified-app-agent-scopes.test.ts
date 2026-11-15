@@ -30,7 +30,7 @@ import { initSessionAuth } from '../../src/auth/middleware.js';
 import { initStats } from '../../src/services/stats.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { requestIdMiddleware } from '../../src/middleware/request-id.js';
-import { emailHashOf } from '../../src/services/owner-provisioning.js';
+import { emailHashOf } from '../../src/services/owner/provisioning.js';
 import { registerWebVerifyRoutes } from '../../src/routes/ghii/web-verify.js';
 import { memoryRouter } from '../../src/routes/memory.js';
 

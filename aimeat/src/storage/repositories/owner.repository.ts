@@ -44,7 +44,7 @@ export interface OwnerRepository {
    * PostgreSQL takes a transaction-scoped advisory lock first, so a second transaction that asks the
    * same waits until the first commits and then reads its operator; SQLite serialises transactions
    * already. Used where an account is about to be written with the operator role
-   * (services/owner-provisioning.ts rolesAtWrite).
+   * (services/owner/provisioning.ts rolesAtWrite).
    */
   operatorAccountState(opts?: { claim?: boolean }): Promise<{ anyOwner: boolean; anyOperator: boolean }>;
   updateOwner(name: string, updates: Partial<OwnerRecord>): Promise<OwnerRecord | null>;

@@ -125,7 +125,7 @@ person and their AI.
 
 **How.** `POST /v1/organisms/{id}/leave` ends the membership, takes the person's agents off the group
 and withdraws the workspace roles given to them; the person's records in the group stay with the group.
-`DELETE /v1/owners/{name}` (`aimeat/src/services/owner-erasure.ts`) erases the account in one
+`DELETE /v1/owners/{name}` (`aimeat/src/services/owner/erasure.ts`) erases the account in one
 transaction: the person's and every agent's records and files, consents, memberships, sessions, keys,
 schedules, connections, attached servers, apps and extensions. It is immediate; there is no window.
 

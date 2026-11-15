@@ -65,7 +65,7 @@
         "aimeat/src/services/content/shared-profile.ts",
         "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:e92723565adf2bd70835950a"
+      "digest": "sha256:16c81557f80c48f9b699c1a7"
     },
     "node:aimeat-context": {
       "reviewedOn": "2026-11-15",
@@ -76,7 +76,7 @@
         "aimeat/src/services/context/check.ts",
         "aimeat/src/services/memory-versions/history.ts"
       ],
-      "digest": "sha256:9a45128df7d7d5691d2ae7f6"
+      "digest": "sha256:9e360085cfee187094688e8d"
     },
     "node:aimeat-find-my-app": {
       "reviewedOn": "2026-11-15",
@@ -132,7 +132,7 @@
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:81ea310633a8d0f68a6cdc42",
+      "digest": "sha256:64146b9a3ec7c2617009a65c",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -182,12 +182,12 @@
       "digest": "sha256:a99fd4d8356918be71ebb999"
     },
     "node:aimeat-app-workstation": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/services/app/size-health.ts",
         "aimeat/src/services/app/publish-next-steps.ts"
       ],
-      "digest": "sha256:b12b67176bb069ad53edf51f"
+      "digest": "sha256:46b3d6dd85c2f17dca15284b"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-11-15",
@@ -300,7 +300,7 @@
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:85b8a5564420e1fa4ef3a211"
+      "digest": "sha256:fa3bf34b27bdf71141677b04"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-11-08",
@@ -315,7 +315,7 @@
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:f500fe193d414bdc94e7bc71"
+      "digest": "sha256:ea57b1e0ef07d535dda87497"
     },
     "node:manage-my-agents": {
       "reviewedOn": "2026-11-15",
@@ -323,7 +323,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:e6a4706cf0ee0b5647ecf984"
+      "digest": "sha256:fa2e450898b14ae3e7f43d6c"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-11-09",
@@ -344,12 +344,12 @@
       "digest": "sha256:eeb569d5020ddb0f17952cf2"
     },
     "node:set-up-content-pipeline": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/lifecycle.ts"
       ],
-      "digest": "sha256:fb75c452344b308939da84cc"
+      "digest": "sha256:02a9d5f292d1dd36fcff63d7"
     },
     "node:configure-routing": {
       "reviewedOn": "2026-11-14",
@@ -402,7 +402,7 @@
         "aimeat/src/services/agent/profile-write.ts",
         "aimeat/src/services/agent/task-rules.ts"
       ],
-      "digest": "sha256:c0d4b9ceccca57f3d7c870c8"
+      "digest": "sha256:bdff5a65f1581bb77256c17a"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-15",
@@ -447,11 +447,11 @@
         "aimeat/src/services/memory/bin.ts",
         "aimeat/src/routes/memory-hands.ts",
         "aimeat/src/routes/owners/export.ts",
-        "aimeat/src/services/owner-erasure.ts",
+        "aimeat/src/services/owner/erasure.ts",
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:ed458f50d32d57209facd731",
+      "digest": "sha256:d28ca4c9f199dbc347446fdb",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -463,17 +463,17 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:567eb1e8564111ea94a70f0e"
+      "digest": "sha256:abbeb52b23649f919d50d8f5"
     },
     "node:aimeat-workflow-decisions": {
-      "reviewedOn": "2026-11-13",
+      "reviewedOn": "2026-11-15",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/engine-human.ts",
         "aimeat/src/services/workflow/lifecycle.ts",
         "aimeat/src/mcp/workflows.ts"
       ],
-      "digest": "sha256:ae00177faaf180d1a6b6e98f"
+      "digest": "sha256:960cd48ffe582966fbbc6807"
     },
     "node:aimeat-bookkeeping": {
       "reviewedOn": "2026-11-13",
@@ -520,7 +520,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:399d394966bb558f9f9119b6"
+      "digest": "sha256:79e352ee175030eeab8ff31b"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -709,7 +709,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app/size-health.ts": "e20ea2e295dcdd51",
-      "aimeat/src/services/app/publish-next-steps.ts": "111fe660b7675c40"
+      "aimeat/src/services/app/publish-next-steps.ts": "269e4ac5568753a6"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/builder/app-layers.ts": "8f5a7c2059171b32",
@@ -778,7 +778,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "254d513415b91da4",
-      "aimeat/src/routes/ghii/register-login.ts": "e86be7762800e046",
+      "aimeat/src/routes/ghii/register-login.ts": "c1cd758f77dd1e4a",
       "aimeat/src/services/first-steps.ts": "9deda60684db661e"
     },
     "node:ai-transparency": {
@@ -786,11 +786,11 @@
       "aimeat/src/services/ai/provenance.ts": "68296bdb24b7667c"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "dfc7befffe7d0766"
+      "aimeat/src/mcp/core-admin.ts": "8049e6509cfa6655"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "eecea69560616834",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "ed60c570e727e9d4"
+      "aimeat/src/mcp/core.ts": "70605320b76c2a13",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "799332a394b48e9c"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "de90c22e1cf64e0a"
@@ -803,7 +803,7 @@
       "aimeat/src/data/basic-agents.ts": "00daece7d51dc565"
     },
     "node:set-up-content-pipeline": {
-      "aimeat/src/models/workflow-schemas.ts": "38fd242996d98d0f",
+      "aimeat/src/models/workflow-schemas.ts": "1302f1e385f459ff",
       "aimeat/src/services/workflow/lifecycle.ts": "2618cea800a5c7ed"
     },
     "node:configure-routing": {
@@ -818,7 +818,7 @@
       "aimeat/src/cli/skill-install.ts": "767dd5a3aaf6fdb5"
     },
     "node:diagnose-a-workflow": {
-      "aimeat/src/models/workflow-schemas.ts": "38fd242996d98d0f",
+      "aimeat/src/models/workflow-schemas.ts": "1302f1e385f459ff",
       "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
       "aimeat/src/services/scheduler.ts": "698e55bd7c47d90b",
       "aimeat/src/services/ai/route-plan.ts": "95f735f72eac78b4"
@@ -911,7 +911,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "c7cee00fc36dfbc1",
+      "aimeat/src/services/journey-state.ts": "f2b1a31e8cf0fd0b",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "24765a8656779b80"
     },
@@ -924,7 +924,7 @@
       "aimeat/src/services/connect-tunnel-push.ts": "7988907b4567d61b",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
       "aimeat/src/routes/organisms/workspace-ops.ts": "ef8573072fce8bef",
-      "aimeat/src/routes/organisms/workspace-access.ts": "6b53f541fc9da3fc",
+      "aimeat/src/routes/organisms/workspace-access.ts": "5b67b6e9bf8a2a11",
       "aimeat/src/services/agent/profile-write.ts": "b33faf5396cd3862",
       "aimeat/src/services/agent/task-rules.ts": "3d0abc3361b12a54"
     },
@@ -939,11 +939,11 @@
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "946f71b4c15023d8",
-      "aimeat/src/routes/memory/key.ts": "cc53be9d60454990",
-      "aimeat/src/services/memory/bin.ts": "5974db996ff348d5",
+      "aimeat/src/routes/memory/key.ts": "5adb67aeccbd4c0b",
+      "aimeat/src/services/memory/bin.ts": "6db55cecd93ab468",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "6f50fd45cba97f84",
-      "aimeat/src/services/owner-erasure.ts": "6360256091fc2a11",
+      "aimeat/src/services/owner/erasure.ts": "cd44f7ccc40e0680",
       "aimeat/src/services/archive.ts": "6ddbae831830e2e9",
       "aimeat/src/mcp/organisms.ts": "bcafa8624d90288d"
     },
@@ -952,10 +952,10 @@
       "aimeat/src/services/mcp-client/grants.ts": "1652c22f0c53e827",
       "aimeat/src/services/mcp-client/registry.ts": "a79dc92621803539",
       "aimeat/src/services/mcp-client/invoke.ts": "666ff816b1baab9b",
-      "aimeat/src/mcp/mcp-proxy.ts": "dbb12f157c0a73d5"
+      "aimeat/src/mcp/mcp-proxy.ts": "f5ee8d6ce55f24ad"
     },
     "node:aimeat-workflow-decisions": {
-      "aimeat/src/models/workflow-schemas.ts": "38fd242996d98d0f",
+      "aimeat/src/models/workflow-schemas.ts": "1302f1e385f459ff",
       "aimeat/src/services/workflow/engine-human.ts": "9d25e1c8926e3d2c",
       "aimeat/src/services/workflow/lifecycle.ts": "2618cea800a5c7ed",
       "aimeat/src/mcp/workflows.ts": "01ece3ff6e971ebe"
@@ -991,7 +991,7 @@
     "node:aimeat-content-classes": {
       "aimeat/src/services/content/pipeline.ts": "c4c8f3a443d82cb8",
       "aimeat/src/services/content/ai-stages.ts": "96d3366e8f153380",
-      "aimeat/src/services/content/service.ts": "5ff8f6edfe5f4818",
+      "aimeat/src/services/content/service.ts": "12b3d2f8f47e2dd8",
       "aimeat/src/services/content/settings.ts": "75ca4524dd531ba0",
       "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949",
       "aimeat/src/services/content/shared-profile.ts": "b8dd9094c864d784",
@@ -1013,8 +1013,8 @@
       "aimeat/src/services/context/index-line.ts": "635f3d9f01f7cc1d",
       "aimeat/src/services/mcp-build-inputs.ts": "b072fc92778f9ae0",
       "aimeat/src/services/context/history-keys.ts": "80323e7765ecfc68",
-      "aimeat/src/services/context/check.ts": "909454759adda26f",
-      "aimeat/src/services/memory-versions/history.ts": "9cc5f2ff527c2989"
+      "aimeat/src/services/context/check.ts": "f0768afe110e859c",
+      "aimeat/src/services/memory-versions/history.ts": "fd78285b47179edd"
     },
     "node:aimeat-app-agents": {
       "aimeat/src/models/crew-def-schemas.ts": "d0eb1d777a146bf8",

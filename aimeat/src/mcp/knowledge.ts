@@ -81,7 +81,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { packageLinksFor } from '../services/knowledge/package-links.js';
 import { presentKnowledgeManifest } from '../services/toll-morsels-names.js';
-import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner/scope-read.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -107,7 +107,7 @@ export function registerKnowledgeTools(
     // GHII (web UI import) or any of their agents, and which duplicate key wins is a priority order
     // that has to be the same answer on both surfaces.
     // An agent reads the owner's and its siblings' records only as the visibility rule admits, unless
-    // it reads as the owner (memory:read-as-owner; services/owner-scope-read.ts). Applied before the
+    // it reads as the owner (memory:read-as-owner; services/owner/scope-read.ts). Applied before the
     // GHII-first dedupe (appdev-kb.ts), as GET /v1/memory/:key?owner_scope=true applies it.
     // `omitted` counts what the visibility rule left out, so an answer that is shorter, or "not
     // found", says why and names the permission that shows it (READ_AS_OWNER_NOTE), as the librarian

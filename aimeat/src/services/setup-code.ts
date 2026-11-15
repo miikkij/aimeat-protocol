@@ -33,7 +33,7 @@
  *   from a terminal by hand still matches.
  *
  *   WHICH ROUTES. Every path that grants the operator role by the first-owner or the no-operator rule:
- *   POST /v1/setup/init and, through claimOperatorSetupCode (services/owner-provisioning.ts),
+ *   POST /v1/setup/init and, through claimOperatorSetupCode (services/owner/provisioning.ts),
  *   POST /v1/ghii, POST /v1/ghii/register-web, POST /v1/owners, provisionOwner (an identity
  *   provider's first sign-in, an invitation) and the sign-in self-heal (routes/ghii/owner-session.ts).
  *   Once the node has an operator none of them asks for the code.

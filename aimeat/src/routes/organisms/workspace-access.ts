@@ -106,7 +106,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { organismLink } from '../../services/notifications/links.js';
 import { hashPassword } from '../../services/password.js';
-import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner-provisioning.js';
+import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner/provisioning.js';
 import { nodeContext } from '../../services/node-context.js';
 import { isOrganismOwner } from '../../services/organism/ownership.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace/enrichment.js';
@@ -120,7 +120,7 @@ import { pendingEmailInvitationsFor } from '../../services/organism-read/manager
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, membershipAfterGrant, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
-import { eraseOwner } from '../../services/owner-erasure.js';
+import { eraseOwner } from '../../services/owner/erasure.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { newPasswordRefusal } from '../../services/sign-in-policy.js';
@@ -773,7 +773,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         admins: gate.organism.admins.filter(x => x !== inv.provisionedOwner),
         updatedAt: new Date().toISOString(),
       });
-      // The one way an account is deleted (services/owner-erasure.ts): its memory, consents, sessions,
+      // The one way an account is deleted (services/owner/erasure.ts): its memory, consents, sessions,
       // grants and audit rows go with it, which the storage cascade alone does not reach (secaudit
       // 2026-10, C7).
       await eraseOwner(storage, config.nodeId, inv.provisionedOwner);

@@ -91,7 +91,7 @@ import { toolError } from './tool-error.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent/dm-reads.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
-import { delegateReaderFor, readOwnerOverview, readOwnerThread, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
+import { delegateReaderFor, readOwnerOverview, readOwnerThread, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
@@ -451,7 +451,7 @@ export function registerDmMessageTools(
     // Gated by `messages:read-as-owner`, which no wildcard carries. aimeat_dm_inbox reads what was sent
     // to the AGENT; this reads what the owner holds, which is what "reply as me" needs in order to read
     // the thread it answers. The SAME service as GET /v1/messages/overview, so the two surfaces show
-    // the same list and leave the same audit line (services/owner-mailbox-reads.ts).
+    // the same list and leave the same audit line (services/owner/mailbox-reads.ts).
     mcp.registerTool(
         'aimeat_dm_inbox_as_owner',
         {

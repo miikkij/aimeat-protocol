@@ -207,7 +207,7 @@ export function inviteView(inv: AppMemberInvite): Omit<AppMemberInvite, 'emailHa
 /**
  * Turn every open invitation of a just-verified address into a membership. Called where a verified
  * address binding is made (routes/ghii/web-verify.ts, routes/ghii/recovery.ts,
- * services/owner-provisioning.ts), beside promoteContactsForVerifiedEmail, and best-effort in the same
+ * services/owner/provisioning.ts), beside promoteContactsForVerifiedEmail, and best-effort in the same
  * way: the caller logs a failure and the verification still completes.
  *
  * An invitation whose app is gone, which names the app's own owner, or which has expired is deleted.

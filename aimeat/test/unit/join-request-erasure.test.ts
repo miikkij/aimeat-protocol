@@ -2,7 +2,7 @@
  * @file test/unit/join-request-erasure.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Erasing an account takes its join requests with it (services/owner-erasure.ts, step
+ * @description Erasing an account takes its join requests with it (services/owner/erasure.ts, step
  *   join_requests). A request names its person by the account name, so an open request left behind
  *   would make the next holder of the released name a member the moment an owner approved it. Every
  *   request the erased account made goes, open or decided, on both backends; another person's
@@ -19,7 +19,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, JoinRequestRecord } from '../../src/storage/interface.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 
 requirePostgresWhenAsked('join-request-erasure');
 

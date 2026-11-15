@@ -150,7 +150,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
-import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
+import { readRefreshCookie, checkRefreshSession } from '../services/owner/session.js';
 import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel, appRecordForAuthorize } from '../services/app/origin-target.js';
 import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app/grant-portfolio.js';
 import { portfolioReadHold } from '../services/portfolio-read-hold.js';

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The exchange part of erasing an account: one step of eraseOwner
- *   (services/owner-erasure.ts). Revokes the paid contracts and the free-access grants of
+ *   (services/owner/erasure.ts). Revokes the paid contracts and the free-access grants of
  *   services/metered-entitlements.ts that the erased account is a party to.
  *
  *   WHY IT EXISTS. Contracts (namespace `metered-entitlement`, keys `entitlement.<hash>`) and grants

@@ -62,7 +62,7 @@ import { getLibraryPacks } from '../data/library-packs.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
 import { filterPitfalls, listLearnedPitfalls, listOwnerScopeShown, type OwnerScopeViewer } from './appdev-kb.js';
-import { ownerScopeView } from './owner-scope-read.js';
+import { ownerScopeView } from './owner/scope-read.js';
 import type { ContentReader } from './classification/reader.js';
 import { listSkills, type SkillAccessor } from './skills.js';
 import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
@@ -86,7 +86,7 @@ export interface AppdevOverviewOpts {
     sections?: string[];
     /**
      * Who reads the owner-scope sections, for ownerScopeView: the caller's principal and whether it
-     * reads as the owner (services/owner-scope-read.ts readsAsOwner). Without it the caller is read
+     * reads as the owner (services/owner/scope-read.ts readsAsOwner). Without it the caller is read
      * as not reading as the owner, so a surface that forgets it shows less, never more.
      */
     view?: OwnerScopeViewer;

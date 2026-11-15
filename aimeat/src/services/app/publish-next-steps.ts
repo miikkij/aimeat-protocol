@@ -55,7 +55,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { agentFaceKey } from '../agent/face.js';
-import { getOwnerScopePublicMemory } from '../owner-memory.js';
+import { getOwnerScopePublicMemory } from '../owner/memory.js';
 import { listSkillsByBinding } from '../skills.js';
 import { appSizeHealth, type AppSizeHealth } from './size-health.js';
 import { logger } from '../../utils/logger.js';

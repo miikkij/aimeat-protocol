@@ -33,7 +33,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import { twoProviders, NODE, now, people, holdFirst, eraseDuring, until, type People } from './erasure-test-kit.js';
 import { initConsentAuditBuffer, bufferConsentAudit, flushConsentAudit, shutdownConsentAuditBuffer } from '../../src/services/consent-audit-buffer.js';
 import { initUsageBuffer, recordUsageCall, flushUsageBuffer, resetUsageBuffer } from '../../src/services/usage/usage-buffer.js';

@@ -33,7 +33,7 @@ import { registerOwnerExportRoute } from '../../src/routes/owners/export.js';
 import { registerMemoryExtendedTools } from '../../src/mcp/memory-extended.js';
 import { registerCoreTools } from '../../src/mcp/core.js';
 import { agentSessionCaller } from '../../src/services/caller-context.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import {
   serviceRecords, moveServicePrefixOnce, serviceMoveStepKey, serviceNamespaceOf, isServiceNamespace, ownerOfServiceNamespace,
 } from '../../src/services/service-records.js';

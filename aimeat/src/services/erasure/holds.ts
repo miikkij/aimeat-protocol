@@ -6,7 +6,7 @@
  *   in-process write buffer keeps them.
  *
  *   WHY. A write buffer takes a row on a request and writes it later. The erasure cascade
- *   (services/owner-erasure.ts) deletes the account's rows in the tables those buffers write, so a
+ *   (services/owner/erasure.ts) deletes the account's rows in the tables those buffers write, so a
  *   row that waited in a buffer, or was being written, when the erasure ran was stored after it:
  *   the erased person came back in the table (register finding f-2026-11-13-write-buffers-and-erasure).
  *   Each buffer holds the account for the length of the erasure: it lets its writes in progress

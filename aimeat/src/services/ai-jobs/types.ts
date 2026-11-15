@@ -200,7 +200,7 @@ export type AiJobLogEntry = Omit<AiJobRecord, 'prompt' | 'input_keys' | 'system_
  * act: an agent of the owner sees and stops only the jobs it started itself, which is what the REST
  * routes already do by resolving the principal (routes/ai-jobs.ts). `all` is the owner in person, an
  * app grant of the owner, and an agent holding `memory:read-as-owner`, the one word that lets a
- * scoped agent read the owner's and its siblings' private records (services/owner-scope-read.ts).
+ * scoped agent read the owner's and its siblings' private records (services/owner/scope-read.ts).
  *
  * Omitting the viewer reads everything in the namespace. That is right for the callers whose key IS
  * the principal (the REST routes) and for the node's own paths (restart reconciliation, log pruning,

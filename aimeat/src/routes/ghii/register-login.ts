@@ -104,8 +104,8 @@ import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../mod
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
-import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
-import { eraseOwner } from '../../services/owner-erasure.js';
+import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner/provisioning.js';
+import { eraseOwner } from '../../services/owner/erasure.js';
 import { passwordSignInRefusal, passwordWayInRefusal, newPasswordRefusal, twoStepCovers } from '../../services/sign-in-policy.js';
 import { twoStepArmed } from '../../services/passkeys.js';
 import { twoStepSetupAnswer } from './login-two-step.js';
@@ -201,7 +201,7 @@ export function registerRegisterLoginRoutes(
             if (config.testMode) {
                 // Test mode: wipe old account entirely and re-create (E2E test isolation)
                 preservedRoles = existingOwner.roles;
-                // The one account deletion (services/owner-erasure.ts; secaudit 2026-10, C7).
+                // The one account deletion (services/owner/erasure.ts; secaudit 2026-10, C7).
                 await eraseOwner(storage, config.nodeId, username);
             } else if (config.devMode) {
                 // Dev mode: reset credentials only, preserve all data (agents, memory, etc.)

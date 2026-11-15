@@ -225,7 +225,7 @@ export async function flushWriteTallyBuffer(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade. No touch by or of the account is
+ * An account erasure (services/owner/erasure.ts), before its cascade. No touch by or of the account is
  * kept from now on, and the writes in progress answer first, so the cascade reaches what they stored.
  * The account's own counts that wait are dropped: the cascade deletes the stored ones. Its touches of
  * other accounts' keys that wait are written now, so the cascade gives them the erasure's pseudonym

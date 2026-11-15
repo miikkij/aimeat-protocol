@@ -71,7 +71,7 @@ import type { Storage } from '../storage/interface.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
 import { nodeContext } from './node-context.js';
 import { outboundEmailHtml } from './email-templates.js';
-import { provenOwnerAddress } from './owner-mail-address.js';
+import { provenOwnerAddress } from './owner/mail-address.js';
 import { sendMail } from './mail-gate.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';

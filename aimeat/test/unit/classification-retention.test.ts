@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description How classification records (TARGET-082) leave the node, against
  *   SqliteStorage(':memory:'), through the real code paths rather than the helpers they call:
- *   - eraseOwner (services/owner-erasure.ts), the whole of DELETE /v1/owners/:name below HTTP, takes
+ *   - eraseOwner (services/owner/erasure.ts), the whole of DELETE /v1/owners/:name below HTTP, takes
  *     the person's exceptions and the audit rows of theirs still waiting in memory, and leaves
  *     another person's;
  *   - the core job `classification-audit-prune` (services/core-jobs.ts), driven through
@@ -21,7 +21,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { ClassificationAuditRow } from '../../src/storage/interface.js';
 import type { Scheduler } from '../../src/services/scheduler.js';
-import { eraseOwner } from '../../src/services/owner-erasure.js';
+import { eraseOwner } from '../../src/services/owner/erasure.js';
 import { registerCoreHandlers } from '../../src/services/core-jobs.js';
 import { addException, listExceptions } from '../../src/services/classification/exceptions.js';
 import {

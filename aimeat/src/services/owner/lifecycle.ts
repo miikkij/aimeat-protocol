@@ -1,5 +1,5 @@
 /**
- * @file src/services/owner-lifecycle.ts
+ * @file src/services/owner/lifecycle.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Deactivating and reactivating an owner account, as ONE operation (BR-04). This is
@@ -54,15 +54,15 @@
  *     audit A8-1). The account role alone had armed every agent an operator connected.
  *   v1.0.0 — 2026-08-23 — Initial implementation (BR-04 phase 0).
  */
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import type { AimeatConfig } from '../config.js';
-import { recordOperatorAction } from './operator-access-audit.js';
-import { nodeContext } from './node-context.js';
-import { inSavepoint } from './tolerant-step.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import { recordOperatorAction } from '../operator-access-audit.js';
+import { nodeContext } from '../node-context.js';
+import { inSavepoint } from '../tolerant-step.js';
 
 // The operator tools import the question from here; its one home is operator-principal.ts.
-export { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from './operator-principal.js';
+export { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../operator-principal.js';
 
 export interface OwnerLifecycleResult {
   sessionsRevoked: number;

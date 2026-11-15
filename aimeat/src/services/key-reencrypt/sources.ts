@@ -50,7 +50,7 @@ import { credentialContext as ownerStoreContext, OWNER_STORE_PREFIX } from '../f
 import { contextOf as mailContext } from '../email-outbox.js';
 import { HELD_KEY_PREFIX, NS_HELD, heldContext } from '../key-credentials.js';
 import { contextOf as settingContext, SEALED_SETTING_PREFIX } from '../config/at-rest.js';
-import { extensionConfigSecrets, sharedBindingName, sharedBindingOwner } from '../owner-secrets.js';
+import { extensionConfigSecrets, sharedBindingName, sharedBindingOwner } from '../owner/secrets.js';
 import { nodeKeyRowSealedWith, nodeKeySecretsNow, openNodePrivateKey } from '../../storage/node-key-at-rest.js';
 import { count, emptyTally, resealString, resealTree, type Tally } from './reseal.js';
 import { logger } from '../../utils/logger.js';
@@ -292,7 +292,7 @@ export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/services/mcp-client/credential.ts': 'MCP server credentials, personal MCP sign-ins',
   'src/services/mcp-client/transport-secrets.ts': 'MCP server headers and environment',
   'src/services/company/company-smtp.ts': 'company SMTP passwords',
-  'src/services/owner-secrets.ts': 'secrets vault',
+  'src/services/owner/secrets.ts': 'secrets vault',
   'src/services/secret-shares/service.ts': 'secret shares',
   'src/services/totp.ts': 'two-step sign-in secrets',
   'src/services/config/at-rest.ts': 'secret Config settings',

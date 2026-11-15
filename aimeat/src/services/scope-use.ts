@@ -150,7 +150,7 @@ export async function shutdownScopeUse(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no word of the account's agents
+ * An account erasure (services/owner/erasure.ts), before its cascade: no word of the account's agents
  * is noted from now on, a write in progress answers first so the cascade deletes what it stored, and
  * the account's noted words are dropped. A waiting batch alone did no harm, because the write reads
  * the agent first and the cascade removes it; a write that had read the agent before the cascade

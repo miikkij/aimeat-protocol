@@ -1,5 +1,5 @@
 /**
- * @file src/services/owner-mail-address.ts
+ * @file src/services/owner/mail-address.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one answer to "is this owner's address proven": the address the node may mail an
@@ -14,7 +14,7 @@
  *   the hash (emailHash) says which address it confirmed; the address the account names now must be
  *   that one, as services/recovery-address.ts provenRecoveryAddress compares them for the reset. Every
  *   path that sets the flag writes the hash in the same update (routes/ghii/web-verify.ts,
- *   routes/ghii/recovery.ts, services/owner-provisioning.ts), so a record with the flag and no hash
+ *   routes/ghii/recovery.ts, services/owner/provisioning.ts), so a record with the flag and no hash
  *   is not written today; it is read on the flag alone, as before.
  *
  *   NOT THE ACCOUNT LEVEL. verificationLevel says how the account was verified (a code, a bank ID, an
@@ -31,7 +31,7 @@
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13, delivery group).
  */
 import { createHash } from 'node:crypto';
-import type { GHIIRecord } from '../storage/interface.js';
+import type { GHIIRecord } from '../../storage/interface.js';
 
 type AddressFields = Pick<GHIIRecord, 'notificationEmail' | 'emailVerifiedAt' | 'emailHash'>;
 

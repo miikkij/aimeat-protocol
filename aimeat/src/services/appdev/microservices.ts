@@ -28,7 +28,7 @@
 
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { ownerScopeView } from '../owner-scope-read.js';
+import { ownerScopeView } from '../owner/scope-read.js';
 import type { OwnerScopeViewer } from '../appdev-kb.js';
 import type { ContentReader } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';

@@ -43,7 +43,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { buildSeoStatus, announceNote } from '../services/seo/seo-status.js';
 import { planAnnouncement, announceEverything } from '../services/indexnow-site.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner/lifecycle.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerSeoTools(

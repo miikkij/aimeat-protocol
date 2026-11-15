@@ -13,13 +13,13 @@
  *   (codebase analysis 2026-11-03, security-architecture.md finding 2). A record in this namespace
  *   needs no list entry: no principal resolves to `svc:...` (an owner name and an agent name are
  *   lowercase letters, digits and hyphens, utils/gaii.ts), so no memory route writes there, the
- *   owner-scope reads (services/owner-memory.ts: the GHII, the agents, the ecosystem apps) never
+ *   owner-scope reads (services/owner/memory.ts: the GHII, the agents, the ecosystem apps) never
  *   include it, and the routes that take a namespace from the caller refuse it
  *   (utils/own-door-keys.ts ownDoorRefusal, services/memory/bin.ts).
  *
  *   OWNERSHIP. The records are the account's. The account holder's data export
  *   (GET /v1/owners/:name/export) carries them beside the records of their own identity, and the
- *   account erasure removes them (services/owner-erasure.ts). A service record is always written
+ *   account erasure removes them (services/owner/erasure.ts). A service record is always written
  *   `private`, so no public listing or public read reaches it.
  *
  *   MOVING A PREFIX HERE. A prefix whose records already exist in the owners' namespaces moves with

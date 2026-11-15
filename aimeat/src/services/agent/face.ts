@@ -56,7 +56,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { sendMarkdown, htmlToMarkdown } from '../markdown-negotiation.js';
 import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
-import { getOwnerScopePublicMemory } from '../owner-memory.js';
+import { getOwnerScopePublicMemory } from '../owner/memory.js';
 import { renderAppMarkdown, FORMAT_MD_BUSY } from '../app/format-md.js';
 import {
   loadServedProvenance, provenanceFrontmatter, provenanceMarkdownNote, setProvenanceHeaders,

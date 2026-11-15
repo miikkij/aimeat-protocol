@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { mailboxReaderOf, delegateReaderFor } from '../../src/services/owner-mailbox-reads.js';
+import { mailboxReaderOf, delegateReaderFor } from '../../src/services/owner/mailbox-reads.js';
 
 const NODE = 'aimeat-test-001';
 const who = (roles: string[], scopes: string[] = [], extra: { federated?: boolean; sub?: string } = {}) =>

@@ -1,7 +1,7 @@
 /**
  * @file registration-gate.test.ts
  * @description Who may get a NEW account on this node, in two parts that only make sense together:
- *   the registration-mode rule table (services/owner-provisioning.ts) and the Entra tenant gate
+ *   the registration-mode rule table (services/owner/provisioning.ts) and the Entra tenant gate
  *   (services/oidc-providers.ts). The organisation-node setting is both at once — mode `oauth` so
  *   nobody registers a password themselves, plus a tenant allowlist so only the approved
  *   organisations' people can sign in. A hole in either half opens the node to everyone, so both
@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { registrationRefusal, type RegistrationVia } from '../../src/services/owner-provisioning.js';
+import { registrationRefusal, type RegistrationVia } from '../../src/services/owner/provisioning.js';
 import { entraTenantGate, makeEntraMapper, makeEntraValidator } from '../../src/services/oidc-providers.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 

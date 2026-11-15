@@ -249,7 +249,7 @@ export interface MemoryRepository {
    * List memory across MANY owner identities in ONE query (ownerGaii IN …) — the owner-scope union in
    * a single round-trip instead of one {@link listMemory} per identity (an owner with ~100 agents was
    * ~65 serial reads). Rows may contain the same key under several identities; the caller
-   * (services/owner-memory.ts) dedups GHII-first. `*Meta` is the value-free variant for ?include=meta.
+   * (services/owner/memory.ts) dedups GHII-first. `*Meta` is the value-free variant for ?include=meta.
    */
   listMemoryForOwners(ownerGaiis: string[], opts?: MemoryListOpts): Promise<MemoryRecord[]>;
   listMemoryMetaForOwners(ownerGaiis: string[], opts?: MemoryListOpts): Promise<MemoryMetaRow[]>;

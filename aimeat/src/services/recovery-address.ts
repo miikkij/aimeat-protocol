@@ -31,7 +31,7 @@
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import type { Storage, GHIIRecord } from '../storage/interface.js';
-import { emailHashOf } from './owner-provisioning.js';
+import { emailHashOf } from './owner/provisioning.js';
 
 /** The refusal when a code arrives for an address that is no longer the account's recovery address. */
 export const EMAIL_CHANGED_MESSAGE = 'The address changed after this code was sent, so the code no longer proves it. '

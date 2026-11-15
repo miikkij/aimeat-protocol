@@ -245,7 +245,7 @@ export async function flushContentIntake(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no item of the account is queued
+ * An account erasure (services/owner/erasure.ts), before its cascade: no item of the account is queued
  * from now on, its waiting items and its memory records still settling are dropped, and the inspection
  * in progress answers first, so the cascade deletes the facts it stored. Only that one is waited for:
  * the worker goes on with other accounts' items, and none of this account's starts once it is held.

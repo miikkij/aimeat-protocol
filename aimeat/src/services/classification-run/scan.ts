@@ -15,7 +15,7 @@
  *   its value.
  *
  *   WHAT A CALLER MAY JUDGE (secaudit 2026-10, v76). Only what it may read with owner_scope
- *   (services/owner-scope-read.ts): the owner in person, an app grant and a credential holding
+ *   (services/owner/scope-read.ts): the owner in person, an app grant and a credential holding
  *   memory:read-as-owner judge the whole owner scope. Any other caller (an agent, an ecosystem app)
  *   judges its own records and the owner's and siblings' records whose visibility is owner, members
  *   or public. A named key whose record is hidden from it reads as its own copy, or as missing when
@@ -39,13 +39,13 @@
  */
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { getOwnerScopeMemory, listOwnerScopeMemoryMeta } from '../owner-memory.js';
+import { getOwnerScopeMemory, listOwnerScopeMemoryMeta } from '../owner/memory.js';
 import {
   ClassificationError, labelActorReadsAll, memoryTarget, READ_AS_OWNER_NOTE, readContentLabel, scopeOrganism,
   type LabelActor,
 } from '../classification/index.js';
 import { classifyText, enqueue, type ClassifyOutcome } from './classifier.js';
-import { ownerScopeView, visibleToSameOwnerReader } from '../owner-scope-read.js';
+import { ownerScopeView, visibleToSameOwnerReader } from '../owner/scope-read.js';
 
 /** Named personal keys judged inside the request; each may be a model call. */
 const NOW_MAX = 3;

@@ -25,7 +25,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { initNodeKeys } from '../../src/auth/jwt.js';
-import { provisionOwner } from '../../src/services/owner-provisioning.js';
+import { provisionOwner } from '../../src/services/owner/provisioning.js';
 import { issueLoginLink, LOGIN_LINK_TTL_MS } from '../../src/services/login-link.js';
 import { setupTotp, totpConfigOf } from '../../src/services/totp.js';
 import { registerLoginLinkOpenRoute } from '../../src/routes/ghii/login-link-open.js';

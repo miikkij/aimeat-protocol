@@ -55,7 +55,7 @@ import { callerOf } from '../middleware/caller.js';
 import { emitChange } from '../services/event-bus.js';
 import { ownerCoordinate, resolveIdentity } from '../utils/gaii.js';
 import { SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
-import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner-secrets.js';
+import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner/secrets.js';
 import {
   listOwnerSecretsWithUses, readApprovalRequest, approveSecretUse, declineSecretUse, withdrawSecretApproval,
 } from '../services/secret-approvals.js';

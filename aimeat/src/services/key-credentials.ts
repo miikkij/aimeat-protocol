@@ -71,7 +71,7 @@ import { generateReadablePassword } from '../utils/password-generation.js';
 import { nodeContext } from './node-context.js';
 import { sendMail, type MailMessage } from './mail-gate.js';
 import { getEncryptionKey, encryptBound, decryptBound } from './encryption.js';
-import { provenOwnerAddress } from './owner-mail-address.js';
+import { provenOwnerAddress } from './owner/mail-address.js';
 import { logger } from '../utils/logger.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { updateRecord } from './record-cas.js';

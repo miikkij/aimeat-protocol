@@ -37,7 +37,7 @@ Regulation (EU) 2016/679 ([EUR-Lex](https://eur-lex.europa.eu/eli/reg/2016/679/o
 | Art. 35 DPIA | partial | DPIA register; data domains that need one make a missing one a gap (`aimeat/src/data/compliance-domains.ts`) | carry out the assessment |
 | Art. 15 access | yes | `GET /v1/owners/:name/export` (`aimeat/src/routes/owners/export.ts`) | answer within a month; files come as metadata, not bytes |
 | Art. 16 rectification | yes | the person edits their own records and profile | handle requests for data the person cannot edit |
-| Art. 17 erasure | yes | `DELETE /v1/owners/:name`, immediate (`aimeat/src/services/owner-erasure.ts`) | backups; shared records kept under a pseudonym; outside file store sweep |
+| Art. 17 erasure | yes | `DELETE /v1/owners/:name`, immediate (`aimeat/src/services/owner/erasure.ts`) | backups; shared records kept under a pseudonym; outside file store sweep |
 | Art. 18 restriction | partial | an operator can disable an account (`aimeat_admin_owner_disable`) | a finer restriction per processing is manual |
 | Art. 19 notification of recipients | partial | a delete or an erasure of a record replicated to federation peers sends a signed retraction to each peer that holds it (`POST /v1/federation/retract`, `aimeat/src/services/memory/replication.ts`). No mechanism was found that tells a peer about a rectification, or that tells the people a record was shared with | notify recipients of rectifications, and of erasures outside federation |
 | Art. 20 portability | yes | the export is JSON; `aimeat_organism_export` for an organism | |

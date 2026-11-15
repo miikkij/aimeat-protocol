@@ -503,7 +503,7 @@ export function offTunnelControlEvent(handler: (evt: TunnelControlEvent) => void
 }
 
 // ── accountErased ────────────────────────────────────────────────────────────────────────────────
-// An account was erased (services/owner-erasure.ts), told after the erasure committed. A process ends
+// An account was erased (services/owner/erasure.ts), told after the erasure committed. A process ends
 // the live state it holds for the account that no storage write reaches: the open MCP sessions of its
 // agents (mcp/session-registry.ts). It reaches every process of the node, and each one acts on its
 // own sessions, so its listeners run for this process's events and for the others'.

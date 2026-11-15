@@ -193,7 +193,7 @@ import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/
 import { isOrganismVisibilityWord, STORED_VISIBILITY_WORDS } from '../utils/visibility-words.js';
 import { isStoredVisibility } from '../services/organism/visibility.js';
 import { callerOf } from '../middleware/caller.js';
-import { mailboxReaderOf } from '../services/owner-mailbox-reads.js';
+import { mailboxReaderOf } from '../services/owner/mailbox-reads.js';
 import { mailboxAttachmentReadable } from '../services/mailbox/attachment-read.js';
 import { denyScope403 } from '../auth/deny.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';

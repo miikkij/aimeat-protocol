@@ -39,8 +39,8 @@
  */
 import { localAccountName, parseGAII, isGEAI } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
-import { getOwnerScopeMemory } from '../owner-memory.js';
-import { visibleToSameOwnerReader, READ_AS_OWNER_SCOPE } from '../owner-scope-read.js';
+import { getOwnerScopeMemory } from '../owner/memory.js';
+import { visibleToSameOwnerReader, READ_AS_OWNER_SCOPE } from '../owner/scope-read.js';
 import { aiReadViewerOf } from '../ai/read-viewer.js';
 import { saverAuthority } from '../workflow/trigger-authority.js';
 import { agentSessionCaller } from '../caller-context.js';

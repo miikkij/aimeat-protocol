@@ -236,7 +236,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // string where the node reads a list: which organisations may sign in is a decision that belongs
   // to whoever runs the node, not to an operator session that could widen it in one PUT.
   { key: 'entraAllowedTenants', dotPath: 'auth.entra_allowed_tenants', envVar: 'AIMEAT_ENTRA_ALLOWED_TENANTS', type: 'string', validate: () => true, immutable: true, description: 'Microsoft Entra tenant GUIDs allowed to sign in (comma-separated). Empty = the gate comes from AIMEAT_ENTRA_OAUTH_TENANT alone: a GUID there admits that one tenant, common/organizations admit any Microsoft account.' },
-  // Read at each refresh (services/owner-session.ts legacyRefreshCookieAccepted). Set once at first
+  // Read at each refresh (services/owner/session.ts legacyRefreshCookieAccepted). Set once at first
   // start when empty (settleRefreshCookieWindowAtStart), so the window does not move on a restart.
   { key: 'refreshCookieLegacyUntil', dotPath: 'auth.refresh_cookie_legacy_until', envVar: 'AIMEAT_REFRESH_COOKIE_LEGACY_UNTIL', type: 'string', validate: v => typeof v === 'string' && /^(\d{4}-\d{2}-\d{2})?$/.test((v as string).trim()), immutable: false, description: 'Last day (YYYY-MM-DD, UTC) an https node still reads the old refresh cookie name aimeat_rt and moves the browser to __Host-aimeat_rt. Set to 30 days after the first start when empty. A past date: the old name is ignored now, and a browser that only has it signs in again.' },
   // Read at each sign-in (services/oidc-providers.ts makeCasdoorLinkFence / makeEntraLinkFence), so

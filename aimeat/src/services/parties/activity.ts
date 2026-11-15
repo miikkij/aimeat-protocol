@@ -210,7 +210,7 @@ export async function flushAll(): Promise<void> {
 }
 
 /**
- * An account erasure (services/owner-erasure.ts), before its cascade: no read entry or counter of the
+ * An account erasure (services/owner/erasure.ts), before its cascade: no read entry or counter of the
  * owner is kept from now on, a write in progress answers first so the cascade deletes what it stored,
  * and the owner's waiting entries and counters are dropped with their timers. The returned function
  * ends the hold, after the cascade.

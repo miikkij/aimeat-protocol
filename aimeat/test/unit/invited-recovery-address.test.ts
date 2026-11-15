@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { invitedRecoveryAddress, accountsInvitedAt } from '../../src/services/recovery-address.js';
-import { emailHashOf } from '../../src/services/owner-provisioning.js';
+import { emailHashOf } from '../../src/services/owner/provisioning.js';
 import type { GHIIRecord } from '../../src/storage/interface.js';
 import type { InvitationRecord } from '../../src/storage/repositories/invitation.repository.js';
 

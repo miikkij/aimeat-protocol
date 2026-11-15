@@ -1,5 +1,5 @@
 /**
- * @file src/services/owner-scope-read.ts
+ * @file src/services/owner/scope-read.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which records a caller reading with owner_scope (or with ?agent= naming a sibling
@@ -39,11 +39,11 @@
  *     owner-scope-patch-answers-value-without-read-as-owner).
  *   2026-10-15 — Initial: memory:read-as-owner (feature-list audit #42).
  */
-import type { CallerContext } from './caller-context.js';
-import type { Storage } from '../storage/interface.js';
-import { READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
-import { organismVisibilityAdmits } from './organism/visibility.js';
-import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
+import type { CallerContext } from '../caller-context.js';
+import type { Storage } from '../../storage/interface.js';
+import { READ_AS_OWNER_SCOPE } from '../../utils/scope-coverage.js';
+import { organismVisibilityAdmits } from '../organism/visibility.js';
+import { isOrganismVisibilityWord } from '../../utils/visibility-words.js';
 
 export { READ_AS_OWNER_SCOPE };
 

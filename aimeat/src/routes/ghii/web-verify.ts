@@ -113,7 +113,7 @@ import { sendHeldKeyCredentials, keyCredentialsPending, notePreSignInAgentKey } 
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
-import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
+import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner/provisioning.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent/clearance.js';
 import { checkSecondFactor } from '../../services/password-check.js';

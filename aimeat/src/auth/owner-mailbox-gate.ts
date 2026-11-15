@@ -5,7 +5,7 @@
  * @description The door on the four owner-mailbox reads (GET /v1/messages/inbox, /conversations,
  *   /conversations/:id, /overview). It admits the owner in person, a published app holding
  *   `messages:read`, and an agent holding `messages:read-as-owner`, and nobody else. Who those three
- *   are and what each is shown is decided in services/owner-mailbox-reads.ts; this file only turns
+ *   are and what each is shown is decided in services/owner/mailbox-reads.ts; this file only turns
  *   that decision into a 403 a client can act on.
  *
  *   Why not requireRoleOrScope('owner', 'messages:read'): its scope path admits ANY principal
@@ -25,7 +25,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { deny401, deny403, denyScope403 } from './deny.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
-import { mailboxReaderOf, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
+import { mailboxReaderOf, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { isForeignPrincipal } from '../utils/gaii.js';
 
 export function requireOwnerMailboxRead(nodeId: string) {

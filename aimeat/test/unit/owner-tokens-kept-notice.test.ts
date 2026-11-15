@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which access tokens the person is told still act as them after a password reset, a
- *   password change or sign out everywhere (services/owner-tokens-kept-notice.ts; secaudit2026oct26,
+ *   password change or sign out everywhere (services/owner/tokens-kept-notice.ts; secaudit2026oct26,
  *   owner-level-pat-session-survives-reset): the Full and operator-level ones that still work, never
  *   a scoped, revoked or expired one, and no notice when none is left.
  * @usage pnpm exec vitest run test/unit/owner-tokens-kept-notice.test.ts
@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
-import { ownerTokensKeptNotice, OWNER_TOKENS_KEPT_TYPE } from '../../src/services/owner-tokens-kept-notice.js';
+import { ownerTokensKeptNotice, OWNER_TOKENS_KEPT_TYPE } from '../../src/services/owner/tokens-kept-notice.js';
 import type { PatRecord } from '../../src/storage/repositories/pat.repository.js';
 
 const pat = (label: string, extra: Partial<PatRecord> = {}): PatRecord => ({

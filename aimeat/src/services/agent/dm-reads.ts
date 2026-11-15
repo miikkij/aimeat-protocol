@@ -41,7 +41,7 @@ import { deliveryTargetFor } from '../../utils/messaging.js';
 import { withReactions } from '../message-reactions.js';
 import { permissionAskText } from '../permission-ask.js';
 
-/** The owner's mailbox permission (services/owner-mailbox-reads.ts), spelled here: that module imports this one. */
+/** The owner's mailbox permission (services/owner/mailbox-reads.ts), spelled here: that module imports this one. */
 const MESSAGES_READ_AS_OWNER_SCOPE = 'messages:read-as-owner';
 
 export interface DmPageOpts {

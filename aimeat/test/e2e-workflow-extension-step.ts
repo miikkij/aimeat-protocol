@@ -261,7 +261,7 @@ await test('4. THE FIX: the run executes the extension server-side and goes gree
 
 await test('4b. What the extension wrote for ITSELF stays invisible to the workflow', async () => {
   // The reason result_to_key exists. `ext:{name}` is a namespace of its own; owner scope is the
-  // owner GHII plus their agents and ecosystem apps (services/owner-memory.ts). A signal aimed at
+  // owner GHII plus their agents and ecosystem apps (services/owner/memory.ts). A signal aimed at
   // the ext key can only ever read nothing, so a step gated that way would be permanently red.
   const inExt = await json(`/v1/memory/${encodeURIComponent(`ext:${EXT}`)}/${encodeURIComponent(OUT_MEMORY_KEY)}`);
   assert(inExt.status === 200, `the extension DID write it, under ext: — ${inExt.status}`);

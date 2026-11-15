@@ -103,7 +103,7 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { warningField } from '../../services/classification-exits.js';
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
-import { readsAsOwner, ownerScopeView, ownerScopeViewAdmitting } from '../../services/owner-scope-read.js';
+import { readsAsOwner, ownerScopeView, ownerScopeViewAdmitting } from '../../services/owner/scope-read.js';
 import { organismReadableRecords } from '../../services/organism/namespace-access.js';
 import { callerOf } from '../../middleware/caller.js';
 import { listMemoryMetaFor, listMemoryMetaPage, searchMemoryRecords } from '../../services/memory/query.js';
@@ -537,7 +537,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       let loaded: MemoryRecord[];
       if (ownerScope && !agentParam) {
         // Owner-scope: GHII + all the owner's agents + eco apps (deduped, GHII first) via the service.
-        // (services/owner-memory.ts remains the shared impl the service composes, so the workflow signal
+        // (services/owner/memory.ts remains the shared impl the service composes, so the workflow signal
         // evaluator reads the exact same set — same-owner-access invariant.)
         loaded = await memoryDb.listOwnerScope(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
       } else {

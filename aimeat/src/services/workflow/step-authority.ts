@@ -100,7 +100,7 @@ export const LLM_SCOPES: readonly string[] = ['ai:use'];
  * owner (services/workflow/eval-context.ts, the same aggregation as GET /v1/memory?owner_scope=true).
  * Since 2026-10-15 that read costs memory:read-as-owner on the memory route for any caller that is
  * not the owner in person and not an app grant, because an agent must not ride the human's ownership
- * (services/owner-scope-read.ts). A step does what its own route does, so it costs the same word:
+ * (services/owner/scope-read.ts). A step does what its own route does, so it costs the same word:
  * READ_AS_OWNER_SCOPES below, added by missingStepScopes for those callers.
  */
 export const MEMORY_READ_SCOPES: readonly string[] = ['memory:read'];

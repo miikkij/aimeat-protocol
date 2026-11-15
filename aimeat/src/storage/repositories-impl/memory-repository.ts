@@ -151,7 +151,7 @@ export class MemoryRepository {
   /**
    * Dedupe rows by `key`, keeping the copy owned by the HIGHEST-priority identity (earliest in
    * `identities`). This is the owner-scope rule: a key present under both the GHII and an agent resolves
-   * to the GHII copy. Pure — moved here from services/owner-memory.ts so every owner-scope read shares
+   * to the GHII copy. Pure — moved here from services/owner/memory.ts so every owner-scope read shares
    * one implementation.
    *
    * The losing copies are REMOVED, not reordered, so an agent's newer write can vanish from an

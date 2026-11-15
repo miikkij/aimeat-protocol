@@ -39,12 +39,12 @@
  */
 import type { Storage, StorageFileRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { getOwnerScopeMemory } from '../owner-memory.js';
+import { getOwnerScopeMemory } from '../owner/memory.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { presentMemories } from '../classification/present-memory.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
-import { visibleToSameOwnerReader } from '../owner-scope-read.js';
+import { visibleToSameOwnerReader } from '../owner/scope-read.js';
 import { aiFileRefusal, hiddenRecordError, AiInputHiddenError, type AiReadViewer } from './read-viewer.js';
 import { storedFileShownTo } from '../datapackage/source-labels.js';
 
