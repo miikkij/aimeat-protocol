@@ -189,7 +189,7 @@ export async function removeAgent(deps: AgentRemoveDeps, caller: AgentRemoveCall
 /**
  * Turn off the enabled agent_task schedules that give work to `gaii` and that `gaii` did not make,
  * in the account `ownerGhii`. Best effort, after the agent is gone: a schedule this misses fails
- * at its next fire with the reason (services/scheduler-agent-task.ts) and is paused by the
+ * at its next fire with the reason (services/schedule/agent-task.ts) and is paused by the
  * scheduler's own failure rule.
  */
 async function turnOffSchedulesFor(storage: Storage, ownerGhii: string, gaii: string): Promise<{ id: string; display_name: string }[]> {

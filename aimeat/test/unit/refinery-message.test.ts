@@ -13,7 +13,7 @@ import {
   parseMessage, listPage, redact, senderDomain, ruleFor, parseJsonAnswer, queueFor, extractionPrompt, stripHtml,
 } from '../../src/services/refinery/message.js';
 import { classPack } from '../../src/data/refinery-classes.js';
-import { checkScheduleGate } from '../../src/services/schedule-gate.js';
+import { checkScheduleGate } from '../../src/services/schedule/gate.js';
 
 const b64url = (s: string) => Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 

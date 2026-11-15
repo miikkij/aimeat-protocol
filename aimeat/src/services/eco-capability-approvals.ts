@@ -15,7 +15,7 @@
  *
  *   THE RULE. The capability's registrant and the caller belong to the same account: nothing changes.
  *   Otherwise the call runs only when (a) the caller's app is connected and declared that action in
- *   its manifest, the same test an eco-capability schedule meets (services/schedule-write.ts), and
+ *   its manifest, the same test an eco-capability schedule meets (services/schedule/write.ts), and
  *   (b) the account holder allowed this capability to ask for this action once, with one press. A
  *   call that meets (a) but not (b) files the question: one entry per (capability, action,
  *   registrant) while it waits, a bell notice with Allow the first time, and the address of the page

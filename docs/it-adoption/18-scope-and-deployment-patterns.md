@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit a8a729a2a) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit ef11b0e73) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -64,7 +64,7 @@ Each box with its own database is a separate node with its own data, its own ope
 
 **What is supported.** Two shapes, both on one PostgreSQL database. One active process and a standby: the load balancer sends all traffic to one process, and a second process with the same `.env` waits on a second host and takes the traffic when the first stops. Several active processes: the load balancer spreads the traffic over them, and what the first table below lists holds for the node as a whole. What the second table lists stays in each process, and each row says what follows and what to do. The maintainer ruled on 2026-11-04 that several active processes become supported when tests with two processes on one database prove the shared state; those tests pass (`aimeat/test/e2e-two-process-bus.ts`, `aimeat/test/e2e-two-process-leases.ts`, `aimeat/test/unit/ephemeral-claims-two-process.test.ts`). Every new piece of per-process state or timer in the code is counted by `pnpm check:process-local` against `aimeat/security/process-local-baseline.json`, which asks each new one what breaks with a second process.
 
-Several processes of one node can run against one PostgreSQL database with the same settings, and they see the same data. The code records that aimeat.io has run two processes on one database: the same workflow fire started twice, 1 ms and 15 ms apart, on 2026-10-02 and 2026-10-03, and the scheduler claim below was written for it (`aimeat/src/services/scheduler-fire-claim.ts`, `aimeat/src/services/once-only-step.ts`).
+Several processes of one node can run against one PostgreSQL database with the same settings, and they see the same data. The code records that aimeat.io has run two processes on one database: the same workflow fire started twice, 1 ms and 15 ms apart, on 2026-10-02 and 2026-10-03, and the scheduler claim below was written for it (`aimeat/src/services/schedule/fire-claim.ts`, `aimeat/src/services/once-only-step.ts`).
 
 **One process is the default; switch several on.** The setting `AIMEAT_NODE_PROCESSES` (`node.processes` on the admin Config page, "Server processes", read at start) is `single` by default. With `single` no other live process can exist, so a process that starts takes all of the node's work at once: it runs the `@activate` schedules, takes the AI jobs left queued or running and runs every sweep round, also when its container was recreated with a new host name. A process is named by its host name and port, so a recreated container is a process of a new name, and with `multiple` it waits for the previous process's lease to run out (30 s) before it takes that work over. Set `AIMEAT_NODE_PROCESSES=multiple` on every process before a standby or a second active process starts: two processes with `single` on one database both run the same work, as before 2026-11-04 (`aimeat/src/services/process-lease.ts`, `aimeat/src/config/runtime.ts`; decided by the maintainer on 2026-11-05). A process stopped normally hands its work over at once in either mode.
 
@@ -75,8 +75,8 @@ Several processes of one node can run against one PostgreSQL database with the s
 | Held in the database | Source |
 |---|---|
 | Every record, account, setting row, app, workflow run and job record | `aimeat/src/storage/interface.ts` |
-| A cron fire of a scheduled job runs once: each process claims the fire in the database before it runs it, and the process that loses skips it | `aimeat/src/services/scheduler-fire-claim.ts` |
-| A fire missed while the node was down is caught up once, under the same claim | `aimeat/src/services/scheduler-catch-up.ts` |
+| A cron fire of a scheduled job runs once: each process claims the fire in the database before it runs it, and the process that loses skips it | `aimeat/src/services/schedule/fire-claim.ts` |
+| A fire missed while the node was down is caught up once, under the same claim | `aimeat/src/services/schedule/catch-up.ts` |
 | A once-per-node start step runs in one process only | `aimeat/src/services/once-only-step.ts` |
 | The node key: two processes that start without a key file adopt one key | `aimeat/src/auth/node-keys.ts` |
 | Sign-in through an outside identity provider (the OIDC login round is a stored nonce), device authorization requests, MCP OAuth clients, refresh tokens and approvals, spent upload tokens, spent agent return proofs | `aimeat/src/routes/oauth-login.ts`, `aimeat/src/routes/agents/device-auth.ts`, `aimeat/src/mcp/oauth.ts`, `aimeat/src/routes/upload.ts`, `aimeat/src/services/device-return-proof.ts` |
@@ -177,7 +177,7 @@ Every outbound call these make is listed, with its setting, on [02 Architecture]
 
 | Question | Answer from this architecture | Source |
 |---|---|---|
-| What does an outage of one node stop? | The people and agents of that node lose the web UI, MCP and REST of that node, and its apps. Stored data is not touched. Peers keep working, and messages to the node wait at the senders. Scheduled jobs wait: at the next start a daily or longer core job runs once to catch up, and a person's missed schedule is written to its run log as skipped | `aimeat/src/services/scheduler-catch-up.ts`, `aimeat/src/services/message-delivery.ts` |
+| What does an outage of one node stop? | The people and agents of that node lose the web UI, MCP and REST of that node, and its apps. Stored data is not touched. Peers keep working, and messages to the node wait at the senders. Scheduled jobs wait: at the next start a daily or longer core job runs once to catch up, and a person's missed schedule is written to its run log as skipped | `aimeat/src/services/schedule/catch-up.ts`, `aimeat/src/services/message-delivery.ts` |
 | Why does the node stay small? | It holds refined knowledge and the state that apps show. Model inference and heavy processing run in other services, so a heavy job cannot take the knowledge store down with it, and a node outage does not stop those services' own work | [Services around a node](#services-around-a-node) |
 | How is one host's loss covered? | A second process on a second host, as a standby or as a second active process; the processes take over each other's AI jobs when a lease runs out | [Several node processes on one database](#several-node-processes-on-one-database) |
 | How is the blast radius kept small? | Separate nodes for units, partners or people: an outage, a setting or a breach on one node stays on it | [Many nodes](#many-nodes) |

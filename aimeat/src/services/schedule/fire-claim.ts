@@ -1,5 +1,5 @@
 /**
- * @file scheduler-fire-claim.ts
+ * @file src/services/schedule/fire-claim.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One cron fire of a scheduled job runs once, however many node processes share the
@@ -21,8 +21,8 @@
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 import type { Cron } from 'croner';
-import type { ScheduledJobRecord, Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
+import type { ScheduledJobRecord, Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
 
 /** The scheduled time of the fire croner is running now, as an ISO string, or null if none matches. */
 export function scheduledFireAt(cron: Cron, now: number = Date.now()): string | null {

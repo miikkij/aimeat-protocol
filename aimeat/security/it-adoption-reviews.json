@@ -183,9 +183,9 @@
         "docs/known_gaps.md",
         "docs/security/threat-model.md",
         "aimeat/src/services/operator-access-audit.ts",
-        "aimeat/src/services/scheduler-fire-claim.ts"
+        "aimeat/src/services/schedule/fire-claim.ts"
       ],
-      "digest": "sha256:6868e6afcd60ca902bb49b52"
+      "digest": "sha256:438f0bc8b9aadfc29205b9ff"
     },
     "17-exit-plan.md": {
       "reviewedOn": "2026-11-15",
@@ -199,7 +199,7 @@
     "18-scope-and-deployment-patterns.md": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/scheduler-fire-claim.ts",
+        "aimeat/src/services/schedule/fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
         "aimeat/src/services/event-bus.ts",
         "aimeat/src/mcp/oauth.ts",
@@ -224,7 +224,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:5de29c39e294ac55e8554bc3"
+      "digest": "sha256:87d505aad1ffef346cc34d4d"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -394,7 +394,7 @@
       "docs/known_gaps.md": "9b4977634dac65c3",
       "docs/security/threat-model.md": "211b04c0cc93e8fe",
       "aimeat/src/services/operator-access-audit.ts": "63fa01330a90a2e8",
-      "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46"
+      "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580"
     },
     "17-exit-plan.md": {
       "docs/data-ownership.md": "38bd8db9d2d6056d",
@@ -424,14 +424,14 @@
       "docs/security/threat-model.md": "211b04c0cc93e8fe"
     },
     "18-scope-and-deployment-patterns.md": {
-      "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
-      "aimeat/src/services/once-only-step.ts": "12c59204aa41d7f2",
+      "aimeat/src/services/schedule/fire-claim.ts": "14edbd2baeff4580",
+      "aimeat/src/services/once-only-step.ts": "afaf629df6d5f1cc",
       "aimeat/src/services/event-bus.ts": "ab76c004d8792ff8",
       "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
       "aimeat/src/mcp/legacy-sessions.ts": "d3e7dd1580854950",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "508ed05b2a24218b",
+      "aimeat/src/services/ai-jobs/service.ts": "7ac7db4a3b603ff9",
       "aimeat/src/services/config/apply.ts": "2c0879b78ab957cd",
       "aimeat/src/services/operator-access-audit.ts": "63fa01330a90a2e8",
       "aimeat/src/config/private-host.ts": "a29cc0391a3a29f0",

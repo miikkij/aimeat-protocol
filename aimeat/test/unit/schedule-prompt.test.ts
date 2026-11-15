@@ -1,7 +1,7 @@
 /**
  * @file test/unit/schedule-prompt.test.ts
  * @description Where each schedule kind keeps its prompt, and that a new prompt lands there and
- *   nowhere else (services/schedule-prompt.ts). The list and update tools on every interface and
+ *   nowhere else (services/schedule/prompt.ts). The list and update tools on every interface and
  *   GET /v1/schedules?detail=true / PATCH /v1/schedules/:id read and write through these two
  *   functions; test/e2e-agent-schedules.ts phase 11 drives them end to end.
  * @usage pnpm test -- schedule-prompt
@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { schedulePromptOf, withSchedulePrompt } from '../../src/services/schedule-prompt.js';
+import { schedulePromptOf, withSchedulePrompt } from '../../src/services/schedule/prompt.js';
 
 const ai = { type: 'ai' as const, input: { prompt: 'old', systemPrompt: 'sys', inputKeys: ['a'], outputKey: 'o' } };
 const task = { type: 'agent_task' as const, input: { taskTemplate: { title: 'T', description: 'old', rules: ['r'] } } };

@@ -6,7 +6,7 @@
  *   work. Every boot step of server-bootstrap/service-init.ts read its record, did the work when the
  *   record was missing and wrote it at the end, so two node processes that start together on one
  *   database both found it missing and both did the work (aimeat.io has run two processes on one
- *   database, services/scheduler-fire-claim.ts). The claim is the same record: a `running` value
+ *   database, services/schedule/fire-claim.ts). The claim is the same record: a `running` value
  *   written with createMemoryIfAbsent (or setMemoryIfVersion over a lapsed claim), so of two processes
  *   exactly one gets it. The winner does the work and writes the step's own record over its claim on
  *   the claim's version (finish); a step that throws removes its claim (release), so the next start

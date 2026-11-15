@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description MCP tools letting an agent create and manage its own recurring
  *   schedules. The server owns the clock: create, update and delete go through
- *   services/schedule-write.ts, the same service the /v1/schedules routes use, which
+ *   services/schedule/write.ts, the same service the /v1/schedules routes use, which
  *   stores the record and arms it on the live Scheduler. Kinds:
  *     - ai         : server-side OpenRouter completion over predefined memory keys
  *     - agent_task : materialise a task into the agent's own queue each fire
@@ -62,11 +62,11 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord, canManageSchedule } from '../services/schedule-write.js';
+import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord, canManageSchedule } from '../services/schedule/write.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import type { ScheduleWriteCaller } from '../services/schedule-write.js';
+import type { ScheduleWriteCaller } from '../services/schedule/write.js';
 import { writeMemoryRecord } from '../services/memory/write.js';
-import { schedulePromptOf } from '../services/schedule-prompt.js';
+import { schedulePromptOf } from '../services/schedule/prompt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
@@ -77,7 +77,7 @@ export function registerAgentScheduleTools(
   getAgentGaii: () => string,
   _emitResourceUpdated: (agentGaii: string, uri: string) => void,
   _emitResourceListChanged: (agentGaii: string) => void,
-  /** The session's own scopes, for the per-kind gate in services/schedule-gate.ts. */
+  /** The session's own scopes, for the per-kind gate in services/schedule/gate.ts. */
   sessionScopes: string[] = [],
   /** The session's caller (services/caller-context.ts). */
   caller: () => CallerContext,
@@ -92,7 +92,7 @@ export function registerAgentScheduleTools(
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
 
   /**
-   * This session in the terms services/schedule-write.ts speaks. An MCP session is an agent acting
+   * This session in the terms services/schedule/write.ts speaks. An MCP session is an agent acting
    * for its owner and never an owner session, so the per-kind scope is checked rather than bypassed,
    * and everything these tools create is createdByAgent (the agent may manage its own schedules,
    * the owner may manage all of them). The session's kind is named rather than assumed, as the REST
@@ -124,7 +124,7 @@ export function registerAgentScheduleTools(
       // agent's own view; an agent_task may name a sibling agent under the same owner instead.
       const targetName = a.kind === 'agent_task' ? (a.target_agent ?? selfName) : selfName;
 
-      // The write itself lives in services/schedule-write.ts, the service POST /v1/schedules calls:
+      // The write itself lives in services/schedule/write.ts, the service POST /v1/schedules calls:
       // the gate, the per-kind input checks, the record build, the store, and registering the job on
       // the live clock. The body field names below are the aliases the route already accepts, so
       // there is nothing to translate at the seam.
@@ -182,7 +182,7 @@ export function registerAgentScheduleTools(
           id: j.id, display_name: j.displayName, kind: j.type, cron: j.cron, timezone: j.timezone,
           enabled: j.enabled, last_run_at: j.lastRunAt, last_run_result: j.lastRunResult,
           next_run_at: j.nextRunAt, run_count: j.runCount, created_by_agent: j.createdByAgent,
-          // What the schedule tells the model or the agent on every fire (services/schedule-prompt.ts).
+          // What the schedule tells the model or the agent on every fire (services/schedule/prompt.ts).
           ...(detail ? { ...schedulePromptOf(j), description: j.description ?? null, purpose: j.purpose ?? null, input: j.input ?? null } : {}),
         })),
         total: mine.length,
@@ -217,7 +217,7 @@ export function registerAgentScheduleTools(
       return text({
         updated: true, schedule_id: a.schedule_id,
         ...(a.prompt !== undefined && out.schedule ? { prompt: schedulePromptOf(out.schedule).prompt } : {}),
-        // An instruction held for the owner (services/schedule-instruction-hold.ts) is answered pending.
+        // An instruction held for the owner (services/schedule/instruction-hold.ts) is answered pending.
         ...(out.approval_request ? { approval_request: out.approval_request } : {}),
         ...(out.warnings ? { warnings: out.warnings } : {}),
       });

@@ -2929,25 +2929,25 @@
       },
       "why": "Reviewed 2026-10-13, the node's own reads: the two run-once markers under the node's system identity that say each half of the 4.0.x keep-working scope grant (principals, published apps) has run, and the earlier steps' run records, read for the agent ids they name. No content is shown to anyone. 2026-10-18: the two markers are read by services/once-only-step.ts; the run records stay here."
     },
-    "src/services/schedule-ai-read.ts": {
+    "src/services/schedule/ai-read.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, r49), the node's own read: the once-only step's own record under system@<node>, and a record a scheduled AI job names, read only to learn whether the saver may see it before the schedule is saved; the content the job's model reads comes through services/ai/inputs.ts when it runs."
     },
-    "src/services/schedule-extension-keep.ts": {
+    "src/services/schedule/extension-keep.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-21 (secaudit 2026-10, restore round), the node's own read: the once-only list of kept app extension schedules under the node's system identity, read at a fire to decide whether the schedule still runs. Nothing read is returned to anyone."
     },
-    "src/services/schedule-instruction-hold.ts": {
+    "src/services/schedule/instruction-hold.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26, sibling schedule edit), the node's own read: the hold record a held schedule instruction keeps under system@<node> (schedules.instruction-hold.<id>), written only by this file. No content anybody classified."
     },
-    "src/services/schedule-write.ts": {
+    "src/services/schedule/write.ts": {
       "reads": {
         "getStorageFile": 1
       },

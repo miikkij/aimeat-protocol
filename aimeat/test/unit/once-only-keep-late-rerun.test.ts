@@ -24,7 +24,7 @@ import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../../src/sto
 import { claimOnceOnlyStep, ruleSinceKey } from '../../src/services/once-only-step.js';
 import { keepExtensionFirstUseOnce, FIRST_USE_KEEP_STEP_KEY } from '../../src/services/extension/first-use-keep.js';
 import { keepExtensionPublishOnce, PUBLISH_KEEP_STEP_KEY } from '../../src/services/extension/publish-keep.js';
-import { keepAiScheduleReadsOnce, AI_SCHEDULE_READ_KEEP_KEY } from '../../src/services/schedule-ai-read.js';
+import { keepAiScheduleReadsOnce, AI_SCHEDULE_READ_KEEP_KEY } from '../../src/services/schedule/ai-read.js';
 import { keepAppToolInvokeOnce, APP_TOOL_INVOKE_KEEP_KEY } from '../../src/services/app/tool-invoke-keep.js';
 
 const NODE_ID = 'aimeat-late-rerun';

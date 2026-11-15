@@ -2,7 +2,7 @@
  * @file test/unit/schedule-manage-rule.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Who may edit, cancel or run one schedule (services/schedule-write.ts canManageSchedule).
+ * @description Who may edit, cancel or run one schedule (services/schedule/write.ts canManageSchedule).
  *
  *   The owner manages every schedule they own. An agent of the same owner manages every schedule an
  *   agent of that owner made, its siblings' included (decision "Core 2026-11 open questions",
@@ -12,7 +12,7 @@
  *   2026-10-15 — Initial (feature-list audit #85).
  */
 import { describe, it, expect } from 'vitest';
-import { canManageSchedule, type ScheduleWriteCaller } from '../../src/services/schedule-write.js';
+import { canManageSchedule, type ScheduleWriteCaller } from '../../src/services/schedule/write.js';
 import type { ScheduledJobRecord } from '../../src/storage/interface.js';
 
 const OWNER = 'alice@test-node';

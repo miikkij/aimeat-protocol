@@ -44,7 +44,7 @@ vi.mock('../../src/services/notify.js', () => ({
 
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { Scheduler } from '../../src/services/scheduler.js';
-import { MAX_CONSECUTIVE_FAILURES } from '../../src/services/scheduler-failures.js';
+import { MAX_CONSECUTIVE_FAILURES } from '../../src/services/schedule/failures.js';
 import type { ScheduledJobRecord, Storage } from '../../src/storage/interface.js';
 
 const SQLITE_PATH = `./test/.schedfail-${process.pid}.db`;

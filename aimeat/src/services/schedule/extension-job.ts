@@ -1,5 +1,5 @@
 /**
- * @file src/services/scheduler-extension-job.ts
+ * @file src/services/schedule/extension-job.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Scheduled `extension` job executor: turns a ScheduledJobRecord into one unattended
@@ -39,12 +39,12 @@
  *   v1.4.1 — 2026-10-21 — The check is services/schedule-fire-refusal.ts, which keeps an app's older
  *     schedules firing and offers the owner Allow for an agent's missing word (capability-loss review).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { runExtensionActionAsSystem } from './extension/system-run.js';
-import { scheduleFireRefusal } from './schedule-fire-refusal.js';
-import type { EmailService } from './email.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { runExtensionActionAsSystem } from '../extension/system-run.js';
+import { scheduleFireRefusal } from './fire-refusal.js';
+import type { EmailService } from '../email.js';
 
 /**
  * Execute a scheduled `extension` job and return the tracked memory reads/writes for the run log.
@@ -73,13 +73,13 @@ export async function runExtensionJob(
   }
   const ownerGhii = ownerScope.includes('@') ? ownerScope : `${ownerName}@${config.nodeId}`;
 
-  // As whoever made the schedule, asked now (services/schedule-actor.ts): a maker that is gone, or
+  // As whoever made the schedule, asked now (services/schedule/actor.ts): a maker that is gone, or
   // that is not the owner in person and no longer holds ext:invoke, does not run the action. The
   // create, edit and run-now paths ask ext:invoke of the caller; this covers a later narrowing or
   // deletion and a schedule stored before those paths asked (secaudit 2026-10,
   // SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke). An owner's schedule and a manifest
   // schedule carry no non-owner maker, so they run as before; so do an app's schedule from before
-  // 2026-10-05 and one the keep step kept (services/schedule-fire-refusal.ts).
+  // 2026-10-05 and one the keep step kept (services/schedule/fire-refusal.ts).
   const refused = await scheduleFireRefusal(storage, job, { nodeId: config.nodeId, baseUrl: config.baseUrl });
   if (refused) throw new Error(refused);
 

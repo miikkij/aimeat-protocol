@@ -702,7 +702,7 @@ export class AiJobService implements AiJobStarter {
 
     /**
      * Where an answer may land. `runAiJob` already refuses a foreign INPUT namespace at run time
-     * (services/scheduler-remote-jobs.ts) with the comment explaining why; this is the same check in
+     * (services/schedule/remote-jobs.ts) with the comment explaining why; this is the same check in
      * the other direction, on the write.
      */
     private assertResultKey(ownerGhii: string, key: unknown): void {

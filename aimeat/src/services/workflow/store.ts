@@ -88,7 +88,7 @@ import { shownRun, withoutObservedValues } from './run-redaction.js';
 import { noteDeprecatedUse, removedFrom } from '../deprecation.js';
 import type { ContentReader } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
-import { scheduleIntervalRefusal } from '../schedule-load-limits.js';
+import { scheduleIntervalRefusal } from '../schedule/load-limits.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
   type WorkflowDef, type WorkflowDefInput, type WorkflowStep, type WorkflowRun, type Signal,
@@ -355,7 +355,7 @@ export async function validateWorkflow(
         // meter — there is no door where a price could be asked — so pointing one at somebody else's
         // extension is an unlimited standing call on their capability, their API keys and their
         // quota. POST /v1/schedules has refused exactly this since it was written
-        // (services/schedule-write.ts); the same rule, at the same moment, for the same reason.
+        // (services/schedule/write.ts); the same rule, at the same moment, for the same reason.
         //
         // Refused at SAVE so the author is told while they are writing it rather than at 06:00 in a
         // run log. It is checked again at run time (services/extension/system-run.ts): `installedBy`
@@ -571,7 +571,7 @@ export async function saveWorkflow(
   const existing = await storage.getMemory(ownerGhii, defKey(id));
   const prior = existing?.value as WorkflowDef | undefined;
   // A scheduled trigger is a schedule: a new time asks the shortest gap between runs, as a schedule's
-  // does (services/schedule-load-limits.ts). The time the workflow already has is not asked.
+  // does (services/schedule/load-limits.ts). The time the workflow already has is not asked.
   const priorTrigger = prior?.trigger;
   if (input.trigger.kind === 'schedule' && !(priorTrigger?.kind === 'schedule'
       && priorTrigger.cron === input.trigger.cron && priorTrigger.timezone === input.trigger.timezone)) {

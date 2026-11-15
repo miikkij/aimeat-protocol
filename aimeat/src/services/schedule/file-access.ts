@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-file-access.ts
+ * @file src/services/schedule/file-access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one rule about a stored file a schedule names: a schedule made by somebody other
@@ -14,7 +14,7 @@
  *   followed the opposite rule since it was written: an attachment must be one the creator can
  *   read (services/task-files.ts). Both now ask the same function, resolveFileRef.
  *
- *   WHY IT IS ITS OWN FILE. The create and edit doors ask it from services/schedule-write.ts, and
+ *   WHY IT IS ITS OWN FILE. The create and edit doors ask it from services/schedule/write.ts, and
  *   the fire asks it from services/scheduler.ts. schedule-write.ts imports the Scheduler for the
  *   live clock, so the fire cannot reach the rule through that file without a module cycle.
  * @structure scheduleFileDenial() · scheduleStorageFileRefusal()
@@ -24,14 +24,14 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { readerForCaller } from './classification/reader.js';
-import { resolveFileRef, type FileRefAccessor } from './file-refs.js';
-import { scheduleActor } from './schedule-actor.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { readerForCaller } from '../classification/reader.js';
+import { resolveFileRef, type FileRefAccessor } from '../file-refs.js';
+import { scheduleActor } from './actor.js';
 
-/** The refusal shape services/schedule-write.ts answers with, without its `ok: false`. */
+/** The refusal shape services/schedule/write.ts answers with, without its `ok: false`. */
 export interface ScheduleFileDenial {
     status: 403;
     code: 'FILE_ACCESS_DENIED';
@@ -63,7 +63,7 @@ export async function scheduleStorageFileRefusal(
     const owner = job.ownerScope ?? '';
     if (typeof storageKey !== 'string' || !storageKey || !owner) return null;
     if (!job.createdByAgent && !job.createdByApp) return null;
-    // Who it fires as, asked now (services/schedule-actor.ts): a maker that is gone does not fire.
+    // Who it fires as, asked now (services/schedule/actor.ts): a maker that is gone does not fire.
     const actor = await scheduleActor(storage, job);
     if (!actor.ok) return actor.reason;
     if (actor.isOwner) return null;

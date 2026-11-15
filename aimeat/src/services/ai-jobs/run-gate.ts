@@ -20,7 +20,7 @@
  *       starter recorded are not asked, as before.
  *     - Since round 15: an erased account's job is dropped (`drop`): no account holds the name and the
  *       job's own stored record went with the erasure, or the account that holds the name now was made
- *       after the job was queued (a previous holder's job, the rule services/schedule-actor.ts applies).
+ *       after the job was queued (a previous holder's job, the rule services/schedule/actor.ts applies).
  *       Nothing is paid, folded or written under the erased identity. A starter that held ai:use and no
  *       longer does ends SCOPE_DENIED before the provider is called, with the page where the owner gives
  *       it back; an app whose grant the owner revoked and an ecosystem app the owner disconnected end

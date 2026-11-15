@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description What a `dataproduct` schedule's input must be before it is stored: `{ name }`, naming
  *   a data product definition of the owner (plan doc-mvwxcas3dom3, D9.5). A leaf, as the refinery's
- *   is: services/schedule-write.ts imports it, and the build itself reaches back into the scheduler's
+ *   is: services/schedule/write.ts imports it, and the build itself reaches back into the scheduler's
  *   neighbours.
  * @structure DATAPRODUCT_RUN_SCOPES · DATAPRODUCT_SCHEDULE_KIND · checkDataproductScheduleInput
  * @usage const bad = await checkDataproductScheduleInput(storage, ownerScope, body.input);

@@ -8,7 +8,7 @@
  *   product that runs when its source changes (./on-change.ts) is here too, for the same reason and
  *   with the same actor rule.
  *
- *   IT FIRES AS ITS MAKER, asked again at every fire (services/schedule-actor.ts): the owner, or the
+ *   IT FIRES AS ITS MAKER, asked again at every fire (services/schedule/actor.ts): the owner, or the
  *   agent, app or ecosystem app that defined the product, with the words it holds today. Every source
  *   is read as that principal, so a fire reaches nothing the maker could not read now. A fire whose
  *   definition is gone fails with that sentence; deleting a definition removes its schedules, so this
@@ -22,10 +22,10 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
-import type { JobRunResult } from '../scheduler-types.js';
+import type { JobRunResult } from '../schedule/types.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { callerFromAuth } from '../caller-context.js';
-import { scheduleActor } from '../schedule-actor.js';
+import { scheduleActor } from '../schedule/actor.js';
 import { runStored } from './service.js';
 import { dataProductKey, asDefinition, runsOnChange, ON_CHANGE } from './definition.js';
 

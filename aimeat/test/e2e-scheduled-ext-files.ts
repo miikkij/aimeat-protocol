@@ -81,7 +81,7 @@ import { makeAgent, openSession, callTool, type McpAgent } from './helpers/mcp-s
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import type { Storage } from '../src/storage/interface.js';
-import { EXTENSION_SCHEDULE_KEEP_KEY, keepAppExtensionSchedulesOnce } from '../src/services/schedule-extension-keep.js';
+import { EXTENSION_SCHEDULE_KEEP_KEY, keepAppExtensionSchedulesOnce } from '../src/services/schedule/extension-keep.js';
 async function setupOwner(label: string) {
   const name = `sef${label}${Date.now()}`;
   let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Sched', password: 'SchedFiles1234' }) });
@@ -495,7 +495,7 @@ await test('18. An extension the owner wrote in person reads the file whichever 
 // asks ext:invoke. The schedule route asked only task:write, so an agent the owner had kept from
 // running extension actions ran any of them, with input it chose, by creating a schedule and
 // triggering it. Create, edit and run-now now ask ext:invoke of anyone but the owner in person, and
-// the fire asks the maker again (services/schedule-actor.ts), so a maker the owner narrows or deletes
+// the fire asks the maker again (services/schedule/actor.ts), so a maker the owner narrows or deletes
 // afterwards no longer runs the action. Test 4 above is the owner's own schedule, which is unchanged.
 
 const makerInput = (key: string) => ({ key, b64: Buffer.from(`made for ${key}`).toString('base64'), visibility: 'private' });

@@ -82,7 +82,7 @@ import { TASK_START_FLOOR } from './task-rules.js';
 import { offerSignalError } from './default-offer.js';
 import { browserDomainsError } from '../crew-browser-domains.js';
 import { withInvitesSentence } from './invites.js';
-import { isValidCron } from '../schedule-gate.js';
+import { isValidCron } from '../schedule/gate.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 /**

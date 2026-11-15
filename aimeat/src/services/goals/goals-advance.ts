@@ -28,7 +28,7 @@
 import { logger } from '../../utils/logger.js';
 import { emitDelivery } from '../event-bus.js';
 import { notify, type NotifText } from '../notify.js';
-import { materialiseAgentTask } from '../scheduler-agent-task.js';
+import { materialiseAgentTask } from '../schedule/agent-task.js';
 import { UNCHANGED } from '../record-cas.js';
 import { LIVE_TASK_STATUSES } from '../../storage/types/agents-messaging.js';
 import { logEntry, readGoal, updateGoal, type GoalDeps } from './goals-store.js';

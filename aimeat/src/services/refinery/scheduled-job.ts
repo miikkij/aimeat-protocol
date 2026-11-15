@@ -31,7 +31,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { startRun } from './runs.js';
 import { RefineryError } from './pipeline.js';
 import { REFINERY_PREFIX_RE, REFINERY_RUN_SCOPES } from './schedule-input.js';
-import { scheduleActor } from '../schedule-actor.js';
+import { scheduleActor } from '../schedule/actor.js';
 
 /** Fire one refinery schedule: start the batch and wait for it. */
 export async function runRefineryJob(storage: Storage, config: AimeatConfig, job: ScheduledJobRecord): Promise<JobRunResult> {
@@ -39,7 +39,7 @@ export async function runRefineryJob(storage: Storage, config: AimeatConfig, job
   if (!ownerGhii) throw new Error(`refinery job "${job.id}" has no ownerScope`);
   const prefix = String((job.input as { prefix?: unknown } | undefined)?.prefix ?? '');
   if (!REFINERY_PREFIX_RE.test(prefix)) throw new Error(`refinery job "${job.id}" has no valid input.prefix`);
-  // Who it fires as, asked now (services/schedule-actor.ts): the owner, or the agent or app that made
+  // Who it fires as, asked now (services/schedule/actor.ts): the owner, or the agent or app that made
   // it with the words it holds today. An app's schedule runs as that app, never as the owner.
   const actor = await scheduleActor(storage, job);
   if (!actor.ok) throw new Error(actor.reason);

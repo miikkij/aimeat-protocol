@@ -1,12 +1,12 @@
 /**
- * @file src/services/scheduler-types.ts
+ * @file src/services/schedule/types.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The scheduler's result types: what triggered a run, what a kind's executor returns,
  *   and the outcome a manual "Run now" reports. Moved out of scheduler.ts by pure extraction when
  *   that file reached the 800-line limit; scheduler.ts re-exports them, so no importer changes.
  * @structure JobTrigger · JobRunResult · JobOutcome
- * @usage import type { JobRunResult } from './scheduler.js';
+ * @usage import type { JobRunResult } from '../scheduler.js';
  * @version-history
  *   v1.1.1 -- 2026-10-25 -- Outcome `stopped` also names a deactivated account's skipped fire (secaudit2026oct22).
  *   v1.1.0 — 2026-10-11 — Outcome `stopped` and `skipCode`, for a run skipped because the agent is stopped.

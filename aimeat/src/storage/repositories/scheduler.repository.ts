@@ -26,7 +26,7 @@ export interface SchedulerRepository {
    * than `fireAt` (or none), and that claim is now `fireAt`; false when another process already
    * claimed this fire or a later one, or the job does not exist. One conditional update, so two
    * node processes on one database cannot both win. `fireAt` is the fire's scheduled time as an ISO
-   * string (services/scheduler-fire-claim.ts).
+   * string (services/schedule/fire-claim.ts).
    */
   claimScheduledFire(id: string, fireAt: string): Promise<boolean>;
 

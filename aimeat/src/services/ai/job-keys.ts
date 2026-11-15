@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Which of the owner's records an AI job may read into its prompt, and where it may
  *   write its answer. One rule for both kinds of job: the AI job a caller starts (services/ai-jobs/)
- *   and the scheduled AI job (services/schedule-write.ts, services/scheduler-remote-jobs.ts).
+ *   and the scheduled AI job (services/schedule/write.ts, services/schedule/remote-jobs.ts).
  *
  *   A job sends every record it reads to the model provider, and writes the answer at a key its
  *   caller names, with the visibility the caller chose. So a job reads none of the records the node

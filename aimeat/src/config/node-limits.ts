@@ -103,7 +103,7 @@ export interface NodeLimitsConfig {
    */
   appRendersAtOnce: number;
   /**
-   * The most schedules one owner keeps, their agents' and apps' included (services/schedule-load-limits.ts).
+   * The most schedules one owner keeps, their agents' and apps' included (services/schedule/load-limits.ts).
    * AIMEAT_SCHEDULE_MAX_PER_OWNER, default 1000; 0 is no limit. Schedules that exist stay; the limit
    * decides only the next one (secaudit2026oct31w2 round 10).
    */

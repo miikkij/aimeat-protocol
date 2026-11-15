@@ -52,7 +52,7 @@
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:527ec5f87dd20e767b1a9452"
+      "digest": "sha256:7f9f8694ff4b6eee55f527f1"
     },
     "node:aimeat-content-classes": {
       "reviewedOn": "2026-11-15",
@@ -98,12 +98,12 @@
     "node:aimeat-recurring-work": {
       "reviewedOn": "2026-11-15",
       "watches": [
-        "aimeat/src/services/schedule-gate.ts",
+        "aimeat/src/services/schedule/gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
-        "aimeat/src/services/schedule-write.ts"
+        "aimeat/src/services/schedule/write.ts"
       ],
-      "digest": "sha256:34c0ebdb1e8db905c230455c"
+      "digest": "sha256:f519ec87b7f5c0989f0cc266"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-11-08",
@@ -390,7 +390,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension/schedules.ts"
       ],
-      "digest": "sha256:b33051c9f17ba4282a66ab81"
+      "digest": "sha256:a08ad9a8edc8d207cd181203"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-15",
@@ -520,7 +520,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:d909b5731382bb76f4a4b560"
+      "digest": "sha256:399d394966bb558f9f9119b6"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -819,8 +819,8 @@
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "38fd242996d98d0f",
-      "aimeat/src/mcp/agent-schedules.ts": "122634de813d28a9",
-      "aimeat/src/services/scheduler.ts": "908687da659c6582",
+      "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
+      "aimeat/src/services/scheduler.ts": "698e55bd7c47d90b",
       "aimeat/src/services/ai/route-plan.ts": "95f735f72eac78b4"
     },
     "node:aimeat-game-apps": {
@@ -880,10 +880,10 @@
       "aimeat/scripts/check-commit-msg.ts": "2e459b8378b1085d"
     },
     "node:aimeat-recurring-work": {
-      "aimeat/src/services/schedule-gate.ts": "4d2c13ef4ace9e0e",
-      "aimeat/src/mcp/agent-schedules.ts": "122634de813d28a9",
+      "aimeat/src/services/schedule/gate.ts": "4071f6e834a03cff",
+      "aimeat/src/mcp/agent-schedules.ts": "7ab9f9ab149a0628",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "8e11e1fc9a2dd2e4",
-      "aimeat/src/services/schedule-write.ts": "c5aa1a9a2b6db16c"
+      "aimeat/src/services/schedule/write.ts": "aec37c1911194dad"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
@@ -907,7 +907,7 @@
     "node:aimeat-refinery": {
       "aimeat/src/services/refinery/pipeline.ts": "8e6289116821f229",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
-      "aimeat/src/services/refinery/schedule-input.ts": "a2229bb9b8d28948",
+      "aimeat/src/services/refinery/schedule-input.ts": "0bd52a64f9284078",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
@@ -935,7 +935,7 @@
       "aimeat/src/services/extension-access/paywall.ts": "8f57971f670133b8",
       "aimeat/src/routes/extensions/crud.ts": "4e8184d1818f4e46",
       "aimeat/src/routes/extensions/instances.ts": "9a6890d60347f61b",
-      "aimeat/src/services/extension/schedules.ts": "ae3a0c93f2e7baf7"
+      "aimeat/src/services/extension/schedules.ts": "94948c01d41b79b4"
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "946f71b4c15023d8",

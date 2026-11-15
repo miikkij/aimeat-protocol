@@ -1,5 +1,5 @@
 /**
- * @file schedule-constraints.ts
+ * @file src/services/schedule/constraints.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Extensible, opt-in budget/run guards for recurring schedules.
@@ -22,9 +22,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-03 — Initial registry (max_runs, daily_limit)
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentRecord } from '../storage/interface.js';
-import { getTodayUsage } from './ai/completion.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentRecord } from '../../storage/interface.js';
+import { getTodayUsage } from '../ai/completion.js';
 
 export interface ConstraintContext {
   storage: Storage;

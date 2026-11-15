@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-ai-read.ts
+ * @file src/services/schedule/ai-read.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which same-owner records a scheduled `ai` job may hand its model: the records the
@@ -13,7 +13,7 @@
  *   refused, set up a schedule over that record and read it back in the answer (secaudit 2026-10, r49,
  *   the scheduled variant). The AI job start closed the same read with the viewer of
  *   services/ai/read-viewer.ts; a fired schedule now reads with the same viewer, built from its maker
- *   as services/schedule-actor.ts finds it at the fire.
+ *   as services/schedule/actor.ts finds it at the fire.
  *
  *   WHO READS EVERYTHING. The owner in person, an app grant of the owner, and a maker holding
  *   memory:read-as-owner (aiReadViewerOf). Everyone else reads its own records and the owner's and
@@ -33,24 +33,24 @@
  *   aiScheduleInputRefusal(storage, caller, ownerGhii, input)
  * @usage
  *   await keepAiScheduleReadsOnce(storage, config);                         // server-bootstrap/once-only-keep-steps.ts
- *   const viewer = await aiScheduleFireViewer(storage, config, job, actor);  // services/scheduler-ai-job.ts
- *   const bad = await aiScheduleInputRefusal(storage, caller, owner, input); // services/schedule-write.ts
+ *   const viewer = await aiScheduleFireViewer(storage, config, job, actor);  // services/schedule/ai-job.ts
+ *   const bad = await aiScheduleInputRefusal(storage, caller, owner, input); // services/schedule/write.ts
  * @version-history
  *   2026-10-27 -- secaudit2026oct26: only a schedule made before the rule's first try on this node is
  *     kept, also when the step runs at a later start (keptBefore, madeBefore).
  *   v1.0.0 -- 2026-10-22 -- Initial (secaudit 2026-10 wave 3, r49 the scheduled variant).
  */
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import { localAccountName, parseGaiiLoose } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { aiReadViewerOf, hiddenRecordError, type AiReadViewer } from './ai/read-viewer.js';
-import { callerFromAuth } from './caller-context.js';
-import { claimOnceOnlyStep, keptBefore, madeBefore } from './once-only-step.js';
-import { visibleToSameOwnerReader } from './owner-scope-read.js';
-import { agentPageUrl } from './permission-ask.js';
-import { makerOf, type ScheduleActor } from './schedule-actor.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import { localAccountName, parseGaiiLoose } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { aiReadViewerOf, hiddenRecordError, type AiReadViewer } from '../ai/read-viewer.js';
+import { callerFromAuth } from '../caller-context.js';
+import { claimOnceOnlyStep, keptBefore, madeBefore } from '../once-only-step.js';
+import { visibleToSameOwnerReader } from '../owner-scope-read.js';
+import { agentPageUrl } from '../permission-ask.js';
+import { makerOf, type ScheduleActor } from './actor.js';
 
 /** The record under `system@<nodeId>` that lists the kept schedules and says the step has run. */
 export const AI_SCHEDULE_READ_KEEP_KEY = 'migrations.schedule-ai-read-as-owner-keep';
@@ -132,7 +132,7 @@ export async function aiScheduleFireViewer(
   }, note);
 }
 
-/** Who is saving an `ai` schedule, in the terms services/schedule-write.ts ScheduleWriteCaller carries. */
+/** Who is saving an `ai` schedule, in the terms services/schedule/write.ts ScheduleWriteCaller carries. */
 export interface AiScheduleSaver {
   identity: string;
   owner: string;

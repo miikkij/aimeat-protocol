@@ -33,7 +33,7 @@ import { suitePort } from './helpers/free-port.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpAgent } from './helpers/mcp-session.js';
 import { startFakeAiProvider, chatJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
-import { AI_SCHEDULE_READ_KEEP_KEY, keepAiScheduleReadsOnce } from '../src/services/schedule-ai-read.js';
+import { AI_SCHEDULE_READ_KEEP_KEY, keepAiScheduleReadsOnce } from '../src/services/schedule/ai-read.js';
 
 const RUNNER_BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now().toString(36);

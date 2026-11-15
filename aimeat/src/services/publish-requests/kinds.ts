@@ -24,7 +24,7 @@ export type PublishKind =
   | 'extension-email-policy' | 'crew-model' | 'account-setting'
   // A subscription renewal whose plan price went up since the buyer agreed (commerce/subscription-price-ask.ts).
   | 'subscription-price'
-  // A sibling agent's new instruction to another agent's ai schedule (services/schedule-instruction-hold.ts).
+  // A sibling agent's new instruction to another agent's ai schedule (services/schedule/instruction-hold.ts).
   | 'schedule-instruction'
   // AIMEAT's model reading private records an agent named in a goal (services/goals/goals-model-reach.ts).
   | 'goal-model-read'

@@ -51,7 +51,7 @@ vi.mock('../../src/services/ai/transcription.js', () => ({
 
 const { AiJobService } = await import('../../src/services/ai-jobs/service.js');
 const { startedByOf, jobReader, unattendedReader } = await import('../../src/services/ai-jobs/starter.js');
-const { runAiJob } = await import('../../src/services/scheduler-ai-job.js');
+const { runAiJob } = await import('../../src/services/schedule/ai-job.js');
 
 const NODE = 'aimeat-local-001-dev';
 const OWNER = `alice@${NODE}`;

@@ -21,7 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { runRefineryJob } from '../services/refinery/scheduled-job.js';
-import { runAiJob } from '../services/scheduler-ai-job.js';
+import { runAiJob } from '../services/schedule/ai-job.js';
 import { runDataproductJob, runDataproductOnChange } from '../services/dataproduct/scheduled-job.js';
 import { installDataproductChangeRuns } from '../services/dataproduct/on-change.js';
 

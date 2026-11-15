@@ -119,21 +119,21 @@ import type { Storage, ScheduledJobRecord, ExecutionLogEntry, ScheduleConstraint
 import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
-import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
+import { evaluateConstraints, applyAfterRun } from './schedule/constraints.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SlotPool } from './slot-pool.js';
-import { runExtensionJob } from './scheduler-extension-job.js';
-import { runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
-import { scheduleStorageFileRefusal } from './schedule-file-access.js';
-import { scheduleFireRefusal } from './schedule-fire-refusal.js';
-import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, type TaskWake } from './scheduler-agent-task.js';
+import { runExtensionJob } from './schedule/extension-job.js';
+import { runWorkflowJob, runEcoCapabilityJob } from './schedule/remote-jobs.js';
+import { scheduleStorageFileRefusal } from './schedule/file-access.js';
+import { scheduleFireRefusal } from './schedule/fire-refusal.js';
+import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, type TaskWake } from './schedule/agent-task.js';
 import { emitResourceUpdated } from './resource-events.js';
-import { claimCronFire } from './scheduler-fire-claim.js';
+import { claimCronFire } from './schedule/fire-claim.js';
 import { takeHeldLease } from './process-lease.js';
-import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './scheduler-run-limit.js';
-import { onFailedRun, noteSuccess, tellScheduleOwner, isOneShot, oneShotFailedReason } from './scheduler-failures.js';
-import { missedFire, missedMessage, type MissedFire } from './scheduler-catch-up.js';
+import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './schedule/run-limit.js';
+import { onFailedRun, noteSuccess, tellScheduleOwner, isOneShot, oneShotFailedReason } from './schedule/failures.js';
+import { missedFire, missedMessage, type MissedFire } from './schedule/catch-up.js';
 import { deactivatedAccountSkip } from './account-deactivated.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -142,8 +142,8 @@ type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 // service init, so a surface made per request (the MCP server) reaches the live cron.
 
 // The result types live in scheduler-types.ts (max-file-lines); re-exported so importers stay as they are.
-import type { JobTrigger, JobRunResult, JobOutcome } from './scheduler-types.js';
-export type { JobTrigger, JobRunResult, JobOutcome } from './scheduler-types.js';
+import type { JobTrigger, JobRunResult, JobOutcome } from './schedule/types.js';
+export type { JobTrigger, JobRunResult, JobOutcome } from './schedule/types.js';
 
 export class Scheduler {
   private config: AimeatConfig;
@@ -682,7 +682,7 @@ export class Scheduler {
    * `eco-capability` kind: invoke a connected ecosystem app's (GEAI) capability over the
    * connect-tunnel on each fire. `input` is `{ app, capability_id, input? }`; `ownerScope` is the
    * owner GHII whose binding to drive. The invoke frame names whoever made the schedule, asked at
-   * the fire (services/schedule-actor.ts), and the ecosystem enforces its OWN ACL on top. When the
+   * the fire (services/schedule/actor.ts), and the ecosystem enforces its OWN ACL on top. When the
    * GEAI is offline at fire time the run is SKIPPED (not an error) so it does not hot-loop — the
    * next scheduled fire retries.
    */
@@ -707,7 +707,7 @@ export class Scheduler {
     if (makerRefusal) throw new Error(makerRefusal);
     // A schedule a non-owner made may publish only a file its maker can read. The create and edit
     // doors refuse one it cannot, and this asks again at the fire because a file's visibility can be
-    // narrowed after the schedule was saved (services/schedule-file-access.ts; secaudit 2026-10).
+    // narrowed after the schedule was saved (services/schedule/file-access.ts; secaudit 2026-10).
     const refusal = await scheduleStorageFileRefusal(this.storage, this.config, job);
     if (refusal) throw new Error(refusal);
     const { runConnectionsPublishJob } = await import('./connections/scheduled-publish-job.js');
@@ -721,7 +721,7 @@ export class Scheduler {
       return { reads: [], writes: [] };
     }
     if (job.type === 'extension') return this.executeExtensionJob(job);
-    // 'ai' is a registered kind (services/scheduler-ai-job.ts), not a branch here: it writes its
+    // 'ai' is a registered kind (services/schedule/ai-job.ts), not a branch here: it writes its
     // answer through the shared memory write service, which reaches this file, so the executor is
     // handed in at boot the way the refinery's is.
     if (job.type === 'agent_task') return this.executeAgentTaskJob(job, trigger);

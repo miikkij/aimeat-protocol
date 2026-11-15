@@ -97,17 +97,17 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { buildGAII, resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
-import type { ScheduleWriteCaller } from '../services/schedule-write.js';
+import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule/write.js';
+import type { ScheduleWriteCaller } from '../services/schedule/write.js';
 import { isManifestDeclaredJob } from '../services/extension/schedules.js';
 import { nodeTimeZone } from '../services/display-prefs.js';
-import { schedulePromptOf } from '../services/schedule-prompt.js';
+import { schedulePromptOf } from '../services/schedule/prompt.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { callerFromAuth } from '../services/caller-context.js';
 
-// The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
+// The record build, the per-kind input checks and the write moved to services/schedule/write.ts on
 // 2026-08-11, so the MCP tools that create, edit and cancel schedules produce the same record this
-// router does. The scope-and-cron gate sits in services/schedule-gate.ts, called from there. What is
+// router does. The scope-and-cron gate sits in services/schedule/gate.ts, called from there. What is
 // left here is HTTP: reading the request and rendering the envelope.
 
 /** Parse a query timestamp: absent → fallback, invalid → null (caller 400s). */
@@ -123,10 +123,10 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
 
   const ownerGhii = (req: Express.Request) => `${req.auth!.owner}@${config.nodeId}`;
 
-  /** This session in the terms services/schedule-write.ts speaks. */
+  /** This session in the terms services/schedule/write.ts speaks. */
   const writeCaller = (req: Express.Request): ScheduleWriteCaller => {
     // An app manages only its own schedules and an ecosystem app only the ones it made itself
-    // (services/schedule-write.ts canManageSchedule, audit #85 and secaudit 2026-10). The kind is
+    // (services/schedule/write.ts canManageSchedule, audit #85 and secaudit 2026-10). The kind is
     // asked once here rather than guessed from the role list, which is how a GEAI token reached the
     // agent branch and managed the owner's agents' schedules.
     const caller = callerFromAuth(req.auth!, config.nodeId, storage);
@@ -220,7 +220,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/schedules', requireAuth(), requireScope('workflow:read'), async (req, res) => {
     try {
       const { schedules } = await aggregateSchedules(ownerGhii(req), req.auth!.owner as string);
-      // ?detail=true names each schedule's prompt beside its input (services/schedule-prompt.ts), the
+      // ?detail=true names each schedule's prompt beside its input (services/schedule/prompt.ts), the
       // same answer aimeat_schedule_list gives with detail: true.
       if (req.query.detail === 'true') {
         const withPrompt = <T extends ScheduledJobRecord>(j: T) => ({ ...j, ...schedulePromptOf(j) });
@@ -389,7 +389,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       { storage, config, scheduler }, writeCaller(req), id, (req.body ?? {}) as Record<string, unknown>,
     );
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
-    // An instruction held for the owner (services/schedule-instruction-hold.ts) is answered pending.
+    // An instruction held for the owner (services/schedule/instruction-hold.ts) is answered pending.
     res.json(success(config.nodeId, {
       schedule: out.schedule,
       ...(out.approval_request ? { approval_request: out.approval_request } : {}),

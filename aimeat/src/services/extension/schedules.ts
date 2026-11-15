@@ -8,7 +8,7 @@
  *   redeploy (services/extension/upsert.ts), package install (routes/instances/install.ts) and the
  *   admin install route — and all four built the record by hand. None of them stamped `ownerScope`,
  *   which cost every scheduled extension on aimeat.io: from 2026-08-15 the executor reads the owner
- *   off the JOB (services/scheduler-extension-job.ts) rather than off the extension record, so a job
+ *   off the JOB (services/schedule/extension-job.ts) rather than off the extension record, so a job
  *   with no ownerScope refuses before it starts. Every `@activate` job on the node failed with
  *   "has no owner scope" on every restart, and every cron-bearing one on every fire.
  *
@@ -67,7 +67,7 @@ export function extensionJobId(extensionName: string, scheduleId: string): strin
  * Did this job come from an extension's manifest, or did the owner create it?
  *
  * The id says so: a manifest job is addressed `ext:<extension>:<schedule>` and an owner-created one
- * gets a UUID (services/schedule-write.ts). The distinction is what the schedules view is built on —
+ * gets a UUID (services/schedule/write.ts). The distinction is what the schedules view is built on —
  * a manifest job is shown as a fact about the extension, an owner's own schedule is shown with the
  * controls that edit it — and the two used to be told apart by ownerScope, which stopped separating
  * anything the moment a manifest job started carrying one.

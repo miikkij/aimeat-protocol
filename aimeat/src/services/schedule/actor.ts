@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-actor.ts
+ * @file src/services/schedule/actor.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who a schedule fires as, asked again at every fire.
@@ -17,7 +17,7 @@
  *   (`createdByApp`) and fires as that app, with the grant's scopes. One an app made before that
  *   carries no grant and cannot be told from the owner's own except by `createdByAgent`; it does not
  *   fire, and says why. The `extension` and `agent_task` kinds fire such a schedule as the account
- *   itself, as before (services/schedule-fire-refusal.ts).
+ *   itself, as before (services/schedule/fire-refusal.ts).
  * @structure ScheduleActor · makerOf(job) · scheduleActor(storage, job)
  * @usage
  *   const actor = await scheduleActor(storage, job);
@@ -29,12 +29,12 @@
  *     services/schedule-extension-keep.ts (secaudit 2026-10, capability-loss review).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AI-2 and AI-3).
  */
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import type { WorkflowSaver } from '../models/workflow-schemas.js';
-import { isGEAI, localAccountOf } from '../utils/gaii.js';
-import { madeAfter, recordIssuedAt } from '../auth/credential-age.js';
-import { saverAuthority } from './workflow/trigger-authority.js';
-import { aiCallerOfPrincipal, OWNER_CALLER, type AiCallerContext } from './ai/caller-context.js';
+import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import type { WorkflowSaver } from '../../models/workflow-schemas.js';
+import { isGEAI, localAccountOf } from '../../utils/gaii.js';
+import { madeAfter, recordIssuedAt } from '../../auth/credential-age.js';
+import { saverAuthority } from '../workflow/trigger-authority.js';
+import { aiCallerOfPrincipal, OWNER_CALLER, type AiCallerContext } from '../ai/caller-context.js';
 
 export type ScheduleActor =
   | {

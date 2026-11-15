@@ -1,5 +1,5 @@
 /**
- * @file src/services/scheduler-catch-up.ts
+ * @file src/services/schedule/catch-up.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What happens at start to a fire that fell while the node was not running.
@@ -29,8 +29,8 @@
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E4-07).
  */
 import { Cron } from 'croner';
-import type { ScheduledJobRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
+import type { ScheduledJobRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
 
 /** A core job whose fires are at least this far apart is caught up. 23 h, so a DST day still counts. */
 export const CATCH_UP_MIN_PERIOD_MS = 23 * 3_600_000;

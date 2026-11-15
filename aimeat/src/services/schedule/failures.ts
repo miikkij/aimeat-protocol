@@ -1,5 +1,5 @@
 /**
- * @file src/services/scheduler-failures.ts
+ * @file src/services/schedule/failures.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who is told when a scheduled run fails, and when a failing schedule is paused.
@@ -35,12 +35,12 @@
  *     at once, with no retry (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E4-03).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import { notify } from './notify.js';
-import { reportJobFault } from './system-fault-report.js';
-import { logger } from '../utils/logger.js';
-import { openItemLink } from './notifications/links.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import { notify } from '../notify.js';
+import { reportJobFault } from '../system-fault-report.js';
+import { logger } from '../../utils/logger.js';
+import { openItemLink } from '../notifications/links.js';
 
 /** Failures in a row after which a user schedule is paused. */
 export const MAX_CONSECUTIVE_FAILURES = 5;

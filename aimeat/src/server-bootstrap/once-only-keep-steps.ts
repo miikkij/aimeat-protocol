@@ -97,8 +97,8 @@ import { migrateRestScopeKeepWorkingOnce } from '../services/rest-scope-keep-wor
 import { keepStorageReadForAppsOnce } from '../services/app/storage-read-keep-migration.js';
 import { keepOnDoneForAppsOnce } from '../services/app/on-done-keep-migration.js';
 import { keepDatapackageReadForAppsOnce } from '../services/app/datapackage-read-keep-migration.js';
-import { keepAppExtensionSchedulesOnce } from '../services/schedule-extension-keep.js';
-import { keepAiScheduleReadsOnce } from '../services/schedule-ai-read.js';
+import { keepAppExtensionSchedulesOnce } from '../services/schedule/extension-keep.js';
+import { keepAiScheduleReadsOnce } from '../services/schedule/ai-read.js';
 import { keepExtensionFirstUseOnce } from '../services/extension/first-use-keep.js';
 import { keepExtensionPublishOnce } from '../services/extension/publish-keep.js';
 import { keepAppToolInvokeOnce } from '../services/app/tool-invoke-keep.js';
@@ -124,12 +124,12 @@ import { givePlaceDefaultToEveryAgent } from '../services/place-agent-scopes.js'
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
-  // An app's extension schedule made before the kind asked ext:invoke keeps firing (services/schedule-extension-keep.ts).
+  // An app's extension schedule made before the kind asked ext:invoke keeps firing (services/schedule/extension-keep.ts).
   // Awaited, so the list exists before scheduler.start() (background-jobs.ts, after this function); a failure logs and boots on.
   await keepAppExtensionSchedulesOnce(storage, config)
     .catch(err => logger.error('Failed to keep the older app extension schedules; the next boot tries again', { error: String(err) }));
   // An agent's ai schedule made before a fire read for its maker keeps reading as before until its
-  // input changes (services/schedule-ai-read.ts). Awaited, so the list exists before scheduler.start().
+  // input changes (services/schedule/ai-read.ts). Awaited, so the list exists before scheduler.start().
   await keepAiScheduleReadsOnce(storage, config)
     .catch(err => logger.error('Failed to keep the reads of the older agent ai schedules; the next boot tries again', { error: String(err) }));
   // Every data package that has a version gets the service-owned record of its audience, as its pointer

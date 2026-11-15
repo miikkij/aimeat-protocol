@@ -533,7 +533,7 @@ export interface ExtensionRecord {
 
 /**
  * A single budget/run guard attached to a schedule. Extensible: new guard
- * `type`s only need a registry entry in services/schedule-constraints.ts plus a
+ * `type`s only need a registry entry in services/schedule/constraints.ts plus a
  * UI toggle — no schema change (constraints are stored as a JSON array).
  * `enabled` defaults to false so guards are strictly opt-in.
  */
@@ -594,7 +594,7 @@ export interface ScheduledJobRecord {
   agentGaii?: string;        // resolved GAII of the target agent
   createdByAgent?: boolean;  // true = created via MCP by an agent
   /** The app grant id when an app made it: the schedule fires as that app while the grant is live
-   *  (services/schedule-actor.ts; secaudit 2026-10, AI-2). Set only by the schedule writer. */
+   *  (services/schedule/actor.ts; secaudit 2026-10, AI-2). Set only by the schedule writer. */
   createdByApp?: string;
   displayName?: string;      // human label ("Morning news translation")
   description?: string;      // human description

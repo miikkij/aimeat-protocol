@@ -93,7 +93,7 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
-/** A schedule's guards, as POST /v1/schedules and PATCH /v1/schedules/:id read them (services/schedule-constraints.ts). */
+/** A schedule's guards, as POST /v1/schedules and PATCH /v1/schedules/:id read them (services/schedule/constraints.ts). */
 const SCHEDULE_CONSTRAINTS_INPUT = z.array(z.object({
     type: z.string().max(INPUT_LIMITS.name).describe("'max_runs' or 'daily_limit'."),
     enabled: z.boolean().optional().describe('true turns the guard on; a guard without it is stored off.'),

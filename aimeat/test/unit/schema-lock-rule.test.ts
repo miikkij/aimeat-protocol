@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The pattern half of the schema lock rule (services/schema-lock-rule.ts) and the
- *   per-kind scope on editing and running a schedule (services/schedule-gate.ts), without a node.
+ *   per-kind scope on editing and running a schedule (services/schedule/gate.ts), without a node.
  * @version-history
  *   2026-11-08 — Cases for rule 4 over the keys a wildcard reaches (wildcardTakesOver) and rule 5, the
  *     csm. family (secaudit2026nov08 round 14).
@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { schemaPatternRefusal, schemaLockRefusal, wildcardTakesOver } from '../../src/services/schema-lock-rule.js';
-import { scheduleKindScopeRefusal } from '../../src/services/schedule-gate.js';
+import { scheduleKindScopeRefusal } from '../../src/services/schedule/gate.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, SchemaRecord } from '../../src/storage/interface.js';
 

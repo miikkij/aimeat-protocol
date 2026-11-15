@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-write.ts
+ * @file src/services/schedule/write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Creating, editing and cancelling one schedule, once, for every surface that can do it.
@@ -19,7 +19,7 @@
  *       one message for both.
  *
  *   Step 3 of the August 2026 audit moved the GATE (kind, per-kind scope, cron) into
- *   services/schedule-gate.ts. This is the other half: the per-kind input checks, the record build,
+ *   services/schedule/gate.ts. This is the other half: the per-kind input checks, the record build,
  *   the write, and the two side effects a schedule has beyond its row — registering it with the
  *   running Scheduler so it actually fires, and the `scheduler` change event the UI listens on.
  *
@@ -97,32 +97,32 @@
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8: the schedule WRITE, both doors).
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentRecord } from '../storage/interface.js';
-import { buildGAII, isGEAI, isSameOwner } from '../utils/gaii.js';
-import { memoryWriteVisibilitySchema } from '../utils/visibility-words.js';
-import { aiJobKeyRefusal } from './ai/job-keys.js';
-import { readerForCaller } from './classification/reader.js';
-import { emitChange } from './event-bus.js';
-import type { FileRefAccessor } from './file-refs.js';
-import { organismVisibilityRefusal } from './organism/visibility.js';
-import { memoryGroupRefusal } from '../storage/memory-sharing.js';
-import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
-import { scheduleFileDenial } from './schedule-file-access.js';
-import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
-import { scheduleIntervalRefusal, scheduleCountRefusal } from './schedule-load-limits.js';
-import { isKeptExtensionSchedule } from './schedule-extension-keep.js';
-import { findExtension } from './component-address.js';
-import { aiScheduleInputRefusal } from './schedule-ai-read.js';
-import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './schedule-instruction-hold.js';
-import type { Scheduler, JobOutcome } from './scheduler.js';
-import { nodeContext } from './node-context.js';
-import { withSchedulePrompt } from './schedule-prompt.js';
-import { withDeliver } from './task-result-delivery.js';
-import { dropNotifyOfAgent } from './delivery-crew.js';
-import { agentTaskInput } from './schedule-agent-task-input.js';
-import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
-import { checkDataproductScheduleInput } from './dataproduct/schedule-input.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentRecord } from '../../storage/interface.js';
+import { buildGAII, isGEAI, isSameOwner } from '../../utils/gaii.js';
+import { memoryWriteVisibilitySchema } from '../../utils/visibility-words.js';
+import { aiJobKeyRefusal } from '../ai/job-keys.js';
+import { readerForCaller } from '../classification/reader.js';
+import { emitChange } from '../event-bus.js';
+import type { FileRefAccessor } from '../file-refs.js';
+import { organismVisibilityRefusal } from '../organism/visibility.js';
+import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
+import { mergeConstraintDefaults, knownConstraintTypes } from './constraints.js';
+import { scheduleFileDenial } from './file-access.js';
+import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './gate.js';
+import { scheduleIntervalRefusal, scheduleCountRefusal } from './load-limits.js';
+import { isKeptExtensionSchedule } from './extension-keep.js';
+import { findExtension } from '../component-address.js';
+import { aiScheduleInputRefusal } from './ai-read.js';
+import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './instruction-hold.js';
+import type { Scheduler, JobOutcome } from '../scheduler.js';
+import { nodeContext } from '../node-context.js';
+import { withSchedulePrompt } from './prompt.js';
+import { withDeliver } from '../task-result-delivery.js';
+import { dropNotifyOfAgent } from '../delivery-crew.js';
+import { agentTaskInput } from './agent-task-input.js';
+import { checkRefineryScheduleInput, refineryRunAs } from '../refinery/schedule-input.js';
+import { checkDataproductScheduleInput } from '../dataproduct/schedule-input.js';
 
 /** Fields an edit may change without changing what the schedule does: no word is asked for these. */
 const QUIET_EDIT_FIELDS: ReadonlySet<string> = new Set(['enabled', 'display_name', 'description', 'purpose']);
@@ -151,7 +151,7 @@ export interface ScheduleWriteCaller {
     /** The session's roles, for the reader a file-access check runs as (services/file-refs.ts). */
     roles?: string[];
     /** The app grant an app's token was issued under (`req.auth.app_grant`): the schedule fires as
-     *  that app, while the grant is live (services/schedule-actor.ts). */
+     *  that app, while the grant is live (services/schedule/actor.ts). */
     appGrant?: string;
     /** True for an app's session (CallerContext kind 'app'): it manages only its own schedules. */
     isApp?: boolean;
@@ -178,7 +178,7 @@ function accessorOf(
 
 export type ScheduleWriteErrorCode =
     | 'INVALID_KIND' | 'SCOPE_DENIED' | 'INVALID_CRON'
-    // The operator's limits on one owner's schedules (services/schedule-load-limits.ts).
+    // The operator's limits on one owner's schedules (services/schedule/load-limits.ts).
     | 'SCHEDULE_TOO_FREQUENT' | 'SCHEDULE_LIMIT'
     | 'NOT_FOUND' | 'FORBIDDEN'
     | 'INVALID_INPUT' | 'CONNECTION_UNAVAILABLE' | 'NO_SUCH_FILE' | 'FILE_ACCESS_DENIED'
@@ -186,7 +186,7 @@ export type ScheduleWriteErrorCode =
     | 'INVALID_EXTENSION_JOB' | 'EXTENSION_NOT_FOUND'
     | 'INVALID_AI_JOB' | 'NAMESPACE_DENIED' | 'RESERVED_KEY' | 'NOT_ORGANISM_MEMBER'
     | 'INVALID_TASK_TEMPLATE'
-    // A prompt edit on a kind that runs with structured input (services/schedule-prompt.ts).
+    // A prompt edit on a kind that runs with structured input (services/schedule/prompt.ts).
     | 'NO_PROMPT'
     | 'INVALID_ECO_JOB' | 'ECO_APP_NOT_FOUND' | 'CAPABILITY_NOT_DECLARED'
     | 'SCHEDULER_UNAVAILABLE' | 'TRIGGER_FAILED';
@@ -394,7 +394,7 @@ export async function createScheduleRecord(
     const owner = `${caller.owner}@${config.nodeId}`;
     const kind = body.kind as ScheduleKind;
 
-    // The gate (services/schedule-gate.ts): a schedule keeps acting after the call that made it, so
+    // The gate (services/schedule/gate.ts): a schedule keeps acting after the call that made it, so
     // the caller has to hold the scope for the capability it DRIVES — a memory:write-only app must
     // not be able to cron the owner's AI budget. Owner sessions bypass, exactly as requireScope lets
     // them.
@@ -403,7 +403,7 @@ export async function createScheduleRecord(
         { isOwnerSession: caller.isOwnerSession, scopes: caller.scopes },
     );
     if (gateRefusal) return { ok: false, ...gateRefusal };
-    // What one owner may load the shared scheduler with (services/schedule-load-limits.ts).
+    // What one owner may load the shared scheduler with (services/schedule/load-limits.ts).
     const loadRefusal = scheduleIntervalRefusal(body.cron as string, typeof body.timezone === 'string' ? body.timezone : undefined, config)
         ?? await scheduleCountRefusal(storage, owner, config);
     if (loadRefusal) return { ok: false, ...loadRefusal };
@@ -468,7 +468,7 @@ export async function createScheduleRecord(
         // (not a literal 'agent' role, which agent tokens don't always carry).
         createdByAgent: !caller.isOwnerSession,
         // An app's schedule names its grant, so it fires as that app and stops with the grant
-        // (services/schedule-actor.ts; secaudit 2026-10, AI-2).
+        // (services/schedule/actor.ts; secaudit 2026-10, AI-2).
         ...(caller.appGrant ? { createdByApp: caller.appGrant } : {}),
         displayName: displayName.slice(0, 200),
         description: typeof body.description === 'string' ? body.description.slice(0, 2000) : undefined,
@@ -520,7 +520,7 @@ export async function createScheduleRecord(
         // rules here as well as at the fire (secaudit 2026-10).
         const badVisibility = await aiOutputVisibilityRefusal(storage, body.output_visibility, caller.identity, owner, body.output_key);
         if (badVisibility) return badVisibility;
-        // The schedule reads for its maker (services/schedule-ai-read.ts): no record of the owner or a
+        // The schedule reads for its maker (services/schedule/ai-read.ts): no record of the owner or a
         // sibling that the maker may not read itself. The fire asks again, for records written later.
         const hidden = await aiScheduleInputRefusal(storage, caller, owner, { inputKeys: body.input_keys, inputNamespaces: body.input_namespaces });
         if (hidden) return { ok: false, ...hidden };
@@ -537,7 +537,7 @@ export async function createScheduleRecord(
         if (!agentName || !agentGaii) {
             return { ok: false, status: 400, code: 'AGENT_REQUIRED', message: 'agent_name is required for agent_task schedules' };
         }
-        // The task each fire queues (services/schedule-agent-task-input.ts).
+        // The task each fire queues (services/schedule/agent-task-input.ts).
         const built = agentTaskInput(body);
         if (!built.ok) return { ok: false, status: 400, code: 'INVALID_TASK_TEMPLATE', message: built.message };
         base.input = built.input;
@@ -686,7 +686,7 @@ export async function updateScheduleRecord(
         }
         updates.input = patch.input as Record<string, unknown>;
     }
-    // A new prompt goes where the kind keeps it (services/schedule-prompt.ts), on top of an input this
+    // A new prompt goes where the kind keeps it (services/schedule/prompt.ts), on top of an input this
     // same patch replaced, else on the stored one; the rest of the input stays as it was.
     if (patch.prompt !== undefined) {
         const next = withSchedulePrompt({ type: job.type, input: updates.input ?? job.input }, patch.prompt);
@@ -702,7 +702,7 @@ export async function updateScheduleRecord(
     }
 
     // A new instruction to an ai schedule that reads with more reach than its editor has waits for the
-    // owner's one press before it fires (services/schedule-instruction-hold.ts; secaudit2026oct26).
+    // owner's one press before it fires (services/schedule/instruction-hold.ts; secaudit2026oct26).
     const instructed = job.type === 'ai' && updates.input !== undefined;
     const hold = instructed ? await instructionHoldNeeded(storage, caller, job, updates.input!) : null;
 
@@ -768,7 +768,7 @@ export async function triggerScheduleRecord(
     }
     // Running it now spends what the schedule drives, so the caller holds that word (F08a-02). One
     // exception: the app (or ecosystem app) that made an `extension` schedule on the once-only keep
-    // list runs it now as its fire runs it (services/schedule-extension-keep.ts). canManageSchedule
+    // list runs it now as its fire runs it (services/schedule/extension-keep.ts). canManageSchedule
     // above has already said the caller is that app.
     const scopeRefusal = scheduleKindScopeRefusal(job.type, caller, 'run');
     const keptForThisApp = !!scopeRefusal && job.type === 'extension'

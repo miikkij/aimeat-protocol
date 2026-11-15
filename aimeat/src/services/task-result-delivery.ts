@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node hands a finished task's result to its owner itself, for a task made by an
- *   agent_task schedule that says `deliver: "owner"` (services/schedule-write.ts). The scheduler stamps
- *   that on the task as one scope entry (DELIVERY_SCOPE, services/scheduler-agent-task.ts) for the agent
+ *   agent_task schedule that says `deliver: "owner"` (services/schedule/write.ts). The scheduler stamps
+ *   that on the task as one scope entry (DELIVERY_SCOPE, services/schedule/agent-task.ts) for the agent
  *   to read, and the completion fan-out (services/agent/task-fanout.ts) calls deliverTaskResult(). The
  *   decision is the schedule's own record (deliveringSchedule), never the scope entry: a task's scope
  *   is written by its agent too.

@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-load-limits.ts
+ * @file src/services/schedule/load-limits.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two operator limits on what one owner may load the shared scheduler with: how many
@@ -19,9 +19,9 @@
  *   2026-10-31 — Initial (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-2).
  */
 import { Cron } from 'croner';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
 
 export interface ScheduleLoadRefusal {
     status: number;

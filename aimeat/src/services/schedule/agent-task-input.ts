@@ -1,16 +1,16 @@
 /**
- * @file src/services/schedule-agent-task-input.ts
+ * @file src/services/schedule/agent-task-input.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The stored input of an agent_task schedule, built from the create body: the task it
- *   queues on every fire (`taskTemplate`). Moved out of services/schedule-write.ts unchanged, which had
+ *   queues on every fire (`taskTemplate`). Moved out of services/schedule/write.ts unchanged, which had
  *   reached its 800 lines, when the delivery setting needed two more there.
  * @structure agentTaskInput(body)
  * @usage const built = agentTaskInput(body); if (!built.ok) return refusal; base.input = built.input;
  * @version-history
  *   v1.0.0 — 2026-11-02 — Moved out of schedule-write.ts createScheduleRecord with its behaviour unchanged.
  */
-import type { AgentTaskScope } from '../storage/interface.js';
+import type { AgentTaskScope } from '../../storage/interface.js';
 
 /** The agent_task input, or the refusal when the task has no title. */
 export function agentTaskInput(body: Record<string, unknown>):

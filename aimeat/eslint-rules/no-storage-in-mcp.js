@@ -29,7 +29,7 @@
  *   HOW TO SATISFY IT. Put the decision in a service that takes the CALLER — identity, roles,
  *   scopes — and returns a refusal or a result. Both doors call it and each renders the answer its
  *   own way. Worked examples: services/memory/write.ts, services/consent-write.ts,
- *   services/board-post.ts, services/schedule-gate.ts.
+ *   services/board-post.ts, services/schedule/gate.ts.
  *
  *   THE SEED. 44 files did this on 2026-08-11 and are listed below. The list only shrinks: a new
  *   MCP file that reaches for storage fails the build, and every conversion deletes a line here.

@@ -13,7 +13,7 @@
  *   compare-and-swap on its version (setMemoryIfVersion, createMemoryIfAbsent), so of two runs one
  *   goes on and the other is refused before it makes anything. The pattern of
  *   commerce/session-claim.ts. An in-process lock would not do: aimeat.io has run two node processes
- *   on one database (services/scheduler-fire-claim.ts).
+ *   on one database (services/schedule/fire-claim.ts).
  *
  *   A CLAIM ENDS. The run's last write removes it (finishRun), on success and on the failure paths
  *   that already wrote the record. A process that stopped mid-run leaves a claim that a later run

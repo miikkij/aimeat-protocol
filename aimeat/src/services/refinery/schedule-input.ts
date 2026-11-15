@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a `refinery` schedule's input must be before it is stored, and who the schedule
- *   runs as. A leaf: services/schedule-write.ts imports it, and the batch itself (runs.ts,
+ *   runs as. A leaf: services/schedule/write.ts imports it, and the batch itself (runs.ts,
  *   pipeline.ts) reaches back into the scheduler's neighbours, so the check lives apart from it.
  *
  *   IT RUNS AS WHOEVER MADE IT. A schedule the owner (or one of their apps) made reads the owner's

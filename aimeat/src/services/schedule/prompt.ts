@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-prompt.ts
+ * @file src/services/schedule/prompt.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A schedule's prompt: the instruction it runs with on every fire, where each kind keeps
@@ -19,7 +19,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-27 — Initial.
  */
-import type { ScheduledJobRecord } from '../storage/interface.js';
+import type { ScheduledJobRecord } from '../../storage/interface.js';
 
 /** What a schedule tells the model or the agent on every fire. null where the kind has none. */
 export interface SchedulePrompt {

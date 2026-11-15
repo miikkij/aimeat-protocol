@@ -18,7 +18,7 @@
  *   run has no paywall, no contract and no meter — there is no door where a price could be asked —
  *   so a clock or a workflow pointed at somebody else's extension is an unlimited standing call on
  *   their capability, their API keys and their quota. `POST /v1/schedules` has refused that since it
- *   was written (services/schedule-write.ts); here it is checked again at RUN time, because
+ *   was written (services/schedule/write.ts); here it is checked again at RUN time, because
  *   `installedBy` is decided at install and a saved schedule or workflow outlives the record it
  *   names. A create-time gate cannot see a delete-and-reinstall by a different owner.
  *

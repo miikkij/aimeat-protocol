@@ -1,11 +1,11 @@
 /**
- * @file src/services/scheduler-remote-jobs.ts
+ * @file src/services/schedule/remote-jobs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Scheduled `workflow` and `eco-capability` job executors — the non-extension,
  *   non-core, non-agent_task kinds the Scheduler dispatches directly. Extracted from scheduler.ts
  *   to satisfy max-file-lines. The `ai` kind lived here until 2026-10-20 and is now
- *   services/scheduler-ai-job.ts, registered at boot; that file says why.
+ *   services/schedule/ai-job.ts, registered at boot; that file says why.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from scheduler.ts (max-file-lines)
  *   v1.1.0 — 2026-08-10 — Security audit C-2: an `ai` job refuses an input namespace outside its
@@ -37,13 +37,13 @@
  *   2026-11-04 — The running workflow engine and connector tunnel manager are read from nodeContext() (services/node-context.ts) in place of
  *     getActiveWorkflowEngine, getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import type { JobRunResult } from './scheduler.js';
-import { nodeContext } from './node-context.js';
-import { buildGEAI, localAccountName } from '../utils/gaii.js';
-import { scheduleActor } from './schedule-actor.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import type { JobRunResult } from '../scheduler.js';
+import { nodeContext } from '../node-context.js';
+import { buildGEAI, localAccountName } from '../../utils/gaii.js';
+import { scheduleActor } from './actor.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 
 /**
  * `workflow` kind: fire one Agent Workflow run. The schedule is just the trigger; the deterministic
@@ -75,7 +75,7 @@ export async function runWorkflowJob(job: ScheduledJobRecord): Promise<JobRunRes
  * scheduled fire retries.
  *
  * WHO THE INVOKE COMES FROM. The schedule acts as its maker, asked again here
- * (services/schedule-actor.ts), exactly as the `ai` kind does: a maker that is gone does not fire,
+ * (services/schedule/actor.ts), exactly as the `ai` kind does: a maker that is gone does not fire,
  * a maker that no longer holds `work:request` does not fire, and the frame names the maker rather
  * than the owner. Until 2026-10-20 it hard-coded the owner's GHII as caller, so an agent's schedule
  * reached a connected app with the owner's whole identity and went on doing it after the owner

@@ -1,5 +1,5 @@
 /**
- * @file src/services/scheduler-agent-task.ts
+ * @file src/services/schedule/agent-task.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The scheduler's `agent_task` kind and the public materialiseAgentTask path: put an
@@ -9,7 +9,7 @@
  *   (`this.webhookDispatcher` and the MCP resource notice) arrive as `wake`; the Scheduler methods of
  *   the same names call these.
  * @structure TaskWake · runAgentTaskJob(storage, wake, job, trigger) · materialiseAgentTask(storage, wake, args)
- * @usage import { runAgentTaskJob, materialiseAgentTask } from './scheduler-agent-task.js';
+ * @usage import { runAgentTaskJob, materialiseAgentTask } from './agent-task.js';
  * @version-history
  *   v1.5.0 — 2026-11-12 — runAgentTaskJob fails with its reason when the agent it gives work to no
  *     longer exists; it queued a task under the removed agent's identity before.
@@ -30,17 +30,17 @@
  *   v1.0.0 — 2026-10-16 — Extracted from scheduler.ts (max-file-lines), bodies verbatim (QA audit E4-03/E4-04/E4-07 grew that file).
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, ScheduledJobRecord, AgentTaskRecord, AgentTaskScope } from '../storage/interface.js';
-import { isTerminalTaskStatus } from '../storage/interface.js';
-import type { createWebhookDispatcher } from './webhook-dispatcher.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent/task-rules.js';
-import { isStopped } from './agent/stop-rules.js';
-import { scheduleFireRefusal } from './schedule-fire-refusal.js';
-import { deliveryScopeEntry } from './task-result-delivery.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import type { JobTrigger, JobRunResult } from './scheduler-types.js';
+import type { Storage, ScheduledJobRecord, AgentTaskRecord, AgentTaskScope } from '../../storage/interface.js';
+import { isTerminalTaskStatus } from '../../storage/interface.js';
+import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
+import { emitChange, emitDelivery } from '../event-bus.js';
+import { decideTaskStart, taskWakeId, AUTO_START_MARK } from '../agent/task-rules.js';
+import { isStopped } from '../agent/stop-rules.js';
+import { scheduleFireRefusal } from './fire-refusal.js';
+import { deliveryScopeEntry } from '../task-result-delivery.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import type { JobTrigger, JobRunResult } from './types.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -81,7 +81,7 @@ export async function runAgentTaskJob(
   const tmpl = cfg.taskTemplate;
   if (!tmpl?.title) throw new Error(`agent_task job "${job.id}" missing taskTemplate.title`);
 
-  // As whoever made the schedule, asked now (services/schedule-actor.ts), as the ai kind asks: a maker
+  // As whoever made the schedule, asked now (services/schedule/actor.ts), as the ai kind asks: a maker
   // that is gone (a deleted agent, a revoked app grant, a disconnected ecosystem app), or that is not
   // the owner in person and no longer holds task:write, puts no task in the queue. The thrown sentence
   // is the run's error in the run log. Before the stopped-agent skip, so a gone maker reads as the
@@ -94,7 +94,7 @@ export async function runAgentTaskJob(
   // so a "Run now" on a stopped agent says the agent is stopped and not that a run is still going.
   const agent = await storage.getAgent(agentGaii);
   // AN AGENT THAT NO LONGER EXISTS IS GIVEN NO TASK. The run fails with its reason, so the owner is
-  // told once and the schedule is paused by the failure rule (services/scheduler-failures.ts).
+  // told once and the schedule is paused by the failure rule (services/schedule/failures.ts).
   // Until 2026-11-12 the run queued a task under the removed agent's identity, where nothing could
   // ever take it, and the overlap guard below then skipped every later fire without a word.
   if (!agent) {

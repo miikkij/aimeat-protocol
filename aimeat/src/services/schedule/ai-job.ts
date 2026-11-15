@@ -1,5 +1,5 @@
 /**
- * @file src/services/scheduler-ai-job.ts
+ * @file src/services/schedule/ai-job.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The scheduled `ai` job: read the named memory records, compose the prompt, ask the
@@ -39,27 +39,27 @@
  *     runAiJob:raw-setMemory-unvalidated-outputVisibility). Its own history before the move is in
  *     services/scheduler-remote-jobs.ts.
  */
-import type { AimeatConfig } from '../config.js';
-import type { MemoryRecord, Storage, ScheduledJobRecord } from '../storage/interface.js';
-import type { JobRunResult } from './scheduler.js';
-import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
-import { completeForOwner } from './ai/completion.js';
-import { isSameOwner, localAccountName } from '../utils/gaii.js';
-import { readerForCaller } from './classification/reader.js';
-import { aiJobKeyRefusal } from './ai/job-keys.js';
-import { readAiRecords } from './ai/inputs.js';
-import { unattendedReader } from './ai-jobs/starter.js';
-import { scheduleActor } from './schedule-actor.js';
-import { writeMemoryRecord } from './memory/write.js';
-import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
-import { AiInputHiddenError } from './ai/read-viewer.js';
-import { aiScheduleFireViewer } from './schedule-ai-read.js';
-import { instructionHoldAtFire } from './schedule-instruction-hold.js';
-import { noteAgentRefusal } from './agent/refusals.js';
-import { agentSessionCaller, callerFromAuth } from './caller-context.js';
-import { organismVisibilityRefusal } from './organism/visibility.js';
-import { memoryGroupRefusal } from '../storage/memory-sharing.js';
-import { checkOrganismNamespaceAccess } from './organism/namespace-access.js';
+import type { AimeatConfig } from '../../config.js';
+import type { MemoryRecord, Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import type { JobRunResult } from '../scheduler.js';
+import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
+import { completeForOwner } from '../ai/completion.js';
+import { isSameOwner, localAccountName } from '../../utils/gaii.js';
+import { readerForCaller } from '../classification/reader.js';
+import { aiJobKeyRefusal } from '../ai/job-keys.js';
+import { readAiRecords } from '../ai/inputs.js';
+import { unattendedReader } from '../ai-jobs/starter.js';
+import { scheduleActor } from './actor.js';
+import { writeMemoryRecord } from '../memory/write.js';
+import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../../utils/scope-coverage.js';
+import { AiInputHiddenError } from '../ai/read-viewer.js';
+import { aiScheduleFireViewer } from './ai-read.js';
+import { instructionHoldAtFire } from './instruction-hold.js';
+import { noteAgentRefusal } from '../agent/refusals.js';
+import { agentSessionCaller, callerFromAuth } from '../caller-context.js';
+import { organismVisibilityRefusal } from '../organism/visibility.js';
+import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
+import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
 
 /** A workspace's manifest record, whose write rule compares the value it stores (services/fenced-space.ts). */
 const MANIFEST_KEY = /^organism\.[^.]+\.w\.[^.]+\.meta\.manifest$/;
@@ -97,7 +97,7 @@ async function answerWriteRefusal(
  */
 export async function runAiJob(storage: Storage, config: AimeatConfig, stored: ScheduledJobRecord): Promise<JobRunResult> {
   // A sibling agent's new instruction that waits for the owner skips this fire; one the owner did not
-  // allow is replaced by the instruction the schedule had (services/schedule-instruction-hold.ts).
+  // allow is replaced by the instruction the schedule had (services/schedule/instruction-hold.ts).
   const held = await instructionHoldAtFire({ storage, config }, stored);
   if ('wait' in held) return { reads: [], writes: [], skipped: true, skipCode: 'stopped', skipReason: held.wait };
   const job = held.job;
@@ -135,7 +135,7 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, stored: S
     named.push({ key, namespace: ns });
     reads.push(ns === owner ? key : `${ns}::${key}`);
   }
-  // As whoever made the schedule, asked now (services/schedule-actor.ts): an agent's cap and the
+  // As whoever made the schedule, asked now (services/schedule/actor.ts): an agent's cap and the
   // owner's rules for that agent or app apply, and a maker that is gone or lost ai:use stops it.
   // Until 2026-10-05 it asked as the owner in person (secaudit 2026-10, AI-3). Asked before the
   // reads since 2026-10-22, because the maker is also who the inputs are read for.
@@ -165,7 +165,7 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, stored: S
   // classification check. A schedule fires with nobody present, so it reads as an AI (TARGET-082 V4,
   // decided 2026-09-29): an agent's schedule as that agent, any other as an unattended run (below).
   // And it hands the model only the
-  // same-owner records its maker may read (services/schedule-ai-read.ts): a private record of the
+  // same-owner records its maker may read (services/schedule/ai-read.ts): a private record of the
   // owner or of a sibling agent is refused to an agent without memory:read-as-owner before any model
   // is called (secaudit 2026-10 wave 3, r49 the scheduled variant). A schedule kept by the once-only
   // step reads as before until its input changes.
@@ -185,7 +185,7 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, stored: S
     inputs = await readAiRecords({ storage, config }, reader, owner, named, { capability: 'text' }, viewer);
   } catch (err) {
     // On the agent's card and in the owner's bell, once while the refusal stays open, as a fire
-    // refused for a missing word is (services/schedule-fire-refusal.ts).
+    // refused for a missing word is (services/schedule/fire-refusal.ts).
     if (err instanceof AiInputHiddenError) {
       if (maker.kind === 'agent') {
         noteAgentRefusal(agentSessionCaller(actor.principal, '', actor.scopes, config.nodeId, storage).auth, [READ_AS_OWNER_SCOPE], false, `schedule ${job.id}`);

@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-extension-keep.ts
+ * @file src/services/schedule/extension-keep.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A once-per-node step: the `extension` schedules an app or an ecosystem app made before
@@ -7,7 +7,7 @@
  *
  *   WHY. Until 2026-10-20 creating an `extension` schedule asked only task:write (secaudit 2026-10,
  *   SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke). Create, edit and run-now now ask
- *   ext:invoke, and every fire asks the maker again (services/schedule-fire-refusal.ts). An app whose
+ *   ext:invoke, and every fire asks the maker again (services/schedule/fire-refusal.ts). An app whose
  *   grant holds task:write and not ext:invoke could make such a schedule before, and it ran every
  *   time. The ruling of this round is that a use that worked keeps working: the security fix closes
  *   the way in, it does not take away what already ran. An app has no permission page where the owner
@@ -19,7 +19,7 @@
  *   ext:invoke then. Nothing made after it can join: a new schedule, or a new instruction for an old
  *   one, needs ext:invoke from whoever gives it. A grant the owner narrows later is not on the list,
  *   because it held the word at the start; a grant the owner revokes stops its schedule
- *   (services/schedule-actor.ts). An agent's schedule is not kept here: the owner allows the word for
+ *   (services/schedule/actor.ts). An agent's schedule is not kept here: the owner allows the word for
  *   the agent with one press (services/permission-ask.ts), which the fire offers.
  *
  *   WHERE. One record under `system@<nodeId>`, EXTENSION_SCHEDULE_KEEP_KEY: { at, ids }. It is never
@@ -36,12 +36,12 @@
  *     triggerScheduleRecord): the app that made a kept schedule runs it now as its fire runs.
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, capability-loss review of the ext:invoke fix).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { claimOnceOnlyStep, keptBefore, madeBefore } from './once-only-step.js';
-import { makerOf, scheduleActor } from './schedule-actor.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { claimOnceOnlyStep, keptBefore, madeBefore } from '../once-only-step.js';
+import { makerOf, scheduleActor } from './actor.js';
 
 /** The record under `system@<nodeId>` that lists the kept schedules and says the step has run. */
 export const EXTENSION_SCHEDULE_KEEP_KEY = 'migrations.schedule-extension-ext-invoke-keep';

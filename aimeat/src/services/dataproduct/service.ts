@@ -18,7 +18,7 @@
  *   audience wider than a source are refused at once, not at the first scheduled run.
  *
  *   THE SCHEDULE BELONGS TO THE DEFINITION. `schedule: { cron }` makes one schedule of kind
- *   `dataproduct` (services/schedule-write.ts createScheduleRecord, as the caller, so it fires as its
+ *   `dataproduct` (services/schedule/write.ts createScheduleRecord, as the caller, so it fires as its
  *   maker); a changed schedule replaces it, `schedule: null` removes it, and deleting the definition
  *   removes every `dataproduct` schedule naming it, whoever made it. A schedule that outlived what it
  *   acts for is the defect of the open incident "Deleting an agent leaves its schedule enabled".
@@ -35,7 +35,7 @@
  *
  *   A PRODUCT THAT RUNS WHEN ITS SOURCE CHANGES has no schedule record: define stores who it runs as
  *   (`runAs`, the fields a schedule record keeps of its maker) and tells ./on-change.ts, which runs it
- *   after a change as that maker, asked again at each run (services/schedule-actor.ts).
+ *   after a change as that maker, asked again at each run (services/schedule/actor.ts).
  * @version-history
  *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
@@ -53,7 +53,7 @@ import type { ScheduledJobRecord } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
-import { createScheduleRecord, type ScheduleWriteCaller } from '../schedule-write.js';
+import { createScheduleRecord, type ScheduleWriteCaller } from '../schedule/write.js';
 import { nodeContext } from '../node-context.js';
 import { recordFailure } from '../datapackage/store.js';
 import { readPointer } from '../datapackage/version-audience.js';

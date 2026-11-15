@@ -1,5 +1,5 @@
 /**
- * @file src/services/scheduler-run-limit.ts
+ * @file src/services/schedule/run-limit.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The time limit on one scheduled run. A handler whose promise never settles (a query
@@ -17,8 +17,8 @@
  *   v1.1.0 — 2026-11-01 — The dataproduct kind gets ten minutes (plan doc-mvwxcas3dom3, D9.5).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E4-04).
  */
-import type { ScheduledJobRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
+import type { ScheduledJobRecord } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
 
 type JobKind = ScheduledJobRecord['type'];
 

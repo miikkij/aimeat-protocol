@@ -245,7 +245,7 @@ await test('4h. An edit cannot put a record the node keeps into an ai schedule',
         `the refused edits changed the schedule: ${JSON.stringify(kept)}`);
 });
 
-// August 2026 audit step 8: create, edit and cancel moved into services/schedule-write.ts so the MCP
+// August 2026 audit step 8: create, edit and cancel moved into services/schedule/write.ts so the MCP
 // schedule tools build the record this door builds. These two lock the parts that had drifted apart:
 // the length cut on description and purpose, and cron validation on EDIT rather than create only.
 await test('4e. description and purpose are cut to their stored maximum', async () => {
@@ -1104,7 +1104,7 @@ await test('42. An ai schedule may not be pointed at an organism the owner is no
 
 console.log('\nPhase 13 -- An agent_task schedule fires as its maker, asked at every fire');
 
-// secaudit 2026-10, runAgentTaskJob:fires-without-asking-maker. services/schedule-actor.ts states the
+// secaudit 2026-10, runAgentTaskJob:fires-without-asking-maker. services/schedule/actor.ts states the
 // rule: a schedule acts as its maker, the maker is looked up again at every fire, and a maker that is
 // gone does not fire. The ai kind asked; agent_task did not, so an agent the owner had deleted kept
 // putting its work orders into a sibling's queue, presented as the owner's. The fire now asks, and a

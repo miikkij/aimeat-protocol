@@ -19,7 +19,7 @@ const step = (name: string) => vi.fn(async () => {
     return { ran: true };
 });
 
-vi.mock('../../src/services/schedule-extension-keep.js', () => ({ keepAppExtensionSchedulesOnce: step('schedules') }));
+vi.mock('../../src/services/schedule/extension-keep.js', () => ({ keepAppExtensionSchedulesOnce: step('schedules') }));
 vi.mock('../../src/services/tool-scope-words-migration.js', () => ({ migrateToolScopeWordsOnce: step('toolWords') }));
 vi.mock('../../src/services/rest-scope-gates-migration.js', () => ({
     migrateRestScopeGatesOnce: step('restGates'), migrateAgentReadGrantOnce: step('agentRead'),

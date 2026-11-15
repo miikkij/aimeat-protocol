@@ -5,7 +5,7 @@
  * @description One work of an agent goal, from being made to being settled. A work is made from a
  *   WorkSpec (validated here, once, for every door). An agent's work becomes a task when an agent takes
  *   it: the goal record is written first, on its version, with the work marked taken by that agent, and
- *   only the winner of that write gets a task (services/scheduler-agent-task.ts materialiseAgentTask, the
+ *   only the winner of that write gets a task (services/schedule/agent-task.ts materialiseAgentTask, the
  *   same wake path a scheduled task uses, so the task-start rules and the permission floor decide as
  *   they do for every task). When the task completes, fails or is declined, settleFromTask() finds the
  *   work by the task id stored on it, never by the code alone, so a task that names a goal it does not
@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AgentTaskRecord } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { materialiseAgentTask } from '../scheduler-agent-task.js';
+import { materialiseAgentTask } from '../schedule/agent-task.js';
 import { UNCHANGED } from '../record-cas.js';
 import {
   GoalError, logEntry, newId, readGoal, updateGoal, type GoalAccess, type GoalDeps,

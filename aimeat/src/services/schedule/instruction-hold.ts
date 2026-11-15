@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-instruction-hold.ts
+ * @file src/services/schedule/instruction-hold.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A sibling agent changes what another agent's `ai` schedule asks, and the schedule reads
@@ -40,18 +40,18 @@
  *     clearing the hold while the edit is still being stored (secaudit 2026-10-31 inv-27).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
-import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
-import { logger } from '../utils/logger.js';
-import { updateMemoryRecord } from './record-cas.js';
-import { makerOf } from './schedule-actor.js';
-import { aiScheduleInputFingerprint } from './schedule-ai-read.js';
-import { saverAuthority } from './workflow/trigger-authority.js';
-import { fileAsk, publishRequestedBody } from './publish-requests/ask.js';
-import { readPublishRequest, type PublishRequester } from './publish-requests/store.js';
-import { publishRequestExpired } from './publish-requests/policy.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
+import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../../utils/scope-coverage.js';
+import { logger } from '../../utils/logger.js';
+import { updateMemoryRecord } from '../record-cas.js';
+import { makerOf } from './actor.js';
+import { aiScheduleInputFingerprint } from './ai-read.js';
+import { saverAuthority } from '../workflow/trigger-authority.js';
+import { fileAsk, publishRequestedBody } from '../publish-requests/ask.js';
+import { readPublishRequest, type PublishRequester } from '../publish-requests/store.js';
+import { publishRequestExpired } from '../publish-requests/policy.js';
 
 /** Where a held schedule's record lives, under `system@<nodeId>`. */
 export const HOLD_PREFIX = 'schedules.instruction-hold.';
@@ -67,7 +67,7 @@ function namespacesOf(input: Record<string, unknown>): string[] {
   return [input.inputNamespaces, input.input_namespaces].flatMap(v => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []));
 }
 
-/** Who edits, in the terms services/schedule-write.ts ScheduleWriteCaller carries. */
+/** Who edits, in the terms services/schedule/write.ts ScheduleWriteCaller carries. */
 export interface HoldEditor {
   identity: string; isOwnerSession: boolean; scopes: string[]; isApp?: boolean; appGrant?: string; isEcosystem?: boolean;
 }

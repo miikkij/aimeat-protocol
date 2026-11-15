@@ -72,7 +72,7 @@ export function scheduleLabelOf(def: Pick<DataProductDefinition, 'schedule'>): s
 
 /**
  * Whom a run on a source change acts as: the maker of the definition, in the terms a schedule record
- * keeps them (services/schedule-actor.ts makerOf), so the run is asked again who that is at each fire.
+ * keeps them (services/schedule/actor.ts makerOf), so the run is asked again who that is at each fire.
  */
 export interface RunAs { createdBy: string; createdByAgent: boolean; createdByApp?: string }
 

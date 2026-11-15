@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A scheduled `ai` job whose stored answer the memory write would refuse is refused before
- *   the model is called (services/scheduler-ai-job.ts; secaudit 2026-10-31 inv-28).
+ *   the model is called (services/schedule/ai-job.ts; secaudit 2026-10-31 inv-28).
  *
  *   A schedule stored before the create and edit doors checked output_visibility (2026-10-20) can name
  *   an organism its maker is not a member of, or an organism.* output key the maker may not write. The
@@ -40,7 +40,7 @@ vi.mock('../../src/services/ai/completion.js', () => {
 
 const { createStorage } = await import('../../src/storage/storage-factory.js');
 const { setThisNodeId } = await import('../../src/utils/gaii.js');
-const { runAiJob } = await import('../../src/services/scheduler-ai-job.js');
+const { runAiJob } = await import('../../src/services/schedule/ai-job.js');
 import type { Storage, ScheduledJobRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 

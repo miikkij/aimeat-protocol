@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description A sibling agent's new instruction to another agent's `ai` schedule never fires with the
  *   maker's reach before the owner allows it, also while the edit is being stored and when the hold
- *   record cannot be written (services/schedule-write.ts updateScheduleRecord,
- *   services/schedule-instruction-hold.ts; secaudit 2026-10-31 inv-27).
+ *   record cannot be written (services/schedule/write.ts updateScheduleRecord,
+ *   services/schedule/instruction-hold.ts; secaudit 2026-10-31 inv-27).
  *
  *   With the real SQLite store. The maker R holds memory:read-as-owner, the editor A does not. A fire
  *   is simulated at the moments the edit writes (instructionHoldAtFire, the step runAiJob takes
@@ -30,8 +30,8 @@ vi.mock('../../src/utils/logger.js', async (importOriginal) => {
 
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
-import { updateScheduleRecord, type ScheduleWriteCaller } from '../../src/services/schedule-write.js';
-import { instructionHoldAtFire, HOLD_PREFIX } from '../../src/services/schedule-instruction-hold.js';
+import { updateScheduleRecord, type ScheduleWriteCaller } from '../../src/services/schedule/write.js';
+import { instructionHoldAtFire, HOLD_PREFIX } from '../../src/services/schedule/instruction-hold.js';
 import { decidePublishRequest } from '../../src/services/publish-requests/decide.js';
 import { PUBLISH_REQUEST_PREFIX } from '../../src/services/publish-requests/store.js';
 import { callerFromAuth } from '../../src/services/caller-context.js';

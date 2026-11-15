@@ -1379,9 +1379,9 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/scheduler-remote-jobs.ts",
+    "from": "src/services/schedule/remote-jobs.ts",
     "to": "src/services/scheduler.ts",
-    "unresolvedTo": "./scheduler.js",
+    "unresolvedTo": "../scheduler.js",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -1401,7 +1401,7 @@
         ]
       },
       {
-        "name": "src/services/scheduler-remote-jobs.ts",
+        "name": "src/services/schedule/remote-jobs.ts",
         "dependencyTypes": [
           "local",
           "import"

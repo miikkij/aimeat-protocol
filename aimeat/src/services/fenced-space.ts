@@ -237,7 +237,7 @@ function isLocalPersonIdentity(identity: string, nodeId: string): boolean {
 /**
  * Does the rule apply to this caller? Roles first: the account holder in person and a hosted
  * app's grant write directly. A hosted app's grant is the role `app` ALONE, which is what
- * routes/app-grants.ts and services/schedule-actor.ts mint; the role beside any other one is not
+ * routes/app-grants.ts and services/schedule/actor.ts mint; the role beside any other one is not
  * that grant, so it is fenced.
  *
  * Every other session is fenced unless its scopes cover `organism:direct`: the account holder gave

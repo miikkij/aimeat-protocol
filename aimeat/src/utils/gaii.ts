@@ -442,7 +442,7 @@ export function resolveIdentity(
   // a name in that shape and composes one only for a caller that built the auth object by hand.
   if (isForeignPrincipal(auth)) return homeIdentityOf(auth);
   // isOwnerInPerson also refuses 'app'. An app grant token carries roles ['app'] and never 'owner'
-  // (routes/app-grants.ts issueAccessToken, services/schedule-actor.ts), so it gets `sub` either way.
+  // (routes/app-grants.ts issueAccessToken, services/schedule/actor.ts), so it gets `sub` either way.
   return isOwnerInPerson(auth) ? `${auth.owner}@${nodeId}` : auth.sub;
 }
 

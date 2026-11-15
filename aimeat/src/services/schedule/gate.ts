@@ -1,5 +1,5 @@
 /**
- * @file src/services/schedule-gate.ts
+ * @file src/services/schedule/gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a caller must hold before a schedule is created, for every surface that creates
@@ -44,8 +44,8 @@
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared gate, both doors).
  */
 import { Cron } from 'croner';
-import { logger } from '../utils/logger.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { logger } from '../../utils/logger.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 
 /** Every schedule kind this node knows. */
 export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish' | 'refinery' | 'dataproduct';

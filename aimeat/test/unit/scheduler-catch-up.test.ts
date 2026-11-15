@@ -31,7 +31,7 @@ vi.mock('../../src/services/notify.js', () => ({ notify: vi.fn(async () => ({ st
 
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { Scheduler } from '../../src/services/scheduler.js';
-import { missedFire } from '../../src/services/scheduler-catch-up.js';
+import { missedFire } from '../../src/services/schedule/catch-up.js';
 import type { ScheduledJobRecord, Storage } from '../../src/storage/interface.js';
 
 const SQLITE_PATH = `./test/.schedcatch-${process.pid}.db`;

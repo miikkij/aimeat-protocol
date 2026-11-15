@@ -38,7 +38,7 @@ vi.mock('../../src/services/refinery/pipeline.js', () => ({
 
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { Scheduler } from '../../src/services/scheduler.js';
-import { withRunLimit, RunTimeoutError } from '../../src/services/scheduler-run-limit.js';
+import { withRunLimit, RunTimeoutError } from '../../src/services/schedule/run-limit.js';
 import { startRun, STALL_MS } from '../../src/services/refinery/runs.js';
 import type { ScheduledJobRecord, Storage } from '../../src/storage/interface.js';
 

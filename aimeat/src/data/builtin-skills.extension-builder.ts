@@ -22,7 +22,7 @@
  *   validation, tollMorsels, commercial, the 4.0.0 refusal of payMorsels), routes/extensions/
  *   paywall.ts and pacing.ts (who pays what per call), routes/extensions/crud.ts and instances.ts
  *   (install, PUT redeploy, instances), services/extension/schedules.ts (schedule fields),
- *   services/schedule-write.ts (instance_id on POST /v1/schedules), config.ts (the limits and
+ *   services/schedule/write.ts (instance_id on POST /v1/schedules), config.ts (the limits and
  *   AIMEAT_EXT_INSTALL_ROLE).
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
