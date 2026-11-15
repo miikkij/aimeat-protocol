@@ -327,3 +327,17 @@ describe('POST /v1/federation/key-exchange (CLI federation join, the node\'s own
         await refused('POST', '/v1/federation/key-exchange', [noKey, noId]);
     });
 });
+
+describe('POST /v1/setup/init (setup wizard, wizard.html)', () => {
+    // wizard.html sends genesisUrl: null unless the "custom" genesis choice is picked and filled.
+    // services/setup-env.ts parseSetupNodeSettings takes an absent, null or empty setting as not set.
+    const body = { locale: 'en', nodeId: 'node-a', nodeType: 'full', owner: { username: 'alice', password: 's3cret-pass' }, port: 40050 };
+
+    it('takes a null genesis address, and a filled one', async () => {
+        await taken('POST', '/v1/setup/init', [{ ...body, genesisUrl: null }, { ...body, genesisUrl: 'https://genesis.example.org' }]);
+    });
+
+    it('still refuses a body without an owner, as the route does', async () => {
+        await refused('POST', '/v1/setup/init', [{ locale: 'en', genesisUrl: null }]);
+    });
+});

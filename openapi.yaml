@@ -49505,9 +49505,9 @@ paths:
                       type: string
                       description: Optional Ed25519 public key to import instead of generating
                 genesisUrl:
-                  type: string
+                  type: [string, 'null']
                   format: uri
-                  description: Genesis node URL for federation
+                  description: Genesis node URL for federation. Null or absent leaves it unset.
                 port:
                   type: integer
                   description: Override port number
