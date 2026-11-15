@@ -96,7 +96,7 @@ function rolesOf(token: string): string[] {
 
 // ─── The socket client ───
 //
-// One flat JSON object per frame (src/services/realtime-types.ts). No handshake beyond the upgrade,
+// One flat JSON object per frame (src/services/realtime/types.ts). No handshake beyond the upgrade,
 // no subscribe, no ping: what the server sends first is `joined`.
 
 const openSockets: Sock[] = [];

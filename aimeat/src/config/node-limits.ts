@@ -93,7 +93,7 @@ export interface NodeLimitsConfig {
   realtimeEchatMaxRooms: number;
   /**
    * The most shared documents one realtime room keeps the latest state of for late joiners
-   * (services/realtime-yjs.ts). AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, default 64; 0 is no limit.
+   * (services/realtime/yjs.ts). AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, default 64; 0 is no limit.
    */
   realtimeMaxDocsPerRoom: number;
   /**

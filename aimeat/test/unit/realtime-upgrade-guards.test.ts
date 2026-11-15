@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The limits the realtime upgrade applies before a socket joins a room
- *   (services/realtime-upgrade-guards.ts; secaudit2026oct26):
+ *   (services/realtime/upgrade-guards.ts; secaudit2026oct26):
  *   - upgradeClientKey counts an anonymous echat visitor by the address Express would give req.ip:
  *     behind a trusted same-host proxy two visitors are two keys, with no trusted proxy the socket
  *     address is kept (local dev, pnpm sandbox), a forged header from an untrusted peer changes
@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import express from 'express';
 import { EventEmitter } from 'node:events';
 import type { WebSocket } from 'ws';
-import { upgradeClientKey, EchatDoor, realtimeMaxPayload, type TrustProxyFn } from '../../src/services/realtime-upgrade-guards.js';
+import { upgradeClientKey, EchatDoor, realtimeMaxPayload, type TrustProxyFn } from '../../src/services/realtime/upgrade-guards.js';
 import { RealtimeManager } from '../../src/services/realtime-manager.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';

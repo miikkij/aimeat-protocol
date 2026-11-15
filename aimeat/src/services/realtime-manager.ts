@@ -46,7 +46,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { runAsNode, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
-import { keepYjsSnapshot, saveYjsSnapshots } from './realtime-yjs.js';
+import { keepYjsSnapshot, saveYjsSnapshots } from './realtime/yjs.js';
 
 /** Live domain for "the room list moved": a room appeared or closed, or a player came or went. */
 const ROOMS_DOMAIN = 'realtime-rooms';
@@ -57,7 +57,7 @@ import type {
   RealtimeRoom,
   CreateRoomOpts,
   RealtimeStats,
-} from './realtime-types.js';
+} from './realtime/types.js';
 
 // Re-export the wire + internal types so existing importers keep working.
 export type {
@@ -66,7 +66,7 @@ export type {
   RealtimeRoom,
   CreateRoomOpts,
   RealtimeStats,
-} from './realtime-types.js';
+} from './realtime/types.js';
 
 /** createRoom refuses past realtime.rooms_per_owner: the rooms the caller's owner holds, and the limit. */
 export class OwnerRoomLimitError extends Error {

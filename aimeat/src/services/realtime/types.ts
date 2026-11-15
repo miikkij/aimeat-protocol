@@ -1,5 +1,5 @@
 /**
- * @file src/services/realtime-types.ts
+ * @file src/services/realtime/types.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Wire + internal type definitions for the realtime WebSocket room manager —

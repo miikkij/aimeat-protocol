@@ -1,5 +1,5 @@
 /**
- * @file src/services/realtime-upgrade-guards.ts
+ * @file src/services/realtime/upgrade-guards.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The limits the realtime WebSocket upgrade applies before a socket joins a room
@@ -27,11 +27,11 @@
  *     getOrCreateRoomByName:anonymous-room-cap-exhaustion).
  */
 import type { IncomingMessage } from 'node:http';
-import type { AimeatConfig } from '../config.js';
-import { ipRateKey } from '../middleware/rate-limit.js';
-import { logger } from '../utils/logger.js';
-import type { RealtimeManager, RealtimeRoom } from './realtime-manager.js';
-import { ECHAT_ANONYMOUS_CREATOR } from './realtime-yjs.js';
+import type { AimeatConfig } from '../../config.js';
+import { ipRateKey } from '../../middleware/rate-limit.js';
+import { logger } from '../../utils/logger.js';
+import type { RealtimeManager, RealtimeRoom } from '../realtime-manager.js';
+import { ECHAT_ANONYMOUS_CREATOR } from './yjs.js';
 
 /** UTF-8 takes at most three bytes for one UTF-16 code unit, so this keeps every frame the size check passes. */
 export function realtimeMaxPayload(limitChars: number): number {

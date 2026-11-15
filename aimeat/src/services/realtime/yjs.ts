@@ -1,5 +1,5 @@
 /**
- * @file src/services/realtime-yjs.ts
+ * @file src/services/realtime/yjs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a realtime room keeps of the Yjs documents its peers sync, and the shutdown
@@ -19,10 +19,10 @@
  *   2026-10-27 — Initial (secaudit2026oct26). saveYjsSnapshots moved from realtime-manager.ts
  *     saveAllYjsSnapshots, with the echat room left out.
  */
-import type { Storage } from '../storage/interface.js';
-import type { RealtimeRoom } from './realtime-types.js';
-import { logger } from '../utils/logger.js';
-import { errorFields } from '../utils/error-fields.js';
+import type { Storage } from '../../storage/interface.js';
+import type { RealtimeRoom } from './types.js';
+import { logger } from '../../utils/logger.js';
+import { errorFields } from '../../utils/error-fields.js';
 
 /** The creator an anonymous echat room is made under (index-start.ts, the echat upgrade). */
 export const ECHAT_ANONYMOUS_CREATOR = 'echat-anonymous';

@@ -336,7 +336,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     const { isAnonymousMode, isOwnerPrincipal } = await import('./auth/middleware.js');
     const { isNodeAccount } = await import('./services/audience.js');
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
-    const { realtimeMaxPayload, upgradeClientKey, EchatDoor } = await import('./services/realtime-upgrade-guards.js');
+    const { realtimeMaxPayload, upgradeClientKey, EchatDoor } = await import('./services/realtime/upgrade-guards.js');
     // Cap forward-tunnel frame size (ws defaults to 100 MiB). An authenticated
     // agent could otherwise buffer huge frames in memory (cheap DoS). Sized a
     // little above the largest JSON body the routes accept; bulk uploads use
@@ -346,7 +346,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true, maxPayload: connectMaxPayload }) : null;
     // The realtime socket receives no frame larger than the room's size check can pass; the limit is
     // set again before each upgrade, so a saved realtime.max_message_size_bytes applies to the next
-    // socket (services/realtime-upgrade-guards.ts; secaudit2026oct26).
+    // socket (services/realtime/upgrade-guards.ts; secaudit2026oct26).
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true, maxPayload: realtimeMaxPayload(config.realtimeMaxMessageSizeBytes) }) : null;
     const echatDoor = realtimeManager ? new EchatDoor(realtimeManager, config) : null;
     const connectWss = connectTunnelManager ? new WebSocketServer({ noServer: true, maxPayload: connectMaxPayload }) : null;
@@ -484,7 +484,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           }
           try {
             // The visitors' room limit, and a room nobody joined is closed once its handshake ends,
-            // failed or not (services/realtime-upgrade-guards.ts EchatDoor; secaudit2026oct26).
+            // failed or not (services/realtime/upgrade-guards.ts EchatDoor; secaudit2026oct26).
             const { room, settle } = await echatDoor.open(roomName);
             socket.once('close', settle);
             if (socket.destroyed) settle();   // closed while the room was looked up
