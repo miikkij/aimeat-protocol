@@ -28,6 +28,7 @@
  *   v2.10.0 — 2026-09-26 — initSecretFields(): the access code fields hide their value behind an eye.
  *   v2.11.0 — 2026-09-26 — The preview frame's `aimeat-request-auth` handler, which answered with the
  *     owner's session token, is gone: preview-host.js answers the preview with the app's own grant.
+ *   v2.12.0 — 2026-11-15 — Expose forkCodeSubmit: the Fork access-code dialog's button (E2E audit M093).
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -35,7 +36,7 @@ import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 import { loadConfig, saveConfig } from './config.js';
 import { extractZip, bundleZip } from './zip.js';
-import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailTranslateDesc, detailPromoteSave, detailPromoteClear, detailToggleFavorite, detailAccessCodeEdit, detailAccessCodeCancel, detailAccessCodeSave, detailSkillAttachToggle, detailSkillAttach, detailSkillDetach, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, detailWorkTry, detailWorkPublish, detailWorkDiscard, detailCheckpointPreview, detailCheckpointRestore, detailCheckpointDelete, saveSourceAsWorkingCopy, openStagingPreview, sourceTestDraftLive, sourcePublishTested, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion } from './detail.js';
+import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailTranslateDesc, detailPromoteSave, detailPromoteClear, detailToggleFavorite, detailAccessCodeEdit, detailAccessCodeCancel, detailAccessCodeSave, detailSkillAttachToggle, detailSkillAttach, detailSkillDetach, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, detailWorkTry, detailWorkPublish, detailWorkDiscard, detailCheckpointPreview, detailCheckpointRestore, detailCheckpointDelete, saveSourceAsWorkingCopy, openStagingPreview, sourceTestDraftLive, sourcePublishTested, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion, forkCodeSubmit } from './detail.js';
 import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool, monetizeDeleteTool,
   odpsToggleDefaultsUi, odpsToggleToolUi, odpsSuggestUi, odpsSaveDefaults,
   odpsGenerateSampleUi, odpsUseMeasuredUi } from './monetize.js';
@@ -224,6 +225,7 @@ import { initPreviewHost } from './preview-host.js';
     saveProtection: saveProtection,
     restoreVersion: restoreVersion,
     forkVersion: forkVersion,
+    forkCodeSubmit: forkCodeSubmit,
     openDetailView: openDetailView,
     closeDetailView: closeDetailView,
     detailLaunch: detailLaunch,

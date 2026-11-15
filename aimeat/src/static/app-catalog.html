@@ -3862,6 +3862,28 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     </footer>
   </dialog>
 
+  <!-- Fork access-code ask: opened when POST .../fork answers 403 ACCESS_DENIED (another person's
+       app behind an access code). Same field as the publish dialog's access code; a wrong code
+       keeps the dialog open with the error line. detail.js forkCodeSubmit() resends the fork. -->
+  <dialog id="fork-code-overlay" class="dlg modal dlg--sm">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="fork.codeTitle">Forking needs the access code</span> <span id="fork-code-app" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body">
+      <div class="form-group">
+        <div style="font-size:.85rem;margin-bottom:8px" data-i18n="fork.codeAsk">The owner protects this app with an access code. Type the code to fork the app. The owner can give you the code.</div>
+        <label for="fork-code-input" data-i18n="detail.accessCodeLabel">Access code</label>
+        <div class="secret-field">
+          <input type="password" id="fork-code-input" class="modal-input" maxlength="64" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" onkeydown="if(event.key==='Enter'){event.preventDefault();window._launcher.forkCodeSubmit();}"/>
+          <button type="button" class="secret-eye" data-secret-toggle="fork-code-input" aria-controls="fork-code-input" aria-pressed="false" aria-label="Show the access code" title="Show the access code"></button>
+        </div>
+      </div>
+      <div id="fork-code-status" role="status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
+    </div>
+    <footer class="dlg-foot">
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" id="fork-code-submit-btn" onclick="window._launcher.forkCodeSubmit()" data-i18n="card.fork">Fork</button>
+    </footer>
+  </dialog>
+
   <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
   <dialog id="lineage-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
     <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="lineage.title">Fork lineage</span> <span id="lineage-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
@@ -4446,6 +4468,11 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "fork.prompt": "Fork this app into your catalogue.\n\nNew filename:",
       "fork.success": "Forked to",
       "fork.failed": "Fork failed",
+      "fork.forking": "Forking…",
+      "fork.codeTitle": "Forking needs the access code",
+      "fork.codeAsk": "The owner protects this app with an access code. Type the code to fork the app. The owner can give you the code.",
+      "fork.codeWrong": "The code is not correct. Check the code and try again.",
+      "fork.codeEmpty": "Type the access code.",
       "detail.forkedFrom": "Forked from",
       "card.forksHint": "View the fork lineage (who forked this, and where it came from)",
       "card.agent": "Agent",
@@ -5552,6 +5579,11 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "fork.prompt": "Haaroita tämä sovellus katalogiisi.\n\nUusi tiedostonimi:",
       "fork.success": "Haaroitettu:",
       "fork.failed": "Haaroitus epäonnistui",
+      "fork.forking": "Haaroitetaan…",
+      "fork.codeTitle": "Haaroitus vaatii pääsykoodin",
+      "fork.codeAsk": "Omistaja on suojannut sovelluksen pääsykoodilla. Kirjoita koodi, niin voit haaroittaa sovelluksen. Saat koodin sovelluksen omistajalta.",
+      "fork.codeWrong": "Koodi ei ole oikea. Tarkista koodi ja yritä uudelleen.",
+      "fork.codeEmpty": "Kirjoita pääsykoodi.",
       "detail.forkedFrom": "Haaroitettu kohteesta",
       "card.forksHint": "Näytä haaroitushistoria (kuka haaroitti ja mistä tämä on peräisin)",
       "card.agent": "Agentti",
@@ -12695,34 +12727,91 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     }
     var body = { new_filename: newName };
     if (version) body.version = version;
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/fork", {
+    sendFork({
+      url: aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/fork",
+      token,
+      filename,
+      newName,
+      body,
+      inVersionsModal,
+      statusEl
+    });
+  }
+  var forkCodePending = null;
+  function sendFork(req) {
+    fetch(req.url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-      body: JSON.stringify(body)
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + req.token },
+      body: JSON.stringify(req.body)
     }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
+      return resp.json().then(function(json) {
+        return { status: resp.status, json };
+      });
+    }).then(function(r) {
+      var json = r.json;
+      var codeOpen = isDlgOpen("fork-code-overlay");
       if (json.ok) {
-        var msg = "✔ " + (t("fork.success") || "Forked to") + ' "' + newName + '"';
-        if (inVersionsModal) {
-          statusEl.textContent = msg;
-          statusEl.style.color = "#34d399";
+        forkCodePending = null;
+        if (codeOpen) closeDlg("fork-code-overlay");
+        var msg = "✔ " + (t("fork.success") || "Forked to") + ' "' + req.newName + '"';
+        if (req.inVersionsModal) {
+          req.statusEl.textContent = msg;
+          req.statusEl.style.color = "#34d399";
         } else showNotice(msg);
         loadPublishedApps();
+      } else if (r.status === 403 && json.error && json.error.code === "ACCESS_DENIED") {
+        askForkCode(req, !!req.body.access_code);
       } else {
         var err = json.error && json.error.message || "Fork failed";
-        if (inVersionsModal) {
-          statusEl.textContent = "✘ " + err;
-          statusEl.style.color = "var(--accent)";
+        if (codeOpen) forkCodeStatus("✘ " + err, true);
+        else if (req.inVersionsModal) {
+          req.statusEl.textContent = "✘ " + err;
+          req.statusEl.style.color = "var(--accent)";
         } else showNotice((t("fork.failed") || "Fork failed") + ": " + err);
       }
     }).catch(function(err) {
       var m = err.message || "Fork failed";
-      if (inVersionsModal) {
-        statusEl.textContent = "✘ " + m;
-        statusEl.style.color = "var(--accent)";
+      if (isDlgOpen("fork-code-overlay")) forkCodeStatus("✘ " + m, true);
+      else if (req.inVersionsModal) {
+        req.statusEl.textContent = "✘ " + m;
+        req.statusEl.style.color = "var(--accent)";
       } else showNotice("Error: " + m);
     });
+  }
+  function forkCodeStatus(text, isError) {
+    var el = document.getElementById("fork-code-status");
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = isError ? "var(--accent)" : "var(--text-muted)";
+  }
+  function askForkCode(req, wrong) {
+    forkCodePending = req;
+    if (req.inVersionsModal && req.statusEl) req.statusEl.textContent = "";
+    var input2 = document.getElementById("fork-code-input");
+    document.getElementById("fork-code-app").textContent = req.filename;
+    if (!wrong && input2) input2.value = "";
+    forkCodeStatus(wrong ? "✘ " + t("fork.codeWrong") : "", wrong);
+    openDlg("fork-code-overlay");
+    if (input2) {
+      input2.focus();
+      if (wrong) input2.select();
+    }
+  }
+  function forkCodeSubmit() {
+    var req = forkCodePending;
+    if (!req) {
+      closeDlg("fork-code-overlay");
+      return;
+    }
+    var input2 = document.getElementById("fork-code-input");
+    var code = input2 ? input2.value.trim() : "";
+    if (!code) {
+      forkCodeStatus(t("fork.codeEmpty"), true);
+      return;
+    }
+    var body = Object.assign({}, req.body, { access_code: code });
+    forkCodeStatus(t("fork.forking"), false);
+    sendFork(Object.assign({}, req, { body }));
   }
 
   // src/static/app-catalog/js/settings.js
@@ -15072,6 +15161,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     saveProtection,
     restoreVersion,
     forkVersion,
+    forkCodeSubmit,
     openDetailView,
     closeDetailView,
     detailLaunch,

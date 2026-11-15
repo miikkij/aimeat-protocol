@@ -8,6 +8,9 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-11-15 — Fork asks for the access code: when POST .../fork answers 403 ACCESS_DENIED
+ *     (another person's app behind a code, E2E audit M093), #fork-code-overlay asks for it and
+ *     forkCodeSubmit resends the fork with `access_code`; a wrong code keeps the dialog open.
  *   2026-11-04 — The version list is read with the session (versionsFetchInit): the node answers a
  *     hidden app's list, or the list of an app that opens for signed-in people, only to whom the app
  *     opens for (codebase analysis 2026-11-03, item A1).
@@ -2553,33 +2556,88 @@ function forkVersion(owner, filename, version) {
   if (inVersionsModal) { statusEl.textContent = 'Forking…'; statusEl.style.color = '#34d399'; }
 
   // Server-side fork: the server copies the source bytes + manifest, enforces the
-  // forkable / paid-license gates, and records provenance (manifest.forkedFrom + a
+  // forkable / access-code / paid-license gates, and records provenance (manifest.forkedFrom + a
   // lineage event). The client no longer downloads the bytes itself.
   var body = { new_filename: newName };
   if (version) body.version = version;
-  fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/fork', {
+  sendFork({
+    url: aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/fork',
+    token: token, filename: filename, newName: newName, body: body,
+    inVersionsModal: inVersionsModal, statusEl: statusEl
+  });
+}
+
+// The fork waiting for its access code in #fork-code-overlay: the request forkVersion built, resent
+// by forkCodeSubmit with `access_code` added. Null when no code ask is open.
+var forkCodePending = null;
+
+// POST .../fork. A 403 ACCESS_DENIED means another person's app behind an access code (the fork
+// gate asks the code the read gate asks, E2E audit M093): the code ask opens, or, when a code was
+// already sent, stays open and says the code is wrong. The owner and an operator never get it.
+function sendFork(req) {
+  fetch(req.url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify(body)
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + req.token },
+    body: JSON.stringify(req.body)
   })
-    .then(function(resp) { return resp.json(); })
-    .then(function(json) {
+    .then(function(resp) { return resp.json().then(function(json) { return { status: resp.status, json: json }; }); })
+    .then(function(r) {
+      var json = r.json;
+      var codeOpen = isDlgOpen('fork-code-overlay');
       if (json.ok) {
-        var msg = '✔ ' + (t('fork.success') || 'Forked to') + ' "' + newName + '"';
-        if (inVersionsModal) { statusEl.textContent = msg; statusEl.style.color = '#34d399'; }
+        forkCodePending = null;
+        if (codeOpen) closeDlg('fork-code-overlay');
+        var msg = '✔ ' + (t('fork.success') || 'Forked to') + ' "' + req.newName + '"';
+        if (req.inVersionsModal) { req.statusEl.textContent = msg; req.statusEl.style.color = '#34d399'; }
         else showNotice(msg);
         loadPublishedApps();
+      } else if (r.status === 403 && json.error && json.error.code === 'ACCESS_DENIED') {
+        askForkCode(req, !!req.body.access_code);
       } else {
         var err = (json.error && json.error.message) || 'Fork failed';
-        if (inVersionsModal) { statusEl.textContent = '✘ ' + err; statusEl.style.color = 'var(--accent)'; }
+        if (codeOpen) forkCodeStatus('✘ ' + err, true);
+        else if (req.inVersionsModal) { req.statusEl.textContent = '✘ ' + err; req.statusEl.style.color = 'var(--accent)'; }
         else showNotice((t('fork.failed') || 'Fork failed') + ': ' + err);
       }
     })
     .catch(function(err) {
       var m = err.message || 'Fork failed';
-      if (inVersionsModal) { statusEl.textContent = '✘ ' + m; statusEl.style.color = 'var(--accent)'; }
+      if (isDlgOpen('fork-code-overlay')) forkCodeStatus('✘ ' + m, true);
+      else if (req.inVersionsModal) { req.statusEl.textContent = '✘ ' + m; req.statusEl.style.color = 'var(--accent)'; }
       else showNotice('Error: ' + m);
     });
+}
+
+function forkCodeStatus(text, isError) {
+  var el = document.getElementById('fork-code-status');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = isError ? 'var(--accent)' : 'var(--text-muted)';
+}
+
+// Open the code ask for `req`. `wrong` is true when the refused request already carried a code.
+function askForkCode(req, wrong) {
+  forkCodePending = req;
+  // The versions dialog's "Forking…" would outlive a cancelled code ask.
+  if (req.inVersionsModal && req.statusEl) req.statusEl.textContent = '';
+  var input = document.getElementById('fork-code-input');
+  document.getElementById('fork-code-app').textContent = req.filename;
+  if (!wrong && input) input.value = '';
+  forkCodeStatus(wrong ? '✘ ' + t('fork.codeWrong') : '', wrong);
+  openDlg('fork-code-overlay');
+  if (input) { input.focus(); if (wrong) input.select(); }
+}
+
+// The dialog's Fork button and Enter in its field: resend the waiting fork with the code.
+function forkCodeSubmit() {
+  var req = forkCodePending;
+  if (!req) { closeDlg('fork-code-overlay'); return; }
+  var input = document.getElementById('fork-code-input');
+  var code = input ? input.value.trim() : '';
+  if (!code) { forkCodeStatus(t('fork.codeEmpty'), true); return; }
+  var body = Object.assign({}, req.body, { access_code: code });
+  forkCodeStatus(t('fork.forking'), false);
+  sendFork(Object.assign({}, req, { body: body }));
 }
 
 export {
@@ -2632,5 +2690,6 @@ export {
   saveProtection,
   showVersionsModal,
   restoreVersion,
-  forkVersion
+  forkVersion,
+  forkCodeSubmit
 };

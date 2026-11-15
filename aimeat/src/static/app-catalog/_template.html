@@ -476,6 +476,28 @@
     </footer>
   </dialog>
 
+  <!-- Fork access-code ask: opened when POST .../fork answers 403 ACCESS_DENIED (another person's
+       app behind an access code). Same field as the publish dialog's access code; a wrong code
+       keeps the dialog open with the error line. detail.js forkCodeSubmit() resends the fork. -->
+  <dialog id="fork-code-overlay" class="dlg modal dlg--sm">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="fork.codeTitle">Forking needs the access code</span> <span id="fork-code-app" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body">
+      <div class="form-group">
+        <div style="font-size:.85rem;margin-bottom:8px" data-i18n="fork.codeAsk">The owner protects this app with an access code. Type the code to fork the app. The owner can give you the code.</div>
+        <label for="fork-code-input" data-i18n="detail.accessCodeLabel">Access code</label>
+        <div class="secret-field">
+          <input type="password" id="fork-code-input" class="modal-input" maxlength="64" autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" onkeydown="if(event.key==='Enter'){event.preventDefault();window._launcher.forkCodeSubmit();}"/>
+          <button type="button" class="secret-eye" data-secret-toggle="fork-code-input" aria-controls="fork-code-input" aria-pressed="false" aria-label="Show the access code" title="Show the access code"></button>
+        </div>
+      </div>
+      <div id="fork-code-status" role="status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
+    </div>
+    <footer class="dlg-foot">
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" id="fork-code-submit-btn" onclick="window._launcher.forkCodeSubmit()" data-i18n="card.fork">Fork</button>
+    </footer>
+  </dialog>
+
   <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
   <dialog id="lineage-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
     <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="lineage.title">Fork lineage</span> <span id="lineage-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>

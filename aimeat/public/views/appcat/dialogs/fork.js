@@ -11,11 +11,18 @@
  *   "✔ Forked to "{name}"" in that dialog's status line; opened anywhere else the result is a notice.
  *   A refusal (a name already taken, an app its owner has not opened for forking) stays in this
  *   dialog's status line so the name can be changed and tried again.
- * @structure default ForkDialog({ owner, filename, version, back })
+ *   Another person's app behind an access code needs that code to be forked: the dialog asks for it
+ *   (the access code field of the app's own settings, typed hidden) from the start when the caller
+ *   says so (`needsCode`), or after the node's first 403 ACCESS_DENIED, and sends it as access_code.
+ *   A wrong code says so in the status line and the person types it again.
+ * @structure default ForkDialog({ owner, filename, version, needsCode, back })
  * @usage openDialog('fork', { owner, filename })  — props: owner, filename (the app forked); version
- *   (optional: that version, else the newest); back (optional { name, props }: the dialog to reopen
- *   afterwards, which receives `status`); onDone (optional: called after a fork).
+ *   (optional: that version, else the newest); needsCode (optional: the app is behind an access code
+ *   and the viewer is neither its owner nor the operator); back (optional { name, props }: the dialog
+ *   to reopen afterwards, which receives `status`); onDone (optional: called after a fork).
  * @version-history
+ *   v1.1.0 — 2026-11-15 — The access code field: POST .../fork asks another person for the code of
+ *     an app behind one (E2E audit M093), and the dialog had no field for it.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, dialogs builder 2), from the old detail.js forkVersion.
  */
 import { h } from 'preact';
@@ -34,12 +41,16 @@ import { FILENAME_RE, forkApp } from '/views/appcat/dialogs/app-io.js';
 
 const html = htm.bind(h);
 
-export default function ForkDialog({ owner, filename, version, back, onDone, close }) {
+export default function ForkDialog({ owner, filename, version, needsCode, back, onDone, close }) {
   const signedIn = !!getSession();
   const [name, setName] = useState((String(filename || 'app').replace(/\.html?$/i, '')) + '-fork.html');
   const [bad, setBad] = useState(false);
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
+  // The access code of another person's app behind one: asked from the start when the row says so,
+  // or from the first 403 ACCESS_DENIED when the caller did not know.
+  const [askCode, setAskCode] = useState(!!needsCode);
+  const [code, setCode] = useState('');
 
   useEffect(() => {
     if (!signedIn) { notice(x('common.loginRequired'), 'error'); close?.(); }
@@ -56,10 +67,12 @@ export default function ForkDialog({ owner, filename, version, back, onDone, clo
     if (!newName) return;
     if (!FILENAME_RE.test(newName)) { setBad(true); return; }
     setBad(false);
+    const accessCode = askCode ? code.trim() : '';
+    if (askCode && !accessCode) { setStatus({ text: x('fork.codeEmpty'), tone: 'err' }); return; }
     setBusy(true);
     setStatus({ text: x('fork.forking'), tone: 'ok' });
     try {
-      await forkApp({ owner, filename, newName, version });
+      await forkApp({ owner, filename, newName, version, accessCode });
       const done = '✔ ' + x('fork.success') + ' "' + newName + '"';
       reloadCatalog();
       onDone?.();
@@ -67,6 +80,12 @@ export default function ForkDialog({ owner, filename, version, back, onDone, clo
       else { notice(done, 'success'); close?.(); }
     } catch (e) {
       setBusy(false);
+      if (e.status === 403 && e.code === 'ACCESS_DENIED') {
+        // The node's refusal in plain words: a sent code was wrong, or the app needs one.
+        setAskCode(true);
+        setStatus(accessCode ? { text: '✘ ' + x('fork.codeWrong'), tone: 'err' } : null);
+        return;
+      }
       setStatus({ text: '✘ ' + (e.message || x('fork.failed')), tone: 'err' });
     }
   };
@@ -80,6 +99,11 @@ export default function ForkDialog({ owner, filename, version, back, onDone, clo
       <${TextField} code autoFocus ariaLabel=${x('fork.newName')} value=${name}
         onInput=${(v) => { setName(v); setBad(false); }} onEnter=${submit}
         message=${bad ? x('fork.invalid') : null} error=${bad} />
+      ${askCode ? html`
+        <${Note} kind="hint">${x('fork.codeAsk')}<//>
+        <${TextField} secret autoFocus label=${x('detail.accessCodeLabel')} value=${code}
+          onInput=${(v) => { setCode(v); if (status && status.tone === 'err') setStatus(null); }} onEnter=${submit}
+          maxLength=${64} showLabel=${x('secret.show')} hideLabel=${x('secret.hide')} />` : null}
       <${Status} status=${status} />
     <//>
   <//>`;

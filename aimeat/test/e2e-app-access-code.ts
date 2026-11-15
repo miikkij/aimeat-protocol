@@ -14,6 +14,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-access-code
  * @version-history
+ *   v1.4.0 — 2026-11-15 — Phase 6: a version fork with the code in the body the catalogues send, and
+ *     the browser-free part of the Fork button's code ask on /app-catalog.html and /v1/appcat (the
+ *     dialog, the request field access_code, the words in en, fi and es). Failed before the change.
  *   v1.3.0 — 2026-11-15 — Phase 5: POST .../fork of a forkable app behind a code refuses another
  *     user without the code or with a wrong one (403 ACCESS_DENIED, no fork made; it answered 201
  *     before the fix, E2E audit M093), and forks with the code, for the owner and for the owner's agent.
@@ -243,6 +246,57 @@ await test('An agent of the owner with app:write forks the owner\'s protected ap
     const writer = await agentTokenOfA(`accforker${Date.now() % 100000}`, ['app:write']);
     const r = await forkAs(writer, 'agent-fork.html');
     assert(r.status === 201 || r.status === 202, `owner's agent fork ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+console.log('\nPhase 6: both app catalogues ask for the code on Fork and send it as access_code (M093 follow-up)');
+
+await test('Another user forks one version with the code, in the body both catalogues send', async () => {
+    // The Fork button on a version row sends { new_filename, version, access_code }.
+    const r = await forkAs(tokenB, 'coded-version-fork.html', { version: 1, access_code: CODE });
+    // 201: a person's fork asks no publish approval (askedStatus answers 202 only then).
+    assert(r.status === 201, `version fork with the code ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.body?.data?.filename === 'coded-version-fork.html', `fork filename: ${JSON.stringify(r.body?.data)}`);
+});
+
+await test('The /app-catalog.html page carries the access-code dialog of its Fork and its words in en and fi', async () => {
+    const res = await fetch(`${BASE}/app-catalog.html`);
+    assert(res.status === 200, `/app-catalog.html ${res.status}`);
+    const page = await res.text();
+    for (const id of ['fork-code-overlay', 'fork-code-input', 'fork-code-status', 'forkCodeSubmit']) {
+        assert(page.includes(id), `the page lacks ${id}`);
+    }
+    for (const word of ['fork.codeAsk', 'fork.codeWrong', 'Koodi ei ole oikea']) {
+        assert(page.includes(word), `the page lacks the words ${word}`);
+    }
+});
+
+await test('The /v1/appcat fork dialog asks for the code and sends it as access_code', async () => {
+    const dialog = await (await fetch(`${BASE}/views/appcat/dialogs/fork.js`)).text();
+    assert(dialog.includes("'ACCESS_DENIED'") && dialog.includes("x('fork.codeWrong')") && dialog.includes('accessCode'),
+        'fork.js must ask for the code on ACCESS_DENIED');
+    const io = await (await fetch(`${BASE}/views/appcat/dialogs/app-io.js`)).text();
+    assert(io.includes('body.access_code = accessCode'), 'forkApp must send the code as access_code');
+});
+
+await test('The /v1/appcat words for the code are in en, fi and es', async () => {
+    const want = ['codeAsk', 'codeWrong', 'codeEmpty'];
+    const words: Record<string, Record<string, string>> = {};
+    for (const lang of ['en', 'fi', 'es']) {
+        const res = await fetch(`${BASE}/locales/${lang}.json`);
+        assert(res.status === 200, `/locales/${lang}.json ${res.status}`);
+        // appcat keeps the old catalogue's dotted keys flat: appcat["fork.codeAsk"].
+        const appcat = ((await res.json() as any)?.appcat ?? {}) as Record<string, string>;
+        const fork: Record<string, string> = {};
+        for (const k of want) {
+            const v = appcat[`fork.${k}`];
+            assert(typeof v === 'string' && v.length > 0, `${lang} lacks appcat.fork.${k}`);
+            fork[k] = v;
+        }
+        words[lang] = fork;
+    }
+    for (const k of want) {
+        assert(words.fi![k] !== words.en![k] && words.es![k] !== words.en![k], `appcat.fork.${k} is not translated`);
+    }
 });
 
 console.log(`\n=== App Access-Code: ${passed} passed, ${failed} failed ===\n`);

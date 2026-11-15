@@ -12,11 +12,13 @@
  * @structure me() · bareOwner(name) · sameOwner(a, b) · isOperator() · appHost() · appUrl(owner, file, sub) ·
  *   openPublished(url, row) · findRow(rows, owner, file) · apiWithToken(path, token) ·
  *   fetchAppText(owner, file, version) · textToB64(text) · restoreVersion({ owner, filename, version, manifest }) ·
- *   forkApp({ owner, filename, newName, version }) · FILENAME_RE · stagePreview(owner, file, text) ·
+ *   forkApp({ owner, filename, newName, version, accessCode }) · FILENAME_RE · stagePreview(owner, file, text) ·
  *   openDraftPreview(owner, file) · publishText(owner, file, text) · anonymousToken() · signInThen(next) ·
  *   durUnits() · durationLabel(ms) · gapMs(a, b) · versionSinceText(versions, i) · versionSpanText(versions)
  * @usage import { fetchAppText, restoreVersion } from '/views/appcat/dialogs/app-io.js';
  * @version-history
+ *   v1.1.0 — 2026-11-15 — forkApp sends `accessCode` as access_code: the node asks another person for
+ *     the code of an app behind one before it forks it (E2E audit M093).
  *   v1.0.1 — 2026-10-19 — anonymousToken() asks for no anonymous token on a signed-in-only node, which refuses it.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, dialogs builder 2): carried over from the old catalogue's
  *     detail.js, server-io.js, cortex.js and util.js, with the same routes and bodies.
@@ -120,10 +122,15 @@ export async function restoreVersion({ owner, filename, version, manifest }) {
 /** The filename rule of the node (F128, F133). */
 export const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
 
-/** Server-side fork (F204): the node copies the bytes and records where they came from. */
-export async function forkApp({ owner, filename, newName, version }) {
+/**
+ * Server-side fork (F204): the node copies the bytes and records where they came from. `accessCode`
+ * is the code of another person's app behind one; without it, or with a wrong one, the node answers
+ * 403 ACCESS_DENIED (err.status, err.code).
+ */
+export async function forkApp({ owner, filename, newName, version, accessCode }) {
   const body = { new_filename: newName };
   if (version) body.version = version;
+  if (accessCode) body.access_code = accessCode;
   const json = await apiPost(appUrl(owner, filename, 'fork'), body);
   return json.data || {};
 }

@@ -12,6 +12,8 @@
  * @structure AppRow({ sa, i, own, open, onToggle, starred }) · openApp(sa) · openDraft(sa)
  * @usage html`<${AppRow} key=${ref} sa=${sa} i=${i} own open=${ref === openRef} onToggle=${…} starred=${favs.has(ref)} />`
  * @version-history
+ *   v1.4.0 — 2026-11-15 — Fork on another person's app behind an access code opens the fork dialog
+ *     with the code field (needsCode), except for the operator, who forks without it (E2E audit M093).
  *   v1.3.0 — 2026-11-12 — An app that brings an agent is marked with the word (card.agent) in the
  *     tag the AI marker uses, in place of the robot emoji.
  *   v1.2.0 — 2026-10-12 — A community app's row is List `members`: its icon has a double edge.
@@ -30,7 +32,7 @@ import { getSession } from '/js/services/auth.js';
 import { x } from '/views/appcat/i18n.js';
 import { notice, openDetail, toggleFavourite, appRef } from '/views/appcat/store.js';
 import { openDialog } from '/views/appcat/dialogs/host.js';
-import { openPublished, openDraftPreview, appUrl } from '/views/appcat/dialogs/app-io.js';
+import { openPublished, openDraftPreview, appUrl, isOperator } from '/views/appcat/dialogs/app-io.js';
 import { appName, appIcon, appDesc, shipsAgents, fmtKb, fmtDate, stateOf } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
@@ -98,7 +100,7 @@ export function AppRow({ sa, i, own, open, onToggle, starred }) {
       <${Action} title=${x('ctx.details')} onClick=${() => openDetail(sa)}>${x('card.details')}<//>`
     : html`
       <${Loud} onClick=${() => openApp(sa)}>${x('card.view')}<//>
-      ${sa.forkable ? html`<${Action} title=${x('card.forkHint')} onClick=${() => openDialog('fork', { owner: sa.owner, filename: sa.filename, version: sa.version_number || 0 })}>${x('card.fork')}<//>` : null}
+      ${sa.forkable ? html`<${Action} title=${x('card.forkHint')} onClick=${() => openDialog('fork', { owner: sa.owner, filename: sa.filename, version: sa.version_number || 0, needsCode: !!sa.protected && !isOperator() })}>${x('card.fork')}<//>` : null}
       ${shipsAgents(sa) ? html`<${Action} title=${x('card.agentHint')} onClick=${() => openDialog('agents', { owner: sa.owner, filename: sa.filename })}>${x('card.agent')}<//>` : null}
       <${Action} title=${x('ctx.details')} onClick=${() => openDetail(sa)}>${x('card.details')}<//>`;
   return html`<${Row} order=${i} open=${open} onToggle=${onToggle} faded=${listing === 'unlisted'} members=${listing === 'community'}>

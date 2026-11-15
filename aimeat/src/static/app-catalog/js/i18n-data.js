@@ -8,6 +8,8 @@
  *   v1.7.3 — 2026-11-15 — list.foot says a row's buttons (fi: painikkeet), not its doors (en, fi).
  *   v1.7.2 — 2026-11-11 — agents.deployDesc says what a deploy with no runner does, and
  *     agents.saidProposed is the notice for an agent that waits for approval (en, fi).
+ *   v1.8.0 — 2026-11-15 — fork.forking and fork.codeTitle / codeAsk / codeWrong / codeEmpty (en, fi):
+ *     the Fork button asks for the access code of another person's app behind one (E2E audit M093).
  *   v1.7.1 — 2026-11-08 — pb.atelierFailed, pb.atelierRetry and pb.atelierAbsent (en, fi): the prompt
  *     builder says when the Atelier guide did not load, and when the node has none.
  *   v1.7.0 — 2026-10-11 — Price and pacing (en, fi): pacing.free and pacing.amount, the monetize editor's
@@ -499,6 +501,11 @@ export const I18N = {
       'fork.prompt': 'Fork this app into your catalogue.\n\nNew filename:',
       'fork.success': 'Forked to',
       'fork.failed': 'Fork failed',
+      'fork.forking': 'Forking…',
+      'fork.codeTitle': 'Forking needs the access code',
+      'fork.codeAsk': 'The owner protects this app with an access code. Type the code to fork the app. The owner can give you the code.',
+      'fork.codeWrong': 'The code is not correct. Check the code and try again.',
+      'fork.codeEmpty': 'Type the access code.',
       'detail.forkedFrom': 'Forked from',
       'card.forksHint': 'View the fork lineage (who forked this, and where it came from)',
       'card.agent': 'Agent',
@@ -1605,6 +1612,11 @@ export const I18N = {
       'fork.prompt': 'Haaroita tämä sovellus katalogiisi.\n\nUusi tiedostonimi:',
       'fork.success': 'Haaroitettu:',
       'fork.failed': 'Haaroitus epäonnistui',
+      'fork.forking': 'Haaroitetaan…',
+      'fork.codeTitle': 'Haaroitus vaatii pääsykoodin',
+      'fork.codeAsk': 'Omistaja on suojannut sovelluksen pääsykoodilla. Kirjoita koodi, niin voit haaroittaa sovelluksen. Saat koodin sovelluksen omistajalta.',
+      'fork.codeWrong': 'Koodi ei ole oikea. Tarkista koodi ja yritä uudelleen.',
+      'fork.codeEmpty': 'Kirjoita pääsykoodi.',
       'detail.forkedFrom': 'Haaroitettu kohteesta',
       'card.forksHint': 'Näytä haaroitushistoria (kuka haaroitti ja mistä tämä on peräisin)',
       'card.agent': 'Agentti',
