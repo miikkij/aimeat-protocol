@@ -96,3 +96,20 @@ describe('POST /v1/work/request, /v1/work and /v1/work/batch (aimeat-work.js req
         await refused('POST', '/v1/work/batch', [{ requests: [noInput] }]);
     });
 });
+
+describe('POST /v1/work/{tc}/deliver and /redeliver (aimeat-work.js deliver)', () => {
+    // work/index.js sends { output, metadata? } as given; WorkDeliverySchema reads output as z.unknown()
+    // (any value, the key required) and metadata as z.unknown().optional(). The re-delivery after a
+    // dispute (routes/disputes.ts) shares the schema and refuses only a missing output.
+    const path = '/v1/work/tc-a1b2c3d4-e5f6-7890-abcd-ef1234567890/deliver';
+
+    it('takes an output and metadata of any JSON type', async () => {
+        const bodies = [{ output: 'the translation' }, { output: 42 }, { output: null }, { output: { text: 'x' }, metadata: 'model x' }, { output: [1, 2], metadata: { ms: 3 } }];
+        await taken('POST', path, bodies);
+        await taken('POST', path.replace(/deliver$/, 'redeliver'), bodies);
+    });
+
+    it('refuses a delivery without output, as the route does', async () => {
+        await refused('POST', path, [{}, { result: 'x' }]);
+    });
+});

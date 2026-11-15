@@ -2903,10 +2903,11 @@ components:
       required: [output]
       properties:
         output:
-          type: object
-          description: Must conform to action's output_schema
+          description: >-
+            Must conform to the action's output_schema. Any JSON value: an object, text, a number,
+            an array or null. The field itself must be present.
         metadata:
-          type: object
+          description: Anything the provider adds about the delivery. Any JSON value.
 
     WorkRating:
       type: object
