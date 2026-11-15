@@ -20,7 +20,7 @@
  *   call that meets (a) but not (b) files the question: one entry per (capability, action,
  *   registrant) while it waits, a bell notice with Allow the first time, and the address of the page
  *   (views/eco-capability-allow.js) in the refusal, so the AI that met it can hand it on. Reused
- *   from services/secret-approvals.ts: one question, one press, a list written by compare-and-swap.
+ *   from services/secret/approvals.ts: one question, one press, a list written by compare-and-swap.
  *
  *   WHAT AN APPROVAL DOES. That capability, registered by that account, may ask this app to run that
  *   action from then on, with whatever input the call carries. A change of the capability's action,

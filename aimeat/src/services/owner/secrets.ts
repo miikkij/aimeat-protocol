@@ -111,7 +111,7 @@ export interface SecretSummary {
    *  extension whose call bound it. Null while unbound. */
   hostBinding: SecretBinding | null;
   /** The extensions the owner allowed to send it to a host, and the requests still waiting
-   *  (an entry without `approvedAt`): services/secret-approvals.ts. */
+   *  (an entry without `approvedAt`): services/secret/approvals.ts. */
   approvals: SecretApproval[];
   /** When an extension last sent it, through a bound host or an approval; null when none has. */
   lastUsedAt: string | null;
@@ -464,7 +464,7 @@ function allowSentence(allowUrl: string | undefined): string {
  * What a refused first use says (secaudit 2026-10, v59). The secret has no host yet, so this call
  * would choose where the owner's credential goes, and the principal behind it may not make that
  * choice. It names the secret, the header, the host and the principal, never a value, and gives the
- * address where the owner allows it (services/secret-approvals.ts).
+ * address where the owner allows it (services/secret/approvals.ts).
  */
 export function secretFirstUseMessage(headerName: string, secretName: string, host: string, by: string, allowUrl?: string): string {
   return `The header "${headerName}" asks for the secret ${secretName}, which has no host yet, so this call would `
@@ -596,7 +596,7 @@ export async function resolveSecretForHeaders(deps: {
       if (plain) {
         // THE OWNER'S OWN ANSWER FIRST. An approval the owner gave in person lets this extension,
         // installed by this account, send this secret to this host, whatever the secret's own
-        // address says, and binds nothing (services/secret-approvals.ts).
+        // address says, and binds nothing (services/secret/approvals.ts).
         const match = deps.approvedFor && host
           ? (record.approvals ?? []).find(a => !!a.approvedAt && a.extension === deps.approvedFor!.extension
             && a.installer === deps.approvedFor!.installer && a.host === host)

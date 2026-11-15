@@ -256,7 +256,7 @@ Six rules, and each one closes a way the value could leak back:
   with an Allow button, and names `/v1/secret-allow?secret=&extension=&host=` in the `SECRET_HOST`
   text. The owner, signed in, allows that extension (installed by that account) to send that secret
   to that host; the approval is kept on the secret, binds nothing, and is withdrawn on the Access
-  page (`src/services/secret-approvals.ts`, 2026-10-21).
+  page (`src/services/secret/approvals.ts`, 2026-10-21).
 - **Never resolve a secret inside a script.** A script that resolves its own secret HOLDS it, in a
   variable, for the length of the call, and every extension wanting the same thing would have to
   write the same code and get it right. What a script still decides is which headers may leave at

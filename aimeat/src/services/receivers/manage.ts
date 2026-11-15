@@ -46,7 +46,7 @@ import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { appMayWriteKey, isServerWrittenKey } from '../../utils/reserved-keys.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { isSecretRecordKey } from '../secret-records.js';
+import { isSecretRecordKey } from '../secret/records.js';
 import { newPartyKey, hashPartyKey } from '../parties/keys.js';
 import { getCsmCompiled, csmMayRead, type CsmUse } from '../csm-service.js';
 import {

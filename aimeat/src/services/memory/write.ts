@@ -173,7 +173,7 @@ import { parseGAII, isForeignPrincipal, localAccountName } from '../../utils/gai
 import { undeclaredSpaceForKey } from '../workspace/write-items.js';
 import { odpsWriteRefusal } from '../exchange/odps-write.js';
 import { legacyPacingWriteRefusal } from '../legacy-pacing-write.js';
-import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret-records.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret/records.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
@@ -245,7 +245,7 @@ export async function writeMemoryRecord(
     }
 
     // 1a. A record that holds a credential is written only by the door that owns it. The generic
-    //     doors show it with the credential replaced (services/secret-records.ts), so a value read
+    //     doors show it with the credential replaced (services/secret/records.ts), so a value read
     //     there and saved back would overwrite the key. The commerce tools are that owning door for
     //     commerce.psp and seal what they write.
     if (isSecretRecordKey(input.key) && input.pipeline !== 'mcp.commerce') {

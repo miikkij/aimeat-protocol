@@ -180,7 +180,7 @@ export const RULES: Rule[] = [
     id: 'ai-key-record',
     label: 'Whose key pays for an AI call is asked of prepareAiCall (services/ai/completion.ts), which knows the node\'s key, its allowance and the free model; the legacy key record read by hand is how six notebook features refused a person the node would have paid for (codebase analysis 2026-11-03, A10)',
     pattern: /getMemory\([^)]*['"]openrouter\.apikey['"]\)/,
-    skipDirs: ['src/services/ai/', 'src/services/secret-records.ts'],
+    skipDirs: ['src/services/ai/', 'src/services/secret/records.ts'],
   },
   {
     id: 'admin-password',

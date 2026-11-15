@@ -8,7 +8,7 @@
  *
  *   KEYS. The owner's key for a provider is `ai.apikey.provider.<id>`, an agent's is
  *   `ai.apikey.agent.<agent>.<id>`, both encrypted (services/encryption.ts), both under the reserved
- *   `ai.apikey.` prefix and on the credential list (services/secret-records.ts), so no general memory
+ *   `ai.apikey.` prefix and on the credential list (services/secret/records.ts), so no general memory
  *   endpoint reads or writes them. A key is set on the web page, in the owner's own session, never
  *   over MCP: a key given in a chat stays in that chat's history on a service the node does not
  *   control. An agent's legacy OpenRouter key (`openrouter.apikey.agent.<name>`) is still read.

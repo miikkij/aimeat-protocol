@@ -61,7 +61,7 @@ import type { AimeatConfig } from '../../config.js';
 import { authorizeRead } from '../access-guard.js';
 import { localAccountName, localAccountOf, isGEAI } from '../../utils/gaii.js';
 import { ecoMayReadKey } from '../ecosystem/access.js';
-import { shownMemoryValue } from '../secret-records.js';
+import { shownMemoryValue } from '../secret/records.js';
 import { workspaceMetaReader } from './meta.js';
 import { decideWorkspaceRead } from './access.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
@@ -193,7 +193,7 @@ export async function collectWorkspace(
   const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
   const { kept, leftOut } = await leaveMemories(reader, await reader.show(permitted, target), { kind: 'export', organismId: orgId });
   // A record that holds a credential leaves with the credential replaced, exactly as every other
-  // read door shows it (services/secret-records.ts). The workspace share record carries the scrypt
+  // read door shows it (services/secret/records.ts). The workspace share record carries the scrypt
   // hash of its password, and the bundle handed it to every member who could read the workspace
   // (secaudit 2026-10, collectWorkspace:share-password-hash-unmasked). A restore of the masked
   // record is a share no password opens, which is closed and not open.

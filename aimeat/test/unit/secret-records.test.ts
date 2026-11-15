@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which memory records hold a credential, and what a generic door shows of them
- *   (services/secret-records.ts). Written with the per-agent AI keys, and for the hole found on the
+ *   (services/secret/records.ts). Written with the per-agent AI keys, and for the hole found on the
  *   way: `decide.apikey` was not on the list, so the generic memory doors returned its ciphertext.
  * @version-history
  *   v1.0.1 — 2026-10-12 — The refusal for `openrouter.apikey` names PUT /v1/ai/providers/{id}/key, not
@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { isSecretRecordKey, shownMemoryValue, secretRecordWriteRefusal } from '../../src/services/secret-records.js';
+import { isSecretRecordKey, shownMemoryValue, secretRecordWriteRefusal } from '../../src/services/secret/records.js';
 import { agentKeyRecord } from '../../src/services/agent/ai-keys.js';
 
 describe('secret records', () => {

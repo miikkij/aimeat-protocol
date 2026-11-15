@@ -104,7 +104,7 @@ export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: 
     // a signal over agent-produced keys must read across the owner's GHII + every agent (the same
     // aggregation as GET /v1/memory?owner_scope=true), not the owner GHII keyspace alone — otherwise
     // every cross-agent signal falsely counts 0 and the step goes RED.
-    // What a signal sees of a record is what the memory doors show of it (services/secret-records.ts):
+    // What a signal sees of a record is what the memory doors show of it (services/secret/records.ts):
     // a credential reads as { configured: true }. The run keeps what a leaf saw, and the llm judge
     // sends it to the model, so neither ever holds the credential itself.
     // Both through presentMemories, the one presentation of a memory value, with the node's own

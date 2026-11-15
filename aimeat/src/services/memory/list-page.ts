@@ -28,7 +28,7 @@
  */
 import type { MemoryRecord, Storage } from '../../storage/interface.js';
 import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
-import { isSecretRecordKey, isWorkspaceShareKey, shownMemoryValue } from '../secret-records.js';
+import { isSecretRecordKey, isWorkspaceShareKey, shownMemoryValue } from '../secret/records.js';
 
 /** What a listing row carries besides its columns: the owner-scope shadow list and the classification warning. */
 type ListedMeta = MemoryMetaRow & { alsoUnder?: string[]; classificationWarning?: unknown };

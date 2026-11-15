@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The account's "Ask me before my secret is sent to a new address for the first time"
- *   (services/secret-host-ask-setting.ts), read and changed. The Access page's switch calls these, and
+ *   (services/secret/host-ask-setting.ts), read and changed. The Access page's switch calls these, and
  *   the MCP tool aimeat_secret_host_ask and its CLI twin call the same service.
  *
  *   GET /v1/ghii/me/secret-host-ask   what is in force, whether the owner chose it, the node's default
@@ -21,7 +21,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
-import { readSecretHostAsk, changeSecretHostAsk } from '../../services/secret-host-ask-setting.js';
+import { readSecretHostAsk, changeSecretHostAsk } from '../../services/secret/host-ask-setting.js';
 
 export function registerSecretHostAskRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   router.get('/v1/ghii/me/secret-host-ask', requireAuth(), requireLocalSession(), requireScope('memory:read'), async (req, res) => {

@@ -89,14 +89,14 @@ import type { Storage } from '../../storage/interface.js';
 import type { ExtensionCtx } from './ctx-contract.js';
 import type { FirstUseDecision, ForeignExtension, SecretResolutionRefusal } from '../owner/secrets.js';
 import { secretForeignExtensionMessage, secretFirstUseMessage, secretHostMessage, secretUnknownMessage } from '../owner/secrets.js';
-import { requestSecretApproval } from '../secret-approvals.js';
+import { requestSecretApproval } from '../secret/approvals.js';
 import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
 import { scopeIsCovered, SECRETS_MANAGE_SCOPE } from '../../utils/scope-coverage.js';
 import { saverAuthority } from '../workflow/trigger-authority.js';
 import { declaredUse, declaresHost } from './secret-uses.js';
 import { keepsPreAuditFirstUse } from './first-use-keep.js';
 import { namesUnvettedHost, HOST_FIELDS_UNVETTED_KEY } from './network-hosts.js';
-import { secretHostAskOn } from '../secret-host-ask-setting.js';
+import { secretHostAskOn } from '../secret/host-ask-setting.js';
 import { askOperatorsAboutSharedHost, sharedFirstUseMessage } from '../shared-secret-ask.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 
@@ -167,7 +167,7 @@ function onOperatorAllowlist(extConfig: Record<string, unknown> | undefined, hos
 
 /**
  * The words ctx.fetch throws for a refused resolution. A refused FIRST USE files the owner's question
- * (services/secret-approvals.ts) and names the address where the owner allows it with one press, so
+ * (services/secret/approvals.ts) and names the address where the owner allows it with one press, so
  * the AI that met the refusal can hand that address on, and the owner also hears it in the bell.
  */
 export async function secretRefusalText(
@@ -216,7 +216,7 @@ async function codeWriter(
     storage: Storage, config: AimeatConfig, extension: ExtensionCtx['extension'] | undefined, vaultOwnerGhii: string,
     /**
      * The owner's "Ask me before my secret is sent to a new address for the first time"
-     * (services/secret-host-ask-setting.ts). Off: code one of the owner's own agents or ecosystem
+     * (services/secret/host-ask-setting.ts). Off: code one of the owner's own agents or ecosystem
      * apps wrote runs with the owner's rights here too, as everywhere else (Jouni, 2026-10-25).
      */
     askOn = true,
@@ -251,7 +251,7 @@ async function codeWriter(
  *      chat connector and schedules keep working;
  *   3. ruling 6: the owner in person, a caller holding secrets:manage, or in an unattended run a
  *      trusted code writer.
- * Every refusal is answered with one press on the allow page (services/secret-approvals.ts).
+ * Every refusal is answered with one press on the allow page (services/secret/approvals.ts).
  */
 export async function decideFirstUse(deps: {
     storage: Storage;
@@ -285,7 +285,7 @@ export async function decideFirstUse(deps: {
     // binds by the keep, a declaration or the code writer: only the owner in person or a caller
     // holding secrets:manage chooses it, below (secaudit2026oct22).
     // The owner's "Ask me before my secret is sent to a new address for the first time", on unless
-    // switched off (services/secret-host-ask-setting.ts). Off: code the owner's agent wrote, and an
+    // switched off (services/secret/host-ask-setting.ts). Off: code the owner's agent wrote, and an
     // address such an agent set in a host field, choose the first host as before the audit; the
     // record still names who wrote the code (Jouni, 2026-10-25).
     const askOn = await secretHostAskOn(storage, config, vaultOwnerGhii);

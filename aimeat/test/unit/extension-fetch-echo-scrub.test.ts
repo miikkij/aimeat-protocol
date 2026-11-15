@@ -66,7 +66,7 @@ const storage = {
         return r?.hosts ?? [];
     },
     noteSecretUse: async () => undefined,
-    // The account's "ask before a new address" setting (services/secret-host-ask-setting.ts): none
+    // The account's "ask before a new address" setting (services/secret/host-ask-setting.ts): none
     // stored, so the node default applies.
     getMemory: async () => null,
 } as unknown as Storage;

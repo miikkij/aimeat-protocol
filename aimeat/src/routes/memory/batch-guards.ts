@@ -33,7 +33,7 @@ import type { BatchPublishRequest } from '../../services/memory/batch-write.js';
 import { publishAskOf, type PublishAsk } from '../../services/publish-requests/ask.js';
 import { callerOf } from '../../middleware/caller.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
-import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret/records.js';
 import { isAnonymousGaii } from './shared.js';
 import { MemoryWriteSchema } from '../../models/schemas.js';
 import { MEMORY_WRITE_VISIBILITIES } from '../../utils/visibility-words.js';

@@ -10,7 +10,7 @@
  *   caller names, with the visibility the caller chose. So a job reads none of the records the node
  *   keeps for itself, and writes over none of them. They are the records every memory door already
  *   guards: the reserved keys (utils/reserved-keys.ts, both kinds: the ones the node reads and acts
- *   on, and the ones only the node writes) and the credential records (services/secret-records.ts),
+ *   on, and the ones only the node writes) and the credential records (services/secret/records.ts),
  *   which the generic doors show redacted. The rule is the same for every caller, the account owner
  *   included, as it is for a decision run (services/decide/runs.ts) and a workflow step
  *   (services/workflow/store.ts reservedStepKeys).
@@ -27,7 +27,7 @@
  *     2026-09: A6-1, 573704db10ed).
  */
 import { isReservedServerKey } from '../../utils/reserved-keys.js';
-import { isSecretRecordKey } from '../secret-records.js';
+import { isSecretRecordKey } from '../secret/records.js';
 
 /** The refusal, which each door renders in its own way. The code and status every memory door uses. */
 export interface AiJobKeyRefusal {

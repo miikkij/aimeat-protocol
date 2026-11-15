@@ -37,7 +37,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner/secrets.js';
-import { withdrawSecretApproval, listOwnerSecretsWithUses } from '../services/secret-approvals.js';
+import { withdrawSecretApproval, listOwnerSecretsWithUses } from '../services/secret/approvals.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerSecretTools(

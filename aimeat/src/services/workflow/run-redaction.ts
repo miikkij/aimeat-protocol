@@ -9,7 +9,7 @@
  *   reads a credential record as the memory doors show it (eval-context.ts), so a new run never holds
  *   one. A run recorded before that can, and GET /v1/workflows/:id/runs and /runs/:runId, the
  *   connector's twin and the MCP tools all read runs through store.ts listRuns and getRun, which pass
- *   every run through here. The same redaction as the memory doors (services/secret-records.ts): no
+ *   every run through here. The same redaction as the memory doors (services/secret/records.ts): no
  *   second list of what counts as a credential.
  *
  *   The second rule here is who may read an observation at all. A json_field leaf holds the field
@@ -25,7 +25,7 @@
  *     wf-preflight-skips-step-authority, the related run-read gap).
  *   v1.0.0 — 2026-09-24 — Initial.
  */
-import { isSecretRecordKey, shownMemoryValue } from '../secret-records.js';
+import { isSecretRecordKey, shownMemoryValue } from '../secret/records.js';
 import type { WorkflowRun } from '../../models/workflow-schemas.js';
 
 /** What an llm leaf said about a credential record: its words can quote what it read. */

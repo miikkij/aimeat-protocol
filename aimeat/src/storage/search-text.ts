@@ -35,15 +35,15 @@ import type { MemoryRecord } from './interface.js';
 /** The value walk stops below this depth: the top-level value is depth 0. */
 export const SEARCH_VALUE_DEPTH = 6;
 
-/** A workspace's public-share record, the same pattern services/secret-records.ts masks on read. */
+/** A workspace's public-share record, the same pattern services/secret/records.ts masks on read. */
 const WORKSPACE_SHARE_KEY_RE = /^organism\.[^.]+\.w\.[^.]+\.meta\.share$/;
 
-/** The fields of a share record that no read door shows (services/secret-records.ts shownMemoryValue). */
+/** The fields of a share record that no read door shows (services/secret/records.ts shownMemoryValue). */
 const SHARE_SECRET_FIELDS = ['passwordHash', 'icsKeyHash'] as const;
 
 /**
  * The credential records every generic read door shows only as configured: the same keys as
- * services/secret-records.ts isSecretRecordKey, spelled here because storage does not import a
+ * services/secret/records.ts isSecretRecordKey, spelled here because storage does not import a
  * service (check:deps). test/unit/search-text-credentials.test.ts holds the two lists equal.
  */
 const CREDENTIAL_KEYS: ReadonlySet<string> = new Set(['openrouter.apikey', 'decide.apikey', 'commerce.psp']);

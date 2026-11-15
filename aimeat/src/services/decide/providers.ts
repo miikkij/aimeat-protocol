@@ -14,7 +14,7 @@
  *     limits measured on a development machine, not copied from the projects' pages.
  *   - `owner`: the owner's own address and key (Jouni ruled that they may). A memory record under
  *     the reserved `decide.` prefix, written by the owner in person only; its key sits in a record
- *     of its own on the credential list (services/secret-records.ts), so no generic door shows it.
+ *     of its own on the credential list (services/secret/records.ts), so no generic door shows it.
  *
  *   SELECTION, STRONGEST FIRST: the rule's (or the call's), the agent's, the owner's default, the
  *   node's. The same order the keys follow, so nobody learns two.

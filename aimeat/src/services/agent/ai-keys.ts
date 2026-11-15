@@ -12,7 +12,7 @@
  *   WHERE IT LIVES. `decide.apikey.agent.<name>` (TypeSafe) and `openrouter.apikey.agent.<name>`
  *   (OpenRouter), in the OWNER's namespace, encrypted the way the owner's own keys are
  *   (services/encryption.ts), under reserved prefixes (utils/reserved-keys.ts) and on the credential
- *   list (services/secret-records.ts): no generic memory door reads or writes them, search does not
+ *   list (services/secret/records.ts): no generic memory door reads or writes them, search does not
  *   show them, and an export carries `{ configured: true }` in their place.
  *
  *   THE ORDER, STRONGEST FIRST: the agent's own key, the owner's own key, the node's key. The decision

@@ -70,7 +70,7 @@ one of them is wrong even when it closes the hole.
    contradicts them breaks everyone who followed them; change both, and keep the old way working.
 8. **A refusal the owner cannot answer is a break.** Every refusal names what to do, in plain words,
    and the control it names exists. Where the owner should decide, give the one-press approval
-   (`services/permission-ask.ts`, `services/secret-approvals.ts`) instead of an error.
+   (`services/permission-ask.ts`, `services/secret/approvals.ts`) instead of an error.
 
 ## For hunters and verifiers
 

@@ -313,7 +313,7 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // 2026-09-28: the provider layer of System 2 (plan 04 and 11), each by its own prefix for the same
   // reason. `ai.providers.` says where the owner's AI calls go and with which model: an app that
   // could write one could point the owner's key at its own address. `ai.apikey.` holds the keys
-  // (also on the credential list, services/secret-records.ts). `ai.routing.` holds which provider
+  // (also on the credential list, services/secret/records.ts). `ai.routing.` holds which provider
   // answers first and whether a fallback may send data off this machine. The owner's routes
   // (/v1/ai/providers, /v1/ai/routing) and the propose-and-confirm tool are the writers. Searched
   // 2026-09-28: nothing writes any of the three through the memory API; they are new.

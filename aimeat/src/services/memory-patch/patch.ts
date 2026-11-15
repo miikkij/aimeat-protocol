@@ -60,7 +60,7 @@ import { ecoMayWriteKey } from '../ecosystem/access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { crewSitesWriteRefusal } from '../crews/def-store.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
-import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret-records.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from '../secret/records.js';
 import { presentMemory } from '../classification/present-memory.js';
 import { classifyAfterWrite } from '../classify-on-write.js';
 import { resolveWriteTarget, type WriteTargetAuth } from '../write-target.js';

@@ -11,7 +11,7 @@
  *   owner's own extension, a first use to a host the manifest declares for that secret, by code a
  *   trusted principal wrote, binds by itself (services/extension/secret-authority.ts), so the owner's
  *   apps, chat connector and schedules keep working without the owner signed in. Anything else asks
- *   the owner (services/secret-approvals.ts), and the question quotes `why`. Declaring is transparency
+ *   the owner (services/secret/approvals.ts), and the question quotes `why`. Declaring is transparency
  *   in the data-map sense: a reader of the extension sees where a person's key goes before running it.
  *
  *   A leaf module: the manifest builder, the first-use decision, the approval request and the

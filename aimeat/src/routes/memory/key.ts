@@ -91,7 +91,7 @@ import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem/access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
-import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
+import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret/records.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { warningField } from '../../services/classification-exits.js';

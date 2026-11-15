@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, finding 1.9).
  */
 import type { OwnerRecord, AgentRecord, MemoryRecord } from '../../storage/interface.js';
-import { isSecretRecordKey, isWorkspaceShareKey } from '../secret-records.js';
+import { isSecretRecordKey, isWorkspaceShareKey } from '../secret/records.js';
 import { presentMemories } from '../classification/present-memory.js';
 import type { ContentReader } from '../classification/reader.js';
 

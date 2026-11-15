@@ -22,7 +22,7 @@
  *
  *   THE FLOWS. The request store files every question that has an applier (making something public,
  *   an extension's emailPolicy, a crew model with its own address, switching off the secret host
- *   question). services/secret-approvals.ts and services/eco-capability-approvals.ts keep their
+ *   question). services/secret/approvals.ts and services/eco-capability-approvals.ts keep their
  *   answer on the row the answer governs (the secret, the outside app) and call tellAsker when the
  *   owner answers. services/shared-secret-ask.ts tells the operators through approverGhiis.
  *   services/permission-ask-notice.ts asks for a permission, which the agent's page answers.

@@ -74,7 +74,7 @@ import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 import { ownerScopeView, readsAsOwner } from '../../owner/scope-read.js';
 import { organismReadableRecords } from '../../organism/namespace-access.js';
 import { readWorkspaceManifest } from '../../workspace/meta.js';
-import { shownMemoryValue } from '../../secret-records.js';
+import { shownMemoryValue } from '../../secret/records.js';
 import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';
 import type { DiscoveryPlace } from '../types.js';
 import { withoutFlagHiddenMemory } from '../../moderation-flags.js';

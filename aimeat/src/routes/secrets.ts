@@ -58,7 +58,7 @@ import { SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
 import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner/secrets.js';
 import {
   listOwnerSecretsWithUses, readApprovalRequest, approveSecretUse, declineSecretUse, withdrawSecretApproval,
-} from '../services/secret-approvals.js';
+} from '../services/secret/approvals.js';
 
 export function secretsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -99,7 +99,7 @@ export function secretsRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, r.data));
   });
 
-  // ── Approvals: the owner answers a refused first use (services/secret-approvals.ts) ──
+  // ── Approvals: the owner answers a refused first use (services/secret/approvals.ts) ──
   // Reading the question and answering it are the account holder's in person: an approval decides
   // where the person's credential goes, and no agent, app or visitor answers that for them.
   const inPerson = (req: Request, res: Response): string | null => {

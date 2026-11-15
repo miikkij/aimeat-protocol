@@ -424,7 +424,7 @@
         "aimeat/src/services/receivers/manage.ts",
         "aimeat/src/tool-catalog/definitions/receivers.ts"
       ],
-      "digest": "sha256:f4ed60c360fe2f8531ab1687"
+      "digest": "sha256:23485dcd6f01e1da985ab862"
     },
     "node:aimeat-agent-capability": {
       "reviewedOn": "2026-11-15",
@@ -451,7 +451,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:b4da07b0251e84a22e4d177a",
+      "digest": "sha256:c407feacafb79c585dcade4f",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -939,8 +939,8 @@
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "2df6f6444c486365",
-      "aimeat/src/routes/memory/key.ts": "78699c0667443947",
-      "aimeat/src/services/memory/bin.ts": "4f071aad66cc88d3",
+      "aimeat/src/routes/memory/key.ts": "68aa87147c323b2f",
+      "aimeat/src/services/memory/bin.ts": "99a904bb4e2ce94d",
       "aimeat/src/routes/memory-hands.ts": "e59db57f45bc760f",
       "aimeat/src/routes/owners/export.ts": "ad1dce804aa88c2c",
       "aimeat/src/services/owner/erasure.ts": "d0f8f4e955564215",
@@ -1006,7 +1006,7 @@
     "node:aimeat-receivers": {
       "aimeat/src/services/receivers/contract.ts": "e65c9b334e14bd87",
       "aimeat/src/services/receivers/receive.ts": "3495190b1619b057",
-      "aimeat/src/services/receivers/manage.ts": "1ea16e7f680c543e",
+      "aimeat/src/services/receivers/manage.ts": "628e6d12d193028f",
       "aimeat/src/tool-catalog/definitions/receivers.ts": "58f218873b049c7d"
     },
     "node:aimeat-context": {

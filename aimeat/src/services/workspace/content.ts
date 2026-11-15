@@ -48,7 +48,7 @@ import { agentBarred, agentBarredMessage } from '../organism/agent-access.js';
 import { workspaceMetaReader, type WorkspaceMetaReader } from './meta.js';
 import { memoryTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
-import { shownMemoryValue } from '../secret-records.js';
+import { shownMemoryValue } from '../secret/records.js';
 
 export interface WorkspaceContentArgs {
   organismId: string;
@@ -136,7 +136,7 @@ export async function loadWorkspaceContent(
   const loaded = args.archived === 'only'
     ? all.filter(r => r.archived || r.key === `${root}meta.manifest` || r.key === `${root}meta.readme`)
     : all;
-  // Every value handed out passes the credential mask (services/secret-records.ts), the half of
+  // Every value handed out passes the credential mask (services/secret/records.ts), the half of
   // presentMemories the reader does not do: the share record shows has_password, never its hash.
   const hydrate = lazy ? async (rows: MemoryRecord[]) => (await hydrateRows(storage, rows)).map(masked) : async (rows: MemoryRecord[]) => rows;
   /** One picked meta record, whole. */

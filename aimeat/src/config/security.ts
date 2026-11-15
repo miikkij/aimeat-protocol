@@ -127,7 +127,7 @@ export interface SecurityDoorConfig {
 
   /**
    * The node's default for each account's "Ask me before my secret is sent to a new address for the
-   * first time" (services/secret-host-ask-setting.ts). On: the first send of an owner's vault secret
+   * first time" (services/secret/host-ask-setting.ts). On: the first send of an owner's vault secret
    * that has no address yet, to an address chosen by code one of the owner's agents wrote or by a host
    * field such an agent set, asks the owner first, unless that agent holds secrets:manage. Off: it is
    * sent and the address is kept, as before the audit. An account's own choice wins over it. Read on

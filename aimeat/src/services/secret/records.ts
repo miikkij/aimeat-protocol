@@ -1,5 +1,5 @@
 /**
- * @file src/services/secret-records.ts
+ * @file src/services/secret/records.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The two memory records that hold a credential, and what every generic memory door
@@ -50,7 +50,7 @@
  *     matched by prefix because the agent's name is the tail of the key.
  *   v1.0.0 — 2026-09-16 — Initial.
  */
-import { PSP_RECORD_KEY, PSP_SECRET_FIELDS, pspSecretHint } from '../commerce/psp-secrets.js';
+import { PSP_RECORD_KEY, PSP_SECRET_FIELDS, pspSecretHint } from '../../commerce/psp-secrets.js';
 
 export const OPENROUTER_KEY_RECORD = 'openrouter.apikey';
 

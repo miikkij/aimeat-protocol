@@ -91,7 +91,7 @@ import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, ser
 import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
 import { settleRequestsForBinnedRecord } from '../publish-requests/store.js';
 import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
-import { isSecretRecordKey, secretRecordBinRefusal } from '../secret-records.js';
+import { isSecretRecordKey, secretRecordBinRefusal } from '../secret/records.js';
 import { legacyPacingWriteRefusal, type LegacyPacingWriteRefusal } from '../legacy-pacing-write.js';
 import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
 import { memoryCapRefusal, memoryWriterAsk } from './publish-gate.js';
@@ -286,7 +286,7 @@ async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'dele
     const refusal = serverWrittenKeyRefusal(req.key);
     return { ok: false, code: refusal.code, message: refusal.message, status: 403 };
   }
-  // A credential record (services/secret-records.ts: the owner's AI keys, the decision model's key, a
+  // A credential record (services/secret/records.ts: the owner's AI keys, the decision model's key, a
   // seller's Stripe key) is neither removed nor put back here, by anyone: the generic write doors
   // already refuse it, and the bin was the way around them. Any principal holding memory:delete
   // could remove the owner's key, and memory:write could put a replaced key back. The owner acts on

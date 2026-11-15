@@ -113,7 +113,7 @@ import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
 import { runReader, hiddenStepInputError } from './run-reader.js';
 import { memoryTarget } from '../classification/labels.js';
-import { shownMemoryValue } from '../secret-records.js';
+import { shownMemoryValue } from '../secret/records.js';
 import { openItemLink } from '../notifications/links.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;

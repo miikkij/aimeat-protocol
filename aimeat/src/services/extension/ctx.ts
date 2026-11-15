@@ -438,7 +438,7 @@ async function resolveOutboundSecrets(
         headers,
         url,
     });
-    // A refused first use files the owner's question and names its address (services/secret-approvals.ts).
+    // A refused first use files the owner's question and names its address (services/secret/approvals.ts).
     if (!resolved.ok) throw new Error(await secretRefusalText({ ...deps, vaultOwnerGhii: vaultOwner, extName }, resolved));
     // Which headers actually carried a secret — the ones a cross-origin redirect must not inherit.
     const sensitive = Object.entries(headers ?? {})

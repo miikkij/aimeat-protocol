@@ -2965,7 +2965,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A screenshot-file existence check."
     },
-    "src/services/secret-host-ask-setting.ts": {
+    "src/services/secret/host-ask-setting.ts": {
       "reads": {
         "getMemory": 2
       },

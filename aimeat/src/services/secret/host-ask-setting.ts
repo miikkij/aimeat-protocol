@@ -1,5 +1,5 @@
 /**
- * @file src/services/secret-host-ask-setting.ts
+ * @file src/services/secret/host-ask-setting.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One account's "Ask me before my secret is sent to a new address for the first time":
@@ -9,7 +9,7 @@
  *   with the owner's rights, and the record still names who wrote it. The one exception is this
  *   setting. While it is on, the first send of an owner's vault secret that has no address yet, to an
  *   address chosen by code one of the owner's agents wrote or by a host field such an agent set, asks
- *   the owner first under the approval standard (services/secret-approvals.ts files the question; an
+ *   the owner first under the approval standard (services/secret/approvals.ts files the question; an
  *   agent holding secrets:manage is not asked about). While it is off, that send goes through and
  *   the address is kept, as before the audit (services/extension/secret-authority.ts decideFirstUse).
  *
@@ -31,14 +31,14 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, leads 68 and 386 reworked; the approval standard).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { CallerContext } from './caller-context.js';
-import { emitChange } from './event-bus.js';
-import { fileAsk, publishRequestedBody, requesterOf } from './publish-requests/ask.js';
-import { localAccountName } from '../utils/gaii.js';
-import { SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { CallerContext } from '../caller-context.js';
+import { emitChange } from '../event-bus.js';
+import { fileAsk, publishRequestedBody, requesterOf } from '../publish-requests/ask.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { SECRETS_MANAGE_SCOPE } from '../../utils/scope-coverage.js';
+import { logger } from '../../utils/logger.js';
 
 export const SECRET_HOST_ASK_FIELD = 'secret_host_ask';
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description aimeat_secret_host_ask on the node's own MCP surface: the owner's "Ask me before my
  *   secret is sent to a new address for the first time", read and switched from a chat. One service
- *   with GET and PUT /v1/ghii/me/secret-host-ask (services/secret-host-ask-setting.ts); the CLI twin
+ *   with GET and PUT /v1/ghii/me/secret-host-ask (services/secret/host-ask-setting.ts); the CLI twin
  *   proxies those routes (tool-dispatch/tool-call-defs-secrets.ts).
  *
  *   memory:read reads it, as the GET route does; switching takes memory:write, as the PUT route does,
@@ -22,7 +22,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
-import { readSecretHostAsk, changeSecretHostAsk } from '../services/secret-host-ask-setting.js';
+import { readSecretHostAsk, changeSecretHostAsk } from '../services/secret/host-ask-setting.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 

@@ -1,5 +1,5 @@
 /**
- * @file src/services/secret-approvals.ts
+ * @file src/services/secret/approvals.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner allows, with one press, a first use of a vault secret the node refused, and
@@ -38,16 +38,16 @@
  *     removed or stored again) answers APPROVAL_NOT_FOUND in plain words and allows nothing.
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, v58 and v59 follow-up).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { SecretApproval, SecretRecord } from '../storage/types/secrets.js';
-import { notify, type NotifyInput } from './notify.js';
-import { emitChange } from './event-bus.js';
-import { declaredHostsFor, declaresHost, usesSecretsOf } from './extension/secret-uses.js';
-import { listOwnerSecrets, purposeText, type SecretSummary } from './owner/secrets.js';
-import { tellAsker, closeQuestion } from './approval-standard.js';
-import { localAccountName } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { SecretApproval, SecretRecord } from '../../storage/types/secrets.js';
+import { notify, type NotifyInput } from '../notify.js';
+import { emitChange } from '../event-bus.js';
+import { declaredHostsFor, declaresHost, usesSecretsOf } from '../extension/secret-uses.js';
+import { listOwnerSecrets, purposeText, type SecretSummary } from '../owner/secrets.js';
+import { tellAsker, closeQuestion } from '../approval-standard.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
 
 /** The most requests one secret holds waiting at once. */
 const MAX_PENDING = 10;

@@ -1333,7 +1333,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/secret-records.ts :: set :: SECRET_RECORD_KEYS": {
+    "src/services/secret/records.ts :: set :: SECRET_RECORD_KEYS": {
       "count": 1,
       "reason": "DEBT"
     },

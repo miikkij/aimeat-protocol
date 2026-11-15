@@ -24,7 +24,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { memoryPageWithValues, shownMemoryBytes } from '../../src/services/memory/list-page.js';
-import { shownMemoryValue } from '../../src/services/secret-records.js';
+import { shownMemoryValue } from '../../src/services/secret/records.js';
 
 const SQLITE_PATH = `./test/.memory-list-page-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

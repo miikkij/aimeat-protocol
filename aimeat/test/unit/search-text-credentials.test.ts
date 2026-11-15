@@ -6,13 +6,13 @@
  *   search-text.ts:searchableValue:secret-record-values-indexed). Search matches a word at its start,
  *   so a hit or a miss on a chosen prefix recovered the value every read door masks a character at a
  *   time. The record stays findable by its key and the key's segments; every other record's value is
- *   indexed as before, and the credential keys are the ones services/secret-records.ts masks.
+ *   indexed as before, and the credential keys are the ones services/secret/records.ts masks.
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
 import { buildSearchBlob, isIndexedCredentialKey } from '../../src/storage/search-text.js';
-import { isSecretRecordKey, SECRET_RECORD_KEYS, AGENT_KEY_PREFIXES } from '../../src/services/secret-records.js';
+import { isSecretRecordKey, SECRET_RECORD_KEYS, AGENT_KEY_PREFIXES } from '../../src/services/secret/records.js';
 import type { MemoryRecord } from '../../src/storage/interface.js';
 
 const rec = (key: string, value: unknown): MemoryRecord => ({

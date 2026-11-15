@@ -82,7 +82,7 @@ async function sellerWithUsdOffer(label: string, offerId: string, amountMicros: 
     const pub = await json('/v1/agents/vendor/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify(offers) });
     assert(pub.status === 200, `publish offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
     // Through the seller's own payout routes: commerce.psp holds a credential, so the general memory
-    // doors refuse it (services/secret-records.ts).
+    // doors refuse it (services/secret/records.ts).
     const p = psp as { address?: string; secretKey?: string };
     if (p.address) {
         const w = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: p.address }) });
