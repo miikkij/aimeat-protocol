@@ -23,6 +23,7 @@
  *   bogus level · spoofed principal · attach-by-id · non-carrying tool · shell path · scope gate
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-connector
  * @version-history
+ *   2026-11-15 — Audit L018: a catalog tool declaring ai_provenance that the connector does not expose fails the test.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.0 — 2026-10-08 — Phase 5 flips: POST /v1/boards/:id/posts records a declaration (aiprov D5),
  *     so aimeat_board_post through the connector stores the crew's level and human involvement
@@ -226,11 +227,10 @@ await test('CONNECTOR MCP: every catalog tool that declares ai_provenance carrie
   assert(expected.length > 0, 'the catalog declares ai_provenance on no tool at all — check the catalog, not the connector');
   const tools = await mcp!.listTools();
   const byName = new Map(tools.tools.map(t => [t.name, t]));
-  const missing = expected.filter(n => {
-    const t = byName.get(n);
-    if (!t) return false;                       // not exposed by the connector at all — not this test's business
-    return !('ai_provenance' in ((t.inputSchema as any)?.properties ?? {}));
-  });
+  // A tool the connector does not expose at all is a crew losing the surface it declares through.
+  const absent = expected.filter(n => !byName.has(n));
+  assert(absent.length === 0, `${absent.length} catalog tool(s) declaring ai_provenance are not on the connector: ${absent.join(', ')}`);
+  const missing = expected.filter(n => !('ai_provenance' in ((byName.get(n)!.inputSchema as any)?.properties ?? {})));
   assert(missing.length === 0,
     `${missing.length} connector tool(s) advertise ai_provenance in the catalog but drop it from their schema: ${missing.join(', ')}`);
 });

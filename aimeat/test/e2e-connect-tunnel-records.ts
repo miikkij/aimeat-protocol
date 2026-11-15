@@ -8,6 +8,8 @@
 // private workspace) is REJECTED at subscribe and receives NO record push (push == REST-read access).
 // 8b-8d (secaudit 2026-10, r48): a cancel marker pushes task.cancelled only for a task of its own
 // account; another account's marker pushes nothing, and a same-owner coordinator agent's still does.
+// @version-history
+//   2026-11-15 — Audit M267: tests 3 and 6 end their silence window with a push that must arrive inside the same window.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -148,6 +150,12 @@ await test('3. A record UPDATE pushes op:updated; a DRAFT write pushes nothing',
   assert(dr.status === 201, `draft write ${dr.status}`);
   const none = await t.waitForDeliver(800);
   assert(none === null, `draft must not push, but got ${JSON.stringify(none?.payload)}`);
+  // The silence counts only if a push arrives within the same 800 ms on this socket, and it is the
+  // published record, not a late draft push.
+  const pub = await writeRecord(A.token, 'rec2b', { id: 'rec2b', title: 'Published after the draft' });
+  assert(pub.status === 201, `published write ${pub.status}`);
+  const alive = await t.waitForDeliver(800);
+  assert((alive?.payload as any)?.id === 'rec2b', `no push of the published record within the silence window: ${JSON.stringify(alive?.payload)}`);
   await t.close();
 });
 
@@ -245,14 +253,29 @@ await test("5. B's agent subscribe is REJECTED (access_denied) for the private w
 });
 
 await test("6. A write produces NO record push to B's agent (no read ⇒ no push)", async () => {
+  // A second workspace B may read, so the same socket proves the push path is alive within the window.
+  const WS2 = 'ws-rec2';
+  const reg = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [WS, WS2].map(id => ({ id, name: id, createdAt: new Date().toISOString(), createdBy: A.name })) }, visibility: 'private' }) });
+  assert(reg.status === 200 || reg.status === 201, `registry ${reg.status}: ${JSON.stringify(reg.body.error)}`);
+  const man = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${orgId}.w.${WS2}.meta.manifest`, value: { manifestVersion: '1.0', id: orgId, name: WS2, kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: SPACE, backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] }, visibility: 'private' }) });
+  assert(man.status === 200 || man.status === 201, `manifest ${man.status}: ${JSON.stringify(man.body.error)}`);
+  const g = await json(`/v1/organisms/${orgId}/workspace-access/grant`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ws: WS2, grantee: B.name, role: 'viewer' }) });
+  assert(g.status === 200, `grant ${g.status}: ${JSON.stringify(g.body.error)}`);
+
   const t = await TunnelClient.connect(BASE, bAgent.token);
   await t.waitForBacklog(1000);
-  t.subscribe([{ organism_id: orgId, ws: WS, space: SPACE }]);
-  await t.waitForSubscribed(2000);  // rejected, but drains the ack
+  t.subscribe([{ organism_id: orgId, ws: WS, space: SPACE }, { organism_id: orgId, ws: WS2, space: SPACE }]);
+  const ack = await t.waitForSubscribed(2000);
+  assert(((ack?.payload as any)?.accepted ?? []).length === 1, `only ${WS2} is accepted: ${JSON.stringify(ack?.payload)}`);
   const w = await writeRecord(A.token, 'rec3', { id: 'rec3', title: 'Owner-only' });
   assert(w.status === 201, `write ${w.status}`);
   const leaked = await t.waitForDeliver(1000);
   assert(leaked === null, `B's agent must receive NO record push, but got ${JSON.stringify(leaked?.payload)}`);
+  const w2 = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${orgId}.w.${WS2}.${SPACE}.rec3b`, value: { id: 'rec3b' }, visibility: 'private' }) });
+  assert(w2.status === 201, `write in ${WS2}: ${w2.status} ${JSON.stringify(w2.body.error)}`);
+  const alive = await t.waitForDeliver(1000);
+  const p = alive?.payload as any;
+  assert(p?.ws === WS2 && p?.id === 'rec3b', `no push from the readable workspace within the silence window: ${JSON.stringify(p)}`);
   await t.close();
 });
 
