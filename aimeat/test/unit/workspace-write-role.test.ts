@@ -6,7 +6,7 @@
  *   POST /v1/consent's explicit `role`, never the purpose text. Until 2026-11-08 the write check read
  *   `purpose === 'workspace-contributor'`, so a purpose typed as that word gave write access, while the
  *   Data Wallet's Read and write was filed read-only for every dated grant. Driven through the shared
- *   service (grantConsent, services/consent-write.ts) and the shared check
+ *   service (grantConsent, services/consent/write.ts) and the shared check
  *   (checkOrganismNamespaceAccess, services/organism/namespace-access.ts) on SQLite.
  * @structure
  *   - the attack: a purpose word grants no write; a caller's own metadata.wsRole grants no write
@@ -23,7 +23,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkOrganismNamespaceAccess } from '../../src/services/organism/namespace-access.js';
-import { grantConsent } from '../../src/services/consent-write.js';
+import { grantConsent } from '../../src/services/consent/write.js';
 import { listWorkspaceMemberRoles, LEGACY_ROLE_PURPOSE_BEFORE } from '../../src/services/workspace/roles.js';
 import type { OrganismRecord, GHIIRecord, ConsentRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';

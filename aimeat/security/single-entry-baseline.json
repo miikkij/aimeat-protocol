@@ -185,7 +185,7 @@
         "count": 1,
         "why": "readerOf: an unattended run is ['operator'] without 'owner' and reads as an AI; the reader kind is not the operator question isOperatorCaller answers (moved from classification/reader-kind.ts, codebase analysis 2026-11-03, B1)."
       },
-      "src/services/consent-write.ts": {
+      "src/services/consent/write.ts": {
         "count": 1,
         "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
       },
@@ -269,7 +269,7 @@
         "count": 3,
         "why": "readerOf tells a person from an AI by the roles (an app and a visitor count as a person there, which isOwnerInPerson does not answer), and credentialVia names a signed-in session; neither decides access (moved from classification/reader-kind.ts, codebase analysis 2026-11-03, B1)."
       },
-      "src/services/consent-write.ts": {
+      "src/services/consent/write.ts": {
         "count": 1,
         "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
       },
@@ -383,7 +383,7 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/consent-write.ts": {
+      "src/services/consent/write.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

@@ -49,7 +49,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { grantConsent } from '../consent-write.js';
+import { grantConsent } from '../consent/write.js';
 import { endShares, isLiveShare, setShareMeta, shareMetaOf, sharePatternOf } from '../parties/shares.js';
 import { partyRefOf } from '../parties/contract.js';
 import { changeParty } from '../parties/store.js';

@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { groupConsentAudit, targetOf, organismIdsIn, bucketConsentAudit, auditWithin } from '../../src/services/consent-audit-groups.js';
+import { groupConsentAudit, targetOf, organismIdsIn, bucketConsentAudit, auditWithin } from '../../src/services/consent/audit-groups.js';
 
 const ORG = 'd0d999ef-712b-408b-91e9-e074cfac3bae';
 const row = (accessorGaii: string, memoryKey: string, timestamp: string, allowed = false, action = 'read') => ({ accessorGaii, memoryKey, timestamp, allowed, action });

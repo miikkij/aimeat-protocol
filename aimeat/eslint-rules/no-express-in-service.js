@@ -26,7 +26,7 @@
  *
  *   WHAT TO DO INSTEAD. Take `{ owner, roles, scopes }` (or the resolved identity) as a parameter.
  *   If a service needs to WRITE a response, it does not: it returns a refusal and each door renders
- *   it — see services/consent-write.ts and services/extension-access/metered-response.ts's PaywallResponder
+ *   it — see services/consent/write.ts and services/extension-access/metered-response.ts's PaywallResponder
  *   for the two shapes that work.
  *
  *   THE SEED. Seven services imported express on 2026-08-11 and are listed below with what each one
@@ -79,7 +79,7 @@ export const noExpressInService = {
         + 'the MCP/REST drift: canManageInstalledExt was the correct ownership check for an extension '
         + 'and took a Request, so the MCP tools could not call it and called nothing instead — any '
         + 'agent with ext:write could uninstall another owner\'s extension. If the service needs to '
-        + 'write a response, return a refusal and let the door render it (services/consent-write.ts), '
+        + 'write a response, return a refusal and let the door render it (services/consent/write.ts), '
         + 'or take a structural responder (services/extension-access/metered-response.ts PaywallResponder).',
     },
   },

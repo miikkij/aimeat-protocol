@@ -32,7 +32,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
-import { grantConsent } from '../consent-write.js';
+import { grantConsent } from '../consent/write.js';
 import { consentCollectionMethod } from '../mydata-receipt.js';
 import {
     PARTY_KINDS, PARTY_MANAGE_SCOPE, MAX_KEYS_PER_PARTY, partyRefOf, partyView, validatePartyName,

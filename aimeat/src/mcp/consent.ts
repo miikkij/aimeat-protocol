@@ -53,7 +53,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { grantConsent, revokeConsent } from '../services/consent-write.js';
+import { grantConsent, revokeConsent } from '../services/consent/write.js';
 import { consentRecordFor, listConsentsFor } from '../services/consent/consent-read.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -169,7 +169,7 @@ export function registerConsentTools(
                 ...(allow_url_key !== undefined ? { allow_url_key } : {}),
                 ...(terms_required !== undefined ? { terms_required } : {}),
             };
-            // ONE implementation (services/consent-write.ts). This tool used to build the record
+            // ONE implementation (services/consent/write.ts). This tool used to build the record
             // itself, which is why it accepted a recipient no access check will ever match, wrote no
             // audit entry, and never refreshed the federation directory — three things the REST door
             // has always done for the same operation.
@@ -185,7 +185,7 @@ export function registerConsentTools(
             });
             if (!granted.ok) {
                 // Nothing was granted, and the owner was asked: the answer carries the request so the
-                // agent can name it to them (services/consent-write.ts, recipient '*' publish gate).
+                // agent can name it to them (services/consent/write.ts, recipient '*' publish gate).
                 const asked = granted.publishRequest ? `\n${JSON.stringify({ publish_request: granted.publishRequest }, null, 2)}` : '';
                 return { content: [{ type: 'text' as const, text: `${granted.code}: ${granted.message}${asked}` }], isError: true };
             }

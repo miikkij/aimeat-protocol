@@ -37,8 +37,8 @@ import { countConsentRecipients } from '../../storage/consent-recipient.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { getPendingConsentAudit } from '../consent-audit-buffer.js';
-import { groupConsentAudit, bucketConsentAudit, organismIdsIn, type AuditGroup, type AuditBucket } from '../consent-audit-groups.js';
-import { CONSENT_QUOTA } from '../consent-write.js';
+import { groupConsentAudit, bucketConsentAudit, organismIdsIn, type AuditGroup, type AuditBucket } from '../consent/audit-groups.js';
+import { CONSENT_QUOTA } from '../consent/write.js';
 
 export interface DataWalletOverview {
   consents: { consents: Array<Record<string, unknown>>; total: number };

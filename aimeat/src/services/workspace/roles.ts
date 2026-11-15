@@ -15,7 +15,7 @@
  *   the owner).
  *
  *   THE ROLE IS `metadata.wsRole`, which only the node writes: this module, and POST /v1/consent with
- *   an explicit `role` (consentWsRole below, called from services/consent-write.ts, which drops a
+ *   an explicit `role` (consentWsRole below, called from services/consent/write.ts, which drops a
  *   caller's own `wsRole`). The purpose is free text the person typed, so it decides no right. A
  *   consent filed before LEGACY_ROLE_PURPOSE_BEFORE without a wsRole still reads its role from the
  *   purpose word, because that is how the role was kept then (wsRoleOf).

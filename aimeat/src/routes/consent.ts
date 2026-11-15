@@ -41,13 +41,13 @@ import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
 import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { grantConsent, revokeConsent } from '../services/consent-write.js';
+import { grantConsent, revokeConsent } from '../services/consent/write.js';
 import { consentRecordFor, listConsentsFor } from '../services/consent/consent-read.js';
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 import { callerOf } from '../middleware/caller.js';
 import { consentCollectionMethod } from '../services/mydata-receipt.js';
-import { auditWithin, groupConsentAudit } from '../services/consent-audit-groups.js';
+import { auditWithin, groupConsentAudit } from '../services/consent/audit-groups.js';
 
 /** A query value that parses as a time, as ISO; anything else is absent. */
 function isoParam(v: unknown): string | undefined {
@@ -80,7 +80,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             role,
         } = req.body ?? {};
 
-    // ONE implementation (services/consent-write.ts): the recipient shapes, the quota, the record,
+    // ONE implementation (services/consent/write.ts): the recipient shapes, the quota, the record,
     // the audit entry and the directory refresh. The MCP tool calls the same function, which is how
     // it stopped accepting recipients nothing matches and started leaving an audit trail.
     const granted = await grantConsent({ storage, config, onDirectoryChange }, {

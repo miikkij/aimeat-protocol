@@ -1,5 +1,5 @@
 /**
- * @file src/services/consent-write.ts
+ * @file src/services/consent/write.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Granting and revoking a consent, once, for every surface that can do it.
@@ -70,25 +70,25 @@
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
 import { randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage, ConsentRecord } from '../storage/interface.js';
-import { auditDataAccess } from './consent.js';
-import { emitChange } from './event-bus.js';
-import { logger } from '../utils/logger.js';
-import { recordAccountEvent } from './account/events.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isSameOwner, localAccountName, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, ConsentRecord } from '../../storage/interface.js';
+import { auditDataAccess } from '../consent.js';
+import { emitChange } from '../event-bus.js';
+import { logger } from '../../utils/logger.js';
+import { recordAccountEvent } from '../account/events.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { isSameOwner, localAccountName, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
 import {
     CONSENT_REACH_ALIAS_REMOVED_IN, CONSENT_REACH_INPUTS, consentReachOf, defaultConsentReach, isConsentReachAlias,
-} from '../utils/consent-reach.js';
-import { noteDeprecatedUse, removedFrom } from './deprecation.js';
-import { COLLECTION_METHOD_KEY } from './mydata-receipt.js';
-import { notifyDirectoryChange } from './directory.js';
-import { callerFromAuth } from './caller-context.js';
-import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
-import { isNamedShare, normalizePartyShare, normalizeVisitorShare, packageOfPattern, sharesEnded } from './parties/shares.js';
-import { consentWsRole, WS_ROLE_KEY } from './workspace/roles.js';
-import { loadOwnerAgents } from './db/owner-identity.js';
+} from '../../utils/consent-reach.js';
+import { noteDeprecatedUse, removedFrom } from '../deprecation.js';
+import { COLLECTION_METHOD_KEY } from '../mydata-receipt.js';
+import { notifyDirectoryChange } from '../directory.js';
+import { callerFromAuth } from '../caller-context.js';
+import { fileAsk, publishAskOf, publishRequestedBody } from '../publish-requests/ask.js';
+import { isNamedShare, normalizePartyShare, normalizeVisitorShare, packageOfPattern, sharesEnded } from '../parties/shares.js';
+import { consentWsRole, WS_ROLE_KEY } from '../workspace/roles.js';
+import { loadOwnerAgents } from '../db/owner-identity.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;

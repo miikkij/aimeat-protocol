@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { grantConsent, revokeConsent } from '../../src/services/consent-write.js';
+import { grantConsent, revokeConsent } from '../../src/services/consent/write.js';
 
 const NODE = 'consent-event-node';
 const GHII = `alice@${NODE}`;

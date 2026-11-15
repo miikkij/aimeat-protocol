@@ -138,7 +138,7 @@ function isActiveFederationConsent(c: { scope: string; status: string; expires?:
  * bootstrap (server-bootstrap/service-init.ts).
  *
  * A write that changes who is listed calls notifyDirectoryChange() itself, instead of depending on
- * its caller to pass a callback: services/consent-write.ts and the consent expiry in
+ * its caller to pass a callback: services/consent/write.ts and the consent expiry in
  * services/consent.ts both reach the index through this, whichever door or job ran them.
  */
 let directoryNotifier: (() => void) | null = null;

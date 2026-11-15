@@ -100,7 +100,7 @@ import { TEST_MONEY_HANDLER_ID } from '../../commerce/test-money-handler.js';
 import { readPsp } from '../../commerce/psp-record.js';
 import { refundCollected, refundSentence, recordUndeliveredPayment } from '../../commerce/undelivered-payment.js';
 import { isValidEmail } from '../../utils/email-validator.js';
-import { grantConsent } from '../consent-write.js';
+import { grantConsent } from '../consent/write.js';
 import { PARTY_NAME_RE, partyRefOf, partyView, type PartyKind, type PartyRecord } from '../parties/contract.js';
 import { newPartyKey, newPartyKeyId, newPartyUid } from '../parties/keys.js';
 import { insertParty, findPartyByUid, removeParty, changeParty } from '../parties/store.js';

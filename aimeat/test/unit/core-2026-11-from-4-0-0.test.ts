@@ -41,7 +41,7 @@ import { initSessionAuth } from '../../src/auth/middleware.js';
 import { initStats } from '../../src/services/stats.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { requestIdMiddleware } from '../../src/middleware/request-id.js';
-import { grantConsent } from '../../src/services/consent-write.js';
+import { grantConsent } from '../../src/services/consent/write.js';
 import { federationPeerRouter } from '../../src/routes/federation-peer.js';
 import { wellknownRouter } from '../../src/routes/wellknown.js';
 import { bootstrapRouter } from '../../src/routes/bootstrap.js';

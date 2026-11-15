@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for a consent to everyone: the consent is granted now,
- *   as the owner, through services/consent-write.ts grantConsent, the same function POST /v1/consent
+ *   as the owner, through services/consent/write.ts grantConsent, the same function POST /v1/consent
  *   and aimeat_consent_grant run (secaudit 2026-10, grantConsent:wildcard-recipient-skips-publish-gate).
  *
  *   NOTHING WAS STORED WHILE IT WAITED. A consent has no level below `*` to keep it at, so the door
@@ -16,7 +16,7 @@
  *   2026-10-20 — Initial (secaudit 2026-10, grantConsent:wildcard-recipient-skips-publish-gate).
  */
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
-import { grantConsent } from '../consent-write.js';
+import { grantConsent } from '../consent/write.js';
 import { namespaceOfOwner } from './apply-memory.js';
 
 export async function applyConsentPublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

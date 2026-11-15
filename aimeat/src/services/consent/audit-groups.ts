@@ -1,5 +1,5 @@
 /**
- * @file src/services/consent-audit-groups.ts
+ * @file src/services/consent/audit-groups.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The consent audit trail grouped the way a person reads it: who tried what, how many

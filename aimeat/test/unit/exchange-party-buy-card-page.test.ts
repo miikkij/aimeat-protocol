@@ -36,7 +36,7 @@ vi.mock('../../src/utils/url-validator.js', async (orig) => ({
         return new Response(JSON.stringify(stripeSession), { status: 200 });
     },
 }));
-vi.mock('../../src/services/consent-write.js', async (orig) => {
+vi.mock('../../src/services/consent/write.js', async (orig) => {
     const real = await orig<Record<string, unknown>>();
     return {
         ...real,

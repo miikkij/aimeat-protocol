@@ -204,7 +204,7 @@ const DELEGATES: Record<string, string> = {
 
     'src/mcp/workspace-create.ts': 'writeRecord() from mcp/workspaces.ts, which emits organisms',
     'src/mcp/apps-fork.ts': 'emits apps itself',
-    'src/mcp/consent.ts': "services/consent-write.ts, which emits 'consent'",
+    'src/mcp/consent.ts': "services/consent/write.ts, which emits 'consent'",
     'src/mcp/contacts.ts': "services/contacts.ts, which emits 'messages'",
     'src/mcp/dm-messages.ts': "services/message/send.ts, which emits 'messages'",
     'src/mcp/feedback.ts': "services/feedback.ts, which emits 'feedback'",

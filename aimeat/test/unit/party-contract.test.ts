@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { parsePartyRef, parsePartyUser, partyRefOf, takesPartyToken, validatePartyName } from '../../src/services/parties/contract.js';
 import { newPartyKey, partyKeyMatches } from '../../src/services/parties/keys.js';
 import { matchesRecipient } from '../../src/storage/consent-recipient.js';
-import { VALID_RECIPIENT_PATTERNS } from '../../src/services/consent-write.js';
+import { VALID_RECIPIENT_PATTERNS } from '../../src/services/consent/write.js';
 import { isNodeAccount, audienceAllows } from '../../src/services/audience.js';
 import { datapackageReadable, versionOpenTo, readsAsPackageOwner } from '../../src/services/datapackage/audience.js';
 import type { Storage } from '../../src/storage/interface.js';
