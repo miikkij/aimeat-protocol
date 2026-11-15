@@ -101,7 +101,7 @@ await test('setup: two owners, a requester agent and a provider agent with an ac
             pricing: { toll_morsels: 1 },
         }),
     });
-    assert(action.status === 201 || action.status === 200, `action: ${action.status} ${JSON.stringify(action.body?.error)}`);
+    assert(action.status === 201, `action: ${action.status} ${JSON.stringify(action.body?.error)}`);
 });
 
 await test('1. POST /v1/work/request refuses a string, an array, a number and null as input, and names the field', async () => {

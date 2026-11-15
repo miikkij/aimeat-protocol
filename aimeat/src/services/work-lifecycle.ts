@@ -37,6 +37,8 @@
  *   const out = await acceptWork({ storage, config }, providerGaii, trackingCode);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-15 — acceptWork() and deliverWork() take `actsFor` (ActsForParty): the person whose agent is
+ *     the provider acts for it in person, as the Work tab offers; the provider itself works as before.
  *   2026-11-15 — deliverWork() refuses a present output that is not a JSON object before anything is
  *     read or written (work/work-payload.ts); an absent output is left to the caller's schema.
  *   2026-10-27 — acceptWork() moves pending to accepted with storage.transitionWorkStatus, so an accept
@@ -70,6 +72,13 @@ export interface WorkDeps {
     storage: Storage;
     config: AimeatConfig;
 }
+
+/**
+ * Who else may act as a party of a work item besides the party itself: a route passes
+ * `(gaii) => mayActOnAgent(req.auth, gaii, nodeId)` (utils/gaii.ts), so a person in person acts for
+ * their own agent on the work it requested or provides. An agent's own session passes nothing.
+ */
+export type ActsForParty = (partyGaii: string) => boolean;
 
 export type WorkLifecycleResult =
     | { ok: true; work: WorkRecord }
@@ -156,12 +165,13 @@ async function loadForProvider(
     trackingCode: string,
     allowedStatuses: string[],
     verb: string,
+    actsFor?: ActsForParty,
 ): Promise<{ ok: true; work: WorkRecord } | { ok: false; status: number; code: string; message: string }> {
     const work = await storage.getWork(trackingCode);
     if (!work) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Work item not found: ${trackingCode}` };
     }
-    if (work.providerGaii !== providerGaii) {
+    if (work.providerGaii !== providerGaii && !actsFor?.(work.providerGaii)) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: `Only the provider can ${verb} work` };
     }
     if (!allowedStatuses.includes(work.status)) {
@@ -180,8 +190,9 @@ export async function acceptWork(
     { storage }: WorkDeps,
     providerGaii: string,
     trackingCode: string,
+    actsFor?: ActsForParty,
 ): Promise<WorkLifecycleResult> {
-    const loaded = await loadForProvider(storage, providerGaii, trackingCode, ['pending'], 'accept');
+    const loaded = await loadForProvider(storage, providerGaii, trackingCode, ['pending'], 'accept', actsFor);
     if (!loaded.ok) return loaded;
     const work = loaded.work;
 
@@ -212,12 +223,13 @@ export async function deliverWork(
     providerGaii: string,
     trackingCode: string,
     output: Record<string, unknown> | undefined,
+    actsFor?: ActsForParty,
 ): Promise<WorkLifecycleResult> {
     // The REST schema and the MCP catalog refuse it first; this keeps every caller to one rule.
     if (output !== undefined && !isWorkPayload(output)) {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: WORK_OUTPUT_NOT_OBJECT };
     }
-    const loaded = await loadForProvider(storage, providerGaii, trackingCode, ['accepted', 'in_progress'], 'deliver');
+    const loaded = await loadForProvider(storage, providerGaii, trackingCode, ['accepted', 'in_progress'], 'deliver', actsFor);
     if (!loaded.ok) return loaded;
     const work = loaded.work;
 

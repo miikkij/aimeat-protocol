@@ -756,6 +756,8 @@ const ALL_SUITES = [
     // A work item's input and a delivery's output are JSON objects on every REST route; an old row
     // with a string input still reads back, and the work-to-task bridge makes one field of it.
     'test/e2e-work-object.ts',
+    // A person accepts, declines, starts, delivers and rates in person for their own agent's work.
+    'test/e2e-work-owner-acts.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail
     // sender (or credentials) is available. -- disabled 2026-06-14
