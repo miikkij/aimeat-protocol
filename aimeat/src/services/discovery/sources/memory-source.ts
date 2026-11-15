@@ -240,7 +240,7 @@ async function resolveOwnerSet(
 ): Promise<string[] | null> {
   if (ctx.scope === 'public') return null;
   const ghii = `${ctx.caller.ownerName}@${config.nodeId}`;
-  // An ecosystem app is fenced to the data areas its owner granted (services/ecosystem-access.ts),
+  // An ecosystem app is fenced to the data areas its owner granted (services/ecosystem/access.ts),
   // and the owner-wide set walks around that fence: it searches its own GEAI namespace only. The
   // generic memory routes have refused it the broadening since it existed (routes/memory/crud.ts).
   if (ctx.caller.isEcosystem) return [ctx.caller.gaii];

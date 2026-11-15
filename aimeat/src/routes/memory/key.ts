@@ -88,7 +88,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../../services/res
 import { enqueueMemoryReplication } from '../../services/memory/replication.js';
 import { emitRecordChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
-import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
+import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem/access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';

@@ -116,7 +116,7 @@ import { scopeRecordFilesToWorkspace } from '../record-files.js';
 import { isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
 import { isNodeAccount } from '../audience.js';
 import { authorizeRead } from '../access-guard.js';
-import { ecoMayReadKey } from '../ecosystem-access.js';
+import { ecoMayReadKey } from '../ecosystem/access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../schema-validator.js';
 import { validateArchiveTarget } from './archive-op.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../workspace/roles.js';

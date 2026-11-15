@@ -120,7 +120,7 @@ export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: st
   { prefix: 'template.catalog.', writtenBy: 'services/app/template-proposals.ts' },
   { prefix: 'atelier.book.', writtenBy: 'services/design-book/service.ts (parts + usage counters)' },
   { prefix: 'packages', writtenBy: 'services/component-registrar.ts' },
-  { prefix: 'ecosystem.', writtenBy: 'services/ecosystem-events.ts' },
+  { prefix: 'ecosystem.', writtenBy: 'services/ecosystem/events.ts' },
   { prefix: 'security.', writtenBy: 'services/security-incident.ts' },
   { prefix: 'notif.', writtenBy: 'services/notify.ts' },
   { prefix: 'presence.', writtenBy: 'services/presence.ts' },

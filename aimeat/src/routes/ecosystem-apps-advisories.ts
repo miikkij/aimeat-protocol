@@ -20,7 +20,7 @@ import { emitChange } from '../services/event-bus.js';
 import {
   deliverAdvisory, pendingKey, pendingPrefix, PENDING_TYPE,
   type PendingAdvisoryRecord,
-} from '../services/ecosystem-automation-advisories.js';
+} from '../services/ecosystem/automation-advisories.js';
 
 export function registerEcosystemAdvisoryRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
 

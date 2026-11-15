@@ -60,7 +60,7 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { authorizeRead } from '../access-guard.js';
 import { localAccountName, localAccountOf, isGEAI } from '../../utils/gaii.js';
-import { ecoMayReadKey } from '../ecosystem-access.js';
+import { ecoMayReadKey } from '../ecosystem/access.js';
 import { shownMemoryValue } from '../secret-records.js';
 import { workspaceMetaReader } from './meta.js';
 import { decideWorkspaceRead } from './access.js';

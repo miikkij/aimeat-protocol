@@ -108,7 +108,7 @@ import { isSameOwner, isForeignPrincipal, callerPrincipal, localAccountOf, isGEA
 import { agentBarred } from '../organism/agent-access.js';
 import { decideWorkspaceRead } from '../workspace/access.js';
 import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
-import { ecoMayReadKey, ecoMayWriteKey } from '../ecosystem-access.js';
+import { ecoMayReadKey, ecoMayWriteKey } from '../ecosystem/access.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
 import { weakerFields } from './levels.js';
 import { ownerOfScope, policyFor, scopeOrganism, scopeOwner } from './policy.js';

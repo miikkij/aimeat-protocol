@@ -42,7 +42,7 @@ import { ECOSYSTEM_EVENT_VERSION } from '../models/ecosystem-event-schemas.js';
 import {
   listSubscriptions, addSubscription, removeSubscriptions, appendInboundEcosystemLog,
   EcosystemSubscriptionsFullError, type EcosystemSubscription,
-} from '../services/ecosystem-events.js';
+} from '../services/ecosystem/events.js';
 import { logger } from '../utils/logger.js';
 
 const InboundEventBody = z.object({

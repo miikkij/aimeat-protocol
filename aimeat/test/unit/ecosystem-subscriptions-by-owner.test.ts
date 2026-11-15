@@ -20,7 +20,7 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { onDeliveryEvent, offDeliveryEvent, type DeliveryEvent } from '../../src/services/event-bus.js';
-import * as eco from '../../src/services/ecosystem-events.js';
+import * as eco from '../../src/services/ecosystem/events.js';
 
 const NODE_ID = 'eco-node-test';
 const SYSTEM = `system@${NODE_ID}`;
@@ -132,7 +132,7 @@ describe('subscriptions per owner', () => {
 
 describe('the once-only move of the node-wide record', () => {
     it('moves each owner\'s entries to that owner, keeps what it cannot place, and runs once', async () => {
-        const { moveEcosystemSubscriptionsByOwnerOnce } = await import('../../src/services/ecosystem-subscriptions-by-owner.js');
+        const { moveEcosystemSubscriptionsByOwnerOnce } = await import('../../src/services/ecosystem/subscriptions-by-owner.js');
         const fresh = new SqliteStorage(':memory:') as unknown as Storage;
         await fresh.createEcosystemApp({
             app: 'desk', owner: 'dora', geai: geai('desk', 'dora'), publicKey: 'pk', scopes: ['memory:read'], status: 'active',
@@ -171,7 +171,7 @@ describe('the once-only move of the node-wide record', () => {
     });
 
     it('removes the node-wide record when every entry found its owner, and does nothing on a node without one', async () => {
-        const { moveEcosystemSubscriptionsByOwnerOnce } = await import('../../src/services/ecosystem-subscriptions-by-owner.js');
+        const { moveEcosystemSubscriptionsByOwnerOnce } = await import('../../src/services/ecosystem/subscriptions-by-owner.js');
         const fresh = new SqliteStorage(':memory:') as unknown as Storage;
         const at = earlier();
         const entry = { geai: geai('desk', 'gus'), ownerGhii: `gus@${NODE_ID}`, event: 'memory.write', transport: ['tunnel'], createdAt: at };

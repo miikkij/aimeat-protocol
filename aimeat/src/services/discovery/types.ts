@@ -160,7 +160,7 @@ export interface DiscoveryContext {
      *  caller to its own identity (secaudit 2026-10). */
     isApp: boolean;
     /** An ecosystem app (role 'ecosystem', a GEAI). Fenced to the data areas its owner granted, so
-     *  it never gets the owner-wide identity set (services/ecosystem-access.ts). */
+     *  it never gets the owner-wide identity set (services/ecosystem/access.ts). */
     isEcosystem: boolean;
     /** Granted read-scopes — used to filter an agent's view of the owner set (design §11.3). */
     scopes: string[];

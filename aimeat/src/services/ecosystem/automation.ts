@@ -1,5 +1,5 @@
 /**
- * @file ecosystem-automation.ts
+ * @file src/services/ecosystem/automation.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The ecosystem-app automation-recipe trigger (feature B4). Observed at the memory-write
@@ -19,7 +19,7 @@
  *   - runAutomationRecipesForWrite(storage, config, writerIdentity, key) — the entry point hooked into PUT memory
  *   - resolveAndGrantOrganism(...) — B5: resolve the organism + attach the agent for report routing
  *   - matchesKeyGlob(glob, key) — the tiny prefix/`*` matcher (reuses the workflow globToRegExp)
- * @usage import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
+ * @usage import { runAutomationRecipesForWrite } from './automation.js';
  * @version-history
  *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
@@ -31,13 +31,13 @@
  *   v1.1.1 — 2026-09-26 — The writer's account comes from localAccountOf, so a write by a visitor from
  *     another node fires no recipe of the local namesake (secaudit 2026-09, F-1).
  */
-import type { Storage, OrganismRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { globToRegExp } from './workflow/signal-eval.js';
-import { nodeContext } from './node/context.js';
-import { localAccountOf, buildGAII } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { agentAccessOf } from './organism/agent-access.js';
+import type { Storage, OrganismRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { globToRegExp } from '../workflow/signal-eval.js';
+import { nodeContext } from '../node/context.js';
+import { localAccountOf, buildGAII } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { agentAccessOf } from '../organism/agent-access.js';
 
 /** A recipe's keyGlob matches a written key using the same glob grammar the event plane uses. */
 export function matchesKeyGlob(glob: string, key: string): boolean {

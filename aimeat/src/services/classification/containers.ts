@@ -30,7 +30,7 @@
  *   can be told apart as the app's on every read without asking anything more:
  *   - INCLUDED: memory records and stored files held in the app's own namespace,
  *     `eco:<slug>#<owner>@<node>`. An ecosystem app writes there (its flat working keys,
- *     services/ecosystem-access.ts), and that identity is the one a hosted app of the same slug calls
+ *     services/ecosystem/access.ts), and that identity is the one a hosted app of the same slug calls
  *     as (utils/gaii.ts callerPrincipal), so the namespace names the app on every record in it.
  *   - LEFT OUT: what a hosted app writes through its owner's app grant. That lands in the OWNER's
  *     namespace (resolveIdentity; "Storage keeps using resolveIdentity, so no app's data moves",

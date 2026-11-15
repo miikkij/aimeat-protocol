@@ -12,7 +12,7 @@
  *   never write these; the owner manages them via the dedicated owner-only routes
  *   (`/v1/openrouter/settings`, `/v1/ghii`, `/v1/finance/accountants`, `/v1/commerce/payout/*`), and
  *   an agent through the named commerce tools. Mirrors the ecosystem path's `ecoMayWriteKey`
- *   (services/ecosystem-access.ts). See
+ *   (services/ecosystem/access.ts). See
  *   docs/coding-guidelines/security-development-dna.md invariant #2.
  * @structure RESERVED_OWNER_KEY_PREFIXES · isReservedServerKey(key) ·
  *   SERVER_WRITTEN_KEYS · SERVER_WRITTEN_KEY_PREFIXES · SERVICE_OWNED_KEY_PREFIXES · SERVICE_OWNED_KEYS ·

@@ -1,5 +1,5 @@
 /**
- * @file ecosystem-automation-notify.ts
+ * @file src/services/ecosystem/automation-notify.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Feature B6 — "email the report on completion" for ecosystem-app automation recipes.
@@ -25,7 +25,7 @@
  *   - notifyAutomationTaskComplete(storage, config, task, completionMessage) — the entry point, called
  *     fire-and-forget from the agent-task /complete route.
  * @usage
- *   import { notifyAutomationTaskComplete } from '../services/ecosystem-automation-notify.js';
+ *   import { notifyAutomationTaskComplete } from './automation-notify.js';
  *   void notifyAutomationTaskComplete(storage, config, task, message);
  * @version-history
  *   v1.0.0 — 2026-06-15 — Created for feature B6 (email + in-app report on automation-task completion).
@@ -54,17 +54,17 @@
  *     says `emailSkipped: 'muted' | 'limit'` when the mail did not go (secaudit2026nov08 round 14,
  *     ecosystem-automation-notify:automation-report-mail-uncounted-unmuted).
  */
-import type { Storage, AgentTaskRecord, MemoryRecord, GHIIRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { nodeContext } from './node/context.js';
-import { provenOwnerAddress, notificationEmailUnverified } from './owner/mail-address.js';
-import { mailOwnerFrom } from './notification-create.js';
-import { readNotificationSettings, prefsFor, senderKey, type NotifSource } from './notification-settings.js';
-import { outboxPrefix } from './ecosystem-automation-advisories.js';
-import { logger } from '../utils/logger.js';
-import { localAccountName, buildGEAI } from '../utils/gaii.js';
-import { systemReader, type ContentReader } from './classification/reader.js';
-import { memoryTarget } from './classification/labels.js';
+import type { Storage, AgentTaskRecord, MemoryRecord, GHIIRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { nodeContext } from '../node/context.js';
+import { provenOwnerAddress, notificationEmailUnverified } from '../owner/mail-address.js';
+import { mailOwnerFrom } from '../notification-create.js';
+import { readNotificationSettings, prefsFor, senderKey, type NotifSource } from '../notification-settings.js';
+import { outboxPrefix } from './automation-advisories.js';
+import { logger } from '../../utils/logger.js';
+import { localAccountName, buildGEAI } from '../../utils/gaii.js';
+import { systemReader, type ContentReader } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
 
 /** Trim an arbitrary value to a short, human-readable excerpt for the report body. */
 function excerpt(value: unknown, max = 600): string {

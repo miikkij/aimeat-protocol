@@ -95,8 +95,8 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | AUTH-09 | met | Owner approval `aimeat/src/routes/agents/device-auth.ts:618-637,685-686`. Same-owner approval `device-auth.ts:337-353` (the approver must be an agent of the same owner and hold `agent:write`; applications and ecosystem principals never approve), `:470-497` (a scope beyond the approving agent's own leaves the request pending for the owner; `approvedBy` names the approver) | Met under the ruling of 2026-10-12 (Q4). The operator can switch same-owner approval off (`sameOwnerAutoApprove`, default on). |
 | AUTH-10 | met | `aimeat/src/routes/agents/constants.ts:27`; `aimeat/src/routes/agents/device-auth.ts:193,432,507` | |
 | AUTH-11 | met | `aimeat/src/routes/auth.ts` (`spendSignature`) | Closed 2026-10-12: a renewal signature works once. |
-| AUTH-12 | met | `aimeat/src/services/ecosystem-refresh.ts:33,71-94`; `aimeat/src/routes/auth.ts:569-595`; pin `aimeat/src/routes/ecosystem-apps.ts:406-453` | |
-| AUTH-13 | met | `ECO_REAPPROVAL_SECONDS` 365 days, `aimeat/src/services/ecosystem-refresh.ts:33` | |
+| AUTH-12 | met | `aimeat/src/services/ecosystem/refresh.ts:33,71-94`; `aimeat/src/routes/auth.ts:569-595`; pin `aimeat/src/routes/ecosystem-apps.ts:406-453` | |
+| AUTH-13 | met | `ECO_REAPPROVAL_SECONDS` 365 days, `aimeat/src/services/ecosystem/refresh.ts:33` | |
 | AUTH-14 | met | `aimeat/src/auth/middleware.ts:736-738` | |
 | AUTH-15 | met | `aimeat/src/routes/agents-v2/enrolment.ts:91-289` | |
 | AUTH-16 | met | `aimeat/src/routes/agents-v2/token.ts:52-207` (EdDSA JWS, `aud` = node id, `jti`, at most 300 s, `spendAssertion`) | |

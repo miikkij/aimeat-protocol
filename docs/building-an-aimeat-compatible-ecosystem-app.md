@@ -470,7 +470,7 @@ schema-valid output, (c) an emitter for each event in `emits`, (d) a handler for
 |---|---|---|
 | GEAI identity (`eco:` helpers, role, resolveIdentity) | ✓ Built | `utils/gaii.ts` |
 | Onboarding (hello, token, pending, approve, list, disconnect) | ✓ Built | `routes/ecosystem-apps.ts` |
-| Renewal signed by the pinned key; one year per approval | ✓ Built | `services/ecosystem-refresh.ts` |
+| Renewal signed by the pinned key; one year per approval | ✓ Built | `services/ecosystem/refresh.ts` |
 | Manifest schema and static validation, with `automation` hints and the `setup` guide | ✓ Built | `models/ecosystem-manifest.ts` |
 | Event envelope, inbound and outbound catalogs, router | ✓ Built | `models/ecosystem-event-schemas.ts`, `routes/ecosystem-events.ts` |
 | Tunnel accepts the `ecosystem` role; capability invocation over the tunnel | ✓ Built | tunnel upgrade and connector |

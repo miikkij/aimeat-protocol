@@ -1,5 +1,5 @@
 /**
- * @file src/services/ecosystem-refresh.ts
+ * @file src/services/ecosystem/refresh.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The rule an ecosystem app's (GEAI) refresh at POST /v1/auth/refresh answers to.
@@ -23,8 +23,8 @@
  *   v1.0.1 — 2026-11-04 — The renewal signature is spent in the node's storage (spendSignature is async), so another process refuses it too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S-2).
  */
-import { verify } from '../auth/keypair.js';
-import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
+import { verify } from '../../auth/keypair.js';
+import { signatureTimestampFresh, spendSignature } from '../../auth/signed-request.js';
 
 /**
  * How long an owner's approval of an ecosystem app carries its refreshes: one year. An app that runs

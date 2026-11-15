@@ -20,7 +20,7 @@
  *   BOTH RECORDS LIVE UNDER `system@{nodeId}`. They are the node's own configuration rather than
  *   anyone's content, so they are not charged against an owner's key quota and do not appear in an
  *   owner's memory listing. Same namespace and the same getMemory/setMemory pair as
- *   services/ecosystem-events.ts, which is the established shape for a registry the server itself
+ *   services/ecosystem/events.ts, which is the established shape for a registry the server itself
  *   trusts.
  * @structure
  *   - Types: ComplianceQuestionnaire · ComplianceUseCase · ComplianceRiskVerdict

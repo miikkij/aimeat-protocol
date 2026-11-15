@@ -117,7 +117,7 @@ import { tellOwnerTokensKept } from '../services/owner/tokens-kept-notice.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, isExternalPrincipal, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
-import { ecosystemRefreshDecision, ECO_REAPPROVAL_SECONDS } from '../services/ecosystem-refresh.js';
+import { ecosystemRefreshDecision, ECO_REAPPROVAL_SECONDS } from '../services/ecosystem/refresh.js';
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 import { getStats } from '../services/stats.js';
@@ -579,7 +579,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       // The bearer alone does not renew an ecosystem app: it proves it holds the key pinned at hello,
-      // and the chain ends a year after the owner's approval (services/ecosystem-refresh.ts; secrets
+      // and the chain ends a year after the owner's approval (services/ecosystem/refresh.ts; secrets
       // audit 2026-10-09, S-2).
       const decision = await ecosystemRefreshDecision({
         geai: req.auth!.sub, publicKey: ecoApp.publicKey, authTime: req.auth!.authTime, iat: req.auth!.iat,

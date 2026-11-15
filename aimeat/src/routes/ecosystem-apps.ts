@@ -93,9 +93,9 @@ import { exceedsCeiling } from '../utils/scope-coverage.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
 import { validateEcoManifest } from '../models/ecosystem-manifest.js';
 import { emitChange } from '../services/event-bus.js';
-import { emitEcosystemBindingRevoked } from '../services/ecosystem-events.js';
+import { emitEcosystemBindingRevoked } from '../services/ecosystem/events.js';
 import { logger } from '../utils/logger.js';
-import { pendingPrefix, PENDING_TYPE, type PendingAdvisoryRecord } from '../services/ecosystem-automation-advisories.js';
+import { pendingPrefix, PENDING_TYPE, type PendingAdvisoryRecord } from '../services/ecosystem/automation-advisories.js';
 import { registerEcosystemAdvisoryRoutes } from './ecosystem-apps-advisories.js';
 import { registerEcoCapabilityApprovalRoutes } from './ecosystem-apps-capability-approvals.js';
 import { readerFor } from '../services/classification/reader.js';
@@ -103,7 +103,7 @@ import { presentMemories } from '../services/classification/present-memory.js';
 import { ecoHelloProofVerifies, markReturnProven, returnProven } from '../services/device-return-proof.js';
 import { reconnectView } from './ecosystem-apps-reconnect.js';
 import { approvalScopes, ownTickWords } from '../services/ecosystem/own-tick-scopes.js';
-import { approvableDataAreas } from '../services/ecosystem-access.js';
+import { approvableDataAreas } from '../services/ecosystem/access.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -470,7 +470,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
       scopes: finalScopes,
       eco_app: request.app,
       // The owner's approval starts the chain of refreshes; it ends ECO_REAPPROVAL_SECONDS later
-      // (services/ecosystem-refresh.ts), and the app is approved again.
+      // (services/ecosystem/refresh.ts), and the app is approved again.
       auth_time: Math.floor(Date.now() / 1000),
     }, config.ecoJwtTtlSeconds, sessionId);
     const expiresAt = new Date(Date.now() + config.ecoJwtTtlSeconds * 1000).toISOString();

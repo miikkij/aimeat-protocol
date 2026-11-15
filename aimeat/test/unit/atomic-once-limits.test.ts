@@ -29,7 +29,7 @@ import { reportPeerIncident } from '../../src/services/peer-incidents.js';
 import { NS_PEER_ORIGIN } from '../../src/services/peer-origin.js';
 import { SECURITY_INCIDENT_PREFIX, securityOwner } from '../../src/services/security-incident.js';
 import { firstNoticeFor } from '../../src/services/packages/compose/package-notices.js';
-import { appendInboundEcosystemLog } from '../../src/services/ecosystem-events.js';
+import { appendInboundEcosystemLog } from '../../src/services/ecosystem/events.js';
 import { appendMailLog, readMailLog, MAIL_LOG_KEY } from '../../src/services/notification-settings.js';
 import { writeMarkerOnce, recordAiModelDetected, recordWelcomeMatPasted, ONBOARDING_KEYS } from '../../src/services/onboarding-funnel.js';
 import { putOwnerProvider, PROVIDER_PREFIX } from '../../src/services/decide/providers.js';

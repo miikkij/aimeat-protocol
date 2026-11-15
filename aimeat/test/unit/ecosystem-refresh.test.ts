@@ -2,7 +2,7 @@
  * @file test/unit/ecosystem-refresh.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The rule an ecosystem app's refresh answers to (services/ecosystem-refresh.ts).
+ * @description The rule an ecosystem app's refresh answers to (services/ecosystem/refresh.ts).
  *
  *   WHAT THIS PINS (secrets audit 2026-10-09, S-2). The app pins an Ed25519 key at hello, and nothing
  *   ever checked it: a refresh took the bearer alone, so a stolen ninety-day credential renewed itself
@@ -19,7 +19,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPair, sign, type KeyPair } from '../../src/auth/keypair.js';
-import { ecosystemRefreshDecision } from '../../src/services/ecosystem-refresh.js';
+import { ecosystemRefreshDecision } from '../../src/services/ecosystem/refresh.js';
 
 const GEAI = 'eco:drum#ada@node-1';
 const DAY = 86_400;

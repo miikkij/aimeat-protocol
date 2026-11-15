@@ -220,7 +220,7 @@ export interface PublishObjectType extends WriteObjectType {
  *   - 'member': a member, an agent or an app grant that passed the organism access rule, and so may
  *     read the manifest. Told the namespace, the declared spaces and how to declare one.
  *   - 'writer': an ecosystem app, which may hold a write area without the read area the manifest
- *     needs (services/ecosystem-access.ts). Told the namespace and how to declare it, not what is declared.
+ *     needs (services/ecosystem/access.ts). Told the namespace and how to declare it, not what is declared.
  *   - 'public': an anonymous submitter (public intake), who is told nothing about the workspace.
  */
 export type UndeclaredSpaceAudience = 'member' | 'writer' | 'public';

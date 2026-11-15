@@ -1,5 +1,5 @@
 /**
- * @file ecosystem-events.ts
+ * @file src/services/ecosystem/events.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The ecosystem-app (GEAI) event plane: the per-GEAI OUTBOUND subscription registry and
@@ -16,7 +16,7 @@
  *   - EcosystemSubscriptionsFullError
  *   - emitOutboundEcosystemEvent / emitEcosystemMemoryWrite / emitEcosystemBindingRevoked
  *   - appendInboundEcosystemLog (per-GEAI capped audit log)
- * @usage import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
+ * @usage import { emitEcosystemMemoryWrite } from './events.js';
  * @version-history
  *   v1.1.0 — 2026-11-01 — The subscriptions are kept per owner (`ecosystem.subscriptions.of.{owner}`),
  *     so a memory write reads only its owner's list and no account grows what every write on the node
@@ -28,14 +28,14 @@
  *   v1.0.2 — 2026-10-18 — appendInboundEcosystemLog appends with updateRecord, on the version it read.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { emitDelivery } from './event-bus.js';
-import { buildEcosystemEnvelope } from '../models/ecosystem-event-schemas.js';
-import { globToRegExp } from './workflow/signal-eval.js';
-import { localAccountOf } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { emitDelivery } from '../event-bus.js';
+import { buildEcosystemEnvelope } from '../../models/ecosystem-event-schemas.js';
+import { globToRegExp } from '../workflow/signal-eval.js';
+import { localAccountOf } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 /** The node-wide record every account's subscriptions lived in before 2026-11-01; read only by the boot move. */
 export const LEGACY_SUBSCRIPTIONS_KEY = 'ecosystem.subscriptions';
@@ -65,7 +65,7 @@ export class EcosystemSubscriptionsFullError extends Error {
 // ── subscription registry: one system-namespace record per owner ──
 // Every memory write on the node reads the writer's owner's record, so one account's list costs only
 // that account's writes (secaudit2026oct31w2 round 12). Until 2026-11-01 all accounts shared one record
-// (LEGACY_SUBSCRIPTIONS_KEY); services/ecosystem-subscriptions-by-owner.ts moves it once at boot.
+// (LEGACY_SUBSCRIPTIONS_KEY); services/ecosystem/subscriptions-by-owner.ts moves it once at boot.
 
 /** The system record that holds one owner's subscriptions. */
 export function ownerSubscriptionsKey(owner: string): string { return `${OWNER_SUBSCRIPTIONS_PREFIX}${owner}`; }

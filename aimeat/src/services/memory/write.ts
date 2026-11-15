@@ -163,8 +163,8 @@ import { enqueueMemoryReplication } from './replication.js';
 import { emitMemoryWritten } from '../event-bus.js';
 import { reconcileAfterSourceWrite } from '../exchange/projection.js';
 import { nodeContext } from '../node/context.js';
-import { emitEcosystemMemoryWrite } from '../ecosystem-events.js';
-import { runAutomationRecipesForWrite } from '../ecosystem-automation.js';
+import { emitEcosystemMemoryWrite } from '../ecosystem/events.js';
+import { runAutomationRecipesForWrite } from '../ecosystem/automation.js';
 import { logger } from '../../utils/logger.js';
 import { recordMemoryTouch } from '../data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
@@ -408,7 +408,7 @@ export async function writeMemoryRecord(
         // `organism.{id}.w.{ws}.{namespace}.{id}.draft|latest|version.N` keys pay the manifest read.
         // After the archive guard, so an archived workspace is told it is archived. An ecosystem
         // app may hold a write area without the read area the manifest needs, so it is refused
-        // without being shown what the manifest declares (services/ecosystem-access.ts).
+        // without being shown what the manifest declares (services/ecosystem/access.ts).
         const undeclared = await undeclaredSpaceForKey(storage, input.key, {
             audience: caller.roles.includes('ecosystem') ? 'writer' : 'member',
         });

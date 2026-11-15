@@ -90,7 +90,7 @@ import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { cached, TTL } from '../../services/cache.js';
 import { writeMemoryRecord } from '../../services/memory/write.js';
-import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
+import { ecoMayWriteKey } from '../../services/ecosystem/access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from '../../services/write-target.js';
 import { resolveIdentity, isForeignPrincipal, isOwnerInPerson, localAccountName } from '../../utils/gaii.js';

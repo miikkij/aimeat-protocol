@@ -1,5 +1,5 @@
 /**
- * @file ecosystem-automation-advisories.ts
+ * @file src/services/ecosystem/automation-advisories.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Features B7 (approval gate) + B8 (deliver an approved advisory to the app) for the
@@ -34,7 +34,7 @@
  *   - outboxPrefix / pendingKey — the owner-namespace key conventions (the LOCKED contract).
  *   - PENDING_TYPE — the discriminator stored on a pending advisory-delivery record.
  * @usage
- *   import { processAutomationAdvisories, deliverAdvisory } from '../services/ecosystem-automation-advisories.js';
+ *   import { processAutomationAdvisories, deliverAdvisory } from './automation-advisories.js';
  *   void processAutomationAdvisories(storage, config, task);
  * @version-history
  *   v1.0.0 — 2026-06-15 — Created for B7 (approval gate) + B8 (deliver-advisory over the connector
@@ -47,13 +47,13 @@
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  */
-import type { Storage, AgentTaskRecord, MemoryRecord, EcoAutomationRecipe } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { nodeContext } from './node/context.js';
-import { buildGEAI, localAccountName } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { systemReader } from './classification/reader.js';
-import { memoryTarget } from './classification/labels.js';
+import type { Storage, AgentTaskRecord, MemoryRecord, EcoAutomationRecipe } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { nodeContext } from '../node/context.js';
+import { buildGEAI, localAccountName } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { systemReader } from '../classification/reader.js';
+import { memoryTarget } from '../classification/labels.js';
 
 /** The discriminator stored on an `advisory-delivery` pending record (so the approve route knows it). */
 export const PENDING_TYPE = 'advisory-delivery' as const;

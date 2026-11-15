@@ -1,5 +1,5 @@
 /**
- * @file src/services/ecosystem-subscriptions-by-owner.ts
+ * @file src/services/ecosystem/subscriptions-by-owner.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The once-per-node boot step that moves the ecosystem app event subscriptions from the
@@ -8,7 +8,7 @@
  *   delivering (secaudit2026oct31w2 round 12, ecosystem-subscriptions:node-wide-registry-unbounded-size).
  *
  *   WHY. Every memory write on the node read the whole node-wide record before it kept the writer's
- *   owner's entries, and any account could grow that record. services/ecosystem-events.ts now reads
+ *   owner's entries, and any account could grow that record. services/ecosystem/events.ts now reads
  *   only the writer's owner's record.
  *
  *   POSITIVE EVIDENCE ONLY (.claude/rules/backend.md). An entry moves when it has the fields the emitter
@@ -27,15 +27,15 @@
  *     (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 12).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
 import {
   LEGACY_SUBSCRIPTIONS_KEY, parseSubscriptions, subscriptionIdentity, subscriptionOwnerOf, updateOwnerSubscriptions,
   type EcosystemSubscription,
-} from './ecosystem-events.js';
-import { UNCHANGED } from './record-cas.js';
+} from './events.js';
+import { UNCHANGED } from '../record-cas.js';
 
 /** The record that says the node-wide subscription record was moved to the owners. */
 export const ECOSYSTEM_SUBSCRIPTIONS_MOVED_KEY = 'migrations.ecosystem-subscriptions-by-owner';

@@ -49,7 +49,7 @@ import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { logger } from '../../utils/logger.js';
 import { writeMemoryRecord } from '../../services/memory/write.js';
-import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
+import { ecoMayWriteKey } from '../../services/ecosystem/access.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { sign } from '../../auth/keypair.js';
 import { audienceProof, deliveryProof } from '../../services/signed-node-request.js';

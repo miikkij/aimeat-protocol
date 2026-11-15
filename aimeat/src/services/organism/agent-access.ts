@@ -14,7 +14,7 @@
  *   treated as a non-member. The rule is subtractive only: it never gives an agent a right its owner
  *   does not have. It applies to agents (`name#owner@node`) and to nothing else: the owner signed in
  *   in person, an app acting under an app grant (its principal is the owner's own id), and an
- *   ecosystem app (which has its own data-area allowlist, services/ecosystem-access.ts) are not
+ *   ecosystem app (which has its own data-area allowlist, services/ecosystem/access.ts) are not
  *   agents here.
  *
  *   Where it is enforced: once for every REST route under /v1/organisms/:id (routes/organisms.ts),

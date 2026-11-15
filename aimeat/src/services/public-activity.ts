@@ -5,7 +5,7 @@
  * @description Records public, landing-page-visible activity events (app publishes,
  *   public organism / workspace publishes, agent materials & knowledge packages).
  *   Each event is persisted as a PUBLIC memory entry under the reserved system
- *   identity `system@{nodeId}` (mirrors services/ecosystem-events.ts — no new DB
+ *   identity `system@{nodeId}` (mirrors services/ecosystem/events.ts — no new DB
  *   table, so no dual-backend schema work) and then broadcast on the event-bus
  *   `publicActivity` channel so the public SSE stream (routes/public-events.ts)
  *   pushes it live. Self-prunes the log (the core memory-ttl-cleanup job only

@@ -254,7 +254,7 @@ async function run() {
   await test('The grant PATTERN is a boundary: a second organism is not covered', async () => {
     // Phases 4 and 6 claim to prove the data-area allowlist, but only ONE organism exists in the whole
     // suite, so the grant's `pattern` is never a boundary — every case flips only the `rights` array.
-    // Drop the consentMatchPattern clause from grantsCover (services/ecosystem-access.ts) and a GEAI
+    // Drop the consentMatchPattern clause from grantsCover (services/ecosystem/access.ts) and a GEAI
     // granted `organism.<A>.**` reads and writes EVERY organism on the node, with all four data-area
     // tests green.
     const o2 = await json('/v1/organisms', { method: 'POST', headers: auth, body: JSON.stringify({ name: 'Eco Org Two', description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }) });

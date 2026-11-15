@@ -1869,26 +1869,26 @@
       },
       "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given. Reviewed 2026-10-10 (wish-allekirjoitus-eudi-lompakolla): signedDocument() reads the wallet-signed PDF a signer stored for this request, for a party who may read the request; the metadata goes through readerFor(...).show() first, as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file. 2026-11-08 (secaudit2026nov08b round 15b): that ask goes through storedFileShownTo, which adds the labels a data package version keeps when the request's document is a package file."
     },
-    "src/services/ecosystem-automation-advisories.ts": {
+    "src/services/ecosystem/automation-advisories.ts": {
       "reads": {
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Advisories pass leave (external) before delivery to the app."
     },
-    "src/services/ecosystem-automation-notify.ts": {
+    "src/services/ecosystem/automation-notify.ts": {
       "reads": {
         "listMemory": 1,
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The deliverable and advisories pass leave (external, e-mail); what stays behind is named in the mail."
     },
-    "src/services/ecosystem-events.ts": {
+    "src/services/ecosystem/events.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The subscription index and inbound log, read to append. 2026-11-01 (secaudit2026oct31w2 round 12): the one read left is the owner's own subscription list under the node's system identity; the writes go through record-cas."
     },
-    "src/services/ecosystem-subscriptions-by-owner.ts": {
+    "src/services/ecosystem/subscriptions-by-owner.ts": {
       "reads": {
         "getMemory": 1
       },

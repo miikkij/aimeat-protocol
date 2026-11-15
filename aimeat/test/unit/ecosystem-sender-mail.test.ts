@@ -21,7 +21,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AgentTaskRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { createPrincipalNotification } from '../../src/services/notification-create.js';
-import { notifyAutomationTaskComplete } from '../../src/services/ecosystem-automation-notify.js';
+import { notifyAutomationTaskComplete } from '../../src/services/ecosystem/automation-notify.js';
 import { updateNotificationSettings, readMailLog } from '../../src/services/notification-settings.js';
 import { setActiveEmailService } from '../../src/services/email.js';
 

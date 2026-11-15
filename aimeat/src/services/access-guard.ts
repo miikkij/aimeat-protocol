@@ -61,7 +61,7 @@ import type { AimeatConfig } from '../config.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
 import { isKeyShared } from './group-shares.js';
 import { parseGaiiLoose, localAccountOf, currentNodeId, isSameOwner, isGEAI, localAccountName } from '../utils/gaii.js';
-import { ecoMayReadKey } from './ecosystem-access.js';
+import { ecoMayReadKey } from './ecosystem/access.js';
 import { readWorkspaceMetaRecord } from './workspace/meta.js';
 import { agentBarred } from './organism/agent-access.js';
 import { isOrganismVisibilityWord } from '../utils/visibility-words.js';

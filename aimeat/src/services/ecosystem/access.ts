@@ -1,5 +1,5 @@
 /**
- * @file ecosystem-access.ts
+ * @file src/services/ecosystem/access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Data-area allowlist enforcement for ecosystem-app (GEAI) reads AND writes. A GEAI works
@@ -15,7 +15,7 @@
  *   - approvableDataAreas(areas)          — the areas an approval shows and stores (no `memory` area)
  *   - ecoMayWriteKey(storage, geai, key) — write gate (area grant with 'write')
  *   - ecoMayReadKey(storage, geai, key)  — read gate (area grant with 'read')
- * @usage import { ecoMayReadKey, ecoMayWriteKey } from '../services/ecosystem-access.js';
+ * @usage import { ecoMayReadKey, ecoMayWriteKey } from './access.js';
  * @version-history
  *   2026-11-15 — approvableDataAreas: the `memory` area is left out of what the approval shows and
  *     stores, since no gate reads it; a request that carries one is accepted (audit 2026-11 L045).
@@ -23,9 +23,9 @@
  *   v1.1.0 — 2026-07-02 — Add ecoMayReadKey (model A / strict): organism reads now require a matching
  *     'read' data-area grant, mirroring the write gate. Closes the inert read-allowlist hole.
  */
-import type { Storage } from '../storage/interface.js';
-import type { EcoDataAreaGrant } from '../storage/interface.js';
-import { consentMatchPattern } from '../storage/pattern-utils.js';
+import type { Storage } from '../../storage/interface.js';
+import type { EcoDataAreaGrant } from '../../storage/interface.js';
+import { consentMatchPattern } from '../../storage/pattern-utils.js';
 
 /**
  * The data areas the owner approves, from what an app asked for or the owner sent: every area except
