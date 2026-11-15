@@ -12,6 +12,7 @@
  * @structure SPACE_LABELS · FIELD_LABELS · manifestI18n
  * @usage const i18n = manifestI18n(shape.workspaces[0].spaces);
  * @version-history
+ *   v1.2.1 — 2026-11-15 — The Spanish label of gateId is "Compuerta de aprobación", the settled word for a gate.
  *   v1.2.0 — 2026-11-14 — The spaces, fields and choices the team types add (ai-use, incident, requirement,
  *     change-request, campaign, ticket, minutes; purpose, provider, risk; minimal, limited, high).
  *   v1.1.0 — 2026-11-14 — VALUE_LABELS: a field's choices (its enum) at "<namespace>.<field>.<value>",
@@ -69,7 +70,7 @@ export const FIELD_LABELS: Record<string, L> = {
     steps: { en: 'Steps', fi: 'Vaiheet', es: 'Pasos' },
     acceptanceCriteria: { en: 'Acceptance criteria', fi: 'Hyväksymisehdot', es: 'Criterios de aceptación' },
     definitionOfDone: { en: 'Definition of done', fi: 'Valmiin määritelmä', es: 'Definición de terminado' },
-    gateId: { en: 'Approval gate', fi: 'Hyväksyntäportti', es: 'Puerta de aprobación' },
+    gateId: { en: 'Approval gate', fi: 'Hyväksyntäportti', es: 'Compuerta de aprobación' },
     ts: { en: 'Time', fi: 'Aika', es: 'Hora' },
     label: { en: 'Label', fi: 'Nimike', es: 'Etiqueta' },
     origin: { en: 'Origin', fi: 'Alkuperä', es: 'Origen' },

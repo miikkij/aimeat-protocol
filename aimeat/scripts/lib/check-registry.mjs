@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-15: check:picture-words, no new door, road, way in, machine room or showroom in the string literals of src/ and public/ or the visible text of the HTML pages (the locale files have check:locales).
  *  - 2026-11-15: check:design-language-publish, the node copy of skill aimeat-design-language is the repository copy as last published (decision P7 of the instruction audit).
  *  - 2026-11-14: check:find-fields, every find field is one the autofill guard sees (type="search" or data-find); Edge on Android wrote the sign-in name into the App Catalog search.
  *  - 2026-11-10: check:owner-agent-reads, the direct getAgentsByOwner calls in src/services/ may only fall (performance work, architecture item 1).
@@ -92,6 +93,7 @@ export const FAST_CHECKS = [
     // Plan doc-mvcn6c7e4e5q, V6.4: each view printed its kind's stored word for who can read a thing.
     { script: 'check:audience-badge', label: 'Every view that shows the owner their content says who can read it with the AudienceBadge' },
     { script: 'check:locales', label: 'Language files agree with en.json' },
+    { script: 'check:picture-words', label: 'No new door, road, way in, machine room or showroom in the strings of the code' },
     { script: 'check:licenses', label: 'Licences allowed, every served file accounted for' },
     { script: 'check:notices', label: 'Third-party notices match the tree' },
     { script: 'check:protocol-versions', label: 'Protocol versions declared vs current' },

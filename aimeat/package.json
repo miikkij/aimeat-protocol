@@ -145,6 +145,7 @@
     "check:ai-disclosure": "tsx scripts/check-ai-disclosure.ts",
     "check:audience-badge": "tsx scripts/check-audience-badge.ts",
     "check:locales": "tsx scripts/check-locales.ts",
+    "check:picture-words": "tsx scripts/check-picture-words.ts",
     "locale:extract": "tsx scripts/locale-extract.ts",
     "locale:merge": "tsx scripts/locale-merge.ts",
     "screenshot:worker": "tsx scripts/screenshot-worker.ts",

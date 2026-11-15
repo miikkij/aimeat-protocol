@@ -44,7 +44,8 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
- *   2026-11-15 — The picture-word baselines of check:locales (locale-<word>-baseline.json) join the report.
+ *   2026-11-15 — The picture-word baselines of check:locales (locale-<word>-baseline.json) and of
+ *     check:picture-words (picture-words-baseline.json) join the report.
  *   2026-11-15 — The "door" ratchet's baseline joins the report; its entries are answers, so none is open.
  *   2026-11-04 — The service-owned list and its reads outside serviceRecords() join the report (codebase
  *     analysis 2026-11-03, item B6).
@@ -293,6 +294,7 @@ const RATCHETS: Ratchet[] = [
     // Every entry is an answer (a real door, an idiom), so nothing in it is open.
     { file: 'aimeat/security/locale-door-baseline.json', label: 'Strings saying "door" to a person', check: 'check:locales', count: raw => Object.keys(JSON.parse(raw) as Record<string, string>).length, open: () => 0 },
     // The other picture words of check:locales: every entry is an answer too.
+    { file: 'aimeat/security/picture-words-baseline.json', label: 'Code strings using a picture word', check: 'check:picture-words', count: raw => Object.keys(JSON.parse(raw) as Record<string, string>).length, open: () => 0 },
     ...['road', 'hand', 'room', 'wall', 'image'].map(w => ({ file: `aimeat/security/locale-${w}-baseline.json`, label: `Strings using "${w}" as a picture`, check: 'check:locales', count: (raw: string) => Object.keys(JSON.parse(raw) as Record<string, string>).length, open: () => 0 })),
     { file: 'aimeat/security/plain-language-baseline.json', label: 'Messages not in plain language', check: 'check:plain-language', count: listLength('messages'), open: listLength('messages') },
     { file: 'aimeat/security/mcp-schema-single-source.json', label: 'MCP schemas written by hand', check: 'check:mcp-schemas', count: listLength('tools'), open: listLength('tools') },

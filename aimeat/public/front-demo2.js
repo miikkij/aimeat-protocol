@@ -7,6 +7,7 @@
  *   the most-opened real apps. The Experience Center renders even when this node's API does
  *   not list it, by its public address. Everything still degrades to the baked-in HTML.
  * @version-history
+ *   v1.1.1 - 2026-11-15 - The strip note says the live count is one click away, not one door away.
  *   v1.1.0 - 2026-08-19 - Publish order (TARGET-066): counters are API-only (no baked numbers,
  *     a counting line until the answer lands, dashes on failure), fill cards refuse developer
  *     jargon and untranslated descriptions (LÄHETIN joined the curated list), and the founding
@@ -93,8 +94,8 @@
       console.warn('[front-demo2] totals not readable:', err.message);
       ['fd-n-apps', 'fd-n-opens', 'fd-n-agents', 'fd-n-online'].forEach(function (id) { txt(id, '–'); });
       txt('fd-strip-note', FI
-        ? 'Elävä laskuri on oven takana: astu demoon ja laske itse.'
-        : 'The live count is one door away: step into the demo and count for yourself.');
+        ? 'Elävä laskuri on yhden klikkauksen päässä: avaa demo ja laske itse.'
+        : 'The live count is one click away: open the demo and count for yourself.');
     });
 
   /**
