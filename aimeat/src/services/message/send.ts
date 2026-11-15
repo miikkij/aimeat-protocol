@@ -76,7 +76,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../../storage/interface.js';
 import type { MessageAttachmentInput } from '../../models/message-schemas.js';
-import { acceptedSameAccount, blockedSenderAccount } from '../contact-same-account.js';
+import { acceptedSameAccount, blockedSenderAccount } from '../contact/same-account.js';
 import { areColleagues } from '../colleagues.js';
 import { isSameOwner, parseGaiiLoose } from '../../utils/gaii.js';
 import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../../utils/messaging.js';

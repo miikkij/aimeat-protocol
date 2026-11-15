@@ -709,7 +709,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/contact-handles.ts :: map :: handles": {
+    "src/services/contact/handles.ts :: map :: handles": {
       "count": 1,
       "reason": "DEBT"
     },

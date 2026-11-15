@@ -45,7 +45,7 @@ import type { DeliveryCtx } from '../message/delivery.js';
 import {
   MAX_GROUP_PARTICIPANTS, createGroupConversation, emitGroupChange, isParticipant, sendGroupMessage,
 } from './group.js';
-import { acceptedSameAccount } from '../contact-same-account.js';
+import { acceptedSameAccount } from '../contact/same-account.js';
 import { areColleagues } from '../colleagues.js';
 import { normalizeContactId } from '../contacts.js';
 import { isIdentityShaped, localIdentityExists, missingIdentityReason } from '../local-identity.js';

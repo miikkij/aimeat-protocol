@@ -9,7 +9,7 @@
  *   (resolveContactEmail in services/contacts.ts, behind POST /v1/contacts/resolve and the
  *   aimeat_contact_resolve_email tool that asks it), saving a person by email (addContact with an
  *   email, behind POST /v1/contacts and aimeat_contact_add), and inviting a person
- *   (createContactInvitation in services/contact-invitations.ts, behind POST /v1/contacts/invite and
+ *   (createContactInvitation in services/contact/invitations.ts, behind POST /v1/contacts/invite and
  *   aimeat_contact_invite), because the saved record and the invitation's answer say the same thing:
  *   whether the address belongs to someone here. A malformed address is refused before it is
  *   counted, because it was never looked up.

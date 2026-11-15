@@ -1,5 +1,5 @@
 /**
- * @file src/services/contact-same-account.ts
+ * @file src/services/contact/same-account.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Has the recipient already accepted contact from the sender's ACCOUNT? A person and their
@@ -24,8 +24,8 @@
  *     M075).
  *   v1.0.0 — 2026-10-17 — Initial (wish-agentin-omistajan-nimiss-l-hett-m-viesti-n-ytt-mik-agentti-s).
  */
-import type { Storage } from '../storage/interface.js';
-import { isSameOwner, ownerGhiiOf, parseGaiiLoose } from '../utils/gaii.js';
+import type { Storage } from '../../storage/interface.js';
+import { isSameOwner, ownerGhiiOf, parseGaiiLoose } from '../../utils/gaii.js';
 
 /**
  * True when `mailboxGhii` has blocked `senderGhii`, or the person `senderGhii` acts for. A person and

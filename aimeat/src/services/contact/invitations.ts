@@ -1,5 +1,5 @@
 /**
- * @file contact-invitations.ts
+ * @file src/services/contact/invitations.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description An invitation from one person to another to join this AIMEAT, with no organism
@@ -22,15 +22,15 @@
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Kontaktien sivu", direction A).
  */
 import { randomBytes, randomUUID } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
-import { hashInviteToken, inviteEmailHash, INVITE_DEFAULT_EXPIRY_DAYS } from './invitations.js';
-import { nodeContext } from './node/context.js';
-import { sendMail } from './mail-gate.js';
-import { contactInviteEmail } from './email/templates.js';
-import { takeEmailLookup } from './email/lookup-limit.js';
-import { isValidEmail } from '../utils/email-validator.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { InvitationRecord } from '../../storage/repositories/invitation.repository.js';
+import { hashInviteToken, inviteEmailHash, INVITE_DEFAULT_EXPIRY_DAYS } from '../invitations.js';
+import { nodeContext } from '../node/context.js';
+import { sendMail } from '../mail-gate.js';
+import { contactInviteEmail } from '../email/templates.js';
+import { takeEmailLookup } from '../email/lookup-limit.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 
 /** How many invitations one person may have open at once, organism ones included. */
 export const CONTACT_INVITE_MAX_PENDING_PER_INVITER = 50;

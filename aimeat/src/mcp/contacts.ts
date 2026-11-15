@@ -59,7 +59,7 @@ import {
     ContactsError, addContact, removeContact, listContactsFor, resolveContactEmail,
     type AddContactInput,
 } from '../services/contacts.js';
-import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
+import { createContactInvitation, ContactInvitationError } from '../services/contact/invitations.js';
 import { invitePublic } from '../services/invitations.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

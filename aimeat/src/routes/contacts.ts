@@ -79,9 +79,9 @@ import {
 } from '../services/contacts.js';
 import { identityKind } from '../services/local-identity.js';
 import { contactTogether } from '../services/contacts-together.js';
-import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
+import { createContactInvitation, ContactInvitationError } from '../services/contact/invitations.js';
 import { invitePublic } from '../services/invitations.js';
-import { mintContactHandle, resolveContactHandle } from '../services/contact-handles.js';
+import { mintContactHandle, resolveContactHandle } from '../services/contact/handles.js';
 import { resolveAppOriginTarget } from '../services/app/origin-target.js';
 
 /** Links as the caller sent them. Shape only — what is ACCEPTABLE (http(s), caps, count) is the

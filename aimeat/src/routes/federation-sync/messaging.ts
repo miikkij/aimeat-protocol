@@ -117,7 +117,7 @@ import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
 import { notify } from '../../services/notify.js';
 import { parseGaiiLoose, isSameOwner, localAccountName, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
-import { acceptedSameAccount, blockedSenderAccount } from '../../services/contact-same-account.js';
+import { acceptedSameAccount, blockedSenderAccount } from '../../services/contact/same-account.js';
 import { readPeerOperators } from '../../services/federation/book.js';
 import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
 import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message/alias.js';
@@ -484,7 +484,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
 
             // (4) The recipient accepted another identity of the sender's account (an agent of the
             // sender, or the sender themself), and the sender is on the node that signed this
-            // (services/contact-same-account.ts; checked above: SENDER_NOT_OF_PEER).
+            // (services/contact/same-account.ts; checked above: SENDER_NOT_OF_PEER).
             const sameAccount = await acceptedSameAccount(storage, deliveryGhii, String(message.senderGhii));
             const autoAccept = isSameOwner(message.senderGhii, deliveryGhii) || knownThread || fromOurSupport || sameAccount;
             state = autoAccept ? 'accepted' : 'pending';

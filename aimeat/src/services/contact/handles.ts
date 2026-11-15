@@ -1,5 +1,5 @@
 /**
- * @file src/services/contact-handles.ts
+ * @file src/services/contact/handles.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A handle saying "this owner chose this contact, for this app, just now".
