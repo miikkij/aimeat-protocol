@@ -1,5 +1,5 @@
 /**
- * @file subdomain-site-origin.ts
+ * @file src/services/subdomain/site-origin.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who chose a subdomain label, and where the label is served. One table holds two kinds
@@ -14,16 +14,16 @@
  *   - autoLabelCandidates(ownerBare, filename) — the labels ensureAppSubdomain tries, in order
  *   - apexServesSite(site, label, config)     — may the apex namespace serve this row
  *   - classifySiteOrigin(site, nodeId, isOperator) — 'operator' | 'publisher' | null, on evidence only
- * @usage import { apexServesSite } from '../services/subdomain-site-origin.js';
+ * @usage import { apexServesSite } from './site-origin.js';
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22): publisher labels leave the apex namespace.
  *     autoLabelCandidates moved unchanged out of routes/subdomains.ts ensureAppSubdomain.
  *   v1.0.1 — 2026-10-25 — autoLabelCandidates trims dashes in linear time (CodeQL alerts 1763, 1764).
  */
-import type { AimeatConfig } from '../config.js';
-import type { SubdomainSiteRecord, SubdomainSiteOrigin } from '../storage/interface.js';
-import { ERASED_PARTY_PREFIX } from '../storage/erased-party.js';
-import { isNodeApexLabel } from './subdomain-node-labels.js';
+import type { AimeatConfig } from '../../config.js';
+import type { SubdomainSiteRecord, SubdomainSiteOrigin } from '../../storage/interface.js';
+import { ERASED_PARTY_PREFIX } from '../../storage/erased-party.js';
+import { isNodeApexLabel } from './node-labels.js';
 
 /**
  * The labels ensureAppSubdomain tries for an app, in order: the filename's base, the owner-prefixed
@@ -51,7 +51,7 @@ function trimDashes(s: string): string {
 /**
  * True when the apex namespace may serve this row's app at `<label>.<apex>`. A redirect row is always
  * served (a 301 runs no script). An app row is not served there when its label is a node name
- * (services/subdomain-node-labels.ts) or when a publish assigned it (origin 'publisher'). An operator
+ * (services/subdomain/node-labels.ts) or when a publish assigned it (origin 'publisher'). An operator
  * row and a row not yet classified are served as before.
  */
 export function apexServesSite(

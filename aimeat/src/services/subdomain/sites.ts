@@ -1,5 +1,5 @@
 /**
- * @file subdomain-sites.ts
+ * @file src/services/subdomain/sites.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Managing which subdomain label points where: list, create, update and delete a
@@ -18,7 +18,7 @@
  *   - updateSubdomainSite(storage, config, subdomain, input)
  *   - deleteSubdomainSite(storage, subdomain)
  * @usage
- *   import { createSubdomainSite } from '../services/subdomain-sites.js';
+ *   import { createSubdomainSite } from './sites.js';
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
@@ -37,12 +37,12 @@
  *   v1.0.0 — 2026-09-27 — Extracted from routes/subdomain-admin.ts v1.0.0, same validation, codes,
  *     messages and writes, when an agent holding operator:admin was allowed to manage the list.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
-import { resolveAppTarget } from './app/access.js';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from './subdomain-names.js';
-import { appNeedsCodeOrPayment } from './app/access.js';
-import { isNodeApexLabel } from './subdomain-node-labels.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, SubdomainSiteRecord } from '../../storage/interface.js';
+import { resolveAppTarget } from '../app/access.js';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from './names.js';
+import { appNeedsCodeOrPayment } from '../app/access.js';
+import { isNodeApexLabel } from './node-labels.js';
 
 /** A refusal, in the shape each door renders as its own error envelope. */
 export interface SubdomainRefusal {
@@ -67,7 +67,7 @@ function refuse(status: SubdomainRefusal['status'], code: SubdomainRefusal['code
   return { ok: false, status, code, message };
 }
 
-/** A node name (services/subdomain-node-labels.ts) takes a redirect, never an app. */
+/** A node name (services/subdomain/node-labels.ts) takes a redirect, never an app. */
 function nodeLabelRefusal(subdomain: string): SubdomainRefusal {
   return refuse(400, 'RESERVED_SUBDOMAIN',
     `People read "${subdomain}" as this node's own page, so it can only be a redirect. Choose a different name for an app.`);
@@ -141,7 +141,7 @@ export async function createSubdomainSite(
 
   const now = new Date().toISOString();
   // A mapping made here is the operator's own site, served on the apex namespace too
-  // (services/subdomain-site-origin.ts).
+  // (services/subdomain/site-origin.ts).
   const site: SubdomainSiteRecord = {
     subdomain, kind, target, enabled,
     createdBy,
@@ -170,7 +170,7 @@ export async function updateSubdomainSite(
 
   const updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'origin'>> = {};
   // The operator's decision on who the label belongs to: 'operator' serves the app on the apex
-  // namespace too, 'publisher' only on its app origin (services/subdomain-site-origin.ts).
+  // namespace too, 'publisher' only on its app origin (services/subdomain/site-origin.ts).
   if (input.origin !== undefined) {
     if (input.origin !== 'operator' && input.origin !== 'publisher') {
       return refuse(400, 'INVALID_ORIGIN', 'origin must be "operator" (served at <label>.<apex> too) or "publisher" (served only at its app address)');

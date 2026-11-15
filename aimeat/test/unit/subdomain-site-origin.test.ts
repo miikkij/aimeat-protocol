@@ -18,8 +18,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { OwnerRecord, SubdomainSiteRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { apexServesSite, autoLabelCandidates, classifySiteOrigin } from '../../src/services/subdomain-site-origin.js';
-import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../../src/services/subdomain-site-origin-keep.js';
+import { apexServesSite, autoLabelCandidates, classifySiteOrigin } from '../../src/services/subdomain/site-origin.js';
+import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../../src/services/subdomain/site-origin-keep.js';
 import { listSecurityIncidents, recordSecurityIncident } from '../../src/services/security-incident.js';
 import { decideIncidentCase } from '../../src/services/incident-decisions.js';
 

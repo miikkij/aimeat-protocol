@@ -391,10 +391,10 @@
       "listOwners": 1,
       "listAgents": 1
     },
-    "src/services/subdomain-names.ts": {
+    "src/services/subdomain/names.ts": {
       "listSubdomainSites": 2
     },
-    "src/services/subdomain-sites.ts": {
+    "src/services/subdomain/sites.ts": {
       "listSubdomainSites": 1
     },
     "src/services/task/stall-detector.ts": {

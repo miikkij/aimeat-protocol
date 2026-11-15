@@ -109,7 +109,7 @@ import { markExistingPortfolioPagesOnce } from '../services/portfolio/read-hold-
 import { moveEcosystemSubscriptionsByOwnerOnce } from '../services/ecosystem/subscriptions-by-owner.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account/event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capabilities/extension-ref.js';
-import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain-site-origin-keep.js';
+import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain/site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
@@ -209,7 +209,7 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   await disableMalformedExtensionRefsOnce(storage, config)
     .catch(err => logger.error('Failed to switch off the extension capabilities whose ref names no action; the next boot tries again', { error: String(err) }));
   // The subdomain rows from before `origin` get the origin their evidence shows; the rest are named on
-  // the Security page and served as before (services/subdomain-site-origin-keep.ts). Awaited, so the
+  // the Security page and served as before (services/subdomain/site-origin-keep.ts). Awaited, so the
   // apex answers by the classified origin from the first request.
   await classifySubdomainSiteOriginsOnce(storage, config)
     .catch(err => logger.error('Failed to classify the older subdomain addresses; the next boot tries again', { error: String(err) }));

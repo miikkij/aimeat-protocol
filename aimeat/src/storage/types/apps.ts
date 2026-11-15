@@ -613,7 +613,7 @@ export interface SubdomainSiteRecord {
    * the app is served on the apex namespace `<label>.<apex>` too. 'publisher': the label a publish or
    * an open assigned to the app (routes/subdomains.ts ensureAppSubdomain), served only on the app
    * origin `<label>.<appHost>`. Null or absent: a row written before the column existed that the
-   * start step could not classify (services/subdomain-site-origin-keep.ts), served as before.
+   * start step could not classify (services/subdomain/site-origin-keep.ts), served as before.
    */
   origin?: SubdomainSiteOrigin | null;
   /**

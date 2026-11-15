@@ -8,7 +8,7 @@
  *   Who may call: the operator in person, or an agent the operator gave operator:admin
  *   (requireOperatorPrincipal, the same door as the node's MCP server registry). No wildcard
  *   carries that word, an app grant never passes, and a federated session never passes.
- *   The work itself is services/subdomain-sites.ts; these handlers parse and render.
+ *   The work itself is services/subdomain/sites.ts; these handlers parse and render.
  * @structure subdomainAdminRouter(config, storage)
  * @usage app.use(subdomainAdminRouter(config, storage)) in routes-loader
  * @version-history
@@ -29,7 +29,7 @@ import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import {
   listSubdomainSites, createSubdomainSite, updateSubdomainSite, deleteSubdomainSite,
   type SubdomainRefusal,
-} from '../services/subdomain-sites.js';
+} from '../services/subdomain/sites.js';
 
 /** Operator management CRUD for subdomain mappings. */
 export function subdomainAdminRouter(config: AimeatConfig, storage: Storage): Router {

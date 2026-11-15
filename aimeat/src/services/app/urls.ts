@@ -20,7 +20,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { ensureAppSubdomain } from '../subdomain-names.js';
+import { ensureAppSubdomain } from '../subdomain/names.js';
 
 /**
  * Scheme + port for the app origin, inherited from the apex baseUrl so only the host

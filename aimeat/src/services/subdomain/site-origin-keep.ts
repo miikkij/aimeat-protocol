@@ -1,5 +1,5 @@
 /**
- * @file src/services/subdomain-site-origin-keep.ts
+ * @file src/services/subdomain/site-origin-keep.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A once-per-node step: every subdomain row written before rows carried `origin` gets the
@@ -9,7 +9,7 @@
  *   WHY. A publisher's auto-assigned label was served on the apex namespace `<label>.<apex>` as well
  *   as on its app origin, and on the apex namespace the node's own pages and sign-in answer
  *   (secaudit2026oct22). From now on a row with origin 'publisher' is served only on the app origin
- *   (services/subdomain-site-origin.ts apexServesSite). Rows from before have origin null (Postgres
+ *   (services/subdomain/site-origin.ts apexServesSite). Rows from before have origin null (Postgres
  *   0116, SQLite safeAddColumn) and are served as before until this step or the operator classifies
  *   them.
  *
@@ -50,17 +50,17 @@
  *     operator role per owner the rows name (getOwner), instead of two whole-table reads (check:unbounded-lists).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
-import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, SubdomainSiteRecord } from '../../storage/interface.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { logger } from '../../utils/logger.js';
+import { claimOnceOnlyStep } from '../once-only-step.js';
 import {
   recordSecurityIncident, listSecurityIncidents, findSecurityIncident, saveSecurityIncident, deleteSecurityIncident,
   type IncidentEntry, type SecurityIncidentValue,
-} from './security-incident.js';
-import { classifySiteOrigin } from './subdomain-site-origin.js';
-import { updateSubdomainSite } from './subdomain-sites.js';
+} from '../security-incident.js';
+import { classifySiteOrigin } from './site-origin.js';
+import { updateSubdomainSite } from './sites.js';
 
 /** The record under `system@<nodeId>` that says the step has run. */
 export const SUBDOMAIN_SITE_ORIGIN_STEP_KEY = 'migrations.secaudit2026oct22.subdomain-site-origin';

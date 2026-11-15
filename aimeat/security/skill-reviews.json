@@ -543,7 +543,7 @@
         "aimeat/src/services/app/agent-deploy.ts",
         "aimeat/src/services/builder/data-map-step.ts"
       ],
-      "digest": "sha256:b5ae5d8e2a0f7b833712e28b",
+      "digest": "sha256:fe0d1ed3ee63536f68758031",
       "note": "The build specs it routes to, the publish answer's next_steps it tells the builder to read whole, and the bundled-agent files it names."
     },
     "project:aimeat-design-language": {
@@ -832,7 +832,7 @@
       "aimeat/src/routes/app-templates.ts": "c04b6dda6dd9ed2f",
       "aimeat/src/services/builder/atelier-prompt.ts": "f22da130ddf9dcb3",
       "aimeat/src/services/builder/app-prompt.ts": "e42d89e8ad0cee61",
-      "aimeat/src/services/app/publish.ts": "8ea8c1732f5a50b6",
+      "aimeat/src/services/app/publish.ts": "93023508a3266cb1",
       "aimeat/src/services/app/bundled-crews.ts": "54f54991ef832487",
       "aimeat/src/services/app/agent-propose.ts": "7cd196a896f8bde1",
       "aimeat/src/services/app/agent-deploy.ts": "cf9f7771be84c7c5",

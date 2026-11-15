@@ -1,5 +1,5 @@
 /**
- * @file subdomain-node-labels.ts
+ * @file src/services/subdomain/node-labels.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The single-label names under the apex that a person reads as the node's own pages
@@ -14,14 +14,14 @@
  *   - NODE_APEX_LABELS            — the fixed names
  *   - isNodeApexLabel(label, cfg) — a fixed name, or the label of a configured node host
  *   - nodeLabelAppOrigin(cfg, label, originalUrl) — the per-app origin address for that label, or null
- * @usage import { isNodeApexLabel, nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
+ * @usage import { isNodeApexLabel, nodeLabelAppOrigin } from './node-labels.js';
  * @version-history
  *   v1.0.2 — 2026-10-25 — nodeLabelAppOrigin also answers for a publisher's label (secaudit2026oct22).
  *   v1.0.1 — 2026-10-25 — Moved unchanged from routes/ to services/: services/subdomain-sites.ts reads
  *     it, and a service does not import a route (check:deps).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22, subdomains.ts app-label-served-on-apex-namespace).
  */
-import type { AimeatConfig } from '../config.js';
+import type { AimeatConfig } from '../../config.js';
 
 /**
  * Names a visitor takes for the node's own sign-in, account, payment or support pages. A page on
@@ -60,7 +60,7 @@ export function isNodeApexLabel(label: string, config: HostConfig): boolean {
 
 /**
  * The per-app origin address for an app row the apex does not serve (a node label, or a label a
- * publish assigned: services/subdomain-site-origin.ts), keeping the request's path and query, or
+ * publish assigned: services/subdomain/site-origin.ts), keeping the request's path and query, or
  * null when this node has no app origin (the apex then answers 404).
  */
 export function nodeLabelAppOrigin(

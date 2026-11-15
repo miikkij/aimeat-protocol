@@ -1,5 +1,5 @@
 /**
- * @file subdomain-names.ts
+ * @file src/services/subdomain/names.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What a subdomain label may be, and the per-app label an app gets the first time it is
@@ -10,15 +10,15 @@
  * @structure RESERVED_SUBDOMAINS, SUBDOMAIN_RE — validation primitives;
  *            DRAFT_LABEL_SUFFIX, draftBaseLabel — an app's draft origin label;
  *            ensureAppSubdomain — the app's own label, created on first use.
- * @usage import { ensureAppSubdomain, SUBDOMAIN_RE } from '../services/subdomain-names.js';
+ * @usage import { ensureAppSubdomain, SUBDOMAIN_RE } from './names.js';
  * @version-history
  *   v1.0.0 — 2026-11-04 — Moved unchanged from routes/subdomains.ts, where the history of these
  *     names stays (codebase analysis 2026-11-03, item D-d).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { isNodeApexLabel } from './subdomain-node-labels.js';
-import { autoLabelCandidates } from './subdomain-site-origin.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { isNodeApexLabel } from './node-labels.js';
+import { autoLabelCandidates } from './site-origin.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -74,14 +74,14 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
   if (forTarget.length > 0) return null;
 
   const taken = new Set(sites.map(s => s.subdomain));
-  // A node name (login, account, pay...) is never an app's label (services/subdomain-node-labels.ts).
+  // A node name (login, account, pay...) is never an app's label (services/subdomain/node-labels.ts).
   const free = (n: string) => SUBDOMAIN_RE.test(n) && !RESERVED_SUBDOMAINS.has(n) && !isNodeApexLabel(n, config) && !taken.has(n) && draftBaseLabel(n) === null;
   const name = autoLabelCandidates(ownerBare, filename).find(free);
   if (!name) return null;
 
   const now = new Date().toISOString();
   try {
-    // origin 'publisher': this label is served only on the app origin (services/subdomain-site-origin.ts).
+    // origin 'publisher': this label is served only on the app origin (services/subdomain/site-origin.ts).
     await storage.createSubdomainSite({ subdomain: name, kind: 'app', target, enabled: true, createdBy: `${ownerBare}@${config.nodeId}`, createdAt: now, updatedAt: now, origin: 'publisher' });
     return name;
   } catch {

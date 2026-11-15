@@ -48,7 +48,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { AppManifest } from '../../storage/types/apps.js';
 import { resolvePublishedPortfolio } from '../portfolio/published.js';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from '../subdomain-names.js';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from '../subdomain/names.js';
 
 /**
  * A grant target for a portfolio origin reads `portfolio:<username>`. An app target reads

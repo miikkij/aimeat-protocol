@@ -10,7 +10,7 @@
  *              HTML, so content stays in one place (app versions).
  * @structure subdomainServeRouter — root catch (GET /) for subdomain requests;
  *            the label names (RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, ensureAppSubdomain)
- *            live in services/subdomain-names.ts;
+ *            live in services/subdomain/names.ts;
  *            unlockRedirect — a browser at a code-gated app is sent to the apex code form.
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
@@ -220,15 +220,15 @@ import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain
 import { pageOriginRefused } from './page-open.js';
 import { originGrant, APP_ACCESS_COOKIE } from './origin-grant-cookie.js';
 import { markOriginOwner } from './origin-owner-cookie.js';
-import { nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
+import { nodeLabelAppOrigin } from '../services/subdomain/node-labels.js';
 import { relaxAppCspMeta } from './subdomain-app-html.js';
-import { apexServesSite } from '../services/subdomain-site-origin.js';
+import { apexServesSite } from '../services/subdomain/site-origin.js';
 import {
   RESERVED_SUBDOMAINS, SUBDOMAIN_RE, DRAFT_LABEL_SUFFIX, draftBaseLabel, ensureAppSubdomain,
-} from '../services/subdomain-names.js';
+} from '../services/subdomain/names.js';
 
 // RESERVED_SUBDOMAINS, SUBDOMAIN_RE, DRAFT_LABEL_SUFFIX, draftBaseLabel and ensureAppSubdomain
-// moved unchanged to services/subdomain-names.ts (codebase analysis 2026-11-03, item D-d).
+// moved unchanged to services/subdomain/names.ts (codebase analysis 2026-11-03, item D-d).
 
 // resolveAppTarget, resolveServableApp, appIsRestricted and unlockRedirect live in
 // ./subdomain-app-gate.ts (moved unchanged at the line ceiling); re-exported for their importers.
@@ -580,7 +580,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
     if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return notFound();
     // A label the apex does not serve (a node name, or a publisher's label) answers with its app
-    // origin, path and query kept (services/subdomain-site-origin.ts apexServesSite).
+    // origin, path and query kept (services/subdomain/site-origin.ts apexServesSite).
     const toAppOrigin = () => {
       const there = nodeLabelAppOrigin(config, sub, req.originalUrl);
       if (!there) return notFound();

@@ -163,7 +163,7 @@ import { parseAppScopes } from '../protected-resource.js';
 import type { DataMapStamp } from '../data-map/data-map-types.js';
 import { lintAppHtmlForMobile } from '../../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../../utils/app-protect.js';
-import { ensureAppSubdomain } from '../subdomain-names.js';
+import { ensureAppSubdomain } from '../subdomain/names.js';
 import { appSeoListable } from './seo.js';
 import { announceApp } from '../indexnow.js';
 import { logger } from '../../utils/logger.js';

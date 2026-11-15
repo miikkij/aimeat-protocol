@@ -105,7 +105,7 @@ import { listActiveAppGrants } from '../services/app/grant-list.js';
 import { exportAppsBackupToStorage } from '../services/apps-backup-export.js';
 import {
     listSubdomainSites, createSubdomainSite, updateSubdomainSite, deleteSubdomainSite,
-} from '../services/subdomain-sites.js';
+} from '../services/subdomain/sites.js';
 import { appManageMemberAction } from './app-manage-members.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';

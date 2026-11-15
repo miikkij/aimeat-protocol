@@ -38,7 +38,7 @@ import { DEFAULT_CAPS_INCIDENT_TYPE, decideDefaultCap } from './classification/d
 import { decideIncidentEntry } from './incident-entries.js';
 import { ANONYMOUS_RECORDS_INCIDENT_TYPE, clearAnonymousRecord } from './anonymous-principal-records.js';
 import { ERASURE_LEFTOVER_INCIDENT_TYPE, deleteLeftoverSchedule } from './erasure-leftover-schedules.js';
-import { SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE, serveAtAppAddressOnly } from './subdomain-site-origin-keep.js';
+import { SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE, serveAtAppAddressOnly } from './subdomain/site-origin-keep.js';
 import { PLATFORM_FEE_INCIDENT_TYPE, uncountPlatformFeeRecord } from '../commerce/platform-fee-writers.js';
 import { ERASED_LOCK_INCIDENT_TYPE, pseudonymiseLockEntry } from './csm/erased-lock-holders.js';
 
