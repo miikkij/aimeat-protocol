@@ -47849,7 +47849,7 @@ paths:
     delete:
       operationId: totpDisable
       summary: Disable TOTP two-factor authentication
-      description: Disable TOTP 2FA for the authenticated owner. Requires current TOTP code or backup code.
+      description: Disable TOTP 2FA for the authenticated owner. Requires the current TOTP code or one backup code.
       tags: [TOTP]
       security:
         - BearerAuth: []
@@ -47859,11 +47859,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [code]
+              anyOf:
+                - required: [code]
+                - required: [backup_code]
               properties:
                 code:
                   type: string
-                  description: Current TOTP code or backup code
+                  description: Current TOTP code from the authenticator app.
+                backup_code:
+                  type: string
+                  description: One unused backup code, sent in place of `code`.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

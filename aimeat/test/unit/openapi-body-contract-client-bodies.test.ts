@@ -164,3 +164,15 @@ describe('POST /v1/ai/stream and /v1/ai/speak (aimeat-voice.js node adapters)', 
         await refused('POST', '/v1/ai/stream', [{ messages: [{ role: 'user', content: 'hello' }], app_id: 'x'.repeat(201) }]);
     });
 });
+
+describe('DELETE /v1/ghii/totp (portal security.js totpDisable)', () => {
+    // security.js sends { backup_code } when the person turns two-step sign-in off with a backup code;
+    // routes/totp.ts hands { code, backup_code } to checkTotpManagementCode, which takes either one.
+    it('takes a backup code in place of the code', async () => {
+        await taken('DELETE', '/v1/ghii/totp', [{ backup_code: 'a1b2c3d4' }, { code: '123456' }]);
+    });
+
+    it('still refuses a body with neither', async () => {
+        await refused('DELETE', '/v1/ghii/totp', [{}, { backupCode: 'a1b2c3d4' }]);
+    });
+});
