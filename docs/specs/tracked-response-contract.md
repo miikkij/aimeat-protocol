@@ -4,6 +4,9 @@
   state machine, and the rules any human/AI system must honor when reading or advancing one. A
   Tracked Response's `spec` field points here so external agents know how to handle the structure.
 @version-history
+  v1.1.1 - 2026-11-15 - The example watches a record in the owner's own memory, `{{result}}` names
+    the classified case, and "How an AI advances the work" says that only the owner or an agent of
+    the owner fires the contract. No change to the contract.
   v1.1.0 - 2026-11-15 - Rules 2 and 5 match the node since 2026-10-14: the watched key is read only
     from the owner's own account (the owner's records and their agents' records), and the account,
     sender, recipient and conversation come from storage, not from the record's own fields. A
@@ -13,7 +16,7 @@
   v1.0.0 — 2026-06-21 — Initial spec (Tracked Response = first Memory Contract instance).
 -->
 
-# Tracked Response — contract spec (v1, revision 1.1.0)
+# Tracked Response — contract spec (v1, revision 1.1.1)
 
 **One line:** *an important inbox message that is owed a response once a linked follow-up has been completed.*
 
@@ -44,12 +47,11 @@ Owner-scoped memory key: `tracked-response.{id}.latest`, `visibility: 'private'`
   },
 
   "watch": {                             // the memory key tracked + the completion test
-    "key": "organism.{org}.w.{ws}.bug.{bugId}.latest",
+    "key": "bug.{bugId}.latest",         // read from the owner's own account only (rule 2)
     "condition": { "field": "status", "equals": "done" }   // shallow equality on the watched value
   },
 
   "references": {                        // everything this involves (for humans + AIs)
-    "organismId": "{org}", "workspaceId": "{ws}",
     "records": [ { "namespace": "bug", "id": "{bugId}" } ],
     "documents": [], "notes": []
   },
@@ -70,7 +72,7 @@ Owner-scoped memory key: `tracked-response.{id}.latest`, `visibility: 'private'`
 
 ### Template substitutions
 - `{{title}}` → the contract `title`.
-- `{{result}}` → the `response.inject.field` plucked from the watched value (`watch.value`), e.g. the bug record's `resolution`. Empty string if absent.
+- `{{result}}` → the `response.inject.field` plucked from the watched value (`watch.value`), e.g. the bug record's `resolution`. Empty string if absent, and also when the watched record's classification label may not leave its organism (rule 6).
 - `{{sourcePreview}}` → `source.preview`.
 
 ## State machine
@@ -91,5 +93,7 @@ cancelled         — owner cancelled; deregistered
 5. **Editing is allowed; the shape is the contract.** Any field may be edited by an authorized human/AI as long as the shape above is preserved and `type` stays `tracked-response`. Add data under `references` freely. Four fields are not taken from the record when the node evaluates it: `ownerGaii` and `source.ownerGhii` become the account that stores the record (it must be a person, not an agent or an app), and `source.peerGhii` and `source.conversationId` come from that account's own copy of the message `source.messageId` names. A record that names no message of that account is skipped.
 6. **A classified result stays home.** When the watched record's classification label may not leave its organism, `{{result}}` is empty, the reply still goes, and the ledger records a `result-withheld` event with the key and the reason.
 
-## How an external AI advances the work (the common case)
-> Read the bug at `watch.key`, do the work, then write it back with `status: "done"` and a `resolution` field, and publish. That's all — the reply to the original reporter is sent automatically.
+## How an AI advances the work (the common case)
+> Only the owner, or an agent of the owner, can make the contract fire. Such an AI reads the record at `watch.key` in the owner's account, does the work, then writes the record back with `status: "done"` and a `resolution` field. The node then sends the reply to the original reporter.
+
+An AI of any other account cannot fire the contract. When it writes a record with the same key, that record sits in its own account, and the node never reads it (rule 2). A record in an organism workspace fires the contract only when the owner or one of the owner's agents wrote it; a record another member wrote does not.
