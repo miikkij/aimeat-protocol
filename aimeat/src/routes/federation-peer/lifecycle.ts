@@ -5,6 +5,8 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — key-exchange refuses a node_public_key that is not an Ed25519 public key, or is a
+ *     small-order one, with 400 INVALID_PEER_KEY (ed25519PublicKeyProblem; audit 2026-11 L056).
  *   2026-11-04 — The single use of a signed lifecycle message is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.10.2 — 2026-10-27 — key-exchange refuses this node's own id (400 SELF_NODE_ID) and reads the
  *     approved peering requests by status instead of every request an introduction left
@@ -51,7 +53,7 @@ import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { LIVENESS_RECOVERABLE, OPERATOR_PARKED, type PeerInfo } from '../../services/federation.js';
-import { verify } from '../../auth/keypair.js';
+import { verify, ed25519PublicKeyProblem } from '../../auth/keypair.js';
 import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
@@ -165,6 +167,15 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
         if (!node_id || !node_public_key) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
                 'node_id and node_public_key are required'));
+            return;
+        }
+        // A key that is not an Ed25519 key, or a small-order one a forged signature passes for, is
+        // refused before any peer row is written (audit 2026-11 L056). The key a peer already has on
+        // file is not checked again: stored keys are left as they are, so its refresh answers as before.
+        const onFile = [...peers.values()].find(p => p.nodeId === node_id)?.publicKey;
+        const keyProblem = node_public_key === onFile ? null : ed25519PublicKeyProblem(node_public_key);
+        if (keyProblem) {
+            res.status(400).json(error(config.nodeId, 'INVALID_PEER_KEY', keyProblem));
             return;
         }
         // No peer under this node's own id (secaudit2026oct26).

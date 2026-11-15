@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-15 -- test/e2e-federation-peer-proofs.ts joins ALL_SUITES (audit 2026-11 M130, L056).
  *   2026-11-15 -- e2e-app-icon-upload.ts joins the list (not the guard tier): aimeat_app_manage icon_upload and the install block.
  *   2026-11-15 -- The plan moves to test/run-e2e-plan.ts (E2E report of 2026-11-15, section 4):
  *     lanes are balanced by measured time (test/e2e-suite-times.json) instead of putting every suite
@@ -918,6 +919,9 @@ const ALL_SUITES = [
     'test/e2e-iam-generated-extension.ts',
     'test/e2e-upsert.ts',
     'test/e2e-federation.ts',
+    // A peer lists only its own providers' actions in a catalogue sync, and a peer key is an Ed25519
+    // public key at registration, update, key exchange and introduction (audit 2026-11 M130, L056).
+    'test/e2e-federation-peer-proofs.ts',
     // Cross-federation "genesis": peering CRUD, signed catalogue ingest, the aggregated
     // cross-catalogue and its filters, cross-genesis memory read both ways, subscriptions and the
     // sync service. Boots its OWN in-process node on 28321 with its own SQLite file, and serves the

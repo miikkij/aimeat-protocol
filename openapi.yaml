@@ -36135,12 +36135,12 @@ paths:
                 public_key:
                   type: string
                   minLength: 1
-                  description: The peer's Ed25519 verification key. Required — an empty one is refused.
+                  description: The peer's Ed25519 verification key, the 32 raw bytes in base64 as the node's card publishes it. Required — an empty one is refused, and so is text that is not such a key or a small-order key (400 INVALID_PEER_KEY).
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
-          description: PEER_KEY_REQUIRED — no `public_key`, so nothing could ever be checked against this peer; SELF_NODE_ID — the node id is this node's own
+          description: PEER_KEY_REQUIRED — no `public_key`, so nothing could ever be checked against this peer; INVALID_PEER_KEY — `public_key` is not an Ed25519 public key (32 bytes of base64 that decode to a point on the curve) or is a small-order key that a forged signature passes for; SELF_NODE_ID — the node id is this node's own
         '409':
           description: CONFLICT — a peer with that node id is already registered
 
@@ -36180,7 +36180,7 @@ paths:
                 public_key:
                   type: string
                   maxLength: 1024
-                  description: The key this node checks the peer's signatures against.
+                  description: The key this node checks the peer's signatures against. When sent, it must be an Ed25519 public key (32 bytes of base64, not small-order), or 400 INVALID_PEER_KEY; leave it out to keep the stored key.
                 status:
                   type: string
                   maxLength: 256
@@ -36259,7 +36259,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
-          description: INVALID_INPUT, a `relay_claim` that is not optional, required, node or null, or a `settlement_ceiling` that is not a whole number of at least 1, none, node or null. Nothing is written.
+          description: INVALID_INPUT, a `relay_claim` that is not optional, required, node or null, or a `settlement_ceiling` that is not a whole number of at least 1, none, node or null. INVALID_PEER_KEY, a `public_key` that is not an Ed25519 public key or is a small-order one. Nothing is written.
         '404':
           description: No peer with that node id
         '409':
@@ -36909,6 +36909,10 @@ paths:
         Synchronise action catalogue entries from a peer node. Supports
         incremental sync via `since_timestamp`. New actions are created;
         existing federated actions are updated (upsert by federated ID).
+        A peer lists only its own providers' actions: an action whose
+        `provider_gaii` is not on `source_node` (a provider of this node or
+        of a third node) is skipped and listed in `rejected` with a reason,
+        and the rest of the sync proceeds.
       tags: [Federation]
       requestBody:
         required: true
@@ -36990,6 +36994,18 @@ paths:
                           updated:
                             type: integer
                             description: Updated existing actions
+                          rejected:
+                            type: array
+                            description: Actions skipped because their provider is not on the signing node. Present only when at least one was skipped.
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                provider_gaii:
+                                  type: string
+                                reason:
+                                  type: string
                           source_node:
                             type: string
                           total_received:
@@ -37022,7 +37038,9 @@ paths:
         keys a peer sends are not kept. An unchanged key is answered without a signature for
         that reason (Core 2026-11 section 9.3). A `node_id` equal to this node's own id is
         refused with 400 SELF_NODE_ID. The approved request is looked up among the approved
-        requests only, never by reading the pending ones.
+        requests only, never by reading the pending ones. A `node_public_key` other than the key
+        the peer has on file must be an Ed25519 public key (the 32 raw bytes in base64) that is not
+        a small-order point, or 400 INVALID_PEER_KEY before anything is read or written.
       tags: [Federation]
       requestBody:
         required: true
@@ -37085,6 +37103,8 @@ paths:
                             description: Always empty. Kept so a peer on an older version that reads the field still parses the answer.
                             items:
                               type: object
+        '400':
+          description: INVALID_INPUT (no node_id or node_public_key), SELF_NODE_ID, or INVALID_PEER_KEY (a new key that is not an Ed25519 public key or is a small-order one).
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -61203,7 +61223,7 @@ paths:
         '202':
           description: Pending operator approval (default; also an unknown/expired/used invite, an invite that names another node, or an invite that names no node presented for a node id held under another key)
         '400':
-          description: SELF_NODE_ID — the node id is this node's own; or a missing field, a stale timestamp or an address this node does not take
+          description: SELF_NODE_ID — the node id is this node's own; INVALID_PEER_KEY — `public_key` is not an Ed25519 public key (32 bytes of base64 that decode to a point on the curve) or is a small-order key, refused before the signature is checked against it; or a missing field, a stale timestamp or an address this node does not take
         '409':
           description: CONFLICT — an active peer holds the node id; PEER_KEY_MISMATCH — a peer holds it under another key and nothing that names this node decided otherwise
         '429':

@@ -5,6 +5,9 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — POST /v1/federation/peers and PUT /v1/federation/peers/:nodeId refuse a public_key
+ *     that is not an Ed25519 public key, or is a small-order one, with 400 INVALID_PEER_KEY
+ *     (ed25519PublicKeyProblem); keys already stored stay as they are (audit 2026-11 L056).
  *   2026-11-04 — A heartbeat tells the `federation` change only for a known peer whose signature and
  *     single use passed: an unknown sender or a refused one changed nothing, and with the event bus
  *     between processes (services/bus-relay.ts) every such event makes each process read the peers
@@ -67,7 +70,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { PeeringDecisionSchema, PeerSettlementCeilingSchema, validateBody } from '../../models/schemas.js';
 import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.js';
-import { verify } from '../../auth/keypair.js';
+import { verify, ed25519PublicKeyProblem } from '../../auth/keypair.js';
 import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
@@ -468,6 +471,14 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 'A peer needs its verification key. Without one this node cannot check that anything claiming to come from that node really did.'));
             return;
         }
+        // The key every signature from this peer is checked against, so it is checked here: text that
+        // is not an Ed25519 key can never verify, and a small-order key verifies a forged signature
+        // (audit 2026-11 L056).
+        const keyProblem = ed25519PublicKeyProblem(public_key);
+        if (keyProblem) {
+            res.status(400).json(error(config.nodeId, 'INVALID_PEER_KEY', keyProblem));
+            return;
+        }
 
         if (peers.has(node_id)) {
             res.status(409).json(error(config.nodeId, 'CONFLICT', `Peer "${node_id}" already registered`));
@@ -520,6 +531,11 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         const next: PeerInfo = { ...peer };
         const schemeRefusal = url ? peerUrlRefusal(config, url) : null;
         if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
+        // The same key check as POST /v1/federation/peers, or this route would write the key that one
+        // refuses (audit 2026-11 L056). A save that sends no public_key (the admin page sends none)
+        // leaves the stored key as it is.
+        const keyProblem = public_key ? ed25519PublicKeyProblem(public_key) : null;
+        if (keyProblem) { res.status(400).json(error(config.nodeId, 'INVALID_PEER_KEY', keyProblem)); return; }
         if (url) next.url = url;
         if (public_key) next.publicKey = public_key;
         if (status) next.status = status;

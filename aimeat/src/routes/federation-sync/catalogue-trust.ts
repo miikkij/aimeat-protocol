@@ -5,6 +5,9 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — The catalogue sync keeps only actions whose provider_gaii is on the signing
+ *     source_node; the others are skipped and listed in the answer's `rejected` with a reason (the
+ *     field is present only when one was skipped), and the rest of the sync proceeds (audit 2026-11 M130).
  *   2026-11-05 — The catalogue sync and the signed trust notice declare the 'federation-peer' credential strategy, which verifies the peer and its signature in the same order with the same refusals; an unsigned notice still passes on to the operator's door (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-11-04 — The single use of a signed trust notice is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
@@ -49,6 +52,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { actionPricingFromPeer } from '../../services/action-pacing.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
 import { revokePeerApprovals } from '../../services/peer-origin.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
 
 export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer
@@ -83,10 +87,24 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
 
         let synced = 0;
         let updated = 0;
+        const rejected: Array<{ id: string; provider_gaii: string; reason: string }> = [];
         const now = new Date().toISOString();
 
         for (const action of actionList) {
             if (!action.id || !action.provider_gaii || !action.display_name) continue;
+            // A peer speaks for its own providers only, the rule SENDER_NOT_OF_PEER applies to a
+            // message: the signature proves which node sent the catalogue, not who provides each
+            // action, so an action whose provider is on this node or on a third node is skipped and
+            // named, and the rest of the sync proceeds. Until 2026-11-15 provider_gaii was copied as
+            // sent, and a peer could list an action under a local person's agent (audit 2026-11 M130).
+            const providerNode = parseGaiiLoose(String(action.provider_gaii)).node;
+            if (providerNode !== source_node) {
+                rejected.push({
+                    id: String(action.id), provider_gaii: String(action.provider_gaii),
+                    reason: `The provider ${String(action.provider_gaii)} is not on ${String(source_node)}, the node that signed this catalogue. A node lists only its own providers' actions.`,
+                });
+                continue;
+            }
 
             const federatedId = `${source_node}:${action.id}`;
             const actionData = {
@@ -131,6 +149,8 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
         res.json(success(config.nodeId, {
             synced,
             updated,
+            // Present only when an action was skipped, so a sync with none answers as before.
+            ...(rejected.length > 0 ? { rejected } : {}),
             source_node,
             total_received: actionList.length,
             incremental: !!since_timestamp,

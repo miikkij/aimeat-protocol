@@ -32,6 +32,8 @@
  *   push-home, list-home) refusing a home token · 7 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-memory-federation-remote
  * @version-history
+ *   2026-11-15 — Both peers are registered with a generated Ed25519 key instead of base64 text: a
+ *     peer key must be one since audit 2026-11 L056. No assertion changed.
  *   v1.1.0 — 2026-09-24 — Phase 4b: pull-remote writes through the shared memory writer, so a
  *     credential record, `__redirect__`, a caller without memory:write, an app grant's reserved
  *     key and an ecosystem app's organism key without a data area are refused as at POST /v1/memory.
@@ -189,7 +191,8 @@ async function run() {
         const { status, body } = await json('/v1/federation/peers', {
             method: 'POST',
             headers: { Authorization: `Bearer ${ownerToken}` },
-            body: JSON.stringify({ node_id: peerNodeId, url: peer!.url, public_key: 'ZmFrZS1wZWVyLWtleQ==' }),
+            // A generated Ed25519 key: since audit 2026-11 L056 a peer key must be one.
+            body: JSON.stringify({ node_id: peerNodeId, url: peer!.url, public_key: Buffer.from(await ed.getPublicKeyAsync(ed.utils.randomSecretKey())).toString('base64') }),
         });
         assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
         assert(body.data.peer.status === 'pending', `a fresh peer must be pending: ${body.data.peer.status}`);
@@ -513,7 +516,7 @@ async function run() {
         const reg = await json('/v1/federation/peers', {
             method: 'POST',
             headers: { Authorization: `Bearer ${ownerToken}` },
-            body: JSON.stringify({ node_id: deadPeerNodeId, url: 'http://127.0.0.1:1', public_key: 'ZGVhZC1wZWVyLWtleQ==' }),
+            body: JSON.stringify({ node_id: deadPeerNodeId, url: 'http://127.0.0.1:1', public_key: Buffer.from(await ed.getPublicKeyAsync(ed.utils.randomSecretKey())).toString('base64') }),
         });
         assert(reg.status === 201, `dead peer register ${reg.status}: ${JSON.stringify(reg.body)}`);
         const act = await json(`/v1/federation/peers/${deadPeerNodeId}`, {

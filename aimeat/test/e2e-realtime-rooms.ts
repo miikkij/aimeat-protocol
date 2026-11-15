@@ -21,6 +21,9 @@
  *   9 the idle reaper.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-realtime-rooms
  * @version-history
+ *   2026-11-15 — The federated room's peer is registered with a generated Ed25519 key instead of 32
+ *     random bytes, which are a curve point only about half the time: a peer key must be one since
+ *     audit 2026-11 L056. No assertion changed.
  *   v1.2.2 — 2026-10-20 — A room's created_by is the owner's GHII, not the bare account name.
  *   v1.2.1 — 2026-10-13 — queryTokenUses throws again when GET /v1/stats has no ws_query_token family
  *     (it read 0 since 2026-10-12, so a dropped counter passed); the counted-use test makes one use
@@ -993,7 +996,7 @@ await test('GET /v1/realtime/federated-rooms — an active peer\'s rooms are fet
     const add = await json('/v1/federation/peers', {
         method: 'POST',
         headers: authA(),
-        body: JSON.stringify({ node_id: peerNodeId, url: peerUrl, public_key: randomBytes(32).toString('base64') }),
+        body: JSON.stringify({ node_id: peerNodeId, url: peerUrl, public_key: (await (await import('../src/auth/keypair.js')).generateKeyPair()).publicKey }),
     });
     assert(add.status === 201, `add peer: ${add.status} ${JSON.stringify(add.body)}`);
     const activate = await json(`/v1/federation/peers/${peerNodeId}`, {

@@ -21,6 +21,8 @@
  *   made appeared under "asking to join" with Approve and Refuse beside it, naming this node as the
  *   asker. Found by driving the browser on 2026-09-12.
  * @version-history
+ *   2026-11-15 -- The peers are made with a generated Ed25519 key: 32 bytes of 'a' are not a curve
+ *     point, and a peer key must be one since audit 2026-11 L056. No assertion changed.
  *   2026-10-31 -- aimeat_admin_federation_settlement_ceiling_set: the operator's agent gives a peer a
  *     daily settlement ceiling of its own and hands it back, and the peer list shows it
  *     (secaudit2026oct31w2 round 10, W2-4).
@@ -85,8 +87,9 @@ const overviewAs = (token: string) =>
     json('/v1/admin/federation/overview', { headers: { Authorization: `Bearer ${token}` } });
 const overview = () => overviewAs(opToken);
 
-/** A public key shaped like the real thing, so a peer can be made with one and without one. */
-const aKey = Buffer.from('a'.repeat(32)).toString('base64');
+/** A generated Ed25519 public key, so a peer can be made with one and without one. Since audit
+ *  2026-11 L056 a peer key must be a real Ed25519 key; 32 bytes of 'a' are not a point on the curve. */
+const aKey = Buffer.from(await ed.getPublicKeyAsync(ed.utils.randomSecretKey())).toString('base64');
 
 await test('Setup: the first owner is the operator; a second is not', async () => {
     const mk = async (name: string) => {

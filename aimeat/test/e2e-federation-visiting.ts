@@ -10,6 +10,8 @@
  *   Nodes: A 28273 aimeat-test-001-fedvisa (open join on); C 28274 aimeat-test-001-fedvisc (off).
  *   Virtual joiner B: aimeat-peer-001-visitb (keypair only; not a running server).
  * @version-history
+ *   2026-11-15 -- Test 6 adds the direct peer with a generated Ed25519 key instead of placeholder
+ *     text: a peer key must be one since audit 2026-11 L056. No assertion changed.
  *   v1.2.1 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 --The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -232,7 +234,7 @@ await test('5. open-join OFF (node C) → introduce stays pending, no peer creat
 });
 
 await test('6. directly added peer defaults to member tier', async () => {
-  const r = await A.json('/v1/federation/peers', { method: 'POST', headers: auth(A.ownerToken), body: JSON.stringify({ node_id: 'aimeat-test-001-direct', url: 'http://localhost:49997', public_key: 'placeholder-key-uncontacted-peer' }) });
+  const r = await A.json('/v1/federation/peers', { method: 'POST', headers: auth(A.ownerToken), body: JSON.stringify({ node_id: 'aimeat-test-001-direct', url: 'http://localhost:49997', public_key: (await generateKeyPair()).publicKey }) });
   assert(r.status === 201, `add peer: ${r.status} ${JSON.stringify(r.body)}`);
   const list = await A.json('/v1/federation/peers', { headers: auth(A.ownerToken) });
   const d = list.body.data.peers.find((p: any) => p.node_id === 'aimeat-test-001-direct');

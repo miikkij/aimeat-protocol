@@ -14,6 +14,8 @@
  *   Nodes: V (vendor) 28288, two operators. C (customer) 28289, one owner who IS its operator, plus
  *   an agent — the principal that actually writes to support when something breaks.
  * @version-history
+ *   2026-11-15 — The second, never-contacted peer gets a generated Ed25519 key instead of placeholder
+ *     text: a peer key must be one since audit 2026-11 L056. No assertion changed.
  *   2026-10-23 — setupOperator registers through helpers/owner-login.ts setupOperator (a password and
  *     the password sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -338,9 +340,10 @@ await test('S10. REFUSED — a second peer cannot also answer support', async ()
     // resolved by whichever peer the iterator reached first.
     const other = 'aimeat-peer-001-second';
     await C.json('/v1/federation/peers', {
-        // Never contacted, so any well-formed key does; it just has to have one.
+        // Never contacted, so any well-formed key does; it just has to have one (a real Ed25519 key
+        // since audit 2026-11 L056).
         method: 'POST', headers: auth(C.ownerToken),
-        body: JSON.stringify({ node_id: other, url: 'http://localhost:49995', public_key: 'placeholder-key-uncontacted-peer' }),
+        body: JSON.stringify({ node_id: other, url: 'http://localhost:49995', public_key: Buffer.from(await ed.getPublicKeyAsync(ed.utils.randomSecretKey())).toString('base64') }),
     });
     await C.json(`/v1/federation/peers/${other}`, {
         method: 'PUT', headers: auth(C.ownerToken), body: JSON.stringify({ status: 'active', tier: 'contact' }),

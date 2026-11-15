@@ -4,6 +4,10 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   2026-11-15 — 18c registers and key-exchanges a generated Ed25519 key (kxPub) instead of the text
+ *     'deadbeef1234567890abcdef'. Its assertion that this text was accepted as a peer key encoded the
+ *     hole audit 2026-11 L056 names, so that one input changes; the assertions stay. The refusals and
+ *     the provenance rule for catalogue sync (M130) are in test/e2e-federation-peer-proofs.ts.
  *   2026-10-22 — Tests 12 and 12e give the agent's owner's sign-in consent for the direct peer before
  *     the replicate into the agent; 12-0 and 12e-0 show the same replicate without it (none yet, then
  *     taken back) is 403 CONSENT_REQUIRED with nothing stored (secaudit 2026-10 wave 3, v71; test
@@ -933,14 +937,14 @@ console.log('\nPhase 6 — Key Exchange');
 
 await test('18c. Key exchange with known peer', async () => {
     // Re-register the direct peer (it was de-peered in phase 4)
-    const kxPeerId = `aimeat-kx-peer-${Date.now()}`;
+    const kxPeerId = `aimeat-kx-peer-${Date.now()}`, kxPub = Buffer.from(await ed.getPublicKeyAsync(ed.utils.randomSecretKey())).toString('base64');
     await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
         // Registered with the SAME key it will present below. It used to be registered keyless, so
         // the key-exchange door read the presented key as a first statement; with a key on file a
         // DIFFERENT one is a rotation and the (pre-existing, correct) continuity guard refuses it.
-        body: JSON.stringify({ node_id: kxPeerId, url: 'http://localhost:9994', public_key: 'deadbeef1234567890abcdef' }),
+        body: JSON.stringify({ node_id: kxPeerId, url: 'http://localhost:9994', public_key: kxPub }),
     });
     // Activate the peer so key-exchange accepts it
     await json(`/v1/federation/peers/${kxPeerId}`, {
@@ -953,7 +957,7 @@ await test('18c. Key exchange with known peer', async () => {
         method: 'POST',
         body: JSON.stringify({
             node_id: kxPeerId,
-            node_public_key: 'deadbeef1234567890abcdef',
+            node_public_key: kxPub,
             capabilities: ['memory', 'actions'],
         }),
     });

@@ -5,6 +5,9 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — The introduction refuses a public_key that is not an Ed25519 public key, or is a
+ *     small-order one, with 400 INVALID_PEER_KEY before the signature is checked against it: a
+ *     small-order key verifies a forged signature (ed25519PublicKeyProblem; audit 2026-11 L056).
  *   2026-11-04 — The single use of a signed introduction is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-10-29 — A peering request nobody answered in federation.peering_request_days (30, 0 never)
  *     expires: the introduction sweeps expired rows before it stores one, and the status route answers
@@ -59,7 +62,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { executeHooks } from '../../services/hooks.js';
 import { PeeringRequestSchema, validateBody } from '../../models/schemas.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { verify } from '../../auth/keypair.js';
+import { verify, ed25519PublicKeyProblem } from '../../auth/keypair.js';
 import {
     signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal, SERVICE_SUMMARY_PURPOSE,
 } from '../../services/signed-node-request.js';
@@ -247,6 +250,15 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
 
         if (role !== 'contributor' && role !== 'operator') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'role must be "contributor" or "operator"'));
+            return;
+        }
+
+        // The signature below is checked against the key this body brings, so the key is checked
+        // first: a small-order key verifies a forged signature and audience proof over any text, and
+        // the request it left would carry that key to the operator's approval (audit 2026-11 L056).
+        const keyProblem = ed25519PublicKeyProblem(public_key);
+        if (keyProblem) {
+            res.status(400).json(error(config.nodeId, 'INVALID_PEER_KEY', keyProblem));
             return;
         }
 
