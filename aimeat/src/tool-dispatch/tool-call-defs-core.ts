@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-15 -- aimeat_action_execute forwards input as given, so the route refuses one that is not a
+ *     JSON object with a message naming the field; it was dropped in silence.
  *   2026-11-13 -- aimeat_knowledge_links forwards relation (unit 3b).
  *   2026-11-13 -- aimeat_group_create forwards default_permissions (unit 3b).
  *   2026-11-13 -- aimeat_memory_list forwards archived as ?archived=only or ?include_archived=true (unit 3b).
@@ -318,10 +320,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_action_execute',
         handler: ({ client }, input) => {
             const body: JsonObject = { action_id: requiredString(input, 'action_id') };
-            const actionInput = optionalRecord(input, 'input');
             const providerGaii = optionalString(input, 'provider_gaii');
             const ttlHours = optionalNumber(input, 'ttl_hours');
-            if (actionInput) body.input = actionInput;
+            // As given: the route refuses an input that is not a JSON object and names the field. This
+            // handler dropped one in silence, and the node then answered that input was missing.
+            if (input.input !== undefined) body.input = input.input;
             // WHO is being asked, and for how long the grant lasts. Dropping the first sends the
             // request to whoever the node picks; dropping the second silently takes the default TTL.
             if (providerGaii) body.provider_gaii = providerGaii;
