@@ -321,7 +321,7 @@ try {
     });
 
     // After the lockout above: every route that takes the admin password counts in one count
-    // (services/admin-password.ts; codebase analysis 2026-11-03, item A12). Seed-examples had only the
+    // (services/node-admin/password.ts; codebase analysis 2026-11-03, item A12). Seed-examples had only the
     // node's global limit, and the setup pages a count of their own, so their budgets added up.
     await test('the same address is refused the admin password on seed-examples and the setup sign-in too, and the operator JWT still seeds', async () => {
         const seed = await json('/v1/admin/seed-examples', admin({ method: 'POST' }));

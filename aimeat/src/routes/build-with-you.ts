@@ -13,7 +13,7 @@
  *   operator's agent holding operator:admin), or the node's admin password in X-Admin-Password, as
  *   /v1/admin/seed-examples takes it: the store's fleet service holds each sold place's admin password
  *   and no account on it. Wrong passwords are counted per address in the one count the admin setup
- *   pages and seed-examples share (services/admin-password.ts).
+ *   pages and seed-examples share (services/node-admin/password.ts).
  * @structure buildWithYouRouter(config, storage)
  *   - GET  /v1/build-with-you/request       the offer and the request, as they stand (owner, memory:read)
  *   - POST /v1/build-with-you/request       send the place's one request (owner, memory:write)
@@ -45,7 +45,7 @@ import { INPUT_LIMITS } from '../models/input-limits.js';
 import { BuildError, operatorHandOp, operatorPendingOp, readOp, submitOp } from '../services/builder/with-you.js';
 import { readOwnTrail, readTrail, TrailError } from '../services/place-trail.js';
 import { NotifyOwnerError, notifyOwnerOnce } from '../services/operator/notify-owner.js';
-import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/admin-password.js';
+import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/node-admin/password.js';
 
 const field = z.string().trim().min(1).max(INPUT_LIMITS.line);
 // The four fields flat or under `spec` (the shape GET's `send` shows); submitOp names a missing one.
@@ -92,7 +92,7 @@ export function buildWithYouRouter(config: AimeatConfig, storage: Storage): Rout
   };
 
   // WRONG PASSWORDS ARE COUNTED, per address, in the one count every admin-password route shares
-  // (services/admin-password.ts). A right one is not, so the fleet service can read a place as often
+  // (services/node-admin/password.ts). A right one is not, so the fleet service can read a place as often
   // as it needs; while an address is over the count every password is refused, the right one too, so
   // guessing gains nothing from the window.
   /** The node's admin password in X-Admin-Password, or else `gate`: the operator gate every operator route takes. */

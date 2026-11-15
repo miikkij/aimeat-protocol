@@ -93,7 +93,7 @@ Files under `providers/postgres-kysely/`:
 ### Step 5: Check what else carries the record
 
 - A field that reaches the API goes into `openapi.yaml` in the same commit (`.claude/rules/backend.md`).
-- A field on `OwnerRecord` or `AgentRecord` stays out of `GET /v1/admin/backup` until it is named in `OWNER_FIELDS` or `AGENT_FIELDS` in `src/services/admin-backup-projection.ts`. That list is an allowlist on purpose.
+- A field on `OwnerRecord` or `AgentRecord` stays out of `GET /v1/admin/backup` until it is named in `OWNER_FIELDS` or `AGENT_FIELDS` in `src/services/node-admin/backup-projection.ts`. That list is an allowlist on purpose.
 
 ### Step 6: Type-check and test
 

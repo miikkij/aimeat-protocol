@@ -184,7 +184,7 @@ export const RULES: Rule[] = [
   },
   {
     id: 'admin-password',
-    label: 'The node\'s admin password is checked only by checkAdminPassword (services/admin-password.ts), with one count of wrong passwords per address for every route that takes it (codebase analysis 2026-11-03, A12)',
+    label: 'The node\'s admin password is checked only by checkAdminPassword (services/node-admin/password.ts), with one count of wrong passwords per address for every route that takes it (codebase analysis 2026-11-03, A12)',
     pattern: /\bconfig\.adminPassword\b/,
   },
   {

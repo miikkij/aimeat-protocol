@@ -2,7 +2,7 @@
  * @file test/unit/admin-password.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The one check of the node's admin password (services/admin-password.ts): a wrong
+ * @description The one check of the node's admin password (services/node-admin/password.ts): a wrong
  *   password counts against its address, a missing one and a right one do not, and an address over
  *   the count is refused every password, the right one too, until its window ends (codebase analysis
  *   2026-11-03, item A12). The routes that use it are proven in e2e-build-with-you and e2e-admin-doors-2.
@@ -13,7 +13,7 @@
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, item A12).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { checkAdminPassword, checkAdminPasswordOnNode, adminPasswordLimitedMessage, resetAdminPasswordMisses } from '../../src/services/admin-password.js';
+import { checkAdminPassword, checkAdminPasswordOnNode, adminPasswordLimitedMessage, resetAdminPasswordMisses } from '../../src/services/node-admin/password.js';
 
 const config = { adminPassword: 'the-right-one', adminAuthRateLimitMax: 5, adminAuthRateLimitWindowMs: 60_000 };
 
@@ -51,7 +51,7 @@ describe('checkAdminPassword', () => {
   });
 });
 
-// secaudit2026nov08 round 14 (services/admin-password.ts:checkAdminPasswordOnNode/read-then-bump): the
+// secaudit2026nov08 round 14 (services/node-admin/password.ts:checkAdminPasswordOnNode/read-then-bump): the
 // node-wide check read the count, compared, and only then counted, so wrong passwords sent together
 // were all compared. The count is reserved before the compare now.
 describe('checkAdminPasswordOnNode', () => {

@@ -1,5 +1,5 @@
 /**
- * @file src/services/admin-password.ts
+ * @file src/services/node-admin/password.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one check of the node's admin password (AIMEAT_ADMIN_PASSWORD, or the one the node
@@ -36,11 +36,11 @@
  *     2026-11-03, item A12).
  */
 import { timingSafeEqual } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import { getStats } from './stats.js';
-import { getPromMetrics } from './prometheus.js';
-import { windowCounter } from './ephemeral-claims.js';
-import type { EphemeralCount } from '../storage/repositories/ephemeral-claim.repository.js';
+import type { AimeatConfig } from '../../config.js';
+import { getStats } from '../stats.js';
+import { getPromMetrics } from '../prometheus.js';
+import { windowCounter } from '../ephemeral-claims.js';
+import type { EphemeralCount } from '../../storage/repositories/ephemeral-claim.repository.js';
 
 /** What one check answers. `missing`: no password was sent, which is not counted as a guess. */
 export type AdminPasswordCheck =

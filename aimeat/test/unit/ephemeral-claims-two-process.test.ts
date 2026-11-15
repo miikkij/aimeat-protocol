@@ -85,7 +85,7 @@ async function bootProcess(storage: Storage) {
     upload,
     signed: await import('../../src/services/signed-node-request.js'),
     limits: await import('../../src/services/account/limits.js'),
-    admin: await import('../../src/services/admin-password.js'),
+    admin: await import('../../src/services/node-admin/password.js'),
   };
 }
 type Proc = Awaited<ReturnType<typeof bootProcess>>;

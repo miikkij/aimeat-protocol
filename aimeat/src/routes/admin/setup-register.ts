@@ -41,7 +41,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { logger } from '../../utils/logger.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
-import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../../services/admin-setup-secret.js';
+import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../../services/node-admin/setup-secret.js';
 import { claimOperatorSetupCode, SetupCodeRefusedError } from '../../services/owner/provisioning.js';
 import { requestFromThisMachine } from '../../services/setup-code.js';
 
@@ -50,7 +50,7 @@ export interface SetupRegisterDeps {
     storage: Storage;
     rateLimiter: RequestHandler;
     /** The admin session (cookie or header) or the admin password in its header, as routes/admin.ts
-     *  checks it (services/admin-password.ts). False when it answered the refusal itself. */
+     *  checks it (services/node-admin/password.ts). False when it answered the refusal itself. */
     admitAdmin: (req: Request, res: Response) => Promise<boolean>;
 }
 
@@ -183,7 +183,7 @@ export function registerSetupRegisterRoute(router: Router, deps: SetupRegisterDe
         }
         claim.commit();
 
-        // The node has an owner now, so the boot's secret file has done its job (services/admin-setup-secret.ts).
+        // The node has an owner now, so the boot's secret file has done its job (services/node-admin/setup-secret.ts).
         try {
             removeAdminSetupSecretFile(adminSetupSecretDir(config));
         } catch (err) {

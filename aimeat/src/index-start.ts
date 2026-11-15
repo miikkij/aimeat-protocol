@@ -99,7 +99,7 @@ import type { AimeatConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
 import { turnDeprecationWarning } from './services/turn-credentials.js';
-import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
+import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/node-admin/setup-secret.js';
 import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
 import { signedInOnly } from './config/visibility.js';
 import { passwordOffLockoutWarning, twoStepWithoutTotpWarning } from './services/sign-in-policy.js';

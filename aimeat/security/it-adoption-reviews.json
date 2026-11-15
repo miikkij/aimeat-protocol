@@ -13,7 +13,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/routes/admin/setup-register.ts"
       ],
-      "digest": "sha256:a51febcf7e6eb7105b791651"
+      "digest": "sha256:1889ee4abf97ada7734c9f3d"
     },
     "01-overview.md": {
       "reviewedOn": "2026-11-15",
@@ -286,7 +286,7 @@
       "aimeat/src/services/config/schema-seo.ts": "4e0f54788df2bdda",
       "aimeat/src/config/posture.ts": "c0ed072cd1e3f4ca",
       "aimeat/src/services/sign-in-policy.ts": "abdf689f004d2cac",
-      "aimeat/src/routes/admin/setup-register.ts": "97e4e6a5a150dfa6"
+      "aimeat/src/routes/admin/setup-register.ts": "52430d6b781e21a3"
     },
     "01-overview.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",

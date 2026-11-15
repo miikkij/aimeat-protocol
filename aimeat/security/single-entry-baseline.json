@@ -635,7 +635,7 @@
         "count": 1,
         "why": "The `aimeat seed` command sends the configured admin password to the node's own seed-examples route as a client; the node checks it with checkAdminPassword."
       },
-      "src/services/admin-password.ts": {
+      "src/services/node-admin/password.ts": {
         "count": 1,
         "why": "checkAdminPassword, the one compare, with the count of wrong passwords per address."
       },

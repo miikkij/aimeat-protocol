@@ -1,5 +1,5 @@
 /**
- * @file src/services/admin-backup-projection.ts
+ * @file src/services/node-admin/backup-projection.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What GET /v1/admin/backup writes for an owner, an agent and a memory record: an
@@ -20,10 +20,10 @@
  *   v1.0.1 — 2026-10-11 — Agent.stoppedAt and stoppedBy travel in a backup (migration 0101).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, finding 1.9).
  */
-import type { OwnerRecord, AgentRecord, MemoryRecord } from '../storage/interface.js';
-import { isSecretRecordKey, isWorkspaceShareKey } from './secret-records.js';
-import { presentMemories } from './classification/present-memory.js';
-import type { ContentReader } from './classification/reader.js';
+import type { OwnerRecord, AgentRecord, MemoryRecord } from '../../storage/interface.js';
+import { isSecretRecordKey, isWorkspaceShareKey } from '../secret-records.js';
+import { presentMemories } from '../classification/present-memory.js';
+import type { ContentReader } from '../classification/reader.js';
 
 /** Owner fields the backup carries. The public key is public; nothing here is a credential. */
 const OWNER_FIELDS = ['name', 'displayName', 'publicKey', 'roles', 'createdAt', 'disabledAt', 'disabledBy', 'managedBy'] as const;

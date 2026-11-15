@@ -2,7 +2,7 @@
  * @file test/unit/admin-restore.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The import behind POST /v1/admin/restore (services/admin-restore.ts) against a storage
+ * @description The import behind POST /v1/admin/restore (services/node-admin/restore.ts) against a storage
  *   double: a row that already exists is a skipped duplicate, any other failure is counted and named
  *   and makes `restored` false. QA audit P6-07: every create error was logged as "skip duplicates"
  *   and the answer always said `restored: true`.
@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-10-16 — Initial (QA audit P6-07).
  */
 import { describe, it, expect } from 'vitest';
-import { restoreBackup } from '../../src/services/admin-restore.js';
+import { restoreBackup } from '../../src/services/node-admin/restore.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 /** A storage double: `existing` names rows already on the node; `broken` names rows whose write fails. */

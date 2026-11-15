@@ -17,7 +17,7 @@ import {
   adminSetupSecretDir,
   removeAdminSetupSecretFile,
   syncAdminSetupSecretFile,
-} from '../../src/services/admin-setup-secret.js';
+} from '../../src/services/node-admin/setup-secret.js';
 
 let root: string;
 let dir: string;

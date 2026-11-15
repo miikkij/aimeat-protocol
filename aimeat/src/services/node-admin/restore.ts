@@ -1,5 +1,5 @@
 /**
- * @file src/services/admin-restore.ts
+ * @file src/services/node-admin/restore.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The import behind POST /v1/admin/restore: writes the owners, agents, actions, boards,
@@ -18,12 +18,12 @@
  *     failures are counted and logged at error level, and `restored` is false when any occurred
  *     (QA audit P6-07).
  */
-import type { Storage, MemoryRecord, WalletTransaction } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { logger } from '../utils/logger.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
-import { recordOperatorAction } from './operator/access-audit.js';
-import { clearanceBoundByApprover } from './agent/clearance.js';
+import type { Storage, MemoryRecord, WalletTransaction } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { logger } from '../../utils/logger.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { recordOperatorAction } from '../operator/access-audit.js';
+import { clearanceBoundByApprover } from '../agent/clearance.js';
 
 type Kind = 'owners' | 'agents' | 'actions' | 'boards' | 'memories' | 'transactions';
 type Counts = Record<Kind, number>;

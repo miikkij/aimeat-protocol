@@ -7,7 +7,7 @@
  *
  * @structure
  *   - adminRouter(config, storage, maintenanceCache?, provenance?, consulService?, peers?): mounts sub-routers
- *   - admitAdmin (the admin password through services/admin-password.ts) / adminSessions /
+ *   - admitAdmin (the admin password through services/node-admin/password.ts) / adminSessions /
  *     create+validateAdminSession: in-memory 1h operator sessions
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
@@ -81,7 +81,7 @@ import { nodeActivity } from '../services/node-admin/activity.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes } from 'node:crypto';
-import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/admin-password.js';
+import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/node-admin/password.js';
 import { sign } from '../auth/keypair.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
@@ -131,7 +131,7 @@ export function adminRouter(
 ): Router {
     const router = Router();
 
-    /** The address over the wrong-password count: 429 with when to try again (services/admin-password.ts). */
+    /** The address over the wrong-password count: 429 with when to try again (services/node-admin/password.ts). */
     function refuseAdminLimited(res: import('express').Response, check: { retryAfterSec: number; max: number; windowSec: number }): void {
         res.setHeader('Retry-After', String(check.retryAfterSec));
         res.status(429).json(error(config.nodeId, 'RATE_LIMITED', adminPasswordLimitedMessage(check), undefined,

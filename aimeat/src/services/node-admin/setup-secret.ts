@@ -1,5 +1,5 @@
 /**
- * @file src/services/admin-setup-secret.ts
+ * @file src/services/node-admin/setup-secret.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where the generated admin setup secret is kept while a node has no owner, and when
@@ -30,7 +30,7 @@
 
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import type { AimeatConfig } from '../config-types.js';
+import type { AimeatConfig } from '../../config-types.js';
 
 /** The file name inside the directory adminSetupSecretDir() returns. */
 export const ADMIN_SETUP_SECRET_FILE = 'admin-setup-secret';

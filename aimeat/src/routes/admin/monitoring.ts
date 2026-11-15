@@ -83,8 +83,8 @@ import { resolveIdentity, ownerGhiiOf, isOwnerInPerson } from '../../utils/gaii.
 import { readerFor } from '../../services/classification/reader.js';
 import type { VerifiedToken } from '../../auth/jwt.js';
 import { ROOMS } from '../../services/home/rooms.js';
-import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED, BACKUP_WITHHELD_NOTE, readableBackupMemories } from '../../services/admin-backup-projection.js';
-import { restoreBackup } from '../../services/admin-restore.js';
+import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED, BACKUP_WITHHELD_NOTE, readableBackupMemories } from '../../services/node-admin/backup-projection.js';
+import { restoreBackup } from '../../services/node-admin/restore.js';
 import { presentWorkCost } from '../../services/morsel.js';
 import { sendTrustNotice, type TrustAdvisoryType } from '../../services/federation/trust-notice.js';
 
@@ -441,7 +441,7 @@ export function adminMonitoringRouter(
             await recordOperatorAccess(storage, config, { operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf, action: 'export', count });
         }
 
-        // Owner and agent rows go through an allowlist (services/admin-backup-projection.ts): the
+        // Owner and agent rows go through an allowlist (services/node-admin/backup-projection.ts): the
         // whole-row spread put every agent's plaintext webhook secret in the file (secrets audit
         // 2026-10-09, 1.9). `omitted` says what a restore has to set again.
         res.json(success(config.nodeId, {
@@ -460,7 +460,7 @@ export function adminMonitoringRouter(
 
     // POST /v1/admin/restore — import data from backup (operator only)
     // A record that already exists is counted as a duplicate; any other failure is counted, logged at
-    // error level, and makes `restored` false (services/admin-restore.ts; QA audit P6-07).
+    // error level, and makes `restored` false (services/node-admin/restore.ts; QA audit P6-07).
     router.post('/v1/admin/restore', requireAuth(), requireOperator(storage), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
         const notList = ['owners', 'agents', 'actions', 'boards'].filter(k => body[k] !== undefined && !Array.isArray(body[k]));
@@ -471,7 +471,7 @@ export function adminMonitoringRouter(
             return;
         }
         // The restoring actor: the operator trail per person written into, and the clearance bound
-        // for the operator's agent (services/admin-restore.ts; secaudit2026oct26).
+        // for the operator's agent (services/node-admin/restore.ts; secaudit2026oct26).
         const actorGaii = resolveIdentity(req.auth!, config.nodeId);
         const outcome = await restoreBackup(storage, body, {
             config, operatorGhii: ownerGhiiOf(actorGaii), actorGaii, inPerson: isOwnerInPerson(req.auth),
