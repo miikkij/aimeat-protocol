@@ -34,6 +34,9 @@
  *   - QuestionnaireSection — section 05
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v3.4.1 — 2026-11-15 — An entry needs a title and a short name before Save sends the register: the
+ *     fields say so, and Save opens the first entry that lacks one instead of sending a register the
+ *     route refuses.
  *   v3.4.0 — 2026-10-29 — An opened entry shows the questions it is asked (`askedWhen`) and says how
  *     many are not; a proposed "none of these areas" says why in the reader's language.
  *   v3.3.0 — 2026-10-28 — An answer from the app's maker says so; an opened entry has a reason field
@@ -104,6 +107,13 @@ function reasonText(r) {
   return `${r.question || r.questionId || ''} ${answer} → ${classWord(r.impliesClass || '')}`;
 }
 const isBlank = (v) => v === undefined || v === null || v === '';
+
+/**
+ * The field an entry still needs before the register can be saved, or null. PUT
+ * /v1/admin/compliance/usecases refuses the whole register when one entry has no title or no id
+ * (UseCaseSchema in src/services/compliance/register.ts, min(1) on both), so the form says so first.
+ */
+export const missingField = (u) => (!String(u?.title ?? '').trim() ? 'title' : !String(u?.id ?? '').trim() ? 'id' : null);
 
 /** `11 of 12 · AI 9 · you 2`: how far one entry is, and who did the answering. */
 function answeredText(u, questions) {
@@ -203,8 +213,10 @@ function EntrySheet({ u, questions, reasons: proposedWhy = {}, onPatch, onAnswer
         <${Action} small soft onClick=${onClose}>${C('close')}<//>
       <//>`}>
       <${Fields} cols=${2}>
-        <${TextField} label=${C('ucTitle')} value=${u.title || ''} onInput=${(v) => onPatch({ title: v })} />
-        <${TextField} code label=${C('ucId')} value=${u.id || ''} onInput=${(v) => onPatch({ id: v })} />
+        <${TextField} required label=${C('ucTitle')} value=${u.title || ''} onInput=${(v) => onPatch({ title: v })}
+          message=${String(u.title ?? '').trim() ? undefined : C('ucTitleRequired')} error />
+        <${TextField} required code label=${C('ucId')} value=${u.id || ''} onInput=${(v) => onPatch({ id: v })}
+          message=${String(u.id ?? '').trim() ? undefined : C('ucIdRequired')} error />
         <${TextArea} wide label=${C('ucPurpose')} rows=${3} value=${u.purpose || ''} onInput=${(v) => onPatch({ purpose: v })} />
         <${TextField} code label=${C('ucModels')} hint=${C('ucModelsHint')} placeholder="anthropic/claude-opus-5, google/gemini-3-pro" value=${modelsText}
           onInput=${(v) => { setModelsText(v); onPatch({ models: splitList(v) }); }} />
@@ -234,6 +246,7 @@ export function RegisterSection({ usecases, questions, draft, setDraft, openId, 
   const [cls, setCls] = useState('all');
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState(PAGE);
+  const [held, setHeld] = useState(false);
   const { confirm, ConfirmUI } = useConfirm();
 
   const list = draft ?? usecases;
@@ -268,6 +281,17 @@ export function RegisterSection({ usecases, questions, draft, setDraft, openId, 
     setOpenId(id); setCls('all'); setQuery('');
   };
   const pickClass = (c) => { setCls(c); setShown(PAGE); };
+  // An entry without a title or an id is refused by the route with the whole register; open the
+  // first such entry and say what it needs instead of sending.
+  const incomplete = list.filter(u => missingField(u));
+  const save = () => {
+    if (incomplete.length > 0) {
+      setHeld(true); setCls('all'); setQuery(''); setOpenId(incomplete[0].id);
+      return;
+    }
+    setHeld(false);
+    onSave(list);
+  };
 
   const open = list.find(u => u.id === openId) || null;
   const openIndex = open ? list.indexOf(open) : -1;
@@ -327,9 +351,10 @@ export function RegisterSection({ usecases, questions, draft, setDraft, openId, 
       ${list.length === 0 ? empty : filled}
       ${list.length > 0 || dirty ? html`
         <${FormActions}>
-          <${Loud} control disabled=${!dirty || saving} onClick=${() => onSave(list)}>${saving ? C('saving') : C('save')}<//>
-          ${dirty ? html`<${Action} small soft onClick=${() => { setDraft(null); setOpenId(null); }}>${C('discard')}<//>` : null}
+          <${Loud} control disabled=${!dirty || saving} onClick=${save}>${saving ? C('saving') : C('save')}<//>
+          ${dirty ? html`<${Action} small soft onClick=${() => { setDraft(null); setOpenId(null); setHeld(false); }}>${C('discard')}<//>` : null}
           <${Note} kind="meta" inline mono>${C('saveNote')}<//>
+          ${held && incomplete.length > 0 ? html`<${Note} kind="message" error>${incomplete.length === 1 ? C('saveNeedsTitleOne') : C('saveNeedsTitleMany', { n: num(incomplete.length) })}<//>` : null}
         <//>` : null}
     <//>`;
 }
