@@ -1,5 +1,5 @@
 /**
- * @file src/services/home-agents.ts
+ * @file src/services/home/agents.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the home says about a person's agents: the proposals that wait for them, the
@@ -36,18 +36,18 @@
  *   v1.1.0 — 2026-10-10 — `hears_messages` on a worker, for the agent page's conversation.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentRecord } from '../storage/interface.js';
-import { listProposals } from './agent/proposals.js';
-import { listConnectors, wantedInstalls } from './connector-registry.js';
-import { readCrewState } from './crews/def-store.js';
-import { CHAT_AGENT_NAME } from './chat/agent.js';
-import { nodeTimeZone } from './display-prefs.js';
-import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent/ties.js';
-import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';
-import { logger } from '../utils/logger.js';
-import { runInReadScope } from '../storage/read-scope/read-scope.js';
-import { loadOwnerAgents } from './db/owner-identity.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
+import { listProposals } from '../agent/proposals.js';
+import { listConnectors, wantedInstalls } from '../connector-registry.js';
+import { readCrewState } from '../crews/def-store.js';
+import { CHAT_AGENT_NAME } from '../chat/agent.js';
+import { nodeTimeZone } from '../display-prefs.js';
+import { readAgentTies, type AgentApp, type AgentWorkplace } from '../agent/ties.js';
+import { readAvatarsOrEmpty, type AvatarView } from '../agent/avatar.js';
+import { logger } from '../../utils/logger.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import { loadOwnerAgents } from '../db/owner-identity.js';
 
 export type WorksWhen = 'ask' | 'clock' | 'talk' | 'always' | 'records';
 

@@ -2,14 +2,14 @@
  * @file test/unit/home-ideas.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description services/home-ideas.ts parseHomeIdeas against what an operator can save, and the
+ * @description services/home/ideas.ts parseHomeIdeas against what an operator can save, and the
  *   seeded documents (services/prompt-defaults/home-ideas.ts) against each other: every language
  *   parses with no problem and carries the same ids, groups, kinds and apps.
  * @version-history
  *   v1.0.0 — 2026-10-14 — Initial (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  */
 import { describe, it, expect } from 'vitest';
-import { parseHomeIdeas } from '../../src/services/home-ideas.js';
+import { parseHomeIdeas } from '../../src/services/home/ideas.js';
 import { HOME_IDEAS_SEEDS } from '../../src/services/prompt-defaults/home-ideas.js';
 
 const seed = HOME_IDEAS_SEEDS[0];

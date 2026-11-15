@@ -1,5 +1,5 @@
 /**
- * @file src/services/home-playbooks.ts
+ * @file src/services/home/playbooks.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The PLAYBOOKS: named outcomes a person actually arrives wanting ("a shop where
@@ -28,7 +28,7 @@
  *   a person reads — the same contract the home feed already follows.
  * @structure PLAYBOOKS · PlaybookDef · openPlaybooks(storage, config)
  * @usage
- *   import { openPlaybooks } from '../services/home-playbooks.js';
+ *   import { openPlaybooks } from './playbooks.js';
  *   const playbooks = await openPlaybooks(storage, config);
  * @version-history
  *   v1.2.0 — 2026-08-23 — The company-brain playbook (TARGET-071), second in the list and
@@ -44,10 +44,10 @@
  *     page, own instance), their capability checks, and proof resolved from this node's own
  *     subdomain mappings.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { buildOutboundProviders, listProviderMeta } from './connections/providers.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { buildOutboundProviders, listProviderMeta } from '../connections/providers.js';
 
 export interface PlaybookDef {
     /** Also the locale-key stem: home.playbooks.<id>.title / .lead / .step1… */

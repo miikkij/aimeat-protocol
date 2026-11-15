@@ -122,7 +122,7 @@ export function adminMaintenanceRouter(
     router.post('/v1/admin/maintenance/backfill-home-feed', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const one = typeof req.body?.owner === 'string' && req.body.owner.trim() ? req.body.owner.trim() : null;
-            const { backfillHomeFeed } = await import('../../services/home-feed.js');
+            const { backfillHomeFeed } = await import('../../services/home/feed.js');
             const owners = one ? [one] : (await storage.listOwners()).map(o => o.name);
             let written = 0;
             const failed: string[] = [];

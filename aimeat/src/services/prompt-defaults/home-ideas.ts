@@ -2,7 +2,7 @@
  * @file src/services/prompt-defaults/home-ideas.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The first text of the managed prompt `home-ideas` (services/home-ideas.ts): the
+ * @description The first text of the managed prompt `home-ideas` (services/home/ideas.ts): the
  *   ideas the home offers, as one JSON document per language. Seeded once; after that the
  *   operator owns the text on the Prompts page and the seeder leaves it alone.
  *

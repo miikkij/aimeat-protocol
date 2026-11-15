@@ -2,7 +2,7 @@
  * @file test/e2e-home-ideas.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description GET /v1/prompts/home-ideas, the ideas the home offers (services/home-ideas.ts), read
+ * @description GET /v1/prompts/home-ideas, the ideas the home offers (services/home/ideas.ts), read
  *   from the managed prompt `home-ideas` the node seeds and the operator edits.
  *
  *   Happy path: the seeded list in Finnish, Spanish and English, the language chosen by ?lang= and

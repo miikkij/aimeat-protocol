@@ -636,7 +636,7 @@ export async function runMcpOnboardingRescueJob(
         let step: 'welcome-mat' | 'first-agent' | null = null;
         let profileDone = false;
         if (trackVal?.track === 'remake') {
-            const { readHomeState } = await import('./home-state.js');
+            const { readHomeState } = await import('./home/state.js');
             const st = await readHomeState(storage, config, g.ownerName);
             // An initialized home needs no reminder at all — skip it entirely.
             if (st.initialized) continue;

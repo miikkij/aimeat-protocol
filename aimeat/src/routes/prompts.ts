@@ -61,7 +61,7 @@ import { isV2Role, V2_ROLES } from '../tool-catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt, buildAppSpecToken } from '../services/builder/app-prompt.js';
-import { PLAYBOOKS } from '../services/home-playbooks.js';
+import { PLAYBOOKS } from '../services/home/playbooks.js';
 import { buildExtensionPrompt } from '../services/builder/extension-prompt.js';
 import { registerBuildCortexPrompt } from './prompts-cortex.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
@@ -368,7 +368,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // GET /v1/prompts/playbook/:id — the recipe behind one playbook (services/home-playbooks.ts).
+  // GET /v1/prompts/playbook/:id — the recipe behind one playbook (services/home/playbooks.ts).
   //
   // ONE route for the family, and an ALLOWLIST rather than a generic prompt reader: PLAYBOOKS is
   // the whole set of ids this serves, so a guessed id can never turn this into a door onto the

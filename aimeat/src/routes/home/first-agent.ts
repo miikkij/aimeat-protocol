@@ -24,7 +24,7 @@ import type { Router } from 'express';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { ONBOARDING_KEYS, recordOnboardingEvent } from '../../services/onboarding-funnel.js';
-import { readHomeState } from '../../services/home-state.js';
+import { readHomeState } from '../../services/home/state.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
 export function registerFirstAgentRoutes(router: Router, ctx: HomeRouteCtx): void {

@@ -9,7 +9,7 @@
  *
  *   Proposals that wait for the person, the agents that do work (when each works, on which machine,
  *   what it last did) and the person's machines, in one answer. The home's Agents block draws it.
- *   The projection is built in services/home-agents.ts from the functions the Agents page, the
+ *   The projection is built in services/home/agents.ts from the functions the Agents page, the
  *   scheduler and the connector list already call.
  *
  *   The owner in person, like every home route (requireOwnerSession): this is the person's own page.
@@ -32,7 +32,7 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
 import { emitChange } from '../../services/event-bus.js';
-import { readHomeAgents } from '../../services/home-agents.js';
+import { readHomeAgents } from '../../services/home/agents.js';
 import { setWorkplace, clearWorkplace, workplaceView, type WorkplaceCaller } from '../../services/agent/workplace.js';
 import { readTieChoices, readWatchableSpaces } from '../../services/agent/ties.js';
 import { readWorkspaceOp, workspaceCallerOf } from '../../services/workspace/tool-ops.js';

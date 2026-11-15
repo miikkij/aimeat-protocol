@@ -1,5 +1,5 @@
 /**
- * @file src/services/home-ideas.ts
+ * @file src/services/home/ideas.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The ideas the home offers a person who does not yet know what to ask for: agents
@@ -22,8 +22,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-14 — Initial (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  */
-import type { Storage } from '../storage/interface.js';
-import { resolvePromptContent } from './prompt-variables.js';
+import type { Storage } from '../../storage/interface.js';
+import { resolvePromptContent } from '../prompt-variables.js';
 
 /** The managed prompt that holds the list. */
 export const HOME_IDEAS_PROMPT_ID = 'home-ideas';

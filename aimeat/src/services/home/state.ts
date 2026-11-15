@@ -1,5 +1,5 @@
 /**
- * @file src/services/home-state.ts
+ * @file src/services/home/state.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where an account stands on the new path (aimeat_remake/06-koti-feed-suostumus.md).
@@ -16,7 +16,7 @@
  *   - readHomeState(storage, config, owner) → HomeState
  *   - HOME_STEPS: connection prerequisite
  * @usage
- *   import { readHomeState } from '../services/home-state.js';
+ *   import { readHomeState } from './state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
  *   2026-11-13 — The onboarding marker keys and recordOnboardingEvent come from onboarding/markers.ts,
@@ -47,22 +47,22 @@
  *     still read "your home is ready".
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 2–3).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { hasHelloMcpProof } from './node/resident-agent.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { hasHelloMcpProof } from '../node/resident-agent.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingTrack, type OnboardingBranch,
     type OnboardingRoom,
-} from './onboarding/markers.js';
-import { resolveAiClient, decideBranch } from './ai/tool-branch.js';
-import { portfolioStandaloneUrl } from './portfolio/standalone-url.js';
-import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio/config.js';
-import { logger } from '../utils/logger.js';
-import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent/health.js';
-import { nodeContext } from './node/context.js';
-import { loadOwnerAgents, loadOwnerOnboardings } from './db/owner-identity.js';
-import { runInReadScope } from '../storage/read-scope/read-scope.js';
-import { readAvatarsOrEmpty, type AvatarView } from './agent/avatar.js';
+} from '../onboarding/markers.js';
+import { resolveAiClient, decideBranch } from '../ai/tool-branch.js';
+import { portfolioStandaloneUrl } from '../portfolio/standalone-url.js';
+import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from '../portfolio/config.js';
+import { logger } from '../../utils/logger.js';
+import { computeAgentHealthMany, isLiveState, type AgentHealth } from '../agent/health.js';
+import { nodeContext } from '../node/context.js';
+import { loadOwnerAgents, loadOwnerOnboardings } from '../db/owner-identity.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import { readAvatarsOrEmpty, type AvatarView } from '../agent/avatar.js';
 
 /** The connection prerequisite; useful tasks and the optional webpage are available alongside it. */
 export const HOME_STEPS = ['first-agent'] as const;

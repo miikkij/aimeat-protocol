@@ -1,5 +1,5 @@
 /**
- * @file src/services/home-rooms.ts
+ * @file src/services/home/rooms.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The rooms (aimeat_remake/07-nelja-huonetta.md), and the check that decides whether
@@ -24,7 +24,7 @@
  *   `rooms` field in the /v1/home/state response, which is a separate decision from arranging pages.
  * @structure ROOMS (with their destinations) · openRooms(storage, config, ownerGhii?)
  * @usage
- *   import { openRooms } from '../services/home-rooms.js';
+ *   import { openRooms } from './rooms.js';
  *   const rooms = await openRooms(storage, config, resolveIdentity(req.auth!, config.nodeId));
  * @version-history
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 7).
@@ -33,10 +33,10 @@
  *   v1.1.1 — 2026-09-29 — The create and monetise rooms lead to /v1/appcat instead of
  *     /app-catalog.html (Jouni).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { OnboardingRoom } from './onboarding-funnel.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { OnboardingRoom } from '../onboarding-funnel.js';
+import { logger } from '../../utils/logger.js';
 
 export interface RoomDef {
     id: OnboardingRoom;

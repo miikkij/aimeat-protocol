@@ -57,7 +57,7 @@ import {
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, recordWelcomeMatPasted, recordAiModelDetected,
 } from '../../services/onboarding-funnel.js';
-import { readHomeState } from '../../services/home-state.js';
+import { readHomeState } from '../../services/home/state.js';
 import { mergeJourneyProfile, type ProfileField } from '../../services/journey-state.js';
 import { mergePortfolioConfig } from '../../services/portfolio/config.js';
 import { allowOwnersOwnPage } from '../../services/portfolio/read-hold.js';

@@ -210,7 +210,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    * provisioned; when off the serve route stays inert and the addresses are not advertised.
    */
   coOriginEnabled: boolean;
-  /** Home room 3 (monetising). Default OFF — see services/home-rooms.ts for why it is a flag. */
+  /** Home room 3 (monetising). Default OFF — see services/home/rooms.ts for why it is a flag. */
   homeRoomMonetise: boolean;
   /**
    * The store's build code for this place (site.build_code, RK-XXXX-XXXX-XXXX), or ''. The owner and

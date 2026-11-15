@@ -5,7 +5,7 @@
  * @description Record types for the per-owner "what has happened" window and its archive.
  *
  *   `kind` IS A KEY, NOT A SENTENCE. Every row is translated by the UI at render time, which is the
- *   contract services/home-feed.ts already keeps for its derived onboarding rows. A server that
+ *   contract services/home/feed.ts already keeps for its derived onboarding rows. A server that
  *   wrote English into the store would decide which language every reader gets, forever, and would
  *   make a translation a data migration.
  * @structure

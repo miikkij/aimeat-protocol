@@ -82,7 +82,7 @@ import { recordOperatorAction, recordOperatorAccess } from '../../services/opera
 import { resolveIdentity, ownerGhiiOf, isOwnerInPerson } from '../../utils/gaii.js';
 import { readerFor } from '../../services/classification/reader.js';
 import type { VerifiedToken } from '../../auth/jwt.js';
-import { ROOMS } from '../../services/home-rooms.js';
+import { ROOMS } from '../../services/home/rooms.js';
 import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED, BACKUP_WITHHELD_NOTE, readableBackupMemories } from '../../services/admin-backup-projection.js';
 import { restoreBackup } from '../../services/admin-restore.js';
 import { presentWorkCost } from '../../services/morsel.js';

@@ -1,5 +1,5 @@
 /**
- * @file src/services/home-feed.ts
+ * @file src/services/home/feed.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The home's feed (aimeat_remake/06-koti-feed-suostumus.md): what has happened on this
@@ -26,7 +26,7 @@
  *   homeFeedAnswer(storage, config, owner, reader) → { items, total, note? } ·
  *   homeFeedAsShown(storage, config, owner, answer) → the same, as the home shows it
  * @usage
- *   import { readHomeFeed, homeFeedAnswer } from '../services/home-feed.js';
+ *   import { readHomeFeed, homeFeedAnswer } from './feed.js';
  * @version-history
  *   v2.5.0 — 2026-11-02 — `at_local` is words in the chat's language with the day said relative to today
  *     ("tänään klo 7.00", "yesterday at 22:56"), from localTimeWriter (crew73: the model misread "2.11.").
@@ -42,16 +42,16 @@
  *   v1.1.0 — 2026-08-17 — The feed is derived rows PLUS recorded ones.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 6).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, AccountEventKind } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { ONBOARDING_KEYS } from './onboarding-funnel.js';
-import { readAccountEvents, recordAccountEvent } from './account-events.js';
-import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from './account-event-view.js';
-import { isNodeResidentAgent } from './node/resident-agent.js';
-import { displayPrefsFor, formatForPerson } from './display-prefs.js';
-import { personZone, personLocale } from './person-zone.js';
-import { createT, toLocale, type Locale } from '../i18n.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AccountEventKind } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { ONBOARDING_KEYS } from '../onboarding-funnel.js';
+import { readAccountEvents, recordAccountEvent } from '../account-events.js';
+import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from '../account-event-view.js';
+import { isNodeResidentAgent } from '../node/resident-agent.js';
+import { displayPrefsFor, formatForPerson } from '../display-prefs.js';
+import { personZone, personLocale } from '../person-zone.js';
+import { createT, toLocale, type Locale } from '../../i18n.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,

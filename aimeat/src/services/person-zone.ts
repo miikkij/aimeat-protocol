@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The time zone a person's browser last sent with a chat turn (routes/chat.ts), so the
  *   node can write a time on their clock when they have chosen no zone of their own: the home feed's
- *   rows for their chat (services/home-feed.ts). In this process only and never written anywhere: it
+ *   rows for their chat (services/home/feed.ts). In this process only and never written anywhere: it
  *   is a fact about the browser in front of them now, not a setting, and the zone they choose in their
  *   settings always wins. A restart forgets it until their next chat turn, which is what asks for it.
  *

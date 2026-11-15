@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description GET /v1/prompts/home-ideas?lang=<tag>: the ideas the home offers, read from the
- *   managed prompt `home-ideas` (services/home-ideas.ts) in the asked language, English where the
+ *   managed prompt `home-ideas` (services/home/ideas.ts) in the asked language, English where the
  *   language has none, and checked: an entry the page cannot show is left out and named in
  *   `problems`. Public like the rest of /v1/prompts: it is guidance the node gives everyone, and
  *   it names no person and no account.
@@ -16,7 +16,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
-import { readHomeIdeas } from '../services/home-ideas.js';
+import { readHomeIdeas } from '../services/home/ideas.js';
 
 export function registerHomeIdeasPrompt(router: Router, config: AimeatConfig, storage: Storage): void {
   router.get('/v1/prompts/home-ideas', async (req, res) => {

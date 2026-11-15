@@ -2119,13 +2119,13 @@
       },
       "why": "Reviewed 2026-11-14 (Ask someone who knows), the node's own read: the reports and the unmatched-topic counts under system@<node> (help.report.*, help.unmatched.*), which the node itself wrote; no person's content is read here."
     },
-    "src/services/home-feed.ts": {
+    "src/services/home/feed.ts": {
       "reads": {
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker records."
     },
-    "src/services/home-state.ts": {
+    "src/services/home/state.ts": {
       "reads": {
         "listMemoryForOwners": 1
       },

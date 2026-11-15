@@ -2,14 +2,14 @@
  * @file test/unit/home-feed-shown.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description homeFeedAsShown (src/services/home-feed.ts): the home's rows as the person sees them,
+ * @description homeFeedAsShown (src/services/home/feed.ts): the home's rows as the person sees them,
  *   which GET /v1/home/feed and aimeat_home_feed both answer. On crew71 the chat answered from the raw
  *   rows, '"morning-digest" -agentti' and '0,0078 $ kulunut', which the home hides for a buyer.
  * @version-history
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { homeFeedAsShown, localTimeWriter, type FeedItem } from '../../src/services/home-feed.js';
+import { homeFeedAsShown, localTimeWriter, type FeedItem } from '../../src/services/home/feed.js';
 import { notePersonZone } from '../../src/services/person-zone.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';

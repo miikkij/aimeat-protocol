@@ -2,7 +2,7 @@
  * @file src/services/prompt-defaults/playbooks.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The PLAYBOOK recipes: one prompt per named outcome (services/home-playbooks.ts).
+ * @description The PLAYBOOK recipes: one prompt per named outcome (services/home/playbooks.ts).
  *   A person picks the outcome, takes the prompt to their own AI or hands it to the node's chat
  *   agent, and the agent walks it with them.
  *

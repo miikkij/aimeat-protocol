@@ -189,7 +189,7 @@ describe('the home feed reads one store', () => {
   const cfg = { nodeId: 'node', accountEventWindow: 100 } as never;
 
   it('shows recorded events and nothing derived', async () => {
-    const { readHomeFeed } = await import('../../src/services/home-feed.js');
+    const { readHomeFeed } = await import('../../src/services/home/feed.js');
     await recordAccountEvent(storage, {
       ownerGhii: ALICE, kind: 'app_published', at: at(5), data: { name: 'thing.html' },
     });
@@ -198,7 +198,7 @@ describe('the home feed reads one store', () => {
   });
 
   it('adds the knocking row live, and it is not in the store', async () => {
-    const { readHomeFeed } = await import('../../src/services/home-feed.js');
+    const { readHomeFeed } = await import('../../src/services/home/feed.js');
     const items = await readHomeFeed(storage, cfg, 'alice', { pendingAgents: 2 });
     expect(items.map(i => i.kind)).toEqual(['agent_knocking']);
     // Live state is not history: nothing was written to answer this.
@@ -225,7 +225,7 @@ describe('backfill gives an existing account its history back', () => {
   }
 
   it('converts the markers, keeping their own timestamps', async () => {
-    const { backfillHomeFeed } = await import('../../src/services/home-feed.js');
+    const { backfillHomeFeed } = await import('../../src/services/home/feed.js');
     await seedOldAccount();
 
     const { written } = await backfillHomeFeed(storage, cfg, 'alice');
@@ -241,7 +241,7 @@ describe('backfill gives an existing account its history back', () => {
   });
 
   it('is idempotent: a second run writes nothing', async () => {
-    const { backfillHomeFeed } = await import('../../src/services/home-feed.js');
+    const { backfillHomeFeed } = await import('../../src/services/home/feed.js');
     await seedOldAccount();
     await backfillHomeFeed(storage, cfg, 'alice');
     const second = await backfillHomeFeed(storage, cfg, 'alice');
@@ -250,7 +250,7 @@ describe('backfill gives an existing account its history back', () => {
   });
 
   it('does not invent a welcome mat from a failed paste', async () => {
-    const { backfillHomeFeed } = await import('../../src/services/home-feed.js');
+    const { backfillHomeFeed } = await import('../../src/services/home/feed.js');
     await createAliceGhii();
     // The one marker that accumulates attempts. A failed paste made nothing, so it is not an event.
     await storage.setMemory({

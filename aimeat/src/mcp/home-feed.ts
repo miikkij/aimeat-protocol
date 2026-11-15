@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description aimeat_home_feed on the node's MCP endpoint: what the person's home lists as having
  *   happened, the same answer GET /v1/home/feed gives the page (routes/home/feed.ts). It does not do
- *   the work: homeFeedAnswer (services/home-feed.ts) and the reader rule (accountEventReader) are what
+ *   the work: homeFeedAnswer (services/home/feed.ts) and the reader rule (accountEventReader) are what
  *   the route calls, so a task's title and reason reach the same readers here as there. The scope
  *   word, memory:read, is applied where every tool is registered (TOOL_SCOPES, from the catalog entry).
  *
@@ -22,7 +22,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
-import { homeFeedAnswer } from '../services/home-feed.js';
+import { homeFeedAnswer } from '../services/home/feed.js';
 import { accountEventReader } from '../services/account-event-task-keep.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });

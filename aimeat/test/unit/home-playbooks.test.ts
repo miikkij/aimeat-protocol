@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { openPlaybooks, PLAYBOOKS } from '../../src/services/home-playbooks.js';
+import { openPlaybooks, PLAYBOOKS } from '../../src/services/home/playbooks.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 
