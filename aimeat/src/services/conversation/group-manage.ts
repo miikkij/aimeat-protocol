@@ -1,5 +1,5 @@
 /**
- * @file conversation-group-manage.ts
+ * @file src/services/conversation/group-manage.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Group chat as a person (or an agent acting for them) uses it: open a group with the
@@ -40,19 +40,19 @@
  *     on (areColleagues, services/colleagues.ts); a block still refuses first.
  *   v1.0.0 — 2026-10-21 — Initial: user-created group chat on the Messages page.
  */
-import type { ConversationRecord, DirectMessageAttachment } from '../storage/interface.js';
-import type { DeliveryCtx } from './message/delivery.js';
+import type { ConversationRecord, DirectMessageAttachment } from '../../storage/interface.js';
+import type { DeliveryCtx } from '../message/delivery.js';
 import {
   MAX_GROUP_PARTICIPANTS, createGroupConversation, emitGroupChange, isParticipant, sendGroupMessage,
-} from './conversation-group.js';
-import { acceptedSameAccount } from './contact-same-account.js';
-import { areColleagues } from './colleagues.js';
-import { normalizeContactId } from './contacts.js';
-import { isIdentityShaped, localIdentityExists, missingIdentityReason } from './local-identity.js';
-import { notify } from './notify.js';
-import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
-import { deliveryTargetFor } from '../utils/messaging.js';
-import type { SendLimitMark } from './message/send-limit.js';
+} from './group.js';
+import { acceptedSameAccount } from '../contact-same-account.js';
+import { areColleagues } from '../colleagues.js';
+import { normalizeContactId } from '../contacts.js';
+import { isIdentityShaped, localIdentityExists, missingIdentityReason } from '../local-identity.js';
+import { notify } from '../notify.js';
+import { isSameOwner, parseGaiiLoose } from '../../utils/gaii.js';
+import { deliveryTargetFor } from '../../utils/messaging.js';
+import type { SendLimitMark } from '../message/send-limit.js';
 
 /** A group's title: shown in every member's list, so a group without one cannot be told apart. */
 export const MAX_GROUP_SUBJECT = 200;

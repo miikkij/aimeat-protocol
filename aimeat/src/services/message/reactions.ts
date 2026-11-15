@@ -39,7 +39,7 @@ import type { DirectMessageRecord, MessageReactionRecord, MessageReactionSummary
 import type { DeliveryCtx } from './delivery.js';
 import type { CallerContext } from '../caller-context.js';
 import { emitChange, emitDelivery } from '../event-bus.js';
-import { isParticipant } from '../conversation-group.js';
+import { isParticipant } from '../conversation/group.js';
 import { deliveryTargetFor } from '../../utils/messaging.js';
 import { parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
 import { sign } from '../../auth/keypair.js';

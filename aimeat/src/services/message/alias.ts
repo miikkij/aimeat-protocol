@@ -12,7 +12,7 @@
  *
  *   So the address is the capability: write to `support@operators` and every operator gets it, in
  *   ONE thread, in the same Messages surface where they already answer people. What each operator
- *   sees is a group conversation (services/conversation-group.ts), not a new inbox and not a
+ *   sees is a group conversation (services/conversation/group.ts), not a new inbox and not a
  *   dashboard tab — that distinction is the whole lesson of the feedback channel it replaces, which
  *   collected seven genuine reports that nobody ever opened.
  *
@@ -43,7 +43,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { ConversationRecord, DirectMessageAttachment } from '../../storage/interface.js';
 import type { DeliveryCtx } from './delivery.js';
 import { listOperatorGhiis } from '../operators.js';
-import { createGroupConversation, setParticipants, fanOutToParticipants } from '../conversation-group.js';
+import { createGroupConversation, setParticipants, fanOutToParticipants } from '../conversation/group.js';
 import { isSameOwner } from '../../utils/gaii.js';
 import { deliveryTargetFor } from '../../utils/messaging.js';
 

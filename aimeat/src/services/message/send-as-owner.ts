@@ -33,7 +33,7 @@ import type { DeliveryCtx } from './delivery.js';
 import type { MessageAttachmentInput } from '../../models/message-schemas.js';
 import type { DeclaredProvenance } from '../ai/provenance.js';
 import { sendDirectMessage, mapMessageAttachments } from './send.js';
-import { sendGroupMessage } from '../conversation-group.js';
+import { sendGroupMessage } from '../conversation/group.js';
 import { resolveGroupTarget } from './alias.js';
 import { takeSendTurn } from './send-limit.js';
 import { mintMessageProvenance } from './provenance.js';

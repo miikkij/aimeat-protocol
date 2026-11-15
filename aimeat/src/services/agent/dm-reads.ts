@@ -9,7 +9,7 @@
  *   A 1:1 message carries the agent's identity on the row: its sent copy is owned by the agent and the
  *   replies name it as recipient, so the two predicates in listAgentDmThread / listDmsAddressedTo find
  *   everything. A GROUP message carries neither. Every copy is written to the mailbox the participant
- *   resolves to (services/conversation-group.ts), which for an agent is its OWNER, and the message is
+ *   resolves to (services/conversation/group.ts), which for an agent is its OWNER, and the message is
  *   addressed to the thread rather than to a person, so `recipientGhii` is the thread's own address.
  *   The agent therefore disappears from its own group correspondence: `aimeat_dm_thread` answered 0 for
  *   a conversation id it had just been handed, and `aimeat_dm_inbox` would never have shown the answer.
@@ -36,7 +36,7 @@
  *   v1.0.0 — 2026-08-22 — Initial: group threads become readable by the agent that is in them.
  */
 import type { Storage, DirectMessageRecord } from '../../storage/interface.js';
-import { isParticipant } from '../conversation-group.js';
+import { isParticipant } from '../conversation/group.js';
 import { deliveryTargetFor } from '../../utils/messaging.js';
 import { withReactions } from '../message/reactions.js';
 import { permissionAskText } from '../permission-ask.js';

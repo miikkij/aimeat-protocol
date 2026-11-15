@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Group chat on the node's MCP endpoint: aimeat_dm_group_create, _get, _members, _leave,
  *   _invitations and _answer. The tools do not decide anything themselves: they call the services the
- *   /v1/messages/groups/* routes call (services/conversation-group-open.ts and
+ *   /v1/messages/groups/* routes call (services/conversation/group-open.ts and
  *   conversation-group-manage.ts), so the chat and the page follow one set of rules. The scope words
  *   are applied where every tool is registered (TOOL_SCOPES, from the catalog entry); `as_owner` asks
  *   messages:send-as-owner here, as the route does.
@@ -23,11 +23,11 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
-import { groupActor, openGroupAs } from '../services/conversation-group-open.js';
+import { groupActor, openGroupAs } from '../services/conversation/group-open.js';
 import {
   answerGroupInvitation, changeGroupMembers, groupView, leaveGroupConversation, listGroupInvitations, readGroupFor,
   type GroupFailure,
-} from '../services/conversation-group-manage.js';
+} from '../services/conversation/group-manage.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 const failed = (f: Pick<GroupFailure, 'message' | 'members'> & { code: string }) => toolError(f.code,

@@ -1,5 +1,5 @@
 /**
- * @file conversation-group.ts
+ * @file src/services/conversation/group.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A conversation with more than two participants: people and AIs in one thread, each
@@ -63,15 +63,15 @@
  *     writes copies the same way rather than a second time.
  */
 import { randomUUID } from 'node:crypto';
-import type { ConversationRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
-import { deliverDirectMessage, type DeliveryCtx } from './message/delivery.js';
-import { duplicateMessageAttachments } from './attachment-duplication.js';
-import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
-import { deliveryTargetFor, messagePreviewWithAttachments } from '../utils/messaging.js';
-import { notify } from './notify.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { messagePreview } from '../utils/messaging.js';
-import { checkSendLimit, type SendLimitMark } from './message/send-limit.js';
+import type { ConversationRecord, DirectMessageAttachment, InteractivePayload } from '../../storage/interface.js';
+import { deliverDirectMessage, type DeliveryCtx } from '../message/delivery.js';
+import { duplicateMessageAttachments } from '../attachment-duplication.js';
+import { isSameOwner, parseGaiiLoose } from '../../utils/gaii.js';
+import { deliveryTargetFor, messagePreviewWithAttachments } from '../../utils/messaging.js';
+import { notify } from '../notify.js';
+import { emitChange, emitDelivery } from '../event-bus.js';
+import { messagePreview } from '../../utils/messaging.js';
+import { checkSendLimit, type SendLimitMark } from '../message/send-limit.js';
 
 /** The maximum number of identities in one group thread. High enough for a team plus its AIs, low
  *  enough that a single send stays one bounded write rather than an unbounded fan-out. */

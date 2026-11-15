@@ -126,7 +126,7 @@ import { propagateReadReceipt } from '../services/message/delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message/send.js';
 import { takeSendTurn } from '../services/message/send-limit.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message/alias.js';
-import { sendGroupMessage } from '../services/conversation-group.js';
+import { sendGroupMessage } from '../services/conversation/group.js';
 import { registerSendAsOwnerRoute } from './messages-as-owner.js';
 import { registerGroupRoutes } from './message-groups.js';
 import { registerMessageReactionRoutes } from './message-reactions.js';

@@ -1421,7 +1421,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The pack-proofs record, read to append a proof."
     },
-    "src/services/conversation-group.ts": {
+    "src/services/conversation/group.ts": {
       "reads": {
         "getStorageFileMeta": 1
       },

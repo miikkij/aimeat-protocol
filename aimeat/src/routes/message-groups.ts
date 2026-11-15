@@ -6,7 +6,7 @@
  *   removes members, anybody leaves, an invited person accepts or declines. Messages in a group are
  *   sent and read on the endpoints every thread uses (POST /v1/messages with conversation_id, GET
  *   /v1/messages/conversations/:id); these endpoints decide who is in it. The rules are in
- *   services/conversation-group-manage.ts, and the aimeat_dm_group_* MCP tools call the same services.
+ *   services/conversation/group-manage.ts, and the aimeat_dm_group_* MCP tools call the same services.
  *
  *   `as_owner` lets an agent act in its owner's name, on the messages:send-as-owner scope, as a 1:1
  *   send in the owner's name does.
@@ -32,11 +32,11 @@ import { refuseNeedsPermission } from '../middleware/refusals.js';
 import { callerOf } from '../middleware/caller.js';
 import { GroupCreateSchema, GroupMembersSchema, GroupLeaveSchema, GroupInvitationAnswerSchema } from '../models/message-schemas.js';
 import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
-import { groupActor, groupErrorStatus, openGroupAs } from '../services/conversation-group-open.js';
+import { groupActor, groupErrorStatus, openGroupAs } from '../services/conversation/group-open.js';
 import {
   answerGroupInvitation, changeGroupMembers, groupView, leaveGroupConversation, listGroupInvitations, readGroupFor,
   type GroupFailure,
-} from '../services/conversation-group-manage.js';
+} from '../services/conversation/group-manage.js';
 
 const AS_OWNER_SCOPE = 'messages:send-as-owner';
 

@@ -178,7 +178,7 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   aimeat_dm_send: { kind: 'recorded-by-route', route: 'POST /v1/messages' },
   aimeat_dm_broadcast: { kind: 'recorded-by-route', route: 'POST /v1/messages/broadcast' },
   aimeat_dm_send_as_owner: { kind: 'recorded-by-route', route: 'POST /v1/messages' },
-  // services/conversation-group-open.ts records the first message's declaration, as a send does.
+  // services/conversation/group-open.ts records the first message's declaration, as a send does.
   aimeat_dm_group_create: { kind: 'recorded-by-route', route: 'POST /v1/messages/groups' },
   // The route records the declaration and attaches an id from the body, refuses a declaration the
   // caller may not make before it settles, and embeds the record in the work it answers (aiprov D2).

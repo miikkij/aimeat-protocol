@@ -1,5 +1,5 @@
 /**
- * @file conversation-group-open.ts
+ * @file src/services/conversation/group-open.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one implementation behind every endpoint that opens a group chat: POST
@@ -17,15 +17,15 @@
  *   v1.1.0 — 2026-11-15 — The team approval gate before the send turn (services/team/action-gate.ts, T7).
  *   v1.0.0 — 2026-10-21 — Initial: user-created group chat (wish-ryhm-keskustelu-viestit-puolelle).
  */
-import type { ConversationRecord } from '../storage/interface.js';
-import type { DeliveryCtx } from './message/delivery.js';
-import type { DeclaredProvenance } from './ai/provenance.js';
-import { provenanceDeclarationRefusal } from './ai/provenance.js';
-import { mintMessageProvenance } from './message/provenance.js';
-import { takeSendTurn } from './message/send-limit.js';
-import { startGroupConversation, type GroupManageError, type MemberOutcome } from './conversation-group-manage.js';
-import { ownerGhiiOf, parseGaiiLoose } from '../utils/gaii.js';
-import { teamAgentGate } from './team/action-gate.js';
+import type { ConversationRecord } from '../../storage/interface.js';
+import type { DeliveryCtx } from '../message/delivery.js';
+import type { DeclaredProvenance } from '../ai/provenance.js';
+import { provenanceDeclarationRefusal } from '../ai/provenance.js';
+import { mintMessageProvenance } from '../message/provenance.js';
+import { takeSendTurn } from '../message/send-limit.js';
+import { startGroupConversation, type GroupManageError, type MemberOutcome } from './group-manage.js';
+import { ownerGhiiOf, parseGaiiLoose } from '../../utils/gaii.js';
+import { teamAgentGate } from '../team/action-gate.js';
 
 /**
  * The identity that acts in a group change: the caller, or with `asOwner` the account behind an

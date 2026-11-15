@@ -93,7 +93,7 @@ import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { delegateReaderFor, readOwnerOverview, readOwnerThread, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner/mailbox-reads.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { sendGroupMessage } from '../services/conversation-group.js';
+import { sendGroupMessage } from '../services/conversation/group.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message/broadcast.js';
 import type { DeliveryCtx } from '../services/message/delivery.js';
 import { annotationsFor } from './annotations.js';

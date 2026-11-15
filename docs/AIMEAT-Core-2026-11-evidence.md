@@ -201,7 +201,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | COL-17 | met | `aimeat/src/services/boards/post.ts:160-165,229,279` | The code calls it a post cost and an anti-flood price; see PACE-11. |
 | COL-18 | met | `aimeat/src/services/message/send.ts:319-327,385-399`; `aimeat/src/routes/messages.ts:755,763,789` | |
 | COL-19 | met | `aimeat/src/services/message/delivery.ts:102-130,201-229`; `aimeat/src/routes/federation-sync/messaging.ts:335` | |
-| COL-20 | met | `aimeat/src/services/conversation-group.ts`; `aimeat/src/storage/types/direct-messages.ts:240-275` | Group threads are node-local, with one remote party allowed. |
+| COL-20 | met | `aimeat/src/services/conversation/group.ts`; `aimeat/src/storage/types/direct-messages.ts:240-275` | Group threads are node-local, with one remote party allowed. |
 
 ## 8. Pacing and metering
 
