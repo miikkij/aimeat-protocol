@@ -14,6 +14,7 @@
  * @structure TeamChanges · parseDependsOn · untilKeyOf · applyTeamChanges
  * @usage out.changes = await applyTeamChanges(deps, caller, organism, teamInput, dryRun);
  * @version-history
+ *   v1.1.0 — 2026-11-15 — `approval_gate` turns the team's approval gate on or off (T7).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T17, T23, T21).
  */
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
@@ -24,7 +25,7 @@ import { cancelEmailInvitation, cancelNameInvitation, InvitationError, inviteEma
 import { readTeamRecordWithVersion, writeTeamRecord } from './record.js';
 /** The parts of a setup's person and team this file reads (services/team/setup.ts PersonInput, TeamInput). */
 interface PersonInput { email: string | null; account: string | null; who: string }
-interface TeamInput { remove: PersonInput[]; endsOn: string | null | undefined; dependsOn: { organism_id: string; what: string }[] | undefined }
+interface TeamInput { remove: PersonInput[]; endsOn: string | null | undefined; dependsOn: { organism_id: string; what: string }[] | undefined; approvalGate?: boolean | undefined }
 
 type Deps = { storage: Storage; config: AimeatConfig };
 interface Caller { owner: string; principal: string; locale: string | null }
@@ -33,6 +34,7 @@ export interface TeamChanges {
     removed: { who: string; result: 'remove' | 'removed' | 'invitation_cancelled' | 'not_member' | 'last_lead' | 'refused'; reason?: string }[];
     ends_on?: string | null;
     depends_on?: { organism_id: string; what: string }[];
+    approval_gate?: boolean;
 }
 
 /** `depends_on` as the setup takes it: [{ organism_id, what }]. Answers the first thing wrong with it. */
@@ -102,11 +104,12 @@ export async function applyTeamChanges(deps: Deps, caller: Caller, organism: Org
     const changes: TeamChanges = { removed: [] };
     if (t.endsOn !== undefined) changes.ends_on = t.endsOn;
     if (t.dependsOn !== undefined) changes.depends_on = t.dependsOn;
+    if (t.approvalGate !== undefined) changes.approval_gate = t.approvalGate;
     if (!organism) return changes;
     for (const p of t.remove) changes.removed.push(await removeOne(deps, caller, (await storage.getOrganism(organism.id)) ?? organism, p, dryRun));
     if (dryRun) return changes;
     const gone = new Set(t.remove.filter((_, i) => ['removed', 'invitation_cancelled'].includes(changes.removed[i].result)).map(untilKeyOf));
-    if (t.endsOn === undefined && t.dependsOn === undefined && !gone.size) return changes;
+    if (t.endsOn === undefined && t.dependsOn === undefined && t.approvalGate === undefined && !gone.size) return changes;
     for (let attempt = 0; attempt < 3; attempt++) {
         const read = await readTeamRecordWithVersion(storage, organism.id);
         if (!read) break;
@@ -116,6 +119,7 @@ export async function applyTeamChanges(deps: Deps, caller: Caller, organism: Org
             ...read.team, until,
             ...(t.endsOn !== undefined ? { endsOn: t.endsOn ?? undefined } : {}),
             ...(t.dependsOn !== undefined ? { dependsOn: t.dependsOn } : {}),
+            ...(t.approvalGate !== undefined ? { approvalGate: t.approvalGate } : {}),
         };
         if (await writeTeamRecord(storage, config, organism.id, team, read, read.team.createdBy)) break;
     }

@@ -17,6 +17,7 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-15 — aimeat_workspace_object_delete asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — roleOf asks organismMemberGate, the role the REST workspace routes ask; an attached
  *     agent's owner who left takes its agents with it, so no caller's answer changes (parity section
  *     WS-UPDATE; structure programme 2026-11, unit 2b phase B).
@@ -236,6 +237,7 @@ import { toolError } from './tool-error.js';
 import { setWorkspaceShareOp } from '../services/workspace/share.js';
 import { organismMemberGate } from '../services/organism-read/member.js';
 import { shareBodyFromToolInput } from '../services/workspace/share-input.js';
+import { teamDeleteGate } from '../services/team/action-gate.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -600,6 +602,10 @@ export function registerWorkspaceTools(
             // deletion on every path — existing events can never be erased.
             const delGuard = await checkDeleteGuard(`${base}.latest`, storage);
             if (!delGuard.valid) return fail('Delete refused: ' + (delGuard.errors?.[0]?.message ?? 'append-only namespace'));
+            // An AI's delete in a team's workspaces waits for a lead (services/team/action-gate.ts, T7).
+            const c = caller();
+            const held = await teamDeleteGate({ storage, config }, { principal: c.principal, roles: [...c.roles] }, [base]);
+            if (held) return toolError(held.code, held.message);
             // The whole instance — the bare key plus `.draft` / `.latest` / every `.version.N`, own
             // and same-owner only — through services/workspace/write.ts, which is the predicate the
             // batched REST delete applies too.

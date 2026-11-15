@@ -14,6 +14,7 @@
  * @structure groupActor() · openGroupAs()
  * @usage const r = await openGroupAs(ctx, { principal, scopes, members, subject, body, pipeline: 'rest.messages_group_create' });
  * @version-history
+ *   v1.1.0 — 2026-11-15 — The team approval gate before the send turn (services/team/action-gate.ts, T7).
  *   v1.0.0 — 2026-10-21 — Initial: user-created group chat (wish-ryhm-keskustelu-viestit-puolelle).
  */
 import type { ConversationRecord } from '../storage/interface.js';
@@ -24,6 +25,7 @@ import { mintMessageProvenance } from './message-provenance.js';
 import { takeSendTurn } from './message-send-limit.js';
 import { startGroupConversation, type GroupManageError, type MemberOutcome } from './conversation-group-manage.js';
 import { ownerGhiiOf, parseGaiiLoose } from '../utils/gaii.js';
+import { teamAgentGate } from './team/action-gate.js';
 
 /**
  * The identity that acts in a group change: the caller, or with `asOwner` the account behind an
@@ -77,6 +79,11 @@ export async function openGroupAs(ctx: DeliveryCtx, req: OpenGroupRequest): Prom
     principal: req.principal, declaredId: req.declaredId, declared: req.declared, enabled: config.aiProvenance, scopes: req.scopes,
   });
   if (refusal) return { ok: false, status: 403, code: refusal.code, message: refusal.message };
+
+  // A group opened by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
+  const teamHeld = await teamAgentGate(ctx, { principal: req.principal, roles: [] }, 'send',
+    { group: req.members, subject: req.subject, body: req.body }, 'open a group conversation');
+  if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
 
   const turn = takeSendTurn(actor);
   if (!turn.ok) return { ok: false, status: 429, code: 'RATE_LIMITED', message: turn.message, retryAfterSec: turn.retryAfterSec };

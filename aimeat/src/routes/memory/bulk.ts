@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — POST /v1/memory/bulk-delete asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — GET /v1/memory/discover names the tool manifest of an app the operator hid only to that
  *     app's account and the operator (services/memory-discover.ts; unit 2b, B12).
  *   2026-11-08 — The bundle asks the labels a data package version keeps of a package file, as GET /v1/pub
@@ -149,6 +150,7 @@ import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 import { signedInOnly } from '../../config/visibility.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { teamDeleteGate } from '../../services/team/action-gate.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -610,6 +612,14 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         return;
       }
       keep.add(`${r.ownerGaii}\u0000${r.key}`);
+    }
+    // An AI's delete in a team's workspaces waits for a lead (services/team/action-gate.ts, T7):
+    // one team key in the request holds the whole request, before the first delete.
+    const held = await teamDeleteGate({ storage, config }, { principal: session.principal, roles: session.roles },
+      records.filter(r => (!keys || keys.has(r.key)) && !keep.has(`${r.ownerGaii}\u0000${r.key}`)).map(r => r.key));
+    if (held) {
+      res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details));
+      return;
     }
 
     let deleted = 0;

@@ -19,6 +19,7 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   2026-11-15 — acceptBid asks the team approval gate before it mints (services/team/action-gate.ts, T7).
  *   2026-11-01 — A datapackage offering carries its `freshness` (plan D6).
  *   2026-11-01 — A fourth kind, `datapackage` (a data package sold as a metered feed, priced from its
  *     listing by resolveDatapackagePricing), and `deliversData` on every offering (plan D5.1, D5.5).
@@ -80,6 +81,7 @@ export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
 // The pricing of a contract from its source lives in exchange-action-pricing.ts; every name is re-exported here.
 import { resolveActionPricing, resolveExtActionPricing, type ActionCommercial, type OfferingPlan } from './exchange-action-pricing.js';
+import { teamAgentGate } from './team/action-gate.js';
 export { resolveActionPricing, resolveExtActionPricing, extActionDeclaredToll } from './exchange-action-pricing.js';
 export type { ActionCommercial, OfferingPlan } from './exchange-action-pricing.js';
 /**
@@ -753,6 +755,11 @@ export async function acceptBid(
     if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
 
     const capUnits = input.capUnits ?? n.budgetCap;
+    // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
+    // The principal decides: a person's GHII is never held.
+    const teamHeld = await teamAgentGate(deps, { principal: input.consumerGaii, roles: [] }, 'pay',
+        { need: input.needId, bid: input.bidId, cap: capUnits }, `accept the bid ${input.bidId} for ${bid.ext}/${bid.action}`);
+    if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
     const existing = await readContractForCall(storage, input.consumerGaii, bid.ext, bid.action);
     const ent = await createEntitlement(storage, {
         consumerGaii: input.consumerGaii,

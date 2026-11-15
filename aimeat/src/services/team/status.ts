@@ -16,6 +16,7 @@
  * @structure TeamStatus · teamStatusFor · listTeamsOf
  * @usage const teams = await teamStatusFor(storage, config, ownerName, locale, orgId);
  * @version-history
+ *   v1.4.0 — 2026-11-15 — `approval_gate` (T7).
  *   v1.3.0 — 2026-11-14 — `week`: this week's decisions, open matters and what waits, as counts (T15).
  *   v1.2.0 — 2026-11-14 — `team_type`.
  *   v1.1.0 — 2026-11-14 — The team's last day, its dependencies, and for a lead each temporary member's day.
@@ -24,7 +25,7 @@
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { isOrganismOwner, organismOwners } from '../organism-ownership.js';
-import { readTeamRecord, teamContextKey, teamDisplayName, type TeamRecord } from './record.js';
+import { readTeamRecord, teamContextKey, teamDisplayName, teamGateOn, type TeamRecord } from './record.js';
 import { memoryTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
 import { teamWeekRecords } from './weekly-report.js';
@@ -60,6 +61,8 @@ export interface TeamStatus {
     member_until?: Record<string, string>;
     /** Counts only: decisions made in the last seven days, open matters, and what waits for a person. */
     week: { decided: number; open: number; waiting: number };
+    /** On: an AI's delete in the team, and a send or payment by an agent working for it, waits for a lead (T7). */
+    approval_gate: boolean;
 }
 
 /** The organisms the owner is an active member of that are teams, newest membership first. */
@@ -113,6 +116,7 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
         ends_on: team.endsOn ?? null,
         depends_on: team.dependsOn ?? [],
         week: { decided: counts.decided.length, open: counts.open, waiting: counts.waiting },
+        approval_gate: teamGateOn(team),
     };
     if (youLead) {
         status.member_until = Object.fromEntries(Object.entries(team.until ?? {}).map(([k, v]) => [k.replace(/^account:/, ''), v]));

@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-11-15 -- completeSession asks the team approval gate after the agent's own limit (services/team/action-gate.ts, T7).
  *   2026-11-04 -- completeSession writes the completed session and the seller's order copy in one transaction with the sale's fee and beneficiary bookings (commerce/settle-purchase.ts; the line step moved to checkout-shares.ts); bookSessionlessSale books through settlePurchase, and settleSessionlessSale books with the caller's last write (codebase analysis 2026-11-03, item B2).
  *   2026-10-27 -- updateSessionItems and cancelSession write the stored session only while it is open (session-claim.ts changeOpenSession; secaudit2026oct26).
  *   2026-10-27 -- A subscription line whose plan period changed since the quote is refused PRICE_CHANGED (secaudit2026oct26).
@@ -98,6 +99,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 import { recordPurchase, recordCheckoutStage } from '../services/visibility/visibility-counter.js';
 import { claimSessionForCompletion, releaseSessionClaim, releaseAfterRefund, refundedPaymentRefusal, recordCollected, invoiceRailRefusal, expireOverdueSession, changeOpenSession } from './session-claim.js';
+import { teamAgentGate } from '../services/team/action-gate.js';
 
 export { CommerceError } from './errors.js';
 // Moved to platform-fee.ts (2026-10-11); re-exported for the callers that import it from here.
@@ -508,6 +510,13 @@ async function completeSessionInner(
   // The same question for an AGENT: money only within the daily limit its owner set on its card.
   const agentRefusal = await agentPurchaseRefusal(storage, config, session, caller);
   if (agentRefusal) throw agentRefusal;
+  // An agent that works for a team pays only after a lead approved this checkout
+  // (services/team/action-gate.ts, T7). The ask is the session: one approval pays this one checkout.
+  if (caller?.sub) {
+    const teamHeld = await teamAgentGate({ storage, config }, { principal: caller.sub, roles: caller.roles }, 'pay',
+      { session: session.id }, `pay checkout ${session.id} to ${session.sellerOwner}`);
+    if (teamHeld) throw new CommerceError(teamHeld.code, teamHeld.status, teamHeld.message);
+  }
   if (Date.now() > new Date(session.expiresAt).getTime()) {
     session.status = 'expired';
     session.updatedAt = new Date().toISOString();

@@ -6,6 +6,8 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-11-15 — The team gate's actions (team:delete, team:send, team:pay) are filed by the
+ *     node only, and are approved or declined as asked, never edited (services/team/action-gate.ts, T7).
  *   v1.8.0 — 2026-11-14 — POST /approvals refuses action "publish" with 400 INVALID_INPUT and names
  *     POST /v1/organisms/:id/publish, as it refuses the member-change actions: resolving one published
  *     the draft without the publish route's checks or its gate's approver (register finding
@@ -77,6 +79,7 @@ import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspa
 import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { fencedSpaceRefusal } from '../../services/fenced-space.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
+import { isTeamGateAction } from '../../services/team/action-gate.js';
 
 /**
  * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
@@ -172,6 +175,14 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     // publish branch for the approvals that route files.
     if (action === 'publish') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `A publish approval is filed by POST /v1/organisms/${id}/publish, which asks the publish checks and the organism's publish gate first.`));
+      return;
+    }
+    // A team gate approval is filed by the node when an AI asks for the held action itself
+    // (services/team/action-gate.ts, T7), with the node's own words of what it is. Filed here, its
+    // fingerprint and its words would be the caller's, and a lead would approve one thing while
+    // reading another.
+    if (isTeamGateAction(action)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `${action} is filed by the node when the action itself is asked for: make the call, and it waits for a lead.`));
       return;
     }
     const riskVal: Risk = ['low', 'medium', 'high'].includes(risk) ? risk : 'medium';
@@ -511,6 +522,12 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     const { decision: d, note, editedArguments } = req.body ?? {};
     if (!['approve', 'reject', 'edit'].includes(d)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'decision must be "approve", "reject", or "edit"'));
+      return;
+    }
+    // A team's approval gate (services/team/action-gate.ts, T7) passes exactly the ask it holds, so
+    // it is approved or declined as asked; the AI asks again for something different.
+    if (d === 'edit' && isTeamGateAction(approval.action)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A team approval is approved or declined as it was asked. To change it, decline it and ask the AI for the changed action.'));
       return;
     }
 

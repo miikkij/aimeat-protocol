@@ -16,6 +16,7 @@
  * @structure WaitingItem · WaitingApproval · teamWaitingFor
  * @usage const out = await teamWaitingFor(deps, caller);
  * @version-history
+ *   v1.1.0 — 2026-11-15 — decide_url opens the team's Waiting for you workspace, where its approvals are decided (T7).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T6).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -94,7 +95,8 @@ export async function teamWaitingFor(
             if ((rank[role] ?? 0) < (rank[a.approverRole] ?? 3)) continue;
             approvals.push({
                 organism_id: organism.id, team: name, id: a.id, action: a.action, prompt: a.prompt ?? '',
-                decide_url: `/v1/profile?tab=organisms&org=${encodeURIComponent(organism.id)}`,
+                // The approvals are listed and decided in the team's Waiting for you workspace.
+                decide_url: `/v1/profile?tab=organisms&org=${encodeURIComponent(organism.id)}&ws=${encodeURIComponent(team.workspaces.waiting)}`,
             });
         }
     }

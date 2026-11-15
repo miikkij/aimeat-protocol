@@ -21,6 +21,8 @@
  *   deleteMemoryRecord() · restoreLevel() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-11-15 — deleteMemoryRecord asks the team approval gate last (services/team/action-gate.ts,
+ *     team setup T7): an AI's delete in a team's workspaces waits for a lead.
  *   2026-11-08 — restoreMemoryRecord asks the key ceiling and byte quota (flipWithinCeilings): a
  *     restore that would take the principal past one answers 413 QUOTA_EXCEEDED naming the setting,
  *     and the record stays in the bin (secaudit2026nov08 round 14).
@@ -100,6 +102,7 @@ import type { MemoryRecord } from '../storage/interface.js';
 import { isServiceNamespace } from '../utils/service-namespace.js';
 import { serviceRecordRefusal } from '../utils/own-door-keys.js';
 import { flipWithinCeilings } from './memory-ceilings.js';
+import { teamDeleteGate, type TeamGateRefusal } from './team/action-gate.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
@@ -107,8 +110,10 @@ export interface MemoryBinRefusal {
   ok: false;
   code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
     | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD' | 'QUOTA_EXCEEDED'
-    | LegacyPacingWriteRefusal['code'];
+    | LegacyPacingWriteRefusal['code'] | TeamGateRefusal['code'];
   message: string;
+  /** The team gate's approval: its id and where a lead decides it (services/team/action-gate.ts). */
+  details?: Record<string, unknown>;
   /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
   status?: number;
   /** The write guard's own list, for the door that carries it in `details`. */
@@ -320,6 +325,13 @@ async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'dele
         : 'This record belongs to an append-only space, and a record there is not put back through the bin: it enters by the space\'s own write path.',
       violations: guard.errors,
     };
+  }
+  // A delete in a team's workspaces by anything but the person in person waits for a lead
+  // (services/team/action-gate.ts, team setup T7). Asked last, so a delete the rules above refuse
+  // files no approval.
+  if (act === 'delete') {
+    const held = await teamDeleteGate(deps, { principal: req.caller, roles: req.roles ?? [] }, [req.key]);
+    if (held) return { ok: false, code: held.code, message: held.message, status: held.status, details: held.details };
   }
   return null;
 }

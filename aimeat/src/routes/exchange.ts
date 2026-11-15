@@ -23,6 +23,7 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   2026-11-15 — POST /v1/exchange/entitlements asks the team approval gate before it mints (services/team/action-gate.ts, T7).
  *   2026-10-27 — Accepting a proposal on a revoked contract answers 409 CONTRACT_ENDED; a consumer's pause
  *     stands when the provider accepts (secaudit2026oct26, exchange-proposals:accept-reactivates-ended-contract).
  *   v1.10.0 — 2026-10-12 — Accepting an extension action prices it with resolveExtActionPricing, so an
@@ -90,6 +91,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { logger } from '../utils/logger.js';
 import { notifyGrantIssued, notifyGrantsRevoked } from '../services/membership-notify.js';
 import { registerExchangeAgentWorkRoutes } from './exchange-agent-work.js';
+import { teamAgentGate } from '../services/team/action-gate.js';
 
 /**
  * The exact principal string a grant must be keyed by — the one the gate will see on the call.
@@ -179,6 +181,10 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
         return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW',
           budgetFloorText(capUnits, minCharge, priced.unit, priced.currency)));
       }
+      // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
+      const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: req.auth!.roles }, 'pay',
+        { contract: priced.ext, action: priced.action, plan: planId ?? '', cap: capUnits }, `accept a paid contract for ${priced.ext}/${priced.action}`);
+      if (teamHeld) return res.status(teamHeld.status).json(error(config.nodeId, teamHeld.code, teamHeld.message, teamHeld.status, teamHeld.details));
       const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
       const ent = await createEntitlement(storage, {
         consumerGaii, appId, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
@@ -217,6 +223,10 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
+    // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
+    const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: req.auth!.roles }, 'pay',
+      { contract: ext, action, plan: planId ?? '', cap: capUnits }, `accept a paid contract for ${ext}/${action}`);
+    if (teamHeld) return res.status(teamHeld.status).json(error(config.nodeId, teamHeld.code, teamHeld.message, teamHeld.status, teamHeld.details));
     // Carry spend forward on re-acceptance (renegotiation) so a new contract does not reset the meter.
     const existing = await readContractForCall(storage, consumerGaii, ext, action);
     const ent = await createEntitlement(storage, {

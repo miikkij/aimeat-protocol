@@ -12,6 +12,8 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-11-15 — aimeat_dm_send, aimeat_dm_ask and aimeat_dm_send_as_owner ask the team approval gate
+ *     before the send turn (services/team/action-gate.ts, T7).
  *   2026-10-27 — aimeat_dm_send and aimeat_dm_ask bind a named conversation_id to the sender
  *     (services/message-thread-binding.ts); aimeat_dm_thread merges the owner's rows that do not involve
  *     the agent only with messages:read-as-owner, and names the ask otherwise (secaudit2026oct26).
@@ -105,6 +107,7 @@ import { mintMessageProvenance } from '../services/message-provenance.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { teamAgentGate } from '../services/team/action-gate.js';
 
 /**
  * How ONE attachment is shown to the agent reading its inbox. `ref` is the point: the descriptor used
@@ -181,6 +184,12 @@ export function registerDmMessageTools(
             if (!body?.trim() && !attachments?.length) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A message must have a body or at least one attachment.' }) }] };
             }
+            // A send by an agent that works for a team waits for a lead (services/team/action-gate.ts,
+            // T7), asked as POST /v1/messages asks it: before the send turn, with the same input.
+            const teamHeld = await teamAgentGate({ storage, config }, { principal: senderGhii, roles: [...caller().roles] }, 'send',
+                { to: recipientGhii, conversation: conversation_id ?? '', subject: subject ?? '', body: body ?? '' },
+                `send a message to ${recipientGhii || `conversation ${conversation_id ?? ''}`}`);
+            if (teamHeld) return toolError(teamHeld.code, teamHeld.message);
             // Counted before anything is written (the provenance record below, a new support
             // thread), and handed to the send service, which then does not count it again.
             const turn = takeSendTurn(senderGhii);
@@ -548,6 +557,10 @@ export function registerDmMessageTools(
             if (recipientGhii === senderGhii) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
             }
+            // A send by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
+            const teamHeld = await teamAgentGate({ storage, config }, { principal: senderGhii, roles: [...caller().roles] }, 'send',
+                { to: recipientGhii, conversation: conversation_id ?? '', subject: subject ?? '', body: body ?? '', questions }, `ask ${recipientGhii} a question`);
+            if (teamHeld) return toolError(teamHeld.code, teamHeld.message);
             // A question is a message: counted before the provenance record below is written.
             const turn = takeSendTurn(senderGhii);
             if (!turn.ok) return sendLimitRefused(turn);

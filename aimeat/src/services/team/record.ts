@@ -18,6 +18,7 @@
  *   const team = await readTeamRecord(storage, orgId);
  *   const name = team ? teamDisplayName(team, 'en', organism.name) : organism.name;
  * @version-history
+ *   v1.2.0 — 2026-11-15 — approvalGate and teamGateOn: the lead's approval for an AI's delete, send or payment (T7).
  *   v1.1.0 — 2026-11-14 — The record keeps each workspace's name and the description in every
  *     language (workspaceNames, descriptionByLang); teamNamesFor serves them, so a page shows the whole
  *     team in its reader's language. A team made before has its workspace names from the kit.
@@ -56,6 +57,12 @@ export interface TeamRecord {
     dependsOn?: { organism_id: string; what: string }[];
     /** The team type the setup made it as (data/team-kit.ts TEAM_TYPES). */
     teamType?: string;
+    /**
+     * Whether a delete in the team's workspaces, and a send or a payment by an agent that works for
+     * the team, waits for a lead's approval when an AI asks for it (action-gate.ts, T7). On unless
+     * a lead turned it off: a team made before the gate existed has it on too.
+     */
+    approvalGate?: boolean;
     createdBy: string;
     createdAt: string;
     updatedAt: string;
@@ -120,6 +127,11 @@ export async function writeTeamRecord(
 
 /** The organism types a team setup writes (setup.ts); only these are read for a team record. */
 export const TEAM_ORGANISM_TYPES = new Set(['team', 'virtual team']);
+
+/** The approval gate is on unless a lead turned it off (TeamRecord.approvalGate). */
+export function teamGateOn(team: Pick<TeamRecord, 'approvalGate'>): boolean {
+    return team.approvalGate !== false;
+}
 
 /** Each team workspace's name in every language: the stored map, or, for a team set up before it was
  *  stored, the kit's names by the workspace's place. */

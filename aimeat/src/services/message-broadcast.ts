@@ -13,6 +13,7 @@
  * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
  * @usage import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
  * @version-history
+ *   v1.8.0 — 2026-11-15 — broadcastFromPrincipal asks the team approval gate first (services/team/action-gate.ts, T7).
  *   v1.7.0 — 2026-10-08 — broadcastProvenanceStamp() hashes with messageProvenanceContent(), the one
  *     rule every message send uses (body plus the questions as stored), and takes the session's
  *     scopes (aiprov D5, D14).
@@ -50,6 +51,7 @@ import { sign } from '../auth/keypair.js';
 import { audienceProof } from './signed-node-request.js';
 import { logger } from '../utils/logger.js';
 import { peerFetch } from '../utils/peer-fetch.js';
+import { teamAgentGate } from './team/action-gate.js';
 
 export interface AudienceSelector {
   /** Explicit recipient identities (owner@node, agent#owner@node, eco:app#owner@node). */
@@ -257,6 +259,11 @@ export async function broadcastFromPrincipal(
       retryAfterSec?: number;
     }
 > {
+  // A broadcast by an agent that works for a team waits for a lead (services/team/action-gate.ts,
+  // T7). The principal decides: an agent's GAII is held, a person's GHII is not.
+  const teamHeld = await teamAgentGate(ctx, { principal: input.senderGhii, roles: [] }, 'send',
+    { to: input.to ?? [], group: input.groupId ?? '', audience: input.audience ?? '', subject: input.subject ?? '', body: input.body ?? '' }, 'send a broadcast');
+  if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
   // The account's send limit comes first: one broadcast is one send, however many it reaches, and
   // nothing below runs for a sender who has used this minute's allowance.
   const turn = takeSendTurn(input.senderGhii);

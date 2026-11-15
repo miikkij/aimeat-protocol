@@ -18,6 +18,7 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-11-15 — aimeat_exchange_accept and aimeat_exchange_bid_accept ask the team approval gate (services/team/action-gate.ts, T7).
  *   2026-10-25 — aimeat_exchange_bid names the bidder's own extension through services/component-address.ts (own first) and keeps its stored name (owner namespaces wish, secaudit2026oct22).
  *     The legacy aimeat_exchange_accept finds the extension the same way and keys the contract by the stored name; the offering's call recipe encodes that name as one path segment and names the invoke tool's `extension_name` field.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -75,6 +76,7 @@ import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../confi
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { offeringExtAction } from '../services/exchange/offering-action.js';
 import { findExtension, addressSegment } from '../services/component-address.js';
+import { teamAgentGate } from '../services/team/action-gate.js';
 
 function ownerOf(gaii: string): string {
     return localAccountName(gaii);
@@ -228,6 +230,10 @@ export function registerExchangeTools(
                 if (capUnits !== null && capUnits < minCharge) {
                     return fail(`BUDGET_TOO_LOW: ${budgetFloorText(capUnits, minCharge, priced.unit, priced.currency)}`);
                 }
+                // A paying contract made by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7).
+                const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: ['agent'] }, 'pay',
+                    { contract: priced.ext, action: priced.action, plan: plan_id ?? '', cap: capUnits }, `accept a paid contract for ${priced.ext}/${priced.action}`);
+                if (teamHeld) return fail(`${teamHeld.code}: ${teamHeld.message}`);
                 const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
                 const ent = await createEntitlement(storage, {
                     consumerGaii, appId: app_id ?? null, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
@@ -259,6 +265,9 @@ export function registerExchangeTools(
 
             // Carry spend forward on re-acceptance (renegotiation) so a new contract does not reset the meter.
             // Keyed by the stored name, which is the name a settled call carries.
+            const teamHeld = await teamAgentGate({ storage, config }, { principal: consumerGaii, roles: ['agent'] }, 'pay',
+                { contract: extRec.name, action, plan: plan_id ?? '', cap: capUnits }, `accept a paid contract for ${extRec.name}/${action}`);
+            if (teamHeld) return fail(`${teamHeld.code}: ${teamHeld.message}`);
             const existing = await readContractForCall(storage, consumerGaii, extRec.name, action);
             const ent = await createEntitlement(storage, {
                 consumerGaii, appId: app_id ?? null, providerGhii, ext: extRec.name, action, capabilityLabel: `${extRec.name}/${action}`,

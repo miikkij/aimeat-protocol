@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-15 — DELETE /v1/organisms/:id asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — GET /v1/organisms and GET /v1/organisms/:id carry `team_names` ({ names, language })
  *     for an organism set up as a team (services/team/record.ts teamNamesFor), so a page names the
  *     team in its reader's language.
@@ -117,6 +118,7 @@ import { isOwnerInPerson, resolveIdentity } from '../../utils/gaii.js';
 import { agentBarred, organismsAdmitting } from '../../services/organism-agent-access.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
+import { teamDeleteGate } from '../../services/team/action-gate.js';
 
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -394,6 +396,10 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator can delete'));
       return;
     }
+
+    // An AI's delete of a whole team waits for a lead (services/team/action-gate.ts, T7).
+    const held = await teamDeleteGate({ storage, config }, { principal: req.auth!.sub, roles: req.auth!.roles }, [`organism.${id}.*`], 'delete the whole team');
+    if (held) { res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details)); return; }
 
     // The organism and every record that belongs to it (services/organism-lifecycle.ts).
     await deleteOrganismRecords(storage, config.nodeId, id);

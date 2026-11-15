@@ -22,6 +22,7 @@
  * @usage router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), validateBody(OrganismCreateBody, config.nodeId), …)
  * @version-history
  *   v1.4.0 — 2026-11-15 — TeamDecisionShareBody: share a team decision with other teams (T19).
+ *     TeamSetupTeams: `approval_gate` (T7).
  *   v1.3.0 — 2026-11-14 — TeamSetupTeams: `type`, the team type (TEAM_TYPE_IDS).
  *   v1.2.0 — 2026-11-14 — TeamSetupBody and TeamSetupTeams: POST /v1/teams/setup and aimeat_team_setup.
  *   v1.1.0 — 2026-11-12 — AccessRequestBody: the optional message of an access request.
@@ -88,6 +89,7 @@ export const TeamSetupTeams = z.array(z.object({
         organism_id: z.string().max(INPUT_LIMITS.id).describe('A team this one needs something from.'),
         what: safeText(300).optional().describe('What it needs, in a few words.'),
     })).max(30).optional().describe('The teams this team depends on, shown on the team map. Replaces the list.'),
+    approval_gate: z.boolean().optional().describe('On (the default for a new team): when an AI deletes in the team\'s workspaces, or an agent that works for the team sends or pays, it waits until a lead approves. Only a lead turns it off.'),
 })).max(30);
 
 /** POST /v1/teams/:id/paste: an AI's tagged answer brought back into the team (services/team/prompt.ts). */

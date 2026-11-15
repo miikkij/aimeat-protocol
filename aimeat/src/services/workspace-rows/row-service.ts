@@ -33,6 +33,7 @@
  *   - rowSpaceSchema
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-11-15 — deleteRow and deleteRowsBefore ask the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-07 — A row space's JSON Schema binds every writer: appendRows checks every body of a
  *     batch against it after the shape and size checks and before the quota and any write, and a
  *     restore checks the revision it puts back; a refusal is SCHEMA_VALIDATION_FAILED (422) naming
@@ -107,6 +108,7 @@ import {
   settleReplacements, lastWriterOf, revisionOf, revisionKeepDays, REVISIONS_PER_ROW,
 } from './row-revisions.js';
 import { lockedRowSchema, checkRowBodies } from './row-schema.js';
+import { teamDeleteGate } from '../team/action-gate.js';
 
 export { WorkspaceRowError } from './row-space.js';
 export { ROW_SCHEMA_REFUSAL } from './row-schema.js';
@@ -652,12 +654,23 @@ export async function readRow(
   return publicRow(row);
 }
 
+/**
+ * An AI's row delete in a team's workspaces waits for a lead (services/team/action-gate.ts, T7). The
+ * ask is named as the rows' address in the workspace, `organism.<id>.w.<ws>.<namespace>.<what>`.
+ */
+async function teamRowGate(deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, namespace: string, what: string): Promise<void> {
+  const held = await teamDeleteGate(deps, { principal: caller.principal, roles: caller.roles },
+    [`organism.${organismId}.w.${wsId}.${namespace}.${what.replace(/\s+/g, '-')}`], `delete ${what} in ${namespace}`);
+  if (held) throw new WorkspaceRowError(held.code, held.status, held.message, held.details);
+}
+
 export async function deleteRow(
   deps: RowServiceDeps, caller: RowCaller,
   organismId: string, wsId: string, spaceName: string, rowId: string,
 ): Promise<void> {
   const space = await loadSpace(deps, organismId, wsId, spaceName);
   await gate(deps, caller, organismId, wsId, space, 'write');
+  await teamRowGate(deps, caller, organismId, wsId, space.namespace, `row ${rowId}`);
   const removed = await deps.storage.deleteWorkspaceRow(organismId, wsId, space.namespace, rowId);
   if (!removed) {
     throw new WorkspaceRowError('NOT_FOUND', 404, `No row "${rowId}" in ${space.name}.`);
@@ -678,6 +691,7 @@ export async function deleteRowsBefore(
   if (!cutoff) {
     throw new WorkspaceRowError('INVALID_ROW', 400, 'Name the cutoff as an ISO 8601 timestamp in `before`.');
   }
+  await teamRowGate(deps, caller, organismId, wsId, space.namespace, `rows before ${cutoff}`);
   const removed = await deps.storage.deleteWorkspaceRowsBefore(organismId, wsId, space.namespace, cutoff);
   // The revisions of the rows removed here go with them (sweepRevisions drops a gone row's).
   if (removed) await sweepRevisions(deps, organismId, wsId, space);

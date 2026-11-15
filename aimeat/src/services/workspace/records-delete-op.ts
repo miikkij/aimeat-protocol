@@ -10,6 +10,7 @@
  * @usage
  *   const r = await deleteRecordsBatchOp(deps, caller, { organismId, ws, namespace, ids });
  * @version-history
+ *   2026-11-15 — The team approval gate (services/team/action-gate.ts, T7): an AI's delete in a team waits for a lead.
  *   2026-11-04 — No value scan or per-key delete for a storage without listMemoryKeysByPrefix or
  *     bulkBinMemory: both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-27 — The fenced-space rule is asked for the workspace the keys lie in, also when
@@ -23,6 +24,7 @@ import { isSameOwner } from '../../utils/gaii.js';
 import { emitChange, emitWorkspaceChange, workspaceOfKey } from '../event-bus.js';
 import { updateOrganismStructure } from '../structure-snapshot.js';
 import { logger } from '../../utils/logger.js';
+import { teamDeleteGate } from '../team/action-gate.js';
 import {
     refuse, denyReason, fencedOpRefusal,
     type WorkspaceOpsDeps, type WorkspaceOpsCaller, type WorkspaceOpResult,
@@ -90,6 +92,9 @@ export async function deleteRecordsBatchOp(
     if (!guard.valid) {
         return refuse(409, 'WRITE_CONFLICT', guard.errors?.[0]?.message ?? 'namespace is append-only', { violations: guard.errors });
     }
+    // An AI's delete in a team's workspaces waits for a lead (services/team/action-gate.ts, T7).
+    const held = await teamDeleteGate(deps, { principal: caller.principal, roles: caller.roles }, ids.map(x => `${root}.${namespace}.${x}`));
+    if (held) return refuse(held.status, held.code, held.message, held.details);
 
     // A key's role suffix must be the RECORD itself (bare), its .draft/.latest, or a .version.N, never
     // a sibling instance (`${base}0`) or an unrelated child. Mirrors object_delete's per-row guard.

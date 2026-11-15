@@ -21,6 +21,7 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-11-15 — POST /v1/messages asks the team approval gate before the send turn (services/team/action-gate.ts, T7).
  *   2026-11-10 — GET /v1/messages/conversations takes waiting, since, limit and preview (additive), with
  *     `total`: the Home's waiting band reads the five threads it shows, not the whole list.
  *   2026-11-08 — An attachment's transcription read asks the labels a data package version keeps of a package file (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
@@ -148,6 +149,7 @@ import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { aiCallerOf } from './ai-policy.js';
 import { checkInteractiveAnswers } from '../services/interactive-answers.js';
+import { teamAgentGate } from '../services/team/action-gate.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -195,6 +197,15 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     });
     if (provenanceRefused) {
       res.status(403).json(error(config.nodeId, provenanceRefused.code, provenanceRefused.message));
+      return;
+    }
+    // A send by an agent that works for a team waits for a lead (services/team/action-gate.ts, T7);
+    // asked before the send turn, so a held message takes none of the account's allowance.
+    const teamHeld = await teamAgentGate({ storage, config }, { principal: senderGhii, roles: req.auth!.roles }, 'send',
+      { to: input.to.trim(), conversation: input.conversation_id ?? '', subject: input.subject ?? '', body: input.body },
+      `send a message to ${input.to.trim() || `conversation ${input.conversation_id ?? ''}`}`);
+    if (teamHeld) {
+      res.status(teamHeld.status).json(error(config.nodeId, teamHeld.code, teamHeld.message, teamHeld.status, teamHeld.details));
       return;
     }
     // Counted before this door writes anything of its own (a new support thread), and handed to the

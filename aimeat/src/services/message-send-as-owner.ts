@@ -25,6 +25,7 @@
  * @structure SendAsOwnerInput · SendAsOwnerResult · sendAsOwner(ctx, input)
  * @usage const r = await sendAsOwner(ctx, { agentGaii, scopes, to, body, pipeline: 'rest.messages_send_as_owner' });
  * @version-history
+ *   v1.1.0 — 2026-11-15 — The team approval gate before the send turn (services/team/action-gate.ts, T7).
  *   v1.0.0 — 2026-10-17 — Initial, from the body of aimeat_dm_send_as_owner
  *     (wish-agentin-omistajan-nimiss-l-hett-m-viesti-n-ytt-mik-agentti-s).
  */
@@ -39,6 +40,7 @@ import { mintMessageProvenance } from './message-provenance.js';
 import { provenanceDeclarationRefusal } from './ai/provenance.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { teamAgentGate } from './team/action-gate.js';
 
 export interface SendAsOwnerInput {
   /** The acting agent's own identity, from its credential. */
@@ -79,6 +81,12 @@ export async function sendAsOwner(ctx: DeliveryCtx, input: SendAsOwnerInput): Pr
     principal: input.agentGaii, declaredId: input.declaredId, declared: input.declared, enabled: config.aiProvenance, scopes: input.scopes,
   });
   if (refusal) return { ok: false, status: 403, code: refusal.code, message: refusal.message };
+
+  // The agent wrote it: a send by an agent that works for a team waits for a lead
+  // (services/team/action-gate.ts, T7), before the send turn.
+  const teamHeld = await teamAgentGate(ctx, { principal: input.agentGaii, roles: ['agent'] }, 'send',
+    { to, conversation: input.conversationId ?? '', subject: input.subject ?? '', body: input.body ?? '' }, `send a message to ${to} in the owner's name`);
+  if (teamHeld) return { ok: false, status: teamHeld.status, code: teamHeld.code, message: teamHeld.message };
 
   // The owner's account is the sender, and the agent is part of it: one allowance.
   const turn = takeSendTurn(ownerGhii);

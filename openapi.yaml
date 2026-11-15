@@ -59808,6 +59808,13 @@ paths:
                         items:
                           type: object
                           properties: { organism_id: { type: string }, what: { type: string } }
+                      approval_gate:
+                        type: boolean
+                        description: >-
+                          On for a new team. While on, a delete in the team's workspaces asked by
+                          anything but the person in person, and a send or a payment by an agent whose
+                          workplace is in the team, answers 403 TEAM_APPROVAL_REQUIRED and files an
+                          approval a lead decides; the same call then runs. Only a lead changes it.
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '201': { $ref: '#/components/responses/AimeatSuccess' }

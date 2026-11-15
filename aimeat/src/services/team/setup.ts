@@ -30,6 +30,7 @@
  *   const parsed = parseTeamSetup(req.body, callerLocale);
  *   const out = await planOrApplyTeams({ storage, config }, caller, parsed, dryRun);
  * @version-history
+ *   v1.3.0 — 2026-11-15 — `approval_gate`: on for a new team; a lead turns it off or on again (T7).
  *   v1.2.0 — 2026-11-14 — The team type (`type`, T18): its spaces in the shared workspace, its line in the skill.
  *   v1.1.0 — 2026-11-14 — A team keeps its workspaces' names in every language from the kit, and its
  *     description in every language the AI writes (`descriptions`), so every part of the team reads
@@ -80,6 +81,8 @@ export interface TeamInput {
     endsOn: string | null | undefined;
     /** Teams this one depends on, replacing the list when given. */
     dependsOn: { organism_id: string; what: string }[] | undefined;
+    /** The approval gate on or off; undefined leaves it (a new team has it on). */
+    approvalGate: boolean | undefined;
 }
 export type TeamSetupInput = { ok: true; teams: TeamInput[] } | { ok: false; message: string };
 
@@ -149,6 +152,7 @@ export function parseTeamSetup(body: unknown, callerLocale: string | null | unde
             teamType: teamTypeOf(t.type).id,
             description: typeof t.description === 'string' ? t.description.trim().slice(0, 2000) : (descriptions[language] ?? ''),
             descriptions, leads, members, remove, endsOn, dependsOn,
+            approvalGate: typeof t.approval_gate === 'boolean' ? t.approval_gate : undefined,
         });
     }
     return { ok: true, teams };
@@ -282,7 +286,7 @@ async function createTeam(deps: Deps, caller: Caller, t: TeamInput, out: TeamOut
     const descriptions = t.description ? { ...t.descriptions, [t.language]: t.description } : t.descriptions;
     const team: TeamRecord = {
         type: TEAM_RECORD_TYPE, names: t.names, language: t.language, kind: t.kind, teamType: type.id, workspaces: ws, workspaceNames, descriptionByLang: descriptions, skill,
-        leadsPending: [], createdBy: caller.owner, createdAt: now, updatedAt: now,
+        leadsPending: [], approvalGate: t.approvalGate ?? true, createdBy: caller.owner, createdAt: now, updatedAt: now,
     };
     if (!(await writeTeamRecord(storage, config, orgId, team, null, caller.owner))) {
         out.problems.push('the team record was written by someone else at the same moment');

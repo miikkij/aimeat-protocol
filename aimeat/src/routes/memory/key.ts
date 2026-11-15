@@ -310,7 +310,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const outcome = await deleteMemoryRecord({ storage, config }, binReq);
     if (!outcome.ok) {
       res.status(outcome.status ?? 404).json(error(config.nodeId, outcome.code, outcome.message,
-        outcome.status ?? 404, outcome.violations ? { violations: outcome.violations } : undefined));
+        outcome.status ?? 404, outcome.violations ? { violations: outcome.violations } : outcome.details));
       return;
     }
     // The operator's ?owner= delete writes the operator-access trail, the same one

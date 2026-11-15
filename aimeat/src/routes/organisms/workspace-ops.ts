@@ -7,6 +7,7 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-15 — DELETE /v1/organisms/:id/workspace asks the team approval gate (services/team/action-gate.ts, T7).
  *   2026-11-14 — PUT /v1/organisms/:id/workspace asks requireMember, the role aimeat_workspace_update
  *     asks; the answers are unchanged (structure programme 2026-11, unit 2b phase B).
  *   2026-11-13 — POST /v1/organisms/:id/workspaces asks requireMember (services/organism-read/member.ts),
@@ -123,6 +124,7 @@ import { withItemProvenance, shareOpenedIdsOf } from '../../services/share-prove
 import { loadServedProvenance, loadServedProvenanceMany, setProvenanceHeaders, envelopeMeta, provenanceMarkdownNote } from '../../services/ai/provenance-marks.js';
 import type { OrganismHelpers } from './shared.js';
 import { logger } from '../../utils/logger.js';
+import { teamDeleteGate } from '../../services/team/action-gate.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -682,6 +684,10 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     // the client, which removes the entry after this succeeds.
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const prefix = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
+    // An AI's delete of a team's workspace waits for a lead (services/team/action-gate.ts, T7).
+    const held = await teamDeleteGate({ storage, config }, { principal: req.auth!.sub, roles: req.auth!.roles }, [`${prefix}*`],
+      ws ? `delete the whole workspace ${ws}` : 'delete every workspace of the team');
+    if (held) { res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, held.details)); return; }
     // Data-access redesign (Phase 2): wipe the container in ONE statement (all rows under the prefix,
     // active AND archived) instead of a per-key deleteMemory loop over thousands of rows.
     const memoryKeys = await storage.deleteMemoryByPrefix(prefix);

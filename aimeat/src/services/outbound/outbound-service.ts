@@ -24,6 +24,7 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-11-15 — sendOutbound asks the team approval gate before the send turn (services/team/action-gate.ts, T7).
  *   2026-11-04 — The mail service is read from nodeContext() (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The send allowance is counted in the node's storage (takeMailSendOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 — The node transport sends through mail-gate.ts sendMail with the account turn (codebase analysis 2026-11-03, item B3).
@@ -104,6 +105,7 @@ import { provenanceForWrite, storeHeldProvenance } from '../ai/provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import { takeMailSendOnNode } from '../account-limits.js';
 import { sendMail } from '../mail-gate.js';
+import { teamAgentGate } from '../team/action-gate.js';
 
 /**
  * Where a refused or failed attempt was recorded, so a caller can find it again.
@@ -511,6 +513,14 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // The account's send allowance, here rather than on a route, so POST /v1/outbound/send, the MCP
   // tool aimeat_mail_send and a contact message draw on one count for the owner and all their agents
   // (services/account-limits.ts; secaudit 2026-10, C5). Asked before anything is written.
+  // A mail sent by an agent that works for a team waits for a lead first (services/team/action-gate.ts,
+  // T7): the principal decides, so a person's own send is never held, and a held one takes no turn.
+  if (input.principal) {
+    const teamHeld = await teamAgentGate({ storage, config }, { principal: input.principal, roles: [] }, 'send',
+      { contact: input.contactId, kind: input.kind, subject: input.subject ?? '', body: input.body ?? '', template: input.templateId ?? '', invoice: input.invoiceId ?? '' },
+      `send an email to contact ${input.contactId}`);
+    if (teamHeld) throw new OutboundError(teamHeld.code, teamHeld.status, teamHeld.message);
+  }
   const turn = await takeMailSendOnNode(input.principal ?? ownerGhii);
   if (!turn.ok) throw new OutboundError(turn.code, 429, turn.message);
 

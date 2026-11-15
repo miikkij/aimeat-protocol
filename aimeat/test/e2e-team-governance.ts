@@ -1,14 +1,22 @@
 /**
- * @file test/e2e-team-admin.ts
+ * @file test/e2e-team-governance.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The operator's view of the teams on a node (team setup T16): GET /v1/admin/teams and
- *   aimeat_admin_teams give every team with counts only (leads, members, connected AIs, the week's
- *   numbers) and never a record title or the team context. The refusals: an ordinary owner and an
- *   agent without operator:admin are refused, and a caller with no token gets 401.
- * @structure t01..t04 in order; each later test reads what the earlier ones made.
- * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=team-admin
+ * @description How a team is governed, end to end.
+ *   T16, the operator's view: GET /v1/admin/teams and aimeat_admin_teams give every team with counts
+ *   only and never a record title or the team context; an ordinary owner, an agent without
+ *   operator:admin and a caller with no token are refused.
+ *   T19, a decision shared with other teams: a dry run first, a copy that names where it came from in
+ *   each team the sharer is in, a team the sharer is not in refused with the reason, a copy not shared
+ *   on, a withdrawal as a new record through the MCP tool.
+ *   T7, the approval gate: an agent's delete in the team and a send by an agent that works for the
+ *   team wait for a lead, the approver is recorded and the same call then runs; the person in person
+ *   is not held; a lead turns the gate off and on, a member cannot; a declined ask is told back; an
+ *   approval is not filed by hand, not edited and not decided by a member.
+ * @structure t01..t15 in order; each later test reads what the earlier ones made.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=team-governance
  * @version-history
+ *   v1.1.0 — 2026-11-15 — T19 (t05..t09) and T7 (t10..t15); renamed from e2e-team-admin.ts.
  *   v1.0.0 — 2026-11-15 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T16).
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
@@ -159,6 +167,91 @@ await test('t09 refusals: a non-member of the source team, an agent without orga
         method: 'POST', headers: auth(reader.token), body: JSON.stringify({ to: [salesId] }),
     });
     assert(noWrite.status === 403, `without organism:write: ${noWrite.status}`);
+});
+
+// ── T7: the team's approval gate ──
+let sharedWs = '', itemIds: string[] = [], leadAgent!: { name: string; gaii: string; token: string };
+const deleteBody = (ids: string[]) => JSON.stringify({ ws: sharedWs, namespace: 'shared.items', ids });
+
+await test('t10 setup: three open items in the team, the lead\'s agent with delete words', async () => {
+    const st = await json(`/v1/teams/status?organism_id=${teamId}`, { headers: auth(lead.token) });
+    assert(st.body.data.teams[0].approval_gate === true, `a new team has the gate on: ${st.body.data.teams[0].approval_gate}`);
+    sharedWs = st.body.data.teams[0].workspaces.shared;
+    const paste = await json(`/v1/teams/${teamId}/paste`, {
+        method: 'POST', headers: auth(lead.token), body: JSON.stringify({ text: `OPEN: eka ${stamp}\nOPEN: toka ${stamp}\nOPEN: kolmas ${stamp}`, dry_run: false }),
+    });
+    assert(paste.status === 201 && paste.body.data.written === 3, `paste ${paste.status}`);
+    const read = await json(`/v1/organisms/${teamId}/workspace?ws=${sharedWs}`, { headers: auth(lead.token) });
+    itemIds = [...new Set(JSON.stringify(read.body).match(/pasted-[a-z0-9]+-[123]/g) ?? [])].sort();
+    assert(itemIds.length === 3, `three item ids: ${itemIds}`);
+    leadAgent = await makeAgent(BASE, lead, ['organism:read', 'organism:write', 'memory:read', 'memory:delete', 'messages:send']);
+});
+
+let approvalId = '';
+await test('t11 the agent\'s delete waits for a lead; asking again files no second approval', async () => {
+    const first = await json(`/v1/organisms/${teamId}/workspace/records/delete`, { method: 'POST', headers: auth(leadAgent.token), body: deleteBody([itemIds[0]]) });
+    assert(first.status === 403 && first.body.error?.code === 'TEAM_APPROVAL_REQUIRED', `first ${first.status} ${JSON.stringify(first.body.error)}`);
+    approvalId = first.body.error.details.approval_id;
+    const again = await json(`/v1/organisms/${teamId}/workspace/records/delete`, { method: 'POST', headers: auth(leadAgent.token), body: deleteBody([itemIds[0]]) });
+    assert(again.body.error?.details?.approval_id === approvalId, 'the same approval');
+    const w = await json('/v1/teams/waiting', { headers: auth(lead.token) });
+    assert(w.body.data.approvals.some((a: any) => a.id === approvalId), 'the lead sees it in what waits');
+    const st = await json(`/v1/organisms/${teamId}/workspace?ws=${sharedWs}`, { headers: auth(lead.token) });
+    assert(JSON.stringify(st.body).includes(itemIds[0]), 'nothing was deleted');
+});
+
+await test('t12 a lead approves, the approver is recorded, and the same call then runs', async () => {
+    const dec = await json(`/v1/organisms/${teamId}/approvals/${approvalId}`, { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(dec.status === 200 && dec.body.data.approval.decidedBy?.startsWith(lead.name), `approve ${dec.status} ${JSON.stringify(dec.body.data?.approval ?? dec.body.error)}`);
+    const run = await json(`/v1/organisms/${teamId}/workspace/records/delete`, { method: 'POST', headers: auth(leadAgent.token), body: deleteBody([itemIds[0]]) });
+    assert(run.status === 200 && run.body.data.deleted.length === 1, `after approval ${run.status} ${JSON.stringify(run.body.error ?? run.body.data)}`);
+    const other = await json(`/v1/organisms/${teamId}/workspace/records/delete`, { method: 'POST', headers: auth(leadAgent.token), body: deleteBody([itemIds[1]]) });
+    assert(other.status === 403 && other.body.error.details.approval_id !== approvalId, 'a different delete needs its own approval');
+});
+
+await test('t13 the person in person is not held; a lead turns the gate off and the agent then deletes', async () => {
+    const own = await json(`/v1/organisms/${teamId}/workspace/records/delete`, { method: 'POST', headers: auth(lead.token), body: deleteBody([itemIds[1]]) });
+    assert(own.status === 200, `the lead's own delete ${own.status} ${JSON.stringify(own.body.error ?? '')}`);
+    const byMember = await json('/v1/teams/setup', { method: 'POST', headers: auth(member.token), body: JSON.stringify({ dry_run: false, teams: [{ organism_id: teamId, approval_gate: false }] }) });
+    const still = await json(`/v1/teams/status?organism_id=${teamId}`, { headers: auth(lead.token) });
+    assert(still.body.data.teams[0].approval_gate === true, `a member cannot turn it off (${byMember.status})`);
+    const off = await json('/v1/teams/setup', { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ dry_run: false, teams: [{ organism_id: teamId, approval_gate: false }] }) });
+    assert(off.status === 201, `off ${off.status} ${JSON.stringify(off.body.error ?? '')}`);
+    const run = await json(`/v1/organisms/${teamId}/workspace/records/delete`, { method: 'POST', headers: auth(leadAgent.token), body: deleteBody([itemIds[2]]) });
+    assert(run.status === 200, `with the gate off ${run.status} ${JSON.stringify(run.body.error ?? '')}`);
+    const on = await json('/v1/teams/setup', { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ dry_run: false, teams: [{ organism_id: teamId, approval_gate: true }] }) });
+    assert(on.status === 201, 'on again');
+});
+
+await test('t14 a send by an agent that works for the team waits; an agent with no workplace is not held', async () => {
+    const plain = await json('/v1/messages', { method: 'POST', headers: auth(leadAgent.token), body: JSON.stringify({ to: member.ghii, body: `hei ${stamp}` }) });
+    assert(plain.status === 201, `no workplace: ${plain.status} ${JSON.stringify(plain.body.error ?? '')}`);
+    const wp = await json(`/v1/agents/${leadAgent.name}/workplace`, { method: 'PUT', headers: auth(lead.token), body: JSON.stringify({ organism_id: teamId, workspace_id: sharedWs }) });
+    assert(wp.status === 200, `workplace ${wp.status} ${JSON.stringify(wp.body.error ?? '')}`);
+    const msg = JSON.stringify({ to: member.ghii, body: `tarjous lähtee ${stamp}` });
+    const held = await json('/v1/messages', { method: 'POST', headers: auth(leadAgent.token), body: msg });
+    assert(held.status === 403 && held.body.error?.code === 'TEAM_APPROVAL_REQUIRED', `held ${held.status} ${JSON.stringify(held.body.error)}`);
+    const dec = await json(`/v1/organisms/${teamId}/approvals/${held.body.error.details.approval_id}`, { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(dec.status === 200, `approve ${dec.status}`);
+    const sent = await json('/v1/messages', { method: 'POST', headers: auth(leadAgent.token), body: msg });
+    assert(sent.status === 201, `after approval ${sent.status} ${JSON.stringify(sent.body.error ?? '')}`);
+});
+
+await test('t15 a declined ask is told back; refusals: filed by hand, edited, decided by a member', async () => {
+    const msg = JSON.stringify({ to: member.ghii, body: `toinen ${stamp}` });
+    const held = await json('/v1/messages', { method: 'POST', headers: auth(leadAgent.token), body: msg });
+    const aid = held.body.error?.details?.approval_id;
+    assert(aid, 'held');
+    const byMember = await json(`/v1/organisms/${teamId}/approvals/${aid}`, { method: 'POST', headers: auth(member.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(byMember.status === 403, `a member decides: ${byMember.status}`);
+    const edit = await json(`/v1/organisms/${teamId}/approvals/${aid}`, { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ decision: 'edit', editedArguments: {} }) });
+    assert(edit.status === 400, `edit: ${edit.status}`);
+    const no = await json(`/v1/organisms/${teamId}/approvals/${aid}`, { method: 'POST', headers: auth(lead.token), body: JSON.stringify({ decision: 'reject', note: 'ei nyt' }) });
+    assert(no.status === 200, `reject ${no.status}`);
+    const after = await json('/v1/messages', { method: 'POST', headers: auth(leadAgent.token), body: msg });
+    assert(after.status === 403 && after.body.error?.code === 'TEAM_APPROVAL_DECLINED', `declined ${after.status} ${JSON.stringify(after.body.error)}`);
+    const forged = await json(`/v1/organisms/${teamId}/approvals`, { method: 'POST', headers: auth(leadAgent.token), body: JSON.stringify({ action: 'team:delete', arguments: { fingerprint: 'x' } }) });
+    assert(forged.status === 400, `filed by hand: ${forged.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
