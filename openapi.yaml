@@ -843,7 +843,7 @@ components:
       properties:
         area:
           type: string
-          description: "What the grant targets: memory | storage | knowledge | organisms."
+          description: "What the grant targets: organisms | storage | knowledge. A request may name memory; the node accepts it and does not store or show it, because an app's own namespace needs no grant."
         pattern:
           type: string
           description: Key prefix / bucket / topic / workspace-id pattern (e.g. "support.*").
@@ -9073,7 +9073,7 @@ paths:
                 data_areas:
                   type: array
                   items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
-                  description: Requested data-area allowlist (stored at approval; enforcement is a later chunk).
+                  description: Requested data-area allowlist. An `organisms` area is what the owner approves and the node enforces on organism keys. A `memory` area is accepted and left out of what is stored and shown, since the app's own namespace needs no grant and no other memory is reachable.
                 bound_ref: { type: string, description: Opaque ecosystem-side account reference (never interpreted by AIMEAT). }
                 proof:
                   type: object
@@ -9173,6 +9173,7 @@ paths:
                 data_areas:
                   type: array
                   items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
+                  description: The areas the owner approves; without it, the areas the app asked for. A `memory` area is left out either way.
       responses:
         '200':
           description: Approved (returns geai, existing_app and held_back_scopes) or denied.

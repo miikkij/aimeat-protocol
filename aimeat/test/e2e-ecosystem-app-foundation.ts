@@ -7,6 +7,10 @@
  *   poll-before-approval). Also unit-asserts the gaii.ts GEAI/GAII discrimination. Additive: the
  *   agent path is unaffected (regression covered by e2e-agent-onboarding).
  * @version-history
+ *   2026-11-15 — Phase 10: a hello declaring a memory area and an organism area shows and stores only
+ *     the organism area, and the app still writes and reads its own namespace (audit 2026-11 L045).
+ *     Phase 9's ticked area is an organism area: the memory area it ticked is no longer shown, a
+ *     behaviour change the developer approved on 2026-11-15.
  *   2026-10-25 — Phase 9: the Outside apps row's approval sends the data areas left ticked, and an
  *     unticked organisms-wide area is not granted (secaudit2026oct22, lead 2378, the portal part).
  *   2026-10-25 — owner_scope on PUT and restore stays inside the ecosystem app's own namespace, and a
@@ -766,9 +770,11 @@ await test('A same-key reconnect signed by the pinned key reads as proven and ke
 console.log('\nPhase 9 — The Outside apps row lists the data areas, and its approval sends the ticked ones');
 
 await test('An organisms-wide area the owner unticks on the row is not granted; the ticked one is', async () => {
+  // The ticked area was a memory one until 2026-11-15, when memory areas stopped being shown or
+  // stored (audit 2026-11 L045, Phase 10); a narrower organism area takes its place.
   const asked = [
     { area: 'organisms', pattern: '*', rights: ['read'] },
-    { area: 'memory', pattern: 'service.areadesk.*', rights: ['read', 'write'] },
+    { area: 'organisms', pattern: 'org-areadesk-team', rights: ['read', 'write'] },
   ];
   const hello = await json('/v1/ecosystem-apps/hello', {
     method: 'POST',
@@ -789,9 +795,52 @@ await test('An organisms-wide area the owner unticks on the row is not granted; 
   assert(ok.status === 200, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
   const apps = (await json('/v1/ecosystem-apps', { headers: { Authorization: `Bearer ${ownerToken}` } })).body.data.ecosystem_apps as any[];
   const rec = apps.find(a => String(a.geai).startsWith('eco:areadesk#'));
-  const areas = (rec?.data_areas ?? []) as Array<{ area: string }>;
-  assert(!areas.some(a => a.area === 'organisms'), `the unticked organisms area was granted: ${JSON.stringify(areas)}`);
-  assert(areas.some(a => a.area === 'memory'), `the ticked memory area is missing: ${JSON.stringify(areas)}`);
+  const areas = (rec?.data_areas ?? []) as Array<{ area: string; pattern: string }>;
+  assert(!areas.some(a => a.area === 'organisms' && a.pattern === '*'), `the unticked organisms area was granted: ${JSON.stringify(areas)}`);
+  assert(areas.some(a => a.area === 'organisms' && a.pattern === 'org-areadesk-team'), `the ticked organism area is missing: ${JSON.stringify(areas)}`);
+});
+
+// ─── Phase 10: a memory area is not something the owner approves (audit 2026-11 L045) ───
+console.log('\nPhase 10 — A memory area is accepted, and neither shown nor stored as approved');
+
+await test('A hello declaring a memory area and an organism area: the approval shows and stores only the organism area, and the app still writes its own namespace', async () => {
+  // A GEAI writes its own namespace with no grant and reaches no other memory, so a memory area
+  // limits nothing; the approval presented it as a limit (audit 2026-11 L045).
+  const memoryArea = { area: 'memory', pattern: 'service.memdesk.*', rights: ['read', 'write'] };
+  const organismArea = { area: 'organisms', pattern: 'org-memdesk-team', rights: ['read'] };
+  const hello = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({ owner: ownerName, app: 'memdesk', display_name: 'Memdesk', public_key: APP_PUBKEY, scopes: ['memory:read', 'memory:write', 'organism:read'], data_areas: [memoryArea, organismArea] }),
+  });
+  assert(hello.status === 200 && hello.body.ok === true, `a hello with a memory area is accepted: ${hello.status} ${JSON.stringify(hello.body.error)}`);
+  const list = await json('/v1/ecosystem-apps/pending', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const row = (list.body.data.requests as any[]).find(r => r.user_code === hello.body.data.user_code);
+  const shown = (row?.requested_data_areas ?? []) as Array<{ area: string; pattern: string }>;
+  assert(shown.length === 1 && shown[0].area === 'organisms' && shown[0].pattern === organismArea.pattern,
+    `the approval shows only the organism area: ${JSON.stringify(shown)}`);
+
+  // The owner's body names the memory area too, as an older portal or an AI may send it: still not stored.
+  const ok = await json(`/v1/ecosystem-apps/${row.user_code}/approve`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write', 'organism:read'], data_areas: [memoryArea, organismArea] }),
+  });
+  assert(ok.status === 200, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+  const apps = (await json('/v1/ecosystem-apps', { headers: { Authorization: `Bearer ${ownerToken}` } })).body.data.ecosystem_apps as any[];
+  const rec = apps.find(a => String(a.geai).startsWith('eco:memdesk#'));
+  const areas = (rec?.data_areas ?? []) as Array<{ area: string; pattern: string }>;
+  assert(areas.length === 1 && areas[0].area === 'organisms' && areas[0].pattern === organismArea.pattern,
+    `only the organism area is stored as approved: ${JSON.stringify(areas)}`);
+
+  const token = await json('/v1/ecosystem-apps/token', { method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: GRANT }) });
+  const memdeskToken = token.body.access_token as string;
+  assert(token.status === 200 && typeof memdeskToken === 'string', `token: ${token.status} ${JSON.stringify(token.body)}`);
+  const write = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${memdeskToken}` },
+    body: JSON.stringify({ key: 'service.memdesk.note', value: { kept: true }, visibility: 'private' }),
+  });
+  assert(write.status === 201, `the app writes a new key in its own namespace with no memory area: ${write.status} ${JSON.stringify(write.body.error)}`);
+  const read = await json(`/v1/memory/${encodeURIComponent('service.memdesk.note')}`, { headers: { Authorization: `Bearer ${memdeskToken}` } });
+  assert(read.status === 200 && read.body.data.value?.kept === true, `and reads it back: ${read.status} ${JSON.stringify(read.body.error)}`);
 });
 
 // ─── Summary ───

@@ -22,6 +22,10 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   2026-11-15 — A `memory` data area is accepted at hello and approve and left out of what is stored
+ *     and shown: GET /pending, the approved binding and GET /v1/ecosystem-apps carry organism areas
+ *     and any other area, never a memory one, since a GEAI's own namespace needs no grant and no gate
+ *     reads a memory area (approvableDataAreas; audit 2026-11 L045).
  *   v1.13.0 — 2026-11-08 — A word outside every wildcard is granted only when the owner names it:
  *     GET /pending names them (`own_tick_scopes`), an approval without `scopes` grants the request
  *     without them unless the app already held them, and names the rest (`held_back_scopes`)
@@ -99,6 +103,7 @@ import { presentMemories } from '../services/classification/present-memory.js';
 import { ecoHelloProofVerifies, markReturnProven, returnProven } from '../services/device-return-proof.js';
 import { reconnectView } from './ecosystem-apps-reconnect.js';
 import { approvalScopes, ownTickWords } from '../services/ecosystem/own-tick-scopes.js';
+import { approvableDataAreas } from '../services/ecosystem-access.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -193,7 +198,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
       status: 'pending',
       publicKey: public_key,
       scopes: Array.isArray(scopes) ? scopes : undefined,
-      dataAreas: Array.isArray(data_areas) ? (data_areas as EcoDataAreaGrant[]) : undefined,
+      // A `memory` area is accepted and not kept: no gate reads one (approvableDataAreas, L045).
+      dataAreas: Array.isArray(data_areas) ? approvableDataAreas(data_areas as EcoDataAreaGrant[]) : undefined,
       boundRef: bound_ref,
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
@@ -333,7 +339,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
         requested_scopes: r.scopes ?? config.defaultEcoScopes,
         // The requested words outside every wildcard: the owner ticks each one (older item O5).
         own_tick_scopes: ownTickWords(r.scopes ?? config.defaultEcoScopes),
-        requested_data_areas: r.dataAreas ?? [],
+        // A row stored before 2026-11-15 can still hold a `memory` area; it is not shown (L045).
+        requested_data_areas: approvableDataAreas(r.dataAreas ?? []),
         status: r.status,
         // Static-validation outcome: 'validated' | 'failed' | 'none' (no manifest submitted).
         validation: r.validationResult ? (r.validationResult.ok ? 'validated' : 'failed') : 'none',
@@ -392,9 +399,10 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     const existing = await storage.getEcosystemAppByOwnerAndApp(request.ownerName, request.app);
     const { scopes: finalScopes, heldBack } = approvalScopes(Array.isArray(scopes) ? scopes : undefined,
       request.scopes ?? config.defaultEcoScopes, existing?.scopes);
-    const finalAreas: EcoDataAreaGrant[] = Array.isArray(data_areas)
+    // Never a `memory` area: the node enforces none, so none is stored as approved (L045).
+    const finalAreas: EcoDataAreaGrant[] = approvableDataAreas(Array.isArray(data_areas)
       ? (data_areas as EcoDataAreaGrant[])
-      : (request.dataAreas ?? []);
+      : (request.dataAreas ?? []));
 
     const invalid = scopesWithinCeiling(finalScopes, config.maxEcoScopes);
     if (invalid.length > 0) {
@@ -515,7 +523,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
         display_name: a.displayName,
         description: a.description,
         scopes: a.scopes,
-        data_areas: a.dataAreas ?? [],
+        // An app approved before 2026-11-15 can still hold a `memory` area; it is not shown (L045).
+        data_areas: approvableDataAreas(a.dataAreas ?? []),
         status: a.status,
         public_key: a.publicKey,
         capabilities: a.capabilities ?? [],

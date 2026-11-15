@@ -12,10 +12,13 @@
  *   without this READ gate an owner-selected read-allowlist (EcoDataAreaGrant.rights = ['read']) is
  *   captured at approval but never enforced — model A (strict): reads require a matching read grant.
  * @structure
+ *   - approvableDataAreas(areas)          — the areas an approval shows and stores (no `memory` area)
  *   - ecoMayWriteKey(storage, geai, key) — write gate (area grant with 'write')
  *   - ecoMayReadKey(storage, geai, key)  — read gate (area grant with 'read')
  * @usage import { ecoMayReadKey, ecoMayWriteKey } from '../services/ecosystem-access.js';
  * @version-history
+ *   2026-11-15 — approvableDataAreas: the `memory` area is left out of what the approval shows and
+ *     stores, since no gate reads it; a request that carries one is accepted (audit 2026-11 L045).
  *   v1.0.0 — 2026-06-14 — Created for ecosystem capability & data-access (chunk 3).
  *   v1.1.0 — 2026-07-02 — Add ecoMayReadKey (model A / strict): organism reads now require a matching
  *     'read' data-area grant, mirroring the write gate. Closes the inert read-allowlist hole.
@@ -23,6 +26,18 @@
 import type { Storage } from '../storage/interface.js';
 import type { EcoDataAreaGrant } from '../storage/interface.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
+
+/**
+ * The data areas the owner approves, from what an app asked for or the owner sent: every area except
+ * `memory`. A GEAI writes and reads its own namespace with no grant (the gates below return true for
+ * a flat key) and reaches no other memory, so the node enforces no memory area; showing one on the
+ * approval presented a limit that does not exist (audit 2026-11 L045). A hello and an approval that
+ * carry one are accepted, since published apps send it, and the area is left out of what is shown and
+ * stored. Every other area passes unchanged.
+ */
+export function approvableDataAreas(areas: EcoDataAreaGrant[]): EcoDataAreaGrant[] {
+  return areas.filter(a => (a as { area?: unknown } | null)?.area !== 'memory');
+}
 
 /**
  * Does any of the GEAI's `organisms`/`organism` data-area grants cover `key` with `right`? The grant
