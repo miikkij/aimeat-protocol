@@ -192,3 +192,24 @@ describe('PUT /v1/datapackages/{owner}/{name}/exchange (portal dataproducts.js s
         await refused('PUT', path, [{ ...terms, toll_morsels: 101 }]);
     });
 });
+
+describe('PUT /v1/admin/internet-openers/{owner} (portal internet-opening.js setInternetOpener)', () => {
+    // The admin tab's end date is a type="date" input, so until arrives as YYYY-MM-DD.
+    // services/internet-opening/opening-service.ts takes any date the clock can read that lies in the
+    // future, and null or '' for no end.
+    const path = '/v1/admin/internet-openers/bob';
+
+    it('takes until as a calendar date, a timestamp, null or empty', async () => {
+        await taken('PUT', path, [
+            { reason: 'runs the workshop', until: '2099-12-31' },
+            { reason: 'runs the workshop', until: '2099-12-31T12:00:00.000Z' },
+            { reason: 'runs the workshop', until: null },
+            { reason: 'runs the workshop', until: '' },
+            { reason: 'runs the workshop' },
+        ]);
+    });
+
+    it('still refuses a body without a reason', async () => {
+        await refused('PUT', path, [{ until: '2099-12-31' }]);
+    });
+});

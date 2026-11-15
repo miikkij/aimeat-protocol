@@ -40597,7 +40597,11 @@ paths:
               required: [reason]
               properties:
                 reason: { type: string }
-                until: { type: string, format: date-time }
+                until:
+                  type: [string, 'null']
+                  description: >-
+                    When the trust ends: a date (`2026-12-31`) or a timestamp, in the future (400
+                    INVALID_INPUT otherwise). Null, empty or absent: no end.
       responses:
         '200': { description: The owners who open without asking }
         '404': { description: No such account }
