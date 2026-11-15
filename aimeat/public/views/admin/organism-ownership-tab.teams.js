@@ -11,6 +11,7 @@
  * @structure useAdminTeams() · AdminTeams({ view, num })
  * @usage imported by organism-ownership-tab.js
  * @version-history
+ *   v1.1.0 — 2026-11-15 — How many members went through the team's AI onboarding (T11).
  *   v1.0.0 — 2026-11-15 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T16).
  */
 import { h } from 'preact';
@@ -63,6 +64,7 @@ export function AdminTeams({ view, num }) {
               <${Mark} tone=${r.members > 0 && r.ai_connected < r.members ? 'attention' : 'fine'}>${T('ai', { n: r.ai_connected, of: r.members })}<//>
               ${r.temporary ? html`<${Mark}>${T('temporary', { n: r.temporary })}<//>` : null}
               ${r.ends_on ? html`<${Mark}>${T('ends', { date: fmtDate(r.ends_on) })}<//>` : null}
+              <${Mark} tone=${r.members > 0 && (r.ai_onboarding ?? 0) < r.members ? 'attention' : 'fine'}>${T('onboarded', { n: r.ai_onboarding ?? 0, of: r.members })}<//>
               <${Note} kind="meta" inline>${T('week', { decided: r.week.decided, open: r.week.open, waiting: r.week.waiting })}<//>
             <//>
             <${Num}>${r.members}<//>

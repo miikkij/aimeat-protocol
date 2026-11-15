@@ -16,6 +16,7 @@
  * @structure TeamStatus · teamStatusFor · listTeamsOf
  * @usage const teams = await teamStatusFor(storage, config, ownerName, locale, orgId);
  * @version-history
+ *   v1.5.0 — 2026-11-15 — `ai_onboarding`: who went through the team's AI onboarding (T11).
  *   v1.4.0 — 2026-11-15 — `approval_gate` (T7).
  *   v1.3.0 — 2026-11-14 — `week`: this week's decisions, open matters and what waits, as counts (T15).
  *   v1.2.0 — 2026-11-14 — `team_type`.
@@ -29,6 +30,7 @@ import { readTeamRecord, teamContextKey, teamDisplayName, teamGateOn, type TeamR
 import { memoryTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
 import { teamWeekRecords } from './weekly-report.js';
+import { readTeamLiteracy, literacySummary, teamSkillVersion } from './onboarding.js';
 
 export const MAX_TEAMS_LISTED = 50;
 
@@ -63,6 +65,11 @@ export interface TeamStatus {
     week: { decided: number; open: number; waiting: number };
     /** On: an AI's delete in the team, and a send or payment by an agent working for it, waits for a lead (T7). */
     approval_gate: boolean;
+    /**
+     * The team's AI onboarding (T11, onboarding.ts): how many members confirmed they went through it,
+     * how many of them the current version of the guide, and when you did. A lead also sees who.
+     */
+    ai_onboarding: { done: number; current: number; of: number; you: string | null; who?: { account: string; at: string; skill_version: string | null }[] };
 }
 
 /** The organisms the owner is an active member of that are teams, newest membership first. */
@@ -92,7 +99,7 @@ async function contextOf(storage: Storage, reader: ContentReader, orgId: string,
     return { key, summary: typeof v.summary === 'string' ? v.summary : '', core: typeof v.core === 'string' ? v.core : '', updated_at: rec.updatedAt ?? null };
 }
 
-async function statusOf(storage: Storage, reader: ContentReader, organism: OrganismRecord, team: TeamRecord, caller: string, locale: string | null): Promise<TeamStatus> {
+async function statusOf(storage: Storage, config: AimeatConfig, reader: ContentReader, organism: OrganismRecord, team: TeamRecord, caller: string, locale: string | null): Promise<TeamStatus> {
     const memberships = (await storage.listMembers(organism.id)).filter(m => m.status === 'active');
     const accounts = memberships.map(m => m.ghii);
     const agentsBy = accounts.length ? await storage.getAgentsByOwners(accounts) : {};
@@ -104,6 +111,7 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
     }).sort((a, b) => Number(b.lead) - Number(a.lead) || a.account.localeCompare(b.account));
     const youLead = isOrganismOwner(organism, caller);
     const counts = await teamWeekRecords(storage, organism.id, team, Date.now());
+    const literacy = literacySummary(await readTeamLiteracy(storage, organism.id), accounts, await teamSkillVersion({ storage, config }, team.skill?.ref ?? null, caller));
     const status: TeamStatus = {
         organism_id: organism.id,
         name: teamDisplayName(team, locale, organism.name),
@@ -117,8 +125,11 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
         depends_on: team.dependsOn ?? [],
         week: { decided: counts.decided.length, open: counts.open, waiting: counts.waiting },
         approval_gate: teamGateOn(team),
+        ai_onboarding: { done: literacy.done, current: literacy.current, of: literacy.of, you: literacy.latest.get(caller)?.at ?? null },
     };
     if (youLead) {
+        status.ai_onboarding.who = [...literacy.latest.values()].filter(e => accounts.includes(e.account))
+            .map(e => ({ account: e.account, at: e.at, skill_version: e.skill_version }));
         status.member_until = Object.fromEntries(Object.entries(team.until ?? {}).map(([k, v]) => [k.replace(/^account:/, ''), v]));
         const pendingLead = new Set(team.leadsPending.map(p => p.invitation));
         const byEmail = (await storage.listInvitationsByOrganism(organism.id, { status: 'pending' }))
@@ -134,15 +145,15 @@ async function statusOf(storage: Storage, reader: ContentReader, organism: Organ
  * The caller's teams, or the one named. Answers null when the named organism is not a team the
  * caller is an active member of, which the doors report as NOT_FOUND.
  */
-export async function teamStatusFor(storage: Storage, _config: AimeatConfig, reader: ContentReader, owner: string, locale: string | null, orgId?: string | null): Promise<TeamStatus[] | null> {
+export async function teamStatusFor(storage: Storage, config: AimeatConfig, reader: ContentReader, owner: string, locale: string | null, orgId?: string | null): Promise<TeamStatus[] | null> {
     if (orgId) {
         const membership = await storage.getMembership(orgId, owner);
         const organism = membership?.status === 'active' ? await storage.getOrganism(orgId) : null;
         const team = organism && !organism.archived ? await readTeamRecord(storage, orgId) : null;
-        return organism && team ? [await statusOf(storage, reader, organism, team, owner, locale)] : null;
+        return organism && team ? [await statusOf(storage, config, reader, organism, team, owner, locale)] : null;
     }
     const teams = await listTeamsOf(storage, owner);
     const out: TeamStatus[] = [];
-    for (const { organism, team } of teams) out.push(await statusOf(storage, reader, organism, team, owner, locale));
+    for (const { organism, team } of teams) out.push(await statusOf(storage, config, reader, organism, team, owner, locale));
     return out;
 }

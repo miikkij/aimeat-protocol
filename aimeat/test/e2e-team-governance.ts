@@ -307,5 +307,38 @@ await test('t19 refusals: an outsider\'s export, an agent without organism:write
     assert(imp.status === 403, `without organism:write ${imp.status}`);
 });
 
+// ── T11: the team's AI onboarding, recorded (EU AI Act art. 4) ──
+await test('t20 the team skill carries the onboarding section; status says the member has not done it', async () => {
+    const st = await json(`/v1/teams/status?organism_id=${teamId}`, { headers: auth(member.token) });
+    const team = st.body.data.teams[0];
+    assert(team.ai_onboarding.you === null && team.ai_onboarding.done === 0 && team.ai_onboarding.of === 2, `before: ${JSON.stringify(team.ai_onboarding)}`);
+    assert(team.ai_onboarding.who === undefined, 'a member sees no list of who');
+    const [skillOwner, skillName] = String(team.skill).replace(/^user:/, '').split('/');
+    const sk = await json(`/v1/skills/${encodeURIComponent(skillName)}?scope=user&owner=${encodeURIComponent(skillOwner)}&body_only=true`, { headers: auth(member.token) });
+    assert(JSON.stringify(sk.body).includes('aimeat_team_onboarding_done'), `the skill names the tool: ${sk.status}`);
+});
+
+await test('t21 the member\'s AI records it once; the lead sees who; the operator sees the count', async () => {
+    const agent = await makeAgent(BASE, member, ['organism:read', 'organism:write']);
+    const ai = await openSession(BASE, agent.token, 'team-onboard-ai');
+    const r = await callTool(ai, 'aimeat_team_onboarding_done', { organism_id: teamId });
+    assert(!r.isError && r.data.entry.account === member.name && r.data.entry.via === 'ai' && r.data.already === false, `record: ${r.text.slice(0, 200)}`);
+    const again = await json(`/v1/teams/${teamId}/onboarding`, { method: 'POST', headers: auth(member.token), body: '{}' });
+    assert(again.status === 200 && again.body.data.already === true, `again: ${again.status}`);
+    const lead_ = await json(`/v1/teams/status?organism_id=${teamId}`, { headers: auth(lead.token) });
+    const ob = lead_.body.data.teams[0].ai_onboarding;
+    assert(ob.done === 1 && ob.who.some((w: any) => w.account === member.name), `lead view: ${JSON.stringify(ob)}`);
+    const admin = await json('/v1/admin/teams', { headers: auth(operator.token) });
+    assert(admin.body.data.teams.find((t: any) => t.organism_id === teamId)?.ai_onboarding === 1, 'operator count');
+});
+
+await test('t22 refusals: an outsider cannot record it, an agent without organism:write cannot', async () => {
+    const out = await json(`/v1/teams/${teamId}/onboarding`, { method: 'POST', headers: auth(operator.token), body: '{}' });
+    assert(out.status === 404, `outsider ${out.status}`);
+    const reader = await makeAgent(BASE, member, ['organism:read']);
+    const ro = await json(`/v1/teams/${teamId}/onboarding`, { method: 'POST', headers: auth(reader.token), body: '{}' });
+    assert(ro.status === 403, `read-only agent ${ro.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed ? 1 : 0);

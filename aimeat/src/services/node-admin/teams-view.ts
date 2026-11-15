@@ -13,6 +13,7 @@
  * @structure AdminTeamRow · nodeTeamsView(storage, opts) → { teams, count, complete }
  * @usage const view = await nodeTeamsView(storage, { now: Date.now() });
  * @version-history
+ *   v1.1.0 — 2026-11-15 — `ai_onboarding`: how many members went through the team's AI onboarding (T11).
  *   v1.0.0 — 2026-11-15 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T16).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -20,6 +21,7 @@ import { organismOwners } from '../organism-ownership.js';
 import { readTeamRecord, teamDisplayName, TEAM_ORGANISM_TYPES } from '../team/record.js';
 import { teamWeekRecords } from '../team/weekly-report.js';
 import { structureKey } from '../structure-snapshot.js';
+import { readTeamLiteracy, literacySummary } from '../team/onboarding.js';
 
 /** How many organisms one read looks through for teams; `complete` says whether it saw them all. */
 export const ADMIN_TEAMS_SCAN = 1000;
@@ -39,6 +41,8 @@ export interface AdminTeamRow {
     last_change: string | null;
     ends_on: string | null;
     week: { decided: number; open: number; waiting: number };
+    /** Members who confirmed they went through the team's AI onboarding (EU AI Act art. 4; team/onboarding.ts). */
+    ai_onboarding: number;
     created_at: string;
 }
 
@@ -57,6 +61,7 @@ export async function nodeTeamsView(storage: Storage, opts: { now: number; local
         const lastChange = structure.items.filter(r => r.key === structureKey(organism.id))
             .map(r => r.updatedAt ?? null).filter((v): v is string => !!v).sort().pop() ?? null;
         const week = await teamWeekRecords(storage, organism.id, team, opts.now);
+        const literacy = literacySummary(await readTeamLiteracy(storage, organism.id), accounts, null);
         teams.push({
             organism_id: organism.id,
             name: teamDisplayName(team, opts.locale ?? null, organism.name),
@@ -68,6 +73,7 @@ export async function nodeTeamsView(storage: Storage, opts: { now: number; local
             last_change: lastChange,
             ends_on: team.endsOn ?? null,
             week: { decided: week.decided.length, open: week.open, waiting: week.waiting },
+            ai_onboarding: literacy.done,
             created_at: organism.createdAt,
         });
     }

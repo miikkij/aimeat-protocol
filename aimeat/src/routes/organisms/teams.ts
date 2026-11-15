@@ -17,9 +17,12 @@
  *   POST /v1/teams/:id/decisions/:decision/share — a copy of one decision into the Decisions of the
  *                              named teams the caller is in, or its withdrawal; a dry run unless
  *                              `dry_run: false` (T19). organism:write.
+ *   POST /v1/teams/:id/onboarding — the caller confirms they went through the team's AI onboarding;
+ *                              the team's record of it (EU AI Act art. 4, T11). organism:write.
  * @structure teamsRouter
  * @usage app.use(teamsRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-11-15 — /v1/teams/:id/onboarding (T11).
  *   v1.2.0 — 2026-11-15 — /v1/teams/:id/decisions/:decision/share (T19).
  *   v1.1.0 — 2026-11-14 — /v1/teams/waiting, /v1/teams/:id/prompt and /v1/teams/:id/paste (T6, T9).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
@@ -33,6 +36,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { validateBody } from '../../models/schemas.js';
 import { TeamSetupBody, TeamPasteBody, TeamDecisionShareBody } from '../../models/write-body-schemas.js';
 import { shareTeamDecision } from '../../services/team/share-decision.js';
+import { recordTeamOnboarding } from '../../services/team/onboarding.js';
 import { teamSetupForCaller, teamStatusForCaller, teamWaitingForCaller } from '../../services/team/for-caller.js';
 import { buildTeamPrompt, importTeamPaste } from '../../services/team/prompt.js';
 
@@ -64,6 +68,12 @@ export function teamsRouter(config: AimeatConfig, storage: Storage): Router {
         });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.status(out.dry_run ? 200 : 201).json(success(config.nodeId, { dry_run: out.dry_run, decision: out.decision, targets: out.targets }));
+    });
+
+    router.post('/v1/teams/:id/onboarding', requireAuth(), requireScope('organism:write'), async (req, res) => {
+        const out = await recordTeamOnboarding({ storage, config }, callerOf(req, config.nodeId, storage), req.params.id as string);
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        res.status(out.already ? 200 : 201).json(success(config.nodeId, { entry: out.entry, already: out.already, team: out.team }));
     });
 
     router.post('/v1/teams/setup', requireAuth(), requireScope('organism:write'), validateBody(TeamSetupBody, config.nodeId), async (req, res) => {

@@ -21,6 +21,7 @@
  *   const made = await applyOrganismShape(deps, orgId, owner, TEAM_KIT, 'fi');
  *   const md = teamSkillMarkdown({ lang: 'fi', skillName, teamName, orgId, ws });
  * @version-history
+ *   v1.3.0 — 2026-11-15 — The team skill ends with the AI onboarding section (T11, EU AI Act art. 4).
  *   v1.2.0 — 2026-11-15 — A decision may carry where it was shared from, and a record may withdraw a share (T19).
  *   v1.1.0 — 2026-11-14 — TEAM_TYPES, teamTypeOf, teamKitFor and the type line in the team skill (T18).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T1, T5, T24).
@@ -273,9 +274,35 @@ Un miembro no cambia esta skill directamente. Pon la propuesta en Pendiente de t
 };
 
 /** The team skill's SKILL.md in the team's working language. */
+/**
+ * The onboarding section every team skill ends with (team setup T11, EU AI Act article 4): the
+ * member's AI goes through how the team uses AI with the person, and records it only on their word
+ * (services/team/onboarding.ts).
+ */
+const ONBOARDING_TEXT: Record<TeamLang, (orgId: string) => string> = {
+    fi: orgId => `\n## Perehdytys tekoälyn käyttöön tässä tiimissä\n\nKun `
+        + `aimeat_team_status kertoo kohdassa \`ai_onboarding.you\`, ettei ihminen ole vielä käynyt perehdytystä, tarjoa sitä kerran. `
+        + `Käy hänen kanssaan läpi tämän ohjeen kohdat: mihin tiimi käyttää tekoälyä, mitä tekoäly tekee itse ja mikä odottaa ihmistä (lähetys, maksu ja poisto odottavat vetäjän hyväksyntää), `
+        + `mitä muut tiimissä näkevät ja mistä ihminen itse vastaa: hän tarkistaa tekoälyn tuottaman tekstin ennen kuin se lähtee eteenpäin. `
+        + `Kysy lopuksi, ymmärsikö hän nämä. Kun hän sanoo kyllä omin sanoin, kutsu aimeat_team_onboarding_done { organism_id: "${orgId}" }. `
+        + `Älä kutsu sitä ilman hänen vastaustaan. Kirjaus on organisaation todiste siitä, että se on huolehtinut tekoälyn käyttäjien osaamisesta (EU:n tekoälyasetus, artikla 4).\n`,
+    en: orgId => `\n## Onboarding to how this team uses AI\n\nWhen `
+        + `aimeat_team_status says under \`ai_onboarding.you\` that the person has not gone through it yet, offer it once. `
+        + `Go through these points of this guide with them: what the team uses AI for, what the AI does on its own and what waits for a person (a send, a payment and a delete wait for a lead's approval), `
+        + `what the others in the team see, and what the person answers for: they check text the AI produced before it goes on. `
+        + `Then ask whether they understood these. When they say yes in their own words, call aimeat_team_onboarding_done { organism_id: "${orgId}" }. `
+        + `Never call it without their answer. The record is the organisation's evidence that it saw to the AI literacy of the people who use AI (EU AI Act, article 4).\n`,
+    es: orgId => `\n## Introducción al uso de la IA en este equipo\n\nCuando `
+        + `aimeat_team_status indique en \`ai_onboarding.you\` que la persona aún no la ha hecho, ofrécesela una vez. `
+        + `Repasa con ella estos puntos de esta guía: para qué usa el equipo la IA, qué hace la IA por su cuenta y qué espera a una persona (un envío, un pago y un borrado esperan la aprobación de un responsable), `
+        + `qué ven los demás del equipo y de qué responde la persona: revisa el texto que la IA produjo antes de que siga adelante. `
+        + `Después pregúntale si lo ha entendido. Cuando diga que sí con sus propias palabras, llama a aimeat_team_onboarding_done { organism_id: "${orgId}" }. `
+        + `No la llames nunca sin su respuesta. El registro es la prueba de la organización de que se ocupó de la alfabetización en IA de quienes la usan (Reglamento de IA de la UE, artículo 4).\n`,
+};
+
 export function teamSkillMarkdown(a: SkillArgs): string {
     const { description, body } = SKILL_TEXT[a.lang](a);
     const fm = `---\nname: ${a.skillName}\ndescription: ${JSON.stringify(description)}\nlicense: MIT\nmetadata:\n  audience: agent\n---\n\n`;
     const heading = { fi: 'Tämän tiimin työ', en: 'This team\'s work', es: 'El trabajo de este equipo' }[a.lang];
-    return fm + body + (a.typeLine ? `\n## ${heading}\n\n${a.typeLine}\n` : '');
+    return fm + body + (a.typeLine ? `\n## ${heading}\n\n${a.typeLine}\n` : '') + ONBOARDING_TEXT[a.lang](a.orgId);
 }

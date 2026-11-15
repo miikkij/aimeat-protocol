@@ -14,6 +14,7 @@
  * @structure useTeam · PromptPath · TeamSections
  * @usage const team = useTeam(org); … ${team ? html`<${TeamSections} team=${team} me=${owner} num=${num} />` : null}
  * @version-history
+ *   v1.1.0 — 2026-11-15 — "You in this team" says whether you went through the team's AI onboarding (T11).
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T14, T15).
  */
 import { h } from 'preact';
@@ -139,6 +140,7 @@ export function TeamSections({ team, me, num }) {
       <${LineList} rows=${[
         { id: 'ai', name: agent ? agent.name : x('aiNone'), text: agent ? x('aiText', { date: when(agent.last_seen) }) : x('aiNoneText'), href: '/v1/profile?tab=agents' },
         { id: 'access', name: x('accessName'), text: x('accessText'), href: orgHref(ws.shared) },
+        { id: 'onboard', name: x('onboardName'), text: status.ai_onboarding?.you ? x('onboardDone', { date: when(status.ai_onboarding.you) }) : x('onboardTodo'), href: '/v1/profile?tab=skills' },
       ]} />
       <${Note}>${x('seenText')}<//>
       <${Note}>${x('unseenText')}<//>

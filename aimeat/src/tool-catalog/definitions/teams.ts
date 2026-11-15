@@ -10,6 +10,7 @@
  * @structure teamTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.2.0 — 2026-11-15 — aimeat_team_onboarding_done (T11), over POST /v1/teams/:id/onboarding.
  *   v1.1.0 — 2026-11-15 — aimeat_team_decision_share (T19), over POST /v1/teams/:id/decisions/:decision/share.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
  */
@@ -57,6 +58,18 @@ export const teamTools = [
             to: { type: 'array', required: true, description: 'The organism_id of each team to share it with, at most 20.', zod: TeamDecisionShareBody.shape.to },
             withdraw: { type: 'boolean', description: 'True withdraws an earlier share from those teams.' },
             dry_run: { type: 'boolean', description: 'True (the default) shows what would be written and writes nothing.' },
+        },
+    },
+    {
+        name: 'aimeat_team_onboarding_done',
+        description: 'Record that the person went through the team\'s AI onboarding: the team skill\'s section on how this team uses AI, which you went through with them. Call it only after they said they understood it, in their own words; never on their behalf without asking. The node keeps who, which version of the team guide and when, as the organisation\'s record of AI literacy (EU AI Act article 4). Calling it again for the same version records nothing new. aimeat_team_status says under `ai_onboarding` whether the person has done it.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Team AI Onboarding Done', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'organism:write',
+        surfaces: ['agent', 'service'],
+        input: {
+            organism_id: { type: 'string', required: true, description: 'The team.' },
         },
     },
     {

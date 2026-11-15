@@ -8,6 +8,7 @@
  * @structure teamCliTools[] — the handler table, spread by index.ts
  * @usage import { teamCliTools } from './tool-call-defs-teams.js';
  * @version-history
+ *   v1.3.0 — 2026-11-15 — aimeat_team_onboarding_done → POST /v1/teams/:id/onboarding.
  *   v1.2.0 — 2026-11-15 — aimeat_team_decision_share → POST /v1/teams/:id/decisions/:decision/share.
  *   v1.1.0 — 2026-11-14 — aimeat_team_waiting → GET /v1/teams/waiting.
  *   v1.0.0 — 2026-11-14 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n).
@@ -39,6 +40,11 @@ export const teamCliTools: ConnectCliToolDefinition[] = [
             const dryRun = optionalBoolean(input, 'dry_run'); if (dryRun !== undefined) body.dry_run = dryRun;
             return client.post(`/v1/teams/${encodeURIComponent(String(input.organism_id ?? ''))}/decisions/${encodeURIComponent(String(input.decision ?? ''))}/share`, body);
         },
+    },
+    {
+        // → POST /v1/teams/:id/onboarding
+        name: 'aimeat_team_onboarding_done',
+        handler: ({ client }, input) => client.post(`/v1/teams/${encodeURIComponent(String(input.organism_id ?? ''))}/onboarding`, {}),
     },
     {
         // → GET /v1/teams/status

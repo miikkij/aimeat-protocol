@@ -59904,6 +59904,29 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/teams/{id}/onboarding:
+    post:
+      x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.3.1' }
+      operationId: teamOnboardingDone
+      summary: Record that the caller went through the team's AI onboarding
+      description: >-
+        The caller confirms they went through the team's AI onboarding (the team skill's section on
+        how the team uses AI). The team keeps who, which version of the team skill and when, and
+        whether the person or their own AI recorded it: the organisation's record of AI literacy
+        under EU AI Act article 4. 201 for a new entry; 200 when this version was recorded already.
+        A team the caller is not an active member of is NOT_FOUND. The MCP twin is
+        aimeat_team_onboarding_done; aimeat_team_status reads it back under `ai_onboarding`.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/teams/{id}/decisions/{decision}/share:
     post:
       x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.3.1' }
