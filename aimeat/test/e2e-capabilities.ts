@@ -6,6 +6,7 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   2026-11-15 -- Audit M126, M127: a non-operator is refused the admin list and override; a stranger's unvouch keeps another person's vouch.
  *   v1.3.0 -- 2026-11-08 -- Phase 10b and two tests on the second node: the page's hand-added form
  *     with "Visible to agents" ticked publishes the entry, and another account lists, opens and calls
  *     it (the MCP search lists it too); unticked stays a private draft; "Show to agents" publishes a
@@ -840,6 +841,13 @@ await test('A vouch is one row per person: dedup, comment landing, and taking on
     const listed = await json(`/v1/capabilities/${capIdV}`, { headers: { 'Authorization': `Bearer ${vToken}` } });
     assert(listed.body.data.trust.vouchCount === 1, `the trust blob mirrors the rows: ${listed.body.data.trust.vouchCount}`);
 
+    // A third owner who never vouched takes nothing back from somebody else's vouch.
+    const third = (await registerOwner(BASE, 'vtp' + Date.now() % 100000)).token;
+    const stray = await json(`/v1/capabilities/${capIdV}/vouch`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${third}` } });
+    assert(stray.status === 200 && stray.body.data.removed === false, `a stranger's unvouch removed a vouch: ${JSON.stringify(stray.body)}`);
+    const kept = await json(`/v1/capabilities/${capIdV}`, { headers: { 'Authorization': `Bearer ${vToken}` } });
+    assert(kept.body.data.trust.vouchCount === 1, `the voucher's vouch is gone after a stranger's unvouch: ${kept.body.data.trust.vouchCount}`);
+
     const un = await json(`/v1/capabilities/${capIdV}/vouch`, {
         method: 'DELETE', headers: { 'Authorization': `Bearer ${vToken}` },
     });
@@ -979,6 +987,17 @@ await test('Non-operator B DOES still see the operator PUBLIC capability', async
     assert(status === 200, `list status ${status}`);
     const ids = (body.data?.capabilities ?? []).map((c: any) => c.id);
     assert(ids.includes(opPubCap), 'B must still see public caps (not over-restricted)');
+});
+
+await test('Non-operator B is refused the admin list and the override, and the override is unchanged', async () => {
+    const list = await json('/v1/admin/capabilities', { headers: { 'Authorization': `Bearer ${nonOpToken}` } });
+    assert(list.status === 403 && list.body?.error?.code === 'ACCESS_DENIED', `admin list by a non-operator: ${list.status} ${JSON.stringify(list.body?.error)}`);
+    const ov = await json(`/v1/admin/capabilities/${opPrivCap}/override`, {
+        method: 'PUT', headers: { 'Authorization': `Bearer ${nonOpToken}` }, body: JSON.stringify({ disabled: true, notes: 'by B' }),
+    });
+    assert(ov.status === 403 && ov.body?.error?.code === 'ACCESS_DENIED', `override by a non-operator: ${ov.status} ${JSON.stringify(ov.body?.error)}`);
+    const back = await json(`/v1/capabilities/${opPrivCap}`, { headers: { 'Authorization': `Bearer ${ownerToken}` } });
+    assert(back.status === 200 && !back.body.data.operatorOverride?.disabled, `the override changed: ${JSON.stringify(back.body.data?.operatorOverride)}`);
 });
 
 await test('Non-operator B is refused the operator aggregation run', async () => {

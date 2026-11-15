@@ -6,6 +6,7 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-11-15 — Audit M008, L017: test 16 reads the agent's default constraint off a later schedule; 48b refuses both create routes without task:write.
  *   2026-11-15 — Audit L037: test 20 names the other owner in the body, expects exactly 404
  *     AGENT_NOT_FOUND and reads the schedule list back for a stray row.
  *   2026-11-06 — 48: editing and deleting a schedule take the same words, workflow:write or memory:write
@@ -573,6 +574,13 @@ await test('16. Owner sets agent schedule-constraint defaults', async () => {
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.daily_spend_limit === 2, 'daily_spend_limit saved');
+    // The defaults reach a schedule made afterwards with no constraints of its own (read back by GET).
+    const made = await json('/v1/schedules', { method: 'POST', headers: auth1, body: JSON.stringify({ kind: 'agent_task', cron: '0 4 * * *', target_agent: o1.agentName, display_name: 'Inherits defaults', task_template: { title: 'DEFAULTS' } }) });
+    assert(made.status === 201, `create: ${made.status} ${JSON.stringify(made.body?.error)}`);
+    const got = await json(`/v1/schedules/${made.body.data.schedule.id}`, { headers: auth1 });
+    const maxRuns = (got.body.data?.schedule?.constraints ?? []).find((c: any) => c.type === 'max_runs');
+    assert(got.status === 200 && maxRuns?.params?.limit === 5, `the agent's default did not reach the schedule: ${JSON.stringify(got.body.data?.schedule?.constraints)}`);
+    await json(`/v1/schedules/${made.body.data.schedule.id}`, { method: 'DELETE', headers: auth1 });
 });
 
 console.log('\nPhase 9 -- Cross-agent targeting (sibling agent token, no token-borrowing)');
@@ -1279,6 +1287,20 @@ await test('48. Either word manages an agent\'s schedule on both verbs; an agent
     const kept = await json(`/v1/schedules/${id}`, { headers: auth1 });
     assert(kept.status === 200 && kept.body.data.schedule.enabled === true, `the refused agent changed the schedule: ${JSON.stringify(kept.body.data?.schedule?.enabled)}`);
     await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth1 });
+});
+
+await test('48b. An agent without task:write is refused both create routes, and no schedule is made', async () => {
+    // An `ai` schedule, whose own kind word (ai:use) the agent holds, so only the routes' task:write
+    // guard stands between it and a schedule (an agent_task kind would be refused by its kind word too).
+    const tok = await scopedAgent(o1.ownerName, o1.ownerToken, 'notaskwrite', ['workflow:read', 'workflow:write', 'ai:use']);
+    const as = { Authorization: `Bearer ${tok}` };
+    const body = JSON.stringify({ kind: 'ai', cron: '0 2 * * *', display_name: 'NO_TASK_WRITE', prompt: 'Say hello.' });
+    const flat = await json('/v1/schedules', { method: 'POST', headers: as, body });
+    assert(flat.status === 403 && flat.body?.error?.code === 'SCOPE_DENIED', `POST /v1/schedules without task:write: ${flat.status} ${JSON.stringify(flat.body?.error)}`);
+    const byAgent = await json(`/v1/agents/${o1.agentName}/schedules`, { method: 'POST', headers: as, body });
+    assert(byAgent.status === 403 && byAgent.body?.error?.code === 'SCOPE_DENIED', `POST /v1/agents/:name/schedules without task:write: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
+    const list = await json('/v1/schedules', { headers: auth1 });
+    assert(!JSON.stringify(list.body.data).includes('NO_TASK_WRITE'), 'a refused create left a schedule behind');
 });
 
 console.log('\nCleanup');
