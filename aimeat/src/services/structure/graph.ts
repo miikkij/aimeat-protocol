@@ -1,5 +1,5 @@
 /**
- * @file structure-graph.ts
+ * @file src/services/structure/graph.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Deterministic STRUCTURED GRAPH of an organism or a single workspace — the data behind
@@ -13,18 +13,18 @@
  *   - collectOrganismGraph() — organism root → workspaces → spaces (+ members/agents)
  *   - collectWorkspaceGraph() — one workspace root → spaces
  * @usage
- *   import { collectOrganismGraph, collectWorkspaceGraph } from '../services/structure-graph.js';
+ *   import { collectOrganismGraph, collectWorkspaceGraph } from './graph.js';
  *   const graph = await collectOrganismGraph(storage, config, { orgId, viewerGaii });
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: organism + workspace graph for the interactive mindmap (Osa C).
  *   v1.0.1 — 2026-09-26 — bareOwner takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-29 — Both graphs take the caller's classification reader (TARGET-082).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { localAccountName } from '../utils/gaii.js';
-import { collectWorkspaceSummary, listWorkspaces, type WorkspaceSummary } from './structure-overview.js';
-import type { ContentReader } from './classification/reader.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { collectWorkspaceSummary, listWorkspaces, type WorkspaceSummary } from './overview.js';
+import type { ContentReader } from '../classification/reader.js';
 
 export interface SpaceNode {
   name: string;

@@ -20,7 +20,7 @@ import type { Storage } from '../../storage/interface.js';
 import { organismOwners } from '../organism/ownership.js';
 import { readTeamRecord, teamDisplayName, TEAM_ORGANISM_TYPES } from '../team/record.js';
 import { teamWeekRecords } from '../team/weekly-report.js';
-import { structureKey } from '../structure-snapshot.js';
+import { structureKey } from '../structure/snapshot.js';
 import { readTeamLiteracy, literacySummary } from '../team/onboarding.js';
 
 /** How many organisms one read looks through for teams; `complete` says whether it saw them all. */

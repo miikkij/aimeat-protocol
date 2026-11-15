@@ -48,7 +48,7 @@ import { fenceOf } from '../fenced-space.js';
 import type { MemoryRecord } from '../../storage/types/commerce.js';
 import { isValidAgentName } from '../../utils/gaii.js';
 import { resolveAppUrls } from '../app/urls.js';
-import { listWorkspaces } from '../structure-overview.js';
+import { listWorkspaces } from '../structure/overview.js';
 import { listOwnerAppToolNames, type OwnerAppToolName } from '../../commerce/app-tool-catalog.js';
 import { decideWorkspaceRead } from '../workspace/access.js';
 import { isMemoryBackedSpace, type WorkspaceManifest } from '../workspace/meta.js';
@@ -130,7 +130,7 @@ export async function placeNames(
   // a key-IN read would leave out. The maps are filled in organism order, as before.
   const names = await storage.organismNames(orgIds);
   const present = orgIds.filter(id => id in names);
-  // The organism's workspaces as the workspace routes list them (services/structure-overview.ts).
+  // The organism's workspaces as the workspace routes list them (services/structure/overview.ts).
   const lists = await Promise.all(present.map(id => listWorkspaces(storage, id)));
   present.forEach((id, i) => {
     org.set(id, names[id] ?? id);

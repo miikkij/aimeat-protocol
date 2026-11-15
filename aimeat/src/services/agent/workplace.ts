@@ -34,7 +34,7 @@ import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import type { MemoryRecord } from '../../storage/types/commerce.js';
 import { buildGAII, ownerGhiiOf, localAccountName, isValidAgentName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
-import { listWorkspaces } from '../structure-overview.js';
+import { listWorkspaces } from '../structure/overview.js';
 import {
   readWorkplace, workplaceKey, WORKPLACE_SPEC, WORKPLACE_TAG, type WorkplaceRecord,
 } from './ties.js';

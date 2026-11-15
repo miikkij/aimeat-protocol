@@ -1,5 +1,5 @@
 /**
- * @file structure-snapshot.ts
+ * @file src/services/structure/snapshot.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Organism STRUCTURE TIMELINE — captures how an organism's shape changes over time. It
@@ -13,18 +13,18 @@
  *   - updateOrganismStructure(storage, config, orgId, { event?, actor? }) — record a snapshot iff changed
  *   - structureKey(orgId) — the trackable memory key
  * @usage
- *   import { updateOrganismStructure } from '../services/structure-snapshot.js';
+ *   import { updateOrganismStructure } from './snapshot.js';
  *   void updateOrganismStructure(storage, config, orgId, { event: 'workspace created', actor }).catch(()=>{});
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: structural fingerprint as a trackable key (Osa D2), timeline via D1.
  *   v1.1.0 — 2026-09-29 — The graph is collected with a system classification reader (TARGET-082).
  */
-import type { Storage } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { collectOrganismGraph, type OrganismGraph } from './structure-graph.js';
-import { stableStringify } from '../utils/stable-json.js';
-import { logger } from '../utils/logger.js';
-import { systemReader } from './classification/reader.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { collectOrganismGraph, type OrganismGraph } from './graph.js';
+import { stableStringify } from '../../utils/stable-json.js';
+import { logger } from '../../utils/logger.js';
+import { systemReader } from '../classification/reader.js';
 
 export function structureKey(orgId: string): string {
   return `organism.${orgId}.meta.structure`;

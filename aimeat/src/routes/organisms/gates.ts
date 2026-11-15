@@ -69,7 +69,7 @@ import { shouldGate, gatePolicyFromManifest, approverRoleFor, DEFAULT_ALWAYS_GAT
 import { readWorkspaceMetaRecord } from '../../services/workspace/meta.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
-import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { updateOrganismStructure } from '../../services/structure/snapshot.js';
 import { canReadWorkspace } from '../../services/workspace/access.js';
 import { readPublishSpace, resolveSpaceNamespace, type UndeclaredSpaceRefusal } from '../../services/workspace/write-items.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';

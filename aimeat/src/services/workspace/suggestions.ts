@@ -59,7 +59,7 @@ import {
 } from './change-core.js';
 import { applySectionOps, summarizeSectionOps, validateSectionOps, MAX_SECTION_OPS, type SectionOp, type Section } from './sections.js';
 import { emitChange } from '../event-bus.js';
-import { updateOrganismStructure } from '../structure-snapshot.js';
+import { updateOrganismStructure } from '../structure/snapshot.js';
 import { logger } from '../../utils/logger.js';
 import { attachedAsParticipant } from '../organism/agent-access.js';
 

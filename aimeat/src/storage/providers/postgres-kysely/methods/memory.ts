@@ -728,7 +728,7 @@ export const memoryMethods = {
 
   // THE ONE METHOD WHOSE RETURN TYPE CONTRADICTED THE INTERFACE. memory.repository.ts declares
   // `Promise<{ active, archived }>` and this returned `Promise<number>`, so on the production
-  // backend services/structure-overview.ts read `.archived` off a number and got `undefined` — no
+  // backend services/structure/overview.ts read `.archived` off a number and got `undefined` — no
   // throw, so its try/catch never fired — and the `active` half did not exist there at all. Review
   // item 5.1, 2026-09-06. FILTER is the Postgres spelling of the CASE sum the SQLite repo uses.
   async countArchivedByKeyPrefix(this: PostgresKyselyStorage, keyPrefix: string): Promise<{ active: number; archived: number }> {

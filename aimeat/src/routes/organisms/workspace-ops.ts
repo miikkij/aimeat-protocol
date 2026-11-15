@@ -114,7 +114,7 @@ import { activateEngagement, retireEngagement, listByWorkspace as listEngagement
 import { isKeyArchived } from '../../services/archive.js';
 import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, deleteRecordsBatchOp } from '../../services/workspace/tool-ops.js';
-import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { updateOrganismStructure } from '../../services/structure/snapshot.js';
 import { isOrgManager, canReadWorkspaceRecords } from '../../services/workspace/access.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';

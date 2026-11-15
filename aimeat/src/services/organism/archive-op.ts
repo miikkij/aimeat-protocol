@@ -11,7 +11,7 @@
  *   refused even when its owner is the creator; the target is valid for its level; a record or space
  *   of a fenced record space is archived for an agent only through one of the extensions it names
  *   (services/fenced-space.ts); then the archive itself (services/archive.ts), the organisms change
- *   event, and the organism timeline entry (services/structure-snapshot.ts).
+ *   event, and the organism timeline entry (services/structure/snapshot.ts).
  *
  *   The MCP tool decided the role from the owner's membership row alone and wrote no timeline entry
  *   until 2026-10-16, so an attached agent of the creator was allowed there and refused on REST.
@@ -38,7 +38,7 @@ import type { Storage } from '../../storage/interface.js';
 import { archiveTarget, unarchiveTarget, archiveRoleOf, archivedOwnersUnder, liveOwnersUnder, type ArchiveLevel, type ArchiveTarget } from '../archive.js';
 import { archiveWithinCeiling, flipWithinCeilings } from '../memory/ceilings.js';
 import { archiveFenceTarget, fencedSpaceRefusal } from '../fenced-space.js';
-import { updateOrganismStructure } from '../structure-snapshot.js';
+import { updateOrganismStructure } from '../structure/snapshot.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { isSameOwner } from '../../utils/gaii.js';

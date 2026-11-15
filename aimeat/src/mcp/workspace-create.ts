@@ -29,7 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { provisionWorkspace, WorkspaceProvisionError, WorkspaceMetaError } from '../services/workspace/provision.js';
-import { updateOrganismStructure } from '../services/structure-snapshot.js';
+import { updateOrganismStructure } from '../services/structure/snapshot.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

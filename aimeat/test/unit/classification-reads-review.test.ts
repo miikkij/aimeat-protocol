@@ -31,7 +31,7 @@ import { memoryTarget, fileTarget, setLabel, type LabelActor } from '../../src/s
 import { readerFor, readerForAgent } from '../../src/services/classification/reader.js';
 import { resetClassificationAudit, pendingClassificationAudit } from '../../src/services/classification/audit.js';
 import { loadWorkspaceContent } from '../../src/services/workspace/content.js';
-import { collectWorkspaceSummary } from '../../src/services/structure-overview.js';
+import { collectWorkspaceSummary } from '../../src/services/structure/overview.js';
 import { readWorkspaceOp } from '../../src/services/workspace/tool-ops.js';
 import { buildExtensionCtx } from '../../src/services/extension/ctx.js';
 import { readAttachments, type Ctx } from '../../src/services/refinery/pipeline.js';

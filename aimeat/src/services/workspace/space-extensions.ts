@@ -53,7 +53,7 @@
 import { localAccountName } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../schema-validator.js';
 import { emitChange } from '../event-bus.js';
-import { updateOrganismStructure } from '../structure-snapshot.js';
+import { updateOrganismStructure } from '../structure/snapshot.js';
 import { logger } from '../../utils/logger.js';
 import { findExtension } from '../component/address.js';
 import { archivedRefusal } from './write-guards.js';

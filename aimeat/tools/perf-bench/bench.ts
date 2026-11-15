@@ -37,7 +37,7 @@ import { checkMemoryQuota } from '../../src/services/quota.js';
 import { validateMemoryWrite } from '../../src/services/schema-validator.js';
 import { createMemoryDbService, createHomeDashboardService } from '../../src/services/db/index.js';
 import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
-import { collectWorkspaceSummary } from '../../src/services/structure-overview.js';
+import { collectWorkspaceSummary } from '../../src/services/structure/overview.js';
 import { loadConfig } from '../../src/config.js';
 
 const NODE = 'bench-node';

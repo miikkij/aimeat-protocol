@@ -48,7 +48,7 @@ import { suggestSpaces, suggestSectionOps, type SuggestionView } from './suggest
 import { findWorkspaceRegistration, type MemberChangeRule } from './meta.js';
 import { validateSections, diffSections, applySectionOps, type Section, type SectionOp } from './sections.js';
 import { emitChange } from '../event-bus.js';
-import { updateOrganismStructure } from '../structure-snapshot.js';
+import { updateOrganismStructure } from '../structure/snapshot.js';
 import { logger } from '../../utils/logger.js';
 
 export { isRefusal };

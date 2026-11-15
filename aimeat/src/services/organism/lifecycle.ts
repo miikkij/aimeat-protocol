@@ -81,7 +81,7 @@ import type { Storage, OrganismRecord, OrganismMembershipRecord, JoinRequestReco
 import { emitChange } from '../event-bus.js';
 import { recordPublicActivity } from '../public-activity.js';
 import { recordAccountEvent } from '../account/events.js';
-import { updateOrganismStructure } from '../structure-snapshot.js';
+import { updateOrganismStructure } from '../structure/snapshot.js';
 import { resolveShape, applyOrganismShape, type ShapedWorkspace, type ShapedWorkspaceFailure } from './shape-apply.js';
 import { getOrganismReadme, setOrganismReadme } from './readme.js';
 import { MEMBER_VISIBILITY_VALUES } from './privacy.js';

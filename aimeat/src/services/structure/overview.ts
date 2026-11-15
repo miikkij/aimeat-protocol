@@ -1,5 +1,5 @@
 /**
- * @file structure-overview.ts
+ * @file src/services/structure/overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Deterministic OKF-style (Open Knowledge Format) STRUCTURE OVERVIEW of an organism or a
@@ -19,7 +19,7 @@
  *   - buildWorkspaceOverview() — DEEP Markdown for one workspace
  *   - buildOrganismOverview() — SHALLOW Markdown for the whole organism
  * @usage
- *   import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
+ *   import { buildOrganismOverview, buildWorkspaceOverview } from './overview.js';
  *   const md = await buildOrganismOverview(storage, config, { orgId, viewerGaii });
  * @version-history
  *   v1.0.0 — 2026-06-13 — Initial: OKF-style organism + workspace structure overview (Markdown).
@@ -57,15 +57,15 @@
  *     a record whose id holds a dot is listed and counted under its whole id; it was left out
  *     (secaudit2026oct31w2 round 10b, dotted record ids).
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { localAccountOf } from '../utils/gaii.js';
-import { isMemoryBackedSpace } from './workspace/meta.js';
-import { loadWorkspaceContent } from './workspace/content.js';
-import type { ContentReader } from './classification/reader.js';
-import { isRecordsSource, evaluateRecordsKpi } from './kpi-rollup.js';
-import { spacePrefixesOf, spaceRowAt } from './workspace/record-key.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { localAccountOf } from '../../utils/gaii.js';
+import { isMemoryBackedSpace } from '../workspace/meta.js';
+import { loadWorkspaceContent } from '../workspace/content.js';
+import type { ContentReader } from '../classification/reader.js';
+import { isRecordsSource, evaluateRecordsKpi } from '../kpi-rollup.js';
+import { spacePrefixesOf, spaceRowAt } from '../workspace/record-key.js';
+import { logger } from '../../utils/logger.js';
 
 /** Recent entries listed per space in either overview. The total is always reported alongside. */
 export const MAX_ITEMS = 10;

@@ -1373,7 +1373,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/structure-snapshot.ts :: map :: structureLocks": {
+    "src/services/structure/snapshot.ts :: map :: structureLocks": {
       "count": 1,
       "reason": "DEBT"
     },

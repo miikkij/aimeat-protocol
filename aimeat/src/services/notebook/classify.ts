@@ -31,7 +31,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { stripCodeblock } from '../llm-strip.js';
-import { collectWorkspaceSummary } from '../structure-overview.js';
+import { collectWorkspaceSummary } from '../structure/overview.js';
 import type { ContentReader } from '../classification/reader.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './ai.js';
 import type { AiCallerContext } from '../ai/caller-context.js';

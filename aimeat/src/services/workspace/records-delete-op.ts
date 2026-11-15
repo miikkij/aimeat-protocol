@@ -25,7 +25,7 @@
 import { checkDeleteGuard } from '../write-guards.js';
 import { isSameOwner } from '../../utils/gaii.js';
 import { emitChange, emitWorkspaceChange, workspaceOfKey } from '../event-bus.js';
-import { updateOrganismStructure } from '../structure-snapshot.js';
+import { updateOrganismStructure } from '../structure/snapshot.js';
 import { logger } from '../../utils/logger.js';
 import { teamDeleteGate } from '../team/action-gate.js';
 import { checkOrganismNamespaceAccess } from '../organism/namespace-access.js';
