@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   2026-11-15 — Words only (Jouni's ruling): "four ways (the columns below)" and "an unattended run", not roads.
  *   2026-11-09 — ADDITIVE: the `ctx.changed({owners})` row.
  *   2026-11-08 — ADDITIVE: ctx.workspace.archiveRecords names the archived memory key limit and its
  *     QUOTA_EXCEEDED (secaudit2026nov08b round 15b).
@@ -236,7 +237,7 @@ function sandboxSection(): string {
     '',
     '### Which runs get which members',
     '',
-    'An action runs on one of four roads. A member the road cannot offer is ABSENT, and the guest sees',
+    'An action runs in one of four ways (the columns below). A member that way cannot offer is ABSENT, and the guest sees',
     '`undefined`. An unattended run (a schedule, a workflow step, an `on_done` action) has',
     '`ctx.caller.roles` = `[\'operator\']`.',
     '',
@@ -265,7 +266,7 @@ function sandboxSection(): string {
     '```',
     '',
     'On a request or a tool call you may still answer a refusal as data (`{ ok: false, reason }`) when',
-    'the caller is meant to read it. On the unattended roads, throw.',
+    'the caller is meant to read it. In an unattended run, throw.',
     '',
     '`ctx.workspace` exists only when your manifest declares it at the top level:',
     '`workspace: { read: true, write: true }` (read alone makes the writers throw PERMISSION). It acts',
