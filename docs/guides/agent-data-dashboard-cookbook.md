@@ -99,7 +99,7 @@ schedule, or data that must stay out of the browser. See
 
 ### 4.1 `manifest.yaml`
 
-The cortex manifest is validated strictly (`src/services/cortex-manifest.ts`);
+The cortex manifest is validated strictly (`src/services/cortex/manifest.ts`);
 the shape is the one in the stack guide §5.1.
 
 ```yaml

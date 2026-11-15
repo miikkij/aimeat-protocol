@@ -1,5 +1,5 @@
 /**
- * @file src/services/cortex-ontology-skos.ts
+ * @file src/services/cortex/ontology-skos.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Renders a cortex `ontology` component as a SKOS concept scheme, so what a cortex
@@ -18,12 +18,12 @@
  *   months ago keeps working and gains a second reading of itself for free.
  * @structure cortexOntologyToSkos(component, ontologyName) → a skos:ConceptScheme document
  * @usage
- *   import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
+ *   import { cortexOntologyToSkos } from './ontology-skos.js';
  * @version-history
  *   v1.0.0 — 2026-09-08 — Initial.
  */
-import type { CortexOntologyComponent } from '../storage/types/organisms-federation.js';
-import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
+import type { CortexOntologyComponent } from '../../storage/types/organisms-federation.js';
+import { DEFAULT_CONTEXT } from '../../utils/onto-context.js';
 
 /** One concept in the rendered scheme. Loose on purpose: this is a JSON-LD node, not a table row. */
 type SkosConcept = Record<string, unknown>;

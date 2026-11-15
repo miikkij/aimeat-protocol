@@ -1,12 +1,12 @@
 /**
- * @file cortex-manifest.ts
+ * @file src/services/cortex/manifest.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Parses and validates Cortex extension manifests (YAML): apiVersion/kind/metadata/spec,
  *   per-component validation (schema, prompt, action, board-template, ontology, seed-data, lib),
  *   static safety warnings for lib code, and namespace ownership checks.
  * @structure parseCortexManifest() entry point; validate*Component() per type; validateNamespaceOwnership().
- * @usage import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
+ * @usage import { parseCortexManifest, validateNamespaceOwnership } from './manifest.js';
  * @version-history
  *   v1.2.0 — 2026-09-13 — A lib component's `api_surface` that is not a string, and `exports` that is
  *     not a list of strings, are validation errors naming the field. A list-shaped api_surface threw
@@ -29,7 +29,7 @@ import type {
   CortexSeedDataComponent,
   CortexLibComponent,
   CortexActivationArtifacts,
-} from '../storage/interface.js';
+} from '../../storage/interface.js';
 
 // CJS-ESM interop: ajv and ajv-formats are CJS packages
 const require = createRequire(import.meta.url);

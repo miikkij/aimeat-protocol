@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The approved publish request for a cortex library: it becomes public, as the owner,
- *   through setCortexVisibility (services/cortex-visibility.ts), the write POST
+ *   through setCortexVisibility (services/cortex/visibility.ts), the write POST
  *   /v1/cortex/:name/visibility runs (plan doc-mvcn6c7e4e5q, V4).
  *
  *   THE OWNER APPROVED WHAT THEY SAW. The request carries the cortex's version and the digest of its
@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
-import { setCortexVisibility } from '../cortex-visibility.js';
+import { setCortexVisibility } from '../cortex/visibility.js';
 import { cortexContentDigest } from './content-digests.js';
 import { localAccountName } from '../../utils/gaii.js';
 

@@ -152,7 +152,7 @@ describe('names live in the owner\'s namespace, on every provider', () => {
     // secaudit2026oct26: a shipped cortex name is the node's own; with the bundled record missing, the
     // bare address reaches no account's namespaced copy of it, which its full address still reaches.
     it('the bare address of a shipped cortex name never falls back to an account\'s namespaced copy', async () => {
-        const { bundledCortexNames } = await import('../../src/services/cortex-seeder.js');
+        const { bundledCortexNames } = await import('../../src/services/cortex/seeder.js');
         const shipped = [...bundledCortexNames()][0]!;
         expect(shipped, 'the build ships at least one cortex').toBeTruthy();
         for (const { name, storage } of provs) {

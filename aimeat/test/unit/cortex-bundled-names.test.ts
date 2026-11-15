@@ -16,9 +16,9 @@
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect } from 'vitest';
-import { installCortex } from '../../src/services/cortex-lifecycle.js';
+import { installCortex } from '../../src/services/cortex/lifecycle.js';
 import { upsertCortex } from '../../src/services/cortex/upsert.js';
-import { seedBundledCortexes } from '../../src/services/cortex-seeder.js';
+import { seedBundledCortexes } from '../../src/services/cortex/seeder.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, CortexExtensionRecord } from '../../src/storage/interface.js';
 

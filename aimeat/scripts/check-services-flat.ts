@@ -57,7 +57,7 @@ export const PLACES: readonly Place[] = [
     label: 'src/services/',
     dir: 'src/services',
     matches: isSource,
-    baseline: 457,
+    baseline: 449,
     instead: 'a domain folder, src/services/<domain>/ (for example ai/, compliance/, workflow/ or classification/, or a new folder for a new domain)',
   },
   {

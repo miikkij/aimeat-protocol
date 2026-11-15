@@ -76,21 +76,21 @@ import { cortexCallerOf } from './cortex/caller.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex,
-} from '../services/cortex-lifecycle.js';
+} from '../services/cortex/lifecycle.js';
 import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
 import { upsertCortex } from '../services/cortex/upsert.js';
 import { cortexLibUrls } from '../services/cortex/lib-urls.js';
-import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
+import { cortexUploadOffer } from '../services/cortex/upload-offer.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { cortexDetail, cortexSource } from '../services/cortex-read.js';
+import { cortexDetail, cortexSource } from '../services/cortex/read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
-import { heldForRequest } from '../services/cortex-holder-change.js';
+import { heldForRequest } from '../services/cortex/holder-change.js';
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
 import { findCortex } from '../services/component-address.js';
-import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
+import { cortexOntologyToSkos } from '../services/cortex/ontology-skos.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { callerOf as requestCaller } from '../middleware/caller.js';
-import { cortexPublishAsk, fileCortexAsk, cortexAskedFields, setCortexVisibility } from '../services/cortex-visibility.js';
+import { cortexPublishAsk, fileCortexAsk, cortexAskedFields, setCortexVisibility } from '../services/cortex/visibility.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
@@ -102,7 +102,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
   /** Who is asking. In ./cortex/caller.ts, which says why a federated session is not the namesake. */
   const callerOf = (req: Parameters<typeof cortexCallerOf>[0]) => cortexCallerOf(req, config.nodeId, storage);
-  /** The caller the publish gate asks about (services/cortex-visibility.ts): the session, and an app grant's app. */
+  /** The caller the publish gate asks about (services/cortex/visibility.ts): the session, and an app grant's app. */
   const publishGateOf = (req: Request): PublishGateInput =>
     ({ caller: requestCaller(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) });
 
@@ -255,7 +255,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── GET /v1/cortex/:name — get extension details ──
   router.get('/v1/cortex/:name', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    // One 404 for "no such cortex" and "not yours to see" (services/cortex-read.ts), which
+    // One 404 for "no such cortex" and "not yours to see" (services/cortex/read.ts), which
     // aimeat_cortex_list answers with too.
     const out = await cortexDetail(storage, config, await callerOf(req), name);
     if (!out.ok) {
@@ -480,7 +480,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/cortex/:name/export', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     // Only the installing owner (or an operator) reads the source, so a non-owner cannot load
-    // someone else's extension into the editor to overwrite it (services/cortex-read.ts).
+    // someone else's extension into the editor to overwrite it (services/cortex/read.ts).
     const out = await cortexSource(storage, { ownerName: req.auth!.owner as string, isOperator: await isOperatorCaller(storage, req.auth) }, name);
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -513,7 +513,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     // An app that loaded this name from an earlier holder loads the new holder's library only after its
-    // owner allowed it (services/cortex-holder-change.ts).
+    // owner allowed it (services/cortex/holder-change.ts).
     if (await heldForRequest({ storage, config }, found.name, { origin: req.get('origin'), referer: req.get('referer') })) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND',
         `The library "${found.name}" now belongs to another account, and the owner of this app has not allowed it yet. The owner was asked with a notification.`));

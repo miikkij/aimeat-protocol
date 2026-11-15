@@ -1,5 +1,5 @@
 /**
- * @file src/services/cortex-read.ts
+ * @file src/services/cortex/read.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Reading one cortex extension: its details (GET /v1/cortex/:name) and its source, the
@@ -14,11 +14,11 @@
  *     The detail keeps `name` as the manifest gives it and adds `owner` and `full_name` (2026-10-26).
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { canSeeCortex, type CortexCaller } from './cortex-lifecycle.js';
-import { listVersions } from './component-versions.js';
-import { findCortex, withOwnerFields } from './component-address.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { canSeeCortex, type CortexCaller } from './lifecycle.js';
+import { listVersions } from '../component-versions.js';
+import { findCortex, withOwnerFields } from '../component-address.js';
 
 export interface CortexReadRefusal { ok: false; status: 403 | 404; code: 'NOT_FOUND' | 'FORBIDDEN'; message: string }
 

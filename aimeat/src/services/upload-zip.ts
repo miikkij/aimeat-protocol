@@ -34,7 +34,7 @@
 import yauzl from 'yauzl';
 import type { AimeatConfig } from '../config.js';
 import type { ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
-import { parseCortexManifest } from './cortex-manifest.js';
+import { parseCortexManifest } from './cortex/manifest.js';
 import { isUnsafeName } from './safe-zip.js';
 import { buildExtensionRecordFromManifest } from './extension/manifest.js';
 

@@ -1,10 +1,10 @@
 /**
- * @file src/services/cortex-visibility.ts
+ * @file src/services/cortex/visibility.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A cortex library's visibility and the publish gate in front of it (plan
  *   doc-mvcn6c7e4e5q, V4). A public cortex is listed and readable by every account on the node
- *   (canSeeCortex, services/cortex-lifecycle.ts): its manifest, prompts, ontology and component map.
+ *   (canSeeCortex, services/cortex/lifecycle.ts): its manifest, prompts, ontology and component map.
  *   It becomes public three ways: the manifest's own `metadata.visibility: public` on an install
  *   (POST /v1/cortex, aimeat_cortex_install, a cortex ZIP), the same on the create branch of the
  *   upsert (PUT /v1/cortex/:name, update:true, a ZIP under a new name), and POST
@@ -21,14 +21,14 @@
  * @version-history
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
-import { isRaiseToPublic } from './publish-gate.js';
-import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CortexExtensionRecord } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
+import { isRaiseToPublic } from '../publish-gate.js';
+import { publishAskOf, type PublishAsk } from '../publish-requests/ask.js';
 import {
   fileAskForDoor, type DoorAsk, type PublishGateInput, type PublishNotAsked, type PublishRequestedBody,
-} from './publish-requests/door.js';
+} from '../publish-requests/door.js';
 
 export type CortexGateAsk = Extract<PublishAsk, { kind: 'ask' | 'refused' }>;
 type Ctx = { storage: Storage; config: AimeatConfig };

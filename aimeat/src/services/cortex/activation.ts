@@ -55,7 +55,7 @@ import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '
 import { logger } from '../../utils/logger.js';
 import { idStemOf } from '../component-address.js';
 import { publicBoardCeiling, type BoardWriteRefusal } from '../board-write.js';
-import { cortexOntologyToSkos } from '../cortex-ontology-skos.js';
+import { cortexOntologyToSkos } from './ontology-skos.js';
 import { accountPrincipals } from '../db/owner-identity.js';
 import { schemaLockRefusal } from '../schema-lock-rule.js';
 import { isOwnersLock } from '../packages/compose/package-component-collisions.js';

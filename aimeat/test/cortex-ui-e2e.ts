@@ -127,7 +127,7 @@ await test('A second, ordinary owner exists — and is not an operator', async (
 // ── Phase 1: These five ship with the node, and a user cannot overwrite them ──
 //
 // The node seeds the bundled cortexes at boot under `system@<nodeId>`
-// (server-bootstrap/service-init.ts, services/cortex-seeder.ts), so by the time any owner exists
+// (server-bootstrap/service-init.ts, services/cortex/seeder.ts), so by the time any owner exists
 // the five records are already there and installed by nobody in particular.
 //
 // This phase used to accept "201 or 409" and that tolerance was hiding a hole. POST /v1/cortex
@@ -135,7 +135,7 @@ await test('A second, ordinary owner exists — and is not an operator', async (
 // name collision and produced the 409. So a plain owner could replace the JavaScript this node
 // serves to every browser under a bundled pack's name, and be told "conflict" after it had already
 // happened. That is the C-4 shape: a cortex upload overwriting served JavaScript that is not the
-// uploader's. It closed on 2026-08-11 when the install moved into services/cortex-lifecycle.ts,
+// uploader's. It closed on 2026-08-11 when the install moved into services/cortex/lifecycle.ts,
 // which asks who holds the name BEFORE writing anything, and on 2026-08-12 for the case that check
 // cannot see, where the name is claimed by boot seeding between the read and the write: the install
 // now creates the record first, so a collision refuses with no bytes written.

@@ -233,7 +233,7 @@ await test('A activates it, so the lib bytes are served (that is what makes an o
 // says nothing, so it is private. Until 2026-09-05 that decided nothing on a read: any signed-in
 // principal fetched its component map, prompts, ontology and activation artifacts by name, both
 // list doors returned it — the HTTP one on `?visibility=private`, the MCP one always — and a managed
-// prompt named it. The rule is canSeeCortex in services/cortex-lifecycle.ts, and every door here
+// prompt named it. The rule is canSeeCortex in services/cortex/lifecycle.ts, and every door here
 // calls it, which is why the HTTP reads and the MCP list are asserted in one place: they leaked
 // together and they must agree.
 //

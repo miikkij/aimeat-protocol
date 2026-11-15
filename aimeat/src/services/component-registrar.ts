@@ -100,7 +100,7 @@ import { publishApp } from './app/publish.js';
 import { putProgramMap } from './data-map/data-map-access.js';
 import { installPackageAppTools } from './packages/install/package-app-tools.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
-import { removeCortex } from './cortex-lifecycle.js';
+import { removeCortex } from './cortex/lifecycle.js';
 import { holdAppLabels } from './held-app-labels.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange/odps-write.js';
 import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './packages/install/package-memory-component.js';
@@ -381,7 +381,7 @@ export async function registerComponent(
           content: typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? ''),
         }));
         // What this registration writes, recorded as an activation records it, so the uninstall and
-        // every teardown find it (services/cortex-lifecycle.ts removeCortex).
+        // every teardown find it (services/cortex/lifecycle.ts removeCortex).
         const artifacts: CortexActivationArtifacts = {
           schemaKeys: [], promptKeys: [], actionIds: [], boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: Object.keys(libs),
         };
@@ -740,7 +740,7 @@ export async function deleteComponent(
         return deleted;
       }
       case 'cortex': {
-        // The one uninstall of a cortex (services/cortex-lifecycle.ts removeCortex): an active one is
+        // The one uninstall of a cortex (services/cortex/lifecycle.ts removeCortex): an active one is
         // taken down first, so the actions, boards, schema locks and prompts its activation made go
         // before the record does. The calling endpoint has checked that the caller owns the package;
         // the actor is that owner, under the account name and the GHII the package code paths pass here.

@@ -658,7 +658,7 @@ async function run() {
     });
 
     // CORTEX WAS THE SAME NAME COMPARISON, ON THE WRITE SIDE TOO. Every ownership question in
-    // services/cortex-lifecycle.ts is `ext.installedBy === caller.ownerName`, and callerOf() handed
+    // services/cortex/lifecycle.ts is `ext.installedBy === caller.ownerName`, and callerOf() handed
     // it the bare owner name of a federated session — so the visitor did not merely READ the local
     // namesake's private cortexes, they owned them: update, deactivate, delete, and the namespace.
     await test("The local namesake's private cortex is not the visitor's to read or to delete", async () => {

@@ -344,7 +344,7 @@ const value = await AIMEAT.data.getPublic('ext:name', key);
 ```
 
 The install is refused, naming the file, when a lib component has no bytes under `libs`
-(`libsWithoutContent` in `src/services/cortex-lifecycle.ts`).
+(`libsWithoutContent` in `src/services/cortex/lifecycle.ts`).
 
 ### 4. session.fetch returns the parsed envelope
 ```javascript
@@ -372,7 +372,7 @@ function t(key, translations) {
 
 ### 6. Activating an active cortex does nothing
 Activating a cortex that is already active returns `alreadyActive: true` and does not run
-activation again (`activateCortex` in `src/services/cortex-lifecycle.ts`). To ship new code, send
+activation again (`activateCortex` in `src/services/cortex/lifecycle.ts`). To ship new code, send
 the new manifest and libs to:
 ```
 PUT /v1/cortex/{name}
@@ -395,6 +395,6 @@ an active cortex (`upsertCortex` in `src/services/cortex/upsert.ts`). Over MCP, 
 | `src/services/extension/runtime.ts` (`transformScript`) | How an action script's `export default` is loaded |
 | `src/routes/memory/public-read.ts` (`registerPublicReadRoute`) | Public memory read route `GET /v1/memory/:gaii/:key` (no auth) |
 | `src/static/sdk-libs/data/index.js` (`get`, `getPublic`) | `AIMEAT.data.get()` with its creator fallback, and `AIMEAT.data.getPublic()` |
-| `src/services/cortex-lifecycle.ts` (`installCortex`, `activateCortex`) | Cortex install (expects the `libs` dict) and activate (no-op when already active) |
+| `src/services/cortex/lifecycle.ts` (`installCortex`, `activateCortex`) | Cortex install (expects the `libs` dict) and activate (no-op when already active) |
 | `src/services/cortex/upsert.ts` (`upsertCortex`) | `PUT /v1/cortex/:name`: redeploy in place, re-run activation |
 | `src/services/cortex/activation.ts` (`activateExtension`) | What an activation writes, `seed-data` included |

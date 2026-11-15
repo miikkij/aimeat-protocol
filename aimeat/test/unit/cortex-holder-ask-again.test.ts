@@ -2,7 +2,7 @@
  * @file test/unit/cortex-holder-ask-again.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description An app held from a cortex's new holder is never a dead end (services/cortex-holder-change.ts;
+ * @description An app held from a cortex's new holder is never a dead end (services/cortex/holder-change.ts;
  *   secaudit2026oct26 round 8c, rule 1): when its owner's question expired, the app's next library
  *   request files the question again; while a question waits, or a Don't allow stands, nothing more is
  *   filed; a refile happens at most once a day. Run on SQLite storage, with the node's record and the
@@ -18,7 +18,7 @@ import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, CortexExtensionRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { heldForRequest, askAgainIfDue, HOLDER_CHANGE_KEY, type CortexHolderChange } from '../../src/services/cortex-holder-change.js';
+import { heldForRequest, askAgainIfDue, HOLDER_CHANGE_KEY, type CortexHolderChange } from '../../src/services/cortex/holder-change.js';
 import { readPublishRequest, settlePublishRequest } from '../../src/services/publish-requests/store.js';
 
 const SQLITE_PATH = `./test/.cortex-holder-ask-${process.pid}.db`;

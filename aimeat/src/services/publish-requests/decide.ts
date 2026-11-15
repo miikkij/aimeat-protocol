@@ -96,7 +96,7 @@ async function accountFor(ctx: PublishStoreCtx, viewer: PublishViewer, account: 
 
 /**
  * The kinds whose Don't allow keeps something held back that the owner may later release by approving
- * the same request: an app held from a cortex's new holder (services/cortex-holder-change.ts). For
+ * the same request: an app held from a cortex's new holder (services/cortex/holder-change.ts). For
  * every other kind a decided request stays decided, as before.
  */
 const REVERSIBLE_KINDS: ReadonlySet<string> = new Set(['cortex-holder']);

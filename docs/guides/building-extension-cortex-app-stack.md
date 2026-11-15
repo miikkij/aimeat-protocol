@@ -331,7 +331,7 @@ curl -X POST https://node/v1/extensions/mytool/activate -H "Authorization: Beare
 ### 5.1 Spec (`manifest.yaml` for cortex)
 
 The cortex manifest is k8s-style and strictly validated (`parseCortexManifest` in
-`src/services/cortex-manifest.ts`): `apiVersion` must be exactly
+`src/services/cortex/manifest.ts`): `apiVersion` must be exactly
 `cortex.aimeat.org/v1`, `kind` must be `Extension`, `metadata.name` AND
 `metadata.namespace` are required, and libs are declared as `spec.components`
 entries of `type: lib`. `exports` + `api_surface` feed the capability aggregator —

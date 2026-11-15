@@ -111,6 +111,6 @@ assets/             (optional)
 | `src/mcp/apps-draft-edit.ts` | `aimeat_app_draft_write`, `_replace`, `_seed` and the draft read |
 | `src/mcp/core-storage.ts` | Dual-mode `aimeat_storage_upload` (mints through `mintStorageUploadUrl` in `src/services/storage-file-write.ts`) |
 | `src/mcp/extensions.ts` | Dual-mode `aimeat_extension_install` |
-| `src/mcp/cortex.ts` | Dual-mode `aimeat_cortex_install` (the offer is `cortexUploadOffer` in `src/services/cortex-upload-offer.ts`, shared with `POST /v1/cortex`) |
+| `src/mcp/cortex.ts` | Dual-mode `aimeat_cortex_install` (the offer is `cortexUploadOffer` in `src/services/cortex/upload-offer.ts`, shared with `POST /v1/cortex`) |
 | `src/mcp/skills.ts` | Dual-mode `aimeat_skill_publish` |
 | `src/mcp/themes.ts` | `aimeat_theme_font_save` (the upload URLs come from `src/services/themes/fonts.ts`) |

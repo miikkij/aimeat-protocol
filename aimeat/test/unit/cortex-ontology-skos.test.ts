@@ -4,7 +4,7 @@
  * straight rename — become real concepts rather than a list nothing can filter on.
  */
 import { describe, it, expect } from 'vitest';
-import { cortexOntologyToSkos } from '../../src/services/cortex-ontology-skos.js';
+import { cortexOntologyToSkos } from '../../src/services/cortex/ontology-skos.js';
 import { annotationErrors } from '../../src/utils/onto-context.js';
 import type { CortexOntologyComponent } from '../../src/storage/types/organisms-federation.js';
 

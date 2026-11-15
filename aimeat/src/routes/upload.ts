@@ -173,7 +173,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
-import { installCortex } from '../services/cortex-lifecycle.js';
+import { installCortex } from '../services/cortex/lifecycle.js';
 import { upsertCortex } from '../services/cortex/upsert.js';
 import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
 import { handleStorageUpload, declaredFromMeta, completeDirectStorageUpload } from './upload-storage.js';
@@ -198,7 +198,7 @@ import { receiveFontUpload } from '../services/themes/fonts.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 import { publishAskOf, type PublishAsk } from '../services/publish-requests/ask.js';
 import { uploadPrincipalRefusal } from '../services/upload-principal.js';
-import { cortexAskedFields } from '../services/cortex-visibility.js';
+import { cortexAskedFields } from '../services/cortex/visibility.js';
 import { carryFirstUseKeep } from '../services/extension/first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
 import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component-address.js';
@@ -697,7 +697,7 @@ async function handleCortexUpload(
         ? await findCortex(storage, incoming.name)
         : (await storage.getCortexExtension(incoming.name)) ?? await ownComponent(n => storage.getCortexExtension(n), ownerName, incoming.name);
 
-    // ── NEW NAME — services/cortex-lifecycle.ts, the same install POST /v1/cortex and the inline
+    // ── NEW NAME — services/cortex/lifecycle.ts, the same install POST /v1/cortex and the inline
     //    branch of aimeat_cortex_install run. It re-reads the manifest and applies the manifest and
     //    lib ceilings, the node's cortex ceiling, the namespace claim and the prior-owner check,
     //    every one of them before the first lib byte is written.

@@ -1,5 +1,5 @@
 /**
- * @file cortex-seeder.ts
+ * @file src/services/cortex/seeder.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Auto-installs bundled cortex extensions from public/cortex-bundled/ on server startup.
@@ -22,13 +22,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
-import { parseCortexManifest } from './cortex-manifest.js';
-import { recordSecurityIncident, SECURITY_INCIDENT_PREFIX, securityOwner } from './security-incident.js';
-import { logger } from '../utils/logger.js';
+import type { Storage, CortexExtensionRecord } from '../../storage/interface.js';
+import { parseCortexManifest } from './manifest.js';
+import { recordSecurityIncident, SECURITY_INCIDENT_PREFIX, securityOwner } from '../security-incident.js';
+import { logger } from '../../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BUNDLED_DIR = join(__dirname, '..', '..', 'public', 'cortex-bundled');
+const BUNDLED_DIR = join(__dirname, '..', '..', '..', 'public', 'cortex-bundled');
 
 let shipped: Set<string> | null = null;
 /** The cortex names this node ships: one per manifest in public/cortex-bundled. Read once. */

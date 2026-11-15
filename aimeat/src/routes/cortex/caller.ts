@@ -2,7 +2,7 @@
  * @file src/routes/cortex/caller.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Who is asking, as services/cortex-lifecycle.ts wants the question put. Extracted
+ * @description Who is asking, as services/cortex/lifecycle.ts wants the question put. Extracted
  *   from routes/cortex.ts (max-file-lines) when the federated-session answer below was written;
  *   the body moved unchanged and the route imports it.
  * @structure cortexCallerOf(req, nodeId, storage) → Promise<CortexCaller>
@@ -19,7 +19,7 @@
  *     account's name.
  */
 import type { Request } from 'express';
-import type { CortexCaller } from '../../services/cortex-lifecycle.js';
+import type { CortexCaller } from '../../services/cortex/lifecycle.js';
 import type { Storage } from '../../storage/interface.js';
 import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
 import { isOperatorCaller } from '../../services/operator-override.js';

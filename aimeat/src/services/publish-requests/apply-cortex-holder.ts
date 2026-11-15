@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner of apps that loaded a cortex library allowed them to load it from its new
- *   holder (services/cortex-holder-change.ts filed the question when the new holder installed the name
+ *   holder (services/cortex/holder-change.ts filed the question when the new holder installed the name
  *   an account erasure or the held-name settlement freed). The apps load the new holder's library from
  *   then on. A cortex removed since, held by another account, or installed again since the question
  *   ends the request `outdated`.
@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c, memory-b-08).
  */
 import { localAccountName } from '../../utils/gaii.js';
-import { allowHolderChange } from '../cortex-holder-change.js';
+import { allowHolderChange } from '../cortex/holder-change.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 export async function applyCortexHolder(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {

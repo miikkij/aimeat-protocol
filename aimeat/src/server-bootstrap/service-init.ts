@@ -150,7 +150,7 @@ import { seedDesignBook } from '../services/design-book/lifecycle.js';
 import { noticeFailingComponents } from '../services/design-book/component-notice.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { loadCatalog } from '../services/ai/catalog/store.js';
-import { seedBundledCortexes } from '../services/cortex-seeder.js';
+import { seedBundledCortexes } from '../services/cortex/seeder.js';
 import { seedBuiltinExtensions } from '../services/builtin-extension-seeder.js';
 import { seedExamplePackages } from '../services/packages/compose/package-seeder.js';
 import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';

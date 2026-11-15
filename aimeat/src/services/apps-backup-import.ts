@@ -33,9 +33,9 @@ import type { AimeatConfig } from '../config.js';
 import { safeUnzip, BACKUP_ZIP_LIMITS, type SafeZipLimits } from './safe-zip.js';
 import { APPS_BACKUP_VERSION } from './apps-backup-export.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
-import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
+import { parseCortexManifest, validateNamespaceOwnership } from './cortex/manifest.js';
 import { cortexInstallRefusal } from './install/quotas.js';
-import { libsWithoutContent, missingLibsMessage } from './cortex-lifecycle.js';
+import { libsWithoutContent, missingLibsMessage } from './cortex/lifecycle.js';
 import { managedIntakeForms } from './app/intake-forms.js';
 
 const APP_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;

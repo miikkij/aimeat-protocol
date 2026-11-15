@@ -62,25 +62,25 @@ import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
+import { cortexUploadOffer } from '../services/cortex/upload-offer.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex,
     type CortexCaller, type CortexRefusal,
-} from '../services/cortex-lifecycle.js';
+} from '../services/cortex/lifecycle.js';
 import { listVisibleCortexes } from '../services/cortex/cortex-list.js';
 import { upsertCortex } from '../services/cortex/upsert.js';
 import { cortexLibUrls } from '../services/cortex/lib-urls.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { cortexDetail, cortexSource } from '../services/cortex-read.js';
+import { cortexDetail, cortexSource } from '../services/cortex/read.js';
 import { toolError } from './tool-error.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
-import { cortexAskedFields } from '../services/cortex-visibility.js';
+import { cortexAskedFields } from '../services/cortex/visibility.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -111,7 +111,7 @@ export function registerCortexTools(
     const callerOwner = localAccountName(getAgentGaii());
 
     /**
-     * The caller as services/cortex-lifecycle.ts sees it.
+     * The caller as services/cortex/lifecycle.ts sees it.
      *
      * `isOperator` is false on the lifecycle three on purpose: an MCP session is an agent, and an
      * operator managing somebody else's cortex does it through the HTTP door. Install passes the
@@ -150,7 +150,7 @@ export function registerCortexTools(
             annotations: annotationsFor('aimeat_cortex_list'),
         },
         async ({ name, include_source, namespace, visibility }) => {
-            // One cortex: the same reads GET /v1/cortex/:name and its /export make (services/cortex-read.ts).
+            // One cortex: the same reads GET /v1/cortex/:name and its /export make (services/cortex/read.ts).
             if (name) {
                 // The two filters narrow the list; one named cortex has nothing to narrow.
                 if (namespace || visibility) {

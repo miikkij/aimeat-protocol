@@ -196,7 +196,7 @@ const DELEGATES: Record<string, string> = {
         + 'the instance record — the same line POST /v1/packages/:groupId/install reaches, since '
         + 'that route is a door onto the same function. Verified by reading the emit out of the '
         + 'service rather than trusting the delegation.',
-    'src/mcp/cortex.ts': "services/cortex-lifecycle.ts, which emits 'cortex'",
+    'src/mcp/cortex.ts': "services/cortex/lifecycle.ts, which emits 'cortex'",
     'src/mcp/extensions.ts': "services/extension/lifecycle.ts, which emits 'extensions'",
     'src/mcp/knowledge.ts': "services/knowledge/package-entry.ts, which emits 'knowledge'",
     'src/mcp/organisms-name-invites.ts': "services/invitations.ts, which emits 'organisms' and 'notifications'",

@@ -37,7 +37,7 @@ export type PublishKind =
   | 'goal-model-spend'
   // Extension code a package brought into an account that may not install extension code (services/extension/code-hold.ts).
   | 'extension-code'
-  // A cortex name's new holder, allowed by the owner of an app that loaded the earlier library (services/cortex-holder-change.ts).
+  // A cortex name's new holder, allowed by the owner of an app that loaded the earlier library (services/cortex/holder-change.ts).
   | 'cortex-holder'
   // An older accountant grant whose holder the node cannot place, asked of the client (finance/accountant-grant-ask.ts).
   | 'accountant-grant'

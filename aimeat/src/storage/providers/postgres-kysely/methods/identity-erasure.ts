@@ -260,7 +260,7 @@ export async function deleteInstalledCortexesDb(
   await db.deleteFrom('CortexExtension').where('installedBy', '=', name).where('name', 'in', names).execute();
   // Each bare name is written down as freed, under a pseudonym no account matches: it stays free for
   // the next install, and the apps that loaded this library ask their owner before they load the next
-  // holder's (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
+  // holder's (services/cortex/holder-change.ts; secaudit2026oct26 round 8c).
   const bare = names.filter(n => !n.includes('/'));
   if (bare.length) {
     const holder = `${FREED_RELEASE_PREFIX}${erasedPartyPseudonym()}`;

@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-09-13 — Initial: api_surface must be a string, exports a list of strings.
  */
 import { describe, it, expect } from 'vitest';
-import { parseCortexManifest } from '../../src/services/cortex-manifest.js';
+import { parseCortexManifest } from '../../src/services/cortex/manifest.js';
 
 function manifestWithLib(libFields: string[]): string {
     return [

@@ -1,5 +1,5 @@
 /**
- * @file src/services/cortex-upload-offer.ts
+ * @file src/services/cortex/upload-offer.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The presigned upload offer for a cortex ZIP: one upload URL the caller PUTs the ZIP
@@ -16,8 +16,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-05 — Moved out of src/mcp/cortex.ts (secaudit 2026-10, M3).
  */
-import type { AimeatConfig } from '../config.js';
-import { generateUploadToken } from './upload-token.js';
+import type { AimeatConfig } from '../../config.js';
+import { generateUploadToken } from '../upload-token.js';
 
 export interface CortexUploadOffer {
     mode: 'upload';

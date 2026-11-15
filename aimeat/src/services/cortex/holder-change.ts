@@ -1,5 +1,5 @@
 /**
- * @file src/services/cortex-holder-change.ts
+ * @file src/services/cortex/holder-change.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description When a bare cortex name changes holder, the apps that loaded the old holder's library
@@ -54,17 +54,17 @@
  *     a Don't allow is released by approving the same request later (coordinator, round 8c).
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c, memory-b-08).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CortexExtensionRecord, MemoryRecord } from '../storage/interface.js';
-import { isFreedRelease } from '../storage/types/component-versions.js';
-import { dependentsOf } from './dependency-map.js';
-import { resolveAppOriginTarget } from './app/origin-target.js';
-import { fileAsk, accountGhii } from './publish-requests/ask.js';
-import { readPublishRequest, effectiveState } from './publish-requests/store.js';
-import { askerKind } from './approval-standard.js';
-import { emitChange } from './event-bus.js';
-import { serialByKey } from '../utils/serial-by-key.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CortexExtensionRecord, MemoryRecord } from '../../storage/interface.js';
+import { isFreedRelease } from '../../storage/types/component-versions.js';
+import { dependentsOf } from '../dependency-map.js';
+import { resolveAppOriginTarget } from '../app/origin-target.js';
+import { fileAsk, accountGhii } from '../publish-requests/ask.js';
+import { readPublishRequest, effectiveState } from '../publish-requests/store.js';
+import { askerKind } from '../approval-standard.js';
+import { emitChange } from '../event-bus.js';
+import { serialByKey } from '../../utils/serial-by-key.js';
+import { logger } from '../../utils/logger.js';
 
 /** The node's record of one cortex name's holder change, under `system@<nodeId>`. */
 export const HOLDER_CHANGE_KEY = (name: string): string => `cortex.holder-change.${name}`;

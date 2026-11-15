@@ -1,5 +1,5 @@
 /**
- * @file src/services/cortex-lifecycle.ts
+ * @file src/services/cortex/lifecycle.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Installing, activating, deactivating and uninstalling a cortex extension. One
@@ -102,24 +102,24 @@
  *   v1.0.0 — 2026-08-11 — Extracted from routes/cortex.ts and mcp/cortex.ts (August 2026 audit
  *     step 8). The four differences above were what the extraction turned up.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../storage/interface.js';
-import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
-import { cortexInstallRefusal } from './install/quotas.js';
-import { emitChange } from './event-bus.js';
-import { activateExtension, activationRefusal, deactivateExtension, type CortexActor } from './cortex/activation.js';
-import { refreshCortexDependencies, forgetDependencies } from './dependency-map.js';
-import { snapshotCortexVersion, forgetVersions } from './component-versions.js';
-import { accountPrincipals } from './db/owner-identity.js';
-import { logger } from '../utils/logger.js';
-import { cortexPublishAsk, fileCortexAsk } from './cortex-visibility.js';
-import type { DoorAsk, PublishGateInput } from './publish-requests/door.js';
-import { accountGhii } from './publish-requests/ask.js';
-import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
-import { bundledCortexNames } from './cortex-seeder.js';
-import { placeCortexInstall, releaseBareName, settleReclaimed, findCortex } from './component-address.js';
-import { nodePrefixRefusal } from './component-name-prefix.js';
-import { noteCortexHolderChange } from './cortex-holder-change.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../../storage/interface.js';
+import { parseCortexManifest, validateNamespaceOwnership } from './manifest.js';
+import { cortexInstallRefusal } from '../install/quotas.js';
+import { emitChange } from '../event-bus.js';
+import { activateExtension, activationRefusal, deactivateExtension, type CortexActor } from './activation.js';
+import { refreshCortexDependencies, forgetDependencies } from '../dependency-map.js';
+import { snapshotCortexVersion, forgetVersions } from '../component-versions.js';
+import { accountPrincipals } from '../db/owner-identity.js';
+import { logger } from '../../utils/logger.js';
+import { cortexPublishAsk, fileCortexAsk } from './visibility.js';
+import type { DoorAsk, PublishGateInput } from '../publish-requests/door.js';
+import { accountGhii } from '../publish-requests/ask.js';
+import { settleRequestsForRemovedTarget } from '../publish-requests/store.js';
+import { bundledCortexNames } from './seeder.js';
+import { placeCortexInstall, releaseBareName, settleReclaimed, findCortex } from '../component-address.js';
+import { nodePrefixRefusal } from '../component-name-prefix.js';
+import { noteCortexHolderChange } from './holder-change.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -285,7 +285,7 @@ export async function installCortex(
     // Install publishes nothing, so it does not take the resolved identity.
     caller: Omit<CortexCaller, 'identity'>,
     /** `publishGate`: the door's caller. A manifest asking for `public` by one the node asks the owner
-     *  about installs the cortex private (services/cortex-visibility.ts). */
+     *  about installs the cortex private (services/cortex/visibility.ts). */
     input: { manifest: unknown; libs?: unknown; publishGate?: PublishGateInput },
 ): Promise<CortexOutcome<CortexInstallResult>> {
     const { storage, config } = deps;

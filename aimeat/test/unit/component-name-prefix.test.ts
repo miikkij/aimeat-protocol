@@ -15,9 +15,9 @@
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c).
  */
 import { describe, it, expect } from 'vitest';
-import { installCortex } from '../../src/services/cortex-lifecycle.js';
+import { installCortex } from '../../src/services/cortex/lifecycle.js';
 import { upsertCortex } from '../../src/services/cortex/upsert.js';
-import { bundledCortexNames } from '../../src/services/cortex-seeder.js';
+import { bundledCortexNames } from '../../src/services/cortex/seeder.js';
 import { BUILTIN_EXTENSIONS } from '../../src/data/builtin-extensions/index.js';
 import { nodePrefixRefusal, hasNodePrefix } from '../../src/services/component-name-prefix.js';
 import type { AimeatConfig } from '../../src/config.js';

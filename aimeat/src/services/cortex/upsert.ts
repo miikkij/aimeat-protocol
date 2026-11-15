@@ -57,16 +57,16 @@
  */
 import type { CortexExtensionRecord } from '../../storage/interface.js';
 import { emitChange } from '../event-bus.js';
-import { parseCortexManifest, validateNamespaceOwnership } from '../cortex-manifest.js';
+import { parseCortexManifest, validateNamespaceOwnership } from './manifest.js';
 import { cortexInstallRefusal } from '../install/quotas.js';
 import {
   libsWithoutContent, missingLibsMessage, reservedNameRefusal, type CortexCaller,
   type CortexDeps, type CortexOutcome, type CortexRefusal,
-} from '../cortex-lifecycle.js';
+} from './lifecycle.js';
 import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
 import { refreshCortexDependencies } from '../dependency-map.js';
 import { managedChangeRefusal } from '../packages/install/package-managed.js';
-import { cortexPublishAsk, fileCortexAsk } from '../cortex-visibility.js';
+import { cortexPublishAsk, fileCortexAsk } from './visibility.js';
 import type { DoorAsk, PublishGateInput } from '../publish-requests/door.js';
 import {
   snapshotCortexVersion, keptVersionRefusal, cortexCodeOf, cortexLibsAfterDeploy,
@@ -76,7 +76,7 @@ import {
   findCortex, ownComponent, placeCortexInstall, settleReclaimed, splitComponentAddress, shortNameOf,
 } from '../component-address.js';
 import { nodePrefixRefusal } from '../component-name-prefix.js';
-import { noteCortexHolderChange } from '../cortex-holder-change.js';
+import { noteCortexHolderChange } from './holder-change.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
 export type CortexUpsertResult =
@@ -209,7 +209,7 @@ export async function upsertCortex(
     // recorded and never served, it answered 201 and the app 404'd on the script.
     const missing = libsWithoutContent(parsed.components, newLibs);
     if (missing.length) return upsertRefusal(400, 'INVALID_MANIFEST', missingLibsMessage(missing));
-    // The publish gate, as installCortex asks it (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
+    // The publish gate, as installCortex asks it (services/cortex/visibility.ts; plan doc-mvcn6c7e4e5q, V4).
     const ask = cortexPublishAsk(deps, input.publishGate, undefined, parsed.visibility);
     if (ask?.kind === 'refused') return upsertRefusal(ask.status, ask.code, ask.message);
     if (ask) parsed.visibility = 'private';

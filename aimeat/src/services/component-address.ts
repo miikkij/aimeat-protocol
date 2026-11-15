@@ -55,7 +55,7 @@
  */
 import type { Storage, ExtensionRecord, CortexExtensionRecord, CapabilityRecord } from '../storage/interface.js';
 import { isFreedRelease, type ComponentKind } from '../storage/types/component-versions.js';
-import { bundledCortexNames } from './cortex-seeder.js';
+import { bundledCortexNames } from './cortex/seeder.js';
 
 /** The namespace of what the node ships: bundled cortexes (system@<node>) and built-in extensions (system). */
 export const SYSTEM_NAMESPACE = 'system';
@@ -101,7 +101,7 @@ export type BareNameReading = 'call' | 'manage';
  * double of the storage interface) has none, so every rule reads as for a name never released. A row
  * an account erasure or the held-name settlement wrote (isFreedRelease) records only that the holder
  * changed: the name stays free for the next install, as it was before the row existed, and the apps
- * that loaded it ask their owner first (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
+ * that loaded it ask their owner first (services/cortex/holder-change.ts; secaudit2026oct26 round 8c).
  */
 async function releasedName(storage: Storage, kind: ComponentKind, name: string): Promise<{ holder: string } | null> {
   const row = typeof storage.getReleasedComponentName === 'function' ? await storage.getReleasedComponentName(kind, name) : null;
