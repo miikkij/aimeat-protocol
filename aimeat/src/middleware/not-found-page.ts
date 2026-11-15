@@ -25,6 +25,10 @@
  * @structure sendNotFound(req, res, config, body) · notFoundPageHtml(locale, baseUrl) (exported for the test)
  * @usage sendNotFound(req, res, config, error(config.nodeId, 'NOT_FOUND', 'Unknown subdomain'));
  * @version-history
+ *   v1.0.1 — 2026-11-15 — A path ending in a static asset's extension (.js, .css, .map, an image, a
+ *     font) gets the JSON 404 even when the caller ranks text/html first: a missing script or source
+ *     map is not a page (e2e-search-visibility, nightly 43705345234). An app's .html address still
+ *     gets the page.
  *   v1.0.0 — 2026-11-09 — Initial: the subdomain, portfolio, company and app-path 404s and the
  *     fallback 404 answer a browser with the page.
  */
@@ -41,6 +45,9 @@ import { resolveAssetDir } from '../server-bootstrap/asset-dirs.js';
 import { logger } from '../utils/logger.js';
 
 const PAGE_FILE = 'not-found.html';
+
+/** A path that names a static asset rather than a page. A crawler asks for these with `Accept: text/html,*\/*` too. */
+const STATIC_ASSET = /\.(?:m?js|map|css|json|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|wasm|txt|xml)$/i;
 
 /** The template, read once. Null when the package shipped without public/, and then JSON is sent. */
 // process-local: nothing breaks; it is a copy of a file shipped with the code, read once per process.
@@ -82,7 +89,7 @@ export function notFoundPageHtml(locale: Locale, baseUrl: string): string | null
  */
 export function sendNotFound(req: Request, res: Response, config: AimeatConfig, body: AimeatResponse): void {
   res.vary('Accept');
-  if ((req.method === 'GET' || req.method === 'HEAD') && prefersHtmlPage(req)) {
+  if ((req.method === 'GET' || req.method === 'HEAD') && !STATIC_ASSET.test(req.path) && prefersHtmlPage(req)) {
     const html = notFoundPageHtml(servedPageLocale(req, config.siteLinks?.defaultLocale), config.baseUrl);
     if (html !== null) {
       res.setHeader('Cache-Control', 'no-store');
