@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.3.1 (commit 776f8fa94) on 2026-11-15. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.3.1 (commit ab9424c16) on 2026-11-15. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -116,6 +116,7 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The per-owner ceiling of queued AI jobs, the extension run slots, and the daily mail count per sender (`email.reports_per_sender_day`) | Each process counts on its own, so N active processes allow N times each limit | Run one active process | `aimeat/src/services/ai-jobs/service.ts`, `aimeat/src/services/extension/run-slots.ts`, `aimeat/src/services/mail-gate.ts` |
 | An incoming webhook's per-minute and per-day message limits, its count of wrong API keys for the security incident, and its delivery log entries not yet written (at most 5 s) | Each process counts on its own, so N active processes allow N times each incoming webhook's limits, and the incident for wrong API keys may need more wrong API keys in total; a process that stops loses its last seconds of log entries, never the data the webhook wrote | Run one active process, or set each incoming webhook's limits divided by the number of processes | `aimeat/src/services/receivers/deliveries.ts`, `aimeat/src/services/receivers/verify.ts` |
 | Whether the chat agent starts: before the chat page says the chat can answer, the process starts its chat agent once and keeps the result, 30 minutes when it started and one minute when it did not | Each process checks its own agent. A host without the agent program, or with a broken one, shows the chat as out of use while another host's chat works, so the same person can see both on two page loads | Install the same chat agent program (`AIMEAT_GOOSE_BIN`) at the same path on every host | `aimeat/src/services/chat/agent-health.ts` |
+| The SIEM export: its syslog socket or connection and the OTLP events not yet sent (at most one second) | Each process sends the security events it saw itself, so the SIEM receives events from every process; a process that stops loses its last second of OTLP events | Set the same `AIMEAT_SIEM_SYSLOG` or `AIMEAT_SIEM_OTLP_URL` on every process, and let the SIEM name the sending host | `aimeat/src/services/node-admin/siem-export.ts` |
 
 Where the code's own notes still say "a node runs one process", they describe one of the rows above: the AI key hold is "per process, like every limiter here: a node runs one process" (`aimeat/src/services/ai/node-key-hold.ts`).
 

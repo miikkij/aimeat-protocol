@@ -16,29 +16,15 @@
  * @structure t01..t15 in order; each later test reads what the earlier ones made.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=team-governance
  * @version-history
+ *   v1.2.0 — 2026-11-15 — On the shared harness (test/helpers/harness.ts) instead of its own copies.
  *   v1.1.0 — 2026-11-15 — T19 (t05..t09) and T7 (t10..t15); renamed from e2e-team-admin.ts.
  *   v1.0.0 — 2026-11-15 — Initial (wish-tiimipaketti-viisi-syyt-valita-aimeat-nopeasti-k-ytt-n, T16).
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
+import { BASE, assert, finish, json, test } from './helpers/harness.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!';
-let passed = 0, failed = 0;
-async function test(name: string, fn: () => Promise<void>) {
-    try { await fn(); passed++; console.log(`  ✅ ${name}`); }
-    catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
-}
-function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-
-async function json(path: string, opts: RequestInit = {}) {
-    for (let i = 0; ; i++) {
-        const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-        if (res.status === 429 && i < 5) { await new Promise(r => setTimeout(r, 1000 * (i + 1))); continue; }
-        const ct = res.headers.get('content-type') ?? '';
-        return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
-    }
-}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 const stamp = Date.now().toString(36).slice(-5);
@@ -343,5 +329,4 @@ await test('t22 refusals: an outsider cannot record it, an agent without organis
     assert(ro.status === 403, `read-only agent ${ro.status}`);
 });
 
-console.log(`\n${passed} passed, ${failed} failed\n`);
-process.exit(failed ? 1 : 0);
+finish();
