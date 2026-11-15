@@ -10,6 +10,7 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-11-15 — Audit L024, L025, L026: llms.txt names this app and not its sibling, scopes_supported is exactly the declared set, the gated app's mcp.json is checked on the raw body.
  *   2026-11-10 — An app origin serves /sw-offline.js, the worker of an app that opens with no
  *     connection, beside the unchanged /sw.js; the apex serves none; the library that registers it
  *     is served.
@@ -339,8 +340,9 @@ async function main() {
             // habitually tries /llms.txt to the wrong manual, which is worse than a 404.
             assert(!body.includes('{{LIBRARY_PACKS_TABLE}}') && !/Client SDK Libraries/i.test(body),
                 'it is not the node-wide builder guide');
-            assert(body.includes(filename) || body.includes(owner),
-                `it names the app or its owner: ${body.slice(0, 160)}`);
+            // Named by its filename, and the owner's other app is not: one per-owner document fails here.
+            assert(body.includes(filename), `it names the app: ${body.slice(0, 160)}`);
+            assert(!body.includes(sibFile), `it names the owner's other app too: ${body.slice(0, 160)}`);
         });
 
         // ── Installable app: the per-app manifest is the app's own, and the emoji icon is
@@ -737,7 +739,8 @@ async function main() {
         await test('its scopes_supported are the ones the app itself declares', async () => {
             const body = (await onAppOrigin('/.well-known/oauth-protected-resource', SUB)).json<any>();
             const scopes: string[] = body.scopes_supported ?? [];
-            assert(scopes.includes('memory:read') && scopes.includes('ai:use'),
+            // Exactly the declared set: a superset advertises authority the app never asked for.
+            assert(JSON.stringify([...scopes].sort()) === JSON.stringify(['ai:use', 'memory:read']),
                 `expected the app's <meta name="aimeat-scopes">, got: ${JSON.stringify(scopes)}`);
         });
 
@@ -985,11 +988,11 @@ async function main() {
             // as they did before a gated app could be served on this origin.
             const llms = await onAppOrigin(`/llms.txt${grantQuery}`, GATED_SUB);
             assert(!llms.body.includes(`${owner}/${gatedFile}`), `llms.txt names the gated app: ${llms.body.slice(0, 160)}`);
+            // The raw body, so a changed card shape or a non-JSON answer cannot excuse a mention.
             const card = await onAppOrigin(`/.well-known/mcp.json${grantQuery}`, GATED_SUB);
-            let described: string | undefined;
-            try { described = card.json<{ app?: { app_id?: string } }>().app?.app_id; }
-            catch (err) { console.log(`     (mcp.json was not JSON, which is also not the app card: ${String(err).slice(0, 60)})`); }
-            assert(described !== gatedFile, 'the MCP server card must not describe a gated app');
+            // Audit L026: the raw card names no gated app, and it is the node's own card.
+            assert(!card.body.includes(gatedFile), `the MCP server card names a gated app: ${card.body.slice(0, 200)}`);
+            assert(card.status === 200 && card.json<{ name?: string }>().name === `io.aimeat/${NODE_ID}`, `the card is the node's: ${card.status} ${card.body.slice(0, 120)}`);
             // The install files follow who may open it (2026-11-15; this was red against the 404 for all):
             // the grant cookie gets the manifest and icon, cached privately; no grant gets the uniform 404.
             for (const p of ['/manifest.webmanifest', '/icon.svg']) {

@@ -20,6 +20,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-warn-only-scopes
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, warn-only-drops-sole-gate-on-outside-wildcard-tools).
+ *   2026-11-15 — Audit M115: a memory:read agent is refused aimeat_extension_install and nothing is installed.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -106,6 +107,18 @@ try {
         }
         const v = await callTool(await openSession(BASE, vault.token, 'warn-vault-check'), 'aimeat_secret_list', {});
         assert(!v.isError && JSON.stringify(v.data).includes(SECRET), `the secret is still there: ${v.text.slice(0, 200)}`);
+    });
+
+    await test('REFUSED: an agent on memory:read alone cannot install extension code, and nothing is installed', async () => {
+        // The registration filter answers on a warn-only node, so the check in the
+        // aimeat_extension_install handler (mcp/extensions.ts, canManageExtensionAs) is the only gate.
+        const name = `warnext-${TAG}`;
+        const manifest = `metadata:\n  name: ${name}\n  version: 1.0.0\n  description: warn-only install refusal\n  author: e2e-test\nactions:\n  - id: echo\n    method: POST\n    path: /echo\n    script: echo\n    input:\n      type: object\n    output:\n      type: object\nlimits:\n  memory_mb: 16\n  timeout_ms: 5000\n  max_api_calls: 5\n`;
+        const s = await openSession(BASE, narrow.token, 'warn-narrow-ext');
+        const r = await callTool(s, 'aimeat_extension_install', { manifest, scripts: { echo: 'export default async function() { return { ok: true }; }' } });
+        assert(r.isError && /ext:write/.test(r.text), `aimeat_extension_install answered on a warn-only node: ${r.text.slice(0, 200)}`);
+        const got = await json(`/v1/extensions/${name}`, { headers: bearer(owner.token) });
+        assert(got.status === 404 && got.body?.error?.code === 'NOT_FOUND', `the refused extension exists: ${got.status} ${JSON.stringify(got.body).slice(0, 200)}`);
     });
 
     await test('KEPT: an agent holding the exact words uses the vault and the access overview', async () => {

@@ -3,6 +3,7 @@
  * @description E2E tests for MCP extensions module — 2 tools + 1 resource.
  *   Tests extension listing, action invocation, and the extension details resource.
  * @version-history
+ *   2026-11-15 — Audit L073: test 3b, aimeat_extension_list leaves out an installed inactive extension.
  *   v1.5.0 — 2026-10-20 — Test 22b: aimeat_extension_unattended_reader names the agent that installed
  *     the extension and the address the person changes the setting at, and refuses another owner's
  *     agent without leaking an agent name (Jouni, 2026-10-20).
@@ -318,7 +319,7 @@ await test('2. aimeat_extension_list returns empty array when no active extensio
     assert(body.result?.content?.[0]?.text !== undefined, 'has content');
     const result = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(result), 'result is array');
-    // May have 0 or more extensions from other tests, just check it's an array of active ones
+    assert(!result.some((e: any) => e.name === extName), `"${extName}" listed before it was installed`);
 });
 
 // ─── Phase 3: Install + activate extension via REST, then use MCP ───
@@ -333,6 +334,12 @@ await test('3. Install extension via REST', async () => {
     assert(status === 201, `install status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.extension.name === extName, `name: ${body.data.extension.name}`);
     assert(body.data.extension.status === 'inactive', `status: ${body.data.extension.status}`);
+});
+
+await test('3b. aimeat_extension_list leaves out the installed extension while it is inactive', async () => {
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_extension_list', arguments: {} }, 1011);
+    const result = JSON.parse(body.result.content[0].text);
+    assert(Array.isArray(result) && !result.some((e: any) => e.name === extName), `inactive "${extName}" is listed: ${body.result.content[0].text.slice(0, 300)}`);
 });
 
 await test('4. Activate extension via REST', async () => {
